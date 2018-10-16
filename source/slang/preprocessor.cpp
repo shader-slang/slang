@@ -838,8 +838,7 @@ top:
         SourceManager* sourceManager = preprocessor->getCompileRequest()->getSourceManager();
 
         // We create a dummy file to represent the token-paste operation
-        PathInfo pathInfo;
-        pathInfo.foundPath = "token paste";
+        PathInfo pathInfo = PathInfo::makeTokenPaste();
        
         SourceFile* sourceFile = sourceManager->createSourceFile(pathInfo, sb.ProduceString());
 
@@ -1627,7 +1626,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
     // See if this an already loaded source file
-    SourceFile* sourceFile = sourceManager->findSourceFile(filePathInfo.canonicalPath);
+    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {

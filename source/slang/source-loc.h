@@ -40,6 +40,24 @@ interpretation for that lex/parse.
 
 struct PathInfo
 {
+        /// To be more rigorous about where a path comes from, the type identifies what a paths origin is
+    enum class Type
+    {
+        Unknown,                    ///< The path is not known
+        Normal,                     ///< Normal has both path and canonical path
+        FoundPath,                  ///< Just has a found path (canonical path is unknown, or even 'unknowable') 
+        TokenPaste,                 ///< No paths, just created to do a macro expansion
+        TypeParse,                  ///< No path, just created to do a type parse
+    };
+
+    // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
+    static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown" }; }
+    static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste" }; }
+    static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
+    static PathInfo makeFoundPath(const String& foundPathIn) { return PathInfo { Type::FoundPath, foundPathIn }; }
+    static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string" };}
+
+    Type type;                      ///< The type of path
     String foundPath;               ///< The path where the file was found (might contain relative elements)
     String canonicalPath;           ///< Canonical version of the found path
 };
@@ -258,7 +276,9 @@ struct SourceManager
 
         /// Searches this manager, and then the parent to see if can find a match for path. 
         /// If not found returns nullptr.    
-    SourceFile* findSourceFile(const String& canonicalPath);
+    SourceFile* findSourceFileRecursively(const String& canonicalPath) const;
+        /// Find if the source file is defined on this manager.
+    SourceFile* findSourceFile(const String& canonicalPath) const;
 
         /// Add a source file, path must be unique for this manager AND any parents
     void addSourceFile(const String& canonicalPath, SourceFile* sourceFile);

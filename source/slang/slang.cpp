@@ -119,6 +119,7 @@ struct IncludeHandlerImpl : IncludeHandler
         String canonicalPath(getString(canonicalPathBlob));
         SLANG_ASSERT(File::Exists(canonicalPath));
 
+        pathInfoOut.type = PathInfo::Type::Normal;
         pathInfoOut.foundPath = relPath;
         pathInfoOut.canonicalPath = canonicalPath;
         return SLANG_OK;     
@@ -129,6 +130,8 @@ struct IncludeHandlerImpl : IncludeHandler
         String const& pathIncludedFrom,
         PathInfo& pathInfoOut) override
     {
+        pathInfoOut.type = PathInfo::Type::Unknown;
+
         // Try just relative to current path
         {
             SlangResult res = _findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
@@ -431,10 +434,7 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
     SourceManager localSourceManager;
     localSourceManager.initialize(sourceManager);
         
-    PathInfo pathInfo;
-    pathInfo.foundPath = "type string";
-
-    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(pathInfo, typeStr));
+    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(PathInfo::makeTypeParse(), typeStr));
     
     // We'll use a temporary diagnostic sink  
     DiagnosticSink sink;
@@ -764,9 +764,7 @@ void CompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    PathInfo pathInfo;
-    pathInfo.foundPath = path;
-
+    PathInfo pathInfo = PathInfo::makeFoundPath(path);
     RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, sourceBlob);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
@@ -777,9 +775,7 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    PathInfo pathInfo;
-    pathInfo.foundPath = path;
-
+    PathInfo pathInfo = PathInfo::makeFoundPath(path);
     RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, source);
 
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);

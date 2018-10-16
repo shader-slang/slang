@@ -149,11 +149,8 @@ PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
     }
     else
     {
-        PathInfo pathInfo;
-        pathInfo.foundPath = m_sourceManager->getStringSlicePool().getSlice(pathHandle);
-        // NOTE! Currently we don't set canonical path -> because a 'canonical path' is not assoicated with an #line directive, and may be impossible
-        // to determine
-        return pathInfo;
+        // We don't have a full normal path (including 'canonical') so just go with FoundPath
+        return PathInfo::makeFoundPath(m_sourceManager->getStringSlicePool().getSlice(pathHandle));
     }
 }
 
@@ -388,13 +385,12 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     const SourceManager* manager = this;
     do 
     {
-        SourceView* sourceView = findSourceView(loc);
+        SourceView* sourceView = manager->findSourceView(loc);
         // If we found a hit we are done
         if (sourceView)
         {
             return sourceView;
         }
-        
         // Try the parent
         manager = manager->m_parent;
     }
@@ -403,19 +399,30 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     return nullptr;
 }
 
-SourceFile* SourceManager::findSourceFile(const String& canonicalPath)
+SourceFile* SourceManager::findSourceFile(const String& canonicalPath) const
 {
     RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(canonicalPath);
-    if (filePtr)
+    return (filePtr) ? filePtr->Ptr() : nullptr;
+}
+
+SourceFile* SourceManager::findSourceFileRecursively(const String& canonicalPath) const
+{
+    const SourceManager* manager = this;
+    do 
     {
-        return filePtr->Ptr();
-    }
-    return m_parent ? m_parent->findSourceFile(canonicalPath) : nullptr;
+        SourceFile* sourceFile = manager->findSourceFile(canonicalPath);
+        if (sourceFile)
+        {
+            return sourceFile;
+        }
+        manager = manager->m_parent;
+    } while (manager);
+    return nullptr;
 }
 
 void SourceManager::addSourceFile(const String& canonicalPath, SourceFile* sourceFile)
 {
-    SLANG_ASSERT(!findSourceFile(canonicalPath));
+    SLANG_ASSERT(!findSourceFileRecursively(canonicalPath));
     m_sourceFiles.Add(canonicalPath, sourceFile);
 }
 
@@ -441,11 +448,7 @@ PathInfo SourceManager::getPathInfo(SourceLoc loc, SourceLocType type)
     }
     else
     {
-        PathInfo pathInfo;
-        pathInfo.foundPath = "unknown";
-        // Canonical path is not defined
-
-        return pathInfo;
+        return PathInfo::makeUnknown();
     }
 }
 
