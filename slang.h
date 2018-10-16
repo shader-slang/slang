@@ -663,18 +663,26 @@ extern "C"
     Slang can make use of this interface whenever it would otherwise try to load files
     from disk, allowing applications to hook and/or override filesystem access from
     the compiler.
+
+    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
+    Blobs that contain strings are always zero terminated. It is the responsibility of 
+    the caller of any method that returns a ISlangBlob to release the blob when it is no 
+    longer used (using 'release').
     */
     struct ISlangFileSystem : public ISlangUnknown
     {
     public:
-        /** Get a canonical path - a path that uniquely identifies a file 
+        /** Get a canonical path - that uniquely identifies an object of the file system.
         
-        Given a path, returns a 'canonical' path which will return the same path for the same file. 
-        It is the canonical path that is used to compare if two includes are the same. 
+        Given a path, returns a 'canonical' path which will return the same path for the same file/directory. 
+        The canonical path is used to compare if two includes are the same file. 
+        The string for the canonical path is held zero terminated in the ISlangBlob of canonicalPathOut. 
+        
+        The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param path
         @param canonicalPathOut
-        @returns A `SlangResult` to indicate success or failure in loading the file.
+        @returns A `SlangResult` to indicate success or failure getting the canonical path.
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
             const char* path,
@@ -682,16 +690,19 @@ extern "C"
 
         /** Get a path relative to a 'from' path.
 
-        @param fromPathType How to interpret the from path
-        @param fromPath The from path, must be null ptr if SLANG_PATH_NONE, must be set otherwise. 
+        The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+        @param fromPathType How to interpret the from path - as a file or a directory.
+        @param fromPath The from path. 
         @param path Path to be determined relative to the fromPath
+        @param pathOut Holds the string which is the relative path. The string is held in the blob zero terminated.  
         @returns A `SlangResult` to indicate success or failure in loading the file.
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
             SlangPathType fromPathType,
             const char* fromPath,
             const char* path,
-            ISlangBlob** pathOutUnk) = 0;
+            ISlangBlob** pathOut) = 0;
             
         /** Load a file from `path` and return a blob of its contents
 
