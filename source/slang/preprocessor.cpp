@@ -1881,8 +1881,13 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     auto directiveLoc = GetDirectiveLoc(context);
     auto issuedFromPathInfo = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPathInfo(directiveLoc, SourceLocType::Actual);
 
-    // Must be set
-    SLANG_ASSERT(issuedFromPathInfo.canonicalPath.Length() > 0);
+    // Must have a canonical path for a #pragma once to work
+    if (!issuedFromPathInfo.hasCanonicalPath())
+    {
+        GetSink(context)->diagnose(subDirectiveToken, Diagnostics::pragmaOnceIgnored);
+        return;
+    }
+
     context->preprocessor->pragmaOncePaths.Add(issuedFromPathInfo.canonicalPath);
 }
 

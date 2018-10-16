@@ -138,6 +138,7 @@ DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of argumen
 // 156xx - pragmas
 DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")
 DIAGNOSTIC(15601, Warning, unknownPragmaDirectiveIgnored, "ignoring unknown directive '#pragma $0'")
+DIAGNOSTIC(15602, Warning, pragmaOnceIgnored, "pragma once was ignored - this is typically because it is in a tranlation unit, or a macro, not in an include")
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")

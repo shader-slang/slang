@@ -50,11 +50,16 @@ struct PathInfo
         TypeParse,                  ///< No path, just created to do a type parse
     };
 
+        /// True if has a canonical path
+    SLANG_FORCE_INLINE bool hasCanonicalPath() const { return type == Type::Normal; }
+        /// True if has a regular found path
+    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath; }
+
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown" }; }
     static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste" }; }
-    static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
-    static PathInfo makeFoundPath(const String& foundPathIn) { return PathInfo { Type::FoundPath, foundPathIn }; }
+    static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { SLANG_ASSERT(canonicalPathIn.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
+    static PathInfo makeFoundPath(const String& foundPathIn) { SLANG_ASSERT(foundPathIn.Length() > 0); return PathInfo { Type::FoundPath, foundPathIn }; }
     static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string" };}
 
     Type type;                      ///< The type of path
