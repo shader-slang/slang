@@ -175,13 +175,13 @@
     <ClInclude Include="compiler.h" />
     <ClInclude Include="core.meta.slang.h" />
     <ClInclude Include="decl-defs.h" />
+    <ClInclude Include="default-file-system.h" />
     <ClInclude Include="diagnostic-defs.h" />
     <ClInclude Include="diagnostics.h" />
     <ClInclude Include="emit.h" />
     <ClInclude Include="expr-defs.h" />
     <ClInclude Include="glsl.meta.slang.h" />
     <ClInclude Include="hlsl.meta.slang.h" />
-    <ClInclude Include="include-file-system.h" />
     <ClInclude Include="ir-constexpr.h" />
     <ClInclude Include="ir-dominators.h" />
     <ClInclude Include="ir-inst-defs.h" />
@@ -228,10 +228,10 @@
     <ClCompile Include="bytecode.cpp" />
     <ClCompile Include="check.cpp" />
     <ClCompile Include="compiler.cpp" />
+    <ClCompile Include="default-file-system.cpp" />
     <ClCompile Include="diagnostics.cpp" />
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
-    <ClCompile Include="include-file-system.cpp" />
     <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="ir-dominators.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />

@@ -24,6 +24,9 @@
     <ClInclude Include="decl-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="default-file-system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="diagnostic-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -40,9 +43,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hlsl.meta.slang.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-constexpr.h">
@@ -179,6 +179,9 @@
     <ClCompile Include="compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="default-file-system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="diagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -186,9 +189,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="emit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-constexpr.cpp">
