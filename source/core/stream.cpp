@@ -134,6 +134,8 @@ namespace Slang
 		fpos_t pos;
 		fgetpos(handle, &pos);
 		return pos;
+#elif defined(__APPLE__)
+		return ftell(handle);
 #else
 		fpos64_t pos;
 		fgetpos64(handle, &pos);
