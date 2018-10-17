@@ -98,7 +98,7 @@ SLANG_NO_THROW uint32_t SLANG_MCALL release() \
         return 0; \
     } \
     return m_refCount; \
-} \
+} 
 
 #define SLANG_IUNKNOWN_ALL \
     SLANG_IUNKNOWN_QUERY_INTERFACE \

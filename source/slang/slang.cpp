@@ -9,7 +9,7 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
-#include "include-file-system.h"
+#include "default-file-system.h"
 
 #include "ir-serialize.h"
 
@@ -316,7 +316,7 @@ CompileRequest::CompileRequest(Session* session)
 
     // Set up the default file system
     SLANG_ASSERT(fileSystem == nullptr);
-    fileSystemExt = IncludeFileSystem::getDefault();
+    fileSystemExt = DefaultFileSystem::getSingleton();
 }
 
 CompileRequest::~CompileRequest()
@@ -407,41 +407,8 @@ ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
 
 SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 {
-    // If there is a used-defined filesystem, then use that to load files.
-    //
-    if(fileSystem)
-    {
-        return fileSystem->loadFile(path.Buffer(), outBlob);
-    }
-
-    // Otherwise, fall back to a default implementation that uses the `core`
-    // libraries facilities for talking to the OS filesystem.
-    //
-    // TODO: we might want to conditionally compile these in, so that
-    // a user could create a build of Slang that doesn't include any OS
-    // filesystem calls.
-    //
-
-    if (!File::Exists(path))
-    {
-        return SLANG_FAIL;
-    }
-
-    try
-    {
-        String sourceString = File::ReadAllText(path);
-        ComPtr<ISlangBlob> sourceBlob = createStringBlob(sourceString);
-        *outBlob = sourceBlob.detach();
-
-        return SLANG_OK;
-    }
-    catch(...)
-    {
-    }
-    return SLANG_FAIL;
-
+    return fileSystemExt->loadFile(path.Buffer(), outBlob);
 }
-
 
 RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope)
 {
@@ -1214,7 +1181,7 @@ SLANG_API void spSetFileSystem(
     // Set up fileSystemExt appropriately
     if (fileSystem == nullptr)
     {
-        req->fileSystemExt = Slang::IncludeFileSystem::getDefault();
+        req->fileSystemExt = Slang::DefaultFileSystem::getSingleton();
     }
     else
     {

@@ -1,4 +1,4 @@
-#include "include-file-system.h"
+#include "default-file-system.h"
 
 #include "../../slang-com-ptr.h"
 #include "../core/slang-io.h"
@@ -14,19 +14,14 @@ static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */ISlangFileSystemExt* IncludeFileSystem::getDefault()
-{
-    static IncludeFileSystem s_includeFileSystem;
-    s_includeFileSystem.ensureRef();
-    return &s_includeFileSystem;
-}
+/* static */DefaultFileSystem DefaultFileSystem::s_singleton; 
 
-ISlangUnknown* IncludeFileSystem::getInterface(const Guid& guid)
+ISlangUnknown* DefaultFileSystem::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(this) : nullptr;
 }
 
-SlangResult IncludeFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
+SlangResult DefaultFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
 {
     String canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::GetCanonical(path, canonicalPath));
@@ -35,7 +30,7 @@ SlangResult IncludeFileSystem::getCanoncialPath(const char* path, ISlangBlob** c
     return SLANG_OK;
 }
 
-SlangResult IncludeFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult DefaultFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String relPath;
     switch (fromPathType)
@@ -56,15 +51,14 @@ SlangResult IncludeFileSystem::calcRelativePath(SlangPathType fromPathType, cons
     return SLANG_OK;
 }
 
-SlangResult SLANG_MCALL IncludeFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
-    // Otherwise, fall back to a default implementation that uses the `core`
+    // Default implementation that uses the `core`
     // libraries facilities for talking to the OS filesystem.
     //
     // TODO: we might want to conditionally compile these in, so that
     // a user could create a build of Slang that doesn't include any OS
     // filesystem calls.
-    //
 
     if (!File::Exists(path))
     {
@@ -86,16 +80,31 @@ SlangResult SLANG_MCALL IncludeFileSystem::loadFile(char const* path, ISlangBlob
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! WrapFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult SLANG_MCALL WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+ISlangUnknown* WrapFileSystem::getInterface(const Guid& guid)
 {
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(this) : nullptr;
+}
+
+SlangResult WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+{
+    // Used the wrapped file system to do the loading
     return m_fileSystem->loadFile(path, outBlob);
 }
 
 SlangResult WrapFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
 {
+    // This isn't a very good 'canonical  path' because the same file might be referenced 
+    // multiple ways - for example by using relative paths. 
+    // But it's simple and matches slangs previous behavior. 
     String canonicalPath(path);
     *canonicalPathOut = createStringBlob(canonicalPath).detach();
     return SLANG_OK;
+}
+
+SlangResult WrapFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+{
+    // Just defer to the default implementation
+    return DefaultFileSystem::getSingleton()->calcRelativePath(fromPathType, fromPath, path, pathOut);
 }
 
 } 
