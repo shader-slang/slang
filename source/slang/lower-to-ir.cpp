@@ -384,6 +384,12 @@ void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
     context->env->mapDeclToValue[decl] = value;
 }
 
+
+    /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
+bool isEffectivelyStatic(
+    Decl*           decl,
+    ContainerDecl*  parentDecl);
+
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
     IRGenContext*   context,
@@ -4453,46 +4459,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     // We also need to be able to detect whether a declaration is
     // either explicitly or implicitly treated as `static`:
-    bool isMemberDeclarationEffectivelyStatic(
-        Decl*           decl,
-        ContainerDecl*  parentDecl)
-    {
-        // Anything explicitly marked `static` counts.
-        //
-        // There is a subtle detail here with a global-scope `static`
-        // variable not really meaning `static` in the same way, but
-        // it doesn't matter because the module shouldn't introduce
-        // any parameters we care about.
-        if(decl->HasModifier<HLSLStaticModifier>())
-            return true;
-
-        // Next we need to deal with cases where a declaration is
-        // effectively `static` even if the language doesn't make
-        // the user say so. Most languages make the default assumption
-        // that nested types are `static` even if they don't say
-        // so (Java is an exception here, perhaps due to some
-        // includence from the Scandanavian OOP tradition).
-        if(dynamic_cast<AggTypeDecl*>(decl))
-            return true;
-
-        // Things nested inside functions may have dependencies
-        // on values from the enclosing scope, but this needs to
-        // be dealt with via "capture" so they are also effectively
-        // `static`
-        if(dynamic_cast<FunctionDeclBase*>(parentDecl))
-            return true;
-
-        return false;
-    }
-    // We also need to be able to detect whether a declaration is
-    // either explicitly or implicitly treated as `static`:
     ParameterListCollectMode getModeForCollectingParentParameters(
         Decl*           decl,
         ContainerDecl*  parentDecl)
     {
         // If we have a `static` parameter, then it is obvious
         // that we should use the `static` mode
-        if(isMemberDeclarationEffectivelyStatic(decl, parentDecl))
+        if(isEffectivelyStatic(decl, parentDecl))
             return kParameterListCollectMode_Static;
 
         // Otherwise, let's default to collecting everything
