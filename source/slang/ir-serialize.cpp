@@ -90,6 +90,193 @@ static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
     return UnownedStringSlice(reader.m_pos, len);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringRepresentationCache !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+StringRepresentationCache::StringRepresentationCache(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager):
+    m_stringTable(stringTable),
+    m_namePool(namePool),
+    m_scopeManager(scopeManager)
+{
+    // Decode the table
+    m_entries.SetSize(StringSlicePool::kNumDefaultHandles);
+    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kNumDefaultHandles == 2);
+
+    {
+        Entry& entry = m_entries[0];
+        entry.m_numChars = 0;
+        entry.m_startIndex = 0;
+        entry.m_object = nullptr;
+    }
+    {
+        Entry& entry = m_entries[1];
+        entry.m_numChars = 0;
+        entry.m_startIndex = 0;
+        entry.m_object = nullptr;
+    }
+
+    {
+        const char* start = stringTable->begin();
+        const char* cur = start;
+        const char* end = stringTable->end();
+
+        while (cur < end)
+        {
+            CharReader reader(cur);
+            const int len = GetUnicodePointFromUTF8(reader);
+
+            Entry entry;
+            entry.m_startIndex = uint32_t(reader.m_pos - start);
+            entry.m_numChars = len;
+            entry.m_object = nullptr;
+
+            cur = reader.m_pos + len;
+        }
+    }
+
+    m_entries.Compress();
+}
+
+StringRepresentationCache::~StringRepresentationCache()
+{
+    for (auto& entry: m_entries)
+    {
+        if (entry.m_object)
+        {
+            entry.m_object->releaseReference();
+        }
+    }
+}
+
+Name* StringRepresentationCache::getName(Handle handle)
+{
+    if (handle == StringSlicePool::kNullHandle)
+    {
+        return nullptr;
+    }
+
+    Entry& entry = m_entries[int(handle)];
+    if (entry.m_object)
+    {
+        Name* name = dynamic_cast<Name*>(entry.m_object);
+        if (name)
+        {
+            return name;
+        }
+        StringRepresentation* stringRep = static_cast<StringRepresentation*>(entry.m_object);
+        // Promote it to a name
+        name = m_namePool->getName(String(stringRep));
+        stringRep->releaseReference();
+        entry.m_object = name;
+        return name;
+    }
+
+    Name* name = m_namePool->getName(String(getStringSlice(handle)));
+    entry.m_object = name;
+    return name;
+}
+
+String StringRepresentationCache::getString(Handle handle)
+{
+    return String(getStringRepresentation(handle));
+}
+
+UnownedStringSlice StringRepresentationCache::getStringSlice(Handle handle) const
+{
+    const Entry& entry = m_entries[int(handle)];
+    const char* start = m_stringTable->begin();
+
+    return UnownedStringSlice(start + entry.m_startIndex, int(entry.m_numChars));
+}
+
+StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle handle)
+{
+    if (handle == StringSlicePool::kNullHandle || handle == StringSlicePool::kEmptyHandle)
+    {
+        return nullptr;
+    }
+
+    Entry& entry = m_entries[int(handle)];
+    if (entry.m_object)
+    {
+        Name* name = dynamic_cast<Name*>(entry.m_object);
+        if (name)
+        {
+            return name->text.getStringRepresentation();
+        }
+        return static_cast<StringRepresentation*>(entry.m_object);
+    }
+
+    const UnownedStringSlice slice = getStringSlice(handle);
+    const UInt size = slice.size();
+
+    StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size + 1, size);
+    char* dst = stringRep->getData();
+    memcpy(dst, slice.begin(), size);
+    dst[size] = 0;
+    
+    stringRep->addReference();
+    entry.m_object = stringRep;
+
+    if (m_scopeManager)
+    {
+        m_scopeManager->add(stringRep);
+    }
+
+    return stringRep;
+}
+
+char* StringRepresentationCache::getCStr(Handle handle)
+{
+    // It turns out StringRepresentation is always 0 terminated, so can just use that
+    StringRepresentation* rep = getStringRepresentation(handle);
+    return rep->getData();
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/* static */void SerialStringTableUtil::encodeStringTable(const StringSlicePool& pool, List<char>& stringTable)
+{
+    // Skip the default handles -> nothing is encoded via them
+    return encodeStringTable(pool.getSlices().begin() + StringSlicePool::kNumDefaultHandles, pool.getNumSlices() - StringSlicePool::kNumDefaultHandles, stringTable);
+}
+    
+/* static */void SerialStringTableUtil::encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable)
+{
+    stringTable.Clear();
+    for (size_t i = 0; i < numSlices; ++i)
+    {
+        const UnownedStringSlice slice = slices[i];
+        const int len = int(slice.size());
+        
+        // We need to write into the the string array
+        char prefixBytes[6];
+        const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
+        const int baseIndex = int(stringTable.Count());
+
+        stringTable.SetSize(baseIndex + numPrefixBytes + len);
+
+        char* dst = stringTable.begin() + baseIndex + baseIndex;
+
+        memcpy(dst, prefixBytes, numPrefixBytes);
+        memcpy(dst + numPrefixBytes, slice.begin(), len);   
+    }
+}
+
+/* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slices)
+{
+    const char* start = stringTable.begin();
+    const char* cur = start;
+    const char* end = stringTable.end();
+
+    while (cur < end)
+    {
+        CharReader reader(cur);
+        const int len = GetUnicodePointFromUTF8(reader);
+        slices.Add(UnownedStringSlice(reader.m_pos, len));
+        cur = reader.m_pos + len;
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 template<typename T>
@@ -105,8 +292,15 @@ size_t IRSerialData::calcSizeInBytes() const
         _calcArraySize(m_childRuns) + 
         _calcArraySize(m_decorationRuns) + 
         _calcArraySize(m_externalOperands) + 
-        _calcArraySize(m_rawSourceLocs) + 
-        _calcArraySize(m_strings);
+        _calcArraySize(m_strings) + 
+        /* Raw source locs */
+        _calcArraySize(m_rawSourceLocs) +
+        /* Debug */
+        _calcArraySize(m_debugSourceFiles) + 
+        _calcArraySize(m_debugLineOffsets) + 
+        _calcArraySize(m_debugViewEntries) + 
+        _calcArraySize(m_debugLocRuns) + 
+        _calcArraySize(m_debugStrings);
 }
 
 void IRSerialData::clear()
@@ -119,6 +313,13 @@ void IRSerialData::clear()
     m_decorationRuns.Clear();
     m_externalOperands.Clear();
     m_rawSourceLocs.Clear();
+
+    // Debug data
+    m_debugSourceFiles.Clear(); 
+    m_debugLineOffsets.Clear(); 
+    m_debugViewEntries.Clear(); 
+    m_debugLocRuns.Clear();     
+    m_debugStrings.Clear();
 
     m_strings.SetSize(2);
     m_strings[int(kNullStringIndex)] = 0;
@@ -217,6 +418,38 @@ UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
 {
     Ser::StringOffset offset = m_stringStarts[int(index)];
     return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
+}
+
+// Find a view index that matches the view by file (and perhaps other characteristics in the future)
+int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
+{
+    const int numViews = int(viewsIn.Count());
+    SourceView*const* views = viewsIn.begin();
+    
+    SourceFile* sourceFile = view->getSourceFile();
+
+    for (int i = 0; i < numViews; ++i)
+    {
+        SourceView* curView = views[i];
+        // For now we just match on source file
+        if (curView->getSourceFile() == sourceFile)
+        {
+            // It's a hit
+            return i;
+        }
+    }
+    return -1;
+}
+
+int _calcSumPathIndices(SourceManager* manager)
+{
+    int sum = 0;
+    while (manager)
+    {
+        sum += int(manager->getStringSlicePool().getSlices().Count());
+        manager = manager->getParent();
+    }
+    return sum;
 }
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
@@ -554,6 +787,289 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             IRInst* srcInst = m_insts[i];
             dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
         }
+    }
+
+    if (true)
+    {
+        // Okay lets order all SourceLocs for easier lookup, and better compressibility 
+        struct SourceLocInstIndex  
+        {
+            typedef SourceLocInstIndex ThisType;
+            bool operator<(const ThisType& rhs) const
+            {
+                return sourceLoc < rhs.sourceLoc || (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex);
+            }
+            bool operator==(const ThisType& rhs) const
+            {
+                return sourceLoc == rhs.sourceLoc && instIndex == rhs.instIndex;
+            }
+
+            SourceLoc::RawValue sourceLoc;
+            uint32_t instIndex;
+        };
+
+        List<SourceLocInstIndex> locs;
+        const int numInsts = int(m_insts.Count());
+        for (int i = 1; i < numInsts; ++i)
+        {
+            auto srcInst = m_insts[i];
+            if (srcInst->sourceLoc.isValid())
+            {
+                locs.Add(SourceLocInstIndex{srcInst->sourceLoc.getRaw(), uint32_t(i) });
+            }    
+        }
+
+        // Sort 
+        locs.Sort();
+
+        // Lets filter this down so we only have unique source locs
+        struct SourceLocRun
+        {
+            SourceLoc::RawValue sourceLoc;
+            uint32_t startInstIndex;
+            uint32_t numInst;
+            //uint32_t sourceFileIndex;
+            uint32_t lineNo;
+            uint32_t columnNo;
+            uint32_t pathIndex;
+        };
+
+        int numPaths = 0;
+        List<int> pathIndexMap;
+        {
+            // Let's make a map 
+            const int totalNumPathIndices = _calcSumPathIndices(sourceManager);
+            pathIndexMap.SetSize(totalNumPathIndices);
+            memset(pathIndexMap.begin(), -1, totalNumPathIndices * sizeof(int));
+        }
+
+        /* Really the challenge here is not about 'finding out the paths/line numbers etc used'
+        a big part of the problem is how to reconstruct the data into a SourceManager such that it can be 
+        used correctly?
+
+        We *could* I suppose work backwards and work out via line and column numbers something that would 
+        work, but it would require finding all the instructions on a line and taking the maximum column as the line 
+        length and then so forth. 
+
+        An alternative would be to save enough data to be able to construct something that is compatible. 
+        For line numbers we only have to save the data about lines that are referenced. We also have to be able to reconstruct 
+        the gaps.
+
+        Then we would still have to save off the data for the entries that are used. 
+        
+        Such an approach also implies we can have multiple 'views' if we really want to. 
+
+        I could test all of this, by storing all the line number information, then storing and recreating and making sure 
+        it matches. 
+
+        */
+
+        // List of unique source views
+        List<SourceView*> sourceViews;
+        // List of runs
+        List<SourceLocRun> locRuns;
+        {
+            SourceView* sourceView = sourceManager->findSourceView(SourceLoc::fromRaw(locs[0].sourceLoc));
+            SLANG_ASSERT(sourceView);
+            SourceRange viewRange = sourceView->getRange();
+
+            // Get the path base index
+            int viewBasePathIndex = _calcSumPathIndices(sourceView->getSourceManager()->getParent());
+            bool viewHasEntries = sourceView->getEntries().Count() > 0;
+
+            uint32_t sourceLocFix = 0;
+            //uint32_t sourceViewIndex = 0;
+            sourceViews.Add(sourceView);
+
+            const int numLocs = int(locs.Count());
+            int i = 0;
+            while (i < numLocs)
+            {   
+                const int startI = i;
+                const auto& loc = locs[startI];
+
+                const uint32_t startInstIndex = loc.instIndex;
+                const uint32_t fixInstIndex = loc.instIndex - uint32_t(startI);
+                
+                const auto rawSourceLoc = loc.sourceLoc;
+
+                // Look for a run
+                for (++i; i < numLocs; ++i)
+                {
+                    const auto& runLoc = locs[i];
+                    if (runLoc.sourceLoc != rawSourceLoc || runLoc.instIndex != fixInstIndex + i) 
+                    {
+                        break;
+                    }
+                }
+
+                {
+                    const SourceLoc sourceLoc(SourceLoc::fromRaw(rawSourceLoc));
+                    // Check if this is still in the current source view
+                    if (!viewRange.contains(sourceLoc))
+                    {
+                        // Look up the SourceView it is
+                        SourceView* nextSourceView = sourceManager->findSourceView(sourceLoc);
+                        SLANG_ASSERT(nextSourceView);
+                        // Update the range being used
+                        viewRange = nextSourceView->getRange();
+                    
+                        // See if there a pre-existing view that has the same source backing it
+                        int foundViewIndex = _findSourceViewIndex(sourceViews, nextSourceView);
+                        if (foundViewIndex >= 0)
+                        {
+                            sourceView = sourceViews[foundViewIndex];
+                            //sourceViewIndex = uint32_t(foundViewIndex);
+                            // With the fix we need to map from the current range to the found range
+                            sourceLocFix =  sourceView->getRange().begin.getRaw() - viewRange.begin.getRaw();
+                        }
+                        else
+                        {
+                            // We have a new source view
+                            //sourceViewIndex = uint32_t(sourceViews.Count());
+                            sourceViews.Add(nextSourceView);
+                            sourceLocFix = 0;
+                            sourceView = nextSourceView;
+                        }
+
+                        // Update the view 
+                        viewBasePathIndex = _calcSumPathIndices(sourceView->getSourceManager()->getParent());
+                        viewHasEntries = sourceView->getEntries().Count() > 0;
+
+                        // Lets assume the original path should always be saved 
+                        if (pathIndexMap[viewBasePathIndex] < 0)
+                        {
+                            pathIndexMap[viewBasePathIndex] = numPaths++;
+                        }
+
+                        // After all this the source must be in range
+                        SLANG_ASSERT(viewRange.contains(sourceLoc));
+
+                        // Moreover the corrected loc must be in the range of the matched sourceView
+                        SLANG_ASSERT(sourceView->getRange().contains(SourceLoc::fromRaw(rawSourceLoc + sourceLocFix)));
+                    }
+                }
+
+                // Add it 
+                SourceLocRun run;
+
+                run.sourceLoc = rawSourceLoc + sourceLocFix;
+                run.startInstIndex = startInstIndex;
+                run.numInst = uint32_t(i - startI);
+                //run.sourceFileIndex = sourceViewIndex;
+
+                SourceLoc fixSourceLoc(SourceLoc::fromRaw(rawSourceLoc + sourceLocFix));
+                
+                // The non remapped index if not overridden by an entry
+                uint32_t pathIndex = uint32_t(viewBasePathIndex);
+
+                // Work out the line/column no from the file if there are no modifications
+                {
+                    SourceFile* sourceFile = sourceView->getSourceFile();
+                    const int offset = sourceView->getRange().getOffset(fixSourceLoc);
+                    
+                    int lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+                    int colIndex = sourceFile->calcColumnIndex(lineIndex, offset);
+
+                    run.lineNo = uint32_t(lineIndex + 1);
+                    run.columnNo = uint32_t(colIndex + 1);
+                }
+
+                // If the view has entries, then we need to look up the mapping
+                if (viewHasEntries)
+                {
+                    const int entryIndex = sourceView->findEntryIndex(fixSourceLoc);
+                    if (entryIndex >= 0)
+                    {
+                        const SourceView::Entry& entry = sourceView->getEntries()[entryIndex];
+                        // Adjust the line
+                        run.lineNo += entry.m_lineAdjust;
+                        // Fix the path index
+                        pathIndex += uint32_t(entry.m_pathHandle);
+                    }
+                }
+
+                int remapPathIndex = pathIndexMap[pathIndex];
+                if (remapPathIndex < 0)
+                {
+                    remapPathIndex = numPaths++;
+                    pathIndexMap[pathIndex] = remapPathIndex;
+                }
+
+                // Mark the index as used
+                run.pathIndex = uint32_t(remapPathIndex);
+
+                locRuns.Add(run);
+            }
+        }
+        
+
+
+#if 0
+        {
+            List<SourceView> sourceViews;
+            // Okay, now lets find if we can remap multiple SourceView to the same SourceFile. 
+
+            if (locs.Count() > 0)
+            {
+                // Look up the view
+                SourceView* sourceView = sourceManager->findSourceView(SourceLoc::fromRaw(locs[0].sourceLoc));
+                SourceLoc::RawValue fixLoc;
+
+                const int numLocs = int(locs.Count());
+                int i = 0;
+                while (i < numLocs)
+                {
+                    SourceLoc::RawValue sourceLoc = locs[i++].sourceLoc; 
+                    if (sourceView->getRange().contains(SourceLoc::fromRaw(sourceLoc)))
+                    {
+                        // It's in the range
+                    }
+                    else
+                    {
+                        // We need to lookup an another loc
+                    }
+
+
+                    // Skip if they are all the same value
+                    while (locs[i].sourceLoc == sourceLoc)
+                    {
+                        i++;
+                    }
+                }
+            }
+        }
+#endif
+
+       // __debugbreak();
+        // Lets see what we have in the way of source locations
+
+
+#if 0
+        List<HumaneSourceLoc> locs;
+        locs.SetSize(numInsts);
+
+        for (int i = 1; i < numInsts; ++i)
+        {
+         
+            if (srcInst->sourceLoc.isValid())
+            {
+                HumaneSourceLoc sourceLoc = sourceManager->getHumaneLoc(srcInst->sourceLoc);
+                if (!sourceLoc.pathInfo.hasFoundPath())
+                {
+                    // Need to know where this was used
+
+                    __debugbreak();
+
+                }
+
+                locs[i] = sourceLoc;
+            }
+
+        }
+
+        //__debugbreak();
+#endif
     }
 
     m_serialData = nullptr;
@@ -1392,7 +1908,7 @@ StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex i
     String string(slice);
 
     StringRepresentation* stringRep = string.getStringRepresentation();   
-    m_module->addRefObjectToFree(stringRep);
+    m_module->getObjectScopeManager()->addMaybeNull(stringRep);
 
     m_stringRepresentationCache[int(index)] = stringRep;
 

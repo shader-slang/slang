@@ -12,6 +12,7 @@
 #include "source-loc.h"
 
 #include "../core/slang-memory-arena.h"
+#include "../core/slang-object-scope-manager.h"
 
 #include "type-system-shared.h"
 
@@ -1071,30 +1072,13 @@ struct IRModule : RefObject
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
-    void addRefObjectToFree(RefObject* obj)
-    {
-        if (obj)
-        {
-            obj->addReference();
-            m_refObjectsToFree.Add(obj);
-        }
-    }
-    
+        /// Get the object scope manager
+    SLANG_FORCE_INLINE ObjectScopeManager* getObjectScopeManager() { return &m_objectScopeManager; }
+
         /// Ctor
     IRModule():
         memoryArena(kMemoryArenaBlockSize)
     {
-    }
-
-    ~IRModule()
-    { 
-        // Release all ref objects
-        for (RefObject* ptr: m_refObjectsToFree)
-        {
-            ptr->releaseReference();
-        }
-        // Clear any memory too
-        m_refObjectsToFree = List<RefObject*>();
     }
 
     MemoryArena memoryArena;
@@ -1104,7 +1088,8 @@ struct IRModule : RefObject
     IRModuleInst* moduleInst;
 
     protected:
-    List<RefObject*> m_refObjectsToFree;
+
+    ObjectScopeManager m_objectScopeManager;
 };
 
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);

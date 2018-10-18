@@ -5,12 +5,59 @@
 #include "../core/basic.h"
 #include "../core/stream.h"
 
+#include "../core/slang-object-scope-manager.h"
+
 #include "ir.h"
 
 // For TranslationUnitRequest
 #include "compiler.h"
 
 namespace Slang {
+
+class StringRepresentationCache
+{
+    public:
+    typedef StringSlicePool::Handle Handle;
+
+    struct Entry
+    {
+        uint32_t m_startIndex;
+        uint32_t m_numChars;
+        RefObject* m_object;                ///< Could be nullptr, Name, or StringRepresentation. 
+    };
+
+        /// Get as a name
+    Name* getName(Handle handle);
+        /// Get as a string
+    String getString(Handle handle);
+        /// Get as string representation
+    StringRepresentation* getStringRepresentation(Handle handle);
+        /// Get as a string slice
+    UnownedStringSlice getStringSlice(Handle handle) const;
+        /// Get as a 0 terminated 'c style' string
+    char* getCStr(Handle handle);
+
+        /// Ctor
+        /// scopeManager can be nullptr, if so all objects will released on dtor
+    StringRepresentationCache(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager);
+        /// Dtor
+    ~StringRepresentationCache();
+
+    protected:
+    ObjectScopeManager* m_scopeManager;
+    NamePool* m_namePool;
+    const List<char>* m_stringTable;
+    List<Entry> m_entries;
+};
+
+struct SerialStringTableUtil
+{
+    /// Convert a pool into a string table
+    static void encodeStringTable(const StringSlicePool& pool, List<char>& stringTable);
+    static void encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable);
+    /// Converts a pool into a string table, appending the strings to the slices
+    static void decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+};
 
 // Pre-declare
 class Name;
@@ -23,13 +70,13 @@ struct IRSerialData
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
 
-    enum class RawSourceLoc : SourceLoc::RawValue;             ///< This is just to copy over source loc data (ie not strictly serialize)
-    enum class StringOffset : uint32_t;             ///< Offset into the m_stringsBuffer
+    enum class RawSourceLoc : SourceLoc::RawValue;          ///< This is just to copy over source loc data (ie not strictly serialize)
+    enum class StringOffset : uint32_t;                     ///< Offset into the m_stringsBuffer
     
     typedef uint32_t SizeType;
 
-    static const StringIndex kNullStringIndex = StringIndex(0);
-    static const StringIndex kEmptyStringIndex = StringIndex(1);
+    static const StringIndex kNullStringIndex = StringIndex(StringSlicePool::kNullHandle);
+    static const StringIndex kEmptyStringIndex = StringIndex(StringSlicePool::kEmptyHandle);
 
     /// A run of instructions
     struct InstRun
@@ -125,6 +172,29 @@ struct IRSerialData
 
         Payload m_payload;
     };
+ 
+    struct DebugSourceFile
+    {
+        uint32_t m_startLoc;                    ///< Start of the location range 
+        uint32_t m_endLoc;                      ///< The end of the location range
+        uint32_t m_pathIndex;                   ///< Path associated
+        uint32_t m_numLineOffsets;              ///< The number of offsets associated with the file
+        uint32_t m_numDebugViewEntries;         ///< The number of debug view entries
+    };
+
+    struct DebugViewEntry
+    {
+        uint32_t m_startLoc;                    ///< Where does this entry begin?
+        uint32_t m_pathIndex;                   ///< What is the presumed path for this entry. If 0 it means there is no path.
+        int32_t m_lineAdjust;                   ///< The line adjustment
+    };
+
+    struct DebugLocRun
+    {
+        uint32_t m_sourceLoc;                   ///< The location
+        uint32_t startInstIndex;                ///< The start instruction index
+        uint32_t numInst;                       ///< The amount of instructions
+    };
 
         /// Clear to initial state
     void clear();
@@ -153,6 +223,12 @@ struct IRSerialData
     List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
 
     List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
+
+    List<DebugSourceFile> m_debugSourceFiles;   ///< The files associated 
+    List<uint32_t> m_debugLineOffsets;          ///< All of the debug line offsets
+    List<uint32_t> m_debugViewEntries;          ///< The debug view entries - that modify line meanings
+    List<DebugLocRun> m_debugLocRuns;           ///< Maps source locations to instructions
+    List<char> m_debugStrings;                  ///< All of the debug strings
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
     
@@ -321,7 +397,7 @@ protected:
 
     Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
-    List<Ser::StringOffset> m_stringStarts;                      ///< Offset for each string index into the m_strings 
+    List<Ser::StringOffset> m_stringStarts;             ///< Offset for each string index into the m_strings 
 
     // TODO (JS):
     // We could perhaps improve this, if we stored at string indices (when linearized) the StringRepresentation

@@ -12,9 +12,15 @@ namespace Slang {
 class StringSlicePool
 {
 public:
+
     /// Handle of 0 is null. If accessed will be returned as the empty string
     enum class Handle : uint32_t;
     typedef UnownedStringSlice Slice;
+
+    static const Handle kNullHandle = Handle(0);
+    static const Handle kEmptyHandle = Handle(1);
+
+    static const int kNumDefaultHandles = 2;
 
         /// Returns the index of a slice, if contained, or -1 if not found
     int findIndex(const Slice& slice) const;
@@ -23,6 +29,8 @@ public:
     bool has(const Slice& slice) { return findIndex(slice) >= 0; }
         /// Add a slice 
     Handle add(const Slice& slice);
+        /// Add from a string
+    Handle add(const char* chars);
 
         /// Empty contents
     void clear();
@@ -33,6 +41,9 @@ public:
         /// Get all the slices
     const List<UnownedStringSlice>& getSlices() const { return m_slices; }
 
+        /// Get the number of slices
+    int getNumSlices() const { return int(m_slices.Count()); }
+
         /// Convert a handle to and index. (A handle is just an index!) 
     static int asIndex(Handle handle) { return int(handle); }
 
@@ -41,7 +52,7 @@ public:
 
 protected:
     List<UnownedStringSlice> m_slices;
-    Dictionary<UnownedStringSlice, int> m_map;
+    Dictionary<UnownedStringSlice, Handle> m_map;
     MemoryArena m_arena;
 };
 
