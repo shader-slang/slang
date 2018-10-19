@@ -37,12 +37,12 @@ class StringRepresentationCache
         /// Get as a 0 terminated 'c style' string
     char* getCStr(Handle handle);
 
-        /// Ctor
-        /// scopeManager can be nullptr, if so all objects will released on dtor
-    StringRepresentationCache(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager);
-        /// Dtor
-    ~StringRepresentationCache();
+        /// Initialize a cache to use a string table, namePool and scopeManager
+    void init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager);
 
+        /// Ctor
+    StringRepresentationCache(); 
+    
     protected:
     ObjectScopeManager* m_scopeManager;
     NamePool* m_namePool;
@@ -220,7 +220,7 @@ struct IRSerialData
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
-    List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
+    List<char> m_stringTable;                       ///< All strings. Indexed into by StringIndex
 
     List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
 
@@ -372,17 +372,19 @@ struct IRSerialWriter
 
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
-        /// Get a slice from an index
-    UnownedStringSlice getStringSlice(Ser::StringIndex index) const;
-
+    
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
-    Ser::StringIndex getStringIndex(StringRepresentation* string); 
-    Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
-    Ser::StringIndex getStringIndex(Name* name);
-    Ser::StringIndex getStringIndex(const char* chars);
-    
+        /// Get a slice from an index
+    UnownedStringSlice getStringSlice(Ser::StringIndex index) const { return m_stringSlicePool.getSlice(StringSlicePool::Handle(index)); }
+        /// Get index from string representations
+    Ser::StringIndex getStringIndex(StringRepresentation* string) { return Ser::StringIndex(m_stringSlicePool.add(string)); }
+    Ser::StringIndex getStringIndex(const UnownedStringSlice& slice) { return Ser::StringIndex(m_stringSlicePool.add(slice)); }
+    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(const char* chars) { return Ser::StringIndex(m_stringSlicePool.add(chars)); }
+    Ser::StringIndex getStringIndex(const String& string) { return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice())); }
+
     IRSerialWriter() :
         m_serialData(nullptr)
     {}
@@ -397,13 +399,7 @@ protected:
 
     Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
-    List<Ser::StringOffset> m_stringStarts;             ///< Offset for each string index into the m_strings 
-
-    // TODO (JS):
-    // We could perhaps improve this, if we stored at string indices (when linearized) the StringRepresentation
-    // Doing so would mean if a String or Name was looked up we wouldn't have to re-allocate on the arena 
-    Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
-    List<RefPtr<StringRepresentation> > m_scopeStrings;                 ///< 
+    StringSlicePool m_stringSlicePool;
     
     IRSerialData* m_serialData;                               ///< Where the data is stored
 };
@@ -411,6 +407,7 @@ protected:
 struct IRSerialReader
 {
     typedef IRSerialData Ser;
+    typedef StringRepresentationCache::Handle StringHandle;
 
         /// Read a stream to fill in dataOut IRSerialData
     static Result readStream(Stream* stream, IRSerialData* dataOut);
@@ -418,14 +415,9 @@ struct IRSerialReader
         /// Read a module from serial data
     Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
 
-    Name* getName(Ser::StringIndex index);
-    String getString(Ser::StringIndex index);
-    StringRepresentation* getStringRepresentation(Ser::StringIndex index);
-    UnownedStringSlice getStringSlice(Ser::StringIndex index) { return getStringSlice(m_stringStarts[int(index)]); }
-    char* getCStr(Ser::StringIndex index);
-
-    UnownedStringSlice getStringSlice(Ser::StringOffset offset);
-
+        /// Get the representation cache
+    StringRepresentationCache& getStringRepresentationCache() { return m_stringRepresentationCache; }
+    
     IRSerialReader():
         m_serialData(nullptr),
         m_module(nullptr)
@@ -434,20 +426,14 @@ struct IRSerialReader
 
     protected:
 
-    void _calcStringStarts();
     IRDecoration* _createDecoration(const Ser::Inst& srcIns);
     static Result _skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
 
-    List<Ser::StringOffset> m_stringStarts;
-    List<StringRepresentation*> m_stringRepresentationCache;
+    StringRepresentationCache m_stringRepresentationCache;
 
     const IRSerialData* m_serialData;
     IRModule* m_module;
 };
-
-
-Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream);
-Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut);
 
 } // namespace Slang
 

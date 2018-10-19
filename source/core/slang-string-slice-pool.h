@@ -31,6 +31,10 @@ public:
     Handle add(const Slice& slice);
         /// Add from a string
     Handle add(const char* chars);
+        /// Add a StringRepresentation
+    Handle add(StringRepresentation* string);
+        /// Add a string
+    Handle add(const String& string) { return add(string.getUnownedSlice()); }
 
         /// Empty contents
     void clear();

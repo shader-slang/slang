@@ -45,6 +45,16 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     return Handle(index);
 }
 
+StringSlicePool::Handle StringSlicePool::add(StringRepresentation* stringRep)
+{
+    if (stringRep == nullptr)
+    {
+        return kNullHandle;
+    }
+    return add(StringRepresentation::asSlice(stringRep));
+}
+ 
+
 StringSlicePool::Handle StringSlicePool::add(const char* chars)
 {
     if (!chars)
