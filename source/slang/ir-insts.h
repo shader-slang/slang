@@ -117,6 +117,7 @@ struct IRNameHintDecoration : IRDecoration
     Name* name;
 };
 
+<<<<<<< HEAD
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
@@ -131,6 +132,20 @@ struct IRVulkanRayPayloadDecoration : IRDecoration
 struct IRVulkanHitAttributesDecoration : IRDecoration
 {
     enum { kDecorationOp = kIRDecorationOp_VulkanHitAttributes };
+};
+
+struct IRRequireGLSLVersionDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_RequireGLSLVersion };
+
+    Int languageVersion;
+};
+
+struct IRRequireGLSLExtensionDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_RequireGLSLExtension };
+
+    StringRepresentation* extensionName;
 };
 
 // An instruction that specializes another IR value
