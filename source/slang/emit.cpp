@@ -3466,9 +3466,38 @@ struct EmitVisitor
         IREmitMode      mode,
         EOpInfo         outerPrec)
     {
+        auto funcValue = inst->getOperand(0);
+
+        // Does this function declare any requirements on GLSL version or
+        // extensions, which should affect our output?
+        if(getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            auto decoratedValue = funcValue;
+            while (auto specInst = as<IRSpecialize>(decoratedValue))
+            {
+                decoratedValue = getSpecializedValue(specInst);
+            }
+
+            for( auto decoration = decoratedValue->firstDecoration; decoration; decoration = decoration->next )
+            {
+                switch(decoration->op)
+                {
+                default:
+                    break;
+
+                case kIRDecorationOp_RequireGLSLExtension:
+                    requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->extensionName));
+                    break;
+
+                case kIRDecorationOp_RequireGLSLVersion:
+                    requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->languageVersion));
+                    break;
+                }
+            }
+        }
+
         // We want to detect any call to an intrinsic operation,
         // that we can emit it directly without mangling, etc.
-        auto funcValue = inst->getOperand(0);
         if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
         {
             emitIntrinsicCallExpr(ctx, inst, irFunc, mode, outerPrec);

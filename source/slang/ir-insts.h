@@ -133,6 +133,20 @@ struct IRVulkanHitAttributesDecoration : IRDecoration
     enum { kDecorationOp = kIRDecorationOp_VulkanHitAttributes };
 };
 
+struct IRRequireGLSLVersionDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_RequireGLSLVersion };
+
+    Int languageVersion;
+};
+
+struct IRRequireGLSLExtensionDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_RequireGLSLExtension };
+
+    StringRepresentation* extensionName;
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
