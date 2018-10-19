@@ -413,16 +413,6 @@ int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
     return -1;
 }
 
-int _calcSumPathIndices(SourceManager* manager)
-{
-    int sum = 0;
-    while (manager)
-    {
-        sum += int(manager->getStringSlicePool().getSlices().Count());
-        manager = manager->getParent();
-    }
-    return sum;
-}
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
@@ -750,9 +740,10 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    if (false)
+    if (true)
     {
-        // Okay lets order all SourceLocs for easier lookup, and better compressibility 
+        StringSlicePool debugStringPool;
+
         struct SourceLocInstIndex  
         {
             typedef SourceLocInstIndex ThisType;
@@ -769,6 +760,8 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             uint32_t instIndex;
         };
 
+        // Find all of the instructions 
+
         List<SourceLocInstIndex> locs;
         const int numInsts = int(m_insts.Count());
         for (int i = 1; i < numInsts; ++i)
@@ -780,7 +773,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             }    
         }
 
-        // Sort 
+        // Okay lets order all SourceLocs for easier lookup, and better compressibility 
         locs.Sort();
 
         // Lets filter this down so we only have unique source locs
@@ -795,14 +788,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             uint32_t pathIndex;
         };
 
-        int numPaths = 0;
-        List<int> pathIndexMap;
-        {
-            // Let's make a map 
-            const int totalNumPathIndices = _calcSumPathIndices(sourceManager);
-            pathIndexMap.SetSize(totalNumPathIndices);
-            memset(pathIndexMap.begin(), -1, totalNumPathIndices * sizeof(int));
-        }
+        // We could just fill up this table with everything...
 
         /* Really the challenge here is not about 'finding out the paths/line numbers etc used'
         a big part of the problem is how to reconstruct the data into a SourceManager such that it can be 
@@ -825,6 +811,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
         */
 
+
         // List of unique source views
         List<SourceView*> sourceViews;
         // List of runs
@@ -833,10 +820,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             SourceView* sourceView = sourceManager->findSourceView(SourceLoc::fromRaw(locs[0].sourceLoc));
             SLANG_ASSERT(sourceView);
             SourceRange viewRange = sourceView->getRange();
-
-            // Get the path base index
-            int viewBasePathIndex = _calcSumPathIndices(sourceView->getSourceManager()->getParent());
-            bool viewHasEntries = sourceView->getEntries().Count() > 0;
 
             uint32_t sourceLocFix = 0;
             //uint32_t sourceViewIndex = 0;
@@ -893,16 +876,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                             sourceView = nextSourceView;
                         }
 
-                        // Update the view 
-                        viewBasePathIndex = _calcSumPathIndices(sourceView->getSourceManager()->getParent());
-                        viewHasEntries = sourceView->getEntries().Count() > 0;
-
-                        // Lets assume the original path should always be saved 
-                        if (pathIndexMap[viewBasePathIndex] < 0)
-                        {
-                            pathIndexMap[viewBasePathIndex] = numPaths++;
-                        }
-
                         // After all this the source must be in range
                         SLANG_ASSERT(viewRange.contains(sourceLoc));
 
@@ -921,9 +894,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
                 SourceLoc fixSourceLoc(SourceLoc::fromRaw(rawSourceLoc + sourceLocFix));
                 
-                // The non remapped index if not overridden by an entry
-                uint32_t pathIndex = uint32_t(viewBasePathIndex);
-
+                
                 // Work out the line/column no from the file if there are no modifications
                 {
                     SourceFile* sourceFile = sourceView->getSourceFile();
@@ -936,102 +907,14 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                     run.columnNo = uint32_t(colIndex + 1);
                 }
 
-                // If the view has entries, then we need to look up the mapping
-                if (viewHasEntries)
-                {
-                    const int entryIndex = sourceView->findEntryIndex(fixSourceLoc);
-                    if (entryIndex >= 0)
-                    {
-                        const SourceView::Entry& entry = sourceView->getEntries()[entryIndex];
-                        // Adjust the line
-                        run.lineNo += entry.m_lineAdjust;
-                        // Fix the path index
-                        pathIndex += uint32_t(entry.m_pathHandle);
-                    }
-                }
-
-                int remapPathIndex = pathIndexMap[pathIndex];
-                if (remapPathIndex < 0)
-                {
-                    remapPathIndex = numPaths++;
-                    pathIndexMap[pathIndex] = remapPathIndex;
-                }
-
                 // Mark the index as used
-                run.pathIndex = uint32_t(remapPathIndex);
+                //run.pathIndex = uint32_t(remapPathIndex);
 
                 locRuns.Add(run);
             }
         }
-        
-
-
-#if 0
-        {
-            List<SourceView> sourceViews;
-            // Okay, now lets find if we can remap multiple SourceView to the same SourceFile. 
-
-            if (locs.Count() > 0)
-            {
-                // Look up the view
-                SourceView* sourceView = sourceManager->findSourceView(SourceLoc::fromRaw(locs[0].sourceLoc));
-                SourceLoc::RawValue fixLoc;
-
-                const int numLocs = int(locs.Count());
-                int i = 0;
-                while (i < numLocs)
-                {
-                    SourceLoc::RawValue sourceLoc = locs[i++].sourceLoc; 
-                    if (sourceView->getRange().contains(SourceLoc::fromRaw(sourceLoc)))
-                    {
-                        // It's in the range
-                    }
-                    else
-                    {
-                        // We need to lookup an another loc
-                    }
-
-
-                    // Skip if they are all the same value
-                    while (locs[i].sourceLoc == sourceLoc)
-                    {
-                        i++;
-                    }
-                }
-            }
-        }
-#endif
-
-       // __debugbreak();
-        // Lets see what we have in the way of source locations
-
-
-#if 0
-        List<HumaneSourceLoc> locs;
-        locs.SetSize(numInsts);
-
-        for (int i = 1; i < numInsts; ++i)
-        {
-         
-            if (srcInst->sourceLoc.isValid())
-            {
-                HumaneSourceLoc sourceLoc = sourceManager->getHumaneLoc(srcInst->sourceLoc);
-                if (!sourceLoc.pathInfo.hasFoundPath())
-                {
-                    // Need to know where this was used
-
-                    __debugbreak();
-
-                }
-
-                locs[i] = sourceLoc;
-            }
-
-        }
-
-        //__debugbreak();
-#endif
     }
+        
 
     m_serialData = nullptr;
     return SLANG_OK;

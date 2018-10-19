@@ -177,7 +177,10 @@ struct IRSerialData
     {
         uint32_t m_startLoc;                    ///< Start of the location range 
         uint32_t m_endLoc;                      ///< The end of the location range
+
         uint32_t m_pathIndex;                   ///< Path associated
+
+        uint32_t m_numLocRuns;                  ///< The number of location runs associated with this source file
         uint32_t m_numLineOffsets;              ///< The number of offsets associated with the file
         uint32_t m_numDebugViewEntries;         ///< The number of debug view entries
     };
@@ -391,7 +394,7 @@ struct IRSerialWriter
 
 protected:
     void _addInstruction(IRInst* inst);
-
+    
     List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
 
     List<IRDecoration*> m_decorations;                  ///< Holds all decorations in order of the instructions as found
@@ -399,9 +402,10 @@ protected:
 
     Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
-    StringSlicePool m_stringSlicePool;
-    
-    IRSerialData* m_serialData;                               ///< Where the data is stored
+    StringSlicePool m_stringSlicePool;    
+    IRSerialData* m_serialData;                         ///< Where the data is stored
+
+    StringSlicePool m_debugStringSlicePool;             ///< Slices held just for debug usage
 };
 
 struct IRSerialReader
