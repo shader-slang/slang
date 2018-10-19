@@ -4909,6 +4909,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // for a particular target, then handle that here.
         addTargetIntrinsicDecorations(irFunc, decl);
 
+        // If this declaration requires certain GLSL extension (or a particular GLSL version)
+        // for it to be usable, then declare that here.
+        //
+        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
+        // case for enumerating the "capabilities" that a declaration requires.
+        //
+        for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRRequireGLSLExtensionDecoration>(irFunc);
+            decoration->extensionName = getBuilder()->addStringToFree(extensionMod->extensionNameToken.Content);
+        }
+        for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRRequireGLSLVersionDecoration>(irFunc);
+            decoration->languageVersion = Int(getIntegerLiteralValue(versionMod->versionNumberToken));
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
