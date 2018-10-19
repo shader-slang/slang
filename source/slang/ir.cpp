@@ -5065,6 +5065,22 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_RequireGLSLExtension:
+                {
+                    auto originalDecoration = (IRRequireGLSLExtensionDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLExtensionDecoration>(clonedValue);
+                    newDecoration->extensionName = originalDecoration->extensionName;
+                }
+                break;
+
+            case kIRDecorationOp_RequireGLSLVersion:
+                {
+                    auto originalDecoration = (IRRequireGLSLVersionDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLVersionDecoration>(clonedValue);
+                    newDecoration->languageVersion = originalDecoration->languageVersion;
+                }
+                break;
+
             default:
                 // Don't clone any decorations we don't understand.
                 break;
