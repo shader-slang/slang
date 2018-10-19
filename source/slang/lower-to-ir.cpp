@@ -4923,7 +4923,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
         {
             auto decoration = getBuilder()->addDecoration<IRRequireGLSLVersionDecoration>(irFunc);
-            decoration->languageVersion = getIntegerLiteralValue(versionMod->versionNumberToken);
+            decoration->languageVersion = Int(getIntegerLiteralValue(versionMod->versionNumberToken));
         }
 
         // For convenience, ensure that any additional global
