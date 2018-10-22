@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -Itests\front-end\subdir
+//TEST:SIMPLE: -Itests/front-end/subdir
 
 // Confirming import lookup via search paths work
 
