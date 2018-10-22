@@ -676,7 +676,7 @@ LoweredValInfo emitCallToDeclRef(
 #undef CASE
             default:
                 SLANG_UNIMPLEMENTED_X("IR pseudo-op");
-                break;
+                UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
 
@@ -994,6 +994,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitVal(Val* /*val*/)
     {
         SLANG_UNIMPLEMENTED_X("value lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
@@ -1446,11 +1447,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitOverloadedExpr2(OverloadedExpr2* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
@@ -1498,6 +1501,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
 
         SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     // We will always lower a dereference expression (`*ptr`)
@@ -1662,6 +1666,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     // After a call to a function with `out` or `in out`
@@ -2034,11 +2039,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("generic application expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
@@ -5279,6 +5286,7 @@ IRInst* lowerSubstitutionArg(
     else
     {
         SLANG_UNIMPLEMENTED_X("value cases");
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -5419,6 +5427,7 @@ LoweredValInfo emitDeclRef(
     else
     {
         SLANG_UNEXPECTED("uhandled substitution type");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 }
 
