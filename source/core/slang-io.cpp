@@ -132,6 +132,49 @@ namespace Slang
 #endif
 	}
 
+    /* static */SlangResult Path::GetPathType(const String & path, SlangPathType* pathTypeOut)
+    {
+#ifdef _WIN32
+        // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
+        struct _stat32 statVar;
+        if (::_wstat32(String(path).ToWString(), &statVar) == 0)
+        {
+            if (statVar.st_mode & _S_IFDIR)
+            {
+                *pathTypeOut = SLANG_PATH_TYPE_DIRECTORY;
+                return SLANG_OK;
+            }
+            else if (statVar.st_mode & _S_IFREG)
+            {
+                *pathTypeOut = SLANG_PATH_TYPE_FILE;
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
+        }
+
+        return SLANG_E_NOT_FOUND;
+#else
+        struct stat statVar;
+        if (::stat(path.Buffer(), &statVar) == 0)
+        {
+            if (S_ISDIR(statVar.st_mode))
+            {
+                *pathTypeOut = SLANG_PATH_TYPE_DIRECTORY;
+                return SLANG_OK;
+            }
+            if (S_ISREG(statVar.st_mode))
+            {
+                *pathTypeOut = SLANG_PATH_TYPE_FILE;
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
+        }
+
+        return SLANG_E_NOT_FOUND;
+#endif
+    }
+
+
     /* static */SlangResult Path::GetCanonical(const String & path, String & canonicalPathOut)
     {
 #if defined(_WIN32)

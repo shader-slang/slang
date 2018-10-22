@@ -51,6 +51,13 @@ SlangResult DefaultFileSystem::calcRelativePath(SlangPathType fromPathType, cons
     return SLANG_OK;
 }
 
+SlangResult SLANG_MCALL DefaultFileSystem::getPathType(
+    const char* path,
+    SlangPathType* pathTypeOut)
+{
+    return Path::GetPathType(path, pathTypeOut);   
+}
+
 SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
     // Default implementation that uses the `core`
@@ -105,6 +112,11 @@ SlangResult WrapFileSystem::calcRelativePath(SlangPathType fromPathType, const c
 {
     // Just defer to the default implementation
     return DefaultFileSystem::getSingleton()->calcRelativePath(fromPathType, fromPath, path, pathOut);
+}
+
+SlangResult WrapFileSystem::getPathType(const char* path, SlangPathType* pathTypeOut)
+{
+    return DefaultFileSystem::getSingleton()->getPathType(path, pathTypeOut); 
 }
 
 } 

@@ -118,6 +118,13 @@ struct IncludeHandlerImpl : IncludeHandler
             return SLANG_FAIL;
         }
      
+        SlangPathType pathType;
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(relPath.begin(), &pathType));
+        if (pathType != SLANG_PATH_TYPE_FILE)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
         // Get the canonical path
         ComPtr<ISlangBlob> canonicalPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
