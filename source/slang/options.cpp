@@ -43,70 +43,138 @@ struct OptionsParser
 
     Slang::CompileRequest*  requestImpl = nullptr;
 
+    // A "translation unit" represents one or more source files
+    // that are processed as a single entity when it comes to
+    // semantic checking.
+    //
+    // For languages like HLSL, GLSL, and C, a translation unit
+    // is usually a single source file (which can then go on
+    // to `#include` other files into the same translation unit).
+    //
+    // For Slang, we support having multiple source files in
+    // a single translation unit, and indeed command-line `slangc`
+    // will always put all the source files into a single translation
+    // unit.
+    //
+    // We track information on the translation units that we
+    // create during options parsing, so that we can assocaite
+    // other entities with these translation units:
+    //
     struct RawTranslationUnit
     {
+        // What language is the translation unit using?
+        //
+        // Note: We do not support translation units that mix
+        // languages.
+        //
         SlangSourceLanguage sourceLanguage;
-        SlangProfileID      implicitProfile;
-        int                 translationUnitIndex;
-    };
 
-    // Collect translation units so that we can futz with them later
+        // Certain naming conventions imply a stage for
+        // a file with only a single entry point, and in
+        // those cases we will try to infer the stage from
+        // the file when it is possible.
+        //
+        Stage impliedStage;
+
+        // We retain the Slang API level translation unit index,
+        // which we will call an "ID" inside the options parsing code.
+        //
+        // This will almost always be the index into the
+        // `rawTranslationUnits` array below, but could conceivably,
+        // be mismatched if we were parsing options for a compile
+        // request that already had some translation unit(s) added
+        // manually.
+        //
+        int                 translationUnitID;
+    };
     List<RawTranslationUnit> rawTranslationUnits;
 
-    struct RawEntryPoint
-    {
-        String          name;
-        Profile         profile;
-        int             translationUnitIndex = -1;
-        int             outputPathIndex = -1;
-    };
-
-    // Collect entry point names, so that we can associate them
-    // with entry points later...
-    List<RawEntryPoint> rawEntryPoints;
+    // If we already have a translation unit for Slang code, then this will give its index.
+    // If not, it will be `-1`.
+    int slangTranslationUnitIndex = -1;
 
     // The number of input files that have been specified
     int inputPathCount = 0;
 
-    // If we already have a translation unit for Slang code, then this will give its index.
-    // If not, it will be `-1`.
-    int slangTranslationUnit = -1;
-
     int translationUnitCount = 0;
-    int currentTranslationUnitIndex = -1;
+    int currentTranslationUnitIndex= -1;
 
-    // The currently specified '-profile' and/or '-stage' options.
-    Profile currentProfile = Profile::Unknown;
+    // An entry point represents a function to be checked and possibly have
+    // code generated in one of our translation units. An entry point
+    // needs to have an assocaited stage, which might come via the
+    // `-stage` command line option, or a `[shader("...")]` attribute
+    // in the source code.
+    //
+    struct RawEntryPoint
+    {
+        String  name;
+        Stage   stage = Stage::Unknown;
+        int     translationUnitIndex = -1;
+        int     entryPointID = -1;
 
-    // How many times were `-profile` and '-stage' options given?
-    int profileOptionCount = 0;
-    int stageOptionCount = 0;
+        // State for tracking command-line errors
+        bool conflictingStagesSet = false;
+        bool redundantStageSet = false;
+    };
+    //
+    // We collect the entry points in a "raw" array so that we can
+    // possibly associate them with a stage or translation unit
+    // after the fact.
+    //
+    List<RawEntryPoint> rawEntryPoints;
+
+    // In the case where we have only a single entry point,
+    // the entry point and its options might be specified out
+    // of order, so we will keep a single `RawEntryPoint` around
+    // and use it as the target for any state-setting options
+    // before the first "proper" entry point is specified.
+    RawEntryPoint defaultEntryPoint;
 
     SlangCompileFlags flags = 0;
-    SlangTargetFlags targetFlags = 0;
 
-    struct RawOutputPath
+    struct RawOutput
     {
-        String              path;
-        SlangCompileTarget  target;
+        String          path;
+        CodeGenTarget   impliedFormat = CodeGenTarget::Unknown;
+        int             targetIndex = -1;
+        int             entryPointIndex = -1;
     };
+    List<RawOutput> rawOutputs;
 
-    List<RawOutputPath> rawOutputPaths;
+    struct RawTarget
+    {
+        CodeGenTarget       format = CodeGenTarget::Unknown;
+        ProfileVersion      profileVersion = ProfileVersion::Unknown;
+        SlangTargetFlags    targetFlags = 0;
+        int                 targetID = -1;
 
-    SlangCompileTarget chosenTarget = SLANG_TARGET_NONE;
+        // State for tracking command-line errors
+        bool conflictingProfilesSet = false;
+        bool redundantProfileSet = false;
+
+    };
+    List<RawTarget> rawTargets;
+
+    RawTarget defaultTarget;
 
     int addTranslationUnit(
         SlangSourceLanguage language,
-        SlangProfileID      implicitProfile = SLANG_PROFILE_UNKNOWN)
+        Stage               impliedStage)
     {
-        auto translationUnitIndex = spAddTranslationUnit(compileRequest, language, nullptr);
+        auto translationUnitIndex = rawTranslationUnits.Count();
+        auto translationUnitID = spAddTranslationUnit(compileRequest, language, nullptr);
 
-        SLANG_RELEASE_ASSERT(UInt(translationUnitIndex) == rawTranslationUnits.Count());
+        // As a sanity check: the API should be returning the same translation
+        // unit index as we maintain internally. This invariant would only
+        // be broken if we decide to support a mix of translation units specified
+        // via API, and ones specified via command-line arguments.
+        //
+        SLANG_RELEASE_ASSERT(UInt(translationUnitID) == translationUnitIndex);
 
         RawTranslationUnit rawTranslationUnit;
         rawTranslationUnit.sourceLanguage = language;
-        rawTranslationUnit.implicitProfile = implicitProfile;
-        rawTranslationUnit.translationUnitIndex = translationUnitIndex;
+        rawTranslationUnit.translationUnitID = translationUnitID;
+        rawTranslationUnit.impliedStage = impliedStage;
 
         rawTranslationUnits.Add(rawTranslationUnit);
 
@@ -118,32 +186,32 @@ struct OptionsParser
     {
         // All of the input .slang files will be grouped into a single logical translation unit,
         // which we create lazily when the first .slang file is encountered.
-        if( slangTranslationUnit == -1 )
+        if( slangTranslationUnitIndex == -1 )
         {
             translationUnitCount++;
-            slangTranslationUnit = addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG);
+            slangTranslationUnitIndex = addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
         }
 
         spAddTranslationUnitSourceFile(
             compileRequest,
-            slangTranslationUnit,
+            rawTranslationUnits[slangTranslationUnitIndex].translationUnitID,
             path.begin());
 
         // Set the translation unit to be used by subsequent entry points
-        currentTranslationUnitIndex = slangTranslationUnit;
+        currentTranslationUnitIndex = slangTranslationUnitIndex;
     }
 
     void addInputForeignShaderPath(
         String const&           path,
         SlangSourceLanguage     language,
-        SlangProfileID          implicitProfile = SLANG_PROFILE_UNKNOWN)
+        Stage                   impliedStage)
     {
         translationUnitCount++;
-        currentTranslationUnitIndex = addTranslationUnit(language, implicitProfile);
+        currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
 
         spAddTranslationUnitSourceFile(
             compileRequest,
-            currentTranslationUnitIndex,
+            rawTranslationUnits[currentTranslationUnitIndex].translationUnitID,
             path.begin());
     }
 
@@ -175,25 +243,39 @@ struct OptionsParser
         return Profile::Unknown;
     }
 
-    static SlangSourceLanguage findSourceLanguageFromPath(const String& path, SlangProfileID* profileOut)
+    static SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
     {
-        *profileOut = SLANG_PROFILE_UNKNOWN;
+        struct Entry
+        {
+            const char*         ext;
+            SlangSourceLanguage sourceLanguage;
+            SlangStage          impliedStage;
+        };
 
-        if (path.EndsWith(".hlsl") ||
-            path.EndsWith(".fx"))
+        static const Entry entries[] = 
         {
-            return SLANG_SOURCE_LANGUAGE_HLSL;
-        }
-        if (path.EndsWith(".glsl"))
-        {
-            return SLANG_SOURCE_LANGUAGE_GLSL;
-        }
+            { ".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE },
 
-        Profile::RawVal profile = findGlslProfileFromPath(path);
-        if (profile != Profile::Unknown)
+            { ".hlsl",  SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE },
+            { ".fx",    SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE },
+
+            { ".glsl", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_NONE },
+            { ".vert", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_VERTEX },
+            { ".frag", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_FRAGMENT },
+            { ".geom", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_GEOMETRY },
+            { ".tesc", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_HULL },
+            { ".tese", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_DOMAIN },
+            { ".comp", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_COMPUTE },
+        };
+
+        for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
-            *profileOut = SlangProfileID(profile);
-            return SLANG_SOURCE_LANGUAGE_GLSL;
+            const Entry& entry = entries[i];
+            if (path.EndsWith(entry.ext))
+            {
+                outImpliedStage = Stage(entry.impliedStage);
+                return entry.sourceLanguage;
+            }
         }
         return SLANG_SOURCE_LANGUAGE_UNKNOWN;
     }
@@ -213,9 +295,9 @@ struct OptionsParser
             addInputSlangPath(path);
             return SLANG_OK;
         }
-        
-        SlangProfileID profileID;
-        SlangSourceLanguage sourceLanguage = findSourceLanguageFromPath(path, &profileID);
+
+        Stage impliedStage = Stage::Unknown;
+        SlangSourceLanguage sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
         
         if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
         {
@@ -223,20 +305,19 @@ struct OptionsParser
             return SLANG_FAIL;
         }
 
-        addInputForeignShaderPath(path, sourceLanguage, profileID);
+        addInputForeignShaderPath(path, sourceLanguage, impliedStage);
 
         return SLANG_OK;
     }
 
     void addOutputPath(
-        String const&       path,
-        SlangCompileTarget  target)
+        String const&   path,
+        CodeGenTarget   impliedFormat)
     {
-        RawOutputPath rawOutputPath;
-        rawOutputPath.path = path;
-        rawOutputPath.target = target;
-
-        rawOutputPaths.Add(rawOutputPath);
+        RawOutput rawOutput;
+        rawOutput.path = path;
+        rawOutput.impliedFormat = impliedFormat;
+        rawOutputs.Add(rawOutput);
     }
 
     void addOutputPath(char const* inPath)
@@ -245,13 +326,16 @@ struct OptionsParser
 
         if (!inPath) {}
 #define CASE(EXT, TARGET)   \
-        else if(path.EndsWith(EXT)) do { addOutputPath(path, SLANG_##TARGET); } while(0)
+        else if(path.EndsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
 
         CASE(".hlsl", HLSL);
         CASE(".fx",   HLSL);
 
         CASE(".dxbc", DXBC);
         CASE(".dxbc.asm", DXBC_ASM);
+
+        CASE(".dxil", DXIL);
+        CASE(".dxil.asm", DXIL_ASM);
 
         CASE(".glsl", GLSL);
         CASE(".vert", GLSL);
@@ -275,8 +359,47 @@ struct OptionsParser
         {
             // Allow an unknown-format `-o`, assuming we get a target format
             // from another argument.
-            addOutputPath(path, SLANG_TARGET_UNKNOWN);
+            addOutputPath(path, CodeGenTarget::Unknown);
         }
+    }
+
+    RawEntryPoint* getCurrentEntryPoint()
+    {
+        auto rawEntryPointCount = rawEntryPoints.Count();
+        return rawEntryPointCount ? &rawEntryPoints[rawEntryPointCount-1] : &defaultEntryPoint;
+    }
+
+    void setStage(RawEntryPoint* rawEntryPoint, Stage stage)
+    {
+        if(rawEntryPoint->stage != Stage::Unknown)
+        {
+            rawEntryPoint->redundantStageSet = true;
+            if( stage != rawEntryPoint->stage )
+            {
+                rawEntryPoint->conflictingStagesSet = true;
+            }
+        }
+        rawEntryPoint->stage = stage;
+    }
+
+    RawTarget* getCurrentTarget()
+    {
+        auto rawTargetCount = rawTargets.Count();
+        return rawTargetCount ? &rawTargets[rawTargetCount-1] : &defaultTarget;
+    }
+
+    void setProfileVersion(RawTarget* rawTarget, ProfileVersion profileVersion)
+    {
+        if(rawTarget->profileVersion != ProfileVersion::Unknown)
+        {
+            rawTarget->redundantProfileSet = true;
+
+            if(profileVersion != rawTarget->profileVersion)
+            {
+                rawTarget->conflictingProfilesSet = true;
+            }
+        }
+        rawTarget->profileVersion = profileVersion;
     }
 
     SlangResult parse(
@@ -300,14 +423,6 @@ struct OptionsParser
             {
                 String argStr = String(arg);
 
-                // The argument looks like an option, so try to parse it.
-//                if (argStr == "-outdir")
-//                    outputDir = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-//                if (argStr == "-out")
-//                    options.outputName = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-//                else if (argStr == "-symbo")
-//                    options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-                //else
                 if(argStr == "-no-mangle" )
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
@@ -334,65 +449,45 @@ struct OptionsParser
                 }
                 else if(argStr == "-parameter-blocks-use-register-spaces" )
                 {
-                    targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
+                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
-                else if (argStr == "-backend" || argStr == "-target")
+                else if (argStr == "-target")
                 {
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
+                    SlangCompileTarget format = SLANG_TARGET_UNKNOWN;
 
-                    if (name == "glsl")
-                    {
-                        target = SLANG_GLSL;
-                    }
-                    else if (name == "glsl_vk")
-                    {
-                        target = SLANG_GLSL_VULKAN;
-                    }
-//                    else if (name == "glsl_vk_onedesc")
-//                    {
-//                        options.Target = CodeGenTarget::GLSL_Vulkan_OneDesc;
-//                    }
-                    else if (name == "hlsl")
-                    {
-                        target = SLANG_HLSL;
-                    }
-                    else if (name == "spriv")
-                    {
-                        target = SLANG_SPIRV;
-                    }
-                    else if (name == "dxbc")
-                    {
-                        target = SLANG_DXBC;
-                    }
-                    else if (name == "dxbc-assembly")
-                    {
-                        target = SLANG_DXBC_ASM;
-                    }
                 #define CASE(NAME, TARGET)  \
-                    else if(name == #NAME) do { target = SLANG_##TARGET; } while(0)
+                    if(name == NAME) { format = SLANG_##TARGET; } else
 
-                    CASE(spirv, SPIRV);
-                    CASE(spirv-assembly, SPIRV_ASM);
-                    CASE(dxil, DXIL);
-                    CASE(dxil-assembly, DXIL_ASM);
-                    CASE(none, TARGET_NONE);
+                    CASE("hlsl", HLSL)
+                    CASE("glsl", GLSL)
+                    CASE("dxbc", DXBC)
+                    CASE("dxbc-assembly", DXBC_ASM)
+                    CASE("dxbc-asm", DXBC_ASM)
+                    CASE("spirv", SPIRV)
+                    CASE("spirv-assembly", SPIRV_ASM)
+                    CASE("spirv-asm", SPIRV_ASM)
+                    CASE("dxil", DXIL)
+                    CASE("dxil-assembly", DXIL_ASM)
+                    CASE("dxil-asm", DXIL_ASM)
 
                 #undef CASE
-
-                    else
+                    /* else */
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownCodeGenerationTarget, name);
                         return SLANG_FAIL;
                     }
 
-                    this->chosenTarget = target;
-                    spSetCodeGenTarget(compileRequest, target);
+                    RawTarget rawTarget;
+                    rawTarget.format = CodeGenTarget(format);
+
+                    rawTargets.Add(rawTarget);
                 }
-                // A "profile" specifies both a specific target stage and a general level
-                // of capability required by the program.
+                // A "profile" can specify both a general capability level for
+                // a target, and also (as a legacy/compatibility feature) a
+                // specific stage to use for an entry point.
                 else if (argStr == "-profile")
                 {
                     String name;
@@ -406,16 +501,16 @@ struct OptionsParser
                     }
                     else
                     {
-                        auto newProfile = Profile(profileID);
-                        currentProfile.setVersion(newProfile.GetVersion());
-                        profileOptionCount++;
+                        auto profile = Profile(profileID);
+
+                        setProfileVersion(getCurrentTarget(), profile.GetVersion());
 
                         // A `-profile` option that also specifies a stage (e.g., `-profile vs_5_0`)
                         // should be treated like a composite (e.g., `-profile sm_5_0 -stage vertex`)
-                        if(newProfile.GetStage() != Stage::Unknown)
+                        auto stage = profile.GetStage();
+                        if(stage != Stage::Unknown)
                         {
-                            currentProfile.setStage(newProfile.GetStage());
-                            stageOptionCount++;
+                            setStage(getCurrentEntryPoint(), stage);
                         }
                     }
                 }
@@ -432,8 +527,7 @@ struct OptionsParser
                     }
                     else
                     {
-                        currentProfile.setStage(stage);
-                        stageOptionCount++;
+                        setStage(getCurrentEntryPoint(), stage);
                     }
                 }
                 else if (argStr == "-entry")
@@ -441,38 +535,12 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    RawEntryPoint entry;
-                    entry.name = name;
-                    entry.translationUnitIndex = currentTranslationUnitIndex;
+                    RawEntryPoint rawEntryPoint;
+                    rawEntryPoint.name = name;
+                    rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
-                    int outputPathCount = (int) rawOutputPaths.Count();
-                    int currentOutputPathIndex = outputPathCount - 1;
-                    entry.outputPathIndex = currentOutputPathIndex;
-
-                    entry.profile = currentProfile;
-
-                    rawEntryPoints.Add(entry);
+                    rawEntryPoints.Add(rawEntryPoint);
                 }
-#if 0
-                else if (argStr == "-stage")
-                {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-
-                    StageTarget stage = StageTarget::Unknown;
-                    if (name == "vertex") { stage = StageTarget::VertexShader; }
-                    else if (name == "fragment") { stage = StageTarget::FragmentShader; }
-                    else if (name == "hull") { stage = StageTarget::HullShader; }
-                    else if (name == "domain") { stage = StageTarget::DomainShader; }
-                    else if (name == "compute") { stage = StageTarget::ComputeShader; }
-                    else
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownStage, name);
-                        return SLANG_FAIL;
-                    }
-                    options.stage = stage;
-                }
-#endif
                 else if (argStr == "-pass-through")
                 {
                     String name;
@@ -492,8 +560,6 @@ struct OptionsParser
                         compileRequest,
                         passThrough);
                 }
-//                else if (argStr == "-genchoice")
-//                    options.Mode = CompilerMode::GenerateChoice;
                 else if (argStr[1] == 'D')
                 {
                     // The value to be defined might be part of the same option, as in:
@@ -619,282 +685,78 @@ struct OptionsParser
 
         spSetCompileFlags(compileRequest, flags);
 
-        // TODO(tfoley): This kind of validation needs to wait until
-        // after all options have been specified for API usage
-#if 0
-        if (inputPathCount == 0)
+        // As a compatability feature, if the user didn't list any explicit entry
+        // point names, *and* they are compiling a single translation unit, *and* they
+        // have either specified a stage, or we can assume one from the naming
+        // of the translation unit, then we assume they wanted to compile a single
+        // entry point named `main`.
+        //
+        if(rawEntryPoints.Count() == 0
+           && rawTranslationUnits.Count() == 1
+           && (defaultEntryPoint.stage != Stage::Unknown
+                || rawTranslationUnits[0].impliedStage != Stage::Unknown))
         {
-            fprintf(stderr, "error: no input file specified\n");
-            return SLANG_E_INVALID_ARG; 
+            RawEntryPoint entry;
+            entry.name = "main";
+            entry.translationUnitIndex = 0;
+            rawEntryPoints.Add(entry);
         }
 
-        // No point in moving forward if there is nothing to compile
-        if( translationUnitCount == 0 )
+        // If the user (manually or implicitly) specified only a single entry point,
+        // then we allow the associated stage to be specified either before or after
+        // the entry point. This means that if there is a stage attached
+        // to the "default" entry point, we should copy it over to the
+        // explicit one.
+        //
+        if( rawEntryPoints.Count() == 1 )
         {
-            fprintf(stderr, "error: no compilation requested\n");
-            return SLANG_FAIL; 
-        }
-#endif
-
-        // If the user didn't list any explicit entry points, then we can
-        // try to infer one from the type of input file
-        if(rawEntryPoints.Count() == 0)
-        {
-            for(auto rawTranslationUnit : rawTranslationUnits)
+            if(defaultEntryPoint.stage != Stage::Unknown)
             {
-                // Dont' add implicit entry points when compiling from Slang files,
-                // since Slang doesn't require entry points to be named on the
-                // command line.
-                if(rawTranslationUnit.sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG )
-                    continue;
+                setStage(getCurrentEntryPoint(), defaultEntryPoint.stage);
+            }
 
-                // Use a default entry point name
-                char const* entryPointName = "main";
-
-                // Try to determine a profile and stage
-
-                // If a profile and/or stage was specified on the command line, then we use it
-                Profile entryPointProfile = currentProfile;
-
-                // Otherwise, check if the translation unit implied a profile
-                // (e.g., a `*.vert` file implies the `GLSL_Vertex` profile)
-                //
-                // TODO: most of this is just there to support GLSL files
-                // as input, which doesn't make sense when we don't support
-                // GLSL at all other than for pass-through. We should ditch
-                // as much of this complexity as possible.
-                //
-                if(entryPointProfile.raw == SLANG_PROFILE_UNKNOWN)
+            if(defaultEntryPoint.redundantStageSet)
+                getCurrentEntryPoint()->redundantStageSet = true;
+            if(defaultEntryPoint.conflictingStagesSet)
+                getCurrentEntryPoint()->conflictingStagesSet = true;
+        }
+        else
+        {
+            // If the "default" entry point has had a stage (or
+            // other state, if we add other per-entry-point state)
+            // specified, but there is more than one entry point,
+            // then that state doesn't apply to anything and we
+            // should issue an error to tell the user something
+            // funky is going on.
+            //
+            if( defaultEntryPoint.stage != Stage::Unknown )
+            {
+                if( rawEntryPoints.Count() == 0 )
                 {
-                    if(rawTranslationUnit.implicitProfile != SLANG_PROFILE_UNKNOWN)
-                    {
-                        entryPointProfile = rawTranslationUnit.implicitProfile;
-                    }
+                    sink->diagnose(SourceLoc(), Diagnostics::stageSpecificationIgnoredBecauseNoEntryPoints);
                 }
-
-
-                RawEntryPoint entry;
-                entry.name = entryPointName;
-                entry.translationUnitIndex = rawTranslationUnit.translationUnitIndex;
-                entry.profile = entryPointProfile;
-                rawEntryPoints.Add(entry);
+                else
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::stageSpecificationIgnoredBecauseBeforeAllEntryPoints);
+                }
             }
         }
 
-        // For any entry points that were given without an explicit profile, we can now apply
-        // the profile that was given to them.
-        if( rawEntryPoints.Count() != 0 )
+        // Slang requires that every explicit entry point indicate the translation
+        // unit it comes from. If there is only one translation unit specified,
+        // then implicitly all entry points come from it.
+        //
+        if(translationUnitCount == 1)
         {
-            bool anyEntryPointWithoutProfile = false;
-            bool anyEntryPointWithoutStage = false;
             for( auto& entryPoint : rawEntryPoints )
             {
-                if(entryPoint.profile.GetStage() == Stage::Unknown)
-                {
-                    anyEntryPointWithoutStage = true;
-                }
-
-                if(entryPoint.profile.getFamily() == ProfileFamily::Unknown)
-                {
-                    anyEntryPointWithoutProfile = true;
-                }
-            }
-
-            if(anyEntryPointWithoutStage)
-            {
-                // If there are entry points that never got a stage specified, and
-                // the user used multiple `-profile` and `-stage` options to try
-                // and establish stages, then that is an error, because we can't
-                // infer a stage for whatever is left.
-                if(stageOptionCount > 1)
-                {
-                    if (rawEntryPoints.Count() > 1)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleStages);
-                        return SLANG_E_INVALID_ARG;
-                    }
-                }
-
-                // If a stage never got specified, then that is an error.
-                if(currentProfile.GetStage() == Stage::Unknown)
-                {
-                    sink->diagnose(SourceLoc(), Diagnostics::noStageSpecified);
-                    return SLANG_E_INVALID_ARG;
-                }
-
-                // Otherwise, exactly one stage was specified on the command line,
-                // and that should implicitly apply to all the entry points.
-                for( auto& e : rawEntryPoints )
-                {
-                    if(e.profile.GetStage() == Stage::Unknown)
-                    {
-                        e.profile.setStage(currentProfile.GetStage());
-                    }
-                }
-            }
-
-            if(anyEntryPointWithoutProfile )
-            {
-                // If there are entry points that never got a profile specified, and
-                // the user used multiple `-profile` options to try and establish
-                // different profiles, then that is an error, because we can't
-                // infer a stage for whatever is left.
-                if(profileOptionCount > 1)
-                {
-                    if (rawEntryPoints.Count() > 1)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::multipleEntryPointsNeedMulitpleProfiles);
-                        return SLANG_E_INVALID_ARG;
-                    }
-                }
-
-                // If a profile never got specified, then that is an error.
-                if(currentProfile.getFamily() == ProfileFamily::Unknown)
-                {
-                    sink->diagnose(SourceLoc(), Diagnostics::noProfileSpecified);
-                    return SLANG_E_INVALID_ARG;
-                }
-
-                // Otherwise, exactly one profile was specified on the command line,
-                // and that should implicitly apply to all the entry points.
-                for( auto& e : rawEntryPoints )
-                {
-                    if(e.profile.getFamily() == ProfileFamily::Unknown)
-                    {
-                        e.profile.setVersion(currentProfile.GetVersion());
-                    }
-                }
+                entryPoint.translationUnitIndex = 0;
             }
         }
-
-        // If the user is requesting multiple targets, *and* is asking
-        // for direct output files for entry points, that is an error.
-        if (rawOutputPaths.Count() != 0 && requestImpl->targets.Count() > 1)
+        else
         {
-            sink->diagnose(SourceLoc(), Diagnostics::explicitOutputPathsAndMultipleTargets);
-        }
-
-        // Did the user try to specify output path(s)?
-        if (rawOutputPaths.Count() != 0)
-        {
-            if (rawEntryPoints.Count() == 1 && rawOutputPaths.Count() == 1)
-            {
-                // There was exactly one entry point, and exactly one output path,
-                // so we can directly use that path for the entry point.
-                rawEntryPoints[0].outputPathIndex = 0;
-            }
-            else if (rawOutputPaths.Count() > rawEntryPoints.Count())
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::tooManyOutputPathsSpecified,
-                    rawOutputPaths.Count(), rawEntryPoints.Count());
-            }
-            else
-            {
-                // If the user tried to apply explicit output paths, but there
-                // were any entry points that didn't pick up a path, that is
-                // an error:
-                for( auto& entryPoint : rawEntryPoints )
-                {
-                    if (entryPoint.outputPathIndex < 0)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::noOutputPathSpecifiedForEntryPoint, entryPoint.name);
-
-                        // Don't emit this same error for other entry
-                        // points, even if we have more
-                        break;
-                    }
-                }
-            }
-
-            // All of the output paths had better agree on the format
-            // they should provide.
-            switch (chosenTarget)
-            {
-            case SLANG_TARGET_NONE:
-            case SLANG_TARGET_UNKNOWN:
-                // No direct `-target` argument given, so try to infer
-                // a target from the entry points:
-                {
-                    bool anyUnknownTargets = false;
-                    for (auto rawOutputPath : rawOutputPaths)
-                    {
-                        if (rawOutputPath.target == SLANG_TARGET_UNKNOWN)
-                        {
-                            // This file didn't imply a target, and that
-                            // needs to be an error:
-                            sink->diagnose(SourceLoc(), Diagnostics::cannotDeduceOutputFormatFromPath, rawOutputPath.path);
-
-                            // Don't keep looking for errors
-                            anyUnknownTargets = true;
-                            break;
-                        }
-                    }
-
-                    if (!anyUnknownTargets)
-                    {
-                        // Okay, all the files have explicit targets,
-                        // so we will set the code generation target
-                        // accordingly, and then ensure that all
-                        // the other output paths specified (if any)
-                        // are consistent with the chosen target.
-                        //
-                        auto target = rawOutputPaths[0].target;
-                        spSetCodeGenTarget(
-                            compileRequest,
-                            target);
-
-                        for (auto rawOutputPath : rawOutputPaths)
-                        {
-                            if (rawOutputPath.target != target)
-                            {
-                                // This file didn't imply a target, and that
-                                // needs to be an error:
-                                sink->diagnose(
-                                    SourceLoc(),
-                                    Diagnostics::outputPathsImplyDifferentFormats,
-                                    rawOutputPaths[0].path,
-                                    rawOutputPath.path);
-
-                                // Don't keep looking for errors
-                                break;
-                            }
-                        }
-                    }
-
-                }
-                break;
-
-            default:
-                {
-                    // An explicit target was given on the command-line.
-                    // We will trust that the user knows what they are
-                    // doing, even if one of the output files implies
-                    // a different format.
-                }
-                break;
-
-            }
-        }
-
-        // If the user specified and per-compilation-target flags, make sure
-        // to apply them here.
-        if(targetFlags)
-        {
-            spSetTargetFlags(compileRequest, 0, targetFlags);
-        }
-
-        if(defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
-        {
-            UInt targetCount = requestImpl->targets.Count();
-            for(UInt tt = 0; tt < targetCount; ++tt)
-            {
-                spSetTargetMatrixLayoutMode(compileRequest, int(tt), defaultMatrixLayoutMode);
-            }
-        }
-
-        // Next, we want to make sure that entry points get attached to the appropriate translation
-        // unit that will provide them.
-        {
+            // Otherwise, we require that all entry points be specified after
+            // the translation unit to which tye belong.
             bool anyEntryPointWithoutTranslationUnit = false;
             for( auto& entryPoint : rawEntryPoints )
             {
@@ -903,45 +765,411 @@ struct OptionsParser
                     continue;
 
                 anyEntryPointWithoutTranslationUnit = true;
-                entryPoint.translationUnitIndex = 0;
             }
-
-            if( anyEntryPointWithoutTranslationUnit && translationUnitCount != 1 )
+            if( anyEntryPointWithoutTranslationUnit )
             {
-                sink->diagnose(SourceLoc(), Diagnostics::multipleTranslationUnitsNeedEntryPoints);
+                sink->diagnose(SourceLoc(), Diagnostics::entryPointsNeedToBeAssociatedWithTranslationUnits);
                 return SLANG_FAIL;
             }
+        }
 
-            // Now place all those entry points where they belong
-            for( auto& entryPoint : rawEntryPoints )
+        // Now that entry points are associated with translation units,
+        // we can make one additional pass where if an entry point has
+        // no specified stage, but the nameing of its translation unit
+        // implies a stage, we will use that (a manual `-stage` annotation
+        // will always win out in such a case).
+        //
+        for( auto& rawEntryPoint : rawEntryPoints )
+        {
+            // Skip entry points that already have a stage.
+            if(rawEntryPoint.stage != Stage::Unknown)
+                continue;
+
+            // Sanity check: don't process entry points with no associated translation unit.
+            if( rawEntryPoint.translationUnitIndex == -1 )
+                continue;
+
+            auto impliedStage = rawTranslationUnits[rawEntryPoint.translationUnitIndex].impliedStage;
+            if(impliedStage != Stage::Unknown)
+                rawEntryPoint.stage = impliedStage;
+        }
+
+        // Note: it is possible that some entry points still won't have associated
+        // stages at this point, but we don't want to error out here, because
+        // those entry points might get stages later, as part of semantic checking,
+        // if the corresponding function has a `[shader("...")]` attribute.
+
+        // Now that we've tried to establish stages for entry points, we can
+        // issue diagnostics for cases where stages were set redundantly or
+        // in conflicting ways.
+        //
+        for( auto& rawEntryPoint : rawEntryPoints )
+        {
+            if( rawEntryPoint.conflictingStagesSet )
             {
-                int entryPointIndex = spAddEntryPoint(
-                    compileRequest,
-                    entryPoint.translationUnitIndex,
-                    entryPoint.name.begin(),
-                    entryPoint.profile.raw);
+                sink->diagnose(SourceLoc(), Diagnostics::conflictingStagesForEntryPoint, rawEntryPoint.name);
+            }
+            else if( rawEntryPoint.redundantStageSet )
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::sameStageSpecifiedMoreThanOnce, rawEntryPoint.stage, rawEntryPoint.name);
+            }
+            else if( rawEntryPoint.translationUnitIndex != -1 )
+            {
+                // As a quality-of-life feature, if the file name implies a particular
+                // stage, but the user manually specified something different for
+                // their entry point, give a warning in case they made a mistake.
 
-                // If an output path was specified for the entry point,
-                // when we need to provide it here.
-                if (entryPoint.outputPathIndex >= 0)
+                auto& rawTranslationUnit = rawTranslationUnits[rawEntryPoint.translationUnitIndex];
+                if( rawTranslationUnit.impliedStage != Stage::Unknown
+                    && rawEntryPoint.stage != Stage::Unknown
+                    && rawTranslationUnit.impliedStage != rawEntryPoint.stage )
                 {
-                    auto rawOutputPath = rawOutputPaths[entryPoint.outputPathIndex];
-
-                    requestImpl->entryPoints[entryPointIndex]->outputPath = rawOutputPath.path;
+                    sink->diagnose(SourceLoc(), Diagnostics::explicitStageDoesntMatchImpliedStage, rawEntryPoint.name, rawEntryPoint.stage, rawTranslationUnit.impliedStage);
                 }
             }
         }
 
-#if 0
-        // Automatically derive an output directory based on the first file specified.
+        // If the user is requesting code generation via pass-through,
+        // then any entry points they specify need to have a stage set,
+        // because fxc/dxc/glslang don't have a facility for taking
+        // a named entry point and pulling its stage from an attribute.
         //
-        // TODO: require manual specification if there are multiple input files, in different directories
-        String fileName = options.translationUnits[0].sourceFilePaths[0];
-        if (outputDir.Length() == 0)
+        if( requestImpl->passThrough != PassThroughMode::None )
         {
-            outputDir = Path::GetDirectoryName(fileName);
+            for( auto& rawEntryPoint : rawEntryPoints )
+            {
+                if( rawEntryPoint.stage == Stage::Unknown )
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::noStageSpecifiedInPassThroughMode, rawEntryPoint.name);
+                }
+            }
         }
-#endif
+
+        // We now have inferred enough information to add the
+        // entry points to our compile request.
+        //
+        for( auto& rawEntryPoint : rawEntryPoints )
+        {
+            if(rawEntryPoint.translationUnitIndex < 0)
+                continue;
+
+            auto translationUnitID = rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
+
+            int entryPointID = spAddEntryPoint(
+                compileRequest,
+                translationUnitID,
+                rawEntryPoint.name.begin(),
+                SlangStage(rawEntryPoint.stage));
+
+            rawEntryPoint.entryPointID = entryPointID;
+        }
+
+        // We are going to build a mapping from target formats to the
+        // target that handles that format.
+        Dictionary<CodeGenTarget, int> mapFormatToTargetIndex;
+
+        // If there was no explicit `-target` specified, then we will look
+        // at the `-o` options to see what we can infer.
+        //
+        if(rawTargets.Count() == 0)
+        {
+            for(auto& rawOutput : rawOutputs)
+            {
+                // Some outputs don't imply a target format, and we shouldn't use those for inference.
+                auto impliedFormat = rawOutput.impliedFormat;
+                if( impliedFormat == CodeGenTarget::Unknown )
+                    continue;
+
+                int targetIndex = 0;
+                if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
+                {
+                    targetIndex = (int) rawTargets.Count();
+
+                    RawTarget rawTarget;
+                    rawTarget.format = impliedFormat;
+                    rawTargets.Add(rawTarget);
+
+                    mapFormatToTargetIndex[impliedFormat] = targetIndex;
+                }
+
+                rawOutput.targetIndex = targetIndex;
+            }
+        }
+        else
+        {
+            // If there were explicit targets, then we will use those, but still
+            // build up our mapping. We should object if the same target format
+            // is specified more than once (just because of the ambiguities
+            // it will create).
+            //
+            int targetCount = (int) rawTargets.Count();
+            for(int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
+            {
+                auto format = rawTargets[targetIndex].format;
+
+                if( mapFormatToTargetIndex.ContainsKey(format) )
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::duplicateTargets, format);
+                }
+                else
+                {
+                    mapFormatToTargetIndex[format] = targetIndex;
+                }
+            }
+        }
+
+        // If we weren't able to infer any targets from output paths (perhaps
+        // because there were no output paths), but there was a profile specified,
+        // then we can try to infer a target from the profile.
+        //
+        if( rawTargets.Count() == 0
+            && defaultTarget.profileVersion != ProfileVersion::Unknown
+            && !defaultTarget.conflictingProfilesSet)
+        {
+            // Let's see if the chosen profile allows us to infer
+            // the code gen target format that the user probably meant.
+            //
+            CodeGenTarget inferredFormat = CodeGenTarget::Unknown;
+            auto profileVersion = defaultTarget.profileVersion;
+            switch( Profile(profileVersion).getFamily() )
+            {
+            default:
+                break;
+
+                // For GLSL profile versions, we will assume SPIR-V
+                // is the output format the user intended.
+            case ProfileFamily::GLSL:
+                inferredFormat = CodeGenTarget::SPIRV;
+                break;
+
+                // For DX profile versions, we will assume that the
+                // user wants DXIL for Shader Model 6.0 and up,
+                // and DXBC for all earlier versions.
+                //
+                // Note: There is overlap where both DXBC and DXIL
+                // nominally support SM 5.1, but in general we
+                // expect users to prefer to make a clean break
+                // at SM 6.0. Anybody who cares about the overlap
+                // cases should manually specify `-target dxil`.
+                //
+            case ProfileFamily::DX:
+                if( profileVersion >= ProfileVersion::DX_6_0 )
+                {
+                    inferredFormat = CodeGenTarget::DXIL;
+                }
+                else
+                {
+                    inferredFormat = CodeGenTarget::DXBytecode;
+                }
+                break;
+            }
+
+            if( inferredFormat != CodeGenTarget::Unknown )
+            {
+                RawTarget rawTarget;
+                rawTarget.format = inferredFormat;
+                rawTargets.Add(rawTarget);
+            }
+        }
+
+        // Similar to the case for entry points, if there is a single target,
+        // then we allow some of its options to come from the "default"
+        // target state.
+        if(rawTargets.Count() == 1)
+        {
+            if(defaultTarget.profileVersion != ProfileVersion::Unknown)
+            {
+                setProfileVersion(getCurrentTarget(), defaultTarget.profileVersion);
+            }
+
+            getCurrentTarget()->targetFlags |= defaultTarget.targetFlags;
+        }
+        else
+        {
+            // If the "default" target has had a profile (or other state)
+            // specified, but there is != 1 taget, then that state doesn't
+            // apply to anythign and we should give the user an error.
+            //
+            if( defaultTarget.profileVersion != ProfileVersion::Unknown )
+            {
+                if( rawTargets.Count() == 0 )
+                {
+                    // This should only happen if there were multiple `-profile` options,
+                    // so we didn't try to infer a target, or if the `-profile` option
+                    // somehow didn't imply a target.
+                    //
+                    sink->diagnose(SourceLoc(), Diagnostics::profileSpecificationIgnoredBecauseNoTargets);
+                }
+                else
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::profileSpecificationIgnoredBecauseBeforeAllTargets);
+                }
+            }
+
+            if( defaultTarget.targetFlags )
+            {
+                if( rawTargets.Count() == 0 )
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
+                }
+                else
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseBeforeAllTargets);
+                }
+            }
+
+        }
+
+        for(auto& rawTarget : rawTargets)
+        {
+            if(rawTarget.redundantProfileSet )
+
+            if( rawTarget.conflictingProfilesSet )
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::conflictingProfilesSpecifiedForTarget, rawTarget.format);
+            }
+            else if( rawTarget.redundantProfileSet )
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::sameProfileSpecifiedMoreThanOnce, rawTarget.profileVersion, rawTarget.format);
+            }
+        }
+
+        // TODO: do we need to require that a target must have a profile specified,
+        // or will we continue to allow the profile to be inferred from the target?
+
+        // We now have enough information to go ahead and declare the targets
+        // through the Slang API:
+        //
+        for(auto& rawTarget : rawTargets)
+        {
+            int targetID = spAddCodeGenTarget(compileRequest, SlangCompileTarget(rawTarget.format));
+            rawTarget.targetID = targetID;
+
+            if( rawTarget.profileVersion != ProfileVersion::Unknown )
+            {
+                spSetTargetProfile(compileRequest, targetID, Profile(rawTarget.profileVersion).raw);
+            }
+
+            if( rawTarget.targetFlags )
+            {
+                spSetTargetFlags(compileRequest, targetID, rawTarget.targetFlags);
+            }
+        }
+
+        if(defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        {
+            spSetMatrixLayoutMode(compileRequest, defaultMatrixLayoutMode);
+        }
+
+        // Next we need to sort out the output files specified with `-o`, and
+        // figure out which entry point and/or target they apply to.
+        //
+        // If there is only a single entry point, then that is automatically
+        // the entry point that should be associated with all outputs.
+        //
+        if( rawEntryPoints.Count() == 1 )
+        {
+            for( auto& rawOutput : rawOutputs )
+            {
+                rawOutput.entryPointIndex = 0;
+            }
+        }
+        //
+        // Similarly, if there is only one target, then all outputs must
+        // implicitly appertain to that target.
+        //
+        if( rawTargets.Count() == 1 )
+        {
+            for( auto& rawOutput : rawOutputs )
+            {
+                rawOutput.targetIndex = 0;
+            }
+        }
+
+        // Consider the output files specified via `-o` and try to figure
+        // out how to deal with them.
+        //
+        for(auto& rawOutput : rawOutputs)
+        {
+            // For now, all output formats need to be tightly bound to
+            // both a target and an entry point (down the road we will
+            // need to support output formats that can store multiple
+            // entry points in one file).
+
+            // If an output doesn't have a target assocaited with
+            // it, then search for the target with the matching format.
+            if( rawOutput.targetIndex == -1 )
+            {
+                auto impliedFormat = rawOutput.impliedFormat;
+                int targetIndex = -1;
+
+                if(impliedFormat == CodeGenTarget::Unknown)
+                {
+                    // If we hit this case, then it means that we need to pick the
+                    // target to assocaite with this output based on its implied
+                    // format, but the file path doesn't direclty imply a format
+                    // (it doesn't have a suffix like `.spv` that tells us what to write).
+                    //
+                    sink->diagnose(SourceLoc(), Diagnostics::cannotDeduceOutputFormatFromPath, rawOutput.path);
+                }
+                else if( mapFormatToTargetIndex.TryGetValue(rawOutput.impliedFormat, targetIndex) )
+                {
+                    rawOutput.targetIndex = targetIndex;
+                }
+                else
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToTarget, rawOutput.path, rawOutput.impliedFormat);
+                }
+            }
+
+            // We won't do any searching to match an output file
+            // with an entry point, since the case of a single entry
+            // point was handled above, and the user is expected to
+            // follow the ordering rules when using multiple entry points.
+            //
+            if( rawOutput.entryPointIndex == -1 )
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+            }
+        }
+
+        // Now that we've diagnosed the output paths, we can add them
+        // to the compile request at the appropriate locations.
+        //
+        // We start by allocating the arrays for per-entry-point output
+        // paths on each of the requested targets.
+        //
+        for(auto rawTarget : rawTargets)
+        {
+            auto targetID = rawTarget.targetID;
+            auto targetReq = requestImpl->targets[targetID];
+
+            targetReq->entryPointOutputPaths.SetSize(rawEntryPoints.Count());
+        }
+
+        // Consider the output files specified via `-o` and try to figure
+        // out how to deal with them.
+        //
+        for(auto& rawOutput : rawOutputs)
+        {
+            if(rawOutput.targetIndex == -1) continue;
+            if(rawOutput.entryPointIndex == -1) continue;
+
+            auto targetID = rawTargets[rawOutput.targetIndex].targetID;
+            auto entryPointID = rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
+
+            auto targetReq = requestImpl->targets[targetID];
+
+            if(targetReq->entryPointOutputPaths[entryPointID].Length())
+            {
+                auto entryPointReq = requestImpl->entryPoints[entryPointID];
+                sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->name, targetReq->target);
+            }
+            else
+            {
+                targetReq->entryPointOutputPaths[entryPointID] = rawOutput.path;
+            }
+        }
 
         return (sink->GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }

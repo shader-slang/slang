@@ -485,6 +485,27 @@ extern "C"
         SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
+    typedef SlangUInt32 SlangStage;
+    enum
+    {
+        SLANG_STAGE_NONE,
+        SLANG_STAGE_VERTEX,
+        SLANG_STAGE_HULL,
+        SLANG_STAGE_DOMAIN,
+        SLANG_STAGE_GEOMETRY,
+        SLANG_STAGE_FRAGMENT,
+        SLANG_STAGE_COMPUTE,
+        SLANG_STAGE_RAY_GENERATION,
+        SLANG_STAGE_INTERSECTION,
+        SLANG_STAGE_ANY_HIT,
+        SLANG_STAGE_CLOSEST_HIT,
+        SLANG_STAGE_MISS,
+        SLANG_STAGE_CALLABLE,
+
+        // alias:
+        SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
+    };
+
     /** A result code for a Slang API operation.
 
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
@@ -856,9 +877,14 @@ extern "C"
         int                     targetIndex,
         SlangTargetFlags        flags);
 
+    /* DEPRECATED: use `spSetMatrixLayoutMode` instead. */
     SLANG_API void spSetTargetMatrixLayoutMode(
         SlangCompileRequest*    request,
         int                     targetIndex,
+        SlangMatrixLayoutMode   mode);
+
+    SLANG_API void spSetMatrixLayoutMode(
+        SlangCompileRequest*    request,
         SlangMatrixLayoutMode   mode);
 
     /*!
@@ -1026,7 +1052,7 @@ extern "C"
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             name,
-        SlangProfileID          profile);
+        SlangStage              stage);
 
     /** Add an entry point in a particular translation unit,
         with additional arguments that specify the concrete
@@ -1036,7 +1062,7 @@ extern "C"
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             name,
-        SlangProfileID          profile,
+        SlangStage              stage,
         int                     genericTypeNameCount,
         char const**            genericTypeNames);
 
@@ -1298,27 +1324,6 @@ extern "C"
         // DEPRECATED:
         SLANG_PARAMETER_CATEGORY_VERTEX_INPUT = SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
         SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT = SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
-    };
-
-    typedef SlangUInt32 SlangStage;
-    enum
-    {
-        SLANG_STAGE_NONE,
-        SLANG_STAGE_VERTEX,
-        SLANG_STAGE_HULL,
-        SLANG_STAGE_DOMAIN,
-        SLANG_STAGE_GEOMETRY,
-        SLANG_STAGE_FRAGMENT,
-        SLANG_STAGE_COMPUTE,
-        SLANG_STAGE_RAY_GENERATION,
-        SLANG_STAGE_INTERSECTION,
-        SLANG_STAGE_ANY_HIT,
-        SLANG_STAGE_CLOSEST_HIT,
-        SLANG_STAGE_MISS,
-        SLANG_STAGE_CALLABLE,
-
-        // alias:
-        SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
     typedef SlangUInt32 SlangLayoutRules;

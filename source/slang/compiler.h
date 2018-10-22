@@ -159,7 +159,7 @@ namespace Slang
         // * Compiling to a slang module container, so that as many entry
         //   points and targets as needed can be specified.
         //
-        String outputPath;
+//        String outputPath;
 
         // The translation unit that this entry point came from
         TranslationUnitRequest* getTranslationUnit();
@@ -227,7 +227,12 @@ namespace Slang
         CompileRequest*     compileRequest;
         CodeGenTarget       target;
         SlangTargetFlags    targetFlags = 0;
-        Slang::Profile      targetProfile = Slang::Profile::Unknown;
+        Slang::Profile      targetProfile = Slang::Profile();
+
+        // Requested output paths for each entry point.
+        // An empty string indices no output desired for
+        // the given entry point.
+        List<String> entryPointOutputPaths;
 
         // The resulting reflection layout information
         RefPtr<ProgramLayout> layout;
@@ -240,9 +245,7 @@ namespace Slang
         // TypeLayouts created on the fly by reflection API
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
 
-        /// The layout to use for matrices by default (row/column major)
-        MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
-        MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
+        MatrixLayoutMode getDefaultMatrixLayoutMode();
     };
 
     // Compute the "effective" profile to use when outputting the given entry point
@@ -324,8 +327,12 @@ namespace Slang
         // Types constructed by reflection API
         Dictionary<String, RefPtr<Type>> types;
 
+        /// The layout to use for matrices by default (row/column major)
+        MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+        MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
+
         // The code generation profile we've been asked to use.
-        Profile profile;
+//        Profile profile;
 
         // Should we just pass the input to another compiler?
         PassThroughMode passThrough = PassThroughMode::None;

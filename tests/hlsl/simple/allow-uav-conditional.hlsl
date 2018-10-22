@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0
 
 // Check output for `[allow_uav_conditional]`
 

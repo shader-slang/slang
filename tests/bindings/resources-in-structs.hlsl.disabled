@@ -1,4 +1,4 @@
-//SLANG_TEST_OPTS:-target dxbc-assembly -profile ps_5_0 -entry main
+//SLANG_TEST_OPTS:-profile ps_5_0 -entry main
 
 // Confirm that resources inside `struct` types work reasonably well,
 

@@ -1,4 +1,6 @@
-//TEST:COMPARE_GLSL:-profile glsl_fragment_450 -no-checking
+// Disabled because Slang compiler doesn't support GLSL as an input language
+//TEST_IGNORE_FILE
+//TEST:COMPARE_GLSL:-profile glsl_fragment_450
 // matrix-mult.glsl
 #version 450
 

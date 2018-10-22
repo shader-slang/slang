@@ -8427,10 +8427,19 @@ namespace Slang
         //   that function is specific to the fragment profile/stage.
         //
 
+        auto sink = &entryPoint->compileRequest->mSink;
+
+        // Every entry point needs to have a stage specified either via
+        // command-line/API options, or via an explicit `[shader("...")]` attribute.
+        //
+        if( entryPoint->getStage() == Stage::Unknown )
+        {
+            sink->diagnose(entryPoint->decl, Diagnostics::entryPointHasNoStage, entryPoint->name);
+        }
+
         if (entryPoint->getStage() == Stage::Hull)
         {
             auto translationUnit = entryPoint->getTranslationUnit();
-            auto sink = &entryPoint->compileRequest->mSink;
             auto translationUnitSyntax = translationUnit->SyntaxNode;
 
             auto attr = entryPoint->decl->FindModifier<PatchConstantFuncAttribute>();
@@ -8552,6 +8561,22 @@ namespace Slang
             // declaration with the right name, that wasn't a function.
             sink->diagnose(firstDeclWithName, Diagnostics::entryPointSymbolNotAFunction, entryPoint->name);
             return;
+        }
+
+        // If the entry point specifies a stage via a `[shader("...")]` attribute,
+        // then we might be able to infer a stage for the entry point request if
+        // it didn't have one, *or* issue a diagnostic if there is a mismatch.
+        //
+        if( auto entryPointAttribute = entryPointFuncDecl->FindModifier<EntryPointAttribute>() )
+        {
+            if( entryPoint->getStage() == Stage::Unknown )
+            {
+                entryPoint->profile.setStage(entryPointAttribute->stage);
+            }
+            else if( entryPointAttribute->stage != entryPoint->getStage() )
+            {
+                sink->diagnose(entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPoint->name, entryPoint->getStage(), entryPointAttribute->stage);
+            }
         }
 
         // TODO: it is possible that the entry point was declared with

@@ -41,7 +41,7 @@ int test(int val)
 
     // Note: using `val %3` here instead of `val %4` in order
     // to work around a code generation issue in dxc.
-
+    //
     int a = s.a[val / 4][val % 3];
     int b = s.b;
 

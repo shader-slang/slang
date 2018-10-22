@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile vs_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL: -profile vs_5_0
 
 // Check handling of initializer list for vector
 

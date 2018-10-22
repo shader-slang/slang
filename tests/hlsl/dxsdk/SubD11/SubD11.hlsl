@@ -1,5 +1,5 @@
 //TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry PatchSkinningVS -entry MeshSkinningVS -profile hs_5_0 -entry SubDToBezierHS -entry SubDToBezierHS4444 -profile ds_5_0 -entry BezierEvalDS -profile ps_4_0 -entry SmoothPS -entry SolidColorPS
+//TEST:COMPARE_HLSL: -profile vs_4_0 -entry PatchSkinningVS -entry MeshSkinningVS -profile hs_5_0 -entry SubDToBezierHS -entry SubDToBezierHS4444 -profile ds_5_0 -entry BezierEvalDS -profile ps_4_0 -entry SmoothPS -entry SolidColorPS
 //--------------------------------------------------------------------------------------
 // File: SubD11.hlsl
 //

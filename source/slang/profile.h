@@ -52,7 +52,7 @@ namespace Slang
     struct Profile
     {
         typedef uint32_t RawVal;
-        enum : RawVal
+        enum RawEnum : RawVal
         {
         Unknown,
 
@@ -62,9 +62,20 @@ namespace Slang
         };
 
         Profile() {}
-        Profile(RawVal raw)
+        Profile(RawEnum raw)
             : raw(raw)
         {}
+        explicit Profile(RawVal raw)
+            : raw(raw)
+        {}
+        explicit Profile(Stage stage)
+        {
+            setStage(stage);
+        }
+        explicit Profile(ProfileVersion version)
+        {
+            setVersion(version);
+        }
 
         bool operator==(Profile const& other) const { return raw == other.raw; }
         bool operator!=(Profile const& other) const { return raw != other.raw; }
@@ -84,6 +95,7 @@ namespace Slang
         ProfileFamily getFamily() const { return getProfileFamily(GetVersion()); }
 
         static Profile LookUp(char const* name);
+        char const* getName();
 
         RawVal raw = Unknown;
     };

@@ -1,5 +1,5 @@
 //TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_4_0 -entry CSNumVerticesIndices
+//TEST:COMPARE_HLSL: -profile cs_4_0 -entry CSNumVerticesIndices
 //--------------------------------------------------------------------------------------
 // File: TessellatorCS40_NumVerticesIndicesCS.hlsl
 //
