@@ -60,8 +60,7 @@ SlangResult SLANG_MCALL DefaultFileSystem::getPathType(
 
 SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
-    // Default implementation that uses the `core`
-    // libraries facilities for talking to the OS filesystem.
+    // Default implementation that uses the `core` libraries facilities for talking to the OS filesystem.
     //
     // TODO: we might want to conditionally compile these in, so that
     // a user could create a build of Slang that doesn't include any OS
@@ -100,7 +99,7 @@ SlangResult WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 
 SlangResult WrapFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
 {
-    // This isn't a very good 'canonical  path' because the same file might be referenced 
+    // This isn't a very good 'canonical path' because the same file might be referenced 
     // multiple ways - for example by using relative paths. 
     // But it's simple and matches slangs previous behavior. 
     String canonicalPath(path);
@@ -116,6 +115,12 @@ SlangResult WrapFileSystem::calcRelativePath(SlangPathType fromPathType, const c
 
 SlangResult WrapFileSystem::getPathType(const char* path, SlangPathType* pathTypeOut)
 {
+    // TODO:
+    // This might be undesirable in the longer term because it means that ISlangFileSystem will not be used 
+    // to test file existence - but the file system will be.
+    // 
+    // It would probably be better to use some kind of cache that uses 'loadFile' to load files, but also 
+    // to test for existence.
     return DefaultFileSystem::getSingleton()->getPathType(path, pathTypeOut); 
 }
 
