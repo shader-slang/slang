@@ -33,11 +33,15 @@ public:
         const char* path,
         ISlangBlob** pathOut) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
+        const char* path,
+        SlangPathType* pathTypeOut) SLANG_OVERRIDE;
+
         /// Get a default instance
     static ISlangFileSystemExt* getSingleton() { return &s_singleton; }
 
 private:
-        /// Make so not constructable
+        /// Make so not constructible
     DefaultFileSystem() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
@@ -74,6 +78,10 @@ public:
         const char* fromPath,
         const char* path,
         ISlangBlob** pathOut) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
+        const char* path,
+        SlangPathType* pathTypeOut) SLANG_OVERRIDE;
 
         /// Ctor
     WrapFileSystem(ISlangFileSystem* fileSystem):

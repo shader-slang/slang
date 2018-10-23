@@ -32,6 +32,8 @@ namespace Slang
 		static String Combine(const String & path1, const String & path2, const String & path3);
 		static bool CreateDir(const String & path);
 
+        static SlangResult GetPathType(const String & path, SlangPathType* pathTypeOut);
+
         static SlangResult GetCanonical(const String & path, String& canonicalPathOut);
 	};
 }
