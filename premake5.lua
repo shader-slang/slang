@@ -107,6 +107,20 @@ workspace "slang"
         optimize "On"
         defines { "NDEBUG" }
 
+		
+function dump(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k,v in pairs(o) do
+            if type(k) ~= 'number' then k = '"'..k..'"' end
+            s = s .. '['..k..'] = ' .. dump(v) .. ','
+        end
+        return s .. '} '
+    else
+        return tostring(o)
+     end
+end
+		
 --
 -- We are now going to start defining the projects, where
 -- each project builds some binary artifact (an executable,
@@ -296,6 +310,7 @@ function example(name)
     links { "slang", "core", "gfx" }
 end
 
+
 --
 -- With all of these helper routines defined, we can now define the
 -- actual projects quite simply. For example, here is the entire
@@ -311,7 +326,6 @@ example "hello-world"
 
 -- Let's go ahead and set up the projects for our other example now.
 example "model-viewer"
-
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
