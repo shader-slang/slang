@@ -36,11 +36,26 @@
 -- Visual Studio terms). It sets up basic build settings that will
 -- apply across all projects.
 --
+
+-- To output linux will output to linux 
+-- % premake5 --os=linux gmake
+--
+-- % cd build.linux
+-- % make config=release_x64
+-- or 
+-- % make config=debug_x64
+--
+-- From in the build directory you can use
+-- % premake5 --file=../premake5.lua --os=linux gmake
+
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
     configurations { "Debug", "Release" }
     platforms { "x86", "x64" }
 
+	filter { "system:linux" }
+        location("build.linux")
+	
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir "bin/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}"
@@ -67,6 +82,15 @@ workspace "slang"
     filter { "platforms:x86" }
         architecture "x86"
 
+    filter { "toolset:clang or gcc*" }
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden", "-std=gnu++11" } 
+    	
+	filter { "toolset:gcc*"}
+		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough" }
+		
+    filter { "toolset:clang" }
+         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare"}
+		
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
@@ -405,7 +429,8 @@ tool "gfx"
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 
-
+	filter { "system:not windows" }
+        removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
 
 --
 -- The `slangc` command-line application is just a very thin wrapper

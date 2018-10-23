@@ -60,12 +60,12 @@ struct PathInfo
     const String getMostUniquePath() const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
-    static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown" }; }
-    static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste" }; }
+    static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown", String() }; }
+    static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste", String()}; }
     static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { SLANG_ASSERT(canonicalPathIn.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
-    static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn }; }
-    static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string" }; }
-    static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line" }; }
+    static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
+    static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string", String() }; }
+    static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line", String() }; }
 
     Type type;                      ///< The type of path
     String foundPath;               ///< The path where the file was found (might contain relative elements) 

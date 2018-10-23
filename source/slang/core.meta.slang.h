@@ -80,19 +80,19 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     case BaseType::Double:
         sb << "\n    , __BuiltinFloatingPointType\n";
         sb << "\n    ,  __BuiltinRealType\n";
-        // fall through to:
+        ; // fall through to:
     case BaseType::Int8:
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
         sb << "\n    ,  __BuiltinSignedArithmeticType\n";
-        // fall through to:
+        ; // fall through to:
     case BaseType::UInt8:
     case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
         sb << "\n    ,  __BuiltinArithmeticType\n";
-        // fall through to:
+        ; // fall through to:
     case BaseType::Bool:
         sb << "\n    ,  __BuiltinType\n";
         break;

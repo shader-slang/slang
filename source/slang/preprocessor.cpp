@@ -992,7 +992,7 @@ static Token AdvanceToken(PreprocessorDirectiveContext* context)
 static Token PeekToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
-        context->preprocessor->endOfFileToken;
+        return context->preprocessor->endOfFileToken;
     return PeekToken(context->preprocessor);
 }
 
@@ -2091,11 +2091,11 @@ static const PreprocessorDirective kDirectives[] =
     { "version",    &handleGLSLVersionDirective,    0 },
     { "extension",  &handleGLSLExtensionDirective,  0 },
 
-    { NULL, NULL },
+    { nullptr, nullptr, 0 },
 };
 
 static const PreprocessorDirective kInvalidDirective = {
-    NULL, &HandleInvalidDirective, 0,
+    nullptr, &HandleInvalidDirective, 0,
 };
 
 // Look up the directive with the given name.

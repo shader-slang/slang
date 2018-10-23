@@ -625,28 +625,35 @@ void usage(char const* appName)
     fprintf(stderr, "usage: %s <input>\n", appName);
 }
 
-char* readAllText(char const * fileName)
+SlangResult readAllText(char const * fileName, String& stringOut)
 {
     FILE * f;
     fopen_s(&f, fileName, "rb");
     if (!f)
     {
-        return "";
+        stringOut = "";
+        return SLANG_FAIL;
     }
     else
     {
+        stringOut = 
         fseek(f, 0, SEEK_END);
         auto size = ftell(f);
-        char * buffer = new char[size + 1];
-        memset(buffer, 0, size + 1);
+
+        StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
+        stringOut = String(stringRep);
+
+        char * buffer = stringRep->getData();
+        memset(buffer, 0, size);
         fseek(f, 0, SEEK_SET);
         fread(buffer, sizeof(char), size, f);
         fclose(f);
-        return buffer;
+
+        return SLANG_OK;
     }
 }
 
-void writeAllText(char const *srcFileName, char const* fileName, char* content)
+void writeAllText(char const *srcFileName, char const* fileName, const char* content)
 {
     FILE * f = nullptr;
     fopen_s(&f, fileName, "wb");
@@ -764,7 +771,7 @@ int main(
     }
 
     char** writeCursor = argv;
-    char const* const* inputPaths = writeCursor;
+    char** inputPaths = writeCursor;
 
     while(argCursor != argEnd)
     {
@@ -805,7 +812,7 @@ int main(
 
         // write output to a temporary file first
         char outputPath[1024];
-        sprintf_s(outputPath, "%s.temp.h", inputPath);
+        sprintf_s(outputPath, sizeof(outputPath), "%s.temp.h", inputPath);
 
         FILE* outputStream;
         fopen_s(&outputStream, outputPath, "w");
@@ -816,13 +823,14 @@ int main(
 
         // update final output only when content has changed
         char outputPathFinal[1024];
-        sprintf_s(outputPathFinal, "%s.h", inputPath);
+        sprintf_s(outputPathFinal, sizeof(outputPathFinal), "%s.h", inputPath);
 
-        char * allTextOld = readAllText(outputPathFinal);
-        char * allTextNew = readAllText(outputPath);
-        if (strcmp(allTextNew, allTextOld) != 0)
+        String allTextOld, allTextNew;
+        readAllText(outputPathFinal, allTextOld);
+        readAllText(outputPath, allTextNew);
+        if (allTextOld != allTextNew)
         {
-            writeAllText(inputPath, outputPathFinal, allTextNew);
+            writeAllText(inputPath, outputPathFinal, allTextNew.Buffer());
         }
         remove(outputPath);
     }

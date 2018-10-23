@@ -88,13 +88,30 @@ SLANG_NO_THROW uint32_t SLANG_MCALL addRef() \
     return ++m_refCount; \
 }
 
+#if SLANG_GCC_FAMILY
+template <typename T>
+SLANG_FORCE_INLINE void allowNonVirtualDelete(T* ptr)
+{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"    
+    delete ptr;
+#pragma GCC diagnostic pop
+}
+#else
+template <typename T>
+SLANG_FORCE_INLINE void allowNonVirtualDelete(T* ptr)
+{
+    delete ptr;
+}
+#endif
+
 #define SLANG_IUNKNOWN_RELEASE \
 SLANG_NO_THROW uint32_t SLANG_MCALL release() \
 { \
     --m_refCount; \
     if (m_refCount == 0) \
     { \
-        delete this; \
+        allowNonVirtualDelete(this); \
         return 0; \
     } \
     return m_refCount; \

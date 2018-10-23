@@ -91,9 +91,9 @@ namespace Slang
 		default:
 			break;
 		}
-		int shFlag;
 #ifdef _WIN32
-		switch (share)
+        int shFlag = _SH_DENYRW;
+        switch (share)
 		{
 		case Slang::FileShare::None:
 			shFlag = _SH_DENYRW;
@@ -136,7 +136,11 @@ namespace Slang
 		return pos;
 #elif defined(__APPLE__)
 		return ftell(handle);
-#else
+#elif defined(__CYGWIN__)
+        fpos_t pos;
+        fgetpos(handle, &pos);
+        return pos;
+#else 
 		fpos64_t pos;
 		fgetpos64(handle, &pos);
 		return *(Int64*)(&pos);

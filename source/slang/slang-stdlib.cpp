@@ -24,6 +24,7 @@ namespace Slang
             case '\t':
             case '\\':
                 pathBuilder << "\\";
+                ; // fall-thru
             default:
                 pathBuilder << *cc;
                 break;

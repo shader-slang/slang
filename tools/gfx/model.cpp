@@ -195,6 +195,11 @@ RefPtr<TextureResource> loadTextureImage(
     return texture;
 }
 
+static std::string makeString(const char* start, const char* end)
+{
+    return std::string(start, size_t(end - start));
+}
+
 Result ModelLoader::load(
     char const* inputPath,
     void**      outModel)
@@ -208,7 +213,7 @@ Result ModelLoader::load(
     std::string baseDir;
     if( auto lastSlash = strrchr(inputPath, '/') )
     {
-        baseDir = std::string(inputPath, lastSlash);
+        baseDir = makeString(inputPath, lastSlash);
     }
 
     std::string diagnostics;

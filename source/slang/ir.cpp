@@ -2771,10 +2771,6 @@ namespace Slang
         IRDumpContext*  context,
         IRType*         type);
 
-    static void dumpDeclRef(
-        IRDumpContext*          context,
-        DeclRef<Decl> const&    declRef);
-
     static void dumpOperand(
         IRDumpContext*  context,
         IRInst*         inst)
