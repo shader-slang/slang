@@ -120,7 +120,16 @@ function dump(o)
         return tostring(o)
      end
 end
-		
+	
+function dumpTable(o)
+	local s = '{ '
+	for k,v in pairs(o) do
+		if type(k) ~= 'number' then k = '"'..k..'"' end
+		s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
+	end
+	return s .. '} '
+end
+	
 --
 -- We are now going to start defining the projects, where
 -- each project builds some binary artifact (an executable,
@@ -310,22 +319,23 @@ function example(name)
     links { "slang", "core", "gfx" }
 end
 
+if os.target() == "windows" then
+    --
+    -- With all of these helper routines defined, we can now define the
+    -- actual projects quite simply. For example, here is the entire
+    -- declaration of the "Hello, World" example project:
+    --
+    example "hello-world"
+    --
+    -- Note how we are calling our custom `example()` subroutine with
+    -- the same syntax sugar that Premake usually advocates for their
+    -- `project()` function. This allows us to treat `example` as
+    -- a kind of specialized "subclass" of `project`
+    --
 
---
--- With all of these helper routines defined, we can now define the
--- actual projects quite simply. For example, here is the entire
--- declaration of the "Hello, World" example project:
---
-example "hello-world"
---
--- Note how we are calling our custom `example()` subroutine with
--- the same syntax sugar that Premake usually advocates for their
--- `project()` function. This allows us to treat `example` as
--- a kind of specialized "subclass" of `project`
---
-
--- Let's go ahead and set up the projects for our other example now.
-example "model-viewer"
+    -- Let's go ahead and set up the projects for our other example now.
+    example "model-viewer"
+end
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
