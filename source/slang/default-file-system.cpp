@@ -2,6 +2,8 @@
 
 #include "../../slang-com-ptr.h"
 #include "../core/slang-io.h"
+#include "../core/slang-string-util.h"
+
 #include "compiler.h"
 
 namespace Slang
@@ -16,9 +18,15 @@ static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 
 /* static */DefaultFileSystem DefaultFileSystem::s_singleton; 
 
+template <typename T>
+static ISlangFileSystemExt* _getInterface(T* ptr, const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(ptr) : nullptr;
+}
+
 ISlangUnknown* DefaultFileSystem::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(this) : nullptr;
+    return _getInterface(this, guid); 
 }
 
 SlangResult DefaultFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
@@ -88,7 +96,7 @@ SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 
 ISlangUnknown* WrapFileSystem::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(this) : nullptr;
+    return _getInterface(this, guid);
 }
 
 SlangResult WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
@@ -122,6 +130,123 @@ SlangResult WrapFileSystem::getPathType(const char* path, SlangPathType* pathTyp
     // It would probably be better to use some kind of cache that uses 'loadFile' to load files, but also 
     // to test for existence.
     return DefaultFileSystem::getSingleton()->getPathType(path, pathTypeOut); 
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
+{
+    return _getInterface(this, guid);
+}
+
+SlangResult CacheFileSystem::_getCanonicalPath(const String& path, String& canonicalOut)
+{
+    const String* canonicalPathPtr = m_pathToCanonicalMap.TryGetValue(path);
+
+    if (canonicalPathPtr)
+    {
+        if (canonicalPathPtr->getStringRepresentation() == nullptr)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+        else
+        {
+            canonicalOut = *canonicalPathPtr;
+            return SLANG_OK;
+        }
+    }
+
+    // Okay request from the underlying file system the canonical path
+    ComPtr<ISlangBlob> canonicalBlob;
+    if (SLANG_FAILED(m_fileSystem->getCanoncialPath(path.Buffer(), canonicalBlob.writeRef())))
+    {
+        // Write in result as being null ptr so not tried again
+        m_pathToCanonicalMap.Add(path, String((StringRepresentation*)nullptr));
+        return SLANG_E_NOT_FOUND;
+    }
+     
+    String canonicalPath = StringUtil::getString(canonicalBlob);
+    SLANG_ASSERT(canonicalPath.Length() > 0);
+
+    // Add it to the cache
+    m_pathToCanonicalMap.Add(path, canonicalPath);
+
+    // A canonical path always maps to itself
+    if (path != canonicalPath)
+    {
+        m_pathToCanonicalMap.AddIfNotExists(canonicalPath, canonicalPath);
+    }
+
+    canonicalOut = canonicalPath;
+    return SLANG_OK;
+}
+
+CacheFileSystem::Info*  CacheFileSystem::_getInfoForCanonicalPath(const String& canonicalPath)
+{
+    Info* info = m_canonicalToInfoMap.TryGetValue(canonicalPath);
+    if (info)
+    {
+        return info;
+    }
+    // Initialize info for this entry
+    Info initInfo;
+    m_canonicalToInfoMap.Add(canonicalPath, initInfo);
+    return m_canonicalToInfoMap.TryGetValue(canonicalPath);
+}
+
+SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
+{
+    *blobOut = nullptr;
+
+    String path(pathIn);
+    String canonicalPath;
+    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+
+    Info* info = _getInfoForCanonicalPath(canonicalPath);
+    if (info->m_loadFileResult == SLANG_E_UNINITIALIZED)
+    {
+        info->m_loadFileResult = m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef());
+        // Can't be in same state after the load
+        SLANG_ASSERT(info->m_loadFileResult != SLANG_E_UNINITIALIZED);
+    }
+
+    *blobOut = info->m_fileBlob;
+    if (*blobOut)
+    {
+        (*blobOut)->addRef();
+    }
+    return info->m_loadFileResult;
+}
+
+SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
+{
+    String canonicalPath;
+    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+    *canonicalPathOut = createStringBlob(canonicalPath).detach();
+    return SLANG_OK;
+}
+
+SlangResult CacheFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+{
+    // Just defer to contained implementation
+    return m_fileSystem->calcRelativePath(fromPathType, fromPath, path, pathOut);
+}
+
+SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
+{
+    String path(pathIn);
+    String canonicalPath;
+    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
+    // See if we have it in the cache
+    Info* info = _getInfoForCanonicalPath(canonicalPath);
+    if (info->m_getPathTypeResult == SLANG_E_UNINITIALIZED)
+    {
+        info->m_getPathTypeResult = m_fileSystem->getPathType(pathIn, &info->m_pathType);
+        SLANG_ASSERT(info->m_getPathTypeResult != SLANG_E_UNINITIALIZED);
+    }
+
+    *pathTypeOut = info->m_pathType;
+    return info->m_getPathTypeResult;
 }
 
 } 

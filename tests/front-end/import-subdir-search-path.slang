@@ -4,4 +4,7 @@
 
 __import import_subdir_a;
 
+// Should realize it's the same thing
+__import subdir.import_subdir_a;
+
 float bar(float x) { return foo(x); }

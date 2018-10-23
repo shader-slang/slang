@@ -74,4 +74,23 @@ namespace Slang {
     return builder;
 }
 
+/* static */String StringUtil::getString(ISlangBlob* blob)
+{
+    if (blob)
+    {
+        size_t size = blob->getBufferSize();
+        if (size > 0)
+        {
+            const char* contents = (const char*)blob->getBufferPointer();
+            // Check it has terminating 0, if not we must construct as if it does
+            if (contents[size - 1] == 0)
+            {
+                size--;
+            }
+            return String(contents, contents + size);
+        }
+    }
+    return String();
+}
+
 } // namespace Slang

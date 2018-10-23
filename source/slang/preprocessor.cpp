@@ -1637,7 +1637,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (!sourceFile)
     {
         ComPtr<ISlangBlob> foundSourceBlob;
-        if (SLANG_FAILED(includeHandler->readFile(filePathInfo.canonicalPath, foundSourceBlob.writeRef())))
+        if (SLANG_FAILED(includeHandler->readFile(filePathInfo.foundPath, foundSourceBlob.writeRef())))
         {
             GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
             return;
