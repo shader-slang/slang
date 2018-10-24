@@ -2572,15 +2572,7 @@ namespace Slang
         IRDumpContext*  context,
         UInt            val)
     {
-        // TODO: This isn't great. The problem is UInt maps to size_t, and on some targets (like OSX)
-        // size_t is distinct from any other integral type. So that creates an ambiguity
-        // Really we want to modify the StringBuilder and elsewhere to handle the case when it is known it can't unambiguously coerce
-#if SLANG_PTR_IS_64
-        context->builder->append(UInt64(val));
-#else
-        context->builder->append(UInt32(val));
-#endif 
-
+        context->builder->append(UnambigousUInt(val));
 //        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
