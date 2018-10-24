@@ -107,7 +107,7 @@ workspace "slang"
 
     filter { "system:linux" }
         location("build.linux")
-        linkoptions("-fPIC")
+        linkoptions("-fPIC", "-ldl")
         buildoptions("-fPIC")
     
 		
