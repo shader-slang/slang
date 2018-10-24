@@ -43,6 +43,7 @@ public:
 private:
         /// Make so not constructible
     DefaultFileSystem() {}
+    virtual ~DefaultFileSystem() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
 
@@ -88,6 +89,8 @@ public:
         m_fileSystem(fileSystem)
     {
     }
+    virtual ~WrapFileSystem() {}
+
 
 protected:
     ISlangUnknown* getInterface(const Guid& guid);

@@ -130,16 +130,12 @@ namespace Slang
 	}
 	Int64 FileStream::GetPosition()
 	{
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 		fpos_t pos;
 		fgetpos(handle, &pos);
 		return pos;
 #elif defined(__APPLE__)
 		return ftell(handle);
-#elif defined(__CYGWIN__)
-        fpos_t pos;
-        fgetpos(handle, &pos);
-        return pos;
 #else 
 		fpos64_t pos;
 		fgetpos64(handle, &pos);

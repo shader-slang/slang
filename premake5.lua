@@ -417,19 +417,21 @@ tool "slang-eval-test"
 -- TODO: Fix that requirement.
 --
 
-tool "render-test"
-    uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
-    includedirs { ".", "external", "source", "tools/gfx" }
-    links { "core", "slang", "gfx" }
-    filter { "system:windows" }
+if os.target() == "windows" then
+    tool "render-test"
+        uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
+        includedirs { ".", "external", "source", "tools/gfx" }
+        links { "core", "slang", "gfx" }
+        filter { "system:windows" }
 
-        systemversion "10.0.14393.0"
+            systemversion "10.0.14393.0"
 
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
-        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-        -- directory into the output directory.
-        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
-
+            -- For Windows targets, we want to copy d3dcompiler_47.dll,
+            -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+            -- directory into the output directory.
+            postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+end
+            
 --
 -- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.
