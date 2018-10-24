@@ -106,7 +106,7 @@ workspace "slang"
         defines { "NDEBUG" }
     		
     filter { "system:linux" }
-        buildoptions{  "-Wl,--no-as-needed", "-ldl"}
+        linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
         
             
 function dump(o)
