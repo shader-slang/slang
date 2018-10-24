@@ -107,6 +107,7 @@ workspace "slang"
 
     filter { "system:linux" }
         location("build.linux")
+        linkoptions("-fPIC")
 	
 		
 function dump(o)
