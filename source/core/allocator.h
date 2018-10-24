@@ -2,7 +2,9 @@
 #define CORE_LIB_ALLOCATOR_H
 
 #include <stdlib.h>
-#include <malloc.h>
+#ifdef _MSC_VER
+#   include <malloc.h>
+#endif
 
 namespace Slang
 {
