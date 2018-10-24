@@ -104,13 +104,7 @@ workspace "slang"
     filter { "configurations:release" }
         optimize "On"
         defines { "NDEBUG" }
-
-    filter { "system:linux" }
-        location("build.linux")
-        linkoptions("-fPIC", "-ldl")
-        buildoptions("-fPIC")
-    
-		
+    		
 function dump(o)
     if type(o) == 'table' then
         local s = '{ '
@@ -517,6 +511,10 @@ standardProject "slang"
     --
     dependson { "slang-generate" }
 
+    filter { "system:linux" }
+        buildoptions{"-fPIC", "-ldl"}
+        linkoptions{"-ldl"}
+
     -- Next, we want to add a custom build rule for each of the
     -- files that makes up the standard library. Those are
     -- always named `*.meta.slang`, so we can select for them
@@ -617,7 +615,9 @@ standardProject "slang-glslang"
 
     filter { "system:linux" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
-
+        buildoptions{"-fPIC", "-pthread", "-ldl"}
+        linkoptions{"-ldl"}
+        
 --
 -- With glslang's build out of the way, we've now covered everything we have
 -- to build to get Slang and its tools/examples built.
