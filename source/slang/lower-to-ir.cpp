@@ -2691,7 +2691,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // We just need to look up the basic block that
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
-        IRBlock* targetBlock;
+        IRBlock* targetBlock = nullptr;
         context->shared->breakLabels.TryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
@@ -2710,7 +2710,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // We just need to look up the basic block that
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
-        IRBlock* targetBlock;
+        IRBlock* targetBlock = nullptr;
         context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
