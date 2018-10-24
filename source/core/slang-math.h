@@ -8,6 +8,17 @@ namespace Slang
 	class Math
 	{
 	public:
+        // Use to fix type punning issues with strict aliasing
+        union FloatIntUnion
+        {
+            float fvalue;
+            int ivalue;
+
+            inline static FloatIntUnion makeFromInt(int i) { FloatIntUnion cast; cast.ivalue = i; return cast; }
+            inline static FloatIntUnion makeFromFloat(float f) { FloatIntUnion cast; cast.fvalue = f; return cast; }
+        };
+
+        
 		static const float Pi;
 		template<typename T>
 		static T Min(const T& v1, const T&v2)
@@ -110,30 +121,19 @@ namespace Slang
 		}
 		*/
 	};
-	inline int FloatAsInt(float val)
+    inline int FloatAsInt(float val)
 	{
-		union InterCast
-		{
-			float fvalue;
-			int ivalue;
-		} cast;
-		cast.fvalue = val;
-		return cast.ivalue;
+        return Math::FloatIntUnion::makeFromFloat(val).ivalue; 
 	}
-	inline float IntAsFloat(int val)
+    inline float IntAsFloat(int val)
 	{
-		union InterCast
-		{
-			float fvalue;
-			int ivalue;
-		} cast;
-		cast.ivalue = val;
-		return cast.fvalue;
+        return Math::FloatIntUnion::makeFromInt(val).fvalue; 
 	}
 
 	inline unsigned short FloatToHalf(float val)
 	{
-		int x = *(int*)&val;
+        const auto x = FloatAsInt(val);
+        
 		unsigned short bits = (x >> 16) & 0x8000;
 		unsigned short m = (x >> 12) & 0x07ff;
 		unsigned int e = (x >> 23) & 0xff;
@@ -158,19 +158,9 @@ namespace Slang
 
 	inline float HalfToFloat(unsigned short input)
 	{
-		union InterCast
-		{
-			float fvalue;
-			int ivalue;
-			InterCast() = default;
-			InterCast(int ival)
-			{
-				ivalue = ival;
-			}
-		};
-		static const InterCast magic = InterCast((127 + (127 - 15)) << 23);
-		static const InterCast was_infnan = InterCast((127 + 16) << 23);
-		InterCast o;
+		static const auto magic = Math::FloatIntUnion::makeFromInt((127 + (127 - 15)) << 23);
+		static const auto was_infnan = Math::FloatIntUnion::makeFromInt((127 + 16) << 23);
+        Math::FloatIntUnion o;
 		o.ivalue = (input & 0x7fff) << 13;     // exponent/mantissa bits
 		o.fvalue *= magic.fvalue;                 // exponent adjust
 		if (o.fvalue >= was_infnan.fvalue)        // make sure Inf/NaN survive
