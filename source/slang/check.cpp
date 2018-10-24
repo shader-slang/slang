@@ -5283,7 +5283,6 @@ namespace Slang
             RefPtr<Type> bestType;
             if(auto basicType = type.As<BasicExpressionType>())
             {
-                basicType->baseType;
                 for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
                 {
                     // Don't consider `type`, since we already know it doesn't work.
