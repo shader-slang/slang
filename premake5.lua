@@ -353,7 +353,11 @@ standardProject "core"
     --
     warnings "Extra"
     flags { "FatalWarnings" }
-
+    
+    -- We need the core library to be relocatable to be able to link with slang.so
+    filter { "system:linux" }
+        buildoptions{"-fPIC", "-ldl"}
+    
 --
 -- `slang-generate` is a tool we use for source code generation on
 -- the compiler. It depends on the `core` library, so we need to
