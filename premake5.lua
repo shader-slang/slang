@@ -108,7 +108,8 @@ workspace "slang"
     filter { "system:linux" }
         location("build.linux")
         linkoptions("-fPIC")
-	
+        buildoptions("-fPIC")
+    
 		
 function dump(o)
     if type(o) == 'table' then
