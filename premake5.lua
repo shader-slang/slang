@@ -53,6 +53,8 @@ workspace "slang"
     configurations { "Debug", "Release" }
     platforms { "x86", "x64" }
 
+    filter { "system:linux" }
+        location("build.linux")
     
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
