@@ -53,9 +53,7 @@ workspace "slang"
     configurations { "Debug", "Release" }
     platforms { "x86", "x64" }
 
-	filter { "system:linux" }
-        location("build.linux")
-	
+    
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir "bin/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}"
@@ -107,6 +105,9 @@ workspace "slang"
         optimize "On"
         defines { "NDEBUG" }
 
+    filter { "system:linux" }
+        location("build.linux")
+	
 		
 function dump(o)
     if type(o) == 'table' then
@@ -422,14 +423,13 @@ if os.target() == "windows" then
         uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
         includedirs { ".", "external", "source", "tools/gfx" }
         links { "core", "slang", "gfx" }
-        filter { "system:windows" }
+        
+        systemversion "10.0.14393.0"
 
-            systemversion "10.0.14393.0"
-
-            -- For Windows targets, we want to copy d3dcompiler_47.dll,
-            -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-            -- directory into the output directory.
-            postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 end
             
 --
