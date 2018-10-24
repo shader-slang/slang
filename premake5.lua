@@ -105,6 +105,10 @@ workspace "slang"
         optimize "On"
         defines { "NDEBUG" }
     		
+    filter { "system:linux" }
+        buildoptions{  "-Wl,--no-as-needed", "-ldl"}
+        
+            
 function dump(o)
     if type(o) == 'table' then
         local s = '{ '
@@ -356,7 +360,7 @@ standardProject "core"
     
     -- We need the core library to be relocatable to be able to link with slang.so
     filter { "system:linux" }
-        buildoptions{"-fPIC", "-ldl"}
+        buildoptions{"-fPIC"}
     
 --
 -- `slang-generate` is a tool we use for source code generation on
@@ -516,9 +520,8 @@ standardProject "slang"
     dependson { "slang-generate" }
 
     filter { "system:linux" }
-        buildoptions{"-fPIC", "-ldl"}
-        linkoptions{"-ldl"}
-
+        buildoptions{"-fPIC"}
+       
     -- Next, we want to add a custom build rule for each of the
     -- files that makes up the standard library. Those are
     -- always named `*.meta.slang`, so we can select for them
@@ -619,8 +622,7 @@ standardProject "slang-glslang"
 
     filter { "system:linux" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
-        buildoptions{"-fPIC", "-pthread", "-ldl"}
-        linkoptions{"-ldl"}
+        buildoptions{"-fPIC", "-pthread"}
         
 --
 -- With glslang's build out of the way, we've now covered everything we have
