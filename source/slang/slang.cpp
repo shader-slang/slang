@@ -11,7 +11,7 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
-#include "default-file-system.h"
+#include "slang-file-system.h"
 
 #include "ir-serialize.h"
 

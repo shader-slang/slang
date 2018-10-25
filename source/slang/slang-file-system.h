@@ -1,5 +1,5 @@
-#ifndef SLANG_DEFAULT_FILE_SYSTEM_H_INCLUDED
-#define SLANG_DEFAULT_FILE_SYSTEM_H_INCLUDED
+#ifndef SLANG_FILE_SYSTEM_H_INCLUDED
+#define SLANG_FILE_SYSTEM_H_INCLUDED
 
 #include "../../slang.h"
 #include "../../slang-com-helper.h"
@@ -166,4 +166,4 @@ protected:
 
 }
 
-#endif
+#endif // SLANG_FILE_SYSTEM_H_INCLUDED

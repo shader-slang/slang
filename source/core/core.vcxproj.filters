@@ -130,8 +130,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="core.natvis">
+    <None Include="core.natvis">
       <Filter>Source Files</Filter>
-    </Natvis>
+    </None>
   </ItemGroup>
 </Project>
