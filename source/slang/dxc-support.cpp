@@ -122,6 +122,16 @@ namespace Slang
             args[argCount++] = L"-WX";
         }
 
+        switch( targetReq->getDefaultMatrixLayoutMode() )
+        {
+        default:
+            break;
+
+        case kMatrixLayoutMode_RowMajor:
+            args[argCount++] = L"-Zpr";
+            break;
+        }
+
         String entryPointName = getText(entryPoint->name);
         OSString wideEntryPointName = entryPointName.ToWString();
 
