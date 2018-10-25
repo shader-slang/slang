@@ -408,8 +408,6 @@ namespace Slang
 
         CompileRequest(Session* session);
 
-        ~CompileRequest();
-
         RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
 
         Type* getTypeFromString(String typeStr);

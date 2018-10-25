@@ -309,15 +309,6 @@ CompileRequest::CompileRequest(Session* session)
     fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
 }
 
-CompileRequest::~CompileRequest()
-{
-    // delete things that may reference IR objects first
-    targets = decltype(targets)();
-    translationUnits = decltype(translationUnits)();
-    entryPoints = decltype(entryPoints)();
-    types = decltype(types)();
-}
-
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
 static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
