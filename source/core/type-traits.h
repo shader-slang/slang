@@ -37,8 +37,8 @@ namespace Slang
 	template <typename B, typename D>
 	struct IsConvertible
 	{
-		static TraitResultYes Use(B) {};
-		static TraitResultNo Use(...) {};
+		static TraitResultYes Use(B) { return TraitResultYes(); };
+		static TraitResultNo Use(...) { return TraitResultNo(); };
 		enum { Value = sizeof(Use(*(D*)(nullptr))) == sizeof(TraitResultYes) };
 	};
 }

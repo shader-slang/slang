@@ -5,6 +5,8 @@
 
 //#include "shader-input-layout.h"
 
+#include <float.h>
+
 #include "../../slang-com-helper.h"
 
 #include "../../source/core/smart-pointer.h"
@@ -423,6 +425,10 @@ class TextureResource: public Resource
     protected:
     Desc m_desc;
 };
+
+// Needed for building on cygwin with gcc
+#undef Always
+#undef None
 
 enum class ComparisonFunc : uint8_t
 {

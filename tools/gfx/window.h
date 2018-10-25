@@ -5,7 +5,7 @@
 
 namespace gfx {
 
-typedef struct Window Window;
+struct Window;
 
 enum class KeyCode
 {
@@ -94,7 +94,7 @@ int runApplication(
 
 #define GFX_CONSOLE_MAIN(APPLICATION_ENTRY)  \
     int main(int argc, char** argv) {       \
-        return gfx::runApplication(&(APPLIATION_ENTRY), argc, argv); \
+        return gfx::runApplication(&(APPLICATION_ENTRY), argc, argv); \
     }
 
 #ifdef _WIN32

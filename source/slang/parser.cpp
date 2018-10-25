@@ -993,7 +993,7 @@ namespace Slang
                     nameToken.Content = nameToken.Content + ":";
                     break;
                 }
-
+                ;       // fall-thru
             default:
                 parser->sink->diagnose(nameToken.loc, Diagnostics::invalidOperator, nameToken);
                 break;
@@ -3689,12 +3689,14 @@ namespace Slang
         case TokenType::OpGeq:
             // Don't allow these ops inside a generic argument
             if (parser->genericDepth > 0) return Precedence::Invalid;
+            ; // fall-thru
         case TokenType::OpLeq:
         case TokenType::OpLess:
             return Precedence::RelationalComparison;
         case TokenType::OpRsh:
             // Don't allow this op inside a generic argument
             if (parser->genericDepth > 0) return Precedence::Invalid;
+            ; // fall-thru
         case TokenType::OpLsh:
             return Precedence::BitShift;
         case TokenType::OpAdd:

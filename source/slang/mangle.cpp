@@ -4,6 +4,8 @@
 #include "ir-insts.h"
 #include "syntax.h"
 
+#include "../core/slang-cpu-defines.h"
+
 namespace Slang
 {
     struct ManglingContext
@@ -22,7 +24,7 @@ namespace Slang
         ManglingContext*    context,
         UInt                value)
     {
-        context->sb.append(value);
+        context->sb.append(UnambigousUInt(value));
     }
 
     void emit(

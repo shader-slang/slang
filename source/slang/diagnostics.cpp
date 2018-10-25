@@ -173,7 +173,7 @@ static void formatDiagnostic(
 
     sb << humaneLoc.pathInfo.foundPath;
     sb << "(";
-    sb << humaneLoc.line;
+    sb << Int32(humaneLoc.line);
     sb << "): ";
     sb << getSeverityName(diagnostic.severity);
 

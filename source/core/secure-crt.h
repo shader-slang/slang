@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+
 #include <wchar.h>
 
 inline void memcpy_s(void *dest, size_t numberOfElements, const void * src, size_t count)
@@ -30,16 +32,26 @@ inline size_t wcsnlen_s(const wchar_t * str, size_t /*numberofElements*/)
 	return wcslen(str);
 }
 
-inline size_t strnlen_s(const char * str, size_t numberofElements)
+inline size_t strnlen_s(const char * str, size_t numberOfElements)
 {
-	return strnlen(str, numberofElements);
+#if defined( __CYGWIN__ )
+    const char* cur = str;
+    if (str)
+    {
+        const char*const end = str + numberOfElements;
+        while (*cur && cur < end) cur++;
+    }
+    return size_t(cur - str);
+#else
+	return strnlen(str, numberOfElements);
+#endif
 }
 
 inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ...)
 {
 	va_list argptr;
 	va_start(argptr, format);
-	int rs = snprintf(buffer, sizeOfBuffer, format, argptr);
+	int rs = vsnprintf(buffer, sizeOfBuffer, format, argptr);
 	va_end(argptr);
 	return rs;
 }
@@ -48,7 +60,7 @@ inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * for
 {
 	va_list argptr;
 	va_start(argptr, format);
-	int rs = swprintf(buffer, sizeOfBuffer, format, argptr);
+	int rs = vswprintf(buffer, sizeOfBuffer, format, argptr);
 	va_end(argptr);
 	return rs;
 }

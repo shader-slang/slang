@@ -2213,7 +2213,7 @@ struct EmitVisitor
 
             context->shared->uniqueNameCounters[key] = count+1;
 
-            sb.append(count);
+            sb.append(Int32(count));
             return sb.ProduceString();
         }
 
@@ -2238,8 +2238,7 @@ struct EmitVisitor
         // for the instruction.
         StringBuilder sb;
         sb << "_S";
-        sb << getID(inst);
-
+        sb << Int32(getID(inst));
 
         return sb.ProduceString();
     }
@@ -5000,7 +4999,7 @@ struct EmitVisitor
 
             String paramName;
             paramName.append("_");
-            paramName.append(pp);
+            paramName.append(Int32(pp));
             auto paramType = funcType->getParamType(pp);
 
             emitIRParamType(ctx, paramType, paramName);
