@@ -287,9 +287,6 @@ namespace Slang
 
     class Session;
 
-    /// Create a blob that will retain a string for its lifetime.
-    ///
-    ComPtr<ISlangBlob> createStringBlob(String const& string);
 
     /// Create a blob that will retain (a copy of) raw data.
     ///

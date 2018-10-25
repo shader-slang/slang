@@ -5,6 +5,7 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-string-util.h"
 #include "../core/dictionary.h"
 
 namespace Slang
@@ -52,55 +53,17 @@ private:
     static DefaultFileSystem s_singleton;
 };
 
-/* Wraps an ISlangFileSystem, and provides the extra methods required to make a ISlangFileSystemExt 
-interface, deferring to the contained file system to do reading. 
+/* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
+as well as emulation of methods if only has ISlangFileSystem interface. Will query capabilities
+of the interface on the constructor.
 
 NOTE! That this behavior is the same as previously in that.... 
 1) calcRelativePath, just returns the path as processed by the Path:: methods 
 2) getCanonicalPath, just returns the input path as the 'canonical' path. This will be wrong with a file multiply referenced through paths with .. and or . but 
 doing it this way means it works as before and requires no new functions.
+
+You can use a more sophisticated canonical style if you pass true to  useSimplifyForCanonicalPath. This will simplify relative path to create a canonical path.
 */
-class WrapFileSystem : public ISlangFileSystemExt
-{
-public:
-    // ISlangUnknown 
-    SLANG_IUNKNOWN_ALL
-    
-    // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-        char const*     path,
-        ISlangBlob**    outBlob) SLANG_OVERRIDE;
-
-    // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
-        const char* path,
-        ISlangBlob** canonicalPathOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
-        SlangPathType fromPathType,
-        const char* fromPath,
-        const char* path,
-        ISlangBlob** pathOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
-        const char* path,
-        SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-
-        /// Ctor
-    WrapFileSystem(ISlangFileSystem* fileSystem):
-        m_fileSystem(fileSystem)
-    {
-    }
-    virtual ~WrapFileSystem() {}
-
-
-protected:
-    ISlangUnknown* getInterface(const Guid& guid);
-
-    ComPtr<ISlangFileSystem> m_fileSystem;                  ///< The wrapped file system
-    uint32_t m_refCount = 0;
-};
-
 class CacheFileSystem: public ISlangFileSystemExt
 {
     public:
@@ -139,46 +102,57 @@ class CacheFileSystem: public ISlangFileSystemExt
         const char* path,
         SlangPathType* pathTypeOut) SLANG_OVERRIDE;
 
-    /// Ctor
-    CacheFileSystem(ISlangFileSystemExt* fileSystem) :
-        m_fileSystem(fileSystem)
-    {
-    }
+        /// Ctor
+    CacheFileSystem(ISlangFileSystem* fileSystem, bool useSimplifyForCanonicalPath = false);
+        /// Dtor
+    ~CacheFileSystem();
 
     static CompressedResult toCompressedResult(Result res);
-
     static Result toResult(CompressedResult compRes) { return s_compressedResultToResult[int(compRes)]; } 
-
     static const Result s_compressedResultToResult[int(CompressedResult::CountOf)];
 
 protected:
     ISlangUnknown* getInterface(const Guid& guid);
 
-    struct Info
+    struct PathInfo
     {
-        Info()
+        PathInfo(const String& canonicalPath)
         {
+            m_canonicalPath = new StringBlob(canonicalPath);
+            m_canonicalPath->addRef();
+
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
         }
-        CompressedResult m_loadFileResult;   
+        ~PathInfo()
+        {
+            m_canonicalPath->release();
+        }
+            /// Get the canonical path as a string
+        const String& getCanonicalPath() const { SLANG_ASSERT(m_canonicalPath); return m_canonicalPath->getString(); }
+
+        StringBlob*  m_canonicalPath;                         ///< The canonical path
+        CompressedResult m_loadFileResult;              
         CompressedResult m_getPathTypeResult;    
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
     };
 
-        /// For a given canonical path return the associated info (by getting or creating and getting)
-    Info* _getInfoForCanonicalPath(const String& canonicalPath);
-    SlangResult _getCanonicalPath(const String& path, String& canonicalOut);
-    
+        /// For a given relPath gets a PathInfo
+    PathInfo* _getPathInfo(const String& relPath);
+
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
     It is probably the case we cannot do dynamic_cast on ISlangBlob if we don't know where constructed -> if outside of slang codebase 
     doing such a cast can cause an exception. So we *never* want to do dynamic cast from blobs which could be created by external code. */
-    Dictionary<String, String> m_pathToCanonicalMap;        ///< Maps a path to a canonical path
-    Dictionary<String, Info> m_canonicalToInfoMap;          ///< Maps a canonical path to a files contents
 
-    ComPtr<ISlangFileSystemExt> m_fileSystem;               ///< Underlying file system
+    Dictionary<String, PathInfo*> m_pathMap;        ///< Maps a path to a canonical path
+    Dictionary<String, PathInfo*> m_canonicalMap;   ///< Maps a canonical path to a files contents. This OWNs the PathInfo.
+
+    bool m_useSimplifyForCanonicalPath;             ///< If set will use Path::Simplify to create 'canonical' paths
+
+    ComPtr<ISlangFileSystem> m_fileSystem;          ///< Must always be set
+    ComPtr<ISlangFileSystemExt> m_fileSystemExt;    ///< Optionally set -> if not will fall back on the m_fileSystem
     uint32_t m_refCount = 0;
 };
 

@@ -343,27 +343,6 @@ protected:
     }
 };
 
-/** A blob that uses a `String` for its storage.
-*/
-class StringBlob : public BlobBase
-{
-public:
-    // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.Buffer(); }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.Length(); }
-    
-    explicit StringBlob(String const& string)
-        : m_string(string)
-    {}
-protected:
-    String m_string;
-};
-
-ComPtr<ISlangBlob> createStringBlob(String const& string)
-{
-    return ComPtr<ISlangBlob>(new StringBlob(string));
-}
-
 /** A blob that manages some raw data that it owns.
 */
 class RawBlob : public BlobBase
@@ -1182,7 +1161,7 @@ SLANG_API void spSetFileSystem(
         if (!req->fileSystemExt)
         {
             // Construct a wrapper to emulate the extended interface behavior
-            req->fileSystemExt = new Slang::WrapFileSystem(fileSystem);
+            req->fileSystemExt = new Slang::CacheFileSystem(fileSystem);
         }
     }
 }
@@ -1325,7 +1304,7 @@ SLANG_API SlangResult spGetDiagnosticOutputBlob(
 
     if(!req->diagnosticOutputBlob)
     {
-        req->diagnosticOutputBlob = Slang::createStringBlob(req->mDiagnosticOutput);
+        req->diagnosticOutputBlob = Slang::StringUtil::createStringBlob(req->mDiagnosticOutput);
     }
 
     Slang::ComPtr<ISlangBlob> resultBlob = req->diagnosticOutputBlob;

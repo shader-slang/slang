@@ -6,7 +6,40 @@
 
 #include <stdarg.h>
 
+#include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
+
 namespace Slang {
+
+/** A blob that uses a `String` for its storage.
+*/
+class StringBlob : public ISlangBlob
+{
+public:
+    // ISlangUnknown
+    SLANG_IUNKNOWN_ALL
+
+        // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.Buffer(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.Length(); }
+
+        /// Get the contained string
+    SLANG_FORCE_INLINE const String& getString() const { return m_string; }
+
+    explicit StringBlob(String const& string)
+        : m_string(string)
+    {}
+
+    /// Need virtual dtor, because BlobBase is derived from and release impl used is the one in the base class (that doesn't know the derived type)
+    /// Alternatively could be implemented by always using SLANG_IUNKNOWN_RELEASE in derived types - this would make derived types slightly smaller/faster
+    virtual ~StringBlob() {}
+
+protected:
+    ISlangUnknown* getInterface(const Guid& guid);
+
+    String m_string;
+    uint32_t m_refCount = 0;
+};
 
 struct StringUtil
 {
@@ -26,6 +59,10 @@ struct StringUtil
         /// Given a string held in a blob, returns as a String
         /// Returns an empty string if blob is nullptr 
     static String getString(ISlangBlob* blob);
+
+        /// Create a blob from a string
+    static ComPtr<ISlangBlob> createStringBlob(const String& string);
+
 };
 
 } // namespace Slang

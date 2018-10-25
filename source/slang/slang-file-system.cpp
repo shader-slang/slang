@@ -14,6 +14,28 @@ static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 
+// Cacluate a relative path, just using Path:: string processing
+static SlangResult _calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+{
+    String relPath;
+    switch (fromPathType)
+    {
+        case SLANG_PATH_TYPE_FILE:
+        {
+            relPath = Path::Combine(Path::GetDirectoryName(fromPath), path);
+            break;
+        }
+        case SLANG_PATH_TYPE_DIRECTORY:
+        {
+            relPath = Path::Combine(fromPath, path);
+            break;
+        }
+    }
+
+    *pathOut = StringUtil::createStringBlob(relPath).detach();
+    return SLANG_OK;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 /* static */DefaultFileSystem DefaultFileSystem::s_singleton; 
@@ -34,29 +56,13 @@ SlangResult DefaultFileSystem::getCanoncialPath(const char* path, ISlangBlob** c
     String canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::GetCanonical(path, canonicalPath));
     
-    *canonicalPathOut = createStringBlob(canonicalPath).detach();
+    *canonicalPathOut = StringUtil::createStringBlob(canonicalPath).detach();
     return SLANG_OK;
 }
 
 SlangResult DefaultFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
-    String relPath;
-    switch (fromPathType)
-    {
-        case SLANG_PATH_TYPE_FILE:
-        {
-            relPath = Path::Combine(Path::GetDirectoryName(fromPath), path);
-            break;
-        }
-        case SLANG_PATH_TYPE_DIRECTORY:
-        {
-            relPath = Path::Combine(fromPath, path);
-            break;
-        }
-    }
-
-    *pathOut = createStringBlob(relPath).detach();
-    return SLANG_OK;
+    return _calcRelativePath(fromPathType, fromPath, path, pathOut);
 }
 
 SlangResult SLANG_MCALL DefaultFileSystem::getPathType(
@@ -82,54 +88,13 @@ SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     try
     {
         String sourceString = File::ReadAllText(path);
-        ComPtr<ISlangBlob> sourceBlob = createStringBlob(sourceString);
-        *outBlob = sourceBlob.detach();
+        *outBlob = StringUtil::createStringBlob(sourceString).detach();
         return SLANG_OK;
     }
     catch (...)
     {
     }
     return SLANG_E_CANNOT_OPEN;
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!! WrapFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-
-ISlangUnknown* WrapFileSystem::getInterface(const Guid& guid)
-{
-    return _getInterface(this, guid);
-}
-
-SlangResult WrapFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
-{
-    // Used the wrapped file system to do the loading
-    return m_fileSystem->loadFile(path, outBlob);
-}
-
-SlangResult WrapFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
-{
-    // This isn't a very good 'canonical path' because the same file might be referenced 
-    // multiple ways - for example by using relative paths. 
-    // But it's simple and matches slangs previous behavior. 
-    String canonicalPath(path);
-    *canonicalPathOut = createStringBlob(canonicalPath).detach();
-    return SLANG_OK;
-}
-
-SlangResult WrapFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
-{
-    // Just defer to the default implementation
-    return DefaultFileSystem::getSingleton()->calcRelativePath(fromPathType, fromPath, path, pathOut);
-}
-
-SlangResult WrapFileSystem::getPathType(const char* path, SlangPathType* pathTypeOut)
-{
-    // TODO:
-    // This might be undesirable in the longer term because it means that ISlangFileSystem will not be used 
-    // to test file existence - but the file system will be.
-    // 
-    // It would probably be better to use some kind of cache that uses 'loadFile' to load files, but also 
-    // to test for existence.
-    return DefaultFileSystem::getSingleton()->getPathType(path, pathTypeOut); 
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -162,70 +127,78 @@ ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
     return _getInterface(this, guid);
 }
 
-SlangResult CacheFileSystem::_getCanonicalPath(const String& path, String& canonicalOut)
+CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, bool useSimplifyForCanonicalPath) :
+    m_fileSystem(fileSystem),
+    m_useSimplifyForCanonicalPath(useSimplifyForCanonicalPath)
 {
-    const String* canonicalPathPtr = m_pathToCanonicalMap.TryGetValue(path);
-
-    if (canonicalPathPtr)
-    {
-        if (canonicalPathPtr->getStringRepresentation() == nullptr)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-        else
-        {
-            canonicalOut = *canonicalPathPtr;
-            return SLANG_OK;
-        }
-    }
-
-    // Okay request from the underlying file system the canonical path
-    ComPtr<ISlangBlob> canonicalBlob;
-    if (SLANG_FAILED(m_fileSystem->getCanoncialPath(path.Buffer(), canonicalBlob.writeRef())))
-    {
-        // Write in result as being null ptr so not tried again
-        m_pathToCanonicalMap.Add(path, String((StringRepresentation*)nullptr));
-        return SLANG_E_NOT_FOUND;
-    }
-     
-    String canonicalPath = StringUtil::getString(canonicalBlob);
-    SLANG_ASSERT(canonicalPath.Length() > 0);
-
-    // Add it to the cache
-    m_pathToCanonicalMap.Add(path, canonicalPath);
-
-    // A canonical path always maps to itself
-    if (path != canonicalPath)
-    {
-        m_pathToCanonicalMap.AddIfNotExists(canonicalPath, canonicalPath);
-    }
-
-    canonicalOut = canonicalPath;
-    return SLANG_OK;
+    // Try to get the more sophisticated interface
+    fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
 }
 
-CacheFileSystem::Info*  CacheFileSystem::_getInfoForCanonicalPath(const String& canonicalPath)
+CacheFileSystem::~CacheFileSystem()
 {
-    Info* info = m_canonicalToInfoMap.TryGetValue(canonicalPath);
-    if (info)
+    for (const auto& pair : m_canonicalMap)
     {
-        return info;
+        delete pair.Value;
     }
-    // Initialize info for this entry
-    Info initInfo;
-    m_canonicalToInfoMap.Add(canonicalPath, initInfo);
-    return m_canonicalToInfoMap.TryGetValue(canonicalPath);
+}
+
+CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& relPath)
+{
+    PathInfo** infoPtr = m_pathMap.TryGetValue(relPath);
+    if (infoPtr)
+    {
+        return *infoPtr;
+    }
+
+    String canonicalPath;
+    if (m_fileSystemExt)
+    {
+        // Try getting the canonical path
+        // Okay request from the underlying file system the canonical path
+        ComPtr<ISlangBlob> canonicalBlob;
+        if (SLANG_FAILED(m_fileSystemExt->getCanoncialPath(relPath.Buffer(), canonicalBlob.writeRef())))
+        {
+            // Write in result as being null ptr so not tried again
+            m_pathMap.Add(relPath, nullptr);
+            return nullptr;
+        }
+        // Get the path as a string
+        canonicalPath = StringUtil::getString(canonicalBlob);
+    }
+    else
+    {
+        canonicalPath = m_useSimplifyForCanonicalPath ? Path::Simplify(relPath.getUnownedSlice()) : relPath;
+    }
+
+    PathInfo* pathInfo;
+    infoPtr = m_canonicalMap.TryGetValue(canonicalPath);
+    if (infoPtr)
+    {
+        pathInfo = *infoPtr;
+    }
+    else
+    {
+        // Create and add to canonical path
+        pathInfo = new PathInfo(canonicalPath);
+        m_canonicalMap.Add(canonicalPath, pathInfo);
+    }
+
+    // Add the relPath
+    m_pathMap.Add(relPath, pathInfo);
+    return pathInfo;
 }
 
 SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
 {
     *blobOut = nullptr;
-
     String path(pathIn);
-    String canonicalPath;
-    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
-
-    Info* info = _getInfoForCanonicalPath(canonicalPath);
+    PathInfo* info = _getPathInfo(path);
+    if (!info)
+    {
+        return SLANG_FAIL;
+    }
+    
     if (info->m_loadFileResult == CompressedResult::Uninitialized)
     {
         info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef()));
@@ -241,29 +214,58 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
 
 SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
 {
-    String canonicalPath;
-    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
-    *canonicalPathOut = createStringBlob(canonicalPath).detach();
+    PathInfo* info = _getPathInfo(path);
+    if (!info)
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+    info->m_canonicalPath->addRef();
+    *canonicalPathOut = info->m_canonicalPath;
     return SLANG_OK;
 }
 
 SlangResult CacheFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     // Just defer to contained implementation
-    return m_fileSystem->calcRelativePath(fromPathType, fromPath, path, pathOut);
+    if (m_fileSystemExt)
+    {
+        return m_fileSystemExt->calcRelativePath(fromPathType, fromPath, path, pathOut);
+    }
+    else
+    {
+        // Just use the default implementation
+        return _calcRelativePath(fromPathType, fromPath, path, pathOut);
+    }
 }
 
 SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
     String path(pathIn);
-    String canonicalPath;
-    SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
-    // See if we have it in the cache
-    Info* info = _getInfoForCanonicalPath(canonicalPath);
+    PathInfo* info = _getPathInfo(path);
+    if (!info)
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
     if (info->m_getPathTypeResult == CompressedResult::Uninitialized)
     {
-        info->m_getPathTypeResult = toCompressedResult(m_fileSystem->getPathType(pathIn, &info->m_pathType));
-        SLANG_ASSERT(info->m_getPathTypeResult != SLANG_E_UNINITIALIZED);
+        if (m_fileSystemExt)
+        {
+            info->m_getPathTypeResult = toCompressedResult(m_fileSystemExt->getPathType(pathIn, &info->m_pathType));
+        }
+        else
+        {
+            // Okay try to load the file
+            if (info->m_loadFileResult == CompressedResult::Uninitialized)
+            {
+                info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef()));
+            }
+
+            // Make the getPathResult the same as the load result
+            info->m_getPathTypeResult = info->m_loadFileResult;
+            // Just set to file... the result is what matters in this case
+            info->m_pathType = SLANG_PATH_TYPE_FILE; 
+        }
     }
 
     *pathTypeOut = info->m_pathType;
