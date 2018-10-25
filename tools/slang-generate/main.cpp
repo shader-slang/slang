@@ -625,28 +625,35 @@ void usage(char const* appName)
     fprintf(stderr, "usage: %s <input>\n", appName);
 }
 
-char* readAllText(char const * fileName)
+SlangResult readAllText(char const * fileName, String& stringOut)
 {
     FILE * f;
     fopen_s(&f, fileName, "rb");
     if (!f)
     {
-        return "";
+        stringOut = "";
+        return SLANG_FAIL;
     }
     else
     {
+        stringOut = 
         fseek(f, 0, SEEK_END);
         auto size = ftell(f);
-        char * buffer = new char[size + 1];
-        memset(buffer, 0, size + 1);
+
+        StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
+        stringOut = String(stringRep);
+
+        char * buffer = stringRep->getData();
+        memset(buffer, 0, size);
         fseek(f, 0, SEEK_SET);
         fread(buffer, sizeof(char), size, f);
         fclose(f);
-        return buffer;
+
+        return SLANG_OK;
     }
 }
 
-void writeAllText(char const *srcFileName, char const* fileName, char* content)
+void writeAllText(char const *srcFileName, char const* fileName, const char* content)
 {
     FILE * f = nullptr;
     fopen_s(&f, fileName, "wb");
@@ -751,34 +758,28 @@ List<SourceFile*> gSourceFiles;
 
 int main(
     int     argc,
-    char**  argv)
+    const char*const*  argv)
 {
     // Parse command-line arguments.
-    char** argCursor = argv;
-    char** argEnd = argv + argc;
-
+    List<const char*> inputPaths;
     char const* appName = "slang-generate";
-    if( argCursor != argEnd )
+
     {
-        appName = *argCursor++;
+        const char*const* argCursor = argv;
+        const char*const* argEnd = argv + argc;
+        // Copy the app name
+        if( argCursor != argEnd )
+        {
+            appName = *argCursor++;
+        }
+        // Copy the input paths
+        for (; argCursor != argEnd; ++argCursor)
+        {
+            inputPaths.Add(*argCursor);
+        }
     }
 
-    char** writeCursor = argv;
-    char const* const* inputPaths = writeCursor;
-
-    while(argCursor != argEnd)
-    {
-        *writeCursor++ = *argCursor++;
-    }
-
-    size_t inputPathCount = writeCursor - inputPaths;
-    if(inputPathCount == 0)
-    {
-        usage(appName);
-        exit(1);
-    }
-
-    if( argCursor != argEnd )
+    if(inputPaths.Count() == 0)
     {
         usage(appName);
         exit(1);
@@ -786,9 +787,8 @@ int main(
 
     // Read each input file and process it according
     // to the type of treatment it requires.
-    for (size_t ii = 0; ii < inputPathCount; ++ii)
+    for (const char* inputPath: inputPaths)
     {
-        char const* inputPath = inputPaths[ii];
         SourceFile* sourceFile = parseSourceFile(inputPath);
         if (sourceFile)
         {
@@ -804,27 +804,28 @@ int main(
         auto node = sourceFile->node;
 
         // write output to a temporary file first
-        char outputPath[1024];
-        sprintf_s(outputPath, "%s.temp.h", inputPath);
+        StringBuilder outputPath;
+        outputPath << inputPath << ".temp.h";
 
         FILE* outputStream;
-        fopen_s(&outputStream, outputPath, "w");
+        fopen_s(&outputStream, outputPath.Buffer(), "w");
 
         emitTemplateNodes(outputStream, node);
 
         fclose(outputStream);
 
         // update final output only when content has changed
-        char outputPathFinal[1024];
-        sprintf_s(outputPathFinal, "%s.h", inputPath);
+        StringBuilder outputPathFinal;
+        outputPathFinal << inputPath << ".h";
 
-        char * allTextOld = readAllText(outputPathFinal);
-        char * allTextNew = readAllText(outputPath);
-        if (strcmp(allTextNew, allTextOld) != 0)
+        String allTextOld, allTextNew;
+        readAllText(outputPathFinal.Buffer(), allTextOld);
+        readAllText(outputPath.Buffer(), allTextNew);
+        if (allTextOld != allTextNew)
         {
-            writeAllText(inputPath, outputPathFinal, allTextNew);
+            writeAllText(inputPath, outputPathFinal.Buffer(), allTextNew.Buffer());
         }
-        remove(outputPath);
+        remove(outputPath.Buffer());
     }
 
     return 0;

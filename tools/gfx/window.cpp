@@ -1,6 +1,5 @@
 // window.cpp
 #include "window.h"
-#pragma once
 
 #include <stdio.h>
 

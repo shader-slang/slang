@@ -147,7 +147,7 @@ SlangResult parseOptions(int* argc, char** argv)
     }
     
     // any arguments left over were positional arguments
-    argCount = (int)(writeCursor - argv);
+    argCount = (int)(writeCursor - (const char**)argv);
     argCursor = argv;
     argEnd = argCursor + argCount;
 

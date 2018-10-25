@@ -330,8 +330,8 @@ namespace Slang
         SyntaxClassBase()
         {}
 
-        SyntaxClassBase(ClassInfo const* classInfo)
-            : classInfo(classInfo)
+        SyntaxClassBase(ClassInfo const* classInfoIn)
+            : classInfo(classInfoIn)
         {}
 
         void* createInstanceImpl() const
@@ -375,11 +375,13 @@ namespace Slang
             return (T*)createInstanceImpl();
         }
 
+        SyntaxClass(const ClassInfo* classInfoIn):
+            SyntaxClassBase(classInfoIn) 
+        {}
+
         static SyntaxClass<T> getClass()
         {
-            SyntaxClass<T> result;
-            result.classInfo = &SyntaxClass::Impl<T>::kClassInfo;
-            return result;
+            return SyntaxClass<T>(&SyntaxClassBase::Impl<T>::kClassInfo);
         }
 
         template<typename U>

@@ -5,6 +5,7 @@
 #include "vector-math.h"
 
 #include <vector>
+#include <string>
 
 namespace gfx {
 

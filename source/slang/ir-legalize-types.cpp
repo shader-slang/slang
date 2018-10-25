@@ -1201,7 +1201,7 @@ static LegalVal declareSimpleVar(
                 if (mangledNameStr.Length() != 0)
                 {
                     mangledNameStr.append("L");
-                    mangledNameStr.append(globalNameInfo->counter++);
+                    mangledNameStr.append(Int32(globalNameInfo->counter++));
                     globalVar->mangledName = context->session->getNameObj(mangledNameStr);
                 }
             }

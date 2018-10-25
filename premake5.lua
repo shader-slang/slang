@@ -36,11 +36,26 @@
 -- Visual Studio terms). It sets up basic build settings that will
 -- apply across all projects.
 --
+
+-- To output linux will output to linux 
+-- % premake5 --os=linux gmake
+--
+-- % cd build.linux
+-- % make config=release_x64
+-- or 
+-- % make config=debug_x64
+--
+-- From in the build directory you can use
+-- % premake5 --file=../premake5.lua --os=linux gmake
+
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
     configurations { "Debug", "Release" }
     platforms { "x86", "x64" }
 
+    filter { "system:linux" }
+        location("build.linux")
+    
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir "bin/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}"
@@ -67,6 +82,15 @@ workspace "slang"
     filter { "platforms:x86" }
         architecture "x86"
 
+    filter { "toolset:clang or gcc*" }
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden", "-std=gnu++11" } 
+    	
+	filter { "toolset:gcc*"}
+		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough" }
+		
+    filter { "toolset:clang" }
+         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare"}
+		
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
@@ -82,7 +106,33 @@ workspace "slang"
     filter { "configurations:release" }
         optimize "On"
         defines { "NDEBUG" }
-
+    		
+    filter { "system:linux" }
+        linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
+        
+            
+function dump(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k,v in pairs(o) do
+            if type(k) ~= 'number' then k = '"'..k..'"' end
+            s = s .. '['..k..'] = ' .. dump(v) .. ','
+        end
+        return s .. '} '
+    else
+        return tostring(o)
+     end
+end
+	
+function dumpTable(o)
+	local s = '{ '
+	for k,v in pairs(o) do
+		if type(k) ~= 'number' then k = '"'..k..'"' end
+		s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
+	end
+	return s .. '} '
+end
+	
 --
 -- We are now going to start defining the projects, where
 -- each project builds some binary artifact (an executable,
@@ -272,22 +322,23 @@ function example(name)
     links { "slang", "core", "gfx" }
 end
 
---
--- With all of these helper routines defined, we can now define the
--- actual projects quite simply. For example, here is the entire
--- declaration of the "Hello, World" example project:
---
-example "hello-world"
---
--- Note how we are calling our custom `example()` subroutine with
--- the same syntax sugar that Premake usually advocates for their
--- `project()` function. This allows us to treat `example` as
--- a kind of specialized "subclass" of `project`
---
+if os.target() == "windows" then
+    --
+    -- With all of these helper routines defined, we can now define the
+    -- actual projects quite simply. For example, here is the entire
+    -- declaration of the "Hello, World" example project:
+    --
+    example "hello-world"
+    --
+    -- Note how we are calling our custom `example()` subroutine with
+    -- the same syntax sugar that Premake usually advocates for their
+    -- `project()` function. This allows us to treat `example` as
+    -- a kind of specialized "subclass" of `project`
+    --
 
--- Let's go ahead and set up the projects for our other example now.
-example "model-viewer"
-
+    -- Let's go ahead and set up the projects for our other example now.
+    example "model-viewer"
+end
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
@@ -308,7 +359,11 @@ standardProject "core"
     --
     warnings "Extra"
     flags { "FatalWarnings" }
-
+    
+    -- We need the core library to be relocatable to be able to link with slang.so
+    filter { "system:linux" }
+        buildoptions{"-fPIC"}
+    
 --
 -- `slang-generate` is a tool we use for source code generation on
 -- the compiler. It depends on the `core` library, so we need to
@@ -369,19 +424,20 @@ tool "slang-eval-test"
 -- TODO: Fix that requirement.
 --
 
-tool "render-test"
-    uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
-    includedirs { ".", "external", "source", "tools/gfx" }
-    links { "core", "slang", "gfx" }
-    filter { "system:windows" }
-
+if os.target() == "windows" then
+    tool "render-test"
+        uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
+        includedirs { ".", "external", "source", "tools/gfx" }
+        links { "core", "slang", "gfx" }
+        
         systemversion "10.0.14393.0"
 
         -- For Windows targets, we want to copy d3dcompiler_47.dll,
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
-
+end
+            
 --
 -- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.
@@ -405,7 +461,8 @@ tool "gfx"
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 
-
+	filter { "system:not windows" }
+        removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
 
 --
 -- The `slangc` command-line application is just a very thin wrapper
@@ -464,6 +521,9 @@ standardProject "slang"
     --
     dependson { "slang-generate" }
 
+    filter { "system:linux" }
+        buildoptions{"-fPIC"}
+       
     -- Next, we want to add a custom build rule for each of the
     -- files that makes up the standard library. Those are
     -- always named `*.meta.slang`, so we can select for them
@@ -564,7 +624,8 @@ standardProject "slang-glslang"
 
     filter { "system:linux" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
-
+        buildoptions{"-fPIC", "-pthread"}
+        
 --
 -- With glslang's build out of the way, we've now covered everything we have
 -- to build to get Slang and its tools/examples built.
