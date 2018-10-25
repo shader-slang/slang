@@ -134,6 +134,29 @@ SlangResult WrapFileSystem::getPathType(const char* path, SlangPathType* pathTyp
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+/* static */ const Result CacheFileSystem::s_compressedResultToResult[] = 
+{
+    SLANG_E_UNINITIALIZED, 
+    SLANG_OK,               ///< Ok
+    SLANG_E_NOT_FOUND,      ///< File not found
+    SLANG_E_CANNOT_OPEN,    ///< CannotOpen,
+    SLANG_FAIL,             ///< Fail
+};
+
+/* static */CacheFileSystem::CompressedResult CacheFileSystem::toCompressedResult(Result res)
+{
+    if (SLANG_SUCCEEDED(res))
+    {
+        return CompressedResult::Ok;
+    }
+    switch (res)
+    {
+        case SLANG_E_CANNOT_OPEN:   return CompressedResult::CannotOpen;
+        case SLANG_E_NOT_FOUND:     return CompressedResult::NotFound;
+        default:                    return CompressedResult::Fail;
+    }
+}
+
 ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
 {
     return _getInterface(this, guid);
@@ -203,11 +226,9 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
     SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
 
     Info* info = _getInfoForCanonicalPath(canonicalPath);
-    if (info->m_loadFileResult == SLANG_E_UNINITIALIZED)
+    if (info->m_loadFileResult == CompressedResult::Uninitialized)
     {
-        info->m_loadFileResult = m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef());
-        // Can't be in same state after the load
-        SLANG_ASSERT(info->m_loadFileResult != SLANG_E_UNINITIALIZED);
+        info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef()));
     }
 
     *blobOut = info->m_fileBlob;
@@ -215,7 +236,7 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
     {
         (*blobOut)->addRef();
     }
-    return info->m_loadFileResult;
+    return toResult(info->m_loadFileResult);
 }
 
 SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
@@ -239,14 +260,14 @@ SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* path
     SLANG_RETURN_ON_FAIL(_getCanonicalPath(path, canonicalPath));
     // See if we have it in the cache
     Info* info = _getInfoForCanonicalPath(canonicalPath);
-    if (info->m_getPathTypeResult == SLANG_E_UNINITIALIZED)
+    if (info->m_getPathTypeResult == CompressedResult::Uninitialized)
     {
-        info->m_getPathTypeResult = m_fileSystem->getPathType(pathIn, &info->m_pathType);
+        info->m_getPathTypeResult = toCompressedResult(m_fileSystem->getPathType(pathIn, &info->m_pathType));
         SLANG_ASSERT(info->m_getPathTypeResult != SLANG_E_UNINITIALIZED);
     }
 
     *pathTypeOut = info->m_pathType;
-    return info->m_getPathTypeResult;
+    return toResult(info->m_getPathTypeResult);
 }
 
 } 

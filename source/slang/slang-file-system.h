@@ -104,6 +104,18 @@ protected:
 class CacheFileSystem: public ISlangFileSystemExt
 {
     public:
+
+    /* Cannot change order/add members without changing s_compressedResultToResult */
+    enum class CompressedResult: uint8_t
+    {   
+        Uninitialized,                          ///< Holds no value
+        Ok,                                     ///< Ok
+        NotFound,                               ///< File not found
+        CannotOpen,                             ///< Cannot open
+        Fail,                                   ///< Generic failure
+        CountOf,
+    };
+
     // ISlangUnknown 
     SLANG_IUNKNOWN_ALL
 
@@ -133,6 +145,12 @@ class CacheFileSystem: public ISlangFileSystemExt
     {
     }
 
+    static CompressedResult toCompressedResult(Result res);
+
+    static Result toResult(CompressedResult compRes) { return s_compressedResultToResult[int(compRes)]; } 
+
+    static const Result s_compressedResultToResult[int(CompressedResult::CountOf)];
+
 protected:
     ISlangUnknown* getInterface(const Guid& guid);
 
@@ -140,11 +158,11 @@ protected:
     {
         Info()
         {
-            m_loadFileResult = SLANG_E_UNINITIALIZED;
-            m_getPathTypeResult = SLANG_E_UNINITIALIZED;
+            m_loadFileResult = CompressedResult::Uninitialized;
+            m_getPathTypeResult = CompressedResult::Uninitialized;
         }
-        SlangResult m_loadFileResult;   
-        SlangResult m_getPathTypeResult;    
+        CompressedResult m_loadFileResult;   
+        CompressedResult m_getPathTypeResult;    
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
     };
