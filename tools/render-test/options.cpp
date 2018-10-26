@@ -139,6 +139,10 @@ SlangResult parseOptions(int* argc, char** argv)
         {
             gOptions.rendererType = RendererType::DirectX11;
         }
+        else if( strcmp(arg, "-use-dxil") == 0 )
+        {
+            gOptions.useDXIL = true;
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);

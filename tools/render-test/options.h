@@ -46,6 +46,8 @@ struct Options
 
     char const* slangArgs[kMaxSlangArgs];
     int slangArgCount = 0;
+
+    bool useDXIL = false;
 };
 
 extern Options gOptions;
