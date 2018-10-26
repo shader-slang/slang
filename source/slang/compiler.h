@@ -287,9 +287,6 @@ namespace Slang
 
     class Session;
 
-    /// Create a blob that will retain a string for its lifetime.
-    ///
-    ComPtr<ISlangBlob> createStringBlob(String const& string);
 
     /// Create a blob that will retain (a copy of) raw data.
     ///
@@ -410,8 +407,6 @@ namespace Slang
         SlangResult loadFile(String const& path, ISlangBlob** outBlob);
 
         CompileRequest(Session* session);
-
-        ~CompileRequest();
 
         RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
 

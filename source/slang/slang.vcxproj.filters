@@ -24,9 +24,6 @@
     <ClInclude Include="decl-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="default-file-system.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="diagnostic-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -126,6 +123,9 @@
     <ClInclude Include="reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-file-system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -177,9 +177,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="compiler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="default-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="diagnostics.cpp">
@@ -260,6 +257,9 @@
     <ClCompile Include="reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-file-system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -286,16 +286,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="slang.natvis">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="core.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
     <CustomBuild Include="hlsl.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="slang.natvis">
-      <Filter>Source Files</Filter>
-    </Natvis>
   </ItemGroup>
 </Project>

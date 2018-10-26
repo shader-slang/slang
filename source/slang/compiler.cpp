@@ -3,6 +3,8 @@
 #include "../core/basic.h"
 #include "../core/platform.h"
 #include "../core/slang-io.h"
+#include "../core/slang-string-util.h"
+
 #include "bytecode.h"
 #include "compiler.h"
 #include "lexer.h"
@@ -108,7 +110,7 @@ namespace Slang
                 break;
 
             case ResultFormat::Text:
-                blob = createStringBlob(outputString);
+                blob = StringUtil::createStringBlob(outputString);
                 break;
 
             case ResultFormat::Binary:

@@ -123,6 +123,105 @@ namespace Slang
 		return sb.ProduceString();
 	}
 
+    /* static */ bool Path::IsDriveSpecification(const UnownedStringSlice& element)
+    {
+        switch (element.size())
+        {
+            case 0:     
+            {
+                // We'll just assume it is
+                return true;
+            }
+            case 2:
+            {
+                // Look for a windows like drive spec
+                const char firstChar = element[0]; 
+                return element[1] == ':' && ((firstChar >= 'a' && firstChar <= 'z') || (firstChar >= 'A' && firstChar <= 'Z'));
+            }
+            default:    return false;
+        }
+        
+    }
+
+    /* static */void Path::Split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
+    {
+        splitOut.Clear();
+
+        const char* start = path.begin();
+        const char* end = path.end();
+
+        while (start < end)
+        {
+            const char* cur = start;
+            // Find the split
+            while (cur < end && !IsDelimiter(*cur)) cur++;
+
+            splitOut.Add(UnownedStringSlice(start, cur));
+           
+            // Next
+            start = cur + 1;
+        }
+
+        // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
+        if (splitOut.Count() > 1 && splitOut.Last().size() == 0)
+        {
+            if (splitOut.Count() == 2 && IsDriveSpecification(splitOut[0]))
+            {
+                return;
+            }
+            // Remove the last 
+            splitOut.RemoveLast();
+        }
+    }
+
+    /* static */String Path::Simplify(const UnownedStringSlice& path)
+    {
+        List<UnownedStringSlice> split;
+        Split(path, split);
+
+        // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
+        for (int i = 0; i < int(split.Count()); i++)
+        {
+            const UnownedStringSlice& cur = split[i];
+            if (cur == "." && split.Count() > 1)
+            {
+                // Just remove it 
+                split.RemoveAt(i);
+                i--;
+            }
+            else if (cur == ".." && i > 0)
+            {
+                // Can we remove this and the one before ?
+                UnownedStringSlice& before = split[i - 1];
+                if (before == ".." || (i == 1 && IsDriveSpecification(before)))
+                {
+                    // Can't do it
+                    continue;
+                }
+                split.RemoveRange(i - 1, 2);
+                i -= 2;
+            }
+        }
+
+        // If its empty it must be .
+        if (split.Count() == 0)
+        {
+            split.Add(UnownedStringSlice::fromLiteral("."));
+        }
+
+        // Reconstruct the string
+        StringBuilder builder;
+        for (int i = 0; i < int(split.Count()); i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(PathDelimiter);
+            }
+            builder.Append(split[i]);
+        }
+        return builder;
+    }
+
 	bool Path::CreateDir(const String & path)
 	{
 #if defined(_WIN32)

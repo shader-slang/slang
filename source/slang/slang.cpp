@@ -1,6 +1,8 @@
 ﻿#include "../../slang.h"
 
 #include "../core/slang-io.h"
+#include "../core/slang-string-util.h"
+
 #include "parameter-binding.h"
 #include "lower-to-ir.h"
 #include "../slang/parser.h"
@@ -9,7 +11,7 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
-#include "default-file-system.h"
+#include "slang-file-system.h"
 
 #include "ir-serialize.h"
 
@@ -77,25 +79,6 @@ Session::Session()
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
 }
 
-static String getString(ISlangBlob* blob)
-{
-    if (blob)
-    {
-        size_t size = blob->getBufferSize();
-        if (size > 0)
-        {
-            const char* contents = (const char*)blob->getBufferPointer();
-            // Check it has terminating 0, if not we must construct as if it does
-            if (contents[size - 1] == 0)
-            {
-                size --;
-            }
-            return String(contents, contents + size);
-        }
-    }
-    return String();
-}
-
 struct IncludeHandlerImpl : IncludeHandler
 {
     CompileRequest* request;
@@ -112,7 +95,7 @@ struct IncludeHandlerImpl : IncludeHandler
         // Get relative path
         ComPtr<ISlangBlob> relPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystemExt->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
-        String relPath(getString(relPathBlob));
+        String relPath(StringUtil::getString(relPathBlob));
         if (relPath.Length() <= 0)
         {
             return SLANG_FAIL;
@@ -130,7 +113,7 @@ struct IncludeHandlerImpl : IncludeHandler
         SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
 
         // If the rel path exists -> the canonical path MUST exists too
-        String canonicalPath(getString(canonicalPathBlob));
+        String canonicalPath(StringUtil::getString(canonicalPathBlob));
         if (canonicalPath.Length() <= 0)
         {   
             // Canonical path can't be empty
@@ -323,16 +306,7 @@ CompileRequest::CompileRequest(Session* session)
 
     // Set up the default file system
     SLANG_ASSERT(fileSystem == nullptr);
-    fileSystemExt = DefaultFileSystem::getSingleton();
-}
-
-CompileRequest::~CompileRequest()
-{
-    // delete things that may reference IR objects first
-    targets = decltype(targets)();
-    translationUnits = decltype(translationUnits)();
-    entryPoints = decltype(entryPoints)();
-    types = decltype(types)();
+    fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
 }
 
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
@@ -359,27 +333,6 @@ protected:
         return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
     }
 };
-
-/** A blob that uses a `String` for its storage.
-*/
-class StringBlob : public BlobBase
-{
-public:
-    // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.Buffer(); }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.Length(); }
-    
-    explicit StringBlob(String const& string)
-        : m_string(string)
-    {}
-protected:
-    String m_string;
-};
-
-ComPtr<ISlangBlob> createStringBlob(String const& string)
-{
-    return ComPtr<ISlangBlob>(new StringBlob(string));
-}
 
 /** A blob that manages some raw data that it owns.
 */
@@ -972,7 +925,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    // There is an argument to passing in the 'canonicalPath' instead of the foundPath, but either should work here
+    // We are going to allow canonicalPath to be able to hold strings other than paths (like hashes), therefore we have to load via the found path 
     if (SLANG_FAILED(includeHandler.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
         this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
@@ -981,12 +934,12 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     }
 
     // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.TryGetValue(filePathInfo.canonicalPath, loadedModule))
+    if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniquePath(), loadedModule))
         return loadedModule->moduleDecl;
 
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
-    if (SLANG_FAILED(includeHandler.readFile(filePathInfo.canonicalPath, fileContents.writeRef())))
+    if (SLANG_FAILED(includeHandler.readFile(filePathInfo.foundPath, fileContents.writeRef())))
     {
         this->mSink.diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -1188,7 +1141,7 @@ SLANG_API void spSetFileSystem(
     // Set up fileSystemExt appropriately
     if (fileSystem == nullptr)
     {
-        req->fileSystemExt = Slang::DefaultFileSystem::getSingleton();
+        req->fileSystemExt = new Slang::CacheFileSystem(Slang::DefaultFileSystem::getSingleton());
     }
     else
     {
@@ -1199,7 +1152,7 @@ SLANG_API void spSetFileSystem(
         if (!req->fileSystemExt)
         {
             // Construct a wrapper to emulate the extended interface behavior
-            req->fileSystemExt = new Slang::WrapFileSystem(fileSystem);
+            req->fileSystemExt = new Slang::CacheFileSystem(fileSystem);
         }
     }
 }
@@ -1342,7 +1295,7 @@ SLANG_API SlangResult spGetDiagnosticOutputBlob(
 
     if(!req->diagnosticOutputBlob)
     {
-        req->diagnosticOutputBlob = Slang::createStringBlob(req->mDiagnosticOutput);
+        req->diagnosticOutputBlob = Slang::StringUtil::createStringBlob(req->mDiagnosticOutput);
     }
 
     Slang::ComPtr<ISlangBlob> resultBlob = req->diagnosticOutputBlob;

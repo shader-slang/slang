@@ -535,7 +535,7 @@ extern "C"
     //! Get the result code for the facility
 #define SLANG_GET_RESULT_CODE(r)        ((int32_t)((r) & 0xffff))
 
-#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | 0x80000000)
+#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | int32_t(0x80000000))
 #define SLANG_MAKE_SUCCESS(fac, code)    ((((int32_t)(fac)) << 16) | ((int32_t)(code)))
 
     /*************************** Facilities ************************************/

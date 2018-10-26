@@ -32,6 +32,17 @@ namespace Slang
 		static String Combine(const String & path1, const String & path2, const String & path3);
 		static bool CreateDir(const String & path);
 
+            /// Accept either style of delimiter
+        SLANG_FORCE_INLINE static bool IsDelimiter(char c) { return c == '/' || c == '\\'; }
+
+        static bool IsDriveSpecification(const UnownedStringSlice& element);
+
+            /// Splits the path into it's individual bits
+        static void Split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut);
+            /// Strips .. and . as much as it can 
+        static String Simplify(const UnownedStringSlice& path);
+        static String Simplify(const String& path) { return Simplify(path.getUnownedSlice()); }
+
         static SlangResult GetPathType(const String & path, SlangPathType* pathTypeOut);
 
         static SlangResult GetCanonical(const String & path, String& canonicalPathOut);
