@@ -178,7 +178,7 @@ struct OptionsParser
 
         rawTranslationUnits.Add(rawTranslationUnit);
 
-        return translationUnitIndex;
+        return int(translationUnitIndex);
     }
 
     void addInputSlangPath(
