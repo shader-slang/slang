@@ -105,7 +105,7 @@ class CacheFileSystem: public ISlangFileSystemExt
         /// Ctor
     CacheFileSystem(ISlangFileSystem* fileSystem, bool useSimplifyForCanonicalPath = false);
         /// Dtor
-    ~CacheFileSystem();
+    virtual ~CacheFileSystem();
 
     static CompressedResult toCompressedResult(Result res);
     static Result toResult(CompressedResult compRes) { return s_compressedResultToResult[int(compRes)]; } 
