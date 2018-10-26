@@ -3251,7 +3251,40 @@ struct EmitVisitor
                                 //
                                 Emit("(");
                                 emitIROperand(ctx, arg->getOperand(0), mode, kEOp_General);
-                                Emit("), (");
+                                Emit("), ");
+
+                                // The coordinate argument will have been computed
+                                // as a `vector<uint, N>` because that is how the
+                                // HLSL image subscript operations are defined.
+                                // In contrast, the GLSL `imageAtomic*` operations
+                                // expect `vector<int, N>` coordinates, so we
+                                // hill hackily insert the conversion here as
+                                // part of the intrinsic op.
+                                //
+                                auto coords = arg->getOperand(1);
+                                auto coordsType = coords->getDataType();
+
+                                auto coordsVecType = as<IRVectorType>(coordsType);
+                                IRIntegerValue elementCount = 1;
+                                if(coordsVecType)
+                                {
+                                    coordsType = coordsVecType->getElementType();
+                                    elementCount = GetIntVal(coordsVecType->getElementCount());
+                                }
+
+                                SLANG_ASSERT(coordsType->op == kIROp_UIntType);
+
+                                if (elementCount > 1)
+                                {
+                                    Emit("ivec");
+                                    emit(elementCount);
+                                }
+                                else
+                                {
+                                    Emit("int");
+                                }
+
+                                Emit("(");
                                 emitIROperand(ctx, arg->getOperand(1), mode, kEOp_General);
                                 Emit(")");
                             }
