@@ -48,6 +48,9 @@
     <ClInclude Include="ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-existential.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-inst-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -192,6 +195,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-dominators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-existential.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-legalize-types.cpp">

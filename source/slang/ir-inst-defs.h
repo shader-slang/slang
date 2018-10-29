@@ -153,8 +153,9 @@ INST(Nop, nop, 0, 0)
 // ensure that it comes at the *end* of the range for `IRType`,
 // and the start of the range for `IRParentInst` (and `IRGlobalValue`)
 INST(StructType, struct, 0, PARENT)
+INST(InterfaceType, interface, 0, PARENT)
 
-INST_RANGE(Type, VoidType, StructType)
+INST_RANGE(Type, VoidType, InterfaceType)
 
 /*IRParentInst*/
 
@@ -366,6 +367,11 @@ INST(SampleGrad, sampleGrad, 4, 0)
 INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
 INST(NotePatchConstantFunc, notePatchConstantFunc, 1, 0)
+
+INST(MakeExistential,                   makeExistential,                2, 0)
+INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
+INST(ExtractExistentialType,            extractExistentialType,         1, 0)
+INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, 0)
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)

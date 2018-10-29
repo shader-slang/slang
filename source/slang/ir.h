@@ -985,6 +985,10 @@ struct IRStructType : IRGlobalValue
     IR_LEAF_ISA(StructType)
 };
 
+struct IRInterfaceType : IRGlobalValue
+{
+    IR_LEAF_ISA(InterfaceType)
+};
 
 /// @brief A global value that potentially holds executable code.
 ///

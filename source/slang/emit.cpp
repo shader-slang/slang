@@ -1,6 +1,7 @@
 // emit.cpp
 #include "emit.h"
 
+#include "ir-existential.h"
 #include "ir-insts.h"
 #include "ir-restructure.h"
 #include "ir-restructure-scoping.h"
@@ -6459,6 +6460,26 @@ String emitEntryPoint(
             dumpIR(irModule);
         }
 
+        // Any code that makes use of existential (interface) types
+        // needs to be simplified to use concrete types instead,
+        // wherever this is possible.
+        //
+        // Note: we are applying this *before* doing specialization
+        // of generics because this pass could expose concrete
+        // types and/or witness tables that allow for further
+        // specialization.
+        //
+        // TODO: Simplification of existential-based and generics-based
+        // code may each open up opportunities for the other, so
+        // in the long run these will need to be merged into a
+        // single pass that looks for all simplification opportunities.
+        //
+        // TODO: We also need a legalization pass that will "expose"
+        // existential values that are nested inside of other types,
+        // so that the simplifications can be applied.
+        //
+        simplifyExistentialTypes(irModule);
+
         // Next, we need to ensure that the code we emit for
         // the target doesn't contain any operations that would
         // be illegal on the target platform. For example,
@@ -6466,6 +6487,8 @@ String emitEntryPoint(
         // so we need to specialize those away.
         //
         specializeGenerics(irModule, sharedContext.target);
+
+
 
         // Debugging code for IR transformations...
 #if 0

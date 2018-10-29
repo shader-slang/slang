@@ -1695,6 +1695,48 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitExtractExistentialValue(
+        IRType* type,
+        IRInst* existentialValue)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_ExtractExistentialValue,
+            type,
+            1,
+            &existentialValue);
+        addInst(inst);
+        return inst;
+    }
+
+    IRType* IRBuilder::emitExtractExistentialType(
+        IRInst* existentialValue)
+    {
+        auto type = getTypeKind();
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_ExtractExistentialType,
+            type,
+            1,
+            &existentialValue);
+        addInst(inst);
+        return (IRType*) inst;
+    }
+
+    IRInst* IRBuilder::emitExtractExistentialWitnessTable(
+        IRInst* existentialValue)
+    {
+        auto type = getWitnessTableType();
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_ExtractExistentialWitnessTable,
+            type,
+            1,
+            &existentialValue);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,
@@ -1801,6 +1843,15 @@ namespace Slang
         IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_makeStruct, argCount, args);
+    }
+
+    IRInst* IRBuilder::emitMakeExistential(
+        IRType* type,
+        IRInst* value,
+        IRInst* witnessTable)
+    {
+        IRInst* args[] = {value, witnessTable};
+        return emitIntrinsicInst(type, kIROp_MakeExistential, SLANG_COUNT_OF(args), args);
     }
 
     IRModule* IRBuilder::createModule()
@@ -1953,6 +2004,16 @@ namespace Slang
             nullptr);
         addGlobalValue(this, structType);
         return structType;
+    }
+
+    IRInterfaceType* IRBuilder::createInterfaceType()
+    {
+        IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
+            this,
+            kIROp_InterfaceType,
+            nullptr);
+        addGlobalValue(this, interfaceType);
+        return interfaceType;
     }
 
     IRStructKey* IRBuilder::createStructKey()
@@ -5726,6 +5787,18 @@ namespace Slang
         return clonedStruct;
     }
 
+
+    IRInterfaceType* cloneInterfaceTypeImpl(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRInterfaceType*                originalInterface,
+        IROriginalValuesForClone const& originalValues)
+    {
+        auto clonedInterface = builder->createInterfaceType();
+        cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface);
+        return clonedInterface;
+    }
+
     void cloneGlobalValueWithCodeCommon(
         IRSpecContextBase*      context,
         IRGlobalValueWithCode*  clonedValue,
@@ -6135,6 +6208,9 @@ namespace Slang
 
         case kIROp_StructType:
             return cloneStructTypeImpl(context, builder, cast<IRStructType>(originalInst), originalValues);
+
+        case kIROp_InterfaceType:
+            return cloneInterfaceTypeImpl(context, builder, cast<IRInterfaceType>(originalInst), originalValues);
 
         case kIROp_Generic:
             return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);

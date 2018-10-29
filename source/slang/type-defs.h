@@ -439,3 +439,17 @@ protected:
     virtual RefPtr<Type> CreateCanonicalType() override;
 )
 END_SYNTAX_CLASS()
+
+// The concrete type for a value wrapped in an existential, accessible
+// when the existential is "opened" in some context.
+SYNTAX_CLASS(ExtractExistentialType, Type)
+RAW(
+    DeclRef<VarDeclBase> declRef;
+
+    virtual String ToString() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+)
+END_SYNTAX_CLASS()

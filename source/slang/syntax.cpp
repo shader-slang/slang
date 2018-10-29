@@ -2417,5 +2417,96 @@ void Type::accept(IValVisitor* visitor, void* extra)
             rs = combineHash(rs, substitutions->GetHashCode());
         return rs;
     }
+
+    // ExtractExistentialType
+
+    String ExtractExistentialType::ToString()
+    {
+        String result;
+        result.append(declRef.toString());
+        result.append(".This");
+        return result;
+    }
+
+    bool ExtractExistentialType::EqualsImpl(Type* type)
+    {
+        if( auto extractExistential = type->As<ExtractExistentialType>() )
+        {
+            return declRef.Equals(extractExistential->declRef);
+        }
+        return false;
+    }
+
+    int ExtractExistentialType::GetHashCode()
+    {
+        return declRef.GetHashCode();
+    }
+
+    RefPtr<Type> ExtractExistentialType::CreateCanonicalType()
+    {
+        return this;
+    }
+
+    RefPtr<Val> ExtractExistentialType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    {
+        int diff = 0;
+        auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        if(!diff)
+            return this;
+
+        (*ioDiff)++;
+
+        RefPtr<ExtractExistentialType> substValue = new ExtractExistentialType();
+        substValue->declRef = declRef;
+        return substValue;
+    }
+
+    // ExtractExistentialSubtypeWitness
+
+    bool ExtractExistentialSubtypeWitness::EqualsVal(Val* val)
+    {
+        if( auto extractWitness = val->dynamicCast<ExtractExistentialSubtypeWitness>() )
+        {
+            return declRef.Equals(extractWitness->declRef);
+        }
+        return false;
+    }
+
+    String ExtractExistentialSubtypeWitness::ToString()
+    {
+        String result;
+        result.append("extractExistentialValue(");
+        result.append(declRef.toString());
+        result.append(")");
+        return result;
+    }
+
+    int ExtractExistentialSubtypeWitness::GetHashCode()
+    {
+        return declRef.GetHashCode();
+    }
+
+    RefPtr<Val> ExtractExistentialSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    {
+        int diff = 0;
+
+        auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        auto substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
+        auto substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+
+        if(!diff)
+            return this;
+
+        (*ioDiff)++;
+
+        RefPtr<ExtractExistentialSubtypeWitness> substValue = new ExtractExistentialSubtypeWitness();
+        substValue->declRef = declRef;
+        substValue->sub = substSub;
+        substValue->sup = substSup;
+        return substValue;
+    }
+
+
+
 }
 
