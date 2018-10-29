@@ -3,6 +3,8 @@
 
 #include "compiler.h"
 
+#include "../core/slang-string-util.h"
+
 namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -323,7 +325,7 @@ SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, ISlangBlob
  
 SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, const String& content)
 {
-    ComPtr<ISlangBlob> contentBlob = createStringBlob(content);
+    ComPtr<ISlangBlob> contentBlob = StringUtil::createStringBlob(content);
     return createSourceFile(pathInfo, contentBlob);
 }
 

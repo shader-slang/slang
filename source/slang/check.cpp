@@ -9,6 +9,75 @@
 
 namespace Slang
 {
+
+        /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
+    bool isEffectivelyStatic(
+        Decl*           decl,
+        ContainerDecl*  parentDecl)
+    {
+        // Things at the global scope are always "members" of their module.
+        //
+        if(parentDecl->As<ModuleDecl>())
+            return false;
+
+        // Anything explicitly marked `static` and not at module scope
+        // counts as a static rather than instance declaration.
+        //
+        if(decl->HasModifier<HLSLStaticModifier>())
+            return true;
+
+        // Next we need to deal with cases where a declaration is
+        // effectively `static` even if the language doesn't make
+        // the user say so. Most languages make the default assumption
+        // that nested types are `static` even if they don't say
+        // so (Java is an exception here, perhaps due to some
+        // influence from the Scandanavian OOP tradition of Beta/gbeta).
+        //
+        if(dynamic_cast<AggTypeDecl*>(decl))
+            return true;
+        if(dynamic_cast<SimpleTypeDecl*>(decl))
+            return true;
+
+        // Things nested inside functions may have dependencies
+        // on values from the enclosing scope, but this needs to
+        // be dealt with via "capture" so they are also effectively
+        // `static`
+        //
+        if(dynamic_cast<FunctionDeclBase*>(parentDecl))
+            return true;
+
+        // Type constraint declarations are used in member-reference
+        // context as a form of casting operation, so we treat them
+        // as if they are instance members. This is a bit of a hack,
+        // but it achieves the result we want until we have an
+        // explicit representation of up-cast operations in the
+        // AST.
+        //
+        if(decl->As<TypeConstraintDecl>())
+            return false;
+
+        return false;
+    }
+
+        /// Should the given `decl` be treated as a static rather than instance declaration?
+    bool isEffectivelyStatic(
+        Decl*           decl)
+    {
+        // For the purposes of an ordinary declaration, when determining if
+        // it is static or per-instance, the "parent" declaration we really
+        // care about is the next outer non-generic declaration.
+        //
+        // TODO: This idiom of getting the "next outer non-generic declaration"
+        // comes up just enough that we should probably have a convenience
+        // function for it.
+
+        auto parentDecl = decl->ParentDecl;
+        if(auto genericDecl = parentDecl->As<GenericDecl>())
+            parentDecl = genericDecl->ParentDecl;
+
+        return isEffectivelyStatic(decl, parentDecl);
+    }
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     struct BasicTypeKey
@@ -412,6 +481,22 @@ namespace Slang
                     expr->loc = loc;
                     expr->type = type;
                     expr->BaseExpression = baseExpr;
+                    expr->name = declRef.GetName();
+                    expr->declRef = declRef;
+                    return expr;
+                }
+                else if(isEffectivelyStatic(declRef.getDecl()))
+                {
+                    // Extract the type of the baseExpr
+                    auto baseExprType = baseExpr->type.type;
+                    RefPtr<SharedTypeExpr> baseTypeExpr = new SharedTypeExpr();
+                    baseTypeExpr->base.type = baseExprType;
+                    baseTypeExpr->type = new TypeType(baseExprType);
+
+                    auto expr = new StaticMemberExpr();
+                    expr->loc = loc;
+                    expr->type = type;
+                    expr->BaseExpression = baseTypeExpr;
                     expr->name = declRef.GetName();
                     expr->declRef = declRef;
                     return expr;
@@ -2243,6 +2328,13 @@ namespace Slang
             {
                 // A `[mutating]` method can't satisfy a non-`[mutating]` requirement,
                 // but vice-versa is okay.
+                return false;
+            }
+
+            if(satisfyingMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>()
+                != requiredMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+            {
+                // A `static` method can't satisfy a non-`static` requirement and vice versa.
                 return false;
             }
 
@@ -5191,7 +5283,6 @@ namespace Slang
             RefPtr<Type> bestType;
             if(auto basicType = type.As<BasicExpressionType>())
             {
-                basicType->baseType;
                 for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
                 {
                     // Don't consider `type`, since we already know it doesn't work.

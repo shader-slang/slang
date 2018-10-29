@@ -460,6 +460,12 @@ SlangResult innerMain(int argc, char** argv)
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
             profileName = "sm_5_0";
+            if( gOptions.useDXIL )
+            {
+                slangTarget = SLANG_DXIL;
+                slangPassThrough = SLANG_PASS_THROUGH_DXC;
+                profileName = "sm_6_0";
+            }
 			break;
 
 		case RendererType::OpenGl:

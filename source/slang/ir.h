@@ -155,6 +155,8 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_Transitory,   
     kIRDecorationOp_VulkanRayPayload,
     kIRDecorationOp_VulkanHitAttributes,
+    kIRDecorationOp_RequireGLSLVersion,
+    kIRDecorationOp_RequireGLSLExtension,
     
     kIRDecorationOp_CountOf          
 };

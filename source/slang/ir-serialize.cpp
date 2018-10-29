@@ -709,6 +709,22 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                     dstInst.m_payloadType = PayloadType::Empty;
                     break;
                 }
+                case kIRDecorationOp_RequireGLSLExtension:
+                {
+                    auto extDecor = static_cast<IRRequireGLSLExtensionDecoration*>(srcDecor);
+
+                    dstInst.m_payloadType = PayloadType::String_1;
+                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(extDecor->extensionName);
+                    break;
+                }
+                case kIRDecorationOp_RequireGLSLVersion:
+                {
+                    auto verDecor = static_cast<IRRequireGLSLVersionDecoration*>(srcDecor);
+
+                    dstInst.m_payloadType = PayloadType::UInt32;
+                    dstInst.m_payload.m_uint32 = uint32_t(verDecor->languageVersion);
+                    break;
+                }
                 default:
                 {
                     SLANG_ASSERT(!"Unhandled decoration type");
@@ -1723,6 +1739,20 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         {
             auto decor = createEmptyDecoration<IRVulkanHitAttributesDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+            return decor;
+        }
+        case kIRDecorationOp_RequireGLSLExtension:
+        {
+            auto decor = createEmptyDecoration<IRRequireGLSLExtensionDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+            decor->extensionName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+            return decor;
+        }
+        case kIRDecorationOp_RequireGLSLVersion:
+        {
+            auto decor = createEmptyDecoration<IRRequireGLSLVersionDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == Ser::Inst::PayloadType::UInt32);
+            decor->languageVersion = Int(srcInst.m_payload.m_uint32);
             return decor;
         }
         default:

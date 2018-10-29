@@ -535,7 +535,7 @@ extern "C"
     //! Get the result code for the facility
 #define SLANG_GET_RESULT_CODE(r)        ((int32_t)((r) & 0xffff))
 
-#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | 0x80000000)
+#define SLANG_MAKE_ERROR(fac, code)        ((((int32_t)(fac)) << 16) | ((int32_t)(code)) | int32_t(0x80000000))
 #define SLANG_MAKE_SUCCESS(fac, code)    ((((int32_t)(fac)) << 16) | ((int32_t)(code)))
 
     /*************************** Facilities ************************************/
@@ -685,7 +685,7 @@ extern "C"
     typedef unsigned int SlangPathType;
     enum
     {
-        SLANG_PATH_TYPE_DIRECTORY,     /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_DIRECTORY,      /**< Path specified specifies a directory. */
         SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
     };
 
@@ -734,7 +734,16 @@ extern "C"
             SlangPathType fromPathType,
             const char* fromPath,
             const char* path,
-            ISlangBlob** pathOut) = 0;            
+            ISlangBlob** pathOut) = 0;          
+            
+        /** Gets the type of path that path is on the file system. 
+        @param path
+        @param pathTypeOut
+        @returns SLANG_OK if located and type is known, else an error. SLANG_E_NOT_FOUND if not found.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
+            const char* path, 
+            SlangPathType* pathTypeOut) = 0;  
     };
 
     #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }

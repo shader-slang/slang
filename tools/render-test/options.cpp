@@ -139,6 +139,10 @@ SlangResult parseOptions(int* argc, char** argv)
         {
             gOptions.rendererType = RendererType::DirectX11;
         }
+        else if( strcmp(arg, "-use-dxil") == 0 )
+        {
+            gOptions.useDXIL = true;
+        }
         else
         {
             fprintf(stderr, "unknown option '%s'\n", arg);
@@ -147,7 +151,7 @@ SlangResult parseOptions(int* argc, char** argv)
     }
     
     // any arguments left over were positional arguments
-    argCount = (int)(writeCursor - argv);
+    argCount = (int)(writeCursor - (const char**)argv);
     argCursor = argv;
     argEnd = argCursor + argCount;
 

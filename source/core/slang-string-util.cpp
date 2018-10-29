@@ -2,6 +2,19 @@
 
 namespace Slang {
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+// Allocate static const storage for the various interface IDs that the Slang API needs to expose
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
+
+/* static */ISlangUnknown* StringBlob::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 /* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut)
 {
     slicesOut.Clear();
@@ -72,6 +85,30 @@ namespace Slang {
     va_end(args);
 
     return builder;
+}
+
+/* static */String StringUtil::getString(ISlangBlob* blob)
+{
+    if (blob)
+    {
+        size_t size = blob->getBufferSize();
+        if (size > 0)
+        {
+            const char* contents = (const char*)blob->getBufferPointer();
+            // Check it has terminating 0, if not we must construct as if it does
+            if (contents[size - 1] == 0)
+            {
+                size--;
+            }
+            return String(contents, contents + size);
+        }
+    }
+    return String();
+}
+
+ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
+{
+    return ComPtr<ISlangBlob>(new StringBlob(string));
 }
 
 } // namespace Slang

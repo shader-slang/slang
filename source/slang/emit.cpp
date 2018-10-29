@@ -2213,7 +2213,7 @@ struct EmitVisitor
 
             context->shared->uniqueNameCounters[key] = count+1;
 
-            sb.append(count);
+            sb.append(Int32(count));
             return sb.ProduceString();
         }
 
@@ -2238,8 +2238,7 @@ struct EmitVisitor
         // for the instruction.
         StringBuilder sb;
         sb << "_S";
-        sb << getID(inst);
-
+        sb << Int32(getID(inst));
 
         return sb.ProduceString();
     }
@@ -3252,7 +3251,40 @@ struct EmitVisitor
                                 //
                                 Emit("(");
                                 emitIROperand(ctx, arg->getOperand(0), mode, kEOp_General);
-                                Emit("), (");
+                                Emit("), ");
+
+                                // The coordinate argument will have been computed
+                                // as a `vector<uint, N>` because that is how the
+                                // HLSL image subscript operations are defined.
+                                // In contrast, the GLSL `imageAtomic*` operations
+                                // expect `vector<int, N>` coordinates, so we
+                                // hill hackily insert the conversion here as
+                                // part of the intrinsic op.
+                                //
+                                auto coords = arg->getOperand(1);
+                                auto coordsType = coords->getDataType();
+
+                                auto coordsVecType = as<IRVectorType>(coordsType);
+                                IRIntegerValue elementCount = 1;
+                                if(coordsVecType)
+                                {
+                                    coordsType = coordsVecType->getElementType();
+                                    elementCount = GetIntVal(coordsVecType->getElementCount());
+                                }
+
+                                SLANG_ASSERT(coordsType->op == kIROp_UIntType);
+
+                                if (elementCount > 1)
+                                {
+                                    Emit("ivec");
+                                    emit(elementCount);
+                                }
+                                else
+                                {
+                                    Emit("int");
+                                }
+
+                                Emit("(");
                                 emitIROperand(ctx, arg->getOperand(1), mode, kEOp_General);
                                 Emit(")");
                             }
@@ -3466,9 +3498,38 @@ struct EmitVisitor
         IREmitMode      mode,
         EOpInfo         outerPrec)
     {
+        auto funcValue = inst->getOperand(0);
+
+        // Does this function declare any requirements on GLSL version or
+        // extensions, which should affect our output?
+        if(getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            auto decoratedValue = funcValue;
+            while (auto specInst = as<IRSpecialize>(decoratedValue))
+            {
+                decoratedValue = getSpecializedValue(specInst);
+            }
+
+            for( auto decoration = decoratedValue->firstDecoration; decoration; decoration = decoration->next )
+            {
+                switch(decoration->op)
+                {
+                default:
+                    break;
+
+                case kIRDecorationOp_RequireGLSLExtension:
+                    requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->extensionName));
+                    break;
+
+                case kIRDecorationOp_RequireGLSLVersion:
+                    requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->languageVersion));
+                    break;
+                }
+            }
+        }
+
         // We want to detect any call to an intrinsic operation,
         // that we can emit it directly without mangling, etc.
-        auto funcValue = inst->getOperand(0);
         if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
         {
             emitIntrinsicCallExpr(ctx, inst, irFunc, mode, outerPrec);
@@ -4971,7 +5032,7 @@ struct EmitVisitor
 
             String paramName;
             paramName.append("_");
-            paramName.append(pp);
+            paramName.append(Int32(pp));
             auto paramType = funcType->getParamType(pp);
 
             emitIRParamType(ctx, paramType, paramName);

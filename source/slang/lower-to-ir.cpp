@@ -384,6 +384,12 @@ void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
     context->env->mapDeclToValue[decl] = value;
 }
 
+
+    /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
+bool isEffectivelyStatic(
+    Decl*           decl,
+    ContainerDecl*  parentDecl);
+
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
     IRGenContext*   context,
@@ -670,7 +676,7 @@ LoweredValInfo emitCallToDeclRef(
 #undef CASE
             default:
                 SLANG_UNIMPLEMENTED_X("IR pseudo-op");
-                break;
+                UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
 
@@ -988,6 +994,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitVal(Val* /*val*/)
     {
         SLANG_UNIMPLEMENTED_X("value lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
@@ -1440,11 +1447,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitOverloadedExpr2(OverloadedExpr2* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
@@ -1492,6 +1501,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
 
         SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     // We will always lower a dereference expression (`*ptr`)
@@ -1656,6 +1666,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     // After a call to a function with `out` or `in out`
@@ -2028,11 +2039,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("generic application expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
@@ -2678,7 +2691,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // We just need to look up the basic block that
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
-        IRBlock* targetBlock;
+        IRBlock* targetBlock = nullptr;
         context->shared->breakLabels.TryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
@@ -2697,7 +2710,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // We just need to look up the basic block that
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
-        IRBlock* targetBlock;
+        IRBlock* targetBlock = nullptr;
         context->shared->continueLabels.TryGetValue(parentStmt, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
@@ -4446,46 +4459,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     // We also need to be able to detect whether a declaration is
     // either explicitly or implicitly treated as `static`:
-    bool isMemberDeclarationEffectivelyStatic(
-        Decl*           decl,
-        ContainerDecl*  parentDecl)
-    {
-        // Anything explicitly marked `static` counts.
-        //
-        // There is a subtle detail here with a global-scope `static`
-        // variable not really meaning `static` in the same way, but
-        // it doesn't matter because the module shouldn't introduce
-        // any parameters we care about.
-        if(decl->HasModifier<HLSLStaticModifier>())
-            return true;
-
-        // Next we need to deal with cases where a declaration is
-        // effectively `static` even if the language doesn't make
-        // the user say so. Most languages make the default assumption
-        // that nested types are `static` even if they don't say
-        // so (Java is an exception here, perhaps due to some
-        // includence from the Scandanavian OOP tradition).
-        if(dynamic_cast<AggTypeDecl*>(decl))
-            return true;
-
-        // Things nested inside functions may have dependencies
-        // on values from the enclosing scope, but this needs to
-        // be dealt with via "capture" so they are also effectively
-        // `static`
-        if(dynamic_cast<FunctionDeclBase*>(parentDecl))
-            return true;
-
-        return false;
-    }
-    // We also need to be able to detect whether a declaration is
-    // either explicitly or implicitly treated as `static`:
     ParameterListCollectMode getModeForCollectingParentParameters(
         Decl*           decl,
         ContainerDecl*  parentDecl)
     {
         // If we have a `static` parameter, then it is obvious
         // that we should use the `static` mode
-        if(isMemberDeclarationEffectivelyStatic(decl, parentDecl))
+        if(isEffectivelyStatic(decl, parentDecl))
             return kParameterListCollectMode_Static;
 
         // Otherwise, let's default to collecting everything
@@ -5139,6 +5119,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // for a particular target, then handle that here.
         addTargetIntrinsicDecorations(irFunc, decl);
 
+        // If this declaration requires certain GLSL extension (or a particular GLSL version)
+        // for it to be usable, then declare that here.
+        //
+        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
+        // case for enumerating the "capabilities" that a declaration requires.
+        //
+        for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRRequireGLSLExtensionDecoration>(irFunc);
+            decoration->extensionName = getBuilder()->addStringToFree(extensionMod->extensionNameToken.Content);
+        }
+        for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
+        {
+            auto decoration = getBuilder()->addDecoration<IRRequireGLSLVersionDecoration>(irFunc);
+            decoration->languageVersion = Int(getIntegerLiteralValue(versionMod->versionNumberToken));
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -5289,6 +5286,7 @@ IRInst* lowerSubstitutionArg(
     else
     {
         SLANG_UNIMPLEMENTED_X("value cases");
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -5429,6 +5427,7 @@ LoweredValInfo emitDeclRef(
     else
     {
         SLANG_UNEXPECTED("uhandled substitution type");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 }
 

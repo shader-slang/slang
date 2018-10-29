@@ -38,9 +38,12 @@ namespace Slang
 	}
 
 #ifdef _MSC_VER
-#define SLANG_RETURN_NEVER __declspec(noreturn)
+#   define SLANG_RETURN_NEVER __declspec(noreturn)
+//#elif SLANG_CLANG
+//#   define SLANG_RETURN_NEVER [[noreturn]]
 #else
-#define SLANG_RETURN_NEVER /* empty */
+#   define SLANG_RETURN_NEVER [[noreturn]]
+//#   define SLANG_RETURN_NEVER /* empty */
 #endif
 
 #ifdef _MSC_VER

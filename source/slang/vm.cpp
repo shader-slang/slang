@@ -415,11 +415,11 @@ void dumpVMFrame(VMFrame* vmFrame)
                 break;
 
             case kIROp_HLSLRWStructuredBufferType:
-                fprintf(stderr, ": RWStructuredBuffer<???> = ???");
+                fprintf(stderr, ": RWStructuredBuffer<??\?> = ???");
                 break;
 
             case kIROp_HLSLStructuredBufferType:
-                fprintf(stderr, ": StructuredBuffer<???> = ???");
+                fprintf(stderr, ": StructuredBuffer<??\?> = ???");
                 break;
 
             case kIROp_BoolType:

@@ -3,6 +3,8 @@
 #include "ir-insts.h"
 
 #include "../core/basic.h"
+#include "../core/slang-cpu-defines.h"
+
 #include "mangle.h"
 
 namespace Slang
@@ -2570,8 +2572,7 @@ namespace Slang
         IRDumpContext*  context,
         UInt            val)
     {
-        context->builder->append(val);
-
+        context->builder->append(UnambigousUInt(val));
 //        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
@@ -2770,10 +2771,6 @@ namespace Slang
     static void dumpType(
         IRDumpContext*  context,
         IRType*         type);
-
-    static void dumpDeclRef(
-        IRDumpContext*          context,
-        DeclRef<Decl> const&    declRef);
 
     static void dumpOperand(
         IRDumpContext*  context,
@@ -5341,6 +5338,22 @@ namespace Slang
             case kIRDecorationOp_VulkanHitAttributes:
                 {
                     context->builder->addDecoration<IRVulkanHitAttributesDecoration>(clonedValue);
+                }
+                break;
+
+            case kIRDecorationOp_RequireGLSLExtension:
+                {
+                    auto originalDecoration = (IRRequireGLSLExtensionDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLExtensionDecoration>(clonedValue);
+                    newDecoration->extensionName = originalDecoration->extensionName;
+                }
+                break;
+
+            case kIRDecorationOp_RequireGLSLVersion:
+                {
+                    auto originalDecoration = (IRRequireGLSLVersionDecoration*)dd;
+                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLVersionDecoration>(clonedValue);
+                    newDecoration->languageVersion = originalDecoration->languageVersion;
                 }
                 break;
 

@@ -54,6 +54,19 @@
 #define SLANG_PTR_IS_64 (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
 #define SLANG_PTR_IS_32 (SLANG_PTR_IS_64 ^ 1)
 
+// TODO: This isn't great. The problem is UInt maps to size_t, and on some targets (like OSX)
+// size_t is distinct from any other integral type. So that creates an ambiguity
+// Really we want to modify the StringBuilder and elsewhere to handle the case when it is known it can't unambiguously coerce
+namespace Slang {
+#ifdef SLANG_PTR_IS_64
+typedef UInt64 UnambigousUInt;
+typedef Int64 UnambiguousInt;
+#else
+typedef UInt32 UnambigousUInt;
+typedef Int32 UnambiguousInt;
+#endif
+} // namespace Slang
+
 // Processor features
 #if SLANG_PROCESSOR_FAMILY_X86
 #   define SLANG_LITTLE_ENDIAN 1

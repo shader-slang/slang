@@ -2,6 +2,9 @@
 #define CORE_LIB_ALLOCATOR_H
 
 #include <stdlib.h>
+#ifdef _MSC_VER
+#   include <malloc.h>
+#endif
 
 namespace Slang
 {
@@ -9,6 +12,8 @@ namespace Slang
 	{
 #ifdef _MSC_VER
 		return _aligned_malloc(size, alignment);
+#elif defined(__CYGWIN__)
+        return aligned_alloc(alignment, size);
 #else
 		void * rs = 0;
 		int succ = posix_memalign(&rs, alignment, size);
