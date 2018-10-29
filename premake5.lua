@@ -53,18 +53,14 @@ workspace "slang"
     configurations { "Debug", "Release" }
     platforms { "x86", "x64" }
 
-    --filter { "system:linux" }
-    --    location("build.linux")
+    if os.target() == "windows" then
+    else
+        location("build." .. os.target())
+    end
     
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir "bin/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}"
-
-    -- The intermediate ("object") directory will use a similar
-    -- naming scheme to the output directory, but will also use
-    -- the project name to avoid cases where multiple projects
-    -- have source files with the same name.
-    objdir "intermediate/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}/%{prj.name}"
 
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
     flags { "StaticRuntime" }
@@ -199,7 +195,19 @@ function baseSlangProject(name, baseDir)
     -- TODO: consider only setting this for examples, since
     -- it is less relevant to other projects.
     --
+
     location(projectDir)
+    
+    if os.target() == "windows" then
+    else
+        location "intermediate/project/%{prj.name}"
+    end
+    
+    -- The intermediate ("object") directory will use a similar
+    -- naming scheme to the output directory, but will also use
+    -- the project name to avoid cases where multiple projects
+    -- have source files with the same name.
+    objdir "intermediate/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}/%{prj.name}"
 
     -- All of our projects are written in C++.
     --
