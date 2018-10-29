@@ -144,23 +144,6 @@ namespace Slang
         // supposed to be defined in.
         int translationUnitIndex;
 
-        // The output path requested for this entry point.
-        // (only used when compiling from the command line)
-        //
-        // TODO: This should get dropped. When compiling from the
-        // command line, the user should be either:
-        //
-        // * Compiling a single entry point for a single target, so
-        //   that only a single output path is needed for the whole request.
-        //
-        // * Compiling for a target that supports multiple entry points directly
-        //   (e.g., a recent DXIL version), so that only one output file is needed.
-        //
-        // * Compiling to a slang module container, so that as many entry
-        //   points and targets as needed can be specified.
-        //
-//        String outputPath;
-
         // The translation unit that this entry point came from
         TranslationUnitRequest* getTranslationUnit();
 
@@ -330,9 +313,6 @@ namespace Slang
         /// The layout to use for matrices by default (row/column major)
         MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
         MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
-
-        // The code generation profile we've been asked to use.
-//        Profile profile;
 
         // Should we just pass the input to another compiler?
         PassThroughMode passThrough = PassThroughMode::None;
