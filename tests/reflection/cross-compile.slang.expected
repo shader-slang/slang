@@ -43,6 +43,12 @@ standard output = {
                 }
             }
         }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
     ]
 }
 }

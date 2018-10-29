@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main -target dxbc-assembly -split-mixed-types
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
 // Make sure we don't crash when desugaring resources
 // in structs when a `cbuffer` only contains resources.
 
@@ -17,12 +17,12 @@ float4 main(float2 uv: UV) : SV_Target
 
 #else
 
-Texture2D SLANG_parameterGroup_C_t : register(t0);
-SamplerState SLANG_parameterGroup_C_s : register(s0);
+Texture2D C_t_0 : register(t0);
+SamplerState C_s_0 : register(s0);
 
-float4 main(float2 uv: UV) : SV_Target
+float4 main(float2 uv: UV) : SV_TARGET
 {
-	return SLANG_parameterGroup_C_t.Sample(SLANG_parameterGroup_C_s, uv);
+	return C_t_0.Sample(C_s_0, uv);
 }
 
 #endif

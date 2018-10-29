@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VS -profile ps_4_0 -entry PS
+//TEST:COMPARE_HLSL: -profile sm_4_0 -entry VS -stage vertex -entry PS -stage fragment
 
 #ifndef __SLANG__
 #define SV_Target SV_TARGET

@@ -13,55 +13,66 @@ Simple Examples
 
 ### HLSL
 
-When compiling an HLSL shader, you must specify the path to your shader code file as well as the "profile" to use.
-To see D3D bytecode assembly for a fragment shader entry point:
+When compiling an HLSL shader, you must specify the path to your shader code file as well as the target shader model (profile) and shader stage to use.
+For example, to see D3D bytecode assembly for a fragment shader entry point:
 
-    slangc my-shader.hlsl -profile ps_5_0
+    slangc my-shader.hlsl -profile sm_5_0 -stage fragment
 
 To direct that output to a bytecode file:
 
-    slangc my-shader.hlsl -profile ps_5_0 -o my-shader.dxbc
+    slangc my-shader.hlsl -profile sm_5_0 -stage fragment -o my-shader.dxbc
 
 If the entry-point function has a name other than the default `main`, then this is specified with `-entry`:
 
-    slangc my-shader.hlsl -profile ps_5_0 -entry psMain
+    slangc my-shader.hlsl -profile sm_5_0 -entry psMain -stage fragment 
+
+If you are using the `[shader("...")]` syntax to mark your entry points, then you may leave off the `-stage` option:
+
+    slangc my-shader.hlsl -profile sm_5_0 -entry psMain
 
 ### Slang
 
-Compiling an entry point from a Slang file is similar to HLSL, except that you must specify the profile, the entry-point name, *and* the code generation target.
+Compiling an entry point from a Slang file is similar to HLSL, except that you must also specify a desired code generation target, because there is no assumed default (like DXBC for Direct3D Shader Model 5.x).
 
 To get DXBC assembly written to the console:
 
-    slangc my-shader.slang -profile ps_5_0 -entry main -target dxbc
+    slangc my-shader.slang -profile sm_5_0 -stage fragment -entry main -target dxbc
 
 To get SPIR-V assembly:
 
-    slangc my-shader.slang -profile ps_5_0 -entry main -target spriv
+    slangc my-shader.slang -profile sm_5_0 -stage fragment -entry main -target spriv
 
 The code generation target is implicit when writing to a file with an appropriate extension.
 To write DXBC, SPIR-V, or GLSL to files, use:
 
-    slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.dxbc
-    slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.spv
-    slangc my-shader.slang -profile ps_5_0 -entry main -o my-shader.glsl
+    slangc my-shader.slang -profile sm_5_0 -entry main -stage fragment -o my-shader.dxbc
+    slangc my-shader.slang -profile sm_6_0 -entry main -stage fragment -o my-shader.dxil
+    slangc my-shader.slang -profile glsl_450 -entry main -stage fragment -o my-shader.spv
 
 Multiple Entry Points
 ---------------------
 
-If you are taking advantage of Slang's ability to automatically assign binding locations to shader parameters (textures, buffers, etc.), then you may need to specify multiple entry points or even multiple files in one compiler invocation.
+`slangc` can compile multiple entry points, which may span multiple files in a single invocation.
+This is useful when you are taking advantage of Slang's ability to automatically assign binding locations to shader parameters, because the compiler can take all of your entry points into account when assigning location (avoiding overlap between entry points that will be used together).
 
-When compiling HLSL or Slang code, you might have multiple entry points in one file.
-In this case, specify the entry-point-specific options after the file, and make sure that the `-profile` option and any `-o` option precedes the corresponding `-entry` option:
+When specifying multiple entry points, you use multiple `-entry` options on the command line.
+The main thing to be aware of is that any `-stage` options apply to the most recent `-entry` point, and the same goes for any `-o` options to specify per-entry-point output files.
+For example, here is a command line to compile both vertex and fragment shader entry points from a single file and output them to distinct DXBC files:
 
-    slangc my-shader.hlsl -profile vs_5_0 -o my-shader.vs.dxbc -entry vsMain
-                          -profile ps_5_0 -o my-shader.ps.dxbc -entry psMain
+    slangc -profile sm_5_0 my-shader.hlsl 
+                          -entry vsMain -stage vertex   -o my-shader.vs.dxbc
+                          -entry fsMain -stage fragment -o my-shader.fs.dxbc
 
-If you want to compile multiple GLSL entry points in one pass, you will need multiple files. It is also required to fully specify the profile and entry-point name in this mode.
+If your shader entry points are spread across multiple HLSL files, then each `-entry` option indicates an entry point in the preceding file.
+For example, if the preceding example put its vertex and fragment entry points in distinct files, the command line would be:
 
-    slangc my-shader.vert -profile glsl_vertex   -o my-shader.vert.spv -entry main
-           my-shader.frag -profile glsl_fragment -o my-shader.frag.spv -entry main
+    slangc -profile sm_5_0 my-shader.vs.hlsl -entry vsMain -stage vertex   -o my-shader.vs.dxbc
+                           my-shader.fs.hlsl -entry fsMain -stage fragment -o my-shader.fs.dxbc
 
-These command lines obviously aren't pleasant, but we expect that most applications that need this level of complexity will be using the API.
+Note that when compiling multiple `.slang` files in one invocation, they will all be compiled together as a single module (with a single global namespace) so that the relative order of `-entry` options and source files does not matter.
+
+These long command lines obviously aren't pleasant.
+We encourage applications that require complex shader compilation workflows to use the Slang API directly so that they can implement compilation that follows application conventions/policy.
 The ability to specify compilation actions like this on the command line is primarily intended a testing and debugging tool.
 
 Options
@@ -73,35 +84,55 @@ For completeness, here are the options that `slangc` currently accepts:
   * The space between `-D` and `<name>` is optional
   * If no `<value>` is specified, Slang will define the macro with an empty value
 
-* `-entry <name>`: Specify the name of the entry-point function
-  * In single-file compiles for HLSL, this defaults to `main`
-  * Multiple `-entry` options may appear on the command line. When they do, the input file path, `-profile` option, and `-o` option that apply for an entry point are each the first one found when scanning to the left from the `-entry` option.
-
-* `-I <path>`: Add a path to be used in resolving `#include` and `__import` operations
+* `-I <path>`: Add a path to be used in resolving `#include` and `import` operations
   * The space between `-I` and `<path>` is optional
 
-* `-o <path>`: Specify a path where generated output should be written
+* `-entry <name>`: Specify the name of the entry-point function
+  * When compiling from a single file, this defaults to `main` *if* you specify a stage using `-stage`
+  * Multiple `-entry` options may appear on the command line. When they do, the file associated with the entry point will be the first one found when searching to the left in the command line.
 
-* `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through more or less modified to the existing compiler `<name>`"
+* `-stage <name>`: Specify the stage of an entry-point function
+  * When there are multiple entry points, a `-stage` option applies to the most recent `-entry` point specified
+  * When there is only a single entry point, the `-stage` option may appear anywhere on the command line
+  * The traditional stages are named as follows:
+    * `vertex`
+    * `hull`: D3D Hull Shader and GL/VK Tessellation Control Shader
+    * `domain`: D3D Domain Shader and GL/VK Tessellation Evaluation Shader
+    * `geometry`
+    * `fragment` / `pixel`: D3D Pixel Shader and GL/VK Fragment Shader
+    * `compute`
+  * The stages for ray tracing use the following names:
+    * `raygeneration`
+    * `intersection`
+    * `anyhit`
+    * `closesthit`
+    * `miss`
+    * `callable`
+
+* `-target <format>`: Specifies the format in which code should be generated. Values for `<target>` are:
+  * `glsl`: GLSL source code
+  * `hlsl`: HLSL source code
+  * `spirv`: SPIR-V intermediate language binary.
+  * `spirv-assembly` / `spirv-asm`: SPIR-V intermediate language assembly
+  * `dxbc`: DirectX shader bytecode binary
+  * `dxbc-assembly` / `dxbc-asm`: DirectX shader bytecode assembly
+  * `dxil`: DirectX Intermediate Language binary
+  * `dxil-assembly` / `dxil-asm`: DirectX Intermediate Language assembly
+
+* `-profile <profile>`: Specify the "profile" to use for the code generation target, which represents an abstact feature level as defined by a particular API standard. Available values include:
+  * The Direct3D "Shader Model" levels are available as `sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3}`
+  * Profiles corresponding to GLSL langauge versions are available as `glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}`
+  * As a convenience, names matching traditional HLSL shader profiles are provided such that, e.g., `-profile vs_5_0` is an abbreviation for `-profile sm_5_0 -stage vertex`
+
+* `-o <path>`: Specify a path where generated output should be written
+  * When multiple `-entry` options are present, each `-o` associates with the first `-entry` to its left.
+
+* `-pass-through <name>`: Don't actually perform Slang parsing/checking/etc. on the input and instead pass it through (more or less) unmodified to the existing compiler `<name>`"
   * `fxc`: Use the `D3DCompile` API as exposed by `d3dcompiler_47.dll`
   * `glslang`: Use Slang's internal version of `glslang` as exposed by `slang-glslang.dll`
   * 'dxc': Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
   * These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options
 
-* `-profile <profile>`: Specify the language "profile" to use. This is a combination of the pipeline stage (vertex, fragment, compute, etc.) and an abstract feature level. E.g., the `ps_5_0` profile specifies the fragment stage, with the Direc3D "Shader Model 5" feature level. To summarize the available profiles:
-  * The D3D profiles of the form `{cs,ds,gs,hs,ps,vs}_{4_0,4_1,5_0}` are supported
-  * The D3D profiles of the form `{vs,ps}_4_0_level_9_{0,1,3}` are supported
-  * Profiles of the form `glsl_{vertex,tess_control,tess_eval,geometry,fragment,compute}_<version>` are supported for all GLSL language versions where the corresponding stage is supported (e.g., there is a `glsl_fragment_110`, but the earliest compute profile is `glsl_compute_430`)
-  * As a convenience profiles of the form `glsl_{vertex,tess_control,tess_eval,geometry,fragment,compute}` are provided that are intended to map to the latest version of GLSL known to the Slang compiler (curently `450`)
-
-* `-target <target>`: Specifies the desired code-generation target. Values for `<target>` are:
-  * `glsl`: GLSL source code
-  * `hlsl`: HLSL source code
-  * `spirv`: SPIR-V intermediate language binary.
-  * `spirv-assembly`: SPIR-V intermediate language assembly
-  * `dxbc`: Direct3D shader bytecode binary
-  * `dxbc-assembly`: Direct3D shader bytecode assembly
-  * `none`: Don't generate output code (but still perform front-end parsing/checking)
 
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
 

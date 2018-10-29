@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile vs_4_0 -entry ParticleVS -profile gs_4_0 -entry ParticleGS -profile ps_4_0 -entry ParticlePS
+//TEST:COMPARE_HLSL:-no-mangle -profile sm_4_0 -entry ParticleVS -stage vertex -entry ParticleGS -stage geometry -entry ParticlePS -stage pixel
 
 #ifndef __SLANG__
 #define ParticlesRO ParticlesRO_0

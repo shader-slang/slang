@@ -1,4 +1,4 @@
-//TEST(compute):SIMPLE:-dump-ir -profile cs_5_0 -entry main
+//TEST(compute):SIMPLE:-dump-ir -stage compute -entry main
 
 [numthreads(1, 1, 1)]
 void main(

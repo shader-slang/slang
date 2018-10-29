@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 30: the stage 'vertex' was specified more than once for entry point 'vsMain'
+}
+standard output = {
+}

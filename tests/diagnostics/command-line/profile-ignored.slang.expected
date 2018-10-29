@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 42: a '-profile' option was specified, but no target was specified with '-target'
+}
+standard output = {
+}

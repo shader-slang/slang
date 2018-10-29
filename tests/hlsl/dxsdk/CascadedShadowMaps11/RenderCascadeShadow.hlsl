@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry VSMain -entry VSMainPancake
+//TEST:COMPARE_HLSL: -profile sm_4_0 -entry VSMain -stage vertex -entry VSMainPancake -stage vertex
 
 #ifndef __SLANG__
 #define cbPerObject cbPerObject_0

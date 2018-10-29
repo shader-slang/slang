@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile cs_5_0 -target dxbc-assembly -no-checking
+//TEST:COMPARE_HLSL: -profile cs_5_0
 
 // Make sure we handle complex UAV write patterns
 
@@ -6,6 +6,13 @@
 // checking takes place:
 #ifdef __SLANG__
 __import empty;
+#else
+
+#define Bar Bar_0
+#define bar bar_0
+#define gUAV gUAV_0
+#define gUAV2 gUAV2_0
+
 #endif
 
 struct Bar

@@ -1,4 +1,4 @@
-//TEST_DISABLED:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile cs_4_0 -entry CSScanInBucket -entry CSScanBucketResult -entry CSScanAddBucketResult
+//TEST_DISABLED:COMPARE_HLSL:-no-mangle -profile cs_4_0 -entry CSScanInBucket -entry CSScanBucketResult -entry CSScanAddBucketResult
 //--------------------------------------------------------------------------------------
 // File: ScanCS.hlsl
 //

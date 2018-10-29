@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile vs_4_0 -entry main Tests/bindings/multi-file-extra.hlsl -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL:-no-mangle -profile sm_4_0 -entry main -stage vertex Tests/bindings/multi-file-extra.hlsl -entry main -stage fragment
 
 // Here we are going to test that we can correctly generating bindings when we
 // are presented with a program spanning multiple input files (and multiple entry points)

@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0
 
 #ifdef __SLANG__
 import split_nested_types;

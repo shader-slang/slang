@@ -1,4 +1,7 @@
-//TEST(smoke):COMPARE_HLSL: -no-checking -target dxbc-assembly -profile ps_4_0 -entry main
+// Disbaled because Slang does semantic checks now, not the downstream compiler.
+
+//TEST_IGNORE_FILE
+//TEST(smoke):COMPARE_HLSL: -profile ps_4_0 -entry main
 
 // We need to confirm that when there is an error in
 // the input code, we allow the downstream compiler

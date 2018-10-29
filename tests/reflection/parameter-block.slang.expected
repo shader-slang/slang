@@ -40,6 +40,12 @@ standard output = {
                 "baseShape": "texture2D"
             }
         }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
     ]
 }
 }

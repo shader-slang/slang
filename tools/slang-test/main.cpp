@@ -955,6 +955,15 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         result = TestResult::Fail;
     }
 
+    // Always fail if the compilation produced a failure, just
+    // to catch situations where, e.g., command-line options parsing
+    // caused the same error in both the Slang and glslang cases.
+    //
+    if( actualSpawner.getResultCode() != 0 )
+    {
+        result = TestResult::Fail;
+    }
+
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
     // diagnose the problem.
@@ -1084,6 +1093,15 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
+    {
+        result = TestResult::Fail;
+    }
+
+    // Always fail if the compilation produced a failure, just
+    // to catch situations where, e.g., command-line options parsing
+    // caused the same error in both the Slang and fxc cases.
+    //
+    if( resultCode != 0 )
     {
         result = TestResult::Fail;
     }

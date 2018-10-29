@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -target dxbc-assembly -profile vs_5_0 -entry main tests/diagnostics/gh-38-fs.hlsl -profile ps_5_0 -entry main
+//TEST:SIMPLE: -profile sm_5_0 -entry main -stage vertex tests/diagnostics/gh-38-fs.hlsl -entry main -stage fragment
 
 // Ensure that we catch errors with overlapping or conflicting parameter bindings.
 

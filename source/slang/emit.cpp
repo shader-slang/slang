@@ -1969,7 +1969,7 @@ struct EmitVisitor
         // then types/variables defined in those modules should be emitted in
         // a way that is consistent with that layout...
 
-        auto matrixLayoutMode = targetReq->defaultMatrixLayoutMode;
+        auto matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
 
         switch(context->shared->target)
         {

@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-profile glsl_fragment -target glsl
+//TEST:REFLECTION:-stage fragment -target glsl
 
 // Confirm that we do parameter binding correctly
 // when we have both a parameter block *and* user-defined

@@ -1,5 +1,5 @@
 //TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry RenderSceneVS -profile ps_4_0 -entry RenderScenePS
+//TEST:COMPARE_HLSL: -profile vs_4_0 -entry RenderSceneVS -profile ps_4_0 -entry RenderScenePS
 //--------------------------------------------------------------------------------------
 // File: SimpleSample.hlsl
 //

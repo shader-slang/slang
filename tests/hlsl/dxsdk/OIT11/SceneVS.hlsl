@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry SceneVS
+//TEST:COMPARE_HLSL: -profile vs_4_0 -entry SceneVS
 
 #ifndef __SLANG__
 #define cbPerObject cbPerObject_0

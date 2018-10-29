@@ -1,5 +1,5 @@
 // array-size-static-const.hlsl
-//TEST:COMPARE_HLSL: -profile cs_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL: -profile cs_5_0
 
 // The bug in this case is that were have a (hidden)
 // cast from the `uint` constant to `int` to get

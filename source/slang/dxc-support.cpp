@@ -28,7 +28,7 @@
 
 namespace Slang
 {
-    char const* GetHLSLProfileName(Profile profile);
+    String GetHLSLProfileName(Profile profile);
     String emitHLSLForEntryPoint(
         EntryPointRequest*  entryPoint,
         TargetRequest*      targetReq);
