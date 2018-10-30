@@ -712,16 +712,16 @@ __target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
 void InterlockedMax(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicMin($A, $1)")
-void InterlockedMin(in out  int dest,  int value);
+void InterlockedMin(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicMin($A, $1)")
-void InterlockedMin(in out uint dest, uint value);
+void InterlockedMin(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-void InterlockedMin(in out  int dest,  int value, out  int original_value);
+void InterlockedMin(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-void InterlockedMin(in out uint dest, uint value, out uint original_value);
+void InterlockedMin(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicOr($A, $1)")
 void InterlockedOr(__ref  int dest,  int value);
