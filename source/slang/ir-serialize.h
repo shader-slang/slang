@@ -5,12 +5,59 @@
 #include "../core/basic.h"
 #include "../core/stream.h"
 
+#include "../core/slang-object-scope-manager.h"
+
 #include "ir.h"
 
 // For TranslationUnitRequest
 #include "compiler.h"
 
 namespace Slang {
+
+class StringRepresentationCache
+{
+    public:
+    typedef StringSlicePool::Handle Handle;
+
+    struct Entry
+    {
+        uint32_t m_startIndex;
+        uint32_t m_numChars;
+        RefObject* m_object;                ///< Could be nullptr, Name, or StringRepresentation. 
+    };
+
+        /// Get as a name
+    Name* getName(Handle handle);
+        /// Get as a string
+    String getString(Handle handle);
+        /// Get as string representation
+    StringRepresentation* getStringRepresentation(Handle handle);
+        /// Get as a string slice
+    UnownedStringSlice getStringSlice(Handle handle) const;
+        /// Get as a 0 terminated 'c style' string
+    char* getCStr(Handle handle);
+
+        /// Initialize a cache to use a string table, namePool and scopeManager
+    void init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager);
+
+        /// Ctor
+    StringRepresentationCache(); 
+    
+    protected:
+    ObjectScopeManager* m_scopeManager;
+    NamePool* m_namePool;
+    const List<char>* m_stringTable;
+    List<Entry> m_entries;
+};
+
+struct SerialStringTableUtil
+{
+    /// Convert a pool into a string table
+    static void encodeStringTable(const StringSlicePool& pool, List<char>& stringTable);
+    static void encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable);
+    /// Converts a pool into a string table, appending the strings to the slices
+    static void decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+};
 
 // Pre-declare
 class Name;
@@ -23,13 +70,13 @@ struct IRSerialData
     enum class StringIndex : uint32_t;
     enum class ArrayIndex : uint32_t;
 
-    enum class RawSourceLoc : SourceLoc::RawValue;             ///< This is just to copy over source loc data (ie not strictly serialize)
-    enum class StringOffset : uint32_t;             ///< Offset into the m_stringsBuffer
+    enum class RawSourceLoc : SourceLoc::RawValue;          ///< This is just to copy over source loc data (ie not strictly serialize)
+    enum class StringOffset : uint32_t;                     ///< Offset into the m_stringsBuffer
     
     typedef uint32_t SizeType;
 
-    static const StringIndex kNullStringIndex = StringIndex(0);
-    static const StringIndex kEmptyStringIndex = StringIndex(1);
+    static const StringIndex kNullStringIndex = StringIndex(StringSlicePool::kNullHandle);
+    static const StringIndex kEmptyStringIndex = StringIndex(StringSlicePool::kEmptyHandle);
 
     /// A run of instructions
     struct InstRun
@@ -125,6 +172,32 @@ struct IRSerialData
 
         Payload m_payload;
     };
+ 
+    struct DebugSourceFile
+    {
+        uint32_t m_startLoc;                    ///< Start of the location range 
+        uint32_t m_endLoc;                      ///< The end of the location range
+
+        uint32_t m_pathIndex;                   ///< Path associated
+
+        uint32_t m_numLocRuns;                  ///< The number of location runs associated with this source file
+        uint32_t m_numLineOffsets;              ///< The number of offsets associated with the file
+        uint32_t m_numDebugViewEntries;         ///< The number of debug view entries
+    };
+
+    struct DebugViewEntry
+    {
+        uint32_t m_startLoc;                    ///< Where does this entry begin?
+        uint32_t m_pathIndex;                   ///< What is the presumed path for this entry. If 0 it means there is no path.
+        int32_t m_lineAdjust;                   ///< The line adjustment
+    };
+
+    struct DebugLocRun
+    {
+        uint32_t m_sourceLoc;                   ///< The location
+        uint32_t startInstIndex;                ///< The start instruction index
+        uint32_t numInst;                       ///< The amount of instructions
+    };
 
         /// Clear to initial state
     void clear();
@@ -150,9 +223,15 @@ struct IRSerialData
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
-    List<char> m_strings;                       ///< All strings. Indexed into by StringIndex
+    List<char> m_stringTable;                       ///< All strings. Indexed into by StringIndex
 
     List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
+
+    List<DebugSourceFile> m_debugSourceFiles;   ///< The files associated 
+    List<uint32_t> m_debugLineOffsets;          ///< All of the debug line offsets
+    List<uint32_t> m_debugViewEntries;          ///< The debug view entries - that modify line meanings
+    List<DebugLocRun> m_debugLocRuns;           ///< Maps source locations to instructions
+    List<char> m_debugStrings;                  ///< All of the debug strings
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
     
@@ -296,24 +375,26 @@ struct IRSerialWriter
 
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
-        /// Get a slice from an index
-    UnownedStringSlice getStringSlice(Ser::StringIndex index) const;
-
+    
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
-    Ser::StringIndex getStringIndex(StringRepresentation* string); 
-    Ser::StringIndex getStringIndex(const UnownedStringSlice& string);
-    Ser::StringIndex getStringIndex(Name* name);
-    Ser::StringIndex getStringIndex(const char* chars);
-    
+        /// Get a slice from an index
+    UnownedStringSlice getStringSlice(Ser::StringIndex index) const { return m_stringSlicePool.getSlice(StringSlicePool::Handle(index)); }
+        /// Get index from string representations
+    Ser::StringIndex getStringIndex(StringRepresentation* string) { return Ser::StringIndex(m_stringSlicePool.add(string)); }
+    Ser::StringIndex getStringIndex(const UnownedStringSlice& slice) { return Ser::StringIndex(m_stringSlicePool.add(slice)); }
+    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(const char* chars) { return Ser::StringIndex(m_stringSlicePool.add(chars)); }
+    Ser::StringIndex getStringIndex(const String& string) { return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice())); }
+
     IRSerialWriter() :
         m_serialData(nullptr)
     {}
 
 protected:
     void _addInstruction(IRInst* inst);
-
+    
     List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
 
     List<IRDecoration*> m_decorations;                  ///< Holds all decorations in order of the instructions as found
@@ -321,20 +402,16 @@ protected:
 
     Dictionary<IRInst*, Ser::InstIndex> m_instMap;      ///< Map an instruction to an instruction index
 
-    List<Ser::StringOffset> m_stringStarts;                      ///< Offset for each string index into the m_strings 
+    StringSlicePool m_stringSlicePool;    
+    IRSerialData* m_serialData;                         ///< Where the data is stored
 
-    // TODO (JS):
-    // We could perhaps improve this, if we stored at string indices (when linearized) the StringRepresentation
-    // Doing so would mean if a String or Name was looked up we wouldn't have to re-allocate on the arena 
-    Dictionary<UnownedStringSlice, Ser::StringIndex> m_stringMap;       ///< String map
-    List<RefPtr<StringRepresentation> > m_scopeStrings;                 ///< 
-    
-    IRSerialData* m_serialData;                               ///< Where the data is stored
+    StringSlicePool m_debugStringSlicePool;             ///< Slices held just for debug usage
 };
 
 struct IRSerialReader
 {
     typedef IRSerialData Ser;
+    typedef StringRepresentationCache::Handle StringHandle;
 
         /// Read a stream to fill in dataOut IRSerialData
     static Result readStream(Stream* stream, IRSerialData* dataOut);
@@ -342,14 +419,9 @@ struct IRSerialReader
         /// Read a module from serial data
     Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
 
-    Name* getName(Ser::StringIndex index);
-    String getString(Ser::StringIndex index);
-    StringRepresentation* getStringRepresentation(Ser::StringIndex index);
-    UnownedStringSlice getStringSlice(Ser::StringIndex index) { return getStringSlice(m_stringStarts[int(index)]); }
-    char* getCStr(Ser::StringIndex index);
-
-    UnownedStringSlice getStringSlice(Ser::StringOffset offset);
-
+        /// Get the representation cache
+    StringRepresentationCache& getStringRepresentationCache() { return m_stringRepresentationCache; }
+    
     IRSerialReader():
         m_serialData(nullptr),
         m_module(nullptr)
@@ -358,20 +430,14 @@ struct IRSerialReader
 
     protected:
 
-    void _calcStringStarts();
     IRDecoration* _createDecoration(const Ser::Inst& srcIns);
     static Result _skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
 
-    List<Ser::StringOffset> m_stringStarts;
-    List<StringRepresentation*> m_stringRepresentationCache;
+    StringRepresentationCache m_stringRepresentationCache;
 
     const IRSerialData* m_serialData;
     IRModule* m_module;
 };
-
-
-Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream);
-Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut);
 
 } // namespace Slang
 
