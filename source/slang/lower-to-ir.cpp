@@ -4012,18 +4012,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // generating the code we actually care about, back in the original function.
 
             auto builder = getBuilder();
+
             auto initBlock = builder->createBlock();
             auto afterBlock = builder->createBlock();
 
             builder->emitIfElse(getSimpleVal(context, boolVal), afterBlock, initBlock, afterBlock);
 
-            builder->setInsertInto(initBlock);
+            builder->insertBlock(initBlock);
             LoweredValInfo initVal = lowerLValueExpr(context, initExpr);
             assign(context, globalVal, initVal);
             assign(context, boolVal, LoweredValInfo::simple(builder->getBoolValue(true)));
             builder->emitBranch(afterBlock);
 
-            builder->setInsertInto(afterBlock);
+            builder->insertBlock(afterBlock);
         }
 
         irGlobal->moveToEnd();
