@@ -2029,23 +2029,37 @@ namespace Slang
             getBasicBlockType());
     }
 
-    IRBlock* IRBuilder::emitBlock()
+    void IRBuilder::insertBlock(IRBlock* block)
     {
-        // Create a block
-        auto bb = createBlock();
-
         // If we are emitting into a function
         // (or another value with code), then
         // append the block to the function and
         // set this block as the new parent for
         // subsequent instructions we insert.
+        //
+        // TODO: This should probably insert the block
+        // after the current "insert into" block if
+        // there is one. Right now we are always
+        // adding the block to the end of the list,
+        // which is technically valid (the ordering
+        // of blocks doesn't affect the CFG topology),
+        // but some later passes might assume the ordering
+        // is significant in representing the intent
+        // of the original code.
+        //
         auto f = getFunc();
         if (f)
         {
-            f->addBlock(bb);
-            setInsertInto(bb);
+            f->addBlock(block);
+            setInsertInto(block);
         }
-        return bb;
+    }
+
+    IRBlock* IRBuilder::emitBlock()
+    {
+        auto block = createBlock();
+        insertBlock(block);
+        return block;
     }
 
     IRParam* IRBuilder::createParam(
