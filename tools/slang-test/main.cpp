@@ -36,9 +36,6 @@ struct TestCategory
 
     // The logical "super-category" of this category
     TestCategory* parent;
-
-    // A list of categories that we explicitly want to exclude
-    List<TestCategory*> prohibitedCategories;
 };
 
 // Options for a particular test
