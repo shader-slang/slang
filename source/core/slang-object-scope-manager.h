@@ -27,7 +27,7 @@ public:
 
         /// Add an object which will be kept in scope until manager is destroyed
     SLANG_INLINE RefObject* add(RefObject* obj);
-        /// Add an object, where it may be nullptr. If it is nothing happens
+        /// Add an object, where it may be nullptr. If it null its a no-op
     SLANG_INLINE RefObject* addMaybeNull(RefObject* obj);
 
         /// Clear the contents

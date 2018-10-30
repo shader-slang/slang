@@ -756,7 +756,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    if (true)
+    if (false)
     {
         StringSlicePool debugStringPool;
 
@@ -1745,7 +1745,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         {
             auto decor = createEmptyDecoration<IRRequireGLSLExtensionDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->extensionName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+            decor->extensionName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_RequireGLSLVersion:
