@@ -1928,6 +1928,8 @@ int main(
 
     auto unitTestCatagory = addTestCategory("unit-test", fullTestCategory);
 
+    auto compatibilityIssueCatagory = addTestCategory("compatibility-issue", fullTestCategory);
+
     // An un-categorized test will always belong to the `full` category
     g_defaultTestCategory = fullTestCategory;
 
