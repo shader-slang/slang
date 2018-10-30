@@ -1320,7 +1320,7 @@ static PreprocessorExpressionValue EvaluateInfixOp(
     case TokenType::OpLess:     return left <  right ? 1 : 0;
     case TokenType::OpGreater:  return left >  right ? 1 : 0;
     case TokenType::OpLeq:      return left <= right ? 1 : 0;
-    case TokenType::OpGeq:      return left <= right ? 1 : 0;
+    case TokenType::OpGeq:      return left >= right ? 1 : 0;
     case TokenType::OpEql:      return left == right ? 1 : 0;
     case TokenType::OpNeq:      return left != right ? 1 : 0;
     case TokenType::OpBitAnd:   return left & right;
