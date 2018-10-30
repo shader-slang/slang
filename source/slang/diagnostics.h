@@ -73,6 +73,10 @@ namespace Slang
     struct TypeExp;
     struct QualType;
 
+    enum class CodeGenTarget;
+    enum class Stage : SlangStage;
+    enum class ProfileVersion;
+
     void printDiagnosticArg(StringBuilder& sb, char const* str);
     void printDiagnosticArg(StringBuilder& sb, int val);
     void printDiagnosticArg(StringBuilder& sb, UInt val);
@@ -85,6 +89,9 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, QualType const& type);
     void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);
     void printDiagnosticArg(StringBuilder& sb, Token const& token);
+    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
+    void printDiagnosticArg(StringBuilder& sb, Stage val);
+    void printDiagnosticArg(StringBuilder& sb, ProfileVersion val);
 
     template<typename T>
     void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)

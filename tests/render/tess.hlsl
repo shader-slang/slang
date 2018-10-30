@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile hs_5_1 -entry HS -profile ds_5_1 -entry DS 
+//TEST:COMPARE_HLSL: -profile sm_5_1 -entry HS -stage hull -entry DS -stage domain
 
 // tests/render/tess.hlsl
 

@@ -1,4 +1,6 @@
-//TEST:COMPARE_HLSL: -no-checking -target dxbc-assembly -profile ps_4_0 -entry main
+// Disabled because Slang should give the error, not downstream compiler
+//TEST_IGNORE_FILE
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
 
 #ifdef __SLANG__
 __import gh_160;

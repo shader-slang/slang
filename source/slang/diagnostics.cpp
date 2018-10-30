@@ -84,6 +84,38 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token)
     sb << token.Content;
 }
 
+void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+{
+    switch( val )
+    {
+    default:
+        sb << "<unknown>";
+        break;
+
+#define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
+    CASE(GLSL,                  "glsl");
+    CASE(HLSL,                  "hlsl");
+    CASE(SPIRV,                 "spirv");
+    CASE(SPIRVAssembly,         "spriv-assembly");
+    CASE(DXBytecode,            "dxbc");
+    CASE(DXBytecodeAssembly,    "dxbc-assembly");
+    CASE(DXIL,                  "dxil");
+    CASE(DXILAssembly,          "dxil-assembly");
+#undef CASE
+    }
+}
+
+void printDiagnosticArg(StringBuilder& sb, Stage val)
+{
+    sb << getStageName(val);
+}
+
+void printDiagnosticArg(StringBuilder& sb, ProfileVersion val)
+{
+    sb << Profile(val).getName();
+}
+
+
 SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)
 {
     return syntax->loc;

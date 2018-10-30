@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main -target dxbc-assembly -split-mixed-types
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
 
 // Make sure we don't crash when desugaring resource in structs,
 // when the user also declares multiple variables with a
@@ -21,19 +21,19 @@ float4 main() : SV_Target
 
 #else
 
-cbuffer C : register(b0)
+cbuffer C_0 : register(b0)
 {
-	float2 uv;
+	float2 uv_0;
 };
 
-Texture2D SLANG_parameterGroup_C_t0 : register(t0);
-Texture2D SLANG_parameterGroup_C_t1 : register(t1);
-SamplerState SLANG_parameterGroup_C_s : register(s0);
+Texture2D C_t0_0 : register(t0);
+Texture2D C_t1_0 : register(t1);
+SamplerState C_s_0 : register(s0);
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
-	return SLANG_parameterGroup_C_t0.Sample(SLANG_parameterGroup_C_s, uv)
-	     + SLANG_parameterGroup_C_t1.Sample(SLANG_parameterGroup_C_s, uv);
+	return C_t0_0.Sample(C_s_0, uv_0)
+	     + C_t1_0.Sample(C_s_0, uv_0);
 }
 
 #endif

@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL:-no-mangle -target dxbc-assembly -profile ps_4_0 -entry PSMain
+//TEST:COMPARE_HLSL:-no-mangle -profile ps_4_0 -entry PSMain
 
 #ifndef __SLANG__
 #define cbPerFrame cbPerFrame_0

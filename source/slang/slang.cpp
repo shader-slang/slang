@@ -365,6 +365,17 @@ ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
     return ComPtr<ISlangBlob>(new RawBlob(inData, size));
 }
 
+//
+
+MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
+{
+    return compileRequest->getDefaultMatrixLayoutMode();
+}
+
+
+
+//
+
 SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 {
     return fileSystemExt->loadFile(path.Buffer(), outBlob);
@@ -1211,7 +1222,7 @@ SLANG_API void spSetTargetProfile(
     SlangProfileID          profile)
 {
     auto req = REQ(request);
-    req->targets[targetIndex]->targetProfile = profile;
+    req->targets[targetIndex]->targetProfile = Slang::Profile(profile);
 }
 
 SLANG_API void spSetTargetFlags(
@@ -1223,13 +1234,21 @@ SLANG_API void spSetTargetFlags(
     req->targets[targetIndex]->targetFlags = flags;
 }
 
+SLANG_API void spSetMatrixLayoutMode(
+    SlangCompileRequest*    request,
+    SlangMatrixLayoutMode   mode)
+{
+    auto req = REQ(request);
+    req->defaultMatrixLayoutMode = Slang::MatrixLayoutMode(mode);
+}
+
 SLANG_API void spSetTargetMatrixLayoutMode(
     SlangCompileRequest*    request,
     int                     targetIndex,
     SlangMatrixLayoutMode   mode)
 {
-    auto req = REQ(request);
-    req->targets[targetIndex]->defaultMatrixLayoutMode = Slang::MatrixLayoutMode(mode);
+    SLANG_UNUSED(targetIndex);
+    spSetMatrixLayoutMode(request, mode);
 }
 
 
@@ -1417,7 +1436,7 @@ SLANG_API int spAddEntryPoint(
     SlangCompileRequest*    request,
     int                     translationUnitIndex,
     char const*             name,
-    SlangProfileID          profile)
+    SlangStage              stage)
 {
     if(!request) return -1;
     auto req = REQ(request);
@@ -1428,7 +1447,7 @@ SLANG_API int spAddEntryPoint(
     return req->addEntryPoint(
         translationUnitIndex,
         name,
-        Slang::Profile(Slang::Profile::RawVal(profile)),
+        Slang::Profile(Slang::Stage(stage)),
         Slang::List<Slang::String>());
 }
 
@@ -1436,7 +1455,7 @@ SLANG_API int spAddEntryPointEx(
     SlangCompileRequest*    request,
     int                     translationUnitIndex,
     char const*             name,
-    SlangProfileID          profile,
+    SlangStage              stage,
     int                     genericParamTypeNameCount,
     char const **           genericParamTypeNames)
 {
@@ -1451,7 +1470,7 @@ SLANG_API int spAddEntryPointEx(
     return req->addEntryPoint(
         translationUnitIndex,
         name,
-        Slang::Profile(Slang::Profile::RawVal(profile)),
+        Slang::Profile(Slang::Stage(stage)),
         typeNames);
 }
 

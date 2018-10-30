@@ -61,7 +61,6 @@ DIAGNOSTIC(    7, Error, noOutputPathSpecifiedForEntryPoint,
 DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
-DIAGNOSTIC(    9, Error, cannotDeduceOutputFormatFromPath, "cannot deduce an output format from the output path '$0'")
 DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
 DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language");
 DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'");
@@ -70,13 +69,35 @@ DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'");
 DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'");
 DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");
 DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'");
-DIAGNOSTIC(    18, Error, noProfileSpecified, "no profile specified; use the '-profile <profile name>' option");
-DIAGNOSTIC(    19, Error, multipleEntryPointsNeedMulitpleProfiles, "when specifying multiple profiles on the command line, each '-entry' option must be preceded by a '-profile' option");
-DIAGNOSTIC(    20, Error, multipleTranslationUnitsNeedEntryPoints, "when using multiple translation units, entry points must be specified after their translation unit file(s)");
+DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)");
 DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'");
-DIAGNOSTIC(    22, Error, noStageSpecified, "no stage specified; use the '-stage <stage name>' option");
-DIAGNOSTIC(    23, Error, multipleEntryPointsNeedMulitpleStages, "when multiple entry points are specified on the command line, each '-entry' point must be given a stage by a preceding '-stage' option");
+
 DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'");
+
+DIAGNOSTIC(    30, Error, sameStageSpecifiedMoreThanOnce, "the stage '$0' was specified more than once for entry point '$1'")
+DIAGNOSTIC(    31, Error, conflictingStagesForEntryPoint, "conflicting stages have been specified for entry point '$0'")
+DIAGNOSTIC(    32, Warning, explicitStageDoesntMatchImpliedStage, "the stage specified for entry point '$0' ('$1') does not match the stage implied by the source file name ('$2')")
+DIAGNOSTIC(    33, Error, stageSpecificationIgnoredBecauseNoEntryPoints, "one or more stages were specified, but no entry points were specified with '-entry'")
+DIAGNOSTIC(    34, Error, stageSpecificationIgnoredBecauseBeforeAllEntryPoints, "when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to")
+DIAGNOSTIC(    35, Error, noStageSpecifiedInPassThroughMode, "no stage was specified for entry point '$0'; when using the '-pass-through' option, stages must be fully specified on the command line")
+
+DIAGNOSTIC(    40, Warning, sameProfileSpecifiedMoreThanOnce, "the '$0' was specified more than once for target '$0'")
+DIAGNOSTIC(    41, Error, conflictingProfilesSpecifiedForTarget, "conflicting profiles have been specified for target '$0'")
+
+DIAGNOSTIC(    42, Error, profileSpecificationIgnoredBecauseNoTargets, "a '-profile' option was specified, but no target was specified with '-target'")
+DIAGNOSTIC(    43, Error, profileSpecificationIgnoredBecauseBeforeAllTargets, "when using multiple targets, any '-profile' option must follow the '-target' it applies to")
+
+DIAGNOSTIC(    42, Error, targetFlagsIgnoredBecauseNoTargets, "target options were specified, but no target was specified with '-target'")
+DIAGNOSTIC(    43, Error, targetFlagsIgnoredBecauseBeforeAllTargets, "when using multiple targets, any target options must follow the '-target' they apply to")
+
+DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified more than once")
+
+DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
+DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
+
+DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
+
+DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple output paths have been specified entry point '$0' on target '$1'")
 
 //
 // 1xxxx - Lexical anaylsis
@@ -305,6 +326,9 @@ DIAGNOSTIC(38003, Error, entryPointSymbolNotAFunction, "entry point '$0' must be
 
 DIAGNOSTIC(38004, Error, entryPointTypeParameterNotFound, "no type found matching entry-point type parameter name '$0'")
 DIAGNOSTIC(38005, Error, entryPointTypeSymbolNotAType, "entry-point type parameter '$0' must be declared as a type")
+
+DIAGNOSTIC(38006, Warning, specifiedStageDoesntMatchAttribute, "entry point '$0' being compiled for the '$1' stage has a '[shader(...)]' attribute that specifies the '$2' stage")
+DIAGNOSTIC(38007, Error, entryPointHasNoStage, "no stage specified for entry point '$0'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage")
 
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")

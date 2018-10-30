@@ -1,4 +1,4 @@
-//TEST_DISABLED:COMPARE_HLSL: -target dxbc-assembly -profile vs_4_0 -entry BezierVS -profile hs_5_0 -entry BezierHS -profile ds_5_0 -entry BezierDS -profile ps_4_0 -entry BezierPS -entry SolidColorPS
+//TEST_DISABLED:COMPARE_HLSL: -profile vs_4_0 -entry BezierVS -profile hs_5_0 -entry BezierHS -profile ds_5_0 -entry BezierDS -profile ps_4_0 -entry BezierPS -entry SolidColorPS
 
 // Note(Slang): Disabling this test for now because compiling it via IR ends up creating a local variable of the `OutputPatch<...>` type, which we need to get rid of via SSA optimization.
 

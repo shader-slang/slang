@@ -1,5 +1,5 @@
 // implicit-conversion-binary-op.hlsl
-//TEST:COMPARE_HLSL: -profile ps_5_0 -target dxbc-assembly
+//TEST:COMPARE_HLSL: -profile ps_5_0
 
 // Make sure that we can pick resolve the right overload
 // to call when applying a binary operator to vectors

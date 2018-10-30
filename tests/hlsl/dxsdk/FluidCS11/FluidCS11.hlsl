@@ -1,5 +1,5 @@
 //TEST_IGNORE_FILE: Currently failing due to Slang compiler issues.
-//TEST:COMPARE_HLSL: -target dxbc-assembly -profile cs_4_0 -entry BuildGridCS -entry ClearGridIndicesCS -entry BuildGridIndicesCS -entry RearrangeParticlesCS -entry DensityCS_Simple -entry DensityCS_Shared -entry DensityCS_Grid -entry ForceCS_Simple -entry ForceCS_Shared -entry ForceCS_Grid -entry IntegrateCS
+//TEST:COMPARE_HLSL: -profile cs_4_0 -entry BuildGridCS -entry ClearGridIndicesCS -entry BuildGridIndicesCS -entry RearrangeParticlesCS -entry DensityCS_Simple -entry DensityCS_Shared -entry DensityCS_Grid -entry ForceCS_Simple -entry ForceCS_Shared -entry ForceCS_Grid -entry IntegrateCS
 //--------------------------------------------------------------------------------------
 // File: FluidCS11.hlsl
 //

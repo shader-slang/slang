@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_HLSL:-no-mangle -profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
+//TEST(smoke):COMPARE_HLSL:-no-mangle -profile sm_4_0 -entry RenderBaseVS -stage vertex -entry RenderPS -stage fragment
 
 #ifndef __SLANG__
 #define cbPerObject cbPerObject_0

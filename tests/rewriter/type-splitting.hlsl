@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -split-mixed-types -no-checking -target dxbc-assembly -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
 
 // Confirm that the `-split-mixed-types` flag works.
 
@@ -37,22 +37,22 @@ float4 main() : SV_Target
 // - Fields of resource type get hoisted out of variable declarations
 //
 
-struct Foo
+struct Foo_0
 {
-	float2 u;
+	float2 u_0;
 };
 
-cbuffer C
+cbuffer C_0
 {
-	Foo foo;
+	Foo_0 foo_0;
 }
 
-Texture2D    SLANG_parameterGroup_C_foo_t;
-SamplerState SLANG_parameterGroup_C_foo_s;
+Texture2D    C_foo_t_0;
+SamplerState C_foo_s_0;
 
-float4 main() : SV_Target
+float4 main() : SV_TARGET
 {
-	return SLANG_parameterGroup_C_foo_t.Sample(SLANG_parameterGroup_C_foo_s, foo.u);	
+	return C_foo_t_0.Sample(C_foo_s_0, foo_0.u_0);	
 }
 
 #endif
