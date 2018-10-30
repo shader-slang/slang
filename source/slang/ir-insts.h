@@ -894,13 +894,13 @@ struct IRBuilder
     template <typename T>
     T* addRefObjectToFree(T* ptr)
     {
-        getModule()->addRefObjectToFree(ptr);
+        getModule()->getObjectScopeManager()->addMaybeNull(ptr);
         return ptr;
     }
     StringRepresentation* addStringToFree(const String& string)
     {
         StringRepresentation* stringRep = string.getStringRepresentation();
-        getModule()->addRefObjectToFree(stringRep);
+        getModule()->getObjectScopeManager()->addMaybeNull(stringRep);
         return stringRep;
     }
 

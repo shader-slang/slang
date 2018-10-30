@@ -81,13 +81,183 @@ struct CharReader
 
 } // anonymous
 
-static UnownedStringSlice asStringSlice(const PrefixString* prefixString)
-{
-    const char* prefix = (char*)prefixString;
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringRepresentationCache !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    CharReader reader(prefix);
-    const int len = GetUnicodePointFromUTF8(reader);
-    return UnownedStringSlice(reader.m_pos, len);
+StringRepresentationCache::StringRepresentationCache():
+    m_stringTable(nullptr),
+    m_namePool(nullptr),
+    m_scopeManager(nullptr)
+{
+}
+
+void StringRepresentationCache::init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager)
+{
+    m_stringTable = stringTable;
+    m_namePool = namePool;
+    m_scopeManager = scopeManager;
+
+    // Decode the table
+    m_entries.SetSize(StringSlicePool::kNumDefaultHandles);
+    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kNumDefaultHandles == 2);
+
+    {
+        Entry& entry = m_entries[0];
+        entry.m_numChars = 0;
+        entry.m_startIndex = 0;
+        entry.m_object = nullptr;
+    }
+    {
+        Entry& entry = m_entries[1];
+        entry.m_numChars = 0;
+        entry.m_startIndex = 0;
+        entry.m_object = nullptr;
+    }
+
+    {
+        const char* start = stringTable->begin();
+        const char* cur = start;
+        const char* end = stringTable->end();
+
+        while (cur < end)
+        {
+            CharReader reader(cur);
+            const int len = GetUnicodePointFromUTF8(reader);
+
+            Entry entry;
+            entry.m_startIndex = uint32_t(reader.m_pos - start);
+            entry.m_numChars = len;
+            entry.m_object = nullptr;
+
+            m_entries.Add(entry);
+
+            cur = reader.m_pos + len;
+        }
+    }
+
+    m_entries.Compress();
+}
+
+Name* StringRepresentationCache::getName(Handle handle)
+{
+    if (handle == StringSlicePool::kNullHandle)
+    {
+        return nullptr;
+    }
+
+    Entry& entry = m_entries[int(handle)];
+    if (entry.m_object)
+    {
+        Name* name = dynamic_cast<Name*>(entry.m_object);
+        if (name)
+        {
+            return name;
+        }
+        StringRepresentation* stringRep = static_cast<StringRepresentation*>(entry.m_object);
+        // Promote it to a name
+        name = m_namePool->getName(String(stringRep));
+        entry.m_object = name;
+        return name;
+    }
+
+    Name* name = m_namePool->getName(String(getStringSlice(handle)));
+    entry.m_object = name;
+    return name;
+}
+
+String StringRepresentationCache::getString(Handle handle)
+{
+    return String(getStringRepresentation(handle));
+}
+
+UnownedStringSlice StringRepresentationCache::getStringSlice(Handle handle) const
+{
+    const Entry& entry = m_entries[int(handle)];
+    const char* start = m_stringTable->begin();
+
+    return UnownedStringSlice(start + entry.m_startIndex, int(entry.m_numChars));
+}
+
+StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle handle)
+{
+    if (handle == StringSlicePool::kNullHandle || handle == StringSlicePool::kEmptyHandle)
+    {
+        return nullptr;
+    }
+
+    Entry& entry = m_entries[int(handle)];
+    if (entry.m_object)
+    {
+        Name* name = dynamic_cast<Name*>(entry.m_object);
+        if (name)
+        {
+            return name->text.getStringRepresentation();
+        }
+        return static_cast<StringRepresentation*>(entry.m_object);
+    }
+
+    const UnownedStringSlice slice = getStringSlice(handle);
+    const UInt size = slice.size();
+
+    StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
+    memcpy(stringRep->getData(), slice.begin(), size);
+    entry.m_object = stringRep;
+
+    // Keep the StringRepresentation in scope
+    m_scopeManager->add(stringRep);
+    
+    return stringRep;
+}
+
+char* StringRepresentationCache::getCStr(Handle handle)
+{
+    // It turns out StringRepresentation is always 0 terminated, so can just use that
+    StringRepresentation* rep = getStringRepresentation(handle);
+    return rep->getData();
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/* static */void SerialStringTableUtil::encodeStringTable(const StringSlicePool& pool, List<char>& stringTable)
+{
+    // Skip the default handles -> nothing is encoded via them
+    return encodeStringTable(pool.getSlices().begin() + StringSlicePool::kNumDefaultHandles, pool.getNumSlices() - StringSlicePool::kNumDefaultHandles, stringTable);
+}
+    
+/* static */void SerialStringTableUtil::encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable)
+{
+    stringTable.Clear();
+    for (size_t i = 0; i < numSlices; ++i)
+    {
+        const UnownedStringSlice slice = slices[i];
+        const int len = int(slice.size());
+        
+        // We need to write into the the string array
+        char prefixBytes[6];
+        const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
+        const int baseIndex = int(stringTable.Count());
+
+        stringTable.SetSize(baseIndex + numPrefixBytes + len);
+
+        char* dst = stringTable.begin() + baseIndex;
+
+        memcpy(dst, prefixBytes, numPrefixBytes);
+        memcpy(dst + numPrefixBytes, slice.begin(), len);   
+    }
+}
+
+/* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slices)
+{
+    const char* start = stringTable.begin();
+    const char* cur = start;
+    const char* end = stringTable.end();
+
+    while (cur < end)
+    {
+        CharReader reader(cur);
+        const int len = GetUnicodePointFromUTF8(reader);
+        slices.Add(UnownedStringSlice(reader.m_pos, len));
+        cur = reader.m_pos + len;
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -105,8 +275,15 @@ size_t IRSerialData::calcSizeInBytes() const
         _calcArraySize(m_childRuns) + 
         _calcArraySize(m_decorationRuns) + 
         _calcArraySize(m_externalOperands) + 
-        _calcArraySize(m_rawSourceLocs) + 
-        _calcArraySize(m_strings);
+        _calcArraySize(m_stringTable) + 
+        /* Raw source locs */
+        _calcArraySize(m_rawSourceLocs) +
+        /* Debug */
+        _calcArraySize(m_debugSourceFiles) + 
+        _calcArraySize(m_debugLineOffsets) + 
+        _calcArraySize(m_debugViewEntries) + 
+        _calcArraySize(m_debugLocRuns) + 
+        _calcArraySize(m_debugStrings);
 }
 
 void IRSerialData::clear()
@@ -120,9 +297,16 @@ void IRSerialData::clear()
     m_externalOperands.Clear();
     m_rawSourceLocs.Clear();
 
-    m_strings.SetSize(2);
-    m_strings[int(kNullStringIndex)] = 0;
-    m_strings[int(kEmptyStringIndex)] = 0;
+    // Debug data
+    m_debugSourceFiles.Clear(); 
+    m_debugLineOffsets.Clear(); 
+    m_debugViewEntries.Clear(); 
+    m_debugLocRuns.Clear();     
+    m_debugStrings.Clear();
+
+    m_stringTable.SetSize(2);
+    m_stringTable[int(kNullStringIndex)] = 0;
+    m_stringTable[int(kEmptyStringIndex)] = 0;
 
     m_decorationBaseIndex = 0;
 }
@@ -166,7 +350,7 @@ bool IRSerialData::operator==(const ThisType& rhs) const
         _isEqual(m_decorationRuns, rhs.m_decorationRuns) &&
         _isEqual(m_externalOperands, rhs.m_externalOperands) &&
         _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
-        _isEqual(m_strings, rhs.m_strings));
+        _isEqual(m_stringTable, rhs.m_stringTable));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -208,16 +392,27 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     }
 }
 
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(Name* name) 
-{ 
-    return name ? getStringIndex(name->text.getStringRepresentation()) : Ser::kNullStringIndex; 
+// Find a view index that matches the view by file (and perhaps other characteristics in the future)
+int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
+{
+    const int numViews = int(viewsIn.Count());
+    SourceView*const* views = viewsIn.begin();
+    
+    SourceFile* sourceFile = view->getSourceFile();
+
+    for (int i = 0; i < numViews; ++i)
+    {
+        SourceView* curView = views[i];
+        // For now we just match on source file
+        if (curView->getSourceFile() == sourceFile)
+        {
+            // It's a hit
+            return i;
+        }
+    }
+    return -1;
 }
 
-UnownedStringSlice IRSerialWriter::getStringSlice(Ser::StringIndex index) const
-{
-    Ser::StringOffset offset = m_stringStarts[int(index)];
-    return asStringSlice((const PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
-}
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
@@ -228,23 +423,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     m_serialData = serialData;
 
     serialData->clear();
-
-    // Set up the stringStarts
-    m_stringStarts.SetSize(2);
-    m_stringStarts[0] = Ser::StringOffset(0);                  // Null
-    m_stringStarts[1] = Ser::StringOffset(1);                  // Empty
-    SLANG_ASSERT(serialData->m_strings.Count() == 2);
-
-    // We'll keep StringRepresentations in scope (and for simplicity keep in order of StringIndex)
-    m_scopeStrings.SetSize(2);
-    m_scopeStrings[0] = nullptr;
-    m_scopeStrings[1] = nullptr;
-
-    m_stringMap.Clear();
-
-    // Add the empty string index. 
-    // We can't add the null string index, because that doesn't have any meaning as an UnownedStringSlice
-    m_stringMap.Add(UnownedStringSlice(""), Ser::kEmptyStringIndex);
 
     // We reserve 0 for null
     m_insts.Clear();
@@ -556,6 +734,12 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
+    // Convert strings into a string table
+    {
+        SerialStringTableUtil::encodeStringTable(m_stringSlicePool, serialData->m_stringTable);
+    }
+
+
     // If the option to use RawSourceLocations is enabled, serialize out as is
     if (options & OptionFlag::RawSourceLocation)
     {
@@ -571,78 +755,9 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
         }
     }
-
+    
     m_serialData = nullptr;
     return SLANG_OK;
-}
-
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(StringRepresentation* rep)
-{
-    if (rep == nullptr)
-    {
-        return Ser::kNullStringIndex;
-    }
-
-    const UnownedStringSlice slice(rep->getData(), rep->getLength());
-    const int len = int(rep->getLength());
-
-    Ser::StringIndex index;
-    if (m_stringMap.TryGetValue(slice, index))
-    {
-        return index;
-    }
-
-    // We need to write into the the string array
-    char prefixBytes[6];
-    const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
-    const int baseIndex = int(m_serialData->m_strings.Count());
-
-    m_serialData->m_strings.SetSize(baseIndex + numPrefixBytes + len);
-
-    char* dst = m_serialData->m_strings.begin() + baseIndex;
-
-    memcpy(dst, prefixBytes, numPrefixBytes);
-    memcpy(dst + numPrefixBytes, slice.begin(), len);
-
-    // We need to add 1, because the 0 is used for null, which is not in the map
-    const Ser::StringIndex stringIndex = Ser::StringIndex(m_stringMap.Count() + 1);
-
-    SLANG_ASSERT(stringIndex == Ser::StringIndex(m_scopeStrings.Count()));
-    // Make sure the rep stays in scope (because the UnownedStringSlice is pointing to it's contents)
-    m_scopeStrings.Add(rep);
-
-    // Add the start offset
-    m_stringStarts.Add(Ser::StringOffset(baseIndex));
-    m_stringMap.Add(slice, stringIndex);
-
-    return stringIndex;
-}
-
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(const char* chars)
-{
-    if (!chars)
-    {
-        return Ser::kNullStringIndex;
-    }
-    if (chars[0] == 0)
-    {
-        return Ser::kEmptyStringIndex;
-    }
-
-    // Get as a StringRepresentation
-    String string(chars);
-    return getStringIndex(string.getStringRepresentation());
-}
-
-IRSerialData::StringIndex IRSerialWriter::getStringIndex(const UnownedStringSlice& slice)
-{
-    const int len = int(slice.size());
-    if (len <= 0)
-    {
-        return Ser::kEmptyStringIndex;
-    }
-    String string(slice);
-    return getStringIndex(string.getStringRepresentation());
 }
 
 template <typename T>
@@ -966,7 +1081,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         _calcChunkSize(compressionType, data.m_childRuns) +
         _calcChunkSize(compressionType, data.m_decorationRuns) +
         _calcChunkSize(compressionType, data.m_externalOperands) +
-        _calcChunkSize(Bin::CompressionType::None, data.m_strings) + 
+        _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) + 
         _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
 
     {
@@ -990,7 +1105,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, stream));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_strings, stream));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_stringTable, stream));
 
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, stream));
     
@@ -1345,7 +1460,7 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
             }
             case Bin::kStringFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_strings));
+                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_stringTable));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
@@ -1365,85 +1480,6 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
     }
 
     return SLANG_OK;
-}
-
-Name* IRSerialReader::getName(Ser::StringIndex index)
-{
-    if (index == Ser::kNullStringIndex)
-    {
-        return nullptr;
-    }
-
-    StringRepresentation* rep = getStringRepresentation(index);
-    String string(rep);
-    Session* session = m_module->getSession();
-
-    return session->getNameObj(string);
-}
-
-String IRSerialReader::getString(Ser::StringIndex index)
-{
-    return String(getStringRepresentation(index));
-}
-
-UnownedStringSlice IRSerialReader::getStringSlice(Ser::StringOffset offset)
-{
-    return asStringSlice((PrefixString*)(m_serialData->m_strings.begin() + int(offset)));
-}
-
-StringRepresentation* IRSerialReader::getStringRepresentation(Ser::StringIndex index)
-{
-    if (index == Ser::kNullStringIndex)
-    {
-        return nullptr;
-    }
-
-    StringRepresentation* rep = m_stringRepresentationCache[int(index)];
-    if (rep)
-    {
-        return rep;
-    }
-
-    const UnownedStringSlice slice = getStringSlice(index);
-    String string(slice);
-
-    StringRepresentation* stringRep = string.getStringRepresentation();   
-    m_module->addRefObjectToFree(stringRep);
-
-    m_stringRepresentationCache[int(index)] = stringRep;
-
-    return stringRep;
-}
-
-char* IRSerialReader::getCStr(Ser::StringIndex index)
-{
-    // It turns out StringRepresentation is always 0 terminated, so can just use that
-    StringRepresentation* rep = getStringRepresentation(index);
-    return rep->getData();
-}
-
-void IRSerialReader::_calcStringStarts()
-{
-    m_stringStarts.Clear();
-
-    const char* start = m_serialData->m_strings.begin();
-    const char* cur = start;
-    const char* end = m_serialData->m_strings.end();
-
-    while (cur < end)
-    {
-        m_stringStarts.Add(Ser::StringOffset(cur - start));
-
-        CharReader reader(cur);
-        const int len = GetUnicodePointFromUTF8(reader);
-        cur = reader.m_pos + len;
-    }
-
-    m_stringRepresentationCache.Clear();
-    // Resize cache
-    m_stringRepresentationCache.SetSize(m_stringStarts.Count());
-    // Make sure all values are null initially
-    memset(m_stringRepresentationCache.begin(), 0, sizeof(StringRepresentation*) * m_stringStarts.Count());
 }
 
 IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
@@ -1478,29 +1514,29 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         {
             auto decor = createEmptyDecoration<IRTargetDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->targetName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+            decor->targetName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_TargetIntrinsic:
         {
             auto decor = createEmptyDecoration<IRTargetIntrinsicDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_2);
-            decor->targetName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
-            decor->definition = getStringRepresentation(srcInst.m_payload.m_stringIndices[1]);
+            decor->targetName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+            decor->definition = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[1]));
             return decor;
         }
         case kIRDecorationOp_GLSLOuterArray:
         {
             auto decor = createEmptyDecoration<IRGLSLOuterArrayDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->outerArrayName = getCStr(srcInst.m_payload.m_stringIndices[0]);
+            decor->outerArrayName = m_stringRepresentationCache.getCStr(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_Semantic:
         {
             auto decor = createEmptyDecoration<IRSemanticDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->semanticName = getName(srcInst.m_payload.m_stringIndices[0]);
+            decor->semanticName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_InterpolationMode:
@@ -1514,7 +1550,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         {
             auto decor = createEmptyDecoration<IRNameHintDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->name = getName(srcInst.m_payload.m_stringIndices[0]);
+            decor->name = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_VulkanRayPayload:
@@ -1533,7 +1569,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         {
             auto decor = createEmptyDecoration<IRRequireGLSLExtensionDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->extensionName = getStringRepresentation(srcInst.m_payload.m_stringIndices[0]);
+            decor->extensionName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             return decor;
         }
         case kIRDecorationOp_RequireGLSLVersion:
@@ -1556,13 +1592,15 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
     typedef Ser::Inst::PayloadType PayloadType;
 
     m_serialData = &data;
-    _calcStringStarts();
-
+ 
     auto module = new IRModule();
     moduleOut = module;
     m_module = module;
 
     module->session = session;
+
+    // Set up the string rep cache
+    m_stringRepresentationCache.init(&data.m_stringTable, session->getNamePool(), module->getObjectScopeManager());
     
     // Add all the instructions
 
@@ -1613,7 +1651,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
                 insts[i] = globalValueInst;
                 // Set the global value
                 SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-                globalValueInst->mangledName = getName(srcInst.m_payload.m_stringIndices[0]);
+                globalValueInst->mangledName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
             }
             else
             {
@@ -1659,7 +1697,7 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
                     {
                         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
 
-                        const UnownedStringSlice slice = getStringSlice(srcInst.m_payload.m_stringIndices[0]);
+                        const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
                         
                         const size_t sliceSize = slice.size();
                         const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
@@ -1813,6 +1851,8 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+#if 0
+
 Result serializeModule(IRModule* module, SourceManager* sourceManager, Stream* stream)
 {
     IRSerialWriter serializer;
@@ -1836,5 +1876,7 @@ Result readModule(Session* session, Stream* stream, RefPtr<IRModule>& moduleOut)
     IRSerialReader reader;
     return reader.read(serialData, session, moduleOut);
 }
+
+#endif
 
 } // namespace Slang

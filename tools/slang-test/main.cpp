@@ -36,9 +36,6 @@ struct TestCategory
 
     // The logical "super-category" of this category
     TestCategory* parent;
-
-    // A list of categories that we explicitly want to exclude
-    List<TestCategory*> prohibitedCategories;
 };
 
 // Options for a particular test
@@ -1930,6 +1927,8 @@ int main(
     auto vulkanTestCategory = addTestCategory("vulkan", fullTestCategory);
 
     auto unitTestCatagory = addTestCategory("unit-test", fullTestCategory);
+
+    auto compatibilityIssueCatagory = addTestCategory("compatibility-issue", fullTestCategory);
 
     // An un-categorized test will always belong to the `full` category
     g_defaultTestCategory = fullTestCategory;

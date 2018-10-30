@@ -2,6 +2,12 @@
 
 namespace Slang {
 
+/* static */ const StringSlicePool::Handle StringSlicePool::kNullHandle;
+/* static */ const StringSlicePool::Handle StringSlicePool::kEmptyHandle;
+
+/* static */const int StringSlicePool::kNumDefaultHandles;
+
+
 StringSlicePool::StringSlicePool() :
     m_arena(1024)
 {
@@ -10,18 +16,23 @@ StringSlicePool::StringSlicePool() :
 
 void StringSlicePool::clear()
 {
-    m_slices.SetSize(1);
-    m_slices[0] = UnownedStringSlice::fromLiteral("");
+    m_slices.SetSize(2);
+
+    m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
+    m_slices[1] = UnownedStringSlice::fromLiteral("");
+    
+    // Add the empty entry
+    m_map.Add(m_slices[1], kEmptyHandle);
 
     m_map.Clear();
 }
 
 StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 {
-    const int* indexPtr = m_map.TryGetValue(slice);
-    if (indexPtr)
+    const Handle* handlePtr = m_map.TryGetValue(slice);
+    if (handlePtr)
     {
-        return Handle(*indexPtr);
+        return *handlePtr;
     }
 
     // Create a scoped copy
@@ -30,14 +41,37 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     const int index = int(m_slices.Count());
 
     m_slices.Add(scopePath);
-    m_map.Add(scopePath, index);
+    m_map.Add(scopePath, Handle(index));
     return Handle(index);
+}
+
+StringSlicePool::Handle StringSlicePool::add(StringRepresentation* stringRep)
+{
+    if (stringRep == nullptr)
+    {
+        return kNullHandle;
+    }
+    return add(StringRepresentation::asSlice(stringRep));
+}
+ 
+
+StringSlicePool::Handle StringSlicePool::add(const char* chars)
+{
+    if (!chars)
+    {
+        return kNullHandle;
+    }
+    if (chars[0] == 0)
+    {
+        return kEmptyHandle;
+    }
+    return add(UnownedStringSlice(chars));
 }
 
 int StringSlicePool::findIndex(const Slice& slice) const
 {
-    const int* index = m_map.TryGetValue(slice);
-    return index ? *index : -1;
+    const Handle* handlePtr = m_map.TryGetValue(slice);
+    return handlePtr ? int(*handlePtr) : -1;
 
 }
 } // namespace Slang
