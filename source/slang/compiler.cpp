@@ -301,9 +301,26 @@ namespace Slang
         char const* stagePrefix = nullptr;
         switch( profile.GetStage() )
         {
+            // Note: All of the raytracing-related stages require
+            // compiling for a `lib_*` profile, even when only a
+            // single entry point is present.
+            //
+            // We also go ahead and use this target in any case
+            // where we don't know the actual stage to compiel for,
+            // as a fallback option.
+            //
+            // TODO: We also want to use this option when compiling
+            // multiple entry points to a DXIL library.
+            //
         default:
-            return "unknown";
+            stagePrefix = "lib";
+            break;
 
+            // The traditional rasterization pipeline and compute
+            // shaders all have custom profile names that identify
+            // both the stage and shader model, which need to be
+            // used when compiling a single entry point.
+            //
     #define CASE(NAME, PREFIX) case Stage::NAME: stagePrefix = #PREFIX; break
         CASE(Vertex,    vs);
         CASE(Hull,      hs);
@@ -311,15 +328,6 @@ namespace Slang
         CASE(Geometry,  gs);
         CASE(Fragment,  ps);
         CASE(Compute,   cs);
-
-        // Note: dxc requires a `lib` target for all
-        // ray tracing stages.
-        CASE(RayGeneration, lib);
-        CASE(Intersection, lib);
-        CASE(AnyHit, lib);
-        CASE(ClosestHit, lib);
-        CASE(Miss, lib);
-        CASE(Callable, lib);
     #undef CASE
         }
 
@@ -976,7 +984,18 @@ String dissassembleDXILUsingDXC(
         TargetRequest*      targetReq,
         UInt                entryPointIndex)
     {
-        auto outputPath = targetReq->entryPointOutputPaths[entryPointIndex];
+        // It is possible that we are dynamically discovering entry
+        // points (using `[shader(...)]` attributes), so that the
+        // number of entry points on the compile request does not
+        // match the number of entries in teh `entryPointOutputPaths`
+        // array.
+        //
+        String outputPath;
+        if( entryPointIndex < targetReq->entryPointOutputPaths.Count() )
+        {
+            outputPath = targetReq->entryPointOutputPaths[entryPointIndex];
+        }
+
         auto& result = targetReq->entryPointResults[entryPointIndex];
 
         // Skip the case with no output
