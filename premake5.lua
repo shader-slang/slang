@@ -38,7 +38,7 @@
 --
 
 -- To output linux will output to linux 
--- % premake5 --os=linux gmake
+-- % premake5 --os=linux gmake --build-location="build.linux"
 --
 -- % cd build.linux
 -- % make config=release_x64
@@ -46,21 +46,51 @@
 -- % make config=debug_x64
 --
 -- From in the build directory you can use
--- % premake5 --file=../premake5.lua --os=linux gmake
+-- % premake5 --file=../premake5.lua --os=linux gmake 
+
+newoption {
+   trigger     = "override-module",
+   description = "(Optional) Specify a lua file that can override functions",
+   value       = "path"   
+}
+
+newoption { 
+   trigger     = "build-location",
+   description = "(Optional) Specifiy the location to place solution on root Makefile",
+   value       = "path"
+}
+
+newoption {
+   trigger     = "execute-binary",
+   description = "(Optional) If true binaries used in build will be executed (disable on cross compilation)",
+   value       = "bool",
+   default     = "true",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
+buildLocation = _OPTIONS["build-location"]
+executeBinary = (_OPTIONS["execute-binary"] == "true")
+
+overrideModule = {}
+local overrideModulePath = _OPTIONS["override-module"]
+if overrideModulePath then
+    overrideModule = require(overrideModulePath)
+end
+
+targetName = "%{cfg.system}-%{cfg.platform:lower()}"
 
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
     configurations { "Debug", "Release" }
-    platforms { "x86", "x64" }
+    platforms { "x86", "x64", "aarch64" }
 
-    if os.target() == "windows" then
-    else
-        location("build." .. os.target())
+    if buildLocation then
+        location(buildLocation)
     end
     
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
-    targetdir "bin/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}"
+    targetdir("bin/" .. targetName .. "/%{cfg.buildcfg:lower()}")
 
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
     flags { "StaticRuntime" }
@@ -77,6 +107,8 @@ workspace "slang"
         architecture "x64"
     filter { "platforms:x86" }
         architecture "x86"
+    filter { "platforms:aarch64" }
+        architecture "ARM"
 
     filter { "toolset:clang or gcc*" }
         buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden", "-std=gnu++11" } 
@@ -128,7 +160,8 @@ function dumpTable(o)
 	end
 	return s .. '} '
 end
-	
+
+
 --
 -- We are now going to start defining the projects, where
 -- each project builds some binary artifact (an executable,
@@ -207,8 +240,8 @@ function baseSlangProject(name, baseDir)
     -- naming scheme to the output directory, but will also use
     -- the project name to avoid cases where multiple projects
     -- have source files with the same name.
-    objdir "intermediate/%{cfg.system}-%{cfg.platform:lower()}/%{cfg.buildcfg:lower()}/%{prj.name}"
-
+    objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
+    
     -- All of our projects are written in C++.
     --
     language "C++"
@@ -246,6 +279,12 @@ function baseSlangProject(name, baseDir)
        { ["Header Files"] = { "**.h", "**.hpp"} },
        { ["Source Files"] = { "**.cpp", "**.slang", "**.natvis" } },
     }
+
+    -- Override default options for a project if necessary
+
+    if overrideModule.addBaseProjectOptions then
+        overrideModule.addBaseProjectOptions()
+    end
 end
 
 -- We can now use the `baseSlangProject()` subroutine to
@@ -469,8 +508,8 @@ tool "gfx"
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
 
-	filter { "system:not windows" }
-        removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
+        filter { "system:not windows" }
+            removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
 
 --
 -- The `slangc` command-line application is just a very thin wrapper
@@ -490,7 +529,7 @@ standardProject "slangc"
 -- to make sure that the binaries it generates use a "relative `RPATH`"
 -- for loading shared libraries, so that Slang is not dependent on
 -- being installed to a fixed path on end-user machines. Before we
--- can use Premake for the Linux build (or evenatually MacOS) we would
+-- can use Premake for the Linux build (or eventually MacOS) we would
 -- need to figure out how to replicate this incantation in premake.
 --
 
@@ -530,6 +569,7 @@ standardProject "slang"
     dependson { "slang-generate" }
 
     filter { "system:linux" }
+	-- might be able to do pic(true)
         buildoptions{"-fPIC"}
        
     -- Next, we want to add a custom build rule for each of the
@@ -538,40 +578,42 @@ standardProject "slang"
     -- using a `filter` and then use Premake's support for
     -- defining custom build commands:
     --
-    filter "files:**.meta.slang"
-        -- Specify the "friendly" message that should print to the build log for the action
-        buildmessage "slang-generate %{file.relpath}"
+    if executeBinary then
+        filter "files:**.meta.slang"
+            -- Specify the "friendly" message that should print to the build log for the action
+            buildmessage "slang-generate %{file.relpath}"
 
-        -- Specify the actual command to run for this action.
-        --
-        -- Note that we use a single-quoted Lua string and wrap the path
-        -- to the `slang-generate` command in double quotes to avoid
-        -- confusing the Windows shell. It seems that Premake outputs that
-        -- path with forward slashes, which confused the shell if we don't
-        -- quote the executable path.
-        --
-        buildcommands { '"%{cfg.targetdir}/slang-generate" %{file.relpath}' }
+            -- Specify the actual command to run for this action.
+            --
+            -- Note that we use a single-quoted Lua string and wrap the path
+            -- to the `slang-generate` command in double quotes to avoid
+            -- confusing the Windows shell. It seems that Premake outputs that
+            -- path with forward slashes, which confused the shell if we don't
+            -- quote the executable path.
+            --
+            buildcommands { '"%{cfg.targetdir}/slang-generate" %{file.relpath}' }
 
-        -- Given `foo.meta.slang` we woutput `foo.meta.slang.h`.
-        -- This needs to be specified because the custom action will only
-        -- run when this file needs to be generated.
-        --
-        buildoutputs { "%{file.relpath}.h" }
+            -- Given `foo.meta.slang` we woutput `foo.meta.slang.h`.
+            -- This needs to be specified because the custom action will only
+            -- run when this file needs to be generated.
+            --
+            buildoutputs { "%{file.relpath}.h" }
 
-        -- We will specify an additional build input dependency on the `slang-generate`
-        -- tool itself, so that changes to the code for the tool cause the generation
-        -- step to be re-run.
-        --
-        -- In order to get the file name right, we need to know the executable suffix
-        -- that the target platform will use. Premake might have a built-in way to
-        -- query this, but I couldn't find it, so I am just winging it for now:
-        --
-        local executableSuffix = "";
-        if(os.target() == "windows") then
-            executableSuffix = ".exe";
-        end
-        --
-        buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
+            -- We will specify an additional build input dependency on the `slang-generate`
+            -- tool itself, so that changes to the code for the tool cause the generation
+            -- step to be re-run.
+            --
+            -- In order to get the file name right, we need to know the executable suffix
+            -- that the target platform will use. Premake might have a built-in way to
+            -- query this, but I couldn't find it, so I am just winging it for now:
+            --
+            local executableSuffix = "";
+            if(os.target() == "windows") then
+                executableSuffix = ".exe";
+            end
+            --
+            buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
+    end
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
