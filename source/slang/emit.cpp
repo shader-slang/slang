@@ -3596,17 +3596,25 @@ struct EmitVisitor
             // Simple constructor call
             if( getTarget(ctx) == CodeGenTarget::HLSL )
             {
+                auto prec = kEOp_Prefix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 emit("(");
                 emitIRType(ctx, inst->getDataType());
                 emit(")");
+
+                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec,prec));
             }
             else
             {
+                auto prec = kEOp_Postfix;
+                needClose = maybeEmitParens(outerPrec, prec);
+
                 emitIRType(ctx, inst->getDataType());
+                emit("(");
+                emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+                emit(")");
             }
-            emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-            emit(")");
             break;
 
         case kIROp_FieldExtract:
