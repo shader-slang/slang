@@ -132,6 +132,16 @@ namespace Slang
             break;
         }
 
+        switch( targetReq->floatingPointMode )
+        {
+        default:
+            break;
+
+        case FloatingPointMode::Precise:
+            args[argCount++] = L"-Gis"; // "force IEEE strictness"
+            break;
+        }
+
         String entryPointName = getText(entryPoint->name);
         OSString wideEntryPointName = entryPointName.ToWString();
 

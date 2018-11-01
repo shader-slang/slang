@@ -428,6 +428,18 @@ namespace Slang
             dxMacros = dxMacrosStorage.Buffer();
         }
 
+        DWORD flags = 0;
+
+        switch( targetReq->floatingPointMode )
+        {
+        default:
+            break;
+
+        case FloatingPointMode::Precise:
+            flags |= D3DCOMPILE_IEEE_STRICTNESS;
+            break;
+        }
+
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
         HRESULT hr = D3DCompile_(
@@ -438,8 +450,8 @@ namespace Slang
             nullptr,
             getText(entryPoint->name).begin(),
             GetHLSLProfileName(profile).Buffer(),
-            0,
-            0,
+            flags,
+            0, // unused: effect flags
             &codeBlob,
             &diagnosticsBlob);
 

@@ -203,6 +203,13 @@ namespace Slang
         RefPtr<IRModule> irModule;
     };
 
+    enum class FloatingPointMode : SlangFloatingPointMode
+    {
+        Default = SLANG_FLOATING_POINT_MODE_DEFAULT,
+        Fast = SLANG_FLOATING_POINT_MODE_FAST,
+        Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
+    };
+
     // A request to generate output in some target format
     class TargetRequest : public RefObject
     {
@@ -211,6 +218,7 @@ namespace Slang
         CodeGenTarget       target;
         SlangTargetFlags    targetFlags = 0;
         Slang::Profile      targetProfile = Slang::Profile();
+        FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
 
         // Requested output paths for each entry point.
         // An empty string indices no output desired for
