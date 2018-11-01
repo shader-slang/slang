@@ -57,7 +57,7 @@ SHARED_LIB_SUFFIX := .so
 BIN_SUFFIX :=
 # Note: we set `visibility=hidden` to avoid exporting more symbols than
 # we really need.
-CFLAGS := -std=c++11 -fvisibility=hidden
+CFLAGS := -std=c++11 -fvisibility=hidden -fno-delete-null-pointer-checks
 CFLAGS += -I.
 LDFLAGS := -L$(OUTPUTDIR)
 SHARED_LIB_LDFLAGS := -shared
