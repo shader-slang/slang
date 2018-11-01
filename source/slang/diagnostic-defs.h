@@ -73,6 +73,7 @@ DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "wh
 DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'");
 
 DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'");
+DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'");
 
 DIAGNOSTIC(    30, Error, sameStageSpecifiedMoreThanOnce, "the stage '$0' was specified more than once for entry point '$1'")
 DIAGNOSTIC(    31, Error, conflictingStagesForEntryPoint, "conflicting stages have been specified for entry point '$0'")

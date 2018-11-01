@@ -147,6 +147,7 @@ struct OptionsParser
         ProfileVersion      profileVersion = ProfileVersion::Unknown;
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
+        FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
 
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
@@ -400,6 +401,11 @@ struct OptionsParser
             }
         }
         rawTarget->profileVersion = profileVersion;
+    }
+
+    void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode)
+    {
+        rawTarget->floatingPointMode = mode;
     }
 
     SlangResult parse(
@@ -659,6 +665,28 @@ struct OptionsParser
 
                     spSetLineDirectiveMode(compileRequest, mode);
 
+                }
+                else if( argStr == "-fp-mode" || argStr == "-floating-point-mode" )
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                    FloatingPointMode mode = FloatingPointMode::Default;
+                    if(name == "fast")
+                    {
+                        mode = FloatingPointMode::Fast;
+                    }
+                    else if(name == "precise")
+                    {
+                        mode = FloatingPointMode::Precise;
+                    }
+                    else
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownFloatingPointMode, name);
+                        return SLANG_FAIL;
+                    }
+
+                    setFloatingPointMode(getCurrentTarget(), mode);
                 }
                 else if (argStr == "--")
                 {
@@ -983,6 +1011,11 @@ struct OptionsParser
             }
 
             getCurrentTarget()->targetFlags |= defaultTarget.targetFlags;
+
+            if( defaultTarget.floatingPointMode != FloatingPointMode::Default )
+            {
+                setFloatingPointMode(getCurrentTarget(), defaultTarget.floatingPointMode);
+            }
         }
         else
         {
@@ -1007,6 +1040,18 @@ struct OptionsParser
             }
 
             if( defaultTarget.targetFlags )
+            {
+                if( rawTargets.Count() == 0 )
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
+                }
+                else
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseBeforeAllTargets);
+                }
+            }
+
+            if( defaultTarget.floatingPointMode != FloatingPointMode::Default )
             {
                 if( rawTargets.Count() == 0 )
                 {
@@ -1053,6 +1098,11 @@ struct OptionsParser
             if( rawTarget.targetFlags )
             {
                 spSetTargetFlags(compileRequest, targetID, rawTarget.targetFlags);
+            }
+
+            if( rawTarget.floatingPointMode != FloatingPointMode::Default )
+            {
+                spSetTargetFloatingPointMode(compileRequest, targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
             }
         }
 

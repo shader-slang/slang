@@ -451,6 +451,17 @@ extern "C"
     };
 
     /*!
+    @brief Options to control floating-point precision guarantees for a target.
+    */
+    typedef unsigned int SlangFloatingPointMode;
+    enum
+    {
+        SLANG_FLOATING_POINT_MODE_DEFAULT = 0,
+        SLANG_FLOATING_POINT_MODE_FAST,
+        SLANG_FLOATING_POINT_MODE_PRECISE,
+    };
+
+    /*!
     @brief Options to control emission of `#line` directives
     */
     typedef unsigned int SlangLineDirectiveMode;
@@ -876,6 +887,14 @@ extern "C"
         SlangCompileRequest*    request,
         int                     targetIndex,
         SlangTargetFlags        flags);
+
+    /*!
+    @brief Set the floating point mode (e.g., precise or fast) to use a target.
+    */
+    SLANG_API void spSetTargetFloatingPointMode(
+        SlangCompileRequest*    request,
+        int                     targetIndex,
+        SlangFloatingPointMode  mode);
 
     /* DEPRECATED: use `spSetMatrixLayoutMode` instead. */
     SLANG_API void spSetTargetMatrixLayoutMode(

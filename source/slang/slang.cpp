@@ -1229,6 +1229,15 @@ SLANG_API void spSetTargetFlags(
     req->targets[targetIndex]->targetFlags = flags;
 }
 
+SLANG_API void spSetTargetFloatingPointMode(
+    SlangCompileRequest*    request,
+    int                     targetIndex,
+    SlangFloatingPointMode  mode)
+{
+    auto req = REQ(request);
+    req->targets[targetIndex]->floatingPointMode = Slang::FloatingPointMode(mode);
+}
+
 SLANG_API void spSetMatrixLayoutMode(
     SlangCompileRequest*    request,
     SlangMatrixLayoutMode   mode)

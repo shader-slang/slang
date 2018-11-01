@@ -132,6 +132,16 @@ namespace Slang
             break;
         }
 
+        switch( targetReq->floatingPointMode )
+        {
+        default:
+            break;
+
+        case FloatingPointMode::Precise:
+            args[argCount++] = L"-Gis"; // "force IEEE strictness"
+            break;
+        }
+
         // Slang strives to produce correct code, and by default
         // we do not show the user warnings produced by a downstream
         // compiler. When the downstream compiler *does* produce an
