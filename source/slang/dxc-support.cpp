@@ -142,6 +142,23 @@ namespace Slang
             break;
         }
 
+        // Slang strives to produce correct code, and by default
+        // we do not show the user warnings produced by a downstream
+        // compiler. When the downstream compiler *does* produce an
+        // error, then we dump its entire diagnostic log, which can
+        // include many distracting spurious warnings that have nothing
+        // to do with the user's code, and just relate to the idiomatic
+        // way that Slang outputs HLSL.
+        //
+        // It would be nice to use fine-grained flags to disable specific
+        // warnings here, so that we keep ourselves honest (e.g., only
+        // use `-Wno-parentheses` to eliminate that class of false positives),
+        // but alas dxc doesn't support these options even though they
+        // work on mainline Clang. Thus the only option we have available
+        // is the big hammer of turning off *all* warnings coming from dxc.
+        //
+        args[argCount++] = L"-no-warnings";
+
         String entryPointName = getText(entryPoint->name);
         OSString wideEntryPointName = entryPointName.ToWString();
 
@@ -203,12 +220,22 @@ namespace Slang
             IDxcBlobEncoding* dxcErrorBlob = nullptr;
             if (!FAILED(dxcResult->GetErrorBuffer(&dxcErrorBlob)))
             {
+                // Note: the error blob returned by dxc doesn't always seem
+                // to be nul-terminated, so we should be careful and turn it
+                // into a string for safety.
+                //
+                // TODO: Alternatively, `diagnoseRaw()` should accept an
+                // `UnownedStringSlice` instead of a `const char*`.
+                //
+                auto errorBegin = (char const*) dxcErrorBlob->GetBufferPointer();
+                auto errorEnd = errorBegin + dxcErrorBlob->GetBufferSize();
+                String errorString = UnownedStringSlice(errorBegin, errorEnd);
+
                 compileRequest->mSink.diagnoseRaw(
                     FAILED(resultCode) ? Severity::Error : Severity::Warning,
-                    (char const*)dxcErrorBlob->GetBufferPointer());
+                    errorString.Buffer());
                 dxcErrorBlob->Release();
             }
-
 
             return 1;
         }
