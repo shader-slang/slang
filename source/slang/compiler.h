@@ -503,6 +503,25 @@ namespace Slang
     class Session
     {
     public:
+
+        enum class SharedLibraryType
+        {
+            Unknown,
+            Dxc,
+            Fxc,
+            Glslang,
+            CountOf,
+        };
+
+        enum class SharedLibraryFuncType
+        {
+            Glslang_Compile,
+            Fxc_D3DCompile,
+            Fxc_D3DDisassemble,
+            Dxc_DxcCreateInstance,
+            CountOf,
+        };
+
         //
 
         RefPtr<Scope>   baseLanguageScope;
@@ -543,6 +562,10 @@ namespace Slang
         RefPtr<Type> overloadedType;
         RefPtr<Type> constExprRate;
         RefPtr<Type> irBasicBlockType;
+
+        ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
+        ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
+        SlangFuncPtr sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)];
 
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
@@ -601,6 +624,14 @@ namespace Slang
         TypeCheckingCache* getTypeCheckingCache();
         void destroyTypeCheckingCache();
         //
+
+            /// Will try to load the library by specified name (using the set loader), if not one already available.
+        ISlangSharedLibrary* getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink);
+
+            /// Gets a shared library by type, or null if not loaded
+        ISlangSharedLibrary* getSharedLibrary(SharedLibraryType type) const { return sharedLibraries[int(type)]; }
+
+        SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
 
         Session();
 

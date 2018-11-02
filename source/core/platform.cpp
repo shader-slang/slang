@@ -19,12 +19,12 @@ namespace Slang
 	SharedLibrary SharedLibrary::load(char const* name)
 	{
 		SharedLibrary result;
-		result.handle = nullptr;
+		result.m_handle = nullptr;
 
 #ifdef _WIN32
 		{
 			HMODULE h = LoadLibraryA(name);
-			result.handle = (Handle) h;			
+			result.m_handle = (Handle) h;			
 		}
 #else
 		{
@@ -33,7 +33,7 @@ namespace Slang
 			fullName.append(name);
 			fullName.append(".so");
 
-			void* h = dlopen(fullName.Buffer(), RTLD_NOW|RTLD_LOCAL);
+			void* h = dlopen(fullName.Buffer(), RTLD_NOW | RTLD_LOCAL);
 			if(!h)
 			{
 				if(auto msg = dlerror())
@@ -41,7 +41,7 @@ namespace Slang
 					fprintf(stderr, "error: %s\n", msg);
 				}
 			}
-			result.handle = (Handle) h;
+			result.m_handle = (Handle) h;
 
 		}
 #endif
@@ -54,11 +54,11 @@ namespace Slang
 #ifdef _WIN32
 		{
 			FreeLibrary(
-				(HMODULE) handle);
+				(HMODULE) m_handle);
 		}
 #else
 		{
-			dlclose(handle);
+			dlclose(m_handle);
 		}
 #endif
 
@@ -71,13 +71,13 @@ namespace Slang
 #ifdef _WIN32
 		{
 			funcPtr = (FuncPtr) GetProcAddress(
-				(HMODULE) handle,
+				(HMODULE) m_handle,
 				name);
 		}
 #else
 		{
 			funcPtr = (FuncPtr) dlsym(
-				(void*) handle,
+				(void*) m_handle,
 				name);
 		}
 #endif

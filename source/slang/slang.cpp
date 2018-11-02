@@ -11,6 +11,7 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
+#include "slang-shared-library.h"
 #include "slang-file-system.h"
 
 #include "ir-serialize.h"
@@ -28,10 +29,15 @@
 
 namespace Slang {
 
+
 Session::Session()
 {
     // Initialize name pool
     getNamePool()->setRootNamePool(getRootNamePool());
+
+    sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+    // Set all the shared library function pointers to nullptr
+    ::memset(sharedLibraryFunctions, 0, sizeof(sharedLibraryFunctions));
 
     // Initialize the lookup table of syntax classes:
 
@@ -1112,6 +1118,41 @@ SLANG_API void spAddBuiltins(
         sourceString);
 }
 
+SLANG_API void spSessionSetSharedLibraryLoader(
+    SlangSession*               session,
+    ISlangSharedLibraryLoader* loader)
+{
+    auto s = SESSION(session);
+
+    if (s->sharedLibraryLoader != loader)
+    {
+        // Need to clear all of the libraries
+        for (int i = 0; i < SLANG_COUNT_OF(s->sharedLibraries); ++i)
+        {
+            s->sharedLibraries[i].setNull();
+        }
+
+        // Clear all of the functions
+        ::memset(s->sharedLibraryFunctions, 0, sizeof(s->sharedLibraryFunctions));
+
+        if (loader == nullptr)
+        {
+            // Set the default shared library loader
+            s->sharedLibraryLoader = Slang::DefaultSharedLibraryLoader::getSingleton();
+        }
+        else
+        {
+            s->sharedLibraryLoader = loader;
+        }
+    }
+}
+
+SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
+    SlangSession*               session)
+{
+    auto s = SESSION(session);
+    return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
+}
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)

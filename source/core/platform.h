@@ -5,27 +5,35 @@
 namespace Slang
 {
 	// Interface for working with shared libraries
-	// in a platfomr-independent fashion.
+	// in a platform-independent fashion.
 	struct SharedLibrary
 	{
 		typedef struct SharedLibraryImpl* Handle;
-		Handle handle;
+        typedef void(*FuncPtr)(void);
 
-		// Attempt to load a shared library for
-		// the current platform.
+		    // Attempt to load a shared library for
+		    // the current platform. Returns an unloaded library on failure.
 		static SharedLibrary load(char const* name);
 
-		// If this refers to a valid loaded library,
-		// then attempt to unload it
+		    // If this refers to a valid loaded library,
+		    // then attempt to unload it
 		void unload();
 
-		typedef void (*FuncPtr)(void);
+            /// True if there is a library loaded
+        bool isLoaded() const { return m_handle != nullptr; }
 
+            /// Get a function by name
 		FuncPtr findFuncByName(char const* name);
 
+            /// Convert to a handle a handle
+		operator Handle() const { return m_handle; }
 
-		operator Handle() { return handle; }
-	};
+            /// Ctor
+        SharedLibrary():m_handle(nullptr) {}
+	
+        protected:
+        Handle m_handle;
+    };
 
 #ifndef _MSC_VER
 	#define _fileno fileno

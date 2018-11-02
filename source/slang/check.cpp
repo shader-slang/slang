@@ -274,6 +274,91 @@ namespace Slang
         typeCheckingCache = nullptr;
     }
 
+    static const char* _getSharedLibraryName(Session::SharedLibraryType type)
+    {
+        typedef Session::SharedLibraryType LibType;
+        switch (type)
+        {
+            case LibType::Dxc:        return "dxcompiler";
+            case LibType::Fxc:        return "d3dcompiler_47";
+            case LibType::Glslang:    return "slang-glslang";
+            default: return nullptr;
+        }
+    }
+
+    namespace { // anonymous
+    struct FunctionInfo
+    {
+        const char* name;
+        Session::SharedLibraryType libraryType;
+    };
+    } // anonymous
+
+    static FunctionInfo _getFunctionInfo(Session::SharedLibraryFuncType funcType)
+    {
+        typedef Session::SharedLibraryFuncType FuncType;
+        typedef Session::SharedLibraryType LibType;
+
+        switch (funcType)
+        {
+            case FuncType::Glslang_Compile:   return { "glslang_compile", LibType::Glslang } ;
+            case FuncType::Fxc_D3DCompile:     return { "D3DCompile", LibType::Fxc };
+            case FuncType::Fxc_D3DDisassemble: return { "D3DDisassemble", LibType::Fxc };
+            case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", LibType::Dxc };
+            default: return { nullptr, LibType::Unknown };
+        } 
+    }
+
+    ISlangSharedLibrary* Session::getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink)
+    {
+        // If not loaded, try loading it
+        if (!sharedLibraries[int(type)])
+        {
+            const char* libName = _getSharedLibraryName(type);
+            if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                return nullptr;
+            }
+        }
+        return sharedLibraries[int(type)];
+    }
+
+    SlangFuncPtr Session::getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink)
+    {
+        if (sharedLibraryFunctions[int(type)])
+        {
+            return sharedLibraryFunctions[int(type)];
+        }
+        // do we have the library
+        FunctionInfo info = _getFunctionInfo(type);
+        if (info.name == nullptr)
+        {
+            return nullptr;
+        }
+        // Try loading the library
+        ISlangSharedLibrary* sharedLib = getOrLoadSharedLibrary(info.libraryType, sink);
+        if (!sharedLib)
+        {
+            return nullptr;
+        }
+
+        // Okay now access the func
+        SlangFuncPtr func = sharedLib->findFuncByName(info.name);
+        if (!func)
+        {
+            const char* libName = _getSharedLibraryName(info.libraryType);
+
+            sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionInSharedLibrary, info.name, libName);
+            return nullptr;
+        }
+
+        // Store in the function cache
+        sharedLibraryFunctions[int(type)] = func;
+        return func;
+    }
+
+
     enum class CheckingPhase
     {
         Header, Body

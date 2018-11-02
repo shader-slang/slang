@@ -359,38 +359,17 @@ namespace Slang
     }
 
 #if SLANG_ENABLE_DXBC_SUPPORT
-    HMODULE loadD3DCompilerDLL(CompileRequest* request)
-    {
-        char const* libraryName = "d3dcompiler_47";
-        HMODULE d3dCompiler =  LoadLibraryA(libraryName);
-        if (!d3dCompiler)
-        {
-            request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
-        }
-        return d3dCompiler;
-    }
-
-    HMODULE getD3DCompilerDLL(CompileRequest* request)
-    {
-        // TODO(tfoley): let user specify version of d3dcompiler DLL to use.
-        static HMODULE d3dCompiler = loadD3DCompilerDLL(request);
-        return d3dCompiler;
-    }
-
+   
     List<uint8_t> EmitDXBytecodeForEntryPoint(
         EntryPointRequest*  entryPoint,
         TargetRequest*      targetReq)
     {
-        static pD3DCompile D3DCompile_ = nullptr;
-        if (!D3DCompile_)
-        {
-            HMODULE d3dCompiler = getD3DCompilerDLL(entryPoint->compileRequest);
-            if (!d3dCompiler)
-                return List<uint8_t>();
+        auto session = entryPoint->compileRequest->mSession;
 
-            D3DCompile_ = (pD3DCompile)GetProcAddress(d3dCompiler, "D3DCompile");
-            if (!D3DCompile_)
-                return List<uint8_t>();
+        auto compileFunc = (pD3DCompile)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Fxc_D3DCompile, &entryPoint->compileRequest->mSink);
+        if (!compileFunc)
+        {
+            return List<uint8_t>();
         }
 
         auto hlslCode = emitHLSLForEntryPoint(entryPoint, targetReq);
@@ -442,7 +421,7 @@ namespace Slang
 
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
-        HRESULT hr = D3DCompile_(
+        HRESULT hr = compileFunc(
             hlslCode.begin(),
             hlslCode.Length(),
             "slang",
@@ -488,35 +467,29 @@ namespace Slang
         return data;
     }
 
-    String dissassembleDXBC(
+    SlangResult dissassembleDXBC(
         CompileRequest*     compileRequest,
         void const*         data,
-        size_t              size)
+        size_t              size, 
+        String& stringOut)
     {
-        static pD3DDisassemble D3DDisassemble_ = nullptr;
-        if (!D3DDisassemble_)
-        {
-            HMODULE d3dCompiler = getD3DCompilerDLL(compileRequest);
-            if (!d3dCompiler)
-                return String();
+        stringOut = String();
 
-            D3DDisassemble_ = (pD3DDisassemble)GetProcAddress(d3dCompiler, "D3DDisassemble");
-            if (!D3DDisassemble_)
-                return String();
+        auto session = compileRequest->mSession;
+
+        auto disassembleFunc = (pD3DDisassemble)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Fxc_D3DDisassemble, &compileRequest->mSink);
+        if (!disassembleFunc)
+        {
+            return SLANG_E_NOT_FOUND;
         }
 
         if (!data || !size)
         {
-            return String();
+            return SLANG_FAIL;
         }
 
-        ID3DBlob* codeBlob;
-        HRESULT hr = D3DDisassemble_(
-            data,
-            size,
-            0,
-            nullptr,
-            &codeBlob);
+        ComPtr<ID3DBlob> codeBlob;
+        SlangResult res = disassembleFunc(data, size, 0, nullptr, codeBlob.writeRef());
 
         String result;
         if (codeBlob)
@@ -524,13 +497,13 @@ namespace Slang
             char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
             char const* codeEnd = codeBegin + codeBlob->GetBufferSize() - 1;
             result.append(codeBegin, codeEnd);
-            codeBlob->Release();
         }
-        if (FAILED(hr))
+        if (FAILED(res))
         {
             // TODO(tfoley): need to figure out what to diagnose here...
         }
-        return result;
+
+        return res;
     }
 
     String EmitDXBytecodeAssemblyForEntryPoint(
@@ -544,7 +517,8 @@ namespace Slang
             return String();
         }
 
-        String result = dissassembleDXBC(entryPoint->compileRequest, dxbc.Buffer(), dxbc.Count());
+        String result;
+        dissassembleDXBC(entryPoint->compileRequest, dxbc.Buffer(), dxbc.Count(), result);
 
         return result;
     }
@@ -559,50 +533,25 @@ int emitDXILForEntryPointUsingDXC(
     TargetRequest*      targetReq,
     List<uint8_t>&      outCode);
 
-String dissassembleDXILUsingDXC(
+SlangResult dissassembleDXILUsingDXC(
     CompileRequest*     compileRequest,
     void const*         data,
-    size_t              size);
+    size_t              size, 
+    String&             stringOut);
 
 #endif
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
-
-    SharedLibrary loadGLSLCompilerDLL(CompileRequest* request)
-    {
-        char const* libraryName = "slang-glslang";
-        // TODO(tfoley): let user specify version of glslang DLL to use.
-
-        SharedLibrary glslCompiler = SharedLibrary::load(libraryName);
-        if (!glslCompiler)
-        {
-            request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
-        }
-        return glslCompiler;
-    }
-
-    SharedLibrary getGLSLCompilerDLL(CompileRequest* request)
-    {
-        static SharedLibrary glslCompiler =  loadGLSLCompilerDLL(request);
-        return glslCompiler;
-    }
-
-
     int invokeGLSLCompiler(
         CompileRequest*             slangCompileRequest,
         glslang_CompileRequest&     request)
     {
+        Session* session = slangCompileRequest->mSession;
 
-        static glslang_CompileFunc glslang_compile = nullptr;
+        auto glslang_compile = (glslang_CompileFunc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile, &slangCompileRequest->mSink);
         if (!glslang_compile)
         {
-            SharedLibrary glslCompiler = getGLSLCompilerDLL(slangCompileRequest);
-            if (!glslCompiler)
-                return 1;
-
-            glslang_compile = (glslang_CompileFunc) glslCompiler.findFuncByName("glslang_compile");
-            if (!glslang_compile)
-                return 1;
+            return 1;
         }
 
         String diagnosticOutput;
@@ -769,10 +718,12 @@ String dissassembleDXILUsingDXC(
                 int err = emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code);
                 if (!err)
                 {
-                    String assembly = dissassembleDXILUsingDXC(
+                    String assembly; 
+                    dissassembleDXILUsingDXC(
                         compileRequest,
                         code.Buffer(),
-                        code.Count());
+                        code.Count(), 
+                        assembly);
 
                     maybeDumpIntermediate(compileRequest, assembly.Buffer(), target);
 
@@ -935,9 +886,10 @@ String dissassembleDXILUsingDXC(
                 #if SLANG_ENABLE_DXBC_SUPPORT
                     case CodeGenTarget::DXBytecode:
                         {
-                            String assembly = dissassembleDXBC(compileRequest,
+                            String assembly;
+                            dissassembleDXBC(compileRequest,
                                 data.begin(),
-                                data.end() - data.begin());
+                                data.end() - data.begin(), assembly);
                             writeOutputToConsole(compileRequest, assembly);
                         }
                         break;
@@ -946,9 +898,11 @@ String dissassembleDXILUsingDXC(
                 #if SLANG_ENABLE_DXIL_SUPPORT
                     case CodeGenTarget::DXIL:
                         {
-                            String assembly = dissassembleDXILUsingDXC(compileRequest,
+                            String assembly; 
+                            dissassembleDXILUsingDXC(compileRequest,
                                 data.begin(),
-                                data.end() - data.begin());
+                                data.end() - data.begin(), 
+                                assembly);
                             writeOutputToConsole(compileRequest, assembly);
                         }
                         break;
@@ -1194,7 +1148,8 @@ String dissassembleDXILUsingDXC(
         case CodeGenTarget::DXBytecode:
             dumpIntermediateBinary(compileRequest, data, size, ".dxbc");
             {
-                String dxbcAssembly = dissassembleDXBC(compileRequest, data, size);
+                String dxbcAssembly;
+                dissassembleDXBC(compileRequest, data, size, dxbcAssembly);
                 dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
             }
             break;
@@ -1208,7 +1163,8 @@ String dissassembleDXILUsingDXC(
         case CodeGenTarget::DXIL:
             dumpIntermediateBinary(compileRequest, data, size, ".dxil");
             {
-                String dxilAssembly = dissassembleDXILUsingDXC(compileRequest, data, size);
+                String dxilAssembly;
+                dissassembleDXILUsingDXC(compileRequest, data, size, dxilAssembly);
                 dumpIntermediateText(compileRequest, dxilAssembly.begin(), dxilAssembly.Length(), ".dxil.asm");
             }
             break;
