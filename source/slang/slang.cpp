@@ -1124,6 +1124,12 @@ SLANG_API void spSessionSetSharedLibraryLoader(
 {
     auto s = SESSION(session);
 
+    if (!loader)
+    {
+        // If null set the default
+        loader = Slang::DefaultSharedLibraryLoader::getSingleton();
+    }
+
     if (s->sharedLibraryLoader != loader)
     {
         // Need to clear all of the libraries
@@ -1135,15 +1141,8 @@ SLANG_API void spSessionSetSharedLibraryLoader(
         // Clear all of the functions
         ::memset(s->sharedLibraryFunctions, 0, sizeof(s->sharedLibraryFunctions));
 
-        if (loader == nullptr)
-        {
-            // Set the default shared library loader
-            s->sharedLibraryLoader = Slang::DefaultSharedLibraryLoader::getSingleton();
-        }
-        else
-        {
-            s->sharedLibraryLoader = loader;
-        }
+        // Set the loader
+        s->sharedLibraryLoader = loader;
     }
 }
 
