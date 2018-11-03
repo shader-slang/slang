@@ -27,7 +27,6 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
     
     // Try loading
     SharedLibrary lib = SharedLibrary::load(path);
-
     if (!lib.isLoaded())
     {
         return SLANG_E_NOT_FOUND;
@@ -43,6 +42,11 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
 ISlangUnknown* DefaultSharedLibrary::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangSharedLibrary) ? static_cast<ISlangSharedLibrary*>(this) : nullptr;
+}
+
+DefaultSharedLibrary::~DefaultSharedLibrary()
+{
+    m_sharedLibrary.unload();
 }
 
 bool DefaultSharedLibrary::isLoaded()

@@ -32,7 +32,7 @@ namespace Slang
         SharedLibrary():m_handle(nullptr) {}
 	
         protected:
-        Handle m_handle;
+        Handle m_handle;            ///< If null means the library is not loaded
     };
 
 #ifndef _MSC_VER

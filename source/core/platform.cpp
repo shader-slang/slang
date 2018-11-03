@@ -19,8 +19,6 @@ namespace Slang
 	SharedLibrary SharedLibrary::load(char const* name)
 	{
 		SharedLibrary result;
-		result.m_handle = nullptr;
-
 #ifdef _WIN32
 		{
 			HMODULE h = LoadLibraryA(name);
@@ -42,46 +40,31 @@ namespace Slang
 				}
 			}
 			result.m_handle = (Handle) h;
-
 		}
 #endif
-
 		return result;
 	}
 
 	void SharedLibrary::unload()
 	{
+        if (m_handle)
+        {
 #ifdef _WIN32
-		{
-			FreeLibrary(
-				(HMODULE) m_handle);
-		}
+			FreeLibrary((HMODULE) m_handle);
 #else
-		{
 			dlclose(m_handle);
-		}
 #endif
-
+            // Mark that it is unloaded
+            m_handle = nullptr;
+        }
 	}
 
 	SharedLibrary::FuncPtr SharedLibrary::findFuncByName(char const* name)
 	{
-		FuncPtr funcPtr = nullptr;
-
 #ifdef _WIN32
-		{
-			funcPtr = (FuncPtr) GetProcAddress(
-				(HMODULE) m_handle,
-				name);
-		}
+	    return (FuncPtr) GetProcAddress((HMODULE) m_handle,	name);
 #else
-		{
-			funcPtr = (FuncPtr) dlsym(
-				(void*) m_handle,
-				name);
-		}
+		return (FuncPtr) dlsym((void*) m_handle, name);
 #endif
-
-		return funcPtr;
 	}
 }

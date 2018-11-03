@@ -53,7 +53,7 @@ class DefaultSharedLibrary : public ISlangSharedLibrary
     {}
 
         /// Need virtual dtor to keep delete this happy
-    virtual ~DefaultSharedLibrary() {}
+    virtual ~DefaultSharedLibrary();
 
     protected:
     ISlangUnknown* getInterface(const Guid& guid);
