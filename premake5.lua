@@ -84,8 +84,9 @@ workspace "slang"
     configurations { "Debug", "Release" }
     platforms { "x86", "x64"}
     
-    filter { "system:linux"}
-        platforms {"aarch64"  }
+    if os.target() == "linux" then
+        platforms {"aarch64" }
+    end
     
     if buildLocation then
         location(buildLocation)

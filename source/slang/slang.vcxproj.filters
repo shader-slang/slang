@@ -126,9 +126,6 @@
     <ClInclude Include="slang-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-shared-library.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -261,9 +258,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-file-system.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-shared-library.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-stdlib.cpp">

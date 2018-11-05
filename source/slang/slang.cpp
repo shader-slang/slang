@@ -2,6 +2,7 @@
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-shared-library.h"
 
 #include "parameter-binding.h"
 #include "lower-to-ir.h"
@@ -11,7 +12,6 @@
 #include "syntax-visitors.h"
 #include "../slang/type-layout.h"
 
-#include "slang-shared-library.h"
 #include "slang-file-system.h"
 
 #include "ir-serialize.h"
