@@ -723,13 +723,6 @@ extern "C"
     struct ISlangSharedLibrary: public ISlangUnknown
     {
         public: 
-            /** Test if the library is loaded and available 
-            @return Returns true if the library is loaded */
-        virtual SLANG_NO_THROW  bool SLANG_MCALL isLoaded() = 0;
-        
-            /** Unload a shared library. If library is already unloaded does nothing */
-        virtual SLANG_NO_THROW void SLANG_MCALL unload() = 0;
-
             /** Get a function by name. If the library is unloaded will only return nullptr. 
             @param name The name of the function 
             @return The function pointer related to the name or nullptr if not found 

@@ -24,16 +24,10 @@ ISlangUnknown* DefaultSharedLibraryLoader::getInterface(const Guid& guid)
 SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISlangSharedLibrary** sharedLibraryOut)
 {
     *sharedLibraryOut = nullptr;
-    
     // Try loading
-    SharedLibrary lib = SharedLibrary::load(path);
-    if (!lib.isLoaded())
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    ComPtr<ISlangSharedLibrary> sharedLib( new DefaultSharedLibrary(lib));
-    *sharedLibraryOut = sharedLib.detach();
+    SharedLibrary::Handle handle;
+    SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
+    *sharedLibraryOut = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
     return SLANG_OK;
 }
 
@@ -46,22 +40,12 @@ ISlangUnknown* DefaultSharedLibrary::getInterface(const Guid& guid)
 
 DefaultSharedLibrary::~DefaultSharedLibrary()
 {
-    m_sharedLibrary.unload();
-}
-
-bool DefaultSharedLibrary::isLoaded()
-{
-    return m_sharedLibrary.isLoaded();
-}
-
-void DefaultSharedLibrary::unload()
-{
-    m_sharedLibrary.unload();
+    SharedLibrary::unload(m_sharedLibraryHandle);
 }
 
 SlangFuncPtr DefaultSharedLibrary::findFuncByName(char const* name)
 {
-    return m_sharedLibrary.isLoaded() ? m_sharedLibrary.findFuncByName(name) : nullptr;
+    return SharedLibrary::findFuncByName(m_sharedLibraryHandle, name); 
 }
 
 } 

@@ -6,6 +6,7 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/platform.h"
+#include "../core/common.h"
 
 namespace Slang
 {
@@ -43,14 +44,14 @@ class DefaultSharedLibrary : public ISlangSharedLibrary
     SLANG_IUNKNOWN_ALL
 
     // ISlangSharedLibrary
-    virtual SLANG_NO_THROW  bool SLANG_MCALL isLoaded() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL unload() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangFuncPtr SLANG_MCALL findFuncByName(char const* name) SLANG_OVERRIDE;
 
         /// Ctor.
-    DefaultSharedLibrary(const SharedLibrary& lib):
-        m_sharedLibrary(lib)
-    {}
+    DefaultSharedLibrary(const SharedLibrary::Handle sharedLibraryHandle):
+        m_sharedLibraryHandle(sharedLibraryHandle)
+    {
+        SLANG_ASSERT(sharedLibraryHandle);
+    }
 
         /// Need virtual dtor to keep delete this happy
     virtual ~DefaultSharedLibrary();
@@ -58,8 +59,8 @@ class DefaultSharedLibrary : public ISlangSharedLibrary
     protected:
     ISlangUnknown* getInterface(const Guid& guid);
 
-    SharedLibrary m_sharedLibrary;
-    int32_t m_refCount;
+    SharedLibrary::Handle m_sharedLibraryHandle = nullptr;
+    int32_t m_refCount = 0;
 };
 
 }
