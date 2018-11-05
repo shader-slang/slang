@@ -82,8 +82,11 @@ targetName = "%{cfg.system}-%{cfg.platform:lower()}"
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
     configurations { "Debug", "Release" }
-    platforms { "x86", "x64", "aarch64" }
-
+    platforms { "x86", "x64"}
+    
+    filter { "system:linux"}
+        platforms {"aarch64"  }
+    
     if buildLocation then
         location(buildLocation)
     end
@@ -107,7 +110,7 @@ workspace "slang"
         architecture "x64"
     filter { "platforms:x86" }
         architecture "x86"
-    filter { "platforms:aarch64" }
+    filter { "platforms:aarch64"}
         architecture "ARM"
 
     filter { "toolset:clang or gcc*" }
