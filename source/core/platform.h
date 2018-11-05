@@ -27,16 +27,16 @@ namespace Slang
             ///
             /// @param platformFileName the platform specific file name. 
             /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
-		static SlangResult loadWithPlatformFilename(char const* platformFileName, Handle& handleOut);
+        static SlangResult loadWithPlatformFilename(char const* platformFileName, Handle& handleOut);
 
             /// Unload the library that was returned from load as handle
             /// @param The valid handle returned from load 
-		static void unload(Handle handle);
+        static void unload(Handle handle);
 
             /// Given a shared library handle and a name, return the associated function
             /// Return nullptr if function is not found
             /// @param The shared library handle as returned by loadPlatformLibrary
-		static FuncPtr findFuncByName(Handle handle, char const* name);
+        static FuncPtr findFuncByName(Handle handle, char const* name);
 
             /// Append to the end of dst, the name, with any platform specific additions
             /// The input name should be unadorned with any 'lib' prefix or extension
