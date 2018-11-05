@@ -1,5 +1,5 @@
-﻿#ifndef RASTER_SHADER_COMPILER_H
-#define RASTER_SHADER_COMPILER_H
+﻿#ifndef SLANG_COMPILER_H_INCLUDED
+#define SLANG_COMPILER_H_INCLUDED
 
 #include "../core/basic.h"
 #include "../core/slang-shared-library.h"
