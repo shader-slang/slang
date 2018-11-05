@@ -136,6 +136,18 @@ For completeness, here are the options that `slangc` currently accepts:
 
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
 
+### Specifying where dlls/shared libraries are loaded from
+
+On windows if you want a dll loaded from a specific path, the path must be specified absolutely. See the *'LoadLibrary'* documentation for more details. A relative path will cause Windows to check all locations along it's search procedure.
+
+On linux it's similar, but any path (relative or not) will override the regular search mechanism. See *'dlopen'* for more details. 
+
+* `-dxc-path`: Sets the path where dxc dlls are loaded from (dxcompiler.dll & dxil).
+
+* `-fxc-path`: Sets the path where fxc dll is loaded from (d3dcompiler_47.dll). 
+
+* `-glslang-path`: Sets where the slang specific 'slang-glslang' is loaded from
+
 Limitations
 -----------
 
