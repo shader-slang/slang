@@ -105,6 +105,29 @@ SLANG_NO_THROW uint32_t SLANG_MCALL release() \
     SLANG_IUNKNOWN_ADD_REF \
     SLANG_IUNKNOWN_RELEASE 
 
+// ------------------------ RefObject IUnknown -----------------------------
+
+#define SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE \
+SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) \
+{ \
+    ISlangUnknown* intf = getInterface(uuid); \
+    if (intf) \
+    { \
+        addReference(); \
+        *outObject = intf; \
+        return SLANG_OK;\
+    } \
+    return SLANG_E_NO_INTERFACE;\
+}
+
+#define SLANG_REF_OBJECT_IUNKNOWN_ADD_REF SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return (uint32_t)addReference(); }
+#define SLANG_REF_OBJECT_IUNKNOWN_RELEASE SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (uint32_t)releaseReference(); }
+
+#define SLANG_REF_OBJECT_IUNKNOWN_ALL \
+    SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE \
+    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF \
+    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
+
 #endif // defined(__cplusplus)
 
 #endif

@@ -316,17 +316,11 @@ static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
 
 /** Base class for simple blobs.
 */
-class BlobBase : public ISlangBlob
+class BlobBase : public ISlangBlob, public RefObject
 {
 public:
-    uint32_t m_refCount = 0;
-
     // ISlangUnknown
-    SLANG_IUNKNOWN_ALL
-
-        /// Need virtual dtor, because BlobBase is derived from and release impl used is the one in the base class (that doesn't know the derived type)
-        /// Alternatively could be implemented by always using SLANG_IUNKNOWN_RELEASE in derived types - this would make derived types slightly smaller/faster
-    virtual ~BlobBase() {}
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
 protected:
     SLANG_FORCE_INLINE ISlangUnknown* getInterface(const Guid& guid)

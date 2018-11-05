@@ -64,7 +64,7 @@ doing it this way means it works as before and requires no new functions.
 
 You can use a more sophisticated canonical style if you pass true to  useSimplifyForCanonicalPath. This will simplify relative path to create a canonical path.
 */
-class CacheFileSystem: public ISlangFileSystemExt
+class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 {
     public:
 
@@ -80,7 +80,7 @@ class CacheFileSystem: public ISlangFileSystemExt
     };
 
     // ISlangUnknown 
-    SLANG_IUNKNOWN_ALL
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
@@ -153,7 +153,6 @@ protected:
 
     ComPtr<ISlangFileSystem> m_fileSystem;          ///< Must always be set
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;    ///< Optionally set -> if not will fall back on the m_fileSystem
-    uint32_t m_refCount = 0;
 };
 
 }

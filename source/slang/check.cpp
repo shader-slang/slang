@@ -274,30 +274,18 @@ namespace Slang
         typeCheckingCache = nullptr;
     }
 
-    static const char* _getSharedLibraryName(Session::SharedLibraryType type)
-    {
-        typedef Session::SharedLibraryType LibType;
-        switch (type)
-        {
-            case LibType::Dxc:        return "dxcompiler";
-            case LibType::Fxc:        return "d3dcompiler_47";
-            case LibType::Glslang:    return "slang-glslang";
-            default: return nullptr;
-        }
-    }
-
     namespace { // anonymous
     struct FunctionInfo
     {
         const char* name;
-        Session::SharedLibraryType libraryType;
+        SharedLibraryType libraryType;
     };
     } // anonymous
 
     static FunctionInfo _getFunctionInfo(Session::SharedLibraryFuncType funcType)
     {
         typedef Session::SharedLibraryFuncType FuncType;
-        typedef Session::SharedLibraryType LibType;
+        typedef SharedLibraryType LibType;
 
         switch (funcType)
         {
@@ -314,7 +302,13 @@ namespace Slang
         // If not loaded, try loading it
         if (!sharedLibraries[int(type)])
         {
-            const char* libName = _getSharedLibraryName(type);
+            // Try to preload dxil first, if loading dxc
+            if (type == SharedLibraryType::Dxc)
+            {
+                getOrLoadSharedLibrary(SharedLibraryType::Dxil, sink);
+            }
+
+            const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
             if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
             {
                 sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
@@ -347,8 +341,7 @@ namespace Slang
         SlangFuncPtr func = sharedLib->findFuncByName(info.name);
         if (!func)
         {
-            const char* libName = _getSharedLibraryName(info.libraryType);
-
+            const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(info.libraryType);
             sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionInSharedLibrary, info.name, libName);
             return nullptr;
         }

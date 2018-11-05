@@ -37,6 +37,7 @@ namespace Slang
         const DWORD lastError = GetLastError();
         switch (lastError)
         {
+            case ERROR_MOD_NOT_FOUND:
             case ERROR_PATH_NOT_FOUND:
             case ERROR_FILE_NOT_FOUND:  
             {

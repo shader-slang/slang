@@ -2,6 +2,8 @@
 #define RASTER_SHADER_COMPILER_H
 
 #include "../core/basic.h"
+#include "../core/slang-shared-library.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "diagnostics.h"
@@ -77,7 +79,7 @@ namespace Slang
 
     // When storing the layout for a matrix-type
     // value, we need to know whether it has been
-    // laid ot with row-major or column-major
+    // laid out with row-major or column-major
     // storage.
     //
     enum MatrixLayoutMode
@@ -503,16 +505,6 @@ namespace Slang
     class Session
     {
     public:
-
-        enum class SharedLibraryType
-        {
-            Unknown,
-            Dxc,
-            Fxc,
-            Glslang,
-            CountOf,
-        };
-
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,
