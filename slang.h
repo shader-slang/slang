@@ -431,13 +431,13 @@ extern "C"
         SLANG_COMPILE_FLAG_NO_MANGLING          = 1 << 3,
 
         /* Skip code generation step, just check the code and generate layout */
-        SLANG_COMPILE_FLAG_NO_CODEGEN                = 1 << 4,
+        SLANG_COMPILE_FLAG_NO_CODEGEN           = 1 << 4,
 
         /* Deprecated flags: kept around to allow existing applications to
         compile. Note that the relevant features will still be left in
         their default state. */
-        SLANG_COMPILE_FLAG_NO_CHECKING = 0,
-        SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES = 0,
+        SLANG_COMPILE_FLAG_NO_CHECKING          = 0,
+        SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES    = 0,
     };
 
     /*!
@@ -517,6 +517,7 @@ extern "C"
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    
     /** A result code for a Slang API operation.
 
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
@@ -713,6 +714,32 @@ extern "C"
     };
     #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
 
+
+    typedef void(*SlangFuncPtr)(void);
+
+    /** An interface that can be used to encapsulate access to a shared library. An implementaion 
+    does not have to implement the library as a shared library. 
+    */
+    struct ISlangSharedLibrary: public ISlangUnknown
+    {
+        public: 
+            /** Get a function by name. If the library is unloaded will only return nullptr. 
+            @param name The name of the function 
+            @return The function pointer related to the name or nullptr if not found 
+            */
+        virtual SLANG_NO_THROW SlangFuncPtr SLANG_MCALL findFuncByName(char const* name) = 0;
+    };
+    #define SLANG_UUID_ISlangSharedLibrary { 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 } };
+
+    struct ISlangSharedLibraryLoader: public ISlangUnknown
+    {
+        public:
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(
+            const char*     path,
+            ISlangSharedLibrary** sharedLibraryOut) = 0;
+    };
+    #define SLANG_UUID_ISlangSharedLibraryLoader { 0x6264ab2b, 0xa3e8, 0x4a06,{ 0x97, 0xf1, 0x49, 0xbc, 0x2d, 0x2a, 0xb1, 0x4d } };
+    
     /* Type that identifies how a path should be interpreted */
     typedef unsigned int SlangPathType;
     enum
@@ -801,6 +828,22 @@ extern "C"
     SLANG_API void spDestroySession(
         SlangSession*   session);
 
+    /*!
+    @brief Set the session shared library loader. If this changes the loader, it may cause shared libraries to be unloaded
+    @param session Session to set the loader on
+    @param loader The loader to set. Setting nullptr sets the default loader. 
+    */
+    SLANG_API void spSessionSetSharedLibraryLoader(
+        SlangSession*               session,
+        ISlangSharedLibraryLoader*  loader);
+
+    /*!
+    @brief Gets the currently set shared library loader
+    @param session Session to get the loader from
+    @return Gets the currently set loader. If returns nullptr, it's the default loader
+    */
+    SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
+        SlangSession*   session);
 
     /*!
     @brief Add new builtin declarations to be used in subsequent compiles.

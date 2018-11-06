@@ -13,11 +13,11 @@ namespace Slang {
 
 /** A blob that uses a `String` for its storage.
 */
-class StringBlob : public ISlangBlob
+class StringBlob : public ISlangBlob, public RefObject
 {
 public:
     // ISlangUnknown
-    SLANG_IUNKNOWN_ALL
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
         // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.Buffer(); }
@@ -30,15 +30,9 @@ public:
         : m_string(string)
     {}
 
-    /// Need virtual dtor, because BlobBase is derived from and release impl used is the one in the base class (that doesn't know the derived type)
-    /// Alternatively could be implemented by always using SLANG_IUNKNOWN_RELEASE in derived types - this would make derived types slightly smaller/faster
-    virtual ~StringBlob() {}
-
 protected:
     ISlangUnknown* getInterface(const Guid& guid);
-
     String m_string;
-    uint32_t m_refCount = 0;
 };
 
 struct StringUtil
@@ -62,7 +56,6 @@ struct StringUtil
 
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
-
 };
 
 } // namespace Slang

@@ -32,23 +32,25 @@ namespace Slang
         virtual ~RefObject()
         {}
 
-        void addReference()
+        UInt addReference()
         {
-            referenceCount++;
+            return ++referenceCount;
         }
 
-        void decreaseReference()
+        UInt decreaseReference()
         {
-            --referenceCount;
+            return --referenceCount;
         }
 
-        void releaseReference()
+        UInt releaseReference()
         {
             SLANG_ASSERT(referenceCount != 0);
             if(--referenceCount == 0)
             {
                 delete this;
+                return 0;
             }
+            return referenceCount;
         }
 
         bool isUniquelyReferenced()

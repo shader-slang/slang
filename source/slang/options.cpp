@@ -43,6 +43,8 @@ struct OptionsParser
 
     Slang::CompileRequest*  requestImpl = nullptr;
 
+    Slang::RefPtr<Slang::ConfigurableSharedLibraryLoader> sharedLibraryLoader;
+    
     // A "translation unit" represents one or more source files
     // that are processed as a single entity when it comes to
     // semantic checking.
@@ -157,6 +159,15 @@ struct OptionsParser
     List<RawTarget> rawTargets;
 
     RawTarget defaultTarget;
+
+    void addSharedLibraryPath(SharedLibraryType libType, const String& path)
+    {
+        if (!sharedLibraryLoader)
+        {
+            sharedLibraryLoader = new ConfigurableSharedLibraryLoader;
+        }
+        sharedLibraryLoader->addEntry(libType, ConfigurableSharedLibraryLoader::changePath, path);
+    }
 
     int addTranslationUnit(
         SlangSourceLanguage language,
@@ -565,6 +576,25 @@ struct OptionsParser
                     spSetPassThrough(
                         compileRequest,
                         passThrough);
+                }
+                else if (argStr == "-dxc-path")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    addSharedLibraryPath(SharedLibraryType::Dxc, name);
+                    addSharedLibraryPath(SharedLibraryType::Dxil, name);
+                }
+                else if (argStr == "-glslang-path")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    addSharedLibraryPath(SharedLibraryType::Glslang, name);
+                }
+                else if (argStr == "-fxc-path")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    addSharedLibraryPath(SharedLibraryType::Fxc, name);
                 }
                 else if (argStr[1] == 'D')
                 {
@@ -1221,6 +1251,11 @@ struct OptionsParser
             }
         }
 
+        if (sharedLibraryLoader)
+        {
+            spSessionSetSharedLibraryLoader(session, sharedLibraryLoader);
+        }
+        
         return (sink->GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
@@ -1236,6 +1271,7 @@ SlangResult parseOptions(
     OptionsParser parser;
     parser.compileRequest = compileRequestIn;
     parser.requestImpl = compileRequest;
+    parser.session = (SlangSession*)compileRequest->mSession;
 
     Result res = parser.parse(argc, argv);
 

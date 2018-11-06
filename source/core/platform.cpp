@@ -1,6 +1,8 @@
 // platform.cpp
 #include "platform.h"
 
+#include "common.h"
+
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
 	#define NOMINMAX
@@ -16,72 +18,102 @@ namespace Slang
 {
 	// SharedLibrary
 
-	SharedLibrary SharedLibrary::load(char const* name)
-	{
-		SharedLibrary result;
-		result.handle = nullptr;
+/* static */SlangResult SharedLibrary::load(const char* filename, SharedLibrary::Handle& handleOut)
+{
+    StringBuilder builder;
+    appendPlatformFileName(UnownedStringSlice(filename), builder);
+    return loadWithPlatformFilename(builder.begin(), handleOut);
+}
 
 #ifdef _WIN32
-		{
-			HMODULE h = LoadLibraryA(name);
-			result.handle = (Handle) h;			
-		}
-#else
-		{
-			String fullName;
-			fullName.append("lib");
-			fullName.append(name);
-			fullName.append(".so");
 
-			void* h = dlopen(fullName.Buffer(), RTLD_NOW|RTLD_LOCAL);
-			if(!h)
-			{
-				if(auto msg = dlerror())
-				{
-					fprintf(stderr, "error: %s\n", msg);
-				}
-			}
-			result.handle = (Handle) h;
+/* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, SharedLibrary::Handle& handleOut)
+{
+    handleOut = nullptr;
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
+    const HMODULE h = LoadLibraryA(platformFileName);
+    if (!h)
+    {
+        const DWORD lastError = GetLastError();
+        switch (lastError)
+        {
+            case ERROR_MOD_NOT_FOUND:
+            case ERROR_PATH_NOT_FOUND:
+            case ERROR_FILE_NOT_FOUND:  
+            {
+                return SLANG_E_NOT_FOUND;
+            }
+            case ERROR_INVALID_ACCESS:
+            case ERROR_ACCESS_DENIED: 
+            case ERROR_INVALID_DATA:
+            {
+                return SLANG_E_CANNOT_OPEN;
+            }
+            default: break;
+        }
+        // Turn to Result, if not one of the well known errors
+        return HRESULT_FROM_WIN32(lastError);
+    }
+    handleOut = (Handle)h;
+    return SLANG_OK;
+}
 
-		}
-#endif
+/* static */void SharedLibrary::unload(Handle handle)
+{
+    SLANG_ASSERT(handle);
+    ::FreeLibrary((HMODULE)handle);
+}
 
-		return result;
-	}
+/* static */SharedLibrary::FuncPtr SharedLibrary::findFuncByName(Handle handle, char const* name)
+{
+    SLANG_ASSERT(handle);
+    return (FuncPtr)GetProcAddress((HMODULE)handle, name);
+}
 
-	void SharedLibrary::unload()
+/* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
+{
+    // Windows doesn't need the extension or any prefix to work
+    dst.Append(name);
+}
+
+#else // _WIN32
+
+/* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, Handle& handleOut)
+{
+    handleOut = nullptr;
+
+	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_LOCAL);
+	if(!h)
 	{
-#ifdef _WIN32
+		if(auto msg = dlerror())
 		{
-			FreeLibrary(
-				(HMODULE) handle);
+			fprintf(stderr, "error: %s\n", msg);
 		}
-#else
-		{
-			dlclose(handle);
-		}
-#endif
-
+        return SLANG_FAIL;
 	}
+    handleOut = (Handle)h;
+    return SLANG_OK;
+}
 
-	SharedLibrary::FuncPtr SharedLibrary::findFuncByName(char const* name)
-	{
-		FuncPtr funcPtr = nullptr;
+/* static */void SharedLibrary::unload(Handle handle)
+{    
+    SLANG_ASSERT(handle);
+	dlclose(handle);
+}
 
-#ifdef _WIN32
-		{
-			funcPtr = (FuncPtr) GetProcAddress(
-				(HMODULE) handle,
-				name);
-		}
-#else
-		{
-			funcPtr = (FuncPtr) dlsym(
-				(void*) handle,
-				name);
-		}
-#endif
+/* static */SharedLibrary::FuncPtr SharedLibrary::findFuncByName(Handle handle, char const* name)
+{
+    SLANG_ASSERT(handle);
+	return (FuncPtr)dlsym((void*)handle, name);
+}
 
-		return funcPtr;
-	}
+/* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
+{
+    dst.Append("lib");
+    dst.Append(name);
+    dst.Append(".so");
+}
+
+#endif // _WIN32
+
 }

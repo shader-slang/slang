@@ -2,6 +2,7 @@
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-shared-library.h"
 
 #include "parameter-binding.h"
 #include "lower-to-ir.h"
@@ -28,10 +29,15 @@
 
 namespace Slang {
 
+
 Session::Session()
 {
     // Initialize name pool
     getNamePool()->setRootNamePool(getRootNamePool());
+
+    sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+    // Set all the shared library function pointers to nullptr
+    ::memset(sharedLibraryFunctions, 0, sizeof(sharedLibraryFunctions));
 
     // Initialize the lookup table of syntax classes:
 
@@ -310,17 +316,11 @@ static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
 
 /** Base class for simple blobs.
 */
-class BlobBase : public ISlangBlob
+class BlobBase : public ISlangBlob, public RefObject
 {
 public:
-    uint32_t m_refCount = 0;
-
     // ISlangUnknown
-    SLANG_IUNKNOWN_ALL
-
-        /// Need virtual dtor, because BlobBase is derived from and release impl used is the one in the base class (that doesn't know the derived type)
-        /// Alternatively could be implemented by always using SLANG_IUNKNOWN_RELEASE in derived types - this would make derived types slightly smaller/faster
-    virtual ~BlobBase() {}
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
 protected:
     SLANG_FORCE_INLINE ISlangUnknown* getInterface(const Guid& guid)
@@ -1112,6 +1112,40 @@ SLANG_API void spAddBuiltins(
         sourceString);
 }
 
+SLANG_API void spSessionSetSharedLibraryLoader(
+    SlangSession*               session,
+    ISlangSharedLibraryLoader* loader)
+{
+    auto s = SESSION(session);
+
+    if (!loader)
+    {
+        // If null set the default
+        loader = Slang::DefaultSharedLibraryLoader::getSingleton();
+    }
+
+    if (s->sharedLibraryLoader != loader)
+    {
+        // Need to clear all of the libraries
+        for (int i = 0; i < SLANG_COUNT_OF(s->sharedLibraries); ++i)
+        {
+            s->sharedLibraries[i].setNull();
+        }
+
+        // Clear all of the functions
+        ::memset(s->sharedLibraryFunctions, 0, sizeof(s->sharedLibraryFunctions));
+
+        // Set the loader
+        s->sharedLibraryLoader = loader;
+    }
+}
+
+SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
+    SlangSession*               session)
+{
+    auto s = SESSION(session);
+    return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
+}
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)

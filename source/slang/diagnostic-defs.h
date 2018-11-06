@@ -96,6 +96,8 @@ DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified 
 DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
 DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
 
+DIAGNOSTIC(    62, Error, failedToFindFunctionInSharedLibrary, "failed to find function '$0' in shared/dynamic library '$1'")
+
 DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
 
 DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple output paths have been specified entry point '$0' on target '$1'")

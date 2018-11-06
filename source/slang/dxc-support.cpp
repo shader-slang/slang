@@ -33,47 +33,23 @@ namespace Slang
         EntryPointRequest*  entryPoint,
         TargetRequest*      targetReq);
 
-    SharedLibrary loadDXCSharedLibrary(CompileRequest* request)
-    {
-        // TODO(tfoley): Let user specify name/path of library to use.
-        char const* libraryName = "dxcompiler";
-
-        SharedLibrary library = SharedLibrary::load(libraryName);
-        if (!library)
-        {
-            request->mSink.diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libraryName);
-        }
-        return library;
-    }
-
-    SharedLibrary getDXCSharedLibrary(CompileRequest* request)
-    {
-        static SharedLibrary library =  loadDXCSharedLibrary(request);
-        return library;
-    }
-
     int emitDXILForEntryPointUsingDXC(
         EntryPointRequest*  entryPoint,
         TargetRequest*      targetReq,
         List<uint8_t>&      outCode)
     {
         auto compileRequest = entryPoint->compileRequest;
+        auto session = compileRequest->mSession;
 
         // First deal with all the rigamarole of loading
         // the `dxcompiler` library, and creating the
         // top-level COM objects that will be used to
         // compile things.
 
-        static DxcCreateInstanceProc dxcCreateInstance = nullptr;
+        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, &compileRequest->mSink);
         if (!dxcCreateInstance)
         {
-            auto dxcSharedLibrary = getDXCSharedLibrary(compileRequest);
-            if (!dxcSharedLibrary)
-                return 1;
-
-            dxcCreateInstance = (DxcCreateInstanceProc) dxcSharedLibrary.findFuncByName("DxcCreateInstance");
-            if (!dxcCreateInstance)
-                return 1;
+            return 1;
         }
 
         IDxcCompiler* dxcCompiler = nullptr;
@@ -262,75 +238,45 @@ namespace Slang
         return 0;
     }
 
-    String dissassembleDXILUsingDXC(
+    SlangResult dissassembleDXILUsingDXC(
         CompileRequest*     compileRequest,
         void const*         data,
-        size_t              size)
+        size_t              size,
+        String&             stringOut)
     {
+        stringOut = String();
+        auto session = compileRequest->mSession;
+
         // First deal with all the rigamarole of loading
         // the `dxcompiler` library, and creating the
         // top-level COM objects that will be used to
         // compile things.
 
-        static DxcCreateInstanceProc dxcCreateInstance = nullptr;
+        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, &compileRequest->mSink);
         if (!dxcCreateInstance)
         {
-            auto dxcSharedLibrary = getDXCSharedLibrary(compileRequest);
-            if (!dxcSharedLibrary)
-                return 1;
-
-            dxcCreateInstance = (DxcCreateInstanceProc) dxcSharedLibrary.findFuncByName("DxcCreateInstance");
-            if (!dxcCreateInstance)
-                return 1;
+            return SLANG_FAIL;
         }
 
-        IDxcCompiler* dxcCompiler = nullptr;
-        if (FAILED(dxcCreateInstance(
-            CLSID_DxcCompiler,
-            __uuidof(dxcCompiler),
-            (LPVOID*) &dxcCompiler)))
-        {
-            return 1;
-        }
-
-        IDxcLibrary* dxcLibrary = nullptr;
-        if (FAILED(dxcCreateInstance(
-            CLSID_DxcLibrary,
-            __uuidof(dxcLibrary),
-            (LPVOID*) &dxcLibrary)))
-        {
-            return 1;
-        }
-
+        ComPtr<IDxcCompiler> dxcCompiler;
+        SLANG_RETURN_ON_FAIL(dxcCreateInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*) dxcCompiler.writeRef()));
+        ComPtr<IDxcLibrary> dxcLibrary;
+        SLANG_RETURN_ON_FAIL(dxcCreateInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*) dxcLibrary.writeRef()));
+        
         // Create blob from the input data
-        IDxcBlobEncoding* dxcSourceBlob = nullptr;
-        if (FAILED(dxcLibrary->CreateBlobWithEncodingFromPinned(
-            (LPBYTE) data,
-            (UINT32) size,
-            0,
-            &dxcSourceBlob)))
-        {
-            return 1;
-        }
+        ComPtr<IDxcBlobEncoding> dxcSourceBlob;
+        SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE) data, (UINT32) size, 0, dxcSourceBlob.writeRef()));
 
-        IDxcBlobEncoding* dxcResultBlob = nullptr;
-        if(FAILED(dxcCompiler->Disassemble(
-            dxcSourceBlob,
-            &dxcResultBlob)))
-        {
-            return 1;
-        }
+        ComPtr<IDxcBlobEncoding> dxcResultBlob;
+        SLANG_RETURN_ON_FAIL(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef()));
 
         String result;
         char const* codeBegin = (char const*)dxcResultBlob->GetBufferPointer();
         char const* codeEnd = codeBegin + dxcResultBlob->GetBufferSize() - 1;
         result.append(codeBegin, codeEnd);
+        stringOut = result;
 
-        if(dxcResultBlob)   dxcResultBlob   ->Release();
-        if(dxcLibrary)      dxcLibrary      ->Release();
-        if(dxcCompiler)     dxcCompiler     ->Release();
-
-        return result;
+        return SLANG_OK;
     }
 
 

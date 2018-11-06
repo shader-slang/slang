@@ -2,30 +2,50 @@
 #ifndef SLANG_CORE_PLATFORM_H_INCLUDED
 #define SLANG_CORE_PLATFORM_H_INCLUDED
 
+#include "../../slang.h"
+#include "../core/slang-string.h"
+
 namespace Slang
 {
 	// Interface for working with shared libraries
-	// in a platfomr-independent fashion.
+	// in a platform-independent fashion.
 	struct SharedLibrary
 	{
 		typedef struct SharedLibraryImpl* Handle;
-		Handle handle;
+        
+        typedef void(*FuncPtr)(void);
 
-		// Attempt to load a shared library for
-		// the current platform.
-		static SharedLibrary load(char const* name);
+            /// Load via an unadorned filename
+            /// 
+            /// @param the unadorned filename
+            /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
+        static SlangResult load(const char* filename, Handle& handleOut);
 
-		// If this refers to a valid loaded library,
-		// then attempt to unload it
-		void unload();
+		    /// Attempt to load a shared library for
+		    /// the current platform. Returns null handle on failure
+            /// The platform specific filename can be generated from a call to appendPlatformFileName
+            ///
+            /// @param platformFileName the platform specific file name. 
+            /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
+        static SlangResult loadWithPlatformFilename(char const* platformFileName, Handle& handleOut);
 
-		typedef void (*FuncPtr)(void);
+            /// Unload the library that was returned from load as handle
+            /// @param The valid handle returned from load 
+        static void unload(Handle handle);
 
-		FuncPtr findFuncByName(char const* name);
+            /// Given a shared library handle and a name, return the associated function
+            /// Return nullptr if function is not found
+            /// @param The shared library handle as returned by loadPlatformLibrary
+        static FuncPtr findFuncByName(Handle handle, char const* name);
 
+            /// Append to the end of dst, the name, with any platform specific additions
+            /// The input name should be unadorned with any 'lib' prefix or extension
+        static void appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst);
 
-		operator Handle() { return handle; }
-	};
+        private:
+            /// Not constructible!
+        SharedLibrary();
+    };
 
 #ifndef _MSC_VER
 	#define _fileno fileno

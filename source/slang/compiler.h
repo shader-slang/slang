@@ -1,7 +1,9 @@
-﻿#ifndef RASTER_SHADER_COMPILER_H
-#define RASTER_SHADER_COMPILER_H
+﻿#ifndef SLANG_COMPILER_H_INCLUDED
+#define SLANG_COMPILER_H_INCLUDED
 
 #include "../core/basic.h"
+#include "../core/slang-shared-library.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "diagnostics.h"
@@ -77,7 +79,7 @@ namespace Slang
 
     // When storing the layout for a matrix-type
     // value, we need to know whether it has been
-    // laid ot with row-major or column-major
+    // laid out with row-major or column-major
     // storage.
     //
     enum MatrixLayoutMode
@@ -503,6 +505,15 @@ namespace Slang
     class Session
     {
     public:
+        enum class SharedLibraryFuncType
+        {
+            Glslang_Compile,
+            Fxc_D3DCompile,
+            Fxc_D3DDisassemble,
+            Dxc_DxcCreateInstance,
+            CountOf,
+        };
+
         //
 
         RefPtr<Scope>   baseLanguageScope;
@@ -543,6 +554,10 @@ namespace Slang
         RefPtr<Type> overloadedType;
         RefPtr<Type> constExprRate;
         RefPtr<Type> irBasicBlockType;
+
+        ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
+        ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
+        SlangFuncPtr sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)];
 
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
@@ -601,6 +616,14 @@ namespace Slang
         TypeCheckingCache* getTypeCheckingCache();
         void destroyTypeCheckingCache();
         //
+
+            /// Will try to load the library by specified name (using the set loader), if not one already available.
+        ISlangSharedLibrary* getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink);
+
+            /// Gets a shared library by type, or null if not loaded
+        ISlangSharedLibrary* getSharedLibrary(SharedLibraryType type) const { return sharedLibraries[int(type)]; }
+
+        SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
 
         Session();
 
