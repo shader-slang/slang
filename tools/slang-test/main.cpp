@@ -222,6 +222,10 @@ Result parseOptions(int* argc, char** argv)
         {
             g_options.outputMode = TestOutputMode::XUnit2;
         }
+        else if (strcmp(arg, "-teamcity") == 0)
+        {
+            g_options.outputMode = TestOutputMode::TeamCity;
+        }
         else if( strcmp(arg, "-category") == 0 )
         {
             if( argCursor == argEnd )
@@ -1670,7 +1674,7 @@ TestResult runTest(
         testInput.testList = &testList;
 
         {
-            TestContext::Scope scope(context, outputStem);
+            TestContext::TestScope scope(context, outputStem);
 
             TestResult testResult = ii->callback(context, testInput);
             context->addResult(testResult); 
@@ -1957,18 +1961,21 @@ int main(
 
     // Setup the context 
     TestContext context(g_options.outputMode);
-   
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
     context.m_isVerbose = g_options.shouldBeVerbose;
- 
-    // Enumerate test files according to policy
-    // TODO: add more directories to this list
-    // TODO: allow for a command-line argument to select a particular directory
-    runTestsInDirectory(&context, "tests/");
-    
+
+    { 
+        TestContext::SuiteScope suiteScope(&context, "tests");
+        // Enumerate test files according to policy
+        // TODO: add more directories to this list
+        // TODO: allow for a command-line argument to select a particular directory
+        runTestsInDirectory(&context, "tests/");
+    }
+
     // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
     // They are registered with SLANG_UNIT_TEST macro
     {
+        TestContext::SuiteScope suiteScope(&context, "unit tests");
         TestContext::set(&context);
 
         // Run the unit tests
@@ -2003,7 +2010,6 @@ int main(
 
         TestContext::set(nullptr);
     }
-        
 
     context.outputSummary();
 

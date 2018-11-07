@@ -99,7 +99,10 @@ bool TestContext::canWriteStdError() const
 
 void TestContext::startTest(const String& testName)
 {
+    // Must be in a suite
+    assert(m_suiteStack.Count());
     assert(!m_inTest);
+
     m_inTest = true;
 
     m_numCurrentResults = 0;
@@ -112,6 +115,7 @@ void TestContext::startTest(const String& testName)
 
 void TestContext::endTest()
 {
+    assert(m_suiteStack.Count());
     assert(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
@@ -196,6 +200,51 @@ void TestContext::dumpOutputDifference(const String& expectedOutput, const Strin
     message(TestMessageType::TestFailure, builder);
 }
 
+static char _getTeamCityEscapeChar(char c)
+{
+    switch (c)
+    {
+        case '|':   return '|';
+        case '\'':  return '\''; 
+        case '\n':  return 'n';
+        case '\r':  return 'r'; 
+        case '[':   return '[';
+        case ']':   return ']';
+        default:    return 0;
+    }
+}
+
+static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBuilder& builder)
+{
+    const char* start = in.begin();
+    const char* cur = start;
+    const char* end = in.end();
+    
+    for (const char* cur = start; cur < end; cur++)
+    {
+        const char c = *cur;
+        const char escapeChar = _getTeamCityEscapeChar(c);
+        if (escapeChar)
+        {
+            // Flush
+            if (cur > start)
+            {
+                builder.Append(start, UInt(cur - start));
+            }
+
+            builder.Append('|');
+            builder.Append(escapeChar);
+            start = cur + 1;
+        }
+    }    
+
+    // Flush the end
+    if (end > start)
+    {
+        builder.Append(start, UInt(end - start));
+    }
+}
+
 void TestContext::_addResult(const TestInfo& info)
 {
     m_totalTestCount++;
@@ -237,6 +286,63 @@ void TestContext::_addResult(const TestInfo& info)
                     break;
             }
             printf("%s test: '%S'\n", resultString, info.name.ToWString().begin());
+            break;
+        }
+        case TestOutputMode::TeamCity:
+        {
+            StringBuilder escapedTestName;
+            _appendEncodedTeamCityString(info.name.getUnownedSlice(), escapedTestName);
+
+            printf("##teamcity[testStarted name='%s']\n", escapedTestName.begin());
+             
+            switch (info.testResult)
+            {
+                case TestResult::Fail:      
+                {
+                    if (info.message.Length())
+                    {
+                        StringBuilder escapedMessage;
+                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);            
+                        printf("##teamcity[testFailed name='%s' message='%s']\n", escapedTestName.begin(), escapedMessage.begin());
+                    }
+                    else
+                    {
+                        printf("##teamcity[testFailed name='%s']\n", escapedTestName.begin());
+                    }
+                    break;
+                }
+                case TestResult::Pass:     
+                {
+                    if (info.message.Length())
+                    {
+                        StringBuilder escapedMessage;
+                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
+                        printf("##teamcity[testStdOut name='%s' out='%s']\n", escapedTestName.begin(), escapedMessage.begin());
+                    }
+                    break;
+                }
+                case TestResult::Ignored:  
+                {
+                    if (info.message.Length())
+                    {
+                        StringBuilder escapedMessage;
+                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
+
+                        printf("##teamcity[testIgnored name='%s' message='%s']\n", escapedTestName.begin(), escapedMessage.begin());
+                    }
+                    else
+                    {
+                        printf("##teamcity[testIgnored name='%s']\n", escapedTestName.begin());
+                    }
+                    break;
+                }
+                default:
+                    assert(!"unexpected");
+                    break;
+            }
+
+            printf("##teamcity[testFinished name='%s']\n", escapedTestName.begin());
+            fflush(stdout);
             break;
         }
         case TestOutputMode::XUnit2:
@@ -397,6 +503,7 @@ void TestContext::outputSummary()
             }
             break;
         }
+        
         case TestOutputMode::XUnit:
         {
             // xUnit 1.0 format  
@@ -451,5 +558,52 @@ void TestContext::outputSummary()
             assert("Not currently supported");
             break;
         }
+        case TestOutputMode::TeamCity:
+        {
+            // Don't output a summary
+            break;
+        }
     }
+}
+
+void TestContext::startSuite(const String& name)
+{
+    m_totalTestCount = 0;
+    m_passedTestCount = 0;
+    m_failedTestCount = 0;
+    m_ignoredTestCount = 0;
+
+    m_suiteStack.Add(name);
+
+    switch (m_outputMode)
+    {
+        case TestOutputMode::TeamCity:
+        {
+            StringBuilder escapedSuiteName;
+            _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
+            printf("##teamcity[testSuiteStarted name='%s']\n", escapedSuiteName.begin());
+            break;
+        }
+        default: break;
+    }
+}
+
+void TestContext::endSuite()
+{
+    assert(m_suiteStack.Count());
+
+    switch (m_outputMode)
+    {
+        case TestOutputMode::TeamCity:
+        {
+            const String& name = m_suiteStack.Last();
+            StringBuilder escapedSuiteName;
+            _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
+            printf("##teamcity[testSuiteFinished name='%s']\n", escapedSuiteName.begin());
+            break;
+        }
+        default: break;
+    }
+    
+    m_suiteStack.RemoveLast();
 }
