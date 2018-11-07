@@ -1,0 +1,13 @@
+//TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
+
+// Confirm that `NonUniformResourceIndex` translates to SPIR-V as expeted
+
+Texture2D t[10];
+SamplerState s;
+
+float4 main(
+    float3 uv : UV)
+    : SV_Target
+{
+    return t[NonUniformResourceIndex(int(uv.z))].Sample(s, uv.xy);
+}
