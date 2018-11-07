@@ -568,11 +568,6 @@ void TestContext::outputSummary()
 
 void TestContext::startSuite(const String& name)
 {
-    m_totalTestCount = 0;
-    m_passedTestCount = 0;
-    m_failedTestCount = 0;
-    m_ignoredTestCount = 0;
-
     m_suiteStack.Add(name);
 
     switch (m_outputMode)
