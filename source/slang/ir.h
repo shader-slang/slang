@@ -157,8 +157,9 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_VulkanHitAttributes,
     kIRDecorationOp_RequireGLSLVersion,
     kIRDecorationOp_RequireGLSLExtension,
-    
-    kIRDecorationOp_CountOf          
+    kIRDecorationOp_ReadNone,
+
+    kIRDecorationOp_CountOf
 };
 
 // represents an object allocated in an IR memory arena
@@ -1047,6 +1048,14 @@ struct IRGeneric : IRGlobalValueWithParams
 // Find the value that is returned from a generic, so that
 // a pass can glean information from it.
 IRInst* findGenericReturnVal(IRGeneric* generic);
+
+// Resolve an instruction that might reference a static definition
+// to the most specific IR node possible, so that we can read
+// decorations from it (e.g., if this is a `specialize` instruction,
+// then try to chase down the generic being specialized, and what
+// it seems to return).
+//
+IRInst* getResolvedInstForDecorations(IRInst* inst);
 
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.

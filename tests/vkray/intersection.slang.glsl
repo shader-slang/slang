@@ -1,7 +1,7 @@
 //TEST_IGNORE_FILE:
 #version 460
 
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
 struct Sphere_0
 {
@@ -40,28 +40,28 @@ bool rayIntersectsSphere_0(
     return tHit_0 >= ray_0.TMin_0;
 }
 
-hitAttributeNVX SphereHitAttributes_0 a_0;
+hitAttributeNV SphereHitAttributes_0 a_0;
 
 bool ReportHit_0(float tHit_1, uint hitKind_0, SphereHitAttributes_0 attributes_0)
 {
     a_0 = attributes_0;
-    bool _S1 = reportIntersectionNVX(tHit_1, hitKind_0);
+    bool _S1 = reportIntersectionNV(tHit_1, hitKind_0);
     return _S1;
 }
 
 void main()
 {
     RayDesc_0 ray_1;
-    vec3 _S2 = gl_ObjectRayOriginNVX;
+    vec3 _S2 = gl_ObjectRayOriginNV;
 
     ray_1.Origin_0 = _S2;
-    vec3 _S3 = gl_ObjectRayDirectionNVX;
+    vec3 _S3 = gl_ObjectRayDirectionNV;
 
     ray_1.Direction_0 = _S3;
-    float _S4 = gl_RayTminNVX;
+    float _S4 = gl_RayTminNV;
 
     ray_1.TMin_0 = _S4;
-    float _S5 = gl_RayTmaxNVX;
+    float _S5 = gl_RayTmaxNV;
 
     ray_1.TMax_0 = _S5;
 

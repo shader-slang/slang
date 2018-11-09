@@ -147,6 +147,11 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
     StringRepresentation* extensionName;
 };
 
+struct IRReadNoneDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_ReadNone };
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -187,6 +192,11 @@ struct IRLookupWitnessTable : IRInst
 struct IRCall : IRInst
 {
     IRUse func;
+
+    IRInst* getCallee() { return getOperand(0); }
+
+    UInt getArgCount() { return getOperandCount() - 1; }
+    IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
 struct IRLoad : IRInst

@@ -405,6 +405,14 @@ SIMPLE_SYNTAX_CLASS(VulkanHitAttributesAttribute, Attribute)
 //
 SIMPLE_SYNTAX_CLASS(MutatingAttribute, Attribute)
 
+// A `[__readNone]` attribute, which indicates that a function
+// computes its results strictly based on argument values, without
+// reading or writing through any pointer arguments, or any other
+// state that could be observed by a caller.
+//
+SIMPLE_SYNTAX_CLASS(ReadNoneAttribute, Attribute)
+
+
 // HLSL modifiers for geometry shader input topology
 SIMPLE_SYNTAX_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier, Modifier)
 SIMPLE_SYNTAX_CLASS(HLSLPointModifier        , HLSLGeometryShaderInputPrimitiveTypeModifier)

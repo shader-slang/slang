@@ -705,6 +705,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                 }
                 case kIRDecorationOp_VulkanRayPayload:
                 case kIRDecorationOp_VulkanHitAttributes:
+                case kIRDecorationOp_ReadNone:
                 {
                     dstInst.m_payloadType = PayloadType::Empty;
                     break;
@@ -1577,6 +1578,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             auto decor = createEmptyDecoration<IRRequireGLSLVersionDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == Ser::Inst::PayloadType::UInt32);
             decor->languageVersion = Int(srcInst.m_payload.m_uint32);
+            return decor;
+        }
+        case kIRDecorationOp_ReadNone:
+        {
+            auto decor = createEmptyDecoration<IRReadNoneDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
             return decor;
         }
         default:
