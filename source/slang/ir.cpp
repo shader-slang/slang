@@ -2939,6 +2939,11 @@ namespace Slang
                     dump(context, "\n[__vulkanHitAttributes]");
                 }
                 break;
+            case kIRDecorationOp_ReadNone:
+                {
+                    dump(context, "\n[__readNone]");
+                }
+                break;
             }
         }
     }
@@ -3521,7 +3526,30 @@ namespace Slang
             return true;
 
         case kIROp_Call:
-            // This is the most interesting.
+            {
+                // In the general case, a function call must be assumed to
+                // have almost arbitrary side effects.
+                //
+                // However, it is possible that the callee can be identified,
+                // and it may be a function with an attribute that explicitly
+                // limits the side effects it is allowed to have.
+                //
+                // For now, we will explicitly check for the `[__readNone]`
+                // attribute, which was used to mark functions that compute
+                // their result strictly as a function of the arguments (and
+                // not anything they point to, or other non-argument state).
+                // Calls to such functions cannot have side effects (except
+                // for things like stack overflow that abstract language models
+                // tend to ignore), and can be subject to dead code elimination,
+                // common subexpression elimination, etc.
+                //
+                auto call = cast<IRCall>(this);
+                auto callee = getResolvedInstForDecorations(call->getCallee());
+                if(callee->findDecoration<IRReadNoneDecoration>())
+                {
+                    return false;
+                }
+            }
             return true;
 
         case kIROp_Nop:
@@ -5371,6 +5399,12 @@ namespace Slang
                 }
                 break;
 
+            case kIRDecorationOp_ReadNone:
+                {
+                    context->builder->addDecoration<IRReadNoneDecoration>(clonedValue);
+                }
+                break;
+
             default:
                 // Don't clone any decorations we don't understand.
                 break;
@@ -6003,6 +6037,24 @@ namespace Slang
 
         auto val = returnInst->getVal();
         return val;
+    }
+
+    IRInst* getResolvedInstForDecorations(IRInst* inst)
+    {
+        IRInst* candidate = inst;
+        while(auto specInst = as<IRSpecialize>(candidate))
+        {
+            auto genericInst = as<IRGeneric>(specInst->getBase());
+            if(!genericInst)
+                break;
+
+            auto returnVal = findGenericReturnVal(genericInst);
+            if(!returnVal)
+                break;
+
+            candidate = returnVal;
+        }
+        return candidate;
     }
 
     bool isDefinition(

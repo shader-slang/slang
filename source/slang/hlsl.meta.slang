@@ -1369,8 +1369,8 @@ void TraceRay<payload_t>(
     RayDesc                         Ray,
     inout payload_t                 Payload);
 
-__target_intrinsic(glsl, "traceNVX")
-void __traceNVX(
+__target_intrinsic(glsl, "traceNV")
+void __traceNV(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
     uint                            InstanceInclusionMask,
@@ -1391,6 +1391,7 @@ void __traceNVX(
 //
 __generic<Payload>
 __target_intrinsic(glsl, "$XP")
+[__readNone]
 int __rayPayloadLocation(Payload payload);
 
 __generic<payload_t>
@@ -1409,7 +1410,7 @@ void TraceRay(
     static payload_t p;
 
     p = Payload;
-    __traceNVX(
+    __traceNV(
         AccelerationStructure,
         RayFlags,
         InstanceInclusionMask,
@@ -1427,8 +1428,8 @@ void TraceRay(
 // 10.3.3
 bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
-__target_intrinsic(glsl, "reportIntersectionNVX")
-bool __reportIntersectionNVX(float tHit, uint hitKind);
+__target_intrinsic(glsl, "reportIntersectionNV")
+bool __reportIntersectionNV(float tHit, uint hitKind);
 
 __generic<A>
 __specialized_for_target(glsl)
@@ -1438,15 +1439,15 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     static A a;
 
     a = attributes;
-    return __reportIntersectionNVX(tHit, hitKind);
+    return __reportIntersectionNV(tHit, hitKind);
 }
 
 // 10.3.4
-__target_intrinsic(glsl, ignoreIntersectionNVX)
+__target_intrinsic(glsl, ignoreIntersectionNV)
 void IgnoreHit();
 
 // 10.3.5
-__target_intrinsic(glsl, terminateRayNVX)
+__target_intrinsic(glsl, terminateRayNV)
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
@@ -1456,25 +1457,25 @@ void AcceptHitAndEndSearch();
 
 // 10.4.1 - Ray Dispatch System Values
 
-__target_intrinsic(glsl, "uvec3(gl_LaunchIDNVX, 0)")
+__target_intrinsic(glsl, "(gl_LaunchIDNV)")
 uint3 DispatchRaysIndex();
 
-__target_intrinsic(glsl, "uvec3(gl_LaunchSizeNVX, 0)")
+__target_intrinsic(glsl, "(gl_LaunchSizeNV)")
 uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
 
-__target_intrinsic(glsl, "(gl_WorldRayOriginNVX)")
+__target_intrinsic(glsl, "(gl_WorldRayOriginNV)")
 float3 WorldRayOrigin();
 
-__target_intrinsic(glsl, "(gl_WorldRayDirectionNVX)")
+__target_intrinsic(glsl, "(gl_WorldRayDirectionNV)")
 float3 WorldRayDirection();
 
-__target_intrinsic(glsl, "(gl_RayTminNVX)")
+__target_intrinsic(glsl, "(gl_RayTminNV)")
 float RayTMin();
 
 // Note: The `RayTCurrent()` intrinsic should translate to
-// either `gl_HitTNVX` (for hit shaders) or `gl_RayTmaxNVX`
+// either `gl_HitTNV` (for hit shaders) or `gl_RayTmaxNV`
 // (for intersection shaders). Right now we are handling this
 // during code emission, for simplicity.
 //
@@ -1486,12 +1487,12 @@ float RayTMin();
 __target_intrinsic(glsl, "$XT")
 float RayTCurrent();
 
-__target_intrinsic(glsl, "(gl_RayFlagsNVX)")
+__target_intrinsic(glsl, "(gl_IncomingRayFlagsNV)")
 uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(glsl, "(gl_InstanceCustomIndexNVX)")
+__target_intrinsic(glsl, "(gl_InstanceCustomIndexNV)")
 uint InstanceIndex();
 
 __target_intrinsic(glsl, "(gl_InstanceID)")
@@ -1500,22 +1501,22 @@ uint InstanceID();
 __target_intrinsic(glsl, "(gl_PrimitiveID)")
 uint PrimitiveIndex();
 
-__target_intrinsic(glsl, "(gl_ObjectRayOriginNVX)")
+__target_intrinsic(glsl, "(gl_ObjectRayOriginNV)")
 float3 ObjectRayOrigin();
 
-__target_intrinsic(glsl, "(gl_ObjectRayDirectionNVX)")
+__target_intrinsic(glsl, "(gl_ObjectRayDirectionNV)")
 float3 ObjectRayDirection();
 
-__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNVX)")
+__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNV)")
 float3x4 ObjectToWorld3x4();
 
-__target_intrinsic(glsl, "transpose(gl_WorldToObjectNVX)")
+__target_intrinsic(glsl, "transpose(gl_WorldToObjectNV)")
 float3x4 WorldToObject3x4();
 
-__target_intrinsic(glsl, "(gl_ObjectToWorldNVX)")
+__target_intrinsic(glsl, "(gl_ObjectToWorldNV)")
 float4x3 ObjectToWorld4x3();
 
-__target_intrinsic(glsl, "(gl_WorldToObjectNVX)")
+__target_intrinsic(glsl, "(gl_WorldToObjectNV)")
 float4x3 WorldToObject4x3();
 
 // Note: The provisional DXR spec included these unadorned
@@ -1531,5 +1532,5 @@ float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
 float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
-__target_intrinsic(glsl, "(gl_HitKindNVX)")
+__target_intrinsic(glsl, "(gl_HitKindNV)")
 uint HitKind();

@@ -1238,3 +1238,9 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
+
+    /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
+    ///
+    /// This is equivalent to the LLVM `readnone` function attribute.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__readNone] : ReadNoneAttribute;

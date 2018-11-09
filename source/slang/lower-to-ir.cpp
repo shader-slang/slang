@@ -5137,6 +5137,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             decoration->languageVersion = Int(getIntegerLiteralValue(versionMod->versionNumberToken));
         }
 
+        if(decl->FindModifier<ReadNoneAttribute>())
+        {
+            getBuilder()->addDecoration<IRReadNoneDecoration>(irFunc);
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list

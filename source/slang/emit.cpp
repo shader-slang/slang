@@ -1168,8 +1168,8 @@ struct EmitVisitor
                 switch (type->op)
                 {
                 case kIROp_RaytracingAccelerationStructureType:
-                    requireGLSLExtension("GL_NVX_raytracing");
-                    Emit("accelerationStructureNVX");
+                    requireGLSLExtension("GL_NV_ray_tracing");
+                    Emit("accelerationStructureNV");
                     break;
 
                 // TODO: These "translations" are obviously wrong for GLSL.
@@ -3332,17 +3332,17 @@ struct EmitVisitor
                         case 'T':
                             {
                                 // The `$XT` case handles selecting between
-                                // the `gl_HitTNVX` and `gl_RayTmaxNVX` builtins,
+                                // the `gl_HitTNV` and `gl_RayTmaxNV` builtins,
                                 // based on what stage we are using:
                                 switch( ctx->shared->entryPoint->getStage() )
                                 {
                                 default:
-                                    Emit("gl_RayTmaxNVX");
+                                    Emit("gl_RayTmaxNV");
                                     break;
 
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
-                                    Emit("gl_HitTNVX");
+                                    Emit("gl_HitTNV");
                                     break;
                                 }
                             }
@@ -5363,11 +5363,11 @@ struct EmitVisitor
             emit("layout(location = ");
             Emit(getRayPayloadLocation(ctx, varDecl));
             emit(")\n");
-            emit("rayPayloadNVX\n");
+            emit("rayPayloadNV\n");
         }
         if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
         {
-            emit("hitAttributeNVX\n");
+            emit("hitAttributeNV\n");
         }
 
         if (!layout)
@@ -5516,13 +5516,13 @@ struct EmitVisitor
 
                 case LayoutResourceKind::RayPayload:
                     {
-                        emit("rayPayloadInNVX ");
+                        emit("rayPayloadInNV ");
                     }
                     break;
 
                 case LayoutResourceKind::HitAttributes:
                     {
-                        emit("hitAttributeNVX ");
+                        emit("hitAttributeNV ");
                     }
                     break;
 
@@ -6535,7 +6535,7 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            requireGLSLExtension(&context.shared->extensionUsageTracker, "GL_NVX_raytracing");
+            requireGLSLExtension(&context.shared->extensionUsageTracker, "GL_NV_ray_tracing");
             requireGLSLVersionImpl(&context.shared->extensionUsageTracker, ProfileVersion::GLSL_460);
         }
         break;
