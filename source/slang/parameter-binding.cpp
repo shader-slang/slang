@@ -1910,13 +1910,19 @@ static RefPtr<TypeLayout> processEntryPointParameter(
             break;
 
         case Stage::AnyHit:
-        case Stage::Callable:
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
             return CreateTypeLayout(context->layoutContext.with(
                 context->getRulesFamily()->getRayPayloadParameterRules()),
                 type);
+
+        case Stage::Callable:
+            // `in out` or `out` parameter is payload
+            return CreateTypeLayout(context->layoutContext.with(
+                context->getRulesFamily()->getCallablePayloadParameterRules()),
+                type);
+
         }
     }
     else

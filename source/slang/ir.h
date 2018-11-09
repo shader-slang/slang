@@ -158,6 +158,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_RequireGLSLVersion,
     kIRDecorationOp_RequireGLSLExtension,
     kIRDecorationOp_ReadNone,
+    kIRDecorationOp_VulkanCallablePayload,
 
     kIRDecorationOp_CountOf
 };

@@ -704,6 +704,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                     break;
                 }
                 case kIRDecorationOp_VulkanRayPayload:
+                case kIRDecorationOp_VulkanCallablePayload:
                 case kIRDecorationOp_VulkanHitAttributes:
                 case kIRDecorationOp_ReadNone:
                 {
@@ -1557,6 +1558,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         case kIRDecorationOp_VulkanRayPayload:
         {
             auto decor = createEmptyDecoration<IRVulkanRayPayloadDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+            return decor;
+        }
+        case kIRDecorationOp_VulkanCallablePayload:
+        {
+            auto decor = createEmptyDecoration<IRVulkanCallablePayloadDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
             return decor;
         }

@@ -1260,6 +1260,10 @@ void addVarDecorations(
         {
             builder->addDecoration<IRVulkanRayPayloadDecoration>(inst);
         }
+        else if(mod.As<VulkanCallablePayloadAttribute>())
+        {
+            builder->addDecoration<IRVulkanCallablePayloadDecoration>(inst);
+        }
         else if(mod.As<VulkanHitAttributesAttribute>())
         {
             builder->addDecoration<IRVulkanHitAttributesDecoration>(inst);

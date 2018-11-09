@@ -2934,6 +2934,11 @@ namespace Slang
                     dump(context, "\n[__vulkanRayPayload]");
                 }
                 break;
+            case kIRDecorationOp_VulkanCallablePayload:
+                {
+                    dump(context, "\n[__vulkanCallPayload]");
+                }
+                break;
             case kIRDecorationOp_VulkanHitAttributes:
                 {
                     dump(context, "\n[__vulkanHitAttributes]");
@@ -5374,6 +5379,12 @@ namespace Slang
             case kIRDecorationOp_VulkanRayPayload:
                 {
                     context->builder->addDecoration<IRVulkanRayPayloadDecoration>(clonedValue);
+                }
+                break;
+
+            case kIRDecorationOp_VulkanCallablePayload:
+                {
+                    context->builder->addDecoration<IRVulkanCallablePayloadDecoration>(clonedValue);
                 }
                 break;
 

@@ -393,6 +393,12 @@ END_SYNTAX_CLASS()
 // ray tracing shader to pass per-ray payload information.
 SIMPLE_SYNTAX_CLASS(VulkanRayPayloadAttribute, Attribute)
 
+// A `[__vulkanCallablePayload]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the input/output interface for a Vulkan
+// ray tracing shader to pass payload information to/from a callee.
+SIMPLE_SYNTAX_CLASS(VulkanCallablePayloadAttribute, Attribute)
+
 // A `[__vulkanHitAttributes]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the output interface for a Vulkan
