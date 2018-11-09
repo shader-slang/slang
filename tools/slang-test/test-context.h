@@ -32,6 +32,7 @@ enum class TestOutputMode
     Travis,        ///< We currently don't specialize for Travis, but maybe we should.
     XUnit,         ///< xUnit original format  https://nose.readthedocs.io/en/latest/plugins/xunit.html
     XUnit2,        ///< https://xunit.github.io/docs/format-xml-v2
+    TeamCity,      ///< Output suitable for teamcity
 };
 
 enum class TestResult
@@ -61,15 +62,15 @@ class TestContext
         Slang::String message;                 ///< Message that is specific for the testResult
     };
     
-    class Scope
+    class TestScope
     {
     public:
-        Scope(TestContext* context, const Slang::String& testName) :
+        TestScope(TestContext* context, const Slang::String& testName) :
             m_context(context)
         {
             context->startTest(testName);
         }
-        ~Scope()
+        ~TestScope()
         {
             m_context->endTest();
         }
@@ -77,6 +78,26 @@ class TestContext
     protected:
         TestContext* m_context;
     };
+
+    class SuiteScope
+    {
+    public:
+        SuiteScope(TestContext* context, const Slang::String& suiteName) :
+            m_context(context)
+        {
+            context->startSuite(suiteName);
+        }
+        ~SuiteScope()
+        {
+            m_context->endSuite();
+        }
+
+    protected:
+        TestContext* m_context;
+    };
+
+    void startSuite(const Slang::String& name);
+    void endSuite();
 
     void startTest(const Slang::String& testName);
     void addResult(TestResult result);
@@ -99,9 +120,7 @@ class TestContext
         /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
-        /// Call at end of tests 
-    void outputSummary();
-
+    
         /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
 
@@ -115,6 +134,8 @@ class TestContext
 
     Slang::List<TestInfo> m_testInfos;
 
+    Slang::List<Slang::String> m_suiteStack;
+
     int m_totalTestCount;
     int m_passedTestCount;
     int m_failedTestCount;
@@ -126,9 +147,11 @@ class TestContext
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
+    void outputSummary();
+
 protected:
     void _addResult(const TestInfo& info);
-
+    
     Slang::StringBuilder m_currentMessage;
     TestInfo m_currentInfo;
     int m_numCurrentResults;
