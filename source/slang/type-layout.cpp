@@ -401,12 +401,14 @@ GLSLVaryingLayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl(LayoutResourceKind::
 GLSLVaryingLayoutRulesImpl kGLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
 
 GLSLRayTracingLayoutRulesImpl kGLSLRayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
+GLSLRayTracingLayoutRulesImpl kGLSLCallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
 GLSLRayTracingLayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
 HLSLVaryingLayoutRulesImpl kHLSLVaryingInputLayoutRulesImpl(LayoutResourceKind::VertexInput);
 HLSLVaryingLayoutRulesImpl kHLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
 
 HLSLRayTracingLayoutRulesImpl kHLSLRayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
+HLSLRayTracingLayoutRulesImpl kHLSLCallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
 HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
 //
@@ -423,7 +425,8 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
-    LayoutRulesImpl* getHitAttributesParameterRules()    override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -438,7 +441,8 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getParameterBlockRules() override;
 
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
-    LayoutRulesImpl* getHitAttributesParameterRules()    override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -475,6 +479,10 @@ LayoutRulesImpl kGLSLRayPayloadParameterLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kGLSLRayPayloadParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kGLSLCallablePayloadParameterLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kGLSLCallablePayloadParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kGLSLHitAttributesParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
@@ -499,6 +507,10 @@ LayoutRulesImpl kHLSLVaryingOutputLayoutRulesImpl_ = {
 
 LayoutRulesImpl kHLSLRayPayloadParameterLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLRayPayloadParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kHLSLCallablePayloadParameterLayoutRulesImpl_ = {
+    &kHLSLLayoutRulesFamilyImpl, &kHLSLCallablePayloadParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
@@ -553,6 +565,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getRayPayloadParameterRules()
     return &kGLSLRayPayloadParameterLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kGLSLCallablePayloadParameterLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
@@ -605,6 +622,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules()
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getRayPayloadParameterRules()
 {
     return &kHLSLRayPayloadParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kHLSLCallablePayloadParameterLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()

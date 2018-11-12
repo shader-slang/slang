@@ -148,6 +148,7 @@ struct SharedEmitContext
     DiagnosticSink* getSink() { return &entryPoint->compileRequest->mSink; }
 
     Dictionary<IRInst*, UInt> mapIRValueToRayPayloadLocation;
+    Dictionary<IRInst*, UInt> mapIRValueToCallablePayloadLocation;
 };
 
 struct EmitContext
@@ -3315,7 +3316,7 @@ struct EmitVisitor
                         case 'P':
                             {
                                 // The `$XP` case handles looking up
-                                // the assocaited `location` for a variable
+                                // the associated `location` for a variable
                                 // used as the argument ray payload at a
                                 // trace call site.
 
@@ -3326,6 +3327,23 @@ struct EmitVisitor
                                 SLANG_RELEASE_ASSERT(argLoad);
                                 auto argVar = argLoad->getOperand(0);
                                 Emit(getRayPayloadLocation(ctx, argVar));
+                            }
+                            break;
+
+                        case 'C':
+                            {
+                                // The `$XC` case handles looking up
+                                // the associated `location` for a variable
+                                // used as the argument callable payload at a
+                                // call site.
+
+                                UInt argIndex = 0;
+                                SLANG_RELEASE_ASSERT(argCount > argIndex);
+                                auto arg = args[argIndex].get();
+                                auto argLoad = as<IRLoad>(arg);
+                                SLANG_RELEASE_ASSERT(argLoad);
+                                auto argVar = argLoad->getOperand(0);
+                                Emit(getCallablePayloadLocation(ctx, argVar));
                             }
                             break;
 
@@ -5347,6 +5365,20 @@ struct EmitVisitor
         return value;
     }
 
+    UInt getCallablePayloadLocation(
+        EmitContext*    ctx,
+        IRInst*         inst)
+    {
+        auto& map = ctx->shared->mapIRValueToCallablePayloadLocation;
+        UInt value = 0;
+        if(map.TryGetValue(inst, value))
+            return value;
+
+        value = map.Count();
+        map.Add(inst, value);
+        return value;
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -5364,6 +5396,13 @@ struct EmitVisitor
             Emit(getRayPayloadLocation(ctx, varDecl));
             emit(")\n");
             emit("rayPayloadNV\n");
+        }
+        if(varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
+        {
+            emit("layout(location = ");
+            Emit(getCallablePayloadLocation(ctx, varDecl));
+            emit(")\n");
+            emit("callableDataNV\n");
         }
         if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
         {
@@ -5517,6 +5556,12 @@ struct EmitVisitor
                 case LayoutResourceKind::RayPayload:
                     {
                         emit("rayPayloadInNV ");
+                    }
+                    break;
+
+                case LayoutResourceKind::CallablePayload:
+                    {
+                        emit("callableDataInNV ");
                     }
                     break;
 

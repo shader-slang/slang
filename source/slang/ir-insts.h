@@ -126,6 +126,14 @@ struct IRVulkanRayPayloadDecoration : IRDecoration
 };
 
 /// A decoration that indicates that a variable represents
+/// a vulkan callable shader payload, and should have a location assigned
+/// to it.
+struct IRVulkanCallablePayloadDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_VulkanCallablePayload };
+};
+
+/// A decoration that indicates that a variable represents
 /// vulkan hit attributes, and should have a location assigned
 /// to it.
 struct IRVulkanHitAttributesDecoration : IRDecoration
@@ -978,7 +986,7 @@ IRGlobalValue* getSpecializedGlobalValueForDeclRef(
 struct ExtensionUsageTracker;
 
 // Clone the IR values reachable from the given entry point
-// into the IR module assocaited with the specialization state.
+// into the IR module associated with the specialization state.
 // When multiple definitions of a symbol are found, the one
 // that is best specialized for the given `targetReq` will be
 // used.

@@ -102,6 +102,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
     CASE(ANY_HIT,           AnyHitNV);
     CASE(CLOSEST_HIT,       ClosestHitNV);
     CASE(MISS,              MissNV);
+    CASE(CALLABLE,          CallableNV);
 
 #undef CASE
 

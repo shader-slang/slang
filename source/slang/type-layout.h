@@ -596,6 +596,7 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
 
     virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
+    virtual LayoutRulesImpl* getCallablePayloadParameterRules()  = 0;
     virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
 };
 

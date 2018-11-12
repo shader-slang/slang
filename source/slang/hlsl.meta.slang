@@ -1355,8 +1355,38 @@ struct BuiltInTriangleIntersectionAttributes
 // 10.3 - Intrinsics
 
 // 10.3.1
-__target_intrinsic(glsl, "callableShadersAreNotYetAvailableInVulkan")
-void CallShader<param_t>(uint ShaderIndex, inout param_t Parameter);
+
+void CallShader<Payload>(uint shaderIndex, inout Payload payload);
+
+// `executeCallableNV` is the GLSL intrinsic that will be used to implement
+// `CallShader()` for GLSL-based targets.
+//
+__target_intrinsic(glsl, "executeCallableNV")
+void __executeCallableNV(uint shaderIndex, int payloadLocation);
+
+// Next is the custom intrinsic that will compute the payload location
+// for a type being used in a `CallShader()` call for GLSL-based targets.
+//
+__generic<Payload>
+__target_intrinsic(glsl, "$XC")
+[__readNone]
+int __callablePayloadLocation(Payload payload);
+
+// Now we provide a hard-coded definition of `CallShader()` for GLSL-based
+// targets, which maps the generic HLSL operation into the non-generic
+// GLSL equivalent.
+//
+__generic<Payload>
+__specialized_for_target(glsl)
+void CallShader(uint shaderIndex, inout Payload payload)
+{
+    [__vulkanRayPayload]
+    static Payload p;
+
+    p = payload;
+    __executeCallableNV(shaderIndex, __callablePayloadLocation(p));
+    payload = p;
+}
 
 // 10.3.2
 void TraceRay<payload_t>(
