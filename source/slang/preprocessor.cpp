@@ -478,7 +478,7 @@ static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, Name
 
 static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor)
 {
-    // The environment we will use for looking up a macro is assocaited
+    // The environment we will use for looking up a macro is associated
     // with the current input stream (because it may include entries
     // for macro arguments).
     //

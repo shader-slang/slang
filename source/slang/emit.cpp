@@ -3316,7 +3316,7 @@ struct EmitVisitor
                         case 'P':
                             {
                                 // The `$XP` case handles looking up
-                                // the assocaited `location` for a variable
+                                // the associated `location` for a variable
                                 // used as the argument ray payload at a
                                 // trace call site.
 
@@ -3333,7 +3333,7 @@ struct EmitVisitor
                         case 'C':
                             {
                                 // The `$XC` case handles looking up
-                                // the assocaited `location` for a variable
+                                // the associated `location` for a variable
                                 // used as the argument callable payload at a
                                 // call site.
 

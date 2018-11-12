@@ -986,7 +986,7 @@ IRGlobalValue* getSpecializedGlobalValueForDeclRef(
 struct ExtensionUsageTracker;
 
 // Clone the IR values reachable from the given entry point
-// into the IR module assocaited with the specialization state.
+// into the IR module associated with the specialization state.
 // When multiple definitions of a symbol are found, the one
 // that is best specialized for the given `targetReq` will be
 // used.
