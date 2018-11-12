@@ -1372,7 +1372,7 @@ __target_intrinsic(glsl, "$XC")
 [__readNone]
 int __callablePayloadLocation(Payload payload);
 
-// Now we provide a hard-coded defintiion of `CallShader()` for GLSL-based
+// Now we provide a hard-coded definition of `CallShader()` for GLSL-based
 // targets, which maps the generic HLSL operation into the non-generic
 // GLSL equivalent.
 //
