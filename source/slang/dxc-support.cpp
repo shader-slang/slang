@@ -270,11 +270,9 @@ namespace Slang
         ComPtr<IDxcBlobEncoding> dxcResultBlob;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef()));
 
-        String result;
         char const* codeBegin = (char const*)dxcResultBlob->GetBufferPointer();
         char const* codeEnd = codeBegin + dxcResultBlob->GetBufferSize() - 1;
-        result.append(codeBegin, codeEnd);
-        stringOut = result;
+        stringOut = String(codeBegin, codeEnd);
 
         return SLANG_OK;
     }

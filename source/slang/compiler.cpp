@@ -491,12 +491,11 @@ namespace Slang
         ComPtr<ID3DBlob> codeBlob;
         SlangResult res = disassembleFunc(data, size, 0, nullptr, codeBlob.writeRef());
 
-        String result;
         if (codeBlob)
         {
             char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
             char const* codeEnd = codeBegin + codeBlob->GetBufferSize() - 1;
-            result.append(codeBegin, codeEnd);
+            stringOut = String(codeBegin, codeEnd);
         }
         if (FAILED(res))
         {
@@ -576,11 +575,14 @@ SlangResult dissassembleDXILUsingDXC(
         return 0;
     }
 
-    String dissassembleSPIRV(
+    SlangResult dissassembleSPIRV(
         CompileRequest*     slangRequest,
         void const*         data,
-        size_t              size)
+        size_t              size, 
+        String&             stringOut)
     {
+        stringOut = String();
+
         String output;
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
@@ -597,13 +599,13 @@ SlangResult dissassembleDXILUsingDXC(
         request.outputUserData = &output;
 
         int err = invokeGLSLCompiler(slangRequest, request);
-
         if (err)
         {
-            String();
+            return SLANG_FAIL;
         }
 
-        return output;
+        stringOut = output;
+        return SLANG_OK;
     }
 
     List<uint8_t> emitSPIRVForEntryPoint(
@@ -648,7 +650,8 @@ SlangResult dissassembleDXILUsingDXC(
         if (spirv.Count() == 0)
             return String();
 
-        String result = dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count());
+        String result;
+        dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count(), result);
         return result;
     }
 #endif
@@ -910,9 +913,10 @@ SlangResult dissassembleDXILUsingDXC(
 
                     case CodeGenTarget::SPIRV:
                         {
-                            String assembly = dissassembleSPIRV(compileRequest,
+                            String assembly;
+                            dissassembleSPIRV(compileRequest,
                                 data.begin(),
-                                data.end() - data.begin());
+                                data.end() - data.begin(), assembly);
                             writeOutputToConsole(compileRequest, assembly);
                         }
                         break;
@@ -1135,7 +1139,8 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::SPIRV:
             dumpIntermediateBinary(compileRequest, data, size, ".spv");
             {
-                String spirvAssembly = dissassembleSPIRV(compileRequest, data, size);
+                String spirvAssembly;
+                dissassembleSPIRV(compileRequest, data, size, spirvAssembly);
                 dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.Length(), ".spv.asm");
             }
             break;
