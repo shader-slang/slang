@@ -18,19 +18,28 @@ __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
+    __target_intrinsic(glsl, "$1 = $0.length()")
     void GetDimensions(
         out uint dim);
 
+    __target_intrinsic(glsl, "$0[$1]")
     uint Load(int location);
+
     uint Load(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec2($0[$1], $0[$1+1])")
     uint2 Load2(int location);
+
     uint2 Load2(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec3($0[$1], $0[$1+1], $0[$1+2])")
     uint3 Load3(int location);
+
     uint3 Load3(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec4($0[$1], $0[$1+1], $0[$1+2], $0[$1+3])")
     uint4 Load4(int location);
+
     uint4 Load4(int location, out uint status);
 };
 
@@ -96,109 +105,133 @@ struct $(item.name)
     // Note(tfoley): supports alll operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
+    __target_intrinsic(glsl, "$1 = $0.length()")
     void GetDimensions(
         out uint dim);
 
+    __target_intrinsic(glsl, "$0[$1]")
     uint Load(int location);
+
     uint Load(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec2($0[$1], $0[$1+4])")
     uint2 Load2(int location);
+
     uint2 Load2(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec3($0[$1], $0[$1+4], $0[$1+8])")
     uint3 Load3(int location);
+
     uint3 Load3(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec4($0[$1], $0[$1+4], $0[$1+8], $0[$1+12])")
     uint4 Load4(int location);
+
     uint4 Load4(int location, out uint status);
 
     // Added operations:
 
+    __target_intrinsic(glsl, "($3 = atomicAdd($0[$1], $2))")
     void InterlockedAdd(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicAdd($0[$1], $2)")
     void InterlockedAdd(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicAnd($0[$1], $2))")
     void InterlockedAnd(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicAnd($0[$1], $2)")
     void InterlockedAnd(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($4 = atomicCompSwap($0[$1], $2, $3))")
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
         UINT value,
         out UINT original_value);
-    void InterlockedCompareExchange(
-        UINT dest,
-        UINT compare_value,
-        UINT value);
 
+    __target_intrinsic(glsl, "atomicCompSwap($0[$1], $2, $3)")
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
         UINT value);
-    void InterlockedCompareStore(
-        UINT dest,
-        UINT compare_value);
 
+    __target_intrinsic(glsl, "($3 = atomicExchange($0[$1], $2))")
     void InterlockedExchange(
         UINT dest,
         UINT value,
         out UINT original_value);
-    void InterlockedExchange(
-        UINT dest,
-        UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicMax($0[$1], $2))")
     void InterlockedMax(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicMax($0[$1], $2)")
     void InterlockedMax(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicMin($0[$1], $2))")
     void InterlockedMin(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicMin($0[$1], $2)")
     void InterlockedMin(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicOr($0[$1], $2))")
     void InterlockedOr(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicOr($0[$1], $2)")
     void InterlockedOr(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicXor($0[$1], $2))")
     void InterlockedXor(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicXor($0[$1], $2)")
     void InterlockedXor(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "$0[$1] = $2")
     void Store(
         uint address,
         uint value);
 
+    __target_intrinsic(glsl, "$0[$1] = $2.x, $0[$1+4] = $2.y")
     void Store2(
         uint address,
         uint2 value);
 
+    __target_intrinsic(glsl, "$0[$1] = $2.x, $0[$1+4] = $2.y, $0[$1+8] = $2.z")
     void Store3(
         uint address,
         uint3 value);
 
+    __target_intrinsic(glsl, "$0[$1] = $2.x, $0[$1+4] = $2.y, $0[$1+8] = $2.z, $0[$1+12] = $2.w")
     void Store4(
         uint address,
         uint4 value);
@@ -686,12 +719,6 @@ void InterlockedCompareStore(__ref  int dest,  int compare_value,  int value);
 
 __target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
-
-__target_intrinsic(glsl, "$atomicExchange($A, $1)")
-void InterlockedExchange(__ref  int dest,  int value);
-
-__target_intrinsic(glsl, "$atomicExchange($A, $1)")
-void InterlockedExchange(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value);

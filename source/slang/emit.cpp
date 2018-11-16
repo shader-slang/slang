@@ -5999,6 +5999,66 @@ struct EmitVisitor
         emit(";\n");
     }
 
+    void emitIRByteAddressBuffer_GLSL(
+        EmitContext*                    ctx,
+        IRGlobalVar*                    varDecl,
+        IRUntypedBufferResourceType*    /* byteAddressBufferType */)
+    {
+        // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
+        // It might be worthwhile to share the common code to avoid regressions sneaking
+        // in when one or the other, but not both, gets updated.
+
+        // Shader storage buffer is an OpenGL 430 feature
+        //
+        // TODO: we should require either the extension or the version...
+        requireGLSLVersion(430);
+
+        Emit("layout(std430");
+
+        auto layout = getVarLayout(ctx, varDecl);
+        if (layout)
+        {
+            LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+            EmitVarChain chain(layout);
+
+            const UInt index = getBindingOffset(&chain, kind);
+            const UInt space = getBindingSpace(&chain, kind);
+
+            Emit(", binding = ");
+            Emit(index);
+            if (space)
+            {
+                Emit(", set = ");
+                Emit(space);
+            }
+        }
+
+        emit(") buffer ");
+
+        // Generate a dummy name for the block
+        emit("_S");
+        Emit(ctx->shared->uniqueIDCounter++);
+        emit("\n{\n");
+        indent();
+
+        emit("uint ");
+        emit(getIRName(varDecl));
+        emit("[];\n");
+
+        dedent();
+        emit("}");
+
+        // TODO: we need to consider the case where the type of the variable is
+        // an *array* of structured buffers, in which case we need to declare
+        // the block as an array too.
+        //
+        // The main challenge here is that then the block will have a name,
+        // and also the field inside the block will have a name, so that when
+        // the user had written `a[i][j]` we now need to emit `a[i].someName[j]`.
+
+        emit(";\n");
+    }
+
     void emitIRGlobalVar(
         EmitContext*    ctx,
         IRGlobalVar*    varDecl)
@@ -6045,6 +6105,17 @@ struct EmitVisitor
                     ctx,
                     varDecl,
                     structuredBufferType);
+                return;
+            }
+
+            // When outputting GLSL, we need to transform any declaration of
+            // a `*ByteAddressBuffer<T>` into an ordinary `buffer` declaration.
+            if( auto byteAddressBufferType = as<IRUntypedBufferResourceType>(unwrapArray(varType)) )
+            {
+                emitIRByteAddressBuffer_GLSL(
+                    ctx,
+                    varDecl,
+                    byteAddressBufferType);
                 return;
             }
 
