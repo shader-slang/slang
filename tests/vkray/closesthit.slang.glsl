@@ -2,11 +2,11 @@
 #version 460
 #extension GL_NV_ray_tracing : require
 
-layout(std430) buffer _S1
+layout(std430, binding = 0) buffer _S1
 {
     vec4 colors_0[];
 };
-
+ 
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
