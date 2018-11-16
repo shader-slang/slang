@@ -5951,8 +5951,28 @@ struct EmitVisitor
         // TODO: we should require either the extension or the version...
         requireGLSLVersion(430);
 
-        emit("layout(std430) buffer ");
+        Emit("layout(std430");
 
+        auto layout = getVarLayout(ctx, varDecl);
+        if (layout)
+        {
+            LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
+            EmitVarChain chain(layout);
+
+            const UInt index = getBindingOffset(&chain, kind);
+            const UInt space = getBindingSpace(&chain, kind);
+
+            Emit(", binding = ");
+            Emit(index);
+            if (space)
+            {
+                Emit(", set = ");
+                Emit(space);
+            }
+        }
+        
+        emit(") buffer ");
+    
         // Generate a dummy name for the block
         emit("_S");
         Emit(ctx->shared->uniqueIDCounter++);
