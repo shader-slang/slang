@@ -6002,7 +6002,7 @@ struct EmitVisitor
     void emitIRByteAddressBuffer_GLSL(
         EmitContext*                    ctx,
         IRGlobalVar*                    varDecl,
-        IRUntypedBufferResourceType*    /* byteAddressBufferType */)
+        IRByteAddressBufferTypeBase*    /* byteAddressBufferType */)
     {
         // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
         // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -6110,7 +6110,7 @@ struct EmitVisitor
 
             // When outputting GLSL, we need to transform any declaration of
             // a `*ByteAddressBuffer<T>` into an ordinary `buffer` declaration.
-            if( auto byteAddressBufferType = as<IRUntypedBufferResourceType>(unwrapArray(varType)) )
+            if( auto byteAddressBufferType = as<IRByteAddressBufferTypeBase>(unwrapArray(varType)) )
             {
                 emitIRByteAddressBuffer_GLSL(
                     ctx,

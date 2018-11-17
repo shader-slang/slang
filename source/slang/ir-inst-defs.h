@@ -90,9 +90,11 @@ INST(Nop, nop, 0, 0)
 
 
     /* UntypedBufferResourceType */
-        INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, 0)
-        INST(HLSLRWByteAddressBufferType,                   RWByteAddressBuffer, 0, 0)
-        INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, 0)
+        /* BVyteAddressBufferTypeBase */
+            INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, 0)
+            INST(HLSLRWByteAddressBufferType,                   RWByteAddressBuffer, 0, 0)
+            INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, 0)
+        INST_RANGE(ByteAddressBufferTypeBase, HLSLByteAddressBufferType, HLSLRasterizerOrderedByteAddressBufferType)
         INST(RaytracingAccelerationStructureType, RaytracingAccelerationStructure, 0, 0)
     INST_RANGE(UntypedBufferResourceType, HLSLByteAddressBufferType, RaytracingAccelerationStructureType)
 
