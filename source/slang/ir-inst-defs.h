@@ -90,7 +90,7 @@ INST(Nop, nop, 0, 0)
 
 
     /* UntypedBufferResourceType */
-        /* BVyteAddressBufferTypeBase */
+        /* ByteAddressBufferTypeBase */
             INST(HLSLByteAddressBufferType,                     ByteAddressBuffer,   0, 0)
             INST(HLSLRWByteAddressBufferType,                   RWByteAddressBuffer, 0, 0)
             INST(HLSLRasterizerOrderedByteAddressBufferType,    RasterizerOrderedByteAddressBuffer, 0, 0)

@@ -102,7 +102,7 @@ __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 struct $(item.name)
 {
-    // Note(tfoley): supports alll operations from `ByteAddressBuffer`
+    // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
     __target_intrinsic(glsl, "$1 = $0.length()")

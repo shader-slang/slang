@@ -129,7 +129,7 @@ SLANG_SPLICE(item.name
 )
 SLANG_RAW("\n")
 SLANG_RAW("{\n")
-SLANG_RAW("    // Note(tfoley): supports alll operations from `ByteAddressBuffer`\n")
+SLANG_RAW("    // Note(tfoley): supports all operations from `ByteAddressBuffer`\n")
 SLANG_RAW("    // TODO(tfoley): can this be made a sub-type?\n")
 SLANG_RAW("\n")
 SLANG_RAW("    __target_intrinsic(glsl, \"$1 = $0.length()\")\n")
