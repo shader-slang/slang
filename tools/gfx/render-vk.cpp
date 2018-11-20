@@ -310,6 +310,23 @@ public:
     class DescriptorSetImpl : public DescriptorSet
     {
     public:
+        // Record the view binding
+        struct Binding
+        {
+            enum class Type : uint8_t
+            {
+                Unknown,
+                ResourceView,
+                SamplerState,
+                BufferResource,
+                CountOf,
+            };
+            Type type;
+            uint32_t range;
+            uint32_t index;
+            RefPtr<RefObject> obj;
+        };
+
         DescriptorSetImpl(VKRenderer* renderer)
             : m_renderer(renderer)
         {
@@ -328,9 +345,14 @@ public:
             ResourceView*   textureView,
             SamplerState*   sampler) override;
 
+        static Binding::Type _getBindingType(RefObject* ptr);
+        void _setBinding(Binding::Type type, UInt range, UInt index, RefObject* ptr);
+
         RefPtr<VKRenderer>                  m_renderer;
         RefPtr<DescriptorSetLayoutImpl>     m_layout;
         VkDescriptorSet                     m_descriptorSet = VK_NULL_HANDLE;
+
+        List<Binding>                       m_bindings;             ///< Records entities are bound to this descriptor set, and keeps the associated resources/views/state in scope
     };
 
 #if 0
@@ -2292,6 +2314,65 @@ Result VKRenderer::createDescriptorSet(DescriptorSetLayout* layout, DescriptorSe
     return SLANG_OK;
 }
 
+/* static */VKRenderer::DescriptorSetImpl::Binding::Type VKRenderer::DescriptorSetImpl::_getBindingType(RefObject* ptr)
+{
+    typedef Binding::Type Type;
+
+    if (ptr)
+    {
+        if (dynamic_cast<ResourceView*>(ptr))
+        {
+            return Type::ResourceView;
+        }
+        else if (dynamic_cast<BufferResource*>(ptr))
+        {
+            return Type::BufferResource;
+        }
+        else if (dynamic_cast<SamplerState*>(ptr))
+        {
+            return Type::SamplerState;
+        }
+    }
+    return Type::Unknown;
+}
+
+void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, UInt index, RefObject* ptr)
+{
+    SLANG_ASSERT(ptr == nullptr || _getBindingType(ptr) == type);
+
+    const int numBindings = int(m_bindings.Count());
+    for (int i = 0; i < numBindings; ++i)
+    {
+        Binding& binding = m_bindings[i];
+
+        if (binding.type == type && binding.range == uint32_t(range) && binding.index == uint32_t(index))
+        {
+            if (ptr)
+            {
+                binding.obj = ptr;
+            }
+            else
+            {
+                m_bindings.RemoveAt(i);
+            }
+
+            return;
+        }
+    }
+
+    // If an entry is not found, and we have a pointer, create an entry
+    if (ptr)
+    {
+        Binding binding;
+        binding.type = type;
+        binding.range = uint32_t(range);
+        binding.index = uint32_t(index);
+        binding.obj = ptr;
+
+        m_bindings.Add(binding);
+    }
+}
+
 void VKRenderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, BufferResource* buffer)
 {
     auto bufferImpl = (BufferResourceImpl*)buffer;
@@ -2310,6 +2391,8 @@ void VKRenderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, Bu
     writeInfo.pBufferInfo = &bufferInfo;
 
     m_renderer->m_api.vkUpdateDescriptorSets(m_renderer->m_device, 1, &writeInfo, 0, nullptr);
+
+    _setBinding(Binding::Type::BufferResource, range, index, buffer);
 }
 
 void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, ResourceView* view)
@@ -2375,10 +2458,14 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resource
         break;
 
     }
+
+    _setBinding(Binding::Type::ResourceView, range, index, view);
 }
 
 void VKRenderer::DescriptorSetImpl::setSampler(UInt range, UInt index, SamplerState* sampler)
 {
+
+    _setBinding(Binding::Type::SamplerState, range, index, sampler);
 }
 
 void VKRenderer::DescriptorSetImpl::setCombinedTextureSampler(
@@ -2387,6 +2474,9 @@ void VKRenderer::DescriptorSetImpl::setCombinedTextureSampler(
     ResourceView*   textureView,
     SamplerState*   sampler)
 {
+
+    _setBinding(Binding::Type::SamplerState, range, index, sampler);
+    _setBinding(Binding::Type::ResourceView, range, index, textureView);
 }
 
 void VKRenderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* layout, UInt index, DescriptorSet* descriptorSet)
