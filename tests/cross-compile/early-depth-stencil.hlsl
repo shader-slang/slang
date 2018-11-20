@@ -1,7 +1,5 @@
 //TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage fragment
-
-////TEST:SIMPLE: -profile ps_4_0 -entry main -target hlsl
-////TEST:SIMPLE: -profile ps_4_0 -entry main -target glsl
+//TEST:CROSS_COMPILE:-profile ps_6_0 -target dxil-assembly -entry main 
 
 [earlydepthstencil]
 float4 main(): SV_Target

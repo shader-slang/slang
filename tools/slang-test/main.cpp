@@ -1,4 +1,4 @@
-﻿// main.cpp
+// main.cpp
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
@@ -916,10 +916,28 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     expectedSpawner.pushExecutablePath(String(g_options.binDir) + "slangc" + osGetExecutableSuffix());
 
     actualSpawner.pushArgument(filePath);
-    expectedSpawner.pushArgument(filePath + ".glsl");
-    expectedSpawner.pushArgument("-pass-through");
-    expectedSpawner.pushArgument("glslang");
 
+    const auto& args = input.testOptions->args;
+
+    const UInt targetIndex = args.IndexOf("-target");
+    if (targetIndex != UInt(-1) && targetIndex + 1 < args.Count())
+    {
+        const auto& target = args[targetIndex + 1];
+
+        if (target == "dxil-assembly")
+        {
+            expectedSpawner.pushArgument(filePath + ".hlsl");
+            expectedSpawner.pushArgument("-pass-through");
+            expectedSpawner.pushArgument("dxc");
+        }
+        else
+        {
+            expectedSpawner.pushArgument(filePath + ".glsl");
+            expectedSpawner.pushArgument("-pass-through");
+            expectedSpawner.pushArgument("glslang");
+        }
+    }
+   
     for( auto arg : input.testOptions->args )
     {
         actualSpawner.pushArgument(arg);
