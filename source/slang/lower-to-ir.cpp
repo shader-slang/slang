@@ -5146,6 +5146,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration<IRReadNoneDecoration>(irFunc);
         }
 
+        if (decl->FindModifier<EarlyDepthStencilAttribute>())
+        {
+            getBuilder()->addDecoration<IREarlyDepthStencilDecoration>(irFunc);
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list

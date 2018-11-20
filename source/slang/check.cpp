@@ -2072,6 +2072,11 @@ namespace Slang
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
                 }
+                else if (attr.As<EarlyDepthStencilAttribute>())
+                {
+                    // Has no args
+                    SLANG_ASSERT(attr->args.Count() == 0);
+                }
                 else
                 {
                     if(attr->args.Count() == 0)
