@@ -141,7 +141,14 @@ static void emitReflectionVarBindingInfoJSON(
         {
             write(writer, ", ");
             write(writer, "\"count\": ");
-            write(writer, count);
+            if( count == SLANG_UNBOUNDED_SIZE )
+            {
+                write(writer, "\"unbounded\"");
+            }
+            else
+            {
+                write(writer, count);
+            }
         }
     }
 }
