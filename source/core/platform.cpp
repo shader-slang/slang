@@ -85,10 +85,13 @@ namespace Slang
 	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_LOCAL);
 	if(!h)
 	{
+#if 0
+        // We can't output the error message here, because it will cause output when testing what code gen is available
 		if(auto msg = dlerror())
 		{
 			fprintf(stderr, "error: %s\n", msg);
 		}
+#endif
         return SLANG_FAIL;
 	}
     handleOut = (Handle)h;

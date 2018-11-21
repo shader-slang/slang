@@ -311,7 +311,10 @@ namespace Slang
             const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
             if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
             {
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                if (sink)
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                }
                 return nullptr;
             }
         }

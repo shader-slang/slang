@@ -1,4 +1,4 @@
-﻿#include "../../slang.h"
+#include "../../slang.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
@@ -1145,6 +1145,14 @@ SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
 {
     auto s = SESSION(session);
     return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
+}
+
+SLANG_API SlangResult spSessionHasCompileTargetSupport(
+    SlangSession*                session,
+    SlangCompileTarget           target)
+{
+    auto s = SESSION(session);
+    return Slang::hasCodeGenTarget(s, Slang::CodeGenTarget(target)) ? SLANG_OK : SLANG_FAIL;
 }
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(

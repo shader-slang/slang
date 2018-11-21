@@ -181,6 +181,64 @@ namespace Slang
     }
 
 
+    bool hasCodeGenTarget(Session* session, CodeGenTarget target)
+    {
+        switch (target)
+        {
+            case CodeGenTarget::Unknown:     return false;
+            case CodeGenTarget::None:       return true;
+            case CodeGenTarget::GLSL:
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                // Can always output GLSL
+                return true;
+            }
+            case CodeGenTarget::HLSL:
+            {
+                // Can always output HLSL
+                return true;
+            }
+            case CodeGenTarget::SPIRVAssembly:
+            case CodeGenTarget::SPIRV:
+            {
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) != nullptr;
+#else
+                return false;
+#endif
+            }            
+            case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::DXBytecodeAssembly:
+            {
+#if SLANG_ENABLE_DXBC_SUPPORT
+                // Must have fxc
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) != nullptr;
+#else
+                return false;
+#endif
+            }
+
+            case CodeGenTarget::DXIL:
+            case CodeGenTarget::DXILAssembly:
+            {
+#if SLANG_ENABLE_DXIL_SUPPORT
+                // Must have dxc
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
+                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr);
+#else
+                return false;
+#endif
+            }
+
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled target");
+                return false;
+            }
+        }
+    }
+
     //
 
     String emitHLSLForEntryPoint(

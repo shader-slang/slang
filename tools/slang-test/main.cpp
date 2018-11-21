@@ -900,6 +900,25 @@ TestResult runEvalTest(TestContext* context, TestInput& input)
     return result;
 }
 
+static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
+{
+#define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
+
+    CASE("hlsl", HLSL)
+    CASE("glsl", GLSL)
+    CASE("dxbc", DXBC)
+    CASE("dxbc-assembly", DXBC_ASM)
+    CASE("dxbc-asm", DXBC_ASM)
+    CASE("spirv", SPIRV)
+    CASE("spirv-assembly", SPIRV_ASM)
+    CASE("spirv-asm", SPIRV_ASM)
+    CASE("dxil", DXIL)
+    CASE("dxil-assembly", DXIL_ASM)
+    CASE("dxil-asm", DXIL_ASM)
+#undef CASE
+
+    return SLANG_TARGET_UNKNOWN;
+}
 
 TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 {
@@ -922,19 +941,30 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     const UInt targetIndex = args.IndexOf("-target");
     if (targetIndex != UInt(-1) && targetIndex + 1 < args.Count())
     {
-        const auto& target = args[targetIndex + 1];
+        SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
-        if (target == "dxil-assembly")
+        // Check the session supports it. If not we ignore it
+        if (SLANG_FAILED(spSessionHasCompileTargetSupport(context->getSession(), target)))
         {
-            expectedSpawner.pushArgument(filePath + ".hlsl");
-            expectedSpawner.pushArgument("-pass-through");
-            expectedSpawner.pushArgument("dxc");
+            return TestResult::Ignored;
         }
-        else
+
+        switch (target)
         {
-            expectedSpawner.pushArgument(filePath + ".glsl");
-            expectedSpawner.pushArgument("-pass-through");
-            expectedSpawner.pushArgument("glslang");
+            case SLANG_DXIL_ASM:
+            {
+                expectedSpawner.pushArgument(filePath + ".hlsl");
+                expectedSpawner.pushArgument("-pass-through");
+                expectedSpawner.pushArgument("dxc");
+                break;
+            }
+            default:
+            {
+                expectedSpawner.pushArgument(filePath + ".glsl");
+                expectedSpawner.pushArgument("-pass-through");
+                expectedSpawner.pushArgument("glslang");
+                break;
+            }
         }
     }
    
@@ -1978,7 +2008,13 @@ int main(
     }
 
     // Setup the context 
-    TestContext context(g_options.outputMode);
+    TestContext context;
+    if (SLANG_FAILED(context.init(g_options.outputMode)))
+    {
+        // Unable to initialize context
+        return 1;
+    }
+
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
     context.m_isVerbose = g_options.shouldBeVerbose;
 
