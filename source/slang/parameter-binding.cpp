@@ -48,45 +48,165 @@ static bool rangesOverlap(UsedRange const& x, UsedRange const& y)
 
 struct UsedRanges
 {
+    // The `ranges` array maintains a sorted list of `UsedRange`
+    // objects such that the `end` of a range is <= the `begin`
+    // of any range that comes after it.
+    //
+    // The values covered by each `[begin,end)` range are marked
+    // as used, and anything not in such an interval is implicitly
+    // free.
+    //
+    // TODO: if it ever starts to matter for performance, we
+    // could encode this information as a tree instead of an array.
+    //
     List<UsedRange> ranges;
 
     // Add a range to the set, either by extending
-    // an existing range, or by adding a new one...
+    // existing range(s), or by adding a new one.
     //
     // If we find that the new range overlaps with
     // an existing range for a *different* parameter
     // then we return that parameter so that the
     // caller can issue an error.
-    ParameterInfo* Add(UsedRange const& range)
+    //
+    ParameterInfo* Add(UsedRange range)
     {
+        // The invariant on entry to this
+        // function is that the `ranges` array
+        // is sorted and no two entries in the
+        // array intersect. We must preserve
+        // that property as a postcondition.
+        //
+        // The other postcondition is that the
+        // interval covered by the input `range`
+        // must be marked as consumed.
+
+        // We will try track any parameter associated
+        // with an overlapping range that doesn't
+        // match the parameter on `range`, so that
+        // the compiler can issue useful diagnostics.
+        //
         ParameterInfo* newParam = range.parameter;
         ParameterInfo* existingParam = nullptr;
-        for (auto& rr : ranges)
+
+        // A clever algorithm might use a binary
+        // search to identify the first entry in `ranges`
+        // that might overlap `range`, but we are going
+        // to settle for being less clever for now, in
+        // the hopes that we can at least be correct.
+        //
+        // Note: we are going to iterate over `ranges`
+        // using indices, because we may actually modify
+        // the array as we go.
+        //
+        Int rangeCount = ranges.Count();
+        for(Int rr = 0; rr < rangeCount; ++rr)
         {
-            if (rangesOverlap(rr, range)
-                && rr.parameter
-                && rr.parameter != newParam)
+            auto existingRange = ranges[rr];
+
+            // The invariant on entry to each loop
+            // iteration will be that `range` does
+            // *not* intersect any preceding entry
+            // in the array.
+            //
+            // Note that this invariant might be
+            // true only because we modified
+            // `range` along the way.
+            //
+            // If `range` does not intertsect `existingRange`
+            // then our invariant will be trivially
+            // true for the next iteration.
+            //
+            if(!rangesOverlap(existingRange, range))
             {
-                // there was an overlap!
-                existingParam = rr.parameter;
+                continue;
             }
+
+            // We now know that `range` and `existingRange`
+            // intersect. The first thing to do
+            // is to check if we have a parameter
+            // associated with `existingRange`, so
+            // that we can use it for emitting diagnostics
+            // about the overlap:
+            //
+            if( existingRange.parameter
+                && existingRange.parameter != newParam)
+            {
+                // There was an overlap with a range that
+                // had a parameter specified, so we will
+                // use that parameter in any subsequent
+                // diagnostics.
+                //
+                existingParam = existingRange.parameter;
+            }
+
+            // Before we can move on in our iteration,
+            // we need to re-establish our invariant by modifying
+            // `range` so that it doesn't overlap with `existingRange`.
+            // Of course we also want to end up with a correct
+            // result for the overall operation, so we can't just
+            // throw away intervals.
+            //
+            // We first note that if `range` starts before `existingRange`,
+            // then the interval from `range.begin` to `existingRange.begin`
+            // needs to be accounted for in the final result. Furthermore,
+            // the interval `[range.begin, existingRange.begin)` could not
+            // intersect with any range already in the `ranges` array,
+            // because it comes strictly before `existingRange`, and our
+            // invariant says there is no intersection with preceding ranges.
+            //
+            if(range.begin < existingRange.begin)
+            {
+                UsedRange prefix;
+                prefix.begin = range.begin;
+                prefix.end = existingRange.begin;
+                prefix.parameter = range.parameter;
+                ranges.Add(prefix);
+            }
+            //
+            // Now we know that the interval `[range.begin, existingRange.begin)`
+            // is claimed, if it exists, and clearly the interval
+            // `[existingRange.begin, existingRange.end)` is already claimed,
+            // so the only interval left to consider would be
+            // `[existingRange.end, range.end)`, if it is non-empty.
+            // That range might intersect with others in the array, so
+            // we will need to continue iterating to deal with that
+            // possibility.
+            //
+            range.begin = existingRange.end;
+
+            // If the range would be empty, then of course we have nothing
+            // left to do.
+            //
+            if(range.begin >= range.end)
+                break;
+
+            // Otherwise, have can be sure that `range` now comes
+            // strictly *after* `existingRange`, and thus our invariant
+            // is preserved.
         }
 
-        for (auto& rr : ranges)
+        // If we manage to exit the loop, then we have resolved
+        // an intersection with existing entries - possibly by
+        // adding some new entries.
+        //
+        // If the `range` we are left with is still non-empty,
+        // then we should go ahead and add it.
+        //
+        if(range.begin < range.end)
         {
-            if (rr.begin == range.end)
-            {
-                rr.begin = range.begin;
-                return existingParam;
-            }
-            else if (rr.end == range.begin)
-            {
-                rr.end = range.end;
-                return existingParam;
-            }
+            ranges.Add(range);
         }
-        ranges.Add(range);
+
+        // Any ranges that got added along the way might not
+        // be in the proper sorted order, so we'll need to
+        // sort the array to restore our global invariant.
+        //
         ranges.Sort();
+
+        // We end by returning an overlapping parameter that
+        // we found along the way, if any.
+        //
         return existingParam;
     }
 
@@ -96,6 +216,15 @@ struct UsedRanges
         range.parameter = param;
         range.begin = begin;
         range.end = end;
+        return Add(range);
+    }
+
+    ParameterInfo* Add(ParameterInfo* param, UInt begin, LayoutSize end)
+    {
+        UsedRange range;
+        range.parameter = param;
+        range.begin = begin;
+        range.end = end.isFinite() ? end.getFiniteValue() : UInt(-1);
         return Add(range);
     }
 
@@ -152,7 +281,7 @@ struct ParameterBindingInfo
 {
     size_t              space;
     size_t              index;
-    size_t              count;
+    LayoutSize          count;
 };
 
 enum
@@ -1295,7 +1424,7 @@ static void addExplicitParameterBinding(
     RefPtr<ParameterInfo>       parameterInfo,
     VarDeclBase*                varDecl,
     LayoutSemanticInfo const&   semanticInfo,
-    UInt                        count,
+    LayoutSize                  count,
     RefPtr<UsedRangeSet>        usedRangeSet = nullptr)
 {
     auto kind = semanticInfo.kind;
@@ -1384,10 +1513,10 @@ static void addExplicitParameterBindings_HLSL(
         // of the given kind.
 
         auto typeRes = typeLayout->FindResourceInfo(kind);
-        int count = 0;
+        LayoutSize count = 0;
         if (typeRes)
         {
-            count = (int) typeRes->count;
+            count = typeRes->count;
         }
         else
         {
@@ -1463,7 +1592,7 @@ static void addExplicitParameterBindings_GLSL(
     auto count = resInfo->count;
     semanticInfo.kind = kind;
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, int(count), usedRangeSet);
+    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count, usedRangeSet);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -1505,6 +1634,85 @@ static void completeBindingsForParameter(
     auto firstVarLayout = parameterInfo->varLayouts.First();
     auto firstTypeLayout = firstVarLayout->typeLayout;
 
+    // We need to deal with allocation of full register spaces first,
+    // since that is the most complicated bit of logic.
+    //
+    // We will compute how many full register spaces the parameter
+    // needs to allocate, across all the kinds of resources it
+    // consumes, so that we can allocate a contiguous range of
+    // spaces.
+    //
+    UInt spacesToAllocateCount = 0;
+    for(auto typeRes : firstTypeLayout->resourceInfos)
+    {
+        auto kind = typeRes.kind;
+
+        // We want to ignore resource kinds for which the user
+        // has specified an explicit binding, since those won't
+        // go into our contiguously allocated range.
+        //
+        auto& bindingInfo = parameterInfo->bindingInfo[(int)kind];
+        if( bindingInfo.count != 0 )
+        {
+            continue;
+        }
+
+        // Now we inspect the kind of resource to figure out
+        // its space requirements:
+        //
+        switch( kind )
+        {
+        default:
+            // An unbounded-size array will need its own space.
+            //
+            if( typeRes.count.isInfinite() )
+            {
+                spacesToAllocateCount++;
+            }
+            break;
+
+        case LayoutResourceKind::RegisterSpace:
+            // If the parameter consumes any full spaces (e.g., it
+            // is a `struct` type with one or more unbounded arrays
+            // for fields), then we will include those spaces in
+            // our allocaiton.
+            //
+            // We assume/require here that we never end up needing
+            // an unbounded number of spaces.
+            // TODO: we should enforce that somewhere with an error.
+            //
+            spacesToAllocateCount += typeRes.count.getFiniteValue();
+            break;
+
+        case LayoutResourceKind::Uniform:
+            // We want to ignore uniform data for this calculation,
+            // since any uniform data in top-level shader parameters
+            // needs to go into a global constant buffer.
+            //
+            break;
+
+        case LayoutResourceKind::GenericResource:
+            // This is more of a marker case, and shouldn't ever
+            // need a space allocated to it.
+            break;
+        }
+    }
+
+    // If we compute that the parameter needs some number of full
+    // spaces allocated to it, then we will go ahead and allocate
+    // contiguous spaces here.
+    //
+    UInt firstAllocatedSpace = 0;
+    if(spacesToAllocateCount)
+    {
+        firstAllocatedSpace = allocateUnusedSpaces(context, spacesToAllocateCount);
+    }
+
+    // We'll then dole the allocated spaces (if any) out to the resource
+    // categories that need them.
+    //
+    UInt currentAllocatedSpace = firstAllocatedSpace;
+
     for(auto typeRes : firstTypeLayout->resourceInfos)
     {
         // Did we already apply some explicit binding information
@@ -1514,87 +1722,115 @@ static void completeBindingsForParameter(
         if( bindingInfo.count != 0 )
         {
             // If things have already been bound, our work is done.
+            //
+            // TODO: it would be good to handle the case where a
+            // binding specified a space, but not an offset/index
+            // for some kind of resource.
+            //
             continue;
         }
 
         auto count = typeRes.count;
 
-        // We need to special-case the scenario where
-        // a parameter wants to claim an entire register
-        // space to itself (for a parameter block), since
-        // that can't be handled like other resources.
-        if (kind == LayoutResourceKind::RegisterSpace)
+        // Certain resource kinds require special handling.
+        //
+        // Note: This `switch` statement should have a `case` for
+        // all of the special cases above that affect the computation of
+        // `spacesToAllocateCount`.
+        //
+        switch( kind )
         {
-            // We need to snag a register space of our own.
+        case LayoutResourceKind::RegisterSpace:
+            {
+                // The parameter's type needs to consume some number of whole
+                // register spaces, and we have already allocated a contiguous
+                // range of spaces above.
+                //
+                // As always, we can't handle the case of a parameter that needs
+                // an infinite number of spaces.
+                //
+                SLANG_ASSERT(count.isFinite());
+                bindingInfo.count = count;
 
-            UInt space = allocateUnusedSpaces(context, count);
+                // We will use the spaces we've allocated, and bump
+                // the variable tracking the "current" space by
+                // the number of spaces consumed.
+                //
+                bindingInfo.index = currentAllocatedSpace;
+                currentAllocatedSpace += count.getFiniteValue();
+
+                // TODO: what should we store as the "space" for
+                // an allocation of register spaces? Either zero
+                // or `space` makes sense, but it isn't clear
+                // which is a better choice.
+                bindingInfo.space = 0;
+
+                continue;
+            }
+
+        case LayoutResourceKind::GenericResource:
+            {
+                // `GenericResource` is somewhat confusingly named,
+                // but simply indicates that the type of this parameter
+                // in some way depends on a generic parameter that has
+                // not been bound to a concrete value, so that asking
+                // specific questions about its resource usage isn't
+                // really possible.
+                //
+                bindingInfo.space = 0;
+                bindingInfo.count = 1;
+                bindingInfo.index = 0;
+                continue;
+            }
+
+        case LayoutResourceKind::Uniform:
+            // TODO: we don't currently handle global-scope uniform parameters.
+            break;
+        }
+
+        // At this point, we know the parameter consumes some resource
+        // (e.g., D3D `t` registers or Vulkan `binding`s), and the user
+        // didn't specify an explicit binding, so we will have to
+        // assign one for them.
+        //
+        // If we are consuming an infinite amount of the given resource
+        // (e.g., an unbounded array of `Texure2D` requires an infinite
+        // number of `t` regisers in D3D), then we will go ahead
+        // and assign a full space:
+        //
+        if( count.isInfinite() )
+        {
+            bindingInfo.count = count;
+            bindingInfo.index = 0;
+            bindingInfo.space = currentAllocatedSpace;
+            currentAllocatedSpace++;
+        }
+        else
+        {
+            // If we have a finite amount of resources, then
+            // we will go ahead and allocate from the "default"
+            // space.
+
+            UInt space = context->shared->defaultSpace;
+
+            RefPtr<UsedRangeSet> usedRangeSet;
+            switch (kind)
+            {
+            default:
+                usedRangeSet = findUsedRangeSetForSpace(context, space);
+                break;
+
+            case LayoutResourceKind::VertexInput:
+            case LayoutResourceKind::FragmentOutput:
+                usedRangeSet = findUsedRangeSetForTranslationUnit(context, parameterInfo->translationUnit);
+                break;
+            }
 
             bindingInfo.count = count;
-            bindingInfo.index = space;
+            bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(parameterInfo, count.getFiniteValue());
 
-            // TODO: what should we store as the "space" for
-            // an allocation of register spaces? Either zero
-            // or `space` makes sense, but it isn't clear
-            // which is a better choice.
-            bindingInfo.space = 0;
-
-            continue;
+            bindingInfo.space = space;
         }
-        else if (kind == LayoutResourceKind::GenericResource)
-        {
-            bindingInfo.space = 0;
-            bindingInfo.count = 1;
-            bindingInfo.index = 0;
-            continue;
-        }
-
-        // Auto-generated bindings will all go in the same space,
-        // which was allocated up front.
-        //
-        // We don't currently worry about running out of room in
-        // this space; if the user declares enough parameters
-        // to overflow the range then we will have other problems
-        // on our hands.
-        //
-        // The one case that might seem like a challenge is unsized
-        // arrays, since these conceptually require a (countably)
-        // infinite register range.
-        //
-        // This turns out not to be a problem that this code
-        // needs to handle, for two reasons:
-        //
-        // 1) In the D3D case, an unbounded-size array should be
-        // computed to require one (or more) whole register spaces,
-        // and so we'd end up in the `RegisterSpace` case above.
-        //
-        // 2) In the Vulkan case, an unbounded-size array of
-        // resources still uses only a single binding, so we
-        // won't run out of space.
-        //
-        UInt space = context->shared->defaultSpace;
-
-        RefPtr<UsedRangeSet> usedRangeSet;
-        switch (kind)
-        {
-        default:
-            usedRangeSet = findUsedRangeSetForSpace(context, space);
-            break;
-
-        case LayoutResourceKind::VertexInput:
-        case LayoutResourceKind::FragmentOutput:
-            usedRangeSet = findUsedRangeSetForTranslationUnit(context, parameterInfo->translationUnit);
-            break;
-        }
-
-        bindingInfo.count = count;
-        bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(parameterInfo, (int) count);
-
-        bindingInfo.space = space;
-    }
-
-    if (firstTypeLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
-    {
-
     }
 
     // At this point we should have explicit binding locations chosen for
@@ -2055,7 +2291,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
                         SLANG_RELEASE_ASSERT(rr.count != 0);
 
                         auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
-                        fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count;
+                        fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count.getFiniteValue();
                         structRes->count += rr.count;
                     }
                 }
@@ -2073,7 +2309,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
             // so we can find the index of this generic param decl in the list
             genParamTypeLayout->type = type;
             genParamTypeLayout->paramIndex = findGenericParam(context->shared->programLayout->globalGenericParams, globalGenericParam.getDecl());
-            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count++;
+            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
             return genParamTypeLayout;
         }
         else
@@ -2176,7 +2412,7 @@ static void collectEntryPointParameters(
         for (auto rr : paramTypeLayout->resourceInfos)
         {
             auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
-            paramVarLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
+            paramVarLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count.getFiniteValue();
             entryPointRes->count += rr.count;
         }
 
@@ -2208,7 +2444,7 @@ static void collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = entryPointLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
+                resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
         }
@@ -2489,7 +2725,7 @@ void generateParameterBindings(
 
         // Does the field have any uniform data?
         auto layoutInfo = firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-        size_t uniformSize = layoutInfo ? layoutInfo->count : 0;
+        LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
         if( uniformSize != 0 )
         {
             // Make sure uniform fields get laid out properly...
@@ -2498,13 +2734,13 @@ void generateParameterBindings(
                 uniformSize,
                 firstVarLayout->typeLayout->uniformAlignment);
 
-            size_t uniformOffset = globalScopeRules->AddStructField(
+            LayoutSize uniformOffset = globalScopeRules->AddStructField(
                 &structLayoutInfo,
                 fieldInfo);
 
             for( auto& varLayout : parameterInfo->varLayouts )
             {
-                varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
+                varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
             }
         }
 
@@ -2612,27 +2848,29 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         // To recover layout context, we skip generic resources in the first pass
         if (varLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
             continue;
-        SLANG_ASSERT(varLayout->resourceInfos.Count() == varLayout->typeLayout->resourceInfos.Count());
-        auto uniformInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-        auto tUniformInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-        if (uniformInfo)
+
+        if (auto uniformInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform))
         {
             anyUniforms = true;
-            SLANG_ASSERT(tUniformInfo);
-            structLayoutInfo.size = Math::Max(structLayoutInfo.size, uniformInfo->index + tUniformInfo->count);
+
+            if( auto tUniformInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+            {
+                structLayoutInfo.size = maximum(structLayoutInfo.size, uniformInfo->index + tUniformInfo->count);
+            }
         }
-        for (UInt i = 0; i < varLayout->resourceInfos.Count(); i++)
+        for( auto resInfo : varLayout->resourceInfos )
         {
-            auto resInfo = varLayout->resourceInfos[i];
-            auto tresInfo = varLayout->typeLayout->FindResourceInfo(resInfo.kind);
-            SLANG_ASSERT(tresInfo);
-            auto usedRangeSet = findUsedRangeSetForSpace(&context, resInfo.space);
-            markSpaceUsed(&context, resInfo.space);
-            usedRangeSet->usedResourceRanges[(int)resInfo.kind].Add(
-                nullptr, // we don't need to track parameter info here
-                resInfo.index,
-                resInfo.index + tresInfo->count);
+            if( auto tresInfo = varLayout->typeLayout->FindResourceInfo(resInfo.kind) )
+            {
+                auto usedRangeSet = findUsedRangeSetForSpace(&context, resInfo.space);
+                markSpaceUsed(&context, resInfo.space);
+                usedRangeSet->usedResourceRanges[(int)resInfo.kind].Add(
+                    nullptr, // we don't need to track parameter info here
+                    resInfo.index,
+                    resInfo.index + tresInfo->count);
+            }
         }
+
         structLayout->fields[varId] = varLayout;
         varLayoutMapping[varLayout] = varLayout;
     }
@@ -2658,8 +2896,8 @@ RefPtr<ProgramLayout> specializeProgramLayout(
                 layoutContext.with(constantBufferRules),
                 newType);
             auto layoutInfo = newTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-            size_t uniformSize = layoutInfo ? layoutInfo->count : 0;
-            if (uniformSize)
+            LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
+            if (uniformSize != 0)
             {
                 if (globalCBufferInfo.kind == LayoutResourceKind::None)
                 {
@@ -2689,10 +2927,10 @@ RefPtr<ProgramLayout> specializeProgramLayout(
                 UniformLayoutInfo fieldInfo(
                     uniformSize,
                     newTypeLayout->uniformAlignment);
-                size_t uniformOffset = layoutContext.getRulesFamily()->getConstantBufferRules()->AddStructField(
+                LayoutSize uniformOffset = layoutContext.getRulesFamily()->getConstantBufferRules()->AddStructField(
                     &structLayoutInfo,
                     fieldInfo);
-                newVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
+                newVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
                 anyUniforms = true;
             }
             structLayout->fields[varId] = newVarLayout;

@@ -1407,7 +1407,20 @@ extern "C"
     SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* type);
     SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflectionType* type, unsigned index);
 
+        /** Returns the number of elements in the given type.
+
+        This operation is valid for vector and array types. For other types it returns zero.
+
+        When invoked on an unbounded-size array it will return `SLANG_UNBOUNDED_SIZE`,
+        which is defined to be `~size_t(0)`.
+
+        If the size of a type cannot be statically computed, perhaps because it depends on
+        a generic parameter that has not been bound to a specific value, this function returns zero.
+        */
     SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* type);
+
+    #define SLANG_UNBOUNDED_SIZE (~size_t(0))
+
     SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* type);
 
     SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* type);
