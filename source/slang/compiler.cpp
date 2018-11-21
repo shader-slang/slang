@@ -181,31 +181,33 @@ namespace Slang
     }
 
 
-    bool hasCodeGenTarget(Session* session, CodeGenTarget target)
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
     {
         switch (target)
         {
-            case CodeGenTarget::Unknown:     return false;
-            case CodeGenTarget::None:       return true;
+            case CodeGenTarget::None:
+            {
+                return SLANG_OK;
+            }
             case CodeGenTarget::GLSL:
             case CodeGenTarget::GLSL_Vulkan:
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 // Can always output GLSL
-                return true;
+                return SLANG_OK;
             }
             case CodeGenTarget::HLSL:
             {
                 // Can always output HLSL
-                return true;
+                return SLANG_OK;
             }
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
 #if SLANG_ENABLE_GLSLANG_SUPPORT
-                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) != nullptr;
+                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
 #else
-                return false;
+                return SLANG_E_NOT_IMPLEMENTED;
 #endif
             }            
             case CodeGenTarget::DXBytecode:
@@ -213,9 +215,9 @@ namespace Slang
             {
 #if SLANG_ENABLE_DXBC_SUPPORT
                 // Must have fxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) != nullptr;
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND; 
 #else
-                return false;
+                return SLANG_E_NOT_IMPLEMENTED;
 #endif
             }
 
@@ -224,19 +226,18 @@ namespace Slang
             {
 #if SLANG_ENABLE_DXIL_SUPPORT
                 // Must have dxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
-                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr);
+                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
+                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
 #else
-                return false;
+                return SLANG_E_NOT_IMPLEMENTED;
 #endif
             }
-
-            default:
-            {
-                SLANG_ASSERT(!"Unhandled target");
-                return false;
-            }
+            
+            default: break;
         }
+
+        SLANG_ASSERT(!"Unhandled target");
+        return SLANG_FAIL;
     }
 
     //

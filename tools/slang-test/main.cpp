@@ -944,7 +944,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
-        if (SLANG_FAILED(spSessionHasCompileTargetSupport(context->getSession(), target)))
+        if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))
         {
             return TestResult::Ignored;
         }

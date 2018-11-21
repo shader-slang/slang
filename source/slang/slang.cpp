@@ -1147,12 +1147,12 @@ SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
     return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
 }
 
-SLANG_API SlangResult spSessionHasCompileTargetSupport(
+SLANG_API SlangResult spSessionCheckCompileTargetSupport(
     SlangSession*                session,
     SlangCompileTarget           target)
 {
     auto s = SESSION(session);
-    return Slang::hasCodeGenTarget(s, Slang::CodeGenTarget(target)) ? SLANG_OK : SLANG_FAIL;
+    return Slang::checkCompileTargetSupport(s, Slang::CodeGenTarget(target));
 }
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
