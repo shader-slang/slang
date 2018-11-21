@@ -706,6 +706,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                 case kIRDecorationOp_VulkanRayPayload:
                 case kIRDecorationOp_VulkanCallablePayload:
                 case kIRDecorationOp_VulkanHitAttributes:
+                case kIRDecorationOp_EarlyDepthStencil:
                 case kIRDecorationOp_ReadNone:
                 {
                     dstInst.m_payloadType = PayloadType::Empty;
@@ -1564,6 +1565,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         case kIRDecorationOp_VulkanCallablePayload:
         {
             auto decor = createEmptyDecoration<IRVulkanCallablePayloadDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+            return decor;
+        }
+        case kIRDecorationOp_EarlyDepthStencil:
+        {
+            auto decor = createEmptyDecoration<IREarlyDepthStencilDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
             return decor;
         }

@@ -4702,6 +4702,14 @@ struct EmitVisitor
 
             break;
         }
+        case Stage::Pixel:
+        {
+            if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
+            {
+                emit("[earlydepthstencil]\n");
+            }
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -4709,7 +4717,7 @@ struct EmitVisitor
     }
 
     void emitIREntryPointAttributes_GLSL(
-        IRFunc*             /*irFunc*/,
+        IRFunc*             irFunc,
         EmitContext*        /*ctx*/,
         EntryPointLayout*   entryPointLayout)
     {
@@ -4805,6 +4813,15 @@ struct EmitVisitor
 
         }
         break;
+        case Stage::Pixel:
+        {
+            if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
+            {
+                // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
+                emit("layout(early_fragment_tests) in;\n");
+            }
+            break;
+        }
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;

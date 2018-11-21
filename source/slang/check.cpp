@@ -311,7 +311,10 @@ namespace Slang
             const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
             if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
             {
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                if (sink)
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                }
                 return nullptr;
             }
         }
@@ -2068,6 +2071,11 @@ namespace Slang
                     }
                 }
                 else if (attr.As<PushConstantAttribute>())
+                {
+                    // Has no args
+                    SLANG_ASSERT(attr->args.Count() == 0);
+                }
+                else if (attr.As<EarlyDepthStencilAttribute>())
                 {
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);

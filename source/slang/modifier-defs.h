@@ -327,6 +327,7 @@ SIMPLE_SYNTAX_CLASS(FlattenAttribute, Attribute)            // `[flatten]`
 SIMPLE_SYNTAX_CLASS(ForceCaseAttribute, Attribute)          // `[forcecase]`
 SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
 
+
 // [[vk_push_constant]] [[push_constant]]
 SIMPLE_SYNTAX_CLASS(PushConstantAttribute, Attribute)
 
@@ -348,7 +349,7 @@ SYNTAX_CLASS(PatchConstantFuncAttribute, Attribute)
 END_SYNTAX_CLASS()
 SIMPLE_SYNTAX_CLASS(DomainAttribute, Attribute)
 
-SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)  // `[earlydepthstencil]`
 
 // An HLSL `[numthreads(x,y,z)]` attribute
 SYNTAX_CLASS(NumThreadsAttribute, Attribute)

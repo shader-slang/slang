@@ -69,8 +69,8 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
     }
 }
 
-TestContext::TestContext(TestOutputMode outputMode) :
-    m_outputMode(outputMode)
+TestContext::TestContext() :
+    m_outputMode(TestOutputMode::Default)
 {
     m_totalTestCount = 0;
     m_passedTestCount = 0;
@@ -82,6 +82,29 @@ TestContext::TestContext(TestOutputMode outputMode) :
     m_inTest = false;
     m_dumpOutputOnFailure = false;
     m_isVerbose = false;
+
+    m_session = nullptr;
+}
+
+Result TestContext::init(TestOutputMode outputMode)
+{
+    m_outputMode = outputMode;
+
+    m_session = spCreateSession(nullptr);
+    if (!m_session)
+    {
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+TestContext::~TestContext()
+{
+    if (m_session)
+    {
+        spDestroySession(m_session);
+    }
 }
 
 bool TestContext::canWriteStdError() const

@@ -124,8 +124,16 @@ class TestContext
         /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
 
+        /// Get the slang session
+    SlangSession* getSession() const { return m_session;  }
+
+    SlangResult init(TestOutputMode outputMode);
+
         /// Ctor
-    TestContext(TestOutputMode outputMode);
+    TestContext();
+        /// Dtor
+    ~TestContext();
+
 
     static TestResult combine(TestResult a, TestResult b) { return (a > b) ? a : b; }
 
@@ -158,6 +166,8 @@ protected:
     int m_numFailResults;
 
     bool m_inTest;
+
+    SlangSession* m_session;
     
     static TestContext* s_context;
 };

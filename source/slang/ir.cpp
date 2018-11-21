@@ -2949,6 +2949,11 @@ namespace Slang
                     dump(context, "\n[__readNone]");
                 }
                 break;
+            case kIRDecorationOp_EarlyDepthStencil:
+                {
+                    dump(context, "\n[earlydepthstencil]");
+                }
+                break;
             }
         }
     }
@@ -5387,7 +5392,11 @@ namespace Slang
                     context->builder->addDecoration<IRVulkanCallablePayloadDecoration>(clonedValue);
                 }
                 break;
-
+            case kIRDecorationOp_EarlyDepthStencil:
+                {
+                    context->builder->addDecoration<IREarlyDepthStencilDecoration>(clonedValue);
+                }
+                break;
             case kIRDecorationOp_VulkanHitAttributes:
                 {
                     context->builder->addDecoration<IRVulkanHitAttributesDecoration>(clonedValue);

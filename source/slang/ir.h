@@ -160,6 +160,8 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_ReadNone,
     kIRDecorationOp_VulkanCallablePayload,
 
+    kIRDecorationOp_EarlyDepthStencil,
+
     kIRDecorationOp_CountOf
 };
 

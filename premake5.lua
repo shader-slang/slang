@@ -435,7 +435,7 @@ tool "slang-generate"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core" }
+    links { "core", "slang" }
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty

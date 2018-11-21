@@ -1,4 +1,4 @@
-﻿#ifndef SLANG_COMPILER_H_INCLUDED
+#ifndef SLANG_COMPILER_H_INCLUDED
 #define SLANG_COMPILER_H_INCLUDED
 
 #include "../core/basic.h"
@@ -498,6 +498,9 @@ namespace Slang
         CompileRequest* compileRequest,
         char const*     text,
         CodeGenTarget   target);
+
+    /* Returns true if a codeGen target is available. */
+    bool hasCodeGenTarget(Session* session, CodeGenTarget target);
 
     struct TypeCheckingCache;
     //
