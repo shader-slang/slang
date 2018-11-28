@@ -98,7 +98,15 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         }
     ],

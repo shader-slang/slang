@@ -189,7 +189,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
 
     // TODO: maybe filter based on kind
 
-    if(auto declRefType = dynamic_cast<DeclRefType*>(type))
+    if(auto declRefType = type->As<DeclRefType>())
     {
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.As<StructDecl>())
@@ -208,7 +208,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
 
     // TODO: maybe filter based on kind
 
-    if(auto declRefType = dynamic_cast<DeclRefType*>(type))
+    if(auto declRefType = type->As<DeclRefType>())
     {
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.As<StructDecl>())
@@ -226,11 +226,11 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
+    if(auto arrayType = type->As<ArrayExpressionType>())
     {
         return arrayType->ArrayLength ? (size_t) GetIntVal(arrayType->ArrayLength) : 0;
     }
-    else if( auto vectorType = dynamic_cast<VectorExpressionType*>(type))
+    else if( auto vectorType = type->As<VectorExpressionType>())
     {
         return (size_t) GetIntVal(vectorType->elementCount);
     }
@@ -243,19 +243,19 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     auto type = convert(inType);
     if(!type) return nullptr;
 
-    if(auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
+    if(auto arrayType = type->As<ArrayExpressionType>())
     {
         return (SlangReflectionType*) arrayType->baseType.Ptr();
     }
-    else if( auto constantBufferType = dynamic_cast<ConstantBufferType*>(type))
+    else if( auto constantBufferType = type->As<ConstantBufferType>())
     {
         return convert(constantBufferType->elementType.Ptr());
     }
-    else if( auto vectorType = dynamic_cast<VectorExpressionType*>(type))
+    else if( auto vectorType = type->As<VectorExpressionType>())
     {
         return convert(vectorType->elementType.Ptr());
     }
-    else if( auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
+    else if( auto matrixType = type->As<MatrixExpressionType>())
     {
         return convert(matrixType->getElementType());
     }
@@ -268,15 +268,15 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
+    if(auto matrixType = type->As<MatrixExpressionType>())
     {
         return (unsigned int) GetIntVal(matrixType->getRowCount());
     }
-    else if(auto vectorType = dynamic_cast<VectorExpressionType*>(type))
+    else if(auto vectorType = type->As<VectorExpressionType>())
     {
         return 1;
     }
-    else if( auto basicType = dynamic_cast<BasicExpressionType*>(type) )
+    else if( auto basicType = type->As<BasicExpressionType>() )
     {
         return 1;
     }
@@ -289,15 +289,15 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
+    if(auto matrixType = type->As<MatrixExpressionType>())
     {
         return (unsigned int) GetIntVal(matrixType->getColumnCount());
     }
-    else if(auto vectorType = dynamic_cast<VectorExpressionType*>(type))
+    else if(auto vectorType = type->As<VectorExpressionType>())
     {
         return (unsigned int) GetIntVal(vectorType->elementCount);
     }
-    else if( auto basicType = dynamic_cast<BasicExpressionType*>(type) )
+    else if( auto basicType = type->As<BasicExpressionType>() )
     {
         return 1;
     }
@@ -310,16 +310,16 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = dynamic_cast<MatrixExpressionType*>(type))
+    if(auto matrixType = type->As<MatrixExpressionType>())
     {
         type = matrixType->getElementType();
     }
-    else if(auto vectorType = dynamic_cast<VectorExpressionType*>(type))
+    else if(auto vectorType = type->As<VectorExpressionType>())
     {
         type = vectorType->elementType.Ptr();
     }
 
-    if(auto basicType = dynamic_cast<BasicExpressionType*>(type))
+    if(auto basicType = type->As<BasicExpressionType>())
     {
         switch (basicType->baseType)
         {
