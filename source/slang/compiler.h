@@ -500,7 +500,7 @@ namespace Slang
         CodeGenTarget   target);
 
     /* Returns true if a codeGen target is available. */
-    bool hasCodeGenTarget(Session* session, CodeGenTarget target);
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
 
     struct TypeCheckingCache;
     //
