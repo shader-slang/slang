@@ -1268,6 +1268,10 @@ void addVarDecorations(
         {
             builder->addDecoration<IRVulkanHitAttributesDecoration>(inst);
         }
+        else if(mod.As<GloballyCoherentModifier>())
+        {
+            builder->addDecoration<IRGloballyCoherentDecoration>(inst);
+        }
 
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -3764,6 +3768,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irGlobal, decl);
 
         maybeSetRate(context, irGlobal, decl);
+
+        addVarDecorations(context, irGlobal, decl);
 
         if (decl)
         {
