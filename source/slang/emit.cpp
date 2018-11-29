@@ -5426,6 +5426,23 @@ struct EmitVisitor
             emit("hitAttributeNV\n");
         }
 
+        if(varDecl->findDecoration<IRGloballyCoherentDecoration>())
+        {
+            switch(getTarget(context))
+            {
+            default:
+                break;
+
+            case CodeGenTarget::HLSL:
+                emit("globallycoherent\n");
+                break;
+
+            case CodeGenTarget::GLSL:
+                emit("coherent\n");
+                break;
+            }
+        }
+
         if (!layout)
             return;
 

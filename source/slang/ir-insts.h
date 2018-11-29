@@ -165,6 +165,11 @@ struct IREarlyDepthStencilDecoration : IRDecoration
     enum { kDecorationOp = kIRDecorationOp_EarlyDepthStencil };
 };
 
+struct IRGloballyCoherentDecoration : IRDecoration
+{
+    enum { kDecorationOp = kIRDecorationOp_GloballyCoherent };
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)

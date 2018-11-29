@@ -2954,6 +2954,11 @@ namespace Slang
                     dump(context, "\n[earlydepthstencil]");
                 }
                 break;
+            case kIRDecorationOp_GloballyCoherent:
+                {
+                    dump(context, "\n[globallycoherent]");
+                }
+                break;
             }
         }
     }
@@ -5395,6 +5400,11 @@ namespace Slang
             case kIRDecorationOp_EarlyDepthStencil:
                 {
                     context->builder->addDecoration<IREarlyDepthStencilDecoration>(clonedValue);
+                }
+                break;
+            case kIRDecorationOp_GloballyCoherent:
+                {
+                    context->builder->addDecoration<IRGloballyCoherentDecoration>(clonedValue);
                 }
                 break;
             case kIRDecorationOp_VulkanHitAttributes:
