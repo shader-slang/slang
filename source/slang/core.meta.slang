@@ -13,6 +13,10 @@ typedef uint uint32_t;
 // as part of translation.
 syntax constexpr : ConstExprModifier;
 
+// Modifier for variables that should have writes be made
+// visible at the global-memory scope
+syntax globallycoherent : GloballyCoherentModifier;
+
 // A type that can be used as an operand for builtins
 interface __BuiltinType {}
 

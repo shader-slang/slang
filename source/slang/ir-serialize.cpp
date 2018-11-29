@@ -708,6 +708,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                 case kIRDecorationOp_VulkanHitAttributes:
                 case kIRDecorationOp_EarlyDepthStencil:
                 case kIRDecorationOp_ReadNone:
+                case kIRDecorationOp_GloballyCoherent:
                 {
                     dstInst.m_payloadType = PayloadType::Empty;
                     break;
@@ -1571,6 +1572,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
         case kIRDecorationOp_EarlyDepthStencil:
         {
             auto decor = createEmptyDecoration<IREarlyDepthStencilDecoration>(m_module);
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
+            return decor;
+        }
+        case kIRDecorationOp_GloballyCoherent:
+        {
+            auto decor = createEmptyDecoration<IRGloballyCoherentDecoration>(m_module);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
             return decor;
         }

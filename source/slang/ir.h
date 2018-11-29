@@ -161,6 +161,7 @@ enum IRDecorationOp : uint16_t
     kIRDecorationOp_VulkanCallablePayload,
 
     kIRDecorationOp_EarlyDepthStencil,
+    kIRDecorationOp_GloballyCoherent,
 
     kIRDecorationOp_CountOf
 };
