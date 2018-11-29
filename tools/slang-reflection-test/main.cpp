@@ -372,6 +372,27 @@ static void emitReflectionTypeInfoJSON(
                 }
                 write(writer, "\"");
             }
+
+            // TODO: We should really print the result type for all resource
+            // types, but current test output depends on the old behavior, so
+            // we only add result type output for structured buffers at first.
+            //
+            switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+            {
+            default:
+                break;
+
+            case SLANG_STRUCTURED_BUFFER:
+                if( auto resultType = type->getResourceResultType() )
+                {
+                    write(writer, ",\n");
+                    write(writer, "\"resultType\": ");
+                    emitReflectionTypeJSON(
+                        writer,
+                        resultType);
+                }
+                break;
+            }
         }
         break;
 

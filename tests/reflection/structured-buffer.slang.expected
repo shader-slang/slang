@@ -1,0 +1,75 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "x",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "y",
+            "binding": {"kind": "shaderResource", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 2,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "z",
+            "binding": {"kind": "shaderResource", "index": 2},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "resultType": {
+                    "kind": "struct",
+                    "fields": [
+                        "name": "a",
+                        "type": {
+                            "kind": "vector",
+                            "elementCount": 2,
+                            "elementType": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            }
+                        },
+                        "name": "b",
+                        "type": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        },
+                        "name": "c",
+                        "type": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
+    ]
+}
+}
