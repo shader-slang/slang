@@ -489,11 +489,24 @@ SlangResult innerMain(int argc, char** argv)
 			return SLANG_FAIL;
 	}
 
+    if (!renderer)
+    {
+        fprintf(stderr, "Unable to create renderer\n");
+        return SLANG_FAIL;
+    }
+
     Renderer::Desc desc;
     desc.width = gWindowWidth;
     desc.height = gWindowHeight;
 
-	SLANG_RETURN_ON_FAIL(renderer->initialize(desc, windowHandle));
+    {
+        Result res = renderer->initialize(desc, windowHandle);
+        if (SLANG_FAILED(res))
+        {
+            fprintf(stderr, "Unable to initialize renderer\n");
+            return res;
+        }
+    }
 
     ShaderCompiler shaderCompiler;
     shaderCompiler.renderer = renderer;
