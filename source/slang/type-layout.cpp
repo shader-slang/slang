@@ -823,7 +823,7 @@ static bool isOpenGLTarget(TargetRequest*)
     return false;
 }
 
-static bool isD3DTarget(TargetRequest* targetReq)
+bool isD3DTarget(TargetRequest* targetReq)
 {
     switch( targetReq->target )
     {
@@ -836,6 +836,20 @@ static bool isD3DTarget(TargetRequest* targetReq)
 
     default:
         return false;
+    }
+}
+
+bool isKhronosTarget(TargetRequest* targetReq)
+{
+    switch( targetReq->target )
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        return true;
     }
 }
 
@@ -886,21 +900,9 @@ static bool isSM5_1OrLater(TargetRequest* targetReq)
 
 static bool isVulkanTarget(TargetRequest* targetReq)
 {
-    switch( targetReq->target )
-    {
-    default:
-        return false;
-
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly:
-        break;
-    }
-
-    // For right now, any GLSL-related target is assumed
+    // For right now, any Khronos-related target is assumed
     // to be a Vulkan target.
-
-    return true;
+    return isKhronosTarget(targetReq);
 }
 
 static bool shouldAllocateRegisterSpaceForParameterBlock(

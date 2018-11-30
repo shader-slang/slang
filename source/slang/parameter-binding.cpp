@@ -338,7 +338,7 @@ struct SharedParameterBindingContext
     // TODO: We should eventually strip this down to
     // just the subset of fields on the target that
     // can influence layout decisions.
-    TargetRequest*  targetRequest;
+    TargetRequest*  targetRequest = nullptr;
 
     LayoutRulesFamilyImpl* defaultLayoutRules;
 
@@ -1491,6 +1491,26 @@ static void addExplicitParameterBindings_HLSL(
     RefPtr<ParameterInfo>       parameterInfo,
     RefPtr<VarLayout>           varLayout)
 {
+    // We only want to apply D3D `register` modifiers when compiling for
+    // D3D targets.
+    //
+    // TODO: Nominally, the `register` keyword allows for a shader
+    // profile to be specified, so that a given binding only
+    // applies for a specific profile:
+    //
+    //      https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dx-graphics-hlsl-variable-register
+    //
+    // We might want to consider supporting that syntax in the
+    // long run, in order to handle bindings for multiple targets
+    // in a more consistent fashion (whereas using `register` for D3D
+    // and `[[vk::binding(...)]]` for Vulkan creates a lot of
+    // visual noise).
+    //
+    // For now we do the filtering on target in a very direct fashion:
+    //
+    if(!isD3DTarget(context->getTargetRequest()))
+        return;
+
     auto typeLayout = varLayout->typeLayout;
     auto varDecl = varLayout->varDecl;
 
@@ -1527,11 +1547,35 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
+static void maybeDiagnoseMissingVulkanLayoutModifier(
+    ParameterBindingContext*    context,
+    DeclRef<VarDeclBase> const& varDecl)
+{
+    // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
+    // but they *did* specify a `register` for D3D, then that is probably an
+    // oversight on their part.
+    if( auto registerModifier = varDecl.getDecl()->FindModifier<HLSLRegisterSemantic>() )
+    {
+        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.GetName());
+    }
+}
+
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
     RefPtr<VarLayout>           varLayout)
 {
+
+    // We only want to apply GLSL-style layout modifers
+    // when compiling for a Khronos-related target.
+    //
+    // TODO: This should have some finer granularity
+    // so that we are able to distinguish between
+    // Vulkan and OpenGL as targets.
+    //
+    if(!isKhronosTarget(context->getTargetRequest()))
+        return;
+
     auto typeLayout = varLayout->typeLayout;
     auto varDecl = varLayout->varDecl;
 
@@ -1556,6 +1600,7 @@ static void addExplicitParameterBindings_GLSL(
         auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
         if (!attr)
         {
+            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
             return;
         }
         semanticInfo.index = attr->binding;
@@ -2564,6 +2609,7 @@ void generateParameterBindings(
     sharedContext.compileRequest = compileReq;
     sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
     sharedContext.programLayout = programLayout;
+    sharedContext.targetRequest = targetReq;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope
@@ -2816,6 +2862,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     sharedContext.compileRequest = targetReq->compileRequest;
     sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
     sharedContext.programLayout = newProgramLayout;
+    sharedContext.targetRequest = targetReq;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope
