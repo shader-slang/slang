@@ -446,7 +446,10 @@ extern "C"
     enum
     {
         /* When compiling for a D3D Shader Model 5.1 or higher target, allocate
-           distinct register spaces for parameter blocks. */
+           distinct register spaces for parameter blocks.
+
+           @deprecated This behavior is now enabled unconditionally.
+        */
         SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES = 1 << 4,
     };
 
