@@ -868,6 +868,22 @@ static bool isSM5OrEarlier(TargetRequest* targetReq)
     return false;
 }
 
+static bool isSM5_1OrLater(TargetRequest* targetReq)
+{
+    if(!isD3DTarget(targetReq))
+        return false;
+
+    auto profile = targetReq->targetProfile;
+
+    if(profile.getFamily() == ProfileFamily::DX)
+    {
+        if(profile.GetVersion() >= ProfileVersion::DX_5_1)
+            return true;
+    }
+
+    return false;
+}
+
 static bool isVulkanTarget(TargetRequest* targetReq)
 {
     switch( targetReq->target )
@@ -907,10 +923,9 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(
     // are generating code for D3D12, and using SM5.1 or later.
     // We will use a register space for parameter blocks *if*
     // the target options tell us to:
-    if( isD3D12Target(targetReq) )
+    if( isD3D12Target(targetReq) && isSM5_1OrLater(targetReq) )
     {
-        if(targetReq->targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
-            return true;
+        return true;
     }
 
     return false;

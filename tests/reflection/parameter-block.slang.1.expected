@@ -1,0 +1,54 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "a",
+            "bindings": [
+                {"kind": "shaderResource", "index": 0},
+                {"kind": "samplerState", "index": 0}
+            ],
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "Helper",
+                    "fields": [
+                        {
+                            "name": "t",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 0}
+                        },
+                        {
+                            "name": "s",
+                            "type": {
+                                "kind": "samplerState"
+                            },
+                            "binding": {"kind": "samplerState", "index": 0}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "b",
+            "binding": {"kind": "shaderResource", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
+    ]
+}
+}
