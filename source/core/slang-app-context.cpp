@@ -14,8 +14,8 @@ namespace Slang
 
     static AppContext context;
 
-    context.m_stdError = &stdError;
-    context.m_stdOut = &stdOut;
+    context.setStream(StreamType::StdError, &stdError);
+    context.setStream(StreamType::StdOut, &stdOut);
 
     setSingleton(&context);
 }

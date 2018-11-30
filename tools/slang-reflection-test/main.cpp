@@ -18,8 +18,7 @@ struct PrettyWriter
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
-    auto stdOut = Slang::AppContext::getSingleton()->getStdOut();
-    stdOut->print("%.*s", int(end - begin), begin);
+    Slang::AppContext::getStdOut()->print("%.*s", int(end - begin), begin);
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -80,8 +79,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    auto stdOut = Slang::AppContext::getSingleton()->getStdOut();
-    stdOut->print("%llu", (unsigned long long)val);
+    Slang::AppContext::getStdOut()->print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);

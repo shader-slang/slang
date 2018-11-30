@@ -17,7 +17,7 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    auto stdError = AppContext::getSingleton()->getStdError();
+    auto stdError = AppContext::getStdError();
 
     stdError->put(message);
     stdError->flush();
@@ -79,7 +79,7 @@ static SlangResult innerMain(int argc, char** argv)
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        AppContext::getSingleton()->getStdOut()->print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        AppContext::getStdOut()->print("internal compiler error: %S\n", e.Message.ToWString().begin());
         return SLANG_FAIL;
     }
 #endif

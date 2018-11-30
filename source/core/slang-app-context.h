@@ -10,9 +10,15 @@ namespace Slang
 class AppContext
 {
 public:
+    enum class StreamType
+    {
+        StdError,
+        StdOut,
+        CountOf,
+    };
 
-    WriteStream * getStdError() const { return m_stdError;  }
-    WriteStream* getStdOut() const { return m_stdOut;  }
+    WriteStream * getStream(StreamType type) const { return m_streams[int(type)]; }
+    void setStream(StreamType type, WriteStream* stream) { m_streams[int(type)] = stream; }
 
         /// Initialize a default context
     static void initDefault();
@@ -20,11 +26,21 @@ public:
     static AppContext* getSingleton() { return s_singleton; }
     static void setSingleton(AppContext* context) { s_singleton = context;  }
 
+    static WriteStream * getStdError() { return getSingleton()->getStream(StreamType::StdError); }
+    static WriteStream* getStdOut() { return getSingleton()->getStream(StreamType::StdOut); }
+
+    AppContext()
+    {
+        for (int i = 0; i < SLANG_COUNT_OF(m_streams); ++i)
+        {
+            m_streams[i] = nullptr;
+        }
+    }
+
 protected:
 
-    WriteStream * m_stdError;
-    WriteStream* m_stdOut;
-
+    WriteStream* m_streams[int(StreamType::CountOf)];
+    
     static AppContext* s_singleton;
 };
 
