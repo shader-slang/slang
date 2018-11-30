@@ -1,10 +1,11 @@
-﻿// main.cpp
+// main.cpp
 
 #include "../../slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 #include "../core/slang-io.h"
+#include "../core/slang-app-context.h"
 
 using namespace Slang;
 
@@ -16,8 +17,10 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    fputs(message, stderr);
-    fflush(stderr);
+    auto stdError = AppContext::getSingleton()->getStdError();
+
+    stdError->put(message);
+    stdError->flush();
 }
 
 #ifdef _WIN32
@@ -76,7 +79,7 @@ static SlangResult innerMain(int argc, char** argv)
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        printf("internal compiler error: %S\n", e.Message.ToWString().begin());
+        AppContext::getSingleton()->getStdOut()->print("internal compiler error: %S\n", e.Message.ToWString().begin());
         return SLANG_FAIL;
     }
 #endif
@@ -85,6 +88,8 @@ static SlangResult innerMain(int argc, char** argv)
 
 int MAIN(int argc, char** argv)
 {
+    AppContext::initDefault();
+
     SlangResult res =  innerMain(argc, argv);
 
     if (SLANG_SUCCEEDED(res))

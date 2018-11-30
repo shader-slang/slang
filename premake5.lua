@@ -446,7 +446,7 @@ tool "slang-test"
 tool "slang-reflection-test"
     uuid "22C45F4F-FB6B-4535-BED1-D3F5D0C71047"
     includedirs { "." }
-    links { "slang" }
+    links { "slang", "core" }
 
 --
 -- `slang-eval-test` is similarly easy to build:

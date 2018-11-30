@@ -8,6 +8,8 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
+#include "../../source/core/slang-app-context.h"
+
 struct PrettyWriter
 {
     bool startOfLine = true;
@@ -16,7 +18,8 @@ struct PrettyWriter
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
-    fprintf(stdout, "%.*s", int(end - begin), begin);
+    auto stdOut = Slang::AppContext::getSingleton()->getStdOut();
+    stdOut->print("%.*s", int(end - begin), begin);
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -27,7 +30,7 @@ static void writeRaw(PrettyWriter& writer, char const* begin)
 static void writeRawChar(PrettyWriter& writer, int c)
 {
     char buffer[] = { (char) c, 0 };
-    writeRaw(writer, buffer);
+    writeRaw(writer, buffer, buffer + 1);
 }
 
 static void adjust(PrettyWriter& writer)
@@ -77,7 +80,8 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    fprintf(stdout, "%llu", (unsigned long long)val);
+    auto stdOut = Slang::AppContext::getSingleton()->getStdOut();
+    stdOut->print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -881,6 +885,7 @@ void emitReflectionJSON(
     auto programReflection = (slang::ShaderReflection*) reflection;
 
     PrettyWriter writer;
+    
     emitReflectionJSON(writer, programReflection);
 }
 
@@ -889,7 +894,7 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        fputs(diagnostic, stderr);
+        Slang::AppContext::getSingleton()->getStdError()->put(diagnostic);
     }
     return res;
 }
@@ -923,6 +928,8 @@ int main(
     int argc,
     char** argv)
 {
+    Slang::AppContext::initDefault();
+
     SlangResult res = innerMain(argc, argv);
     return SLANG_FAILED(res) ? 1 : 0;
 }
