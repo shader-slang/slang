@@ -2,6 +2,12 @@
 #version 460
 #extension GL_NV_ray_tracing : require
 
+layout(shaderRecordNV)
+buffer ShaderRecord_0
+{
+    uint shaderRecordID_0;
+};
+
 layout(std430, binding = 0) buffer _S1
 {
     vec4 colors_0[];
@@ -34,7 +40,7 @@ void main()
     uint _S9 = _S7 + _S8;
     uint _S10 = gl_HitKindNV;
 
-    vec4 color_1 = colors_0[_S9 + _S10];
+    vec4 color_1 = colors_0[_S9 + _S10 + shaderRecordID_0];
 
     float _S11 = gl_HitTNV;
     float _S12 = gl_RayTminNV;
