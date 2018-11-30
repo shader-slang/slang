@@ -1,0 +1,103 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "a",
+            "binding": {"kind": "constantBuffer", "space": 2, "index": 0, "count": 0},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "A",
+                    "fields": [
+                        {
+                            "name": "au",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                        },
+                        {
+                            "name": "at1",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 0}
+                        },
+                        {
+                            "name": "at2",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 1}
+                        },
+                        {
+                            "name": "as",
+                            "type": {
+                                "kind": "samplerState"
+                            },
+                            "binding": {"kind": "samplerState", "index": 0}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "b",
+            "binding": {"kind": "constantBuffer", "space": 3, "index": 0, "count": 0},
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "B",
+                    "fields": [
+                        {
+                            "name": "bu",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                        },
+                        {
+                            "name": "bt",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture2D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 0}
+                        },
+                        {
+                            "name": "bs",
+                            "type": {
+                                "kind": "samplerState"
+                            },
+                            "binding": {"kind": "samplerState", "index": 0}
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "fragment"
+        }
+    ]
+}
+}

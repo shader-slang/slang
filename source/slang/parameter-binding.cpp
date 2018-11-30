@@ -443,6 +443,36 @@ static void splitNameAndIndex(
     outDigits = UnownedStringSlice(digitsBegin, digitsEnd);
 }
 
+LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)
+{
+    switch( registerClassName.size() )
+    {
+    case 1:
+        switch (*registerClassName.begin())
+        {
+        case 'b': return LayoutResourceKind::ConstantBuffer;
+        case 't': return LayoutResourceKind::ShaderResource;
+        case 'u': return LayoutResourceKind::UnorderedAccess;
+        case 's': return LayoutResourceKind::SamplerState;
+
+        default:
+            break;
+        }
+        break;
+
+    case 5:
+        if( registerClassName == "space" )
+        {
+            return LayoutResourceKind::RegisterSpace;
+        }
+        break;
+
+    default:
+        break;
+    }
+    return LayoutResourceKind::None;
+}
+
 LayoutSemanticInfo ExtractLayoutSemanticInfo(
     ParameterBindingContext*    context,
     HLSLLayoutSemantic*         semantic)
@@ -470,31 +500,9 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     UnownedStringSlice registerIndexDigits;
     splitNameAndIndex(registerName, registerClassName, registerIndexDigits);
 
-    // All of the register classes we support are single ASCII characters,
-    // so we really just care about the first byte, but we want to be
-    // careful and only look at it if the register class name is one
-    // byte long.
-    char registerClassChar = registerClassName.size() == 1 ? *registerClassName.begin() : 0;
-    LayoutResourceKind kind = LayoutResourceKind::None;
-    switch (registerClassChar)
+    LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
+    if(kind == LayoutResourceKind::None)
     {
-    case 'b':
-        kind = LayoutResourceKind::ConstantBuffer;
-        break;
-
-    case 't':
-        kind = LayoutResourceKind::ShaderResource;
-        break;
-
-    case 'u':
-        kind = LayoutResourceKind::UnorderedAccess;
-        break;
-
-    case 's':
-        kind = LayoutResourceKind::SamplerState;
-        break;
-
-    default:
         getSink(context)->diagnose(semantic->registerName, Diagnostics::unknownRegisterClass, registerClassName);
         return info;
     }
@@ -524,13 +532,17 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
             UnownedStringSlice spaceDigits;
             splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
 
-            if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+            if( kind == LayoutResourceKind::RegisterSpace )
             {
-                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpace, spaceSpelling);
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
+            }
+            else if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+            {
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpace, spaceSpelling);
             }
             else if( spaceDigits.size() == 0 )
             {
-                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpaceIndex);
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpaceIndex);
             }
             else
             {
@@ -1605,6 +1617,22 @@ static void addExplicitParameterBindings_GLSL(
         }
         semanticInfo.index = attr->binding;
         semanticInfo.space = attr->set;
+    }
+    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
+    {
+        // Try to find `set`
+        auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
+        if (!attr)
+        {
+            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+            return;
+        }
+        if( attr->binding != 0)
+        {
+            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.GetName(), attr->binding);
+        }
+        semanticInfo.index = attr->set;
+        semanticInfo.space = 0;
     }
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VertexInput)) != nullptr )
     {
