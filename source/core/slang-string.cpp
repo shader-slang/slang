@@ -253,7 +253,31 @@ namespace Slang
         ensureUniqueStorageWithCapacity(newLength);
         return getData() + oldLength;
     }
+    void String::appendInPlace(const char* chars, UInt count)
+    {
+        SLANG_UNUSED(chars);
 
+        if (count > 0)
+        {
+            SLANG_ASSERT(buffer && buffer->isUniquelyReferenced());
+
+            auto oldLength = getLength();
+            auto newLength = oldLength + count;
+
+            char* dst = buffer->getData();
+
+            // Make sure the input buffer is the same one returned from prepareForAppend
+            SLANG_ASSERT(chars == dst + oldLength);
+            // It has to fit within the capacity
+            SLANG_ASSERT(newLength <= buffer->capacity);
+
+            // We just need to modify the length
+            buffer->length = newLength;
+
+            // And mark with a terminating 0
+            dst[newLength] = 0;
+        }
+    }
 
     void String::append(const char* textBegin, char const* textEnd)
     {
