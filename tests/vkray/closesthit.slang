@@ -8,6 +8,12 @@ struct ReflectionRay
 
 StructuredBuffer<float4> colors;
 
+layout(shaderRecordNV)
+cbuffer ShaderRecord
+{
+	uint shaderRecordID;
+}
+
 void main(
 	BuiltInTriangleIntersectionAttributes 	attributes,
 	in out ReflectionRay 					ioPayload)
@@ -15,7 +21,8 @@ void main(
 	uint materialID = InstanceIndex()
 		+ InstanceID()
 		+ PrimitiveIndex()
-		+ HitKind();
+		+ HitKind()
+		+ shaderRecordID;
 
 	float4 color = colors[materialID];
 

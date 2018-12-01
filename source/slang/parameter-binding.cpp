@@ -1184,6 +1184,13 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
     auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
 
+    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && type->As<ConstantBufferType>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getShaderRecordConstantBufferRules()),
+            type);
+    }
+
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
     if (varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>())

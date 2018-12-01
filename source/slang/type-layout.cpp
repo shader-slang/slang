@@ -350,6 +350,17 @@ struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 };
 GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutRulesImpl_;
 
+struct GLSLShaderRecordConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
+{
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/) override
+    {
+        // Special-case the layout for a constant-buffer, because we don't
+        // want it to allocate a descriptor-table slot
+        return SimpleLayoutInfo(LayoutResourceKind::ShaderRecord, 1);
+    }
+};
+GLSLShaderRecordConstantBufferObjectLayoutRulesImpl kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_;
+
 struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
     virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
@@ -439,6 +450,8 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -455,6 +468,8 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -473,6 +488,10 @@ LayoutRulesImpl kStd430LayoutRulesImpl_ = {
 
 LayoutRulesImpl kGLSLPushConstantLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kGLSLShaderRecordLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
 };
 
 LayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl_ = {
@@ -547,6 +566,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
     return &kGLSLPushConstantLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kGLSLShaderRecordLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules()
 {
     return nullptr;
@@ -602,6 +626,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getParameterBlockRules()
 
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
