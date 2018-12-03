@@ -17,9 +17,8 @@ static void outputCallback(
     char const* message,
     void*       userData)
 {
-    auto stdError = (WriteStream * )userData;
-    
-    stdError->put(message);
+    auto stdError = (ISlangWriter* )userData;
+    stdError->write(message, ::strlen(message));
     stdError->flush();
 }
 
@@ -39,14 +38,14 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
     spSetDiagnosticCallback(
         compileRequest,
         &outputCallback,
-        AppContext::getStdError());
+        AppContext::getStdError().getWriter());
 
-    if (!AppContext::getStdOut()->isFile())
+    if (bool(AppContext::getStdOut().getWriter()->isConsole()))
     {
         spSetOutputCallback(
             compileRequest,
             &outputCallback,
-            AppContext::getStdOut());
+            AppContext::getStdOut().getWriter());
     }
 
     spSetCommandLineCompilerMode(compileRequest);
@@ -84,7 +83,7 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        AppContext::getStdOut()->print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        AppContext::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
         return SLANG_FAIL;
     }
 #endif

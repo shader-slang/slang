@@ -646,19 +646,18 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
 
         if (exeName == "slangc")
         {
-            
             auto func = context->getInnerMainFunc(String(g_options.binDir), "slangc");
             if (func)
             {
                 StringBuilder stdErrorString;
                 StringBuilder stdOutString;
 
-                StringWriteStream stdError(&stdErrorString);
-                StringWriteStream stdOut(&stdOutString);
+                StringWriter stdError(&stdErrorString, WriterFlag::IsConsole);
+                StringWriter stdOut(&stdOutString, WriterFlag::IsConsole);
 
                 AppContext appContext;
-                appContext.setStream(AppContext::StreamType::StdError, &stdError);
-                appContext.setStream(AppContext::StreamType::StdOut, &stdOut);
+                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR, &stdError);
+                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT, &stdOut);
 
                 List<const char*> args;
                 args.Add(exeName.Buffer());

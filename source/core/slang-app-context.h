@@ -1,7 +1,8 @@
 #ifndef SLANG_APP_CONTEXT_H
 #define SLANG_APP_CONTEXT_H
 
-#include "slang-write-stream.h"
+#include "slang-writer.h"
+#include "../../slang-com-ptr.h"
 
 namespace Slang
 {
@@ -16,15 +17,9 @@ namespace Slang
 class AppContext
 {
 public:
-    enum class StreamType
-    {
-        StdError,
-        StdOut,
-        CountOf,
-    };
-
-    WriteStream * getStream(StreamType type) const { return m_streams[int(type)]; }
-    void setStream(StreamType type, WriteStream* stream) { m_streams[int(type)] = stream; }
+    
+    ISlangWriter * getWriter(SlangWriterTargetType type) const { return m_streams[type]; }
+    void setWriter(SlangWriterTargetType type, ISlangWriter* writer) { m_streams[type] = writer; }
 
         /// Initialize a default context
     static AppContext* initDefault();
@@ -32,22 +27,15 @@ public:
     static AppContext* getSingleton() { return s_singleton; }
     static void setSingleton(AppContext* context) { s_singleton = context;  }
 
-    static WriteStream* getStdError() { return getSingleton()->getStream(StreamType::StdError); }
-    static WriteStream* getStdOut() { return getSingleton()->getStream(StreamType::StdOut); }
+    static WriterHelper getStdError() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR); }
+    static WriterHelper getStdOut() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT); }
+    static WriterHelper getDiagnostic() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC); }
 
     static int getReturnCode(SlangResult res);
 
-    AppContext()
-    {
-        for (int i = 0; i < SLANG_COUNT_OF(m_streams); ++i)
-        {
-            m_streams[i] = nullptr;
-        }
-    }
-
 protected:
 
-    WriteStream* m_streams[int(StreamType::CountOf)];
+    ComPtr<ISlangWriter> m_streams[SLANG_WRITER_TARGET_TYPE_COUNT_OF]; 
     
     static AppContext* s_singleton;
 };

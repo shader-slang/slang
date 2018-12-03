@@ -1,6 +1,8 @@
 
 #include "slang-app-context.h"
 
+#include "slang-writer.h"
+
 namespace Slang
 {
 
@@ -9,13 +11,13 @@ namespace Slang
 
 /* static */AppContext* AppContext::initDefault()
 {
-    static FileWriteStream stdError(stderr, false);
-    static FileWriteStream stdOut(stdout, false);
+    static FileWriter stdError(stderr, FileWriter::getIsConsoleFlag(stderr));
+    static FileWriter stdOut(stdout, FileWriter::getIsConsoleFlag(stderr));
 
     static AppContext context;
 
-    context.setStream(StreamType::StdError, &stdError);
-    context.setStream(StreamType::StdOut, &stdOut);
+    context.setWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR, &stdError);
+    context.setWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT, &stdOut);
 
     setSingleton(&context);
     return &context;
