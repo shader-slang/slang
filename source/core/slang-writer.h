@@ -11,7 +11,11 @@ namespace Slang
 
 class WriterHelper
 {
-        
+    SlangResult print(const char* format, ...);
+    SlangResult put(const char* text);
+
+    WriterHelper(ISlangWriter* writer) :m_writer(writer) {}
+
     ISlangWriter* m_writer;
 };
 
@@ -37,6 +41,7 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::RefCounted) ? (uint32_t)releaseReference() : 1; }
 
     // ISlangWriter - default impl
+    virtual SlangResult writeVaList(const char* format, va_list args) { SLANG_UNUSED(args); SLANG_UNUSED(format); return SLANG_E_NOT_IMPLEMENTED; }
     virtual void flush() SLANG_OVERRIDE {}
     virtual SlangBool isConsole() SLANG_OVERRIDE { return SlangBool((m_flags & WriterFlag::IsConsole) != 0); }
     virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE { SLANG_UNUSED(mode);  return SLANG_FAIL; }
@@ -70,12 +75,12 @@ protected:
     const void* m_data;
 };
 
-
 class FileWriter : public BaseWriter
 {
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
+    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
     virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     virtual void flush() SLANG_OVERRIDE;
     virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE;
@@ -96,12 +101,12 @@ protected:
     FILE* m_file;
 };
 
-
 class StringWriter : public BaseWriter
 {
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
+    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
     virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
         /// Ctor
@@ -112,6 +117,20 @@ public:
 
 protected:
     StringBuilder* m_builder;
+};
+
+class NullWriter : public BaseWriter
+{
+public:
+    typedef BaseWriter Parent;
+    // ISlangWriter
+    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE { SLANG_UNUSED(format); SLANG_UNUSED(args); return SLANG_OK; }
+    virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE { SLANG_UNUSED(chars); SLANG_UNUSED(numChars); return SLANG_OK; }
+
+    /// Ctor
+    NullWriter(WriterFlags flags) :
+        Parent(flags)
+    {}
 };
 
 }

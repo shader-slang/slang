@@ -1,6 +1,7 @@
 #include "slang-writer.h"
 
 #include "platform.h"
+#include "slang-string-util.h"
 
 // Includes to allow us to control console
 // output when writing assembly dumps.
@@ -11,10 +12,38 @@
 #   include <unistd.h>
 #endif
 
+#include <stdarg.h>
+
 namespace Slang
 {
 static const Guid IID_ISlangWriter = SLANG_UUID_ISlangWriter;
 static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! WriterHelper !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+SlangResult WriterHelper::print(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    SlangResult res = m_writer->writeVaList(format, args);
+
+    if (res == SLANG_E_NOT_IMPLEMENTED)
+    {
+        StringBuilder builder;
+        StringUtil::append(format, args, builder);
+
+        // Write if there is anything to write
+        res = (builder.Length()) ? m_writer->write(builder.Buffer(), builder.Length()) : SLANG_OK;
+    }
+
+    va_end(args);
+    return res;
+}
+
+SlangResult WriterHelper::put(const char* text)
+{
+    return m_writer->write(text, ::strlen(text));
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! BaseWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -47,6 +76,13 @@ FileWriter::~FileWriter()
     {
         fclose(m_file);
     }
+}
+
+SlangResult FileWriter::writeVaList(const char* format, va_list args)
+{
+    // http://www.cplusplus.com/reference/cstdio/vfprintf/
+    vfprintf(m_file, format, args);
+    return SLANG_OK;
 }
 
 SlangResult FileWriter::write(const char* text, size_t numChars)
@@ -84,6 +120,12 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! StringWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+SlangResult StringWriter::writeVaList(const char* format, va_list args)
+{
+    StringUtil::append(format, args, *m_builder);
+    return SLANG_OK;
+}
 
 SlangResult StringWriter::write(const char* chars, size_t numChars)
 {
