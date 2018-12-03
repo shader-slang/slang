@@ -18,6 +18,7 @@ public:
     virtual void printVaList(const char* format, va_list args) = 0;
     virtual void put(const char* text, size_t numChars) = 0;
     virtual void flush() = 0;
+    virtual bool isFile() = 0;
 
     void print(const char* format, ...);
     void put(const char* text) { put(text, ::strlen(text)); }
@@ -30,6 +31,7 @@ public:
     virtual void printVaList(const char* format, va_list args) SLANG_OVERRIDE;
     virtual void put(const char* text, size_t numChars) SLANG_OVERRIDE;
     virtual void flush() SLANG_OVERRIDE;
+    virtual bool isFile() SLANG_OVERRIDE { return true;  }
 
         /// Ctor
     FileWriteStream(FILE* file, bool isOwned) :
@@ -53,6 +55,7 @@ public:
     virtual void printVaList(const char* format, va_list args) SLANG_OVERRIDE;
     virtual void put(const char* text, size_t numChars) SLANG_OVERRIDE;
     virtual void flush() SLANG_OVERRIDE;
+    virtual bool isFile() SLANG_OVERRIDE { return false; }
 
         /// Ctor
     StringWriteStream(StringBuilder* builder) :

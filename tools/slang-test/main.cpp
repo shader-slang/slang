@@ -2,6 +2,7 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
+#include "../../source/core/slang-app-context.h"
 
 #include "../../slang-com-helper.h"
 
@@ -638,7 +639,45 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
         String commandLine = spawner.getCommandLine();
         context->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
+
     
+    {
+        String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+
+        if (exeName == "slangc")
+        {
+            
+            auto func = context->getInnerMainFunc(String(g_options.binDir), "slangc");
+            if (func)
+            {
+                StringBuilder stdErrorString;
+                StringBuilder stdOutString;
+
+                StringWriteStream stdError(&stdErrorString);
+                StringWriteStream stdOut(&stdOutString);
+
+                AppContext appContext;
+                appContext.setStream(AppContext::StreamType::StdError, &stdError);
+                appContext.setStream(AppContext::StreamType::StdOut, &stdOut);
+
+                List<const char*> args;
+                args.Add(exeName.Buffer());
+                for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
+                {
+                    args.Add(spawner.argumentList_[i].Buffer());
+                }
+
+                SlangResult res = func(&appContext, context->getSession(), int(args.Count()), args.begin());
+
+                spawner.standardError_ = stdErrorString;
+                spawner.standardOutput_ = stdOutString;
+                spawner.resultCode_ = AppContext::getReturnCode(res);
+
+                return kOSError_None;
+            }
+        }
+    }
+
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
     {

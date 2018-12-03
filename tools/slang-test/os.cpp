@@ -222,6 +222,8 @@ void OSProcessSpawner::pushArgument(
     // TODO(tfoley): handle cases where arguments need some escaping
     commandLine_.Append(" ");
     commandLine_.Append(argument);
+
+    argumentList_.Add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -496,6 +498,7 @@ void OSProcessSpawner::pushArgument(
     Slang::String argument)
 {
     arguments_.Add(argument);
+    argumentList_.Add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()

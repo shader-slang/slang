@@ -13,12 +13,12 @@ using namespace Slang;
 
 // Try to read an argument for a command-line option.
 
-static void diagnosticCallback(
+static void outputCallback(
     char const* message,
-    void*       /*userData*/)
+    void*       userData)
 {
-    auto stdError = AppContext::getStdError();
-
+    auto stdError = (WriteStream * )userData;
+    
     stdError->put(message);
     stdError->flush();
 }
@@ -29,20 +29,25 @@ static void diagnosticCallback(
 #define MAIN main
 #endif
 
-// Used to identify that compilation was the failure - with a unique 'internal' code
-#define SLANG_E_INTERNAL_COMPILE_FAILED SLANG_MAKE_ERROR(SLANG_FACILITY_INTERNAL, 0x7fab)
-
-static SlangResult innerMain(int argc, char** argv)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
     // Parse any command-line options
+    AppContext::setSingleton(appContext);
 
-    SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
     spSetDiagnosticCallback(
         compileRequest,
-        &diagnosticCallback,
-        nullptr);
+        &outputCallback,
+        AppContext::getStdError());
+
+    if (!AppContext::getStdOut()->isFile())
+    {
+        spSetOutputCallback(
+            compileRequest,
+            &outputCallback,
+            AppContext::getStdOut());
+    }
 
     spSetCommandLineCompilerMode(compileRequest);
 
@@ -68,13 +73,13 @@ static SlangResult innerMain(int argc, char** argv)
         {
             // If the compilation failed, then get out of here...
             // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
-            return SLANG_E_INTERNAL_COMPILE_FAILED;
+            return SLANG_E_INTERNAL_FAIL;
         }
 
         // Now that we are done, clean up after ourselves
 
         spDestroyCompileRequest(compileRequest);
-        spDestroySession(session);
+
     }
 #ifndef _DEBUG
     catch (Exception & e)
@@ -88,19 +93,13 @@ static SlangResult innerMain(int argc, char** argv)
 
 int MAIN(int argc, char** argv)
 {
-    AppContext::initDefault();
-
-    SlangResult res =  innerMain(argc, argv);
-
-    if (SLANG_SUCCEEDED(res))
+    SlangResult res;
     {
-        return 0;
+        SlangSession* session = spCreateSession(nullptr);
+        res = innerMain(AppContext::initDefault(), session, argc, argv);
+        spDestroySession(session);
     }
-    else if (res == SLANG_E_INTERNAL_COMPILE_FAILED)
-    {
-        return -1;
-    }
-    return 1;
+    return AppContext::getReturnCode(res);
 }
 
 #ifdef _WIN32

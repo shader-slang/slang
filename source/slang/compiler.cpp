@@ -925,14 +925,22 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     static void writeOutputToConsole(
-        CompileRequest*,
+        CompileRequest* request,
         String const&   text)
     {
-        fwrite(
-            text.begin(),
-            text.end() - text.begin(),
-            1,
-            stdout);
+        if (request->outputCallback)
+        {
+            // TODO: JS this is outputing assuming 0 termination, which is perhaps not desirable..
+            request->outputCallback(text.Buffer(), (void*)request->outputData);
+        }
+        else
+        {
+            fwrite(
+                text.begin(),
+                text.end() - text.begin(),
+                1,
+                stdout);
+        }
     }
 
     static void writeEntryPointResultToStandardOutput(
@@ -952,7 +960,10 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 auto& data = result.outputBinary;
                 int stdoutFileDesc = _fileno(stdout);
-                if (_isatty(stdoutFileDesc))
+
+                bool isTextBased = compileRequest->outputCallback || _isatty(stdoutFileDesc);
+
+                if (isTextBased)
                 {
                     // Writing to console, so we need to generate text output.
 
@@ -1004,6 +1015,7 @@ SlangResult dissassembleDXILUsingDXC(
                 #ifdef _WIN32
                     _setmode(stdoutFileDesc, _O_BINARY);
                 #endif
+
                     writeOutputFile(
                         compileRequest,
                         stdout,

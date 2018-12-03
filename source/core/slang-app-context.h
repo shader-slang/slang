@@ -6,6 +6,12 @@
 namespace Slang
 {
 
+#ifdef SLANG_SHARED_LIBRARY_TOOL
+#   define SLANG_SHARED_LIBRARY_TOOL_API SLANG_EXTERN_C SLANG_DLL_EXPORT 
+#else
+#   define SLANG_SHARED_LIBRARY_TOOL_API
+#endif
+
 /* A structure to hold general state shared across an application */
 class AppContext
 {
@@ -21,13 +27,15 @@ public:
     void setStream(StreamType type, WriteStream* stream) { m_streams[int(type)] = stream; }
 
         /// Initialize a default context
-    static void initDefault();
+    static AppContext* initDefault();
 
     static AppContext* getSingleton() { return s_singleton; }
     static void setSingleton(AppContext* context) { s_singleton = context;  }
 
-    static WriteStream * getStdError() { return getSingleton()->getStream(StreamType::StdError); }
+    static WriteStream* getStdError() { return getSingleton()->getStream(StreamType::StdError); }
     static WriteStream* getStdOut() { return getSingleton()->getStream(StreamType::StdOut); }
+
+    static int getReturnCode(SlangResult res);
 
     AppContext()
     {

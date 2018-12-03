@@ -480,6 +480,35 @@ bool TestContext::didAllSucceed() const
     return m_passedTestCount == (m_totalTestCount - m_ignoredTestCount);
 }
 
+TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, const String& name)
+{
+    {
+        SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
+        if (tool)
+        {
+            return tool->m_func;
+        }
+    }
+
+    StringBuilder sharedLibToolBuilder;
+    sharedLibToolBuilder.append(name);
+    sharedLibToolBuilder.append("-shared-library");
+
+    StringBuilder builder;
+    SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), builder);
+    String path = Path::Combine(dirPath, builder);
+
+    SharedLibraryTool tool = {};
+
+    if (SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformFilename(path.begin(), tool.m_sharedLibrary)))
+    {
+        tool.m_func = (InnerMainFunc)SharedLibrary::findFuncByName(tool.m_sharedLibrary, "innerMain");
+    }
+
+    m_sharedLibTools.Add(name, tool);
+    return tool.m_func;
+}
+
 void TestContext::outputSummary()
 {
     auto passCount = m_passedTestCount;

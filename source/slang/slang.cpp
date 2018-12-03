@@ -1205,7 +1205,6 @@ SLANG_API void spSetFileSystem(
     }
 }
 
-
 SLANG_API void spSetCompileFlags(
     SlangCompileRequest*    request,
     SlangCompileFlags       flags)
@@ -1324,6 +1323,18 @@ SLANG_API void spSetDiagnosticCallback(
 
     req->mSink.callback = callback;
     req->mSink.callbackUserData = (void*) userData;
+}
+
+SLANG_API void spSetOutputCallback(
+    SlangCompileRequest*    request,
+    SlangDiagnosticCallback callback,
+    void const*             userData)
+{
+    if (!request) return;
+    auto req = REQ(request);
+
+    req->outputCallback = callback;
+    req->outputData = userData;
 }
 
 SLANG_API void spAddSearchPath(

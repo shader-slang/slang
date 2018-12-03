@@ -192,19 +192,25 @@ convention for interface methods.
     #define SLANG_DYNAMIC
 #endif
 
+#if defined(_MSC_VER)
+#   define SLANG_DLL_EXPORT __declspec(dllexport)
+#else
+#   define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
+#endif
+
 #if defined(SLANG_DYNAMIC)
-    #if defined(_MSC_VER)
-        #ifdef SLANG_DYNAMIC_EXPORT
-            #define SLANG_API __declspec(dllexport)
-        #else
-            #define SLANG_API __declspec(dllimport)
-        #endif
-    #else
+#   if defined(_MSC_VER)
+#       ifdef SLANG_DYNAMIC_EXPORT
+#           define SLANG_API SLANG_DLL_EXPORT
+#       else
+#           define SLANG_API __declspec(dllimport)
+#       endif
+#   else
         // TODO: need to consider compiler capabilities
-//        #ifdef SLANG_DYNAMIC_EXPORT
-            #define SLANG_API __attribute__((__visibility__("default")))
-//        #endif
-    #endif
+//#     ifdef SLANG_DYNAMIC_EXPORT
+#       define SLANG_API SLANG_DLL_EXPORT 
+//#     endif
+#   endif
 #endif
 
 #ifndef SLANG_API
@@ -281,6 +287,13 @@ convention for interface methods.
 #endif
 #ifndef SLANG_UINT64
 #	define SLANG_UINT64(x) (x##ull)
+#endif
+
+
+#ifdef __cplusplus
+#   define SLANG_EXTERN_C extern "C"
+#else
+#   define SLANG_EXTERN_C
 #endif
 
 #ifdef __cplusplus
@@ -631,6 +644,8 @@ extern "C"
 #define SLANG_E_CANNOT_OPEN                 SLANG_MAKE_CORE_ERROR(4)
     //! Indicates a file/resource could not be found
 #define SLANG_E_NOT_FOUND                   SLANG_MAKE_CORE_ERROR(5)
+    //! An unhandled internal failure (typically from unhandled exception)
+#define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
 
     /** A "Universally Unique Identifier" (UUID)
 
@@ -977,6 +992,11 @@ extern "C"
         void*       userData);
 
     SLANG_API void spSetDiagnosticCallback(
+        SlangCompileRequest*    request,
+        SlangDiagnosticCallback callback,
+        void const*             userData);
+
+    SLANG_API void spSetOutputCallback(
         SlangCompileRequest*    request,
         SlangDiagnosticCallback callback,
         void const*             userData);

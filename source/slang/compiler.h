@@ -395,6 +395,10 @@ namespace Slang
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
+        // For output
+        SlangDiagnosticCallback outputCallback = nullptr;
+        const void*                 outputData = nullptr;
+
         /// Load a file into memory using the configured file system.
         ///
         /// @param path The path to attempt to load from
