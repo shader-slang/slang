@@ -87,6 +87,9 @@
     <ClInclude Include="slang-write-stream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="smart-pointer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -141,6 +144,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-write-stream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="stream.cpp">
