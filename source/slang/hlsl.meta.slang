@@ -567,17 +567,46 @@ __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<
 
 // Attribute evaluation
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtCentroid(T x);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
+// TODO: The matrix cases of these functions won't actuall work
+// when compiled to GLSL, since they only support scalar/vector
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtSample(T x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
+// TODO: Should these be constrains to `__BuiltinFloatingPointType`?
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeSnapped(T x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, interpolateAtCentroid)
+T EvaluateAttributeAtCentroid(T x);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, interpolateAtCentroid)
+vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, interpolateAtCentroid)
+matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+T EvaluateAttributeAtSample(T x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+T EvaluateAttributeSnapped(T x, int2 offset);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
 
 // Base-e exponent
 __generic<T : __BuiltinFloatingPointType> T exp(T x);
@@ -829,8 +858,14 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log2(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log2(matrix<T,N,M> x);
 
 // multiply-add
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType> T mad(T mvalue, T avalue, T bvalue);
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
 
 // maximum
