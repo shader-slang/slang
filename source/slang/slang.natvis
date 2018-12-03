@@ -93,6 +93,15 @@
         </Expand>
       </Synthetic>
       <Item Name="[parent]">parent</Item>
+      <Synthetic Name="[children]" Condition="(op &gt;= Slang::kIROp_FirstParentInst) &amp;&amp; (op &lt;= Slang::kIROp_LastParentInst)">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>(*((Slang::IRParentInst*) this)).children.first</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>this</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
       <Synthetic Name="[uses]">
         <Expand>
           <LinkedListItems>
