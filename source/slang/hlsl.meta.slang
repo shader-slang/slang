@@ -338,9 +338,11 @@ __generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);
 __generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
+__target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
 void AllMemoryBarrier();
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+__target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
 void AllMemoryBarrierWithGroupSync();
 
 // Test if any components is non-zero (HLSL SM 1.0)
@@ -546,7 +548,10 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M
 __generic<T : __BuiltinFloatingPointType, let N : int> T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
+__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
 void DeviceMemoryBarrier();
+
+__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
 void DeviceMemoryBarrierWithGroupSync();
 
 // Vector distance
@@ -703,12 +708,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 __target_intrinsic(glsl, "groupMemoryBarrier")
 void GroupMemoryBarrier();
 
-// Note: the unmatched parentheses in the GLSL lowering are
-// to cancel out the parens that the emit logic uses, so that
-// we can emit this as if it were an expression.
-//
-// TODO: investigate whether we can just use "operator comma" here.
-__target_intrinsic(glsl, "groupMemoryBarrier()); (barrier()")
+__target_intrinsic(glsl, "groupMemoryBarrier(), barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
