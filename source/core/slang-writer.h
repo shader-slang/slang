@@ -29,9 +29,10 @@ struct WriterFlag
 {
     enum Enum :uint32_t
     {
-        RefCounted = 0x1,
-        IsConsole = 0x2,
-        IsOwned = 0x4,
+        IsStatic = 0x1,             ///< Means non ref counted
+        IsConsole = 0x2,            ///< True if console
+        IsUnowned = 0x4,            ///< True if doesn't own contained type
+        AutoFlush = 0x8,            ///< Automatically flushes after every call
     };
 private:
     WriterFlag() = delete;
@@ -44,12 +45,12 @@ public:
     // ISlangUnknown
     SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE
     SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::RefCounted) ? (uint32_t)releaseReference() : 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::IsStatic) ? 1 : (uint32_t)releaseReference(); }
 
     // ISlangWriter - default impl
     virtual SlangResult writeVaList(const char* format, va_list args) { SLANG_UNUSED(args); SLANG_UNUSED(format); return SLANG_E_NOT_IMPLEMENTED; }
     virtual void flush() SLANG_OVERRIDE {}
-    virtual SlangBool isConsole() SLANG_OVERRIDE { return SlangBool((m_flags & WriterFlag::IsConsole) != 0); }
+    virtual bool isConsole() SLANG_OVERRIDE { return (m_flags & WriterFlag::IsConsole) != 0; }
     virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE { SLANG_UNUSED(mode);  return SLANG_FAIL; }
 
     BaseWriter(WriterFlags flags) :
@@ -62,7 +63,7 @@ protected:
     WriterFlags m_flags;
 };
 
-class CallbackWriter : BaseWriter
+class CallbackWriter : public BaseWriter
 {
 public:
     typedef BaseWriter Parent;   
@@ -92,11 +93,11 @@ public:
     virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE;
 
     static const bool isConsole(FILE* file);
-    static WriterFlags getIsConsoleFlag(FILE* file) { return isConsole(file) ? WriterFlag::IsConsole : 0; }
+    static WriterFlags getDefaultFlags(FILE* file) { return isConsole(file) ? WriterFlag::IsConsole : 0; }
 
         /// Ctor
     FileWriter(FILE* file, WriterFlags flags) :
-        Parent(flags),
+        Parent(flags | getDefaultFlags(file)),
         m_file(file)
     {}
 

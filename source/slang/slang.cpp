@@ -13,6 +13,7 @@
 #include "../slang/type-layout.h"
 
 #include "slang-file-system.h"
+#include "../core/slang-writer.h"
 
 #include "ir-serialize.h"
 
@@ -305,6 +306,12 @@ CompileRequest::CompileRequest(Session* session)
 
     sourceManager->initialize(session->getBuiltinSourceManager());
 
+    // Set all the default writers
+    for (int i = 0; i < SLANG_WRITER_TARGET_TYPE_COUNT_OF; ++i)
+    {
+        setWriter(SlangWriterTargetType(i), nullptr);
+    }
+
     // Set up the default file system
     SLANG_ASSERT(fileSystem == nullptr);
     fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
@@ -368,8 +375,37 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 }
 
 
-
 //
+
+static ISlangWriter* _getDefaultWriter(SlangWriterTargetType type)
+{
+    static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static NullWriter nullWriter(WriterFlag::IsStatic | WriterFlag::IsConsole);
+
+    switch (type)
+    {
+        case SLANG_WRITER_TARGET_TYPE_STD_ERROR:    return &stdError;
+        case SLANG_WRITER_TARGET_TYPE_STD_OUTPUT:   return &stdOut;
+        case SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC:   return &nullWriter;
+        default:
+        {
+            SLANG_ASSERT(!"Unknown type");
+            return &stdError;
+        }
+    }
+}
+
+void CompileRequest::setWriter(SlangWriterTargetType type, ISlangWriter* writer)
+{
+    writer = writer ? writer : _getDefaultWriter(type);
+    m_writers[type] = writer;
+
+    if (type == SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC)
+    {
+        mSink.writer = writer;
+    }
+}
 
 SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 {
@@ -1318,23 +1354,33 @@ SLANG_API void spSetDiagnosticCallback(
     SlangDiagnosticCallback callback,
     void const*             userData)
 {
+    using namespace Slang;
+
     if(!request) return;
     auto req = REQ(request);
 
-    req->mSink.callback = callback;
-    req->mSink.callbackUserData = (void*) userData;
+    ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
+    req->setWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC, writer);
 }
 
-SLANG_API void spSetOutputCallback(
+SLANG_API void spSetWriter(
     SlangCompileRequest*    request,
-    SlangDiagnosticCallback callback,
-    void const*             userData)
+    SlangWriterTargetType   type, 
+    ISlangWriter*           writer)
 {
     if (!request) return;
     auto req = REQ(request);
 
-    req->outputCallback = callback;
-    req->outputData = userData;
+    req->setWriter(type, writer);
+}
+
+SLANG_API ISlangWriter* spGetWriter(
+    SlangCompileRequest*    request,
+    SlangWriterTargetType   type)
+{
+    if (!request) return nullptr;
+    auto req = REQ(request);
+    return req->getWriter(type);
 }
 
 SLANG_API void spAddSearchPath(

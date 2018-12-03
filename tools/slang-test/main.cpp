@@ -652,12 +652,14 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
                 StringBuilder stdErrorString;
                 StringBuilder stdOutString;
 
-                StringWriter stdError(&stdErrorString, WriterFlag::IsConsole);
-                StringWriter stdOut(&stdOutString, WriterFlag::IsConsole);
+                // Say static so not released
+                StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+                StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
                 AppContext appContext;
                 appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR, &stdError);
                 appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT, &stdOut);
+                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC, &stdError);
 
                 List<const char*> args;
                 args.Add(exeName.Buffer());

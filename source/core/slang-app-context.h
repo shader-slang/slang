@@ -18,8 +18,10 @@ class AppContext
 {
 public:
     
-    ISlangWriter * getWriter(SlangWriterTargetType type) const { return m_streams[type]; }
-    void setWriter(SlangWriterTargetType type, ISlangWriter* writer) { m_streams[type] = writer; }
+    ISlangWriter * getWriter(SlangWriterTargetType type) const { return m_writers[type]; }
+    void setWriter(SlangWriterTargetType type, ISlangWriter* writer) { m_writers[type] = writer; }
+
+    void setWriters(SlangCompileRequest* request);
 
         /// Initialize a default context
     static AppContext* initDefault();
@@ -35,7 +37,7 @@ public:
 
 protected:
 
-    ComPtr<ISlangWriter> m_streams[SLANG_WRITER_TARGET_TYPE_COUNT_OF]; 
+    ComPtr<ISlangWriter> m_writers[SLANG_WRITER_TARGET_TYPE_COUNT_OF]; 
     
     static AppContext* s_singleton;
 };

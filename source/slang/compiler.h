@@ -396,8 +396,10 @@ namespace Slang
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
         // For output
-        SlangDiagnosticCallback outputCallback = nullptr;
-        const void*                 outputData = nullptr;
+        ComPtr<ISlangWriter> m_writers[SLANG_WRITER_TARGET_TYPE_COUNT_OF];
+
+        void setWriter(SlangWriterTargetType type, ISlangWriter* writer);
+        ISlangWriter* getWriter(SlangWriterTargetType type) const { return m_writers[type]; }
 
         /// Load a file into memory using the configured file system.
         ///

@@ -72,7 +72,7 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
 
 FileWriter::~FileWriter()
 {
-    if (m_flags & WriterFlag::IsOwned)
+    if ((m_flags & WriterFlag::IsUnowned) == 0)
     {
         fclose(m_file);
     }
@@ -81,13 +81,23 @@ FileWriter::~FileWriter()
 SlangResult FileWriter::writeVaList(const char* format, va_list args)
 {
     // http://www.cplusplus.com/reference/cstdio/vfprintf/
-    vfprintf(m_file, format, args);
+    ::vfprintf(m_file, format, args);
+
+    if (m_flags & WriterFlag::AutoFlush)
+    {
+        ::fflush(m_file);
+    }
+
     return SLANG_OK;
 }
 
 SlangResult FileWriter::write(const char* text, size_t numChars)
 {
     const size_t numWritten = ::fwrite(text, sizeof(char), numChars, m_file);
+    if (m_flags & WriterFlag::AutoFlush)
+    {
+        ::fflush(m_file);
+    }
     return numChars == numWritten ? SLANG_OK : SLANG_FAIL;
 }
 

@@ -6,21 +6,11 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 #include "../core/slang-io.h"
 #include "../core/slang-app-context.h"
+#include "../core/slang-writer.h"
 
 using namespace Slang;
 
 #include <assert.h>
-
-// Try to read an argument for a command-line option.
-
-static void outputCallback(
-    char const* message,
-    void*       userData)
-{
-    auto stdError = (ISlangWriter* )userData;
-    stdError->write(message, ::strlen(message));
-    stdError->flush();
-}
 
 #ifdef _WIN32
 #define MAIN slangc_main
@@ -35,18 +25,7 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
-    spSetDiagnosticCallback(
-        compileRequest,
-        &outputCallback,
-        AppContext::getStdError().getWriter());
-
-    if (bool(AppContext::getStdOut().getWriter()->isConsole()))
-    {
-        spSetOutputCallback(
-            compileRequest,
-            &outputCallback,
-            AppContext::getStdOut().getWriter());
-    }
+    appContext->setWriters(compileRequest);
 
     spSetCommandLineCompilerMode(compileRequest);
 

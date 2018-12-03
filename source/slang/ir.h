@@ -1111,8 +1111,8 @@ struct IRModule : RefObject
 void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
 String getSlangIRAssembly(IRModule* module);
 
-void dumpIR(IRModule* module);
-void dumpIR(IRGlobalValue* globalVal);
+void dumpIR(IRModule* module, ISlangWriter* writer);
+void dumpIR(IRGlobalValue* globalVal, ISlangWriter* writer);
 
 String dumpIRFunc(IRFunc* func);
 

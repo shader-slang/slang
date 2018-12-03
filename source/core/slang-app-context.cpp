@@ -11,8 +11,8 @@ namespace Slang
 
 /* static */AppContext* AppContext::initDefault()
 {
-    static FileWriter stdError(stderr, FileWriter::getIsConsoleFlag(stderr));
-    static FileWriter stdOut(stdout, FileWriter::getIsConsoleFlag(stderr));
+    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned | WriterFlag::AutoFlush);
+    static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned | WriterFlag::AutoFlush);
 
     static AppContext context;
 
@@ -34,6 +34,14 @@ namespace Slang
         return -1;
     }
     return 1;
+}
+
+void AppContext::setWriters(SlangCompileRequest* request)
+{
+    for (int i = 0; i < SLANG_WRITER_TARGET_TYPE_COUNT_OF; ++i)
+    {
+        spSetWriter(request, SlangWriterTargetType(i), m_writers[i]);
+    }
 }
 
 }

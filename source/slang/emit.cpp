@@ -6626,7 +6626,9 @@ String emitEntryPoint(
         // un-specialized IR.
         if (translationUnit->compileRequest->shouldDumpIR)
         {
-            dumpIR(irModule);
+            ISlangWriter* writer = translationUnit->compileRequest->getWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR);
+
+            dumpIR(irModule, writer);
         }
 
         // Next, we need to ensure that the code we emit for
