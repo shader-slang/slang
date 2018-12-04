@@ -122,8 +122,10 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
         int stdoutFileDesc = _fileno(m_file);
         _setmode(stdoutFileDesc, _O_BINARY);
         return SLANG_OK;
-    }
+#else
+        break;
 #endif
+    }
     default: break;
     }
     return SLANG_FAIL;
