@@ -482,7 +482,7 @@ void OSProcessSpawner::pushExecutableName(
     Slang::String executableName)
 {
     executableName_ = executableName;
-    arguments_.Add(argument);
+    arguments_.Add(executableName);
     isExecutablePath_ = false;
 }
 
@@ -490,7 +490,7 @@ void OSProcessSpawner::pushExecutablePath(
     Slang::String executablePath)
 {
     executableName_ = executablePath;
-    arguments_.Add(argument);
+    arguments_.Add(executablePath);
     isExecutablePath_ = true;
 }
 
