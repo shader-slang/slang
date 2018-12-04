@@ -175,7 +175,7 @@ Result parseOptions(int argc, char** argv, Slang::WriterHelper stdError)
             }
             g_options.binDir = *argCursor++;
         }
-        else if (strcmp(arg, "-useexes"))
+        else if (strcmp(arg, "-useexes") == 0)
         {
             g_options.useExes = true;
         }
