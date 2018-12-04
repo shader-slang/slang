@@ -482,7 +482,7 @@ void OSProcessSpawner::pushExecutableName(
     Slang::String executableName)
 {
     executableName_ = executableName;
-    pushArgument(executableName);
+    arguments_.Add(argument);
     isExecutablePath_ = false;
 }
 
@@ -490,7 +490,7 @@ void OSProcessSpawner::pushExecutablePath(
     Slang::String executablePath)
 {
     executableName_ = executablePath;
-    pushArgument(executablePath);
+    arguments_.Add(argument);
     isExecutablePath_ = true;
 }
 
@@ -510,7 +510,6 @@ Slang::String OSProcessSpawner::getCommandLine()
     {
         if(ii != 0) sb << " ";
         sb << arguments_[ii];
-
     }
     return sb.ProduceString();
 }
