@@ -106,7 +106,7 @@ void FileWriter::flush()
     ::fflush(m_file);
 }
 
-/* static */const bool FileWriter::isConsole(FILE* file)
+/* static */bool FileWriter::isConsole(FILE* file)
 {
     const int stdoutFileDesc = _fileno(file);
     return _isatty(stdoutFileDesc) != 0;

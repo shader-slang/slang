@@ -92,8 +92,8 @@ public:
     virtual void flush() SLANG_OVERRIDE;
     virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE;
 
-    static const bool isConsole(FILE* file);
-    static WriterFlags getDefaultFlags(FILE* file) { return isConsole(file) ? WriterFlag::IsConsole : 0; }
+    static bool isConsole(FILE* file);
+    static WriterFlags getDefaultFlags(FILE* file) { return isConsole(file) ? WriterFlags(WriterFlag::IsConsole) : 0; }
 
         /// Ctor
     FileWriter(FILE* file, WriterFlags flags) :
