@@ -352,6 +352,8 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+#include <stdarg.h>
+
 #ifdef __cplusplus
 extern "C"
 {
