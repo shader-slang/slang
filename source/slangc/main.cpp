@@ -29,7 +29,6 @@ static void diagnosticCallback(
 
 SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
-    // Parse any command-line options
     AppContext::setSingleton(appContext);
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);

@@ -343,6 +343,8 @@ function toolSharedLibrary(name)
     --
     baseSlangProject(name .. "-shared-library", "tools/" .. name)
     
+    defines { "SLANG_SHARED_LIBRARY_TOOL" }
+   
     kind "SharedLib"
 end
 
@@ -463,6 +465,13 @@ tool "slang-reflection-test"
     includedirs { "." }
     links { "slang", "core" }
 
+toolSharedLibrary "slang-reflection-test"
+    uuid "C5ACCA6E-C04D-4B36-8516-3752B3C13C2F"
+    
+    includedirs { "." }
+    kind "SharedLib"
+    links { "core", "slang" }      
+    
 --
 -- `slang-eval-test` is similarly easy to build:
 --

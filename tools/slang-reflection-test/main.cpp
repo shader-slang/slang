@@ -897,12 +897,13 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     return res;
 }
 
-static SlangResult innerMain(int argc, char*const*argv)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
-    // Parse any command-line options
-
-    SlangSession* session = spCreateSession(nullptr);
+    Slang::AppContext::setSingleton(appContext);
+    
     SlangCompileRequest* request = spCreateCompileRequest(session);
+
+    appContext->configureRequest(request);
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
@@ -917,8 +918,7 @@ static SlangResult innerMain(int argc, char*const*argv)
     emitReflectionJSON(reflection);
 
     spDestroyCompileRequest(request);
-    spDestroySession(session);
-
+    
     return SLANG_OK;
 }
 
@@ -926,8 +926,9 @@ int main(
     int argc,
     char** argv)
 {
-    Slang::AppContext::initDefault();
+    SlangSession* session = spCreateSession(nullptr);
+    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    spDestroySession(session);
 
-    SlangResult res = innerMain(argc, argv);
     return SLANG_FAILED(res) ? 1 : 0;
 }

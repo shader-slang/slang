@@ -640,43 +640,44 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
         context->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
-    
+    if (context->m_useSharedLibraryTools)
     {
         String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
 
-        if (exeName == "slangc")
+        auto func = context->getInnerMainFunc(String(g_options.binDir), exeName);
+        if (func)
         {
-            auto func = context->getInnerMainFunc(String(g_options.binDir), "slangc");
-            if (func)
+            StringBuilder stdErrorString;
+            StringBuilder stdOutString;
+
+            // Say static so not released
+            StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+            StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+
+            AppContext appContext;
+            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
+            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+
+            if (exeName == "slangc")
             {
-                StringBuilder stdErrorString;
-                StringBuilder stdOutString;
-
-                // Say static so not released
-                StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
-                StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
-
-                AppContext appContext;
-                appContext.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
-                appContext.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
                 appContext.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
-                appContext.setReplaceWriterFlagsAll();
-
-                List<const char*> args;
-                args.Add(exeName.Buffer());
-                for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
-                {
-                    args.Add(spawner.argumentList_[i].Buffer());
-                }
-
-                SlangResult res = func(&appContext, context->getSession(), int(args.Count()), args.begin());
-
-                spawner.standardError_ = stdErrorString;
-                spawner.standardOutput_ = stdOutString;
-                spawner.resultCode_ = AppContext::getReturnCode(res);
-
-                return kOSError_None;
             }
+            appContext.setReplaceWriterFlagsAll();
+
+            List<const char*> args;
+            args.Add(exeName.Buffer());
+            for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
+            {
+                args.Add(spawner.argumentList_[i].Buffer());
+            }
+
+            SlangResult res = func(&appContext, context->getSession(), int(args.Count()), args.begin());
+
+            spawner.standardError_ = stdErrorString;
+            spawner.standardOutput_ = stdOutString;
+            spawner.resultCode_ = AppContext::getReturnCode(res);
+
+            return kOSError_None;
         }
     }
 

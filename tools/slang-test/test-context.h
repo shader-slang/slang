@@ -162,6 +162,8 @@ class TestContext
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
+    bool m_useSharedLibraryTools;
+
     void outputSummary();
 
 protected:
