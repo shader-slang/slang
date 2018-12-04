@@ -354,6 +354,13 @@ public:
         info.count = count;
         addResourceUsage(info);
     }
+
+        /// "Unwrap" any layers of array-ness from this type layout.
+        ///
+        /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the elemnt type layout.
+        /// Otherwise, returns this type layout.
+        ///
+    RefPtr<TypeLayout> unwrapArray();
 };
 
 typedef unsigned int VarLayoutFlags;

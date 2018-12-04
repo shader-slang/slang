@@ -13,8 +13,14 @@
 
 #ifdef __SLANG__
 #define R(X) /**/
+#define BEGIN_CBUFFER(NAME) cbuffer NAME
+#define END_CBUFFER(NAME, REG) /**/
+#define CBUFFER_REF(NAME, FIELD) FIELD
 #else
 #define R(X) X
+#define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
+#define END_CBUFFER(NAME, REG) ; cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define tB tB_0
 #define sB sB_0
@@ -32,17 +38,19 @@ Texture2D 		tB R(: register(t1));
 SamplerState 	sA R(: register(s0));
 SamplerState 	sB R(: register(s1));
 
-cbuffer C0 R(: register(b0))
+BEGIN_CBUFFER(C0)
 {
 	float c0;
 }
+END_CBUFFER(C0, register(b0))
 
-cbuffer C1 R(: register(b1))
+BEGIN_CBUFFER(C1)
 {
 	float c1;
 }
+END_CBUFFER(C1, register(b1))
 
 float4 main() : SV_TARGET
 {
-	return use(tB,sB) + use(c1);
+	return use(tB,sB) + use(CBUFFER_REF(C1,c1));
 }

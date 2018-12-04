@@ -42,9 +42,14 @@ struct Foo_0
 	float2 u_0;
 };
 
+struct SLANG_ParameterGroup_C_0
+{
+	Foo_0 foo_0;	
+};
+
 cbuffer C_0
 {
-	Foo_0 foo_0;
+	SLANG_ParameterGroup_C_0 C_0;
 }
 
 Texture2D    C_foo_t_0;
@@ -52,7 +57,7 @@ SamplerState C_foo_s_0;
 
 float4 main() : SV_TARGET
 {
-	return C_foo_t_0.Sample(C_foo_s_0, foo_0.u_0);	
+	return C_foo_t_0.Sample(C_foo_s_0, C_0.foo_0.u_0);	
 }
 
 #endif

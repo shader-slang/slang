@@ -3576,7 +3576,6 @@ namespace Slang
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
-        case kIROp_BufferLoad:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_getElement:

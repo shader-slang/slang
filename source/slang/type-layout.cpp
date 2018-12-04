@@ -2276,6 +2276,17 @@ RefPtr<TypeLayout> CreateTypeLayout(
     return typeLayout;
 }
 
+RefPtr<TypeLayout> TypeLayout::unwrapArray()
+{
+    TypeLayout* typeLayout = this;
+
+    while(auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
+        typeLayout = arrayTypeLayout->elementTypeLayout;
+
+    return typeLayout;
+}
+
+
 RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl()
 {
     auto declRefType = type->AsDeclRefType();

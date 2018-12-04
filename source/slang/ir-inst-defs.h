@@ -217,10 +217,6 @@ INST(Var, var, 0, 0)
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
 
-INST(BufferLoad, bufferLoad, 2, 0)
-INST(BufferStore, bufferStore, 3, 0)
-INST(BufferElementRef, bufferElementRef, 2, 0)
-
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)
 

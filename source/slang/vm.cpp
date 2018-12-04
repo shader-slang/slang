@@ -846,6 +846,7 @@ void resumeThread(
             }
             break;
 
+#if 0
         case kIROp_BufferLoad:
             {
                 VMType type = decodeType(frame, &ip);
@@ -910,6 +911,7 @@ void resumeThread(
                 *(void**)dest = elementData;
             }
             break;
+#endif
 
 
         case kIROp_Call:
