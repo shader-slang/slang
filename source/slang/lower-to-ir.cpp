@@ -5614,7 +5614,7 @@ IRModule* generateIRForTranslationUnit(
     // then we can dump the initial IR for the module here.
     if(compileRequest->shouldDumpIR)
     {
-        ISlangWriter* writer = translationUnit->compileRequest->getWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR);
+        ISlangWriter* writer = translationUnit->compileRequest->getWriter(WriterChannel::StdError);
 
         dumpIR(module, writer);
     }

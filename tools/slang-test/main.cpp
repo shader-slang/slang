@@ -657,9 +657,10 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
                 StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
                 AppContext appContext;
-                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR, &stdError);
-                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT, &stdOut);
-                appContext.setWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC, &stdError);
+                appContext.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
+                appContext.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+                appContext.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
+                appContext.setReplaceWriterFlagsAll();
 
                 List<const char*> args;
                 args.Add(exeName.Buffer());

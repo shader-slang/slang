@@ -825,15 +825,17 @@ extern "C"
     #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
 
     /* Identifies different types of writer target*/
-    enum SlangWriterTargetType
+    typedef unsigned int SlangWriterChannel;
+    enum
     {
-        SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC,
-        SLANG_WRITER_TARGET_TYPE_STD_OUTPUT,
-        SLANG_WRITER_TARGET_TYPE_STD_ERROR,
-        SLANG_WRITER_TARGET_TYPE_COUNT_OF,
+        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
+        SLANG_WRITER_CHANNEL_STD_OUTPUT,
+        SLANG_WRITER_CHANNEL_STD_ERROR,
+        SLANG_WRITER_CHANNEL_COUNT_OF,
     };
 
-    enum SlangWriterMode
+    typedef unsigned int SlangWriterMode;
+    enum 
     {
         SLANG_WRITER_MODE_TEXT,
         SLANG_WRITER_MODE_BINARY,
@@ -1043,12 +1045,12 @@ extern "C"
 
     SLANG_API void spSetWriter(
         SlangCompileRequest*    request,
-        SlangWriterTargetType   type, 
+        SlangWriterChannel      channel, 
         ISlangWriter*           writer);
 
     SLANG_API ISlangWriter* spGetWriter(
         SlangCompileRequest*    request,
-        SlangWriterTargetType   type);
+        SlangWriterChannel      channel);
 
     /*!
     @brief Add a path to use when searching for referenced files.

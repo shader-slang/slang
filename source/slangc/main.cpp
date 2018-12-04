@@ -12,6 +12,15 @@ using namespace Slang;
 
 #include <assert.h>
 
+static void diagnosticCallback(
+    char const* message,
+    void*       /*userData*/)
+{
+    auto stdError = AppContext::getStdError();
+    stdError.put(message);
+    stdError.flush();
+}
+
 #ifdef _WIN32
 #define MAIN slangc_main
 #else
@@ -25,9 +34,15 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
-    appContext->setWriters(compileRequest);
+    spSetDiagnosticCallback(
+        compileRequest,
+        &diagnosticCallback,
+        nullptr);
 
     spSetCommandLineCompilerMode(compileRequest);
+
+    // Do any app specific configuration
+    appContext->configureRequest(compileRequest);
 
     char const* appName = "slangc";
     if (argc > 0) appName = argv[0];
@@ -41,32 +56,29 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
         }
     }
 
+    SlangResult res = SLANG_OK;
+
 #ifndef _DEBUG
     try
 #endif
     {
-        // Run the compiler (this will produce any diagnostics through
-        // our callback above).
-        if (SLANG_FAILED(spCompile(compileRequest)))
-        {
-            // If the compilation failed, then get out of here...
-            // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
-            return SLANG_E_INTERNAL_FAIL;
-        }
-
-        // Now that we are done, clean up after ourselves
-
-        spDestroyCompileRequest(compileRequest);
-
+        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        res = spCompile(compileRequest);
+        // If the compilation failed, then get out of here...
+        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
     }
 #ifndef _DEBUG
     catch (Exception & e)
     {
         AppContext::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
-        return SLANG_FAIL;
+        res = SLANG_FAIL;
     }
 #endif
-    return SLANG_OK;    
+
+    // Now that we are done, clean up after ourselves
+    spDestroyCompileRequest(compileRequest);
+    return res;
 }
 
 int MAIN(int argc, char** argv)

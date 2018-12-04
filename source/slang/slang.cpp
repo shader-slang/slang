@@ -307,9 +307,9 @@ CompileRequest::CompileRequest(Session* session)
     sourceManager->initialize(session->getBuiltinSourceManager());
 
     // Set all the default writers
-    for (int i = 0; i < SLANG_WRITER_TARGET_TYPE_COUNT_OF; ++i)
+    for (int i = 0; i < int(WriterChannel::CountOf); ++i)
     {
-        setWriter(SlangWriterTargetType(i), nullptr);
+        setWriter(WriterChannel(i), nullptr);
     }
 
     // Set up the default file system
@@ -377,17 +377,17 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 
 //
 
-static ISlangWriter* _getDefaultWriter(SlangWriterTargetType type)
+static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 {
     static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned);
     static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
     static NullWriter nullWriter(WriterFlag::IsStatic | WriterFlag::IsConsole);
 
-    switch (type)
+    switch (chan)
     {
-        case SLANG_WRITER_TARGET_TYPE_STD_ERROR:    return &stdError;
-        case SLANG_WRITER_TARGET_TYPE_STD_OUTPUT:   return &stdOut;
-        case SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC:   return &nullWriter;
+        case WriterChannel::StdError:    return &stdError;
+        case WriterChannel::StdOutput:   return &stdOut;
+        case WriterChannel::Diagnostic:  return &nullWriter;
         default:
         {
             SLANG_ASSERT(!"Unknown type");
@@ -396,12 +396,12 @@ static ISlangWriter* _getDefaultWriter(SlangWriterTargetType type)
     }
 }
 
-void CompileRequest::setWriter(SlangWriterTargetType type, ISlangWriter* writer)
+void CompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
 {
-    writer = writer ? writer : _getDefaultWriter(type);
-    m_writers[type] = writer;
+    writer = writer ? writer : _getDefaultWriter(chan);
+    m_writers[int(chan)] = writer;
 
-    if (type == SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC)
+    if (chan == WriterChannel::Diagnostic)
     {
         mSink.writer = writer;
     }
@@ -1360,27 +1360,27 @@ SLANG_API void spSetDiagnosticCallback(
     auto req = REQ(request);
 
     ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
-    req->setWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC, writer);
+    req->setWriter(WriterChannel::Diagnostic, writer);
 }
 
 SLANG_API void spSetWriter(
     SlangCompileRequest*    request,
-    SlangWriterTargetType   type, 
+    SlangWriterChannel      chan, 
     ISlangWriter*           writer)
 {
     if (!request) return;
     auto req = REQ(request);
 
-    req->setWriter(type, writer);
+    req->setWriter(Slang::WriterChannel(chan), writer);
 }
 
 SLANG_API ISlangWriter* spGetWriter(
     SlangCompileRequest*    request,
-    SlangWriterTargetType   type)
+    SlangWriterChannel      chan)
 {
     if (!request) return nullptr;
     auto req = REQ(request);
-    return req->getWriter(type);
+    return req->getWriter(Slang::WriterChannel(chan));
 }
 
 SLANG_API void spAddSearchPath(

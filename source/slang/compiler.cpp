@@ -955,7 +955,7 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto compileRequest = entryPoint->compileRequest;
 
-        ISlangWriter* writer = compileRequest->getWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT);
+        ISlangWriter* writer = compileRequest->getWriter(WriterChannel::StdOutput);
 
         switch (result.format)
         {

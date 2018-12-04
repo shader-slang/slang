@@ -18,27 +18,40 @@ class AppContext
 {
 public:
     
-    ISlangWriter * getWriter(SlangWriterTargetType type) const { return m_writers[type]; }
-    void setWriter(SlangWriterTargetType type, ISlangWriter* writer) { m_writers[type] = writer; }
+    ISlangWriter * getWriter(SlangWriterChannel chan) const { return m_writers[chan]; }
+    void setWriter(SlangWriterChannel chan, ISlangWriter* writer) { m_writers[chan] = writer; }
 
-    void setWriters(SlangCompileRequest* request);
+        /// Make modifications to the request
+    void configureRequest(SlangCompileRequest* request);
+
+    void setRequestWriters(SlangCompileRequest* request);
+
+    void setReplaceWriterFlagsAll() { setReplaceWriterFlags((1 << SLANG_WRITER_CHANNEL_COUNT_OF) - 1); }
+    void setReplaceWriterFlags(int flags) { m_replaceWriterFlags = flags;  }
+    int getReplaceWriterFlags() const { return m_replaceWriterFlags;  }
+ 
+        /// Ctor
+    AppContext() : m_replaceWriterFlags(0) {}
 
         /// Initialize a default context
     static AppContext* initDefault();
 
+    static AppContext* getDefault();
+
     static AppContext* getSingleton() { return s_singleton; }
     static void setSingleton(AppContext* context) { s_singleton = context;  }
 
-    static WriterHelper getStdError() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_STD_ERROR); }
-    static WriterHelper getStdOut() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_STD_OUTPUT); }
-    static WriterHelper getDiagnostic() { return getSingleton()->getWriter(SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC); }
+    static WriterHelper getStdError() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR); }
+    static WriterHelper getStdOut() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT); }
+    static WriterHelper getDiagnostic() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC); }
 
     static int getReturnCode(SlangResult res);
 
 protected:
 
-    ComPtr<ISlangWriter> m_writers[SLANG_WRITER_TARGET_TYPE_COUNT_OF]; 
-    
+    ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF]; 
+    int m_replaceWriterFlags;                                               ///< Bit for each writer
+
     static AppContext* s_singleton;
 };
 
