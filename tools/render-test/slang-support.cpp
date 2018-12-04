@@ -14,7 +14,6 @@ namespace renderer_test {
 RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     ShaderCompileRequest const& request)
 {
-    SlangSession* slangSession = spCreateSession(NULL);
     SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
 
     spSetCodeGenTarget(slangRequest, target);
@@ -173,8 +172,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     // owns the memory allocation for the generated text, and will
     // free it when we destroy the compilation result.
     spDestroyCompileRequest(slangRequest);
-    spDestroySession(slangSession);
-
+    
     return shaderProgram;
 }
 
