@@ -96,6 +96,9 @@ struct Options
     // integration builds.
     bool dumpOutputOnFailure = false;
 
+    // If set, will force using of executables (not shared library) for tests
+    bool useExes = false;
+
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;
 
@@ -171,6 +174,10 @@ Result parseOptions(int argc, char** argv, Slang::WriterHelper stdError)
                 return SLANG_FAIL;
             }
             g_options.binDir = *argCursor++;
+        }
+        else if (strcmp(arg, "-useexes"))
+        {
+            g_options.useExes = true;
         }
         else if( strcmp(arg, "-v") == 0 )
         {
@@ -639,7 +646,7 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
         context->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
-    if (context->m_useSharedLibraryTools)
+    if (!context->m_useExes)
     {
         String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
 
@@ -2065,6 +2072,7 @@ int main(
     }
 
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
+    context.m_useExes = g_options.useExes;
     context.m_isVerbose = g_options.shouldBeVerbose;
 
     { 

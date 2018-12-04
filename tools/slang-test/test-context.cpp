@@ -82,7 +82,7 @@ TestContext::TestContext() :
     m_inTest = false;
     m_dumpOutputOnFailure = false;
     m_isVerbose = false;
-    m_useSharedLibraryTools = true;
+    m_useExes = false;
 
     m_session = nullptr;
 }

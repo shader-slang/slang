@@ -162,7 +162,7 @@ class TestContext
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
-    bool m_useSharedLibraryTools;
+    bool m_useExes;
 
     void outputSummary();
 
