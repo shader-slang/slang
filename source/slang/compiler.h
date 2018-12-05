@@ -255,6 +255,12 @@ namespace Slang
         MatrixLayoutMode getDefaultMatrixLayoutMode();
     };
 
+        /// Are we generating code for a D3D API?
+    bool isD3DTarget(TargetRequest* targetReq);
+
+        /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
+    bool isKhronosTarget(TargetRequest* targetReq);
+
     // Compute the "effective" profile to use when outputting the given entry point
     // for the chosen code-generation target.
     //

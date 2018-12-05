@@ -338,7 +338,7 @@ struct SharedParameterBindingContext
     // TODO: We should eventually strip this down to
     // just the subset of fields on the target that
     // can influence layout decisions.
-    TargetRequest*  targetRequest;
+    TargetRequest*  targetRequest = nullptr;
 
     LayoutRulesFamilyImpl* defaultLayoutRules;
 
@@ -443,6 +443,36 @@ static void splitNameAndIndex(
     outDigits = UnownedStringSlice(digitsBegin, digitsEnd);
 }
 
+LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)
+{
+    switch( registerClassName.size() )
+    {
+    case 1:
+        switch (*registerClassName.begin())
+        {
+        case 'b': return LayoutResourceKind::ConstantBuffer;
+        case 't': return LayoutResourceKind::ShaderResource;
+        case 'u': return LayoutResourceKind::UnorderedAccess;
+        case 's': return LayoutResourceKind::SamplerState;
+
+        default:
+            break;
+        }
+        break;
+
+    case 5:
+        if( registerClassName == "space" )
+        {
+            return LayoutResourceKind::RegisterSpace;
+        }
+        break;
+
+    default:
+        break;
+    }
+    return LayoutResourceKind::None;
+}
+
 LayoutSemanticInfo ExtractLayoutSemanticInfo(
     ParameterBindingContext*    context,
     HLSLLayoutSemantic*         semantic)
@@ -470,31 +500,9 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     UnownedStringSlice registerIndexDigits;
     splitNameAndIndex(registerName, registerClassName, registerIndexDigits);
 
-    // All of the register classes we support are single ASCII characters,
-    // so we really just care about the first byte, but we want to be
-    // careful and only look at it if the register class name is one
-    // byte long.
-    char registerClassChar = registerClassName.size() == 1 ? *registerClassName.begin() : 0;
-    LayoutResourceKind kind = LayoutResourceKind::None;
-    switch (registerClassChar)
+    LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
+    if(kind == LayoutResourceKind::None)
     {
-    case 'b':
-        kind = LayoutResourceKind::ConstantBuffer;
-        break;
-
-    case 't':
-        kind = LayoutResourceKind::ShaderResource;
-        break;
-
-    case 'u':
-        kind = LayoutResourceKind::UnorderedAccess;
-        break;
-
-    case 's':
-        kind = LayoutResourceKind::SamplerState;
-        break;
-
-    default:
         getSink(context)->diagnose(semantic->registerName, Diagnostics::unknownRegisterClass, registerClassName);
         return info;
     }
@@ -524,13 +532,17 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
             UnownedStringSlice spaceDigits;
             splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
 
-            if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+            if( kind == LayoutResourceKind::RegisterSpace )
             {
-                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpace, spaceSpelling);
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
+            }
+            else if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+            {
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpace, spaceSpelling);
             }
             else if( spaceDigits.size() == 0 )
             {
-                getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedSpaceIndex);
+                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpaceIndex);
             }
             else
             {
@@ -1172,6 +1184,13 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
     auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
 
+    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && type->As<ConstantBufferType>() )
+    {
+        return CreateTypeLayout(
+            layoutContext.with(rules->getShaderRecordConstantBufferRules()),
+            type);
+    }
+
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
     if (varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>())
@@ -1491,6 +1510,26 @@ static void addExplicitParameterBindings_HLSL(
     RefPtr<ParameterInfo>       parameterInfo,
     RefPtr<VarLayout>           varLayout)
 {
+    // We only want to apply D3D `register` modifiers when compiling for
+    // D3D targets.
+    //
+    // TODO: Nominally, the `register` keyword allows for a shader
+    // profile to be specified, so that a given binding only
+    // applies for a specific profile:
+    //
+    //      https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dx-graphics-hlsl-variable-register
+    //
+    // We might want to consider supporting that syntax in the
+    // long run, in order to handle bindings for multiple targets
+    // in a more consistent fashion (whereas using `register` for D3D
+    // and `[[vk::binding(...)]]` for Vulkan creates a lot of
+    // visual noise).
+    //
+    // For now we do the filtering on target in a very direct fashion:
+    //
+    if(!isD3DTarget(context->getTargetRequest()))
+        return;
+
     auto typeLayout = varLayout->typeLayout;
     auto varDecl = varLayout->varDecl;
 
@@ -1527,11 +1566,35 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
+static void maybeDiagnoseMissingVulkanLayoutModifier(
+    ParameterBindingContext*    context,
+    DeclRef<VarDeclBase> const& varDecl)
+{
+    // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
+    // but they *did* specify a `register` for D3D, then that is probably an
+    // oversight on their part.
+    if( auto registerModifier = varDecl.getDecl()->FindModifier<HLSLRegisterSemantic>() )
+    {
+        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.GetName());
+    }
+}
+
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
     RefPtr<VarLayout>           varLayout)
 {
+
+    // We only want to apply GLSL-style layout modifers
+    // when compiling for a Khronos-related target.
+    //
+    // TODO: This should have some finer granularity
+    // so that we are able to distinguish between
+    // Vulkan and OpenGL as targets.
+    //
+    if(!isKhronosTarget(context->getTargetRequest()))
+        return;
+
     auto typeLayout = varLayout->typeLayout;
     auto varDecl = varLayout->varDecl;
 
@@ -1556,10 +1619,27 @@ static void addExplicitParameterBindings_GLSL(
         auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
         if (!attr)
         {
+            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
             return;
         }
         semanticInfo.index = attr->binding;
         semanticInfo.space = attr->set;
+    }
+    else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
+    {
+        // Try to find `set`
+        auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
+        if (!attr)
+        {
+            maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
+            return;
+        }
+        if( attr->binding != 0)
+        {
+            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.GetName(), attr->binding);
+        }
+        semanticInfo.index = attr->set;
+        semanticInfo.space = 0;
     }
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VertexInput)) != nullptr )
     {
@@ -2564,6 +2644,7 @@ void generateParameterBindings(
     sharedContext.compileRequest = compileReq;
     sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
     sharedContext.programLayout = programLayout;
+    sharedContext.targetRequest = targetReq;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope
@@ -2816,6 +2897,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     sharedContext.compileRequest = targetReq->compileRequest;
     sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
     sharedContext.programLayout = newProgramLayout;
+    sharedContext.targetRequest = targetReq;
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope

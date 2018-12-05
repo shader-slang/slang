@@ -4562,6 +4562,7 @@ namespace Slang
                     CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
                     CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
                     CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
+                    CASE(shaderRecordNV,  ShaderRecordNVLayoutModifier);
 
                 #undef CASE
                     else

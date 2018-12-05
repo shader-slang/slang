@@ -1,4 +1,6 @@
 //TEST:REFLECTION:-stage fragment -target glsl
+//TEST:REFLECTION:-stage fragment -target hlsl -profile sm_5_0
+//TEST:REFLECTION:-stage fragment -target hlsl -profile sm_5_1
 
 // Confirm that we do parameter binding correctly
 // when we have both a parameter block *and* user-defined

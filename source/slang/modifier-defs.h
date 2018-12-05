@@ -136,6 +136,8 @@ SIMPLE_SYNTAX_CLASS(GLSLLocalSizeXLayoutModifier,    GLSLLocalSizeLayoutModifier
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeYLayoutModifier,    GLSLLocalSizeLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeZLayoutModifier,    GLSLLocalSizeLayoutModifier)
 
+SIMPLE_SYNTAX_CLASS(ShaderRecordNVLayoutModifier, GLSLParsedLayoutModifier)
+
 // A catch-all for single-keyword modifiers
 SIMPLE_SYNTAX_CLASS(SimpleModifier, Modifier)
 

@@ -463,7 +463,10 @@ extern "C"
     enum
     {
         /* When compiling for a D3D Shader Model 5.1 or higher target, allocate
-           distinct register spaces for parameter blocks. */
+           distinct register spaces for parameter blocks.
+
+           @deprecated This behavior is now enabled unconditionally.
+        */
         SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES = 1 << 4,
     };
 
@@ -1464,6 +1467,7 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD,
         SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
         SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
+        SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -1781,6 +1785,8 @@ namespace slang
         RayPayload = SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD,
         HitAttributes = SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
         CallablePayload = SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
+
+        ShaderRecord = SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

@@ -1753,14 +1753,14 @@ struct EmitVisitor
         emitHLSLParameterGroupFieldLayoutSemantics(&chain);
     }
 
-    void emitGLSLLayoutQualifier(
+    bool emitGLSLLayoutQualifier(
         LayoutResourceKind  kind,
         EmitVarChain*       chain)
     {
         if(!chain)
-            return;
+            return false;
         if(!chain->varLayout->FindResourceInfo(kind))
-            return;
+            return false;
 
         UInt index = getBindingOffset(chain, kind);
         UInt space = getBindingSpace(chain, kind);
@@ -1828,8 +1828,12 @@ struct EmitVisitor
         case LayoutResourceKind::PushConstantBuffer:
             Emit("layout(push_constant)\n");
             break;
+        case LayoutResourceKind::ShaderRecord:
+            Emit("layout(shaderRecordNV)\n");
+            break;
 
         }
+        return true;
     }
 
     void emitGLSLLayoutQualifiers(
@@ -5821,8 +5825,13 @@ struct EmitVisitor
 
         emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
         emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
+        bool isShaderRecord = emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
-        if(as<IRGLSLShaderStorageBufferType>(type))
+        if( isShaderRecord )
+        {
+            emit("buffer ");
+        }
+        else if(as<IRGLSLShaderStorageBufferType>(type))
         {
             emit("layout(std430) buffer ");
         }

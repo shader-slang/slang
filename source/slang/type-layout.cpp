@@ -350,6 +350,17 @@ struct GLSLPushConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
 };
 GLSLPushConstantBufferObjectLayoutRulesImpl kGLSLPushConstantBufferObjectLayoutRulesImpl_;
 
+struct GLSLShaderRecordConstantBufferObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
+{
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind /*kind*/) override
+    {
+        // Special-case the layout for a constant-buffer, because we don't
+        // want it to allocate a descriptor-table slot
+        return SimpleLayoutInfo(LayoutResourceKind::ShaderRecord, 1);
+    }
+};
+GLSLShaderRecordConstantBufferObjectLayoutRulesImpl kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_;
+
 struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
     virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
@@ -439,6 +450,8 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -455,6 +468,8 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getRayPayloadParameterRules()      override;
     LayoutRulesImpl* getCallablePayloadParameterRules() override;
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -473,6 +488,10 @@ LayoutRulesImpl kStd430LayoutRulesImpl_ = {
 
 LayoutRulesImpl kGLSLPushConstantLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kGLSLShaderRecordLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
 };
 
 LayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl_ = {
@@ -547,6 +566,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
     return &kGLSLPushConstantLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kGLSLShaderRecordLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules()
 {
     return nullptr;
@@ -602,6 +626,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getParameterBlockRules()
 
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
@@ -823,7 +852,7 @@ static bool isOpenGLTarget(TargetRequest*)
     return false;
 }
 
-static bool isD3DTarget(TargetRequest* targetReq)
+bool isD3DTarget(TargetRequest* targetReq)
 {
     switch( targetReq->target )
     {
@@ -836,6 +865,20 @@ static bool isD3DTarget(TargetRequest* targetReq)
 
     default:
         return false;
+    }
+}
+
+bool isKhronosTarget(TargetRequest* targetReq)
+{
+    switch( targetReq->target )
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        return true;
     }
 }
 
@@ -868,23 +911,27 @@ static bool isSM5OrEarlier(TargetRequest* targetReq)
     return false;
 }
 
-static bool isVulkanTarget(TargetRequest* targetReq)
+static bool isSM5_1OrLater(TargetRequest* targetReq)
 {
-    switch( targetReq->target )
-    {
-    default:
+    if(!isD3DTarget(targetReq))
         return false;
 
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly:
-        break;
+    auto profile = targetReq->targetProfile;
+
+    if(profile.getFamily() == ProfileFamily::DX)
+    {
+        if(profile.GetVersion() >= ProfileVersion::DX_5_1)
+            return true;
     }
 
-    // For right now, any GLSL-related target is assumed
-    // to be a Vulkan target.
+    return false;
+}
 
-    return true;
+static bool isVulkanTarget(TargetRequest* targetReq)
+{
+    // For right now, any Khronos-related target is assumed
+    // to be a Vulkan target.
+    return isKhronosTarget(targetReq);
 }
 
 static bool shouldAllocateRegisterSpaceForParameterBlock(
@@ -907,10 +954,9 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(
     // are generating code for D3D12, and using SM5.1 or later.
     // We will use a register space for parameter blocks *if*
     // the target options tell us to:
-    if( isD3D12Target(targetReq) )
+    if( isD3D12Target(targetReq) && isSM5_1OrLater(targetReq) )
     {
-        if(targetReq->targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
-            return true;
+        return true;
     }
 
     return false;
