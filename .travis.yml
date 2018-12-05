@@ -39,7 +39,7 @@ matrix:
 # `./configure && make && make test` which is appropriate
 # for autoconf, but I don't want to get into that mess..
 #
-script: ./travis_build_and_test.sh
+script: bash ./travis_build_and_test.sh
         
 before_deploy: |
   export SLANG_OS_NAME=${TRAVIS_OS_NAME}

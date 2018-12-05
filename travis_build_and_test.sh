@@ -10,5 +10,5 @@ make config=debug_x64
 cd ..
 
 # Setup to run release tests
-./travis_test.sh release smoke
+bash ./travis_test.sh release smoke
 
