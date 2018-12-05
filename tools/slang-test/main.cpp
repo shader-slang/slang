@@ -1331,7 +1331,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 		spawner.pushArgument(arg);
 	}
 
-    for (int i = 0; i < numLangOpts; ++i)
+    for (int i = 0; i < int(numLangOpts); ++i)
     {
         spawner.pushArgument(langOpts[i]);
     }

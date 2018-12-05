@@ -48,10 +48,10 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::IsStatic) ? 1 : (uint32_t)releaseReference(); }
 
     // ISlangWriter - default impl
-    virtual SlangResult writeVaList(const char* format, va_list args) { SLANG_UNUSED(args); SLANG_UNUSED(format); return SLANG_E_NOT_IMPLEMENTED; }
-    virtual void flush() SLANG_OVERRIDE {}
-    virtual bool isConsole() SLANG_OVERRIDE { return (m_flags & WriterFlag::IsConsole) != 0; }
-    virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE { SLANG_UNUSED(mode);  return SLANG_FAIL; }
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) { SLANG_UNUSED(args); SLANG_UNUSED(format); return SLANG_E_NOT_IMPLEMENTED; }
+    SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE {}
+    SLANG_NO_THROW virtual bool SLANG_MCALL isConsole() SLANG_OVERRIDE { return (m_flags & WriterFlag::IsConsole) != 0; }
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL setMode(SlangWriterMode mode) SLANG_OVERRIDE { SLANG_UNUSED(mode);  return SLANG_FAIL; }
 
     BaseWriter(WriterFlags flags) :
         m_flags(flags)
@@ -68,7 +68,7 @@ class CallbackWriter : public BaseWriter
 public:
     typedef BaseWriter Parent;   
     // ISlangWriter
-    virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
     CallbackWriter(SlangDiagnosticCallback callback, const void* data, WriterFlags flags) :
         Parent(flags),
@@ -87,10 +87,10 @@ class FileWriter : public BaseWriter
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
-    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
-    virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE;
-    virtual void flush() SLANG_OVERRIDE;
-    virtual SlangResult setMode(SlangWriterMode mode) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL setMode(SlangWriterMode mode) SLANG_OVERRIDE;
 
     static bool isConsole(FILE* file);
     static WriterFlags getDefaultFlags(FILE* file) { return isConsole(file) ? WriterFlags(WriterFlag::IsConsole) : 0; }
@@ -113,8 +113,8 @@ class StringWriter : public BaseWriter
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
-    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
-    virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
         /// Ctor
     StringWriter(StringBuilder* builder, WriterFlags flags) :
@@ -131,8 +131,8 @@ class NullWriter : public BaseWriter
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
-    virtual SlangResult writeVaList(const char* format, va_list args) SLANG_OVERRIDE { SLANG_UNUSED(format); SLANG_UNUSED(args); return SLANG_OK; }
-    virtual SlangResult write(const char* chars, size_t numChars) SLANG_OVERRIDE { SLANG_UNUSED(chars); SLANG_UNUSED(numChars); return SLANG_OK; }
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE { SLANG_UNUSED(format); SLANG_UNUSED(args); return SLANG_OK; }
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE { SLANG_UNUSED(chars); SLANG_UNUSED(numChars); return SLANG_OK; }
 
     /// Ctor
     NullWriter(WriterFlags flags) :
