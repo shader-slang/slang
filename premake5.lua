@@ -121,7 +121,7 @@ workspace "slang"
 		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
 		
     filter { "toolset:clang" }
-         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template"}
+         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function"}
 		
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
