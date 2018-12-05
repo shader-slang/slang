@@ -9,5 +9,5 @@ make config=${CONFIGURATION}_x64
 cd ..
 
 # Setup to run release tests
-bash ./travis_test.sh
+source ./travis_test.sh
 
