@@ -5,10 +5,9 @@ wget https://github.com/shader-slang/slang-binaries/blob/master/premake/premake-
 chmod u+x premake5
 ./premake5 gmake -build-location=build.linux
 cd build.linux        
-make config=release_x64
-make config=debug_x64
+make config=${CONFIGURATION}_x64
 cd ..
 
 # Setup to run release tests
-bash ./travis_test.sh release smoke
+bash ./travis_test.sh
 

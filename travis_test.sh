@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-CONFIGURATION="${1}"
-SLANG_TEST_CATEGORY="${2}"
-shift
+# CONFIGURATION=release or debug
+# SLANG_TEST_CATEGORY= 
 
-# CONFIGURATION=release
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCHITECTURE=$(uname -p)
 
