@@ -864,7 +864,7 @@ extern "C"
             /** Flushes any content to the ouput */
         virtual SLANG_NO_THROW void SLANG_MCALL flush() = 0;
             /** Determines if the writer stream is to the console, and can be used to alter the output 
-            @returns Returns SlangBool::True if is a console writer */
+            @returns Returns true if is a console writer */
         virtual SLANG_NO_THROW SlangBool SLANG_MCALL isConsole() = 0;
             /** Set the mode for the writer to use
             @param mode The mode to use
