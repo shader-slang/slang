@@ -84,7 +84,7 @@ One slightly odd design choice in the parser is that it attaching lexical scopin
 ### Semantic Checking
 
 The semantic checking step (`check.{h,cpp}`) is, not surprisingly, the most complicated and messiest bit of the compiler today.
-The basic premise is simply; recursively walk the entire AST and apply semantic checking to each construct.
+The basic premise is simple: recursively walk the entire AST and apply semantic checking to each construct.
 
 Semantic checking applies to one translation unit at a time.
 It has access to the list of entry points for the translation unit (so it can validate them), but it *not* allowed to depend on the compilation target(s) the user might have selected.

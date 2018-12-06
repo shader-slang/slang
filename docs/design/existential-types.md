@@ -36,7 +36,7 @@ float4 offsetImage(Type* T, IImageWitnessTable* W, void* image, float2 uv)
 }
 ```
 
-This translation takes the generic parameters and turns them into ordinary runtime paramters: the type `T` becomes a pointer to a run-time type representation, while the constraint that `T : IImage` becomes a "witness table" of function pointers that, we assume, implements the `IImage` interface for `T`. So, the syntax of generics is *not* tied to static specialization, and can admit a purely runtime implementation as well.
+This translation takes the generic parameters and turns them into ordinary runtime parameters: the type `T` becomes a pointer to a run-time type representation, while the constraint that `T : IImage` becomes a "witness table" of function pointers that, we assume, implements the `IImage` interface for `T`. So, the syntax of generics is *not* tied to static specialization, and can admit a purely runtime implementation as well.
 
 Readers who are familiar with how languages like C++ are implemented might see the "witness table" above and realize that it is kind of like a virtual function table, just being passed alongside the object, rather than stored in its first word.
 
@@ -55,7 +55,7 @@ float4 modulateImage(IImage image, float2 uv)
 
 Unlike `offsetImage`, `modulateImage` is trying to use the `IImage` interface as a *type* and not just a constraint.
 
-This code appears to be asking for a dynamic implemenation rather than specialization (we'll get back to that...) and so we should be able to implement it similarly to our translation of `offsetImage` to C++.
+This code appears to be asking for a dynamic implementation rather than specialization (we'll get back to that...) and so we should be able to implement it similarly to our translation of `offsetImage` to C++.
 Something like the following makes a lot of sense:
 
 ```c++
@@ -117,7 +117,7 @@ void myFunc(IImage img)
 
 This seems like an appealing thing for a language to support, but there are some subtle reasons why this isn't possible to support in general.
 If we think about what `doSomethingCool(img)` is asking for, it seems to be trying to invoke the function `doSomethingCool<IImage>`.
-That function only accepts type parametesr that implement the `IImage` interface, so we have to ask ourselves:
+That function only accepts type parameters that implement the `IImage` interface, so we have to ask ourselves:
 
 Does the (existential) type `IImage` implement the `IImage` interface?
 
@@ -125,7 +125,7 @@ Knowing the implementation strategy outline above, we can re-phrase this questio
 
 For simple interfaces this is sometimes possible, but in the general case there are other desirable language features that get in the way:
 
-* When an interface has associted types, there is no type that can be chosen as the associated type for the interface's existential type. The "obvious" approach of using the constraints on the associatd type can lead to unsound logic when interface methods take associated types as parameters.
+* When an interface has associated types, there is no type that can be chosen as the associated type for the interface's existential type. The "obvious" approach of using the constraints on the associatd type can lead to unsound logic when interface methods take associated types as parameters.
 
 * When an interface uses the "this type" (e.g., an `IComparable` interface with a `compareTo(ThisType other)` method), it isn't correct to simplify the this type to the interface type (just because you have to `IComarable` values doesn't mean you can compare them - they have to be of the same concrete type!)
 

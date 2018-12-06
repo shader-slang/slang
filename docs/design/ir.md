@@ -15,7 +15,7 @@ We will start by enumerating these goals (and related non-goals) explicitly so t
 
 * As a particular case of analysis and optimization, it should be possible to validate flow-dependent properties of an input function/program (e.g., whether an `[unroll]` loop is actually unrollable) using the IR, and emit meaningful error messages that reference the AST-level names/locations of constructs involved in an error.
 
-* It should be posible to compile modules to the IR separately an then "link" them in a way that depends only on IR-level (not AST-level) constructs. We want to allow changing implementation details of a module without forcing a re-compile of IR code using that module (what counts as "implementation details") is negotiable.
+* It should be posible to compile modules to the IR separately and then "link" them in a way that depends only on IR-level (not AST-level) constructs. We want to allow changing implementation details of a module without forcing a re-compile of IR code using that module (what counts as "implementation details") is negotiable.
 
 * There should be a way to serialize IR modules in a round-trip fashion preserving all of the structure. As a long-term goal, the serialized format should provide stability across compiler versions (working more as an IL than an IR)
 
@@ -34,7 +34,7 @@ Inspirations
 
 The IR design we currently use takes inspiration from three main sources:
 
-* The LLVM project provides the basic inspiration for the approach to SSA, such as using a typed IR, the decision to use the same object to represnet an instruction and the SSA value it produces, and the push to have an extremely simple `replaceAllUsesWith` primitive. It is easy to forget that it is possible to design a compiler with different design decisions; the LLVM ones just happen to both be well-motivated and well-known.
+* The LLVM project provides the basic inspiration for the approach to SSA, such as using a typed IR, the decision to use the same object to represent an instruction and the SSA value it produces, and the push to have an extremely simple `replaceAllUsesWith` primitive. It is easy to forget that it is possible to design a compiler with different design decisions; the LLVM ones just happen to both be well-motivated and well-known.
 
 * The Swift IL (SIL) provides the inspiration for our approach for encoding SSA "phi nodes" (blocks with arguments), and also informs some of how we have approached encoding generics and related features like existential types.
 
@@ -119,17 +119,17 @@ This encoding is equivalent in what it represents to traditional phi instruction
 
 - The phi operands in the successor block are now arguments in the *predecessor* block, so that the "def dominates use" property can be enforced without any special cases.
 
-- The "assignment" of the argument values to parameters is now encoded with a single instruction, so that the simultaneity of all the assignements is more clear. We still need to be careful when leaving SSA form to obey those semantics, but there are no tricky issues when looking at the IR itself.
+- The "assignment" of the argument values to parameters is now encoded with a single instruction, so that the simultaneity of all the assignments is more clear. We still need to be careful when leaving SSA form to obey those semantics, but there are no tricky issues when looking at the IR itself.
 
-- There is no special work required to track which phi operands come from which predecessor block, since the operands are attached to the terminator instruction of the predecessor block itself. There is no need to update phi instructions after a CFG change that might affect the predecessor list of a block. The trade-off is that any change the *number* of parameters of a block now requires changes to the terminator of each predecessor, but that is a less common change (isolated to passes that can introduce or eliinate block parametesr/phis).
+- There is no special work required to track which phi operands come from which predecessor block, since the operands are attached to the terminator instruction of the predecessor block itself. There is no need to update phi instructions after a CFG change that might affect the predecessor list of a block. The trade-off is that any change the *number* of parameters of a block now requires changes to the terminator of each predecessor, but that is a less common change (isolated to passes that can introduce or eliminate block parameters/phis).
 
 - It it much more clear how to give an operational semantics to a "branch with arguments" instead of phi instructions: compute the target block, copy the argumenst to temporary storage (because of the simultaneity requirement), and then copy the temporaries over the parameters of the target block.
 
-The main caveat those this representation is that it requires branch instructions to have room for arguments to the target block. For an ordinary unconditional branch this is pretty easy: we just put a variable number of arguments after the operand for the target block. For branch instructions like a two-way conditional, we might need to encode two argument lists - one for each target block - and an N-way `switch` branch only gets more complicated.
+The main caveat of this representation is that it requires branch instructions to have room for arguments to the target block. For an ordinary unconditional branch this is pretty easy: we just put a variable number of arguments after the operand for the target block. For branch instructions like a two-way conditional, we might need to encode two argument lists - one for each target block - and an N-way `switch` branch only gets more complicated.
 
 The Slang IR avoids the problem of needing to store arguments on every branch instruction by banning *critical edges* in IR functions that are using SSA phis/parameters. A critical edge is any edge from a block with multiple successors (meaning it ends in a conditional branch) to one with multiple predecessors (meaning it is a "join point" in the CFG).
 Phi instructions/parameters are only ever needed at join points, and so block arguments are only needed on branches to a join point.
-By rulling out conditional branches that target join points, we avoid the need to encode arguments on conditional branch instructions.
+By ruling out conditional branches that target join points, we avoid the need to encode arguments on conditional branch instructions.
 
 This constraint could be lifted at some point, but it is important to note that there are no programs that cannot be represented as a CFG without critical edges.
 
@@ -142,7 +142,7 @@ The succesor-to-predecessor edges form a graph over the basic blocks called the 
 
 A simple representation of a function would store the CFG explicitly as a graph data structure, but in that case the data structure would need to be updated whenever a change is made to the terminator instruction of a branch in a way that might change the successor/predecessor relationship.
 
-The Slang IR avoids this maintenance problem by noting an imporant property.
+The Slang IR avoids this maintenance problem by noting an important property.
 If block `P`, with terminator `t`, is a predecessor of `S`, then `t` must have an operand that references `S`.
 In turn, that means that the list of uses of `S` must include `t`.
 

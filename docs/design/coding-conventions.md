@@ -307,6 +307,9 @@ Values should in general use `lowerCamelCase`. This includes functions, methods,
 Macros should in general use `SCREAMING_SNAKE_CASE`.
 It is important to prefix all macros (e.g., with `SLANG_`) to avoid collisions, since `namespace`s don't affect macros).
 
+In names using camel case, acronyms and initialisms should appear eniterly in either upper or lower case (e.g., `D3DThing d3dThing`) and not be capitalized as if they were ordinary words (e.g., `D3dThing d3dThing`).
+Note that this also applies to uses of "ID" as an abbreviation for "identifier" (e.g., use `nodeID` instead of `nodeId`).
+
 ### Prefixes
 
 Prefixes based on types (e.g., `p` for pointers) should never be used.
@@ -317,10 +320,18 @@ Of course, both of these should be avoided, so this shouldn't come up often.
 
 Constant data (in the sense of `static const`) should have a `k` prefix.
 
-In `class` types where "information hiding" is relevant/important, an `m` prefix on members is allowed (but not required). Exmaple: `mBegin`.
-In all other cases, member variables/fields should not be prefixed.
+In contexts where "information hiding" is relevant/important, such as when a type has both `public` and `private` members, or just has certain operations/fields that are considered "implementation details" that most clients should not be using, and `_` prefix on function and field members is allowed (but not required).
 
-No prefixing convention is used to differentiate the public interface of an C++ feature/class from its implementation.
+In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.
+For example:
+
+```c++
+void copyData(void* outBuffer, void const* inBuffer, size_t size);
+
+Result lookupThing(Key k, Thing& outThing);
+
+void maybeAppendExtraNames(std::vector<Name>& ioNames);
+```
 
 Public C APIs will prefix all symbol names while following the casing convention (e.g. `SlangModule`, `slangLoadModule`, etc.).
 
@@ -331,15 +342,15 @@ C-style `enum` should use the following convention:
 ```c++
 enum Color
 {
-    kColor_Red,
-    kColor_Green,
-    kColor_Blue,
+    Color_Red,
+    Color_Green,
+    Color_Blue,
 
-    kColorCount,
+    ColorCount,
 };
 ```
 
-When using `enum class`, drop the `k` prefix, but retain the `UpperCamelCase` tag names:
+When using `enum class`, drop the type name as prefix, but retain the `UpperCamelCase` tag names:
 
 ```c++
 enum class Color
@@ -358,17 +369,19 @@ When defining a set of flags, separate the type definition from the `enum`:
 typedef unsigned int Axes;
 enum
 {
-    kAxes_None = 0,
+    Axes_None = 0,
 
-    kAxis_X = 1 << 0,
-    kAxis_Y = 1 << 1,
-    kAxis_Z = 1 << 2,
+    Axis_X = 1 << 0,
+    Axis_Y = 1 << 1,
+    Axis_Z = 1 << 2,
 
-    kAxes_All = kAxis_X | kAxis_Y | kAxis_Z,
+    Axes_All = kAxis_X | kAxis_Y | kAxis_Z,
 };
 ```
 
-In public APIs, `enum` cases should use `SCREAMING_SNAKE_CASE`:
+Note that the type name reflects the plural case, while the cases that represent individual bits are named with a singular prefix.
+
+In public APIs, all `enum`s should use the style of separating the type defintion from the `enum`, and all cases should use `SCREAMING_SNAKE_CASE`:
 
 ```c++
 typedef unsigned int SlangAxes;
@@ -393,7 +406,7 @@ Function names should either be named with action verbs (`get`, `set`, `create`,
 Whenever possible, compiler concepts should be named using the most widely-understood term available: e.g., we use `Token` over `Lexeme`, and `Lexer` over `Scanner` simply because they appear to be the more common names.
 
 Avoid abbreviations and initialisms unless they are already widely established across the codebase; a longer name may be cumbersome to write in the moment, but the code will probably be read many more times than it is written, so clarity should be preferred.
-An important exception to this is common compiler soncepts or techqniues which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
+An important exception to this is common compiler concepts or techqniues which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
 
 One gotcha particular to compiler front-ends is that almost every synonym for "type" has some kind of established technical meaning; most notably the term "kind" has a precise meaning that is relevant in our domain.
 It is common practice in C and C++ to define tagged union types with a selector field called a "type" or "kind," which does not usually match this technical definition.

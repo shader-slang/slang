@@ -99,7 +99,7 @@ struct Cell<T>
 }
 ```
 
-The reference to `a` in the body of `b` will be represented as a declaration refernece to `Cell::a` with a substitution that maps `[Cell::T => Cell::T]`. This might seem superfluous, but it makes it clear that we are "applying" the generic to arguments (even if they are in some sense placeholder arguments), and not trying to refer to an unspecialized generic.
+The reference to `a` in the body of `b` will be represented as a declaration reference to `Cell::a` with a substitution that maps `[Cell::T => Cell::T]`. This might seem superfluous, but it makes it clear that we are "applying" the generic to arguments (even if they are in some sense placeholder arguments), and not trying to refer to an unspecialized generic.
 
 There are a few places in the compiler where we might currently bend these rules, but experience has shown that failing to include appropriate substitutions is more often than not a source of bugs.
 
@@ -153,7 +153,7 @@ What does any of this mean for me?
 ----------------------------------
 
 When working in the Slang compiler code, try to be aware of whether you should be working with a plain `Decl*` or a full `DeclRef`.
-There are many queries like "what is the rturn type of this function?" that typically only make sense if you are applying them to a `DeclRef`.
+There are many queries like "what is the return type of this function?" that typically only make sense if you are applying them to a `DeclRef`.
 
 The `syntax.h` file defines helpers for most of the existing declaration AST nodes for querying properties that should represent substitutions (the type of a variable, the return type of a function, etc.).
 If you are writing code that is working with a `DeclRef`, try to use these accessors and avoid being tempted to extract the bare declaration and start querying it.
