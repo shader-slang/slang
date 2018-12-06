@@ -6188,12 +6188,9 @@ struct EmitVisitor
             ensureInstOperand(ctx, inst->getOperand(ii));
         }
 
-        if(auto parentInst = as<IRParentInst>(inst))
+        for(auto child : inst->getChildren())
         {
-            for(auto child : parentInst->getChildren())
-            {
-                ensureInstOperandsRec(ctx, child);
-            }
+            ensureInstOperandsRec(ctx, child);
         }
     }
 

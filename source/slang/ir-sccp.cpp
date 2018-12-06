@@ -929,14 +929,10 @@ static void applySparseConditionalConstantPropagationRec(
         }
     }
 
-    if( auto parentInst = as<IRParentInst>(inst) )
+    for( auto childInst : inst->getChildren() )
     {
-        for( auto childInst : parentInst->getChildren() )
-        {
-            applySparseConditionalConstantPropagationRec(shared, childInst);
-        }
+        applySparseConditionalConstantPropagationRec(shared, childInst);
     }
-
 }
 
 void applySparseConditionalConstantPropagation(

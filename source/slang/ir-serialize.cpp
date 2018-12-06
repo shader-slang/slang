@@ -16,12 +16,9 @@ namespace Slang {
 
 /* Note that an IRInst can be derived from, but when it derived from it's new members are IRUse variables, and they in 
 effect alias over the operands - and reflected in the operand count. There _could_ be other members after these IRUse 
-variables, but in practice there do not appear to be.
+variables, but only a few types include extra data, and these do not have any operands:
 
-The only difference to this is IRParentInst derived types, as it contains IRInstListBase children. Thus IRParentInst derived classes can 
-have no operands - because it would write over the top of IRInstListBase.  BUT they can contain members after the list 
-types which do this are
-
+* IRConstant        - Needs special-case handling
 * IRModuleInst      - Presumably we can just set to the module pointer on reconstruction
 * IRGlobalValue     - There are types derived from this type, but they don't add a parameter
 
@@ -43,12 +40,6 @@ bother to check if it's correct, and just casts it.
     { 0, 0 },   // Float64,
     { 0, 0 }    // Int64,
 };
-
-static bool isParentDerived(IROp opIn)
-{
-    const int op = (kIROpMeta_PseudoOpMask & opIn);
-    return op >= kIROp_FirstParentInst && op <= kIROp_LastParentInst;
-}
 
 static bool isGlobalValueDerived(IROp opIn)
 {
@@ -433,7 +424,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     m_decorations.Clear();
     
     // Stack for parentInst
-    List<IRParentInst*> parentInstStack;
+    List<IRInst*> parentInstStack;
   
     IRModuleInst* moduleInst = module->getModuleInst();
     parentInstStack.Add(moduleInst);
@@ -445,7 +436,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     while (parentInstStack.Count())
     {
         // If it's in the stack it is assumed it is already in the inst map
-        IRParentInst* parentInst = parentInstStack.Last();
+        IRInst* parentInst = parentInstStack.Last();
         parentInstStack.RemoveLast();
         SLANG_ASSERT(m_instMap.ContainsKey(parentInst));
 
@@ -461,11 +452,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
             _addInstruction(child);
             
-            IRParentInst* childAsParent = as<IRParentInst>(child);
-            if (childAsParent)
-            {
-                parentInstStack.Add(childAsParent);
-            }
+            parentInstStack.Add(child);
         }
 
         // If it had any children, then store the information about it
@@ -1668,25 +1655,16 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
 
         const IROp op((IROp)srcInst.m_op);
 
-        if (isParentDerived(op))
+        if (isGlobalValueDerived(op))
         {
             // Cannot have operands
             SLANG_ASSERT(srcInst.getNumOperands() == 0);
 
-            if (isGlobalValueDerived(op))
-            {
-                IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
-                insts[i] = globalValueInst;
-                // Set the global value
-                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-                globalValueInst->mangledName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            }
-            else
-            {
-                // Just needs to big enough to hold IRParentInst
-                IRParentInst* parentInst = static_cast<IRParentInst*>(createEmptyInstWithSize(module, op, sizeof(IRParentInst)));
-                insts[i] = parentInst;
-            }
+            IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
+            insts[i] = globalValueInst;
+            // Set the global value
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+            globalValueInst->mangledName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
         }
         else
         {
@@ -1808,15 +1786,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             const auto& run = data.m_childRuns[i];
 
             IRInst* inst = insts[int(run.m_parentIndex)];
-            IRParentInst* parentInst = as<IRParentInst>(inst);
-            SLANG_ASSERT(parentInst);
 
             for (int j = 0; j < int(run.m_numChildren); ++j)
             {
                 IRInst* child = insts[j + int(run.m_startInstIndex)];
                 SLANG_ASSERT(child->parent == nullptr);
-                //child->parent = parentInst;
-                child->insertAtEnd(parentInst);
+                child->insertAtEnd(inst);
             }
         }
     }

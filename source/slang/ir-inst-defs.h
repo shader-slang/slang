@@ -149,40 +149,31 @@ INST(Nop, nop, 0, 0)
 // This is a parent instruction that holds zero or more
 // `field` instructions.
 //
-// Note: we are being a bit slippery here, because a `struct`
-// instruction is really an `IRParentInst`, but we want it
-// to also be caught in any dynamic cast to `IRType`, so we
-// ensure that it comes at the *end* of the range for `IRType`,
-// and the start of the range for `IRParentInst` (and `IRGlobalValue`)
 INST(StructType, struct, 0, PARENT)
 
 INST_RANGE(Type, VoidType, StructType)
 
-/*IRParentInst*/
+/*IRGlobalValue*/
 
-    /*IRGlobalValue*/
+    /*IRGlobalValueWithCode*/
+        /* IRGlobalValueWIthParams*/
+            INST(Func, func, 0, PARENT)
+            INST(Generic, generic, 0, PARENT)
+        INST_RANGE(GlobalValueWithParams, Func, Generic)
 
-        /*IRGlobalValueWithCode*/
-            /* IRGlobalValueWIthParams*/
-                INST(Func, func, 0, PARENT)
-                INST(Generic, generic, 0, PARENT)
-            INST_RANGE(GlobalValueWithParams, Func, Generic)
+        INST(GlobalVar, global_var, 0, 0)
+        INST(GlobalConstant, global_constant, 0, 0)
+    INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
 
-            INST(GlobalVar, global_var, 0, 0)
-            INST(GlobalConstant, global_constant, 0, 0)
-        INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
+    INST(StructKey, key, 0, 0)
+    INST(GlobalGenericParam, global_generic_param, 0, 0)
+    INST(WitnessTable, witness_table, 0, 0)
 
-        INST(StructKey, key, 0, 0)
-        INST(GlobalGenericParam, global_generic_param, 0, 0)
-        INST(WitnessTable, witness_table, 0, 0)
+INST_RANGE(GlobalValue, StructType, WitnessTable)
 
-    INST_RANGE(GlobalValue, StructType, WitnessTable)
+INST(Module, module, 0, PARENT)
 
-    INST(Module, module, 0, PARENT)
-
-    INST(Block, block, 0, PARENT)
-
-INST_RANGE(ParentInst, StructType, Block)
+INST(Block, block, 0, PARENT)
 
 /* IRConstant */
     INST(BoolLit, boolConst, 0, 0)

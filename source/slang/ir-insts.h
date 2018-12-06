@@ -573,7 +573,7 @@ struct IRBuilder
     // The current parent being inserted into (this might
     // be the global scope, a function, a block inside
     // a function, etc.)
-    IRParentInst*   insertIntoParent = nullptr;
+    IRInst*   insertIntoParent = nullptr;
     //
     // An instruction in the current parent that we should insert before
     IRInst*         insertBeforeInst = nullptr;
@@ -585,7 +585,7 @@ struct IRBuilder
     // that we are inserting into (if any).
     IRGlobalValueWithCode*  getFunc();
 
-    void setInsertInto(IRParentInst* insertInto);
+    void setInsertInto(IRInst* insertInto);
     void setInsertBefore(IRInst* insertBefore);
 
     IRBuilderSourceLocRAII* sourceLocInfo = nullptr;

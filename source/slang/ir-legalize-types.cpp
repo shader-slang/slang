@@ -1096,7 +1096,7 @@ static void addParamType(List<IRType*>& ioParamTypes, LegalType t)
 
 static void legalizeInstsInParent(
     IRTypeLegalizationContext*  context,
-    IRParentInst*               parent)
+    IRInst*                     parent)
 {
     IRInst* nextChild = nullptr;
     for(auto child = parent->getFirstChild(); child; child = nextChild)

@@ -191,9 +191,86 @@ struct IRDecoration : public IRObject
 };
 
 struct IRBlock;
-struct IRParentInst;
 struct IRRate;
 struct IRType;
+
+// A double-linked list of instruction
+struct IRInstListBase
+{
+    IRInstListBase()
+    {}
+
+    IRInstListBase(IRInst* first, IRInst* last)
+        : first(first)
+        , last(last)
+    {}
+
+
+
+    IRInst* first = nullptr;
+    IRInst* last = nullptr;
+
+    IRInst* getFirst() { return first; }
+    IRInst* getLast() { return last; }
+
+    struct Iterator
+    {
+        IRInst* inst;
+
+        Iterator() : inst(nullptr) {}
+        Iterator(IRInst* inst) : inst(inst) {}
+
+        void operator++();
+        IRInst* operator*()
+        {
+            return inst;
+        }
+
+        bool operator!=(Iterator const& i)
+        {
+            return inst != i.inst;
+        }
+    };
+
+    Iterator begin();
+    Iterator end();
+};
+
+// Specialization of `IRInstListBase` for the case where
+// we know (or at least expect) all of the instructions
+// to be of type `T`
+template<typename T>
+struct IRInstList : IRInstListBase
+{
+    IRInstList() {}
+
+    IRInstList(T* first, T* last)
+        : IRInstListBase(first, last)
+    {}
+
+    explicit IRInstList(IRInstListBase const& list)
+        : IRInstListBase(list)
+    {}
+
+    T* getFirst() { return (T*) first; }
+    T* getLast() { return (T*) last; }
+
+    struct Iterator : public IRInstListBase::Iterator
+    {
+        Iterator() {}
+        Iterator(IRInst* inst) : IRInstListBase::Iterator(inst) {}
+
+        T* operator*()
+        {
+            return (T*) inst;
+        }
+    };
+
+    Iterator begin() { return Iterator(first); }
+    Iterator end() { return Iterator(last ? last->next : nullptr); }
+};
+
+
 
 // Every value in the IR is an instruction (even things
 // like literal values).
@@ -236,9 +313,9 @@ struct IRInst : public IRObject
 
 
     // The parent of this instruction.
-    IRParentInst*   parent;
+    IRInst*   parent;
 
-    IRParentInst* getParent() { return parent; }
+    IRInst* getParent() { return parent; }
 
     // The next and previous instructions with the same parent
     IRInst*         next;
@@ -246,6 +323,15 @@ struct IRInst : public IRObject
 
     IRInst* getNextInst() { return next; }
     IRInst* getPrevInst() { return prev; }
+
+    // The instructions stored under this parent
+    IRInstListBase children;
+
+    IRInst* getFirstChild() { return children.first; }
+    IRInst* getLastChild()  { return children.last;  }
+    IRInstListBase getChildren() { return children; }
+
+    void removeAndDeallocateAllChildren();
 
     // The type of the result value of this instruction,
     // or `null` to indicate that the instruction has
@@ -289,16 +375,16 @@ struct IRInst : public IRObject
     void insertAfter(IRInst* other);
 
     // Insert as first/last child of given parent
-    void insertAtStart(IRParentInst* parent);
-    void insertAtEnd(IRParentInst* parent);
+    void insertAtStart(IRInst* parent);
+    void insertAtEnd(IRInst* parent);
 
     // Move to the start/end of current parent
     void moveToStart();
     void moveToEnd();
 
     // Insert before/after the given instruction, in a specific block
-    void insertBefore(IRInst* other, IRParentInst* parent);
-    void insertAfter(IRInst* other, IRParentInst* parent);
+    void insertBefore(IRInst* other, IRInst* parent);
+    void insertAfter(IRInst* other, IRInst* parent);
 
     // Remove this instruction from its parent block,
     // but don't delete it, or replace uses.
@@ -351,89 +437,6 @@ T* cast(IRInst* inst, T* /* */ = nullptr)
     return (T*)inst;
 }
 
-
-// A double-linked list of instruction
-struct IRInstListBase
-{
-    IRInstListBase()
-    {}
-
-    IRInstListBase(IRInst* first, IRInst* last)
-        : first(first)
-        , last(last)
-    {}
-
-
-
-    IRInst* first = nullptr;
-    IRInst* last = nullptr;
-
-    IRInst* getFirst() { return first; }
-    IRInst* getLast() { return last; }
-
-    struct Iterator
-    {
-        IRInst* inst;
-
-        Iterator() : inst(nullptr) {}
-        Iterator(IRInst* inst) : inst(inst) {}
-
-        void operator++()
-        {
-            if (inst)
-            {
-                inst = inst->next;
-            }
-        }
-
-        IRInst* operator*()
-        {
-            return inst;
-        }
-
-        bool operator!=(Iterator const& i)
-        {
-            return inst != i.inst;
-        }
-    };
-
-    Iterator begin() { return Iterator(first); }
-    Iterator end() { return Iterator(last ? last->next : nullptr); }
-};
-
-// Specialization of `IRInstListBase` for the case where
-// we know (or at least expect) all of the instructions
-// to be of type `T`
-template<typename T>
-struct IRInstList : IRInstListBase
-{
-    IRInstList() {}
-
-    IRInstList(T* first, T* last)
-        : IRInstListBase(first, last)
-    {}
-
-    explicit IRInstList(IRInstListBase const& list)
-        : IRInstListBase(list)
-    {}
-
-    T* getFirst() { return (T*) first; }
-    T* getLast() { return (T*) last; }
-
-    struct Iterator : public IRInstListBase::Iterator
-    {
-        Iterator() {}
-        Iterator(IRInst* inst) : IRInstListBase::Iterator(inst) {}
-
-        T* operator*()
-        {
-            return (T*) inst;
-        }
-    };
-
-    Iterator begin() { return Iterator(first); }
-    Iterator end() { return Iterator(last ? last->next : nullptr); }
-};
 
 // Types
 
@@ -564,30 +567,12 @@ struct IRParam : IRInst
     IR_LEAF_ISA(Param)
 };
 
-// A "parent" instruction is one that contains other instructions
-// as its children. The most common case of a parent instruction
-// is a basic block, but there are other cases (e.g., a function
-// is in turn a parent for basic blocks).
-struct IRParentInst : IRInst
-{
-    // The instructions stored under this parent
-    IRInstListBase children;
-
-    IRInst* getFirstChild() { return children.first; }
-    IRInst* getLastChild()  { return children.last;  }
-    IRInstListBase getChildren() { return children; }
-
-    void removeAndDeallocateAllChildren();
-
-    IR_PARENT_ISA(ParentInst)
-};
-
 // A basic block is a parent instruction that adds the constraint
 // that all the children need to be "ordinary" instructions (so
 // no function declarations, or nested blocks). We also expect
 // that the previous/next instruction are always a basic block.
 //
-struct IRBlock : IRParentInst
+struct IRBlock : IRInst
 {
     // Linked list of the instructions contained in this block
     //
@@ -922,7 +907,7 @@ struct IRFuncType : IRType
 // A "global value" is an instruction that might have
 // linkage, so that it can be declared in one module
 // and then resolved to a definition in another module.
-struct IRGlobalValue : IRParentInst
+struct IRGlobalValue : IRInst
 {
     // The mangled name, for a symbol that should have linkage,
     // or which might have multiple declarations.
@@ -1064,7 +1049,7 @@ IRInst* getResolvedInstForDecorations(IRInst* inst);
 
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.
-struct IRModuleInst : IRParentInst
+struct IRModuleInst : IRInst
 {
     // Pointer back to the non-instruction object that represents
     // the module, so that we can get back to it in algorithms

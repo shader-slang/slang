@@ -26,12 +26,9 @@ void checkForMissingReturnsRec(
         }
     }
 
-    if( auto parentInst = as<IRParentInst>(inst) )
+    for( auto childInst : inst->getChildren() )
     {
-        for( auto childInst : parentInst->getChildren() )
-        {
-            checkForMissingReturnsRec(childInst, sink);
-        }
+        checkForMissingReturnsRec(childInst, sink);
     }
 }
 

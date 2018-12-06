@@ -35,7 +35,7 @@ namespace Slang
 
     void validateIRInstChildren(
         IRValidateContext*  context,
-        IRParentInst*       parent)
+        IRInst*             parent)
     {
         IRInst* prevChild = nullptr;
         for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
@@ -174,10 +174,7 @@ namespace Slang
 
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.
-        if (auto parent = as<IRParentInst>(inst))
-        {
-            validateIRInstChildren(context, parent);
-        }
+        validateIRInstChildren(context, inst);
     }
 
     void validateIRModule(IRModule* module, DiagnosticSink* sink)

@@ -166,6 +166,19 @@ namespace Slang
         }
     }
 
+    // IRInstListBase
+
+    void IRInstListBase::Iterator::operator++()
+    {
+        if (inst)
+        {
+            inst = inst->next;
+        }
+    }
+
+    IRInstListBase::Iterator IRInstListBase::begin() { return Iterator(first); }
+    IRInstListBase::Iterator IRInstListBase::end() { return Iterator(last ? last->next : nullptr); }
+
     //
 
     IRUse* IRInst::getOperands()
@@ -585,7 +598,7 @@ namespace Slang
     }
 
 
-    void IRBuilder::setInsertInto(IRParentInst* insertInto)
+    void IRBuilder::setInsertInto(IRInst* insertInto)
     {
         insertIntoParent = insertInto;
         insertBeforeInst = nullptr;
@@ -620,7 +633,7 @@ namespace Slang
     // Given two parent instructions, pick the better one to use as as
     // insertion location for a "hoistable" instruction.
     //
-    IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
+    IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     {
         // If the candidates are both the same, then who cares?
         if(left == right) return left;
@@ -681,7 +694,7 @@ namespace Slang
         // If the non-block on the left or right is a descendent of
         // the other, then that is what we should use.
         //
-        IRParentInst* parentNonBlock = nullptr;
+        IRInst* parentNonBlock = nullptr;
         for (auto ll = leftNonBlock; ll; ll = ll->getParent())
         {
             if (ll == rightNonBlock)
@@ -715,7 +728,7 @@ namespace Slang
             parentNonBlock = leftNonBlock;
         }
 
-        IRParentInst* parent = parentNonBlock;
+        IRInst* parent = parentNonBlock;
 
         // At this point we've found a non-block parent where we
         // could stick things, but we have to fix things up in
@@ -814,7 +827,7 @@ namespace Slang
     {
         // Start with the assumption that we would insert this instruction
         // into the global scope (the instruction that represents the module)
-        IRParentInst* parent = builder->getModule()->getModuleInst();
+        IRInst* parent = builder->getModule()->getModuleInst();
 
         // The above decision might be invalid, because there might be
         // one or more operands of the instruction that are defined in
@@ -3038,7 +3051,7 @@ namespace Slang
 
     void dumpIRParentInst(
         IRDumpContext*  context,
-        IRParentInst*   inst)
+        IRInst*         inst)
     {
         auto opInfo = getIROpInfo(inst->op);
 
@@ -3348,7 +3361,7 @@ namespace Slang
         insertBefore(other, other->parent);
     }
 
-    void IRInst::insertAtStart(IRParentInst* newParent)
+    void IRInst::insertAtStart(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
         insertBefore(newParent->children.first, newParent);
@@ -3361,7 +3374,7 @@ namespace Slang
         insertAtStart(p);
     }
 
-    void IRInst::insertBefore(IRInst* other, IRParentInst* newParent)
+    void IRInst::insertBefore(IRInst* other, IRInst* newParent)
     {
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
@@ -3403,7 +3416,7 @@ namespace Slang
         insertAfter(other, other->parent);
     }
 
-    void IRInst::insertAtEnd(IRParentInst* newParent)
+    void IRInst::insertAtEnd(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
         insertAfter(newParent->children.last, newParent);
@@ -3416,7 +3429,7 @@ namespace Slang
         insertAtEnd(p);
     }
 
-    void IRInst::insertAfter(IRInst* other, IRParentInst* newParent)
+    void IRInst::insertAfter(IRInst* other, IRInst* newParent)
     {
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
@@ -3507,20 +3520,13 @@ namespace Slang
     {
         removeFromParent();
         removeArguments();
-
-        // If this is a parent instruction then we had
-        // better remove all its children as well.
-        //
-        if(auto parentInst = as<IRParentInst>(this))
-        {
-            parentInst->removeAndDeallocateAllChildren();
-        }
+        removeAndDeallocateAllChildren();
 
         // Run destructor to be sure...
         this->~IRInst();
     }
 
-    void IRParentInst::removeAndDeallocateAllChildren()
+    void IRInst::removeAndDeallocateAllChildren()
     {
         IRInst* nextChild = nullptr;
         for( IRInst* child = getFirstChild(); child; child = nextChild )
@@ -5864,7 +5870,7 @@ namespace Slang
 
     }
 
-    void checkIRDuplicate(IRInst* inst, IRParentInst* moduleInst, Name* mangledName)
+    void checkIRDuplicate(IRInst* inst, IRInst* moduleInst, Name* mangledName)
     {
 #ifdef _DEBUG
         for (auto child : moduleInst->getChildren())
@@ -6124,7 +6130,7 @@ namespace Slang
         case kIROp_GlobalConstant:
         case kIROp_Func:
         case kIROp_Generic:
-            return ((IRParentInst*)val)->getFirstChild() != nullptr;
+            return val->getFirstChild() != nullptr;
 
         case kIROp_StructType:
         case kIROp_GlobalVar:
@@ -6704,18 +6710,13 @@ namespace Slang
             // We do *not* consider generics, or instructions nested under them.
             return;
         }
-        else if(auto parentInst = as<IRParentInst>(inst))
+        else
         {
-            // For a parent instruction, we will scan through its contents,
-            // since that will be where the `specialize` instructions are
-
-            for(auto child : parentInst->children)
+            for(auto child : inst->children)
             {
                 addToSpecializationWorkListRec(sharedContext, child);
             }
-        }
-        else
-        {
+
             // Default case: consider this instruction for specialization.
             sharedContext->addToWorkList(inst);
         }
