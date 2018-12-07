@@ -175,7 +175,7 @@ struct Vec1
 
 There is no hard limit on line length, but if you are going past 80-100 columns quite often, maybe think about breaking lines.
 
-When you decide to break lines for a paramter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
+When you decide to break lines for a parameter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
 
 ```c++
 float bigFunc(
@@ -250,7 +250,7 @@ For other binary operators, use your best judgement.
 
 If you have to line break a binary expression, put the line break after the operator for an assignment, and before the operator before all others.
 
-Intializer lists for constructors get some special-case formatting rules.
+Initializer lists for constructors get some special-case formatting rules.
 If everything fits on one line, then great:
 
 ```c++
@@ -314,13 +314,58 @@ Note that this also applies to uses of "ID" as an abbreviation for "identifier" 
 
 Prefixes based on types (e.g., `p` for pointers) should never be used.
 
-Global variables should have a `g` prefix, e.g. `gCounter`.
-Non-`const` `static` class members can have an `s` prefix if that suits your fancy.
+Global variables should have a `g_` prefix, e.g. `g_counter`.
+Non-`const` `static` class members can have an `s_` prefix if that suits your fancy.
 Of course, both of these should be avoided, so this shouldn't come up often.
 
 Constant data (in the sense of `static const`) should have a `k` prefix.
 
-In contexts where "information hiding" is relevant/important, such as when a type has both `public` and `private` members, or just has certain operations/fields that are considered "implementation details" that most clients should not be using, and `_` prefix on function and field members is allowed (but not required).
+In contexts where "information hiding" is relevant/important, such as when a type has both `public` and `private` methods, or just has certain operations that are considered "implementation details" that most clients should not be using, using `_` prefix on lower camel functions is allowed (but not required).
+
+Member variables can be prefixed with `m_` to identify them as such. As a rule of thumb, if a class/struct has member functions and/or constructors then prefixing should be used. The major benefit being the clarity in code of member access over parameters or local variables. This also avoids the clash of parameter names and member variables that typically occurs otherwise in constructors. For example...
+
+```c++
+// In this example it has methods and value which are 
+class SomeClass 
+{
+    public:
+    int getValue() const { return m_value; }
+    void incrementValue() { m_value += s_increment; }
+        /// Public interface method calling an internal implementation 
+    bool isOdd() const { return _isOdd(); }
+    
+    static void setIncrement(int inc) { s_increment = inc; }
+    
+        /// There is no confusion over the parameter and the member variable
+    explicit SomeClass(int value = 0):
+        m_value(value)
+    {}
+    
+    private:
+    // Because this method is 'internal implementation' it is prefixed with _
+    bool _isOdd(int change) const { return (m_value & 1) != 0; }
+    
+    // This member value is prefixed with m_ because class has protection and methods
+    int m_value;
+    // Static members can be prefixed with s_
+    static int s_increment;
+};
+
+/* static */int SomeClass::s_increment = 1;
+```
+
+For classes that don't have methods the class is typically acting as a 'bag of values' that are directly accessed, and so the arguments for prefixing don't apply. For example...
+
+```c++
+// Typically 'bag of values' should be structs - because they have no protection
+struct AnotherClass
+{
+    // The members are not prefixed, as there are no methods/ctors/dtors. 
+    // They can just be accessed by name from client code. 
+    int index;          
+    char* name;
+};
+```
 
 In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.
 For example:
