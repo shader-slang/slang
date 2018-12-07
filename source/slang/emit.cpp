@@ -5939,7 +5939,7 @@ struct EmitVisitor
         {
             // There are a number of types that are (or can be)
             // "first-class" in D3D HLSL, but are second-class in GLSL in
-            // that they require explicit global declaratiosn for each value/object,
+            // that they require explicit global declarations for each value/object,
             // and don't support declaration as ordinary variables.
             //
             // This includes constant buffers (`uniform` blocks) and well as
