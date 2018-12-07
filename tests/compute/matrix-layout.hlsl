@@ -32,7 +32,14 @@ cbuffer C0
 //TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):dxbinding(1),glbinding(1)
 cbuffer C1
 {
-    column_major
+
+// Note: support for the explicit `row_major` and `column_major` modifiers is being
+// disabled for now, since our current Vulkan output strategy cannot possibly match the
+// semantics of these modifiers in D3D. Once we do a more complete implementation of
+// matrix layout (see GitHub issue #695) we can add a directed test for all the
+// corners cases of explicit matrix layout.
+//
+//    column_major
     int3x4 cc;
     int    dd;
 };
@@ -47,7 +54,7 @@ int test(int val)
     int a = s.a[val / 4][val % 3];
     int b = s.b;
 
-    int c = cc[val / 4][val % 4];
+    int c = cc[val / 4][val % 3];
     int d = dd;
 
     return ((a*N + b) * N + c) * N + d;

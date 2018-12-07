@@ -7,8 +7,14 @@
 
 #ifdef __SLANG__
 #define R(X) /**/
+#define BEGIN_CBUFFER(NAME) cbuffer NAME
+#define END_CBUFFER(NAME, REG) /**/
+#define CBUFFER_REF(NAME, FIELD) FIELD
 #else
 #define R(X) X
+#define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
+#define END_CBUFFER(NAME, REG) ; cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define sharedC     sharedC_0
 #define sharedCA    sharedCA_0
@@ -50,13 +56,15 @@ float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
 // Start with some parameters that will appear in both shaders
 Texture2D sharedT R(: register(t0));
 SamplerState sharedS R(: register(s0));
-cbuffer sharedC R(: register(b0))
+
+BEGIN_CBUFFER(sharedC)
 {
-	float3 sharedCA R(: packoffset(c0));
-	float  sharedCB R(: packoffset(c0.w));
-	float3 sharedCC R(: packoffset(c1));
-	float2 sharedCD R(: packoffset(c2));
+	float3 sharedCA;
+	float  sharedCB;
+	float3 sharedCC;
+	float2 sharedCD;
 }
+END_CBUFFER(sharedC, register(b0))
 
 // Then some parameters specific to this shader.
 // These will be placed *after* the ones from the main file,
@@ -65,13 +73,15 @@ cbuffer sharedC R(: register(b0))
 
 Texture2D fragmentT R(: register(t4));
 SamplerState fragmentS R(: register(s2));
-cbuffer fragmentC R(: register(b2))
+
+BEGIN_CBUFFER(fragmentC)
 {
-	float3 fragmentCA R(: packoffset(c0));
-	float  fragmentCB R(: packoffset(c0.w));
-	float3 fragmentCC R(: packoffset(c1));
-	float2 fragmentCD R(: packoffset(c2));
+	float3 fragmentCA;
+	float  fragmentCB;
+	float3 fragmentCC;
+	float2 fragmentCD;
 }
+END_CBUFFER(fragmentC, register(b2))
 
 // And end with some shared parameters again
 Texture2D sharedTV R(: register(t2));
@@ -82,9 +92,9 @@ float4 main() : SV_TARGET
 {
 	// Go ahead and use everything here, just to make sure things got placed correctly
 	return use(sharedT, sharedS)
-		+  use(sharedCD)
+		+  use(CBUFFER_REF(sharedC,sharedCD))
 		+  use(fragmentT, fragmentS)
-		+  use(fragmentCD)
+		+  use(CBUFFER_REF(fragmentC, fragmentCD))
 		+  use(sharedTF, sharedS)
 		;
 }

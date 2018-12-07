@@ -71,7 +71,7 @@ struct A
 {
     float4 au;
 };
-cbuffer _S1         : register(b0, space2)
+cbuffer a            : register(b0, space2)
 { A a; }
 Texture2D       at1  : register(t0, space2);
 Texture2D       at2  : register(t1, space2);
@@ -81,7 +81,7 @@ struct B
 {
     float4      bu;
 };
-cbuffer _S3         : register(b0, space3)
+cbuffer b           : register(b0, space3)
 { B b; }
 Texture2D       bt  : register(t0, space3);
 SamplerState    bs  : register(s0, space3);

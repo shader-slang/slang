@@ -1,8 +1,18 @@
 //TEST:COMPARE_HLSL:-no-mangle -profile ps_5_0
 
 #ifdef __SLANG__
+
+#define BEGIN_CBUFFER(NAME) cbuffer NAME
+#define END_CBUFFER(NAME, REG) /**/
+#define CBUFFER_REF(NAME, FIELD) FIELD
+
 import split_nested_types;
+
 #else
+
+#define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
+#define END_CBUFFER(NAME, REG) ; cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define A A_0
 #define x x_0
@@ -31,12 +41,13 @@ struct M
 
 #endif
 
-cbuffer C
+BEGIN_CBUFFER(C)
 {
 	M m;
 }
+END_CBUFFER(C,register(b0))
 
 float4 main() : SV_TARGET
 {
-	return m.b.y;
+	return CBUFFER_REF(C,m).b.y;
 }
