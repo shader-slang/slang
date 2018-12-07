@@ -5,7 +5,6 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 
-#include "bytecode.h"
 #include "compiler.h"
 #include "lexer.h"
 #include "lower-to-ir.h"
@@ -1077,18 +1076,6 @@ SlangResult dissassembleDXILUsingDXC(
         for (auto targetReq : compileRequest->targets)
         {
             generateOutputForTarget(targetReq);
-        }
-
-        // If we are being asked to generate code in a container
-        // format, then we are now in a position to do so.
-        switch (compileRequest->containerFormat)
-        {
-        default:
-            break;
-
-        case ContainerFormat::SlangModule:
-            generateBytecodeForCompileRequest(compileRequest);
-            break;
         }
 
         // If we are in command-line mode, we might be expected to actually

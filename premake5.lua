@@ -449,18 +449,6 @@ tool "slang-reflection-test"
     links { "slang" }
 
 --
--- `slang-eval-test` is similarly easy to build:
---
--- Note: `slang-eval-test` will probably be deprecated and its functionality
--- folded into `render-test`, but we aren't ready for that just yet.
---
-
-tool "slang-eval-test"
-    uuid "205FCAB9-A13F-4980-86FA-F6221A7095EE"
-    includedirs { "." }
-    links { "core", "slang" }
-
---
 -- The most complex testing tool we have is `render-test`, but from
 -- a build perspective the most interesting thing about it is that for
 -- our Windows build it requires a Windows 10 SDK.

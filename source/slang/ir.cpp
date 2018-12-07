@@ -2617,7 +2617,20 @@ namespace Slang
         }
     }
 
-    bool opHasResult(IRInst* inst);
+    bool opHasResult(IRInst* inst)
+    {
+        auto type = inst->getDataType();
+        if (!type) return false;
+
+        // As a bit of a hack right now, we need to check whether
+        // the function returns the distinguished `Void` type,
+        // since that is conceptually the same as "not returning
+        // a value."
+        if(type->op == kIROp_VoidType)
+            return false;
+
+        return true;
+    }
 
     bool instHasUses(IRInst* inst)
     {

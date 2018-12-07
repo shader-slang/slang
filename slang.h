@@ -1237,40 +1237,6 @@ extern "C"
         SlangCompileRequest*    request,
         size_t*                 outSize);
 
-
-
-    typedef struct SlangVM          SlangVM;
-    typedef struct SlangVMModule    SlangVMModule;
-    typedef struct SlangVMFunc      SlangVMFunc;
-    typedef struct SlangVMThread    SlangVMThread;
-
-    SLANG_API SlangVM* SlangVM_create();
-
-    SLANG_API SlangVMModule* SlangVMModule_load(
-        SlangVM*    vm,
-        void const* bytecode,
-        size_t      bytecodeSize);
-
-    SLANG_API void* SlangVMModule_findGlobalSymbolPtr(
-        SlangVMModule*  module,
-        char const*     name);
-
-    SLANG_API SlangVMThread* SlangVMThread_create(
-        SlangVM*    vm);
-
-    SLANG_API void SlangVMThread_beginCall(
-        SlangVMThread*  thread,
-        SlangVMFunc*    func);
-
-    SLANG_API void SlangVMThread_setArg(
-        SlangVMThread*  thread,
-        SlangUInt       argIndex,
-        void const*     data,
-        size_t          size);
-
-    SLANG_API void SlangVMThread_resume(
-        SlangVMThread*  thread);
-
     /* Note(tfoley): working on new reflection interface...
     */
 
