@@ -212,14 +212,12 @@ struct IRSerialData
     size_t calcSizeInBytes() const;
 
     /// Ctor
-    IRSerialData() :
-        m_decorationBaseIndex(0)
+    IRSerialData()
     {}
 
     List<Inst> m_insts;                         ///< The instructions
 
     List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
-    List<InstRun> m_decorationRuns;             ///< Holds instruction decorations    
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
@@ -234,8 +232,6 @@ struct IRSerialData
     List<char> m_debugStrings;                  ///< All of the debug strings
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
-    
-    int m_decorationBaseIndex;                  ///< All decorations insts are at indices >= to this value
 };
 
 // --------------------------------------------------------------------------
@@ -323,12 +319,10 @@ struct IRSerialBinary
     static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
 
     static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
-    static const uint32_t kDecoratorRunFourCc = SLANG_FOUR_CC('S', 'L', 'd', 'r');
     static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
 
     static const uint32_t kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
-    static const uint32_t kCompressedDecoratorRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kDecoratorRunFourCc);
     static const uint32_t kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
     static const uint32_t kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
 
@@ -339,7 +333,6 @@ struct IRSerialBinary
     struct SlangHeader
     {
         Chunk m_chunk;
-        uint32_t m_decorationBase;
         uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader

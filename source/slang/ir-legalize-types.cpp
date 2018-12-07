@@ -114,12 +114,12 @@ struct IRGlobalNameInfo
 };
 
 static LegalVal declareVars(
-    IRTypeLegalizationContext*    context,
+    IRTypeLegalizationContext*  context,
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain,
-    String const*               nameHint,
+    UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo);
 
 static LegalType legalizeType(
@@ -844,17 +844,17 @@ static LegalVal legalizeInst(
 RefPtr<VarLayout> findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return layoutDecoration->layout->dynamicCast<VarLayout>();
+        return layoutDecoration->getLayout()->dynamicCast<VarLayout>();
     return nullptr;
 }
 
-static String const* findNameHint(IRInst* inst)
+static UnownedStringSlice findNameHint(IRInst* inst)
 {
     if( auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>() )
     {
-        return &nameHintDecoration->name->text;
+        return nameHintDecoration->getName();
     }
-    return nullptr;
+    return UnownedStringSlice();
 }
 
 static LegalVal legalizeLocalVar(
@@ -912,7 +912,7 @@ static LegalVal legalizeLocalVar(
             varChain = &varChainStorage;
         }
 
-        String const* nameHint = findNameHint(irLocalVar);
+        UnownedStringSlice nameHint = findNameHint(irLocalVar);
         LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, nullptr);
 
         // Remove the old local var.
@@ -944,7 +944,7 @@ static LegalVal legalizeParam(
 
         context->insertBeforeParam = originalParam;
 
-        String const* nameHint = findNameHint(originalParam);
+        UnownedStringSlice nameHint = findNameHint(originalParam);
         auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr, nameHint, nullptr);
 
         originalParam->removeFromParent();
@@ -1099,7 +1099,7 @@ static void legalizeInstsInParent(
     IRInst*                     parent)
 {
     IRInst* nextChild = nullptr;
-    for(auto child = parent->getFirstChild(); child; child = nextChild)
+    for(auto child = parent->getFirstDecorationOrChild(); child; child = nextChild)
     {
         nextChild = child->getNextInst();
 
@@ -1147,25 +1147,13 @@ static LegalVal legalizeFunc(
     return LegalVal::simple(irFunc);
 }
 
-static void addNameHint(
-    IRTypeLegalizationContext*  context,
-    IRInst*                     inst,
-    String const&               text)
-{
-    if(text.Length() == 0)
-        return;
-
-    auto name = context->session->getNameObj(text);
-    context->builder->addDecoration<IRNameHintDecoration>(inst)->name = name;
-}
-
 static LegalVal declareSimpleVar(
     IRTypeLegalizationContext*  context,
     IROp                        op,
     IRType*                     type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain,
-    String const*               nameHint,
+    UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo)
 {
     RefPtr<VarLayout> varLayout = createVarLayout(varChain, typeLayout);
@@ -1252,9 +1240,9 @@ static LegalVal declareSimpleVar(
             builder->addHighLevelDeclDecoration(irVar, varDeclRef.getDecl());
         }
 
-        if( nameHint )
+        if( nameHint.size() )
         {
-            addNameHint(context, irVar, *nameHint);
+            context->builder->addNameHintDecoration(irVar, nameHint);
         }
     }
 
@@ -1267,7 +1255,7 @@ static LegalVal declareVars(
     LegalType                   type,
     TypeLayout*                 typeLayout,
     LegalVarChain*              varChain,
-    String const*               nameHint,
+    UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo)
 {
     switch (type.flavor)
@@ -1329,17 +1317,17 @@ static LegalVal declareVars(
                     newVarChain = &newVarChainStorage;
                 }
 
-                String* fieldNameHint = nullptr;
+                UnownedStringSlice fieldNameHint;
                 String joinedNameHintStorage;
-                if( nameHint )
+                if( nameHint.size() )
                 {
                     if( auto fieldNameHintDecoration = ee.key->findDecoration<IRNameHintDecoration>() )
                     {
-                        joinedNameHintStorage.append(*nameHint);
+                        joinedNameHintStorage.append(nameHint);
                         joinedNameHintStorage.append(".");
-                        joinedNameHintStorage.append(fieldNameHintDecoration->name->text);
+                        joinedNameHintStorage.append(fieldNameHintDecoration->getName());
 
-                        fieldNameHint = &joinedNameHintStorage;
+                        fieldNameHint = joinedNameHintStorage.getUnownedSlice();
                     }
 
                 }
@@ -1409,7 +1397,7 @@ static LegalVal legalizeGlobalVar(
             globalNameInfo.globalVar = irGlobalVar;
             globalNameInfo.counter = 0;
 
-            String const* nameHint = findNameHint(irGlobalVar);
+            UnownedStringSlice nameHint = findNameHint(irGlobalVar);
             LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, typeLayout, varChain, nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old
@@ -1452,7 +1440,7 @@ static LegalVal legalizeGlobalConstant(
 
             // TODO: need to handle initializer here!
 
-            String const* nameHint = findNameHint(irGlobalConstant);
+            UnownedStringSlice nameHint = findNameHint(irGlobalConstant);
             LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, nullptr, nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old

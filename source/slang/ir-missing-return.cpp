@@ -26,7 +26,7 @@ void checkForMissingReturnsRec(
         }
     }
 
-    for( auto childInst : inst->getChildren() )
+    for( auto childInst : inst->getDecorationsAndChildren() )
     {
         checkForMissingReturnsRec(childInst, sink);
     }

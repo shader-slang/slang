@@ -1238,39 +1238,39 @@ void addVarDecorations(
     {
         if(mod.As<HLSLNoInterpolationModifier>())
         {
-            builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::NoInterpolation;
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
         }
         else if(mod.As<HLSLNoPerspectiveModifier>())
         {
-            builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::NoPerspective;
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoPerspective);
         }
         else if(mod.As<HLSLLinearModifier>())
         {
-            builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::Linear;
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Linear);
         }
         else if(mod.As<HLSLSampleModifier>())
         {
-            builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::Sample;
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Sample);
         }
         else if(mod.As<HLSLCentroidModifier>())
         {
-            builder->addDecoration<IRInterpolationModeDecoration>(inst)->mode = IRInterpolationMode::Centroid;
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
         else if(mod.As<VulkanRayPayloadAttribute>())
         {
-            builder->addDecoration<IRVulkanRayPayloadDecoration>(inst);
+            builder->addSimpleDecoration<IRVulkanRayPayloadDecoration>(inst);
         }
         else if(mod.As<VulkanCallablePayloadAttribute>())
         {
-            builder->addDecoration<IRVulkanCallablePayloadDecoration>(inst);
+            builder->addSimpleDecoration<IRVulkanCallablePayloadDecoration>(inst);
         }
         else if(mod.As<VulkanHitAttributesAttribute>())
         {
-            builder->addDecoration<IRVulkanHitAttributesDecoration>(inst);
+            builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
         }
         else if(mod.As<GloballyCoherentModifier>())
         {
-            builder->addDecoration<IRGloballyCoherentDecoration>(inst);
+            builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
 
         // TODO: what are other modifiers we need to propagate through?
@@ -1294,7 +1294,7 @@ void maybeSetRate(
     }
 }
 
-static Name* getNameForNameHint(
+static String getNameForNameHint(
     IRGenContext*   context,
     Decl*           decl)
 {
@@ -1311,9 +1311,9 @@ static Name* getNameForNameHint(
     // There is no point in trying to provide a name hint for something with no name,
     // or with an empty name
     if(!leafName)
-        return nullptr;
+        return String();
     if(leafName->text.Length() == 0)
-        return nullptr;
+        return String();
 
 
     if(auto varDecl = dynamic_cast<VarDeclBase*>(decl))
@@ -1326,7 +1326,7 @@ static Name* getNameForNameHint(
         // TODO: consider whether global/static variables should
         // follow different rules.
         //
-        return leafName;
+        return leafName->text;
     }
 
     // For other cases of declaration, we want to consider
@@ -1338,9 +1338,9 @@ static Name* getNameForNameHint(
         parentDecl = genericParentDecl->ParentDecl;
 
     auto parentName = getNameForNameHint(context, parentDecl);
-    if(!parentName)
+    if(parentName.Length() == 0)
     {
-        return leafName;
+        return leafName->text;
     }
 
     // TODO: at some point we will start giving `ModuleDecl`s names,
@@ -1351,11 +1351,11 @@ static Name* getNameForNameHint(
     // combining the name of the parent and the leaf declaration.
 
     StringBuilder sb;
-    sb.append(parentName->text);
+    sb.append(parentName);
     sb.append(".");
     sb.append(leafName->text);
 
-    return context->getSession()->getNameObj(sb.ProduceString());
+    return sb.ProduceString();
 }
 
 /// Try to add an appropriate name hint to the instruction,
@@ -1365,10 +1365,10 @@ static void addNameHint(
     IRInst*         inst,
     Decl*           decl)
 {
-    Name* name = getNameForNameHint(context, decl);
-    if(!name)
+    String name = getNameForNameHint(context, decl);
+    if(name.Length() == 0)
         return;
-    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+    context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
 /// Add a name hint based on a fixed string.
@@ -1377,8 +1377,7 @@ static void addNameHint(
     IRInst*         inst,
     char const*     text)
 {
-    Name* name = context->getSession()->getNameObj(text);
-    context->irBuilder->addDecoration<IRNameHintDecoration>(inst)->name = name;
+    context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
 }
 
 LoweredValInfo createVar(
@@ -2410,8 +2409,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         if( stmt->FindModifier<UnrollAttribute>() )
         {
-            auto decoration = getBuilder()->addDecoration<IRLoopControlDecoration>(inst);
-            decoration->mode = kIRLoopControl_Unroll;
+            getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Unroll);
         }
         // TODO: handle other cases here
     }
@@ -4313,8 +4311,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto semanticModifier = fieldDecl->FindModifier<HLSLSimpleSemantic>())
         {
-            auto semanticDecoration = builder->addDecoration<IRSemanticDecoration>(irFieldKey);
-            semanticDecoration->semanticName = semanticModifier->name.getName();
+            builder->addSemanticDecoration(irFieldKey, semanticModifier->name.getName()->text.getUnownedSlice());
         }
 
         // We allow a field to be marked as a target intrinsic,
@@ -4779,18 +4776,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
         {
-            auto decoration = builder->addDecoration<IRTargetIntrinsicDecoration>(irInst);
-            decoration->targetName = builder->addStringToFree(targetMod->targetToken.Content);
-            
+            String definition;
             auto definitionToken = targetMod->definitionToken;
             if (definitionToken.type == TokenType::StringLiteral)
             {
-                decoration->definition = builder->addStringToFree(getStringLiteralTokenValue(definitionToken));
+                definition = getStringLiteralTokenValue(definitionToken);
             }
             else
             {
-                decoration->definition = builder->addStringToFree(definitionToken.Content);
+                definition = definitionToken.Content;
             }
+
+            builder->addTargetIntrinsicDecoration(irInst, targetMod->targetToken.Content.getUnownedSlice(), definition.getUnownedSlice());
         }
     }
 
@@ -5076,12 +5073,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // Convert the patch constant function into IRInst
                     IRInst* irPatchConstantFunc = getSimpleVal(context, ensureDecl(subContext, patchConstantFunc));
 
-                    // Emit the note patch constant func
-                    subContext->irBuilder->emitIntrinsicInst(
-                        nullptr,
-                        kIROp_NotePatchConstantFunc,
-                        1,
-                        &irPatchConstantFunc);
+                    // Attach a decoration so that our IR function references
+                    // the patch constant function.
+                    //
+                    subContext->irBuilder->addPatchConstantFuncDecoration(
+                        irFunc,
+                        irPatchConstantFunc);
 
                 }
             }
@@ -5122,8 +5119,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a specialized definition of the particular function for the given
             // target, and we need to reflect that at the IR level.
 
-            auto decoration = getBuilder()->addDecoration<IRTargetDecoration>(irFunc);
-            decoration->targetName = getBuilder()->addStringToFree(targetMod->targetToken.Content);
+            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.Content.getUnownedSlice());
         }
 
         // If this declaration was marked as having a target-specific lowering
@@ -5138,23 +5134,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
         {
-            auto decoration = getBuilder()->addDecoration<IRRequireGLSLExtensionDecoration>(irFunc);
-            decoration->extensionName = getBuilder()->addStringToFree(extensionMod->extensionNameToken.Content);
+            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.Content.getUnownedSlice());
         }
         for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
         {
-            auto decoration = getBuilder()->addDecoration<IRRequireGLSLVersionDecoration>(irFunc);
-            decoration->languageVersion = Int(getIntegerLiteralValue(versionMod->versionNumberToken));
+            getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
 
         if(decl->FindModifier<ReadNoneAttribute>())
         {
-            getBuilder()->addDecoration<IRReadNoneDecoration>(irFunc);
+            getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
         }
 
         if (decl->FindModifier<EarlyDepthStencilAttribute>())
         {
-            getBuilder()->addDecoration<IREarlyDepthStencilDecoration>(irFunc);
+            getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
         }
 
         // For convenience, ensure that any additional global

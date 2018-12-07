@@ -633,7 +633,7 @@ struct SCCPContext
                     // may in turn add other blocks/instructions to
                     // the work lists.
                     //
-                    for( auto inst : block->getChildren() )
+                    for( auto inst : block->getDecorationsAndChildren() )
                     {
                         updateValueForInst(inst);
                     }
@@ -702,7 +702,7 @@ struct SCCPContext
         List<IRInst*> instsToRemove;
         for( auto block : code->getBlocks() )
         {
-            for( auto inst : block->getChildren() )
+            for( auto inst : block->getDecorationsAndChildren() )
             {
                 // We look for instructions that have a constnat value on
                 // the lattice.
@@ -869,7 +869,7 @@ struct SCCPContext
             // err on the side of allowing unreachable code without
             // a warning.
             //
-            block->removeAndDeallocateAllChildren();
+            block->removeAndDeallocateAllDecorationsAndChildren();
         }
         //
         // At this point every one of our unreachable blocks is empty,
@@ -929,7 +929,7 @@ static void applySparseConditionalConstantPropagationRec(
         }
     }
 
-    for( auto childInst : inst->getChildren() )
+    for( auto childInst : inst->getDecorationsAndChildren() )
     {
         applySparseConditionalConstantPropagationRec(shared, childInst);
     }

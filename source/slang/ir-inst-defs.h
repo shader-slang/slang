@@ -179,6 +179,7 @@ INST(Block, block, 0, PARENT)
     INST(BoolLit, boolConst, 0, 0)
     INST(IntLit, integer_constant, 0, 0)
     INST(FloatLit, float_constant, 0, 0)
+    INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, StringLit)
 
@@ -354,7 +355,40 @@ INST(SampleGrad, sampleGrad, 4, 0)
 
 INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 
-INST(NotePatchConstantFunc, notePatchConstantFunc, 1, 0)
+/* Decoration */
+
+INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
+    INST(LayoutDecoration,                  layout,                 1, 0)
+    INST(LoopControlDecoration,             loopControl,            1, 0)
+    /* TargetSpecificDecoration */
+        INST(TargetDecoration,              target,                 1, 0)
+        INST(TargetIntrinsicDecoration,     targetIntrinsic,        2, 0)
+    INST_RANGE(TargetSpecificDecoration, TargetDecoration, TargetIntrinsicDecoration)
+    INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
+    INST(SemanticDecoration,                semantic,               1, 0)
+    INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
+    INST(NameHintDecoration,                nameHint,               1, 0)
+
+    /**  The decorated _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module. 
+        Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
+        needs to be special cased for lookup. */
+    INST(TransitoryDecoration,              transitory,             0, 0)
+
+    INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
+    INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
+    INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
+    INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
+    INST(ReadNoneDecoration,                readNone,               0, 0)
+    INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
+    INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
+    INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
+    INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
+
+INST_RANGE(Decoration, HighLevelDeclDecoration, PatchConstantFuncDecoration)
+
+
+//
+
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)
