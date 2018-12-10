@@ -320,7 +320,7 @@ Of course, both of these should be avoided, so this shouldn't come up often.
 
 Constant data (in the sense of `static const`) should have a `k` prefix.
 
-In contexts where "information hiding" is relevant/important, such as when a type has both `public` and `private` members, or just has certain operations/fields that are considered "implementation details" that most clients should not be using, and `_` prefix on function and field members is allowed (but not required).
+In contexts where "information hiding" is relevant/important, such as when a type has both `public` and `private` members, or just has certain operations/fields that are considered "implementation details" that most clients should not be using, an `m_` prefix on member variables and a `_` prefix on member functions is allowed (but not required).
 
 In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.
 For example:
@@ -342,15 +342,15 @@ C-style `enum` should use the following convention:
 ```c++
 enum Color
 {
-    Color_Red,
-    Color_Green,
-    Color_Blue,
+    kColor_Red,
+    kColor_Green,
+    kColor_Blue,
 
-    ColorCount,
+    kColorCount,
 };
 ```
 
-When using `enum class`, drop the type name as prefix, but retain the `UpperCamelCase` tag names:
+When using `enum class`, drop the `k` and type name as prefix, but retain the `UpperCamelCase` tag names:
 
 ```c++
 enum class Color
@@ -369,13 +369,13 @@ When defining a set of flags, separate the type definition from the `enum`:
 typedef unsigned int Axes;
 enum
 {
-    Axes_None = 0,
+    kAxes_None = 0,
 
-    Axis_X = 1 << 0,
-    Axis_Y = 1 << 1,
-    Axis_Z = 1 << 2,
+    kAxis_X = 1 << 0,
+    kAxis_Y = 1 << 1,
+    kAxis_Z = 1 << 2,
 
-    Axes_All = kAxis_X | kAxis_Y | kAxis_Z,
+    kAxes_All = kAxis_X | kAxis_Y | kAxis_Z,
 };
 ```
 
