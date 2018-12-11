@@ -78,6 +78,28 @@ namespace Slang
         return isEffectivelyStatic(decl, parentDecl);
     }
 
+        /// Is `decl` a global shader parameter declaration?
+    bool isGlobalShaderParameter(VarDeclBase* decl)
+    {
+        // A global shader parameter must be declared at global (module) scope.
+        //
+        if(!dynamic_cast<ModuleDecl*>(decl->ParentDecl)) return false;
+
+        // A global variable marked `static` indicates a traditional
+        // global variable (albeit one that is implicitly local to
+        // the translation unit)
+        //
+        if(decl->HasModifier<HLSLStaticModifier>()) return false;
+
+        // The `groupshared` modifier indicates that a variable cannot
+        // be a shader parameters, but is instead transient storage
+        // allocated for the duration of a thread-group's execution.
+        //
+        if(decl->HasModifier<HLSLGroupSharedModifier>()) return false;
+
+        return true;
+    }
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     struct BasicTypeKey
@@ -4211,17 +4233,6 @@ namespace Slang
             if (function || checkingPhase == CheckingPhase::Header)
             {
                 TypeExp typeExp = CheckUsableType(varDecl->type);
-#if 0
-                if (typeExp.type->GetBindableResourceType() != BindableResourceType::NonBindable)
-                {
-                    // We don't want to allow bindable resource types as local variables (at least for now).
-                    auto parentDecl = varDecl->ParentDecl;
-                    if (auto parentScopeDecl = dynamic_cast<ScopeDecl*>(parentDecl))
-                    {
-                        getSink()->diagnose(varDecl->type, Diagnostics::invalidTypeForLocalVariable);
-                    }
-                }
-#endif
                 varDecl->type = typeExp;
                 if (varDecl->type.Equals(getSession()->getVoidType()))
                 {
@@ -9006,6 +9017,18 @@ namespace Slang
 
             bool isLValue = true;
             if(varDeclRef.getDecl()->FindModifier<ConstModifier>())
+                isLValue = false;
+
+            // Global-scope shader parameters should not be writable,
+            // since they are effectively program inputs.
+            //
+            // TODO: We could eventually treat a mutable global shader
+            // parameter as a shorthand for an immutable parameter and
+            // a global variable that gets initialized from that parameter,
+            // but in order to do so we'd need to support global variables
+            // with resource types better in the back-end.
+            //
+            if(isGlobalShaderParameter(varDeclRef.getDecl()))
                 isLValue = false;
 
             qualType.IsLeftValue = isLValue;
