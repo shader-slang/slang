@@ -982,7 +982,7 @@ struct IRBuilder
     template<typename T>
     void addSimpleDecoration(IRInst* value)
     {
-        addDecoration(value, IROp(T::kOp), nullptr, 0);
+        addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
