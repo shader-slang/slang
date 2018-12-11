@@ -1006,6 +1006,15 @@ namespace Slang
                 }
             }
 
+            if (!type)
+            {
+                if (outProperType)
+                {
+                    *outProperType = nullptr;
+                }
+                return false;
+            }
+
             if (auto genericDeclRefType = type->As<GenericDeclRefType>())
             {
                 // We are using a reference to a generic declaration as a concrete
@@ -1034,7 +1043,7 @@ namespace Slang
                         }
 
                         // TODO: this is one place where syntax should get cloned!
-                        if(outProperType)
+                        if (outProperType)
                             args.Add(typeParam->initType.exp);
                     }
                     else if (auto valParam = member.As<GenericValueParamDecl>())
@@ -1050,7 +1059,7 @@ namespace Slang
                         }
 
                         // TODO: this is one place where syntax should get cloned!
-                        if(outProperType)
+                        if (outProperType)
                             args.Add(valParam->initExpr);
                     }
                     else
@@ -1065,15 +1074,13 @@ namespace Slang
                 }
                 return true;
             }
-            else
+            
+            // default case: we expect this to already be a proper type
+            if (outProperType)
             {
-                // default case: we expect this to already be a proper type
-                if (outProperType)
-                {
-                    *outProperType = type;
-                }
-                return true;
+                *outProperType = type;
             }
+            return true;
         }
 
 
@@ -1147,7 +1154,7 @@ namespace Slang
         {
             // TODO: we may want other cases here...
 
-            if (auto errorType = expr->type->As<ErrorType>())
+            if (auto errorType = expr->type.As<ErrorType>())
                 return true;
 
             return false;
@@ -7229,7 +7236,7 @@ namespace Slang
                 // for anything applicable.
                 AddDeclRefOverloadCandidates(LookupResultItem(declRefExpr->declRef), context);
             }
-            else if (auto funcType = funcExprType->As<FuncType>())
+            else if (auto funcType = funcExprType.As<FuncType>())
             {
                 // TODO(tfoley): deprecate this path...
                 AddFuncOverloadCandidate(funcType, context);
@@ -7250,7 +7257,7 @@ namespace Slang
                     AddOverloadCandidates(item, context);
                 }
             }
-            else if (auto typeType = funcExprType->As<TypeType>())
+            else if (auto typeType = funcExprType.As<TypeType>())
             {
                 // If none of the above cases matched, but we are
                 // looking at a type, then I suppose we have

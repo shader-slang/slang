@@ -293,6 +293,12 @@ namespace Slang
         RefPtr<Type>	type;
         bool					IsLeftValue;
 
+        template <typename T>
+        T* As()
+        {
+            return type ? type->As<T>() : nullptr;
+        }
+
         QualType()
             : IsLeftValue(false)
         {}
