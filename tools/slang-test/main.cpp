@@ -901,53 +901,6 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-TestResult runEvalTest(TestContext* context, TestInput& input)
-{
-    // We are going to load and evaluate the code
-
-    auto filePath = input.filePath;
-    auto outputStem = input.outputStem;
-
-    OSProcessSpawner spawner;
-
-    spawner.pushExecutablePath(String(g_options.binDir) + "slang-eval-test" + osGetExecutableSuffix());
-    spawner.pushArgument(filePath);
-
-    for( auto arg : input.testOptions->args )
-    {
-        spawner.pushArgument(arg);
-    }
-
-    if (spawnAndWait(context, outputStem, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
-
-    String actualOutput = getOutput(spawner);
-    String expectedOutput = getExpectedOutput(outputStem);
-
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
-    {
-        result = TestResult::Fail;
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
-
-        context->dumpOutputDifference(expectedOutput, actualOutput);
-    }
-
-    return result;
-}
-
 static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
 {
 #define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
@@ -1760,7 +1713,6 @@ TestResult runTest(
 #endif
         { "COMPARE_GLSL", &runGLSLComparisonTest },
         { "CROSS_COMPILE", &runCrossCompilerTest },
-        { "EVAL", &runEvalTest },
         { nullptr, nullptr },
     };
 

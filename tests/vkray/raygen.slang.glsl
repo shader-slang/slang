@@ -1,9 +1,45 @@
 //TEST_IGNORE_FILE:
 #version 460
 
+layout(row_major) uniform;
+
 #extension GL_NV_ray_tracing : require
 
 #define TRACING_EPSILON 1e-6
+
+#define tmp_ubo             _S1
+#define tmp_saturate        _S2
+#define tmp_launchID_x      _S3
+#define tmp_add_x           _S4
+#define tmp_launchSize_x    _S5
+#define tmp_div_x           _S6
+#define tmp_launchID_y      _S7
+#define tmp_add_y           _S8
+#define tmp_launchSize_y    _S9
+#define tmp_div_y           _S10
+#define tmp_tex_pos         _S11
+#define tmp_tex_nrm         _S12
+#define tmp_light_invDist   _S13
+#define tmp_trace_A         _S14
+#define tmp_trace_B         _S15
+#define tmp_trace_C         _S16
+#define tmp_trace_D         _S17
+#define tmp_trace_E         _S18
+#define tmp_trace_ray       _S19
+#define tmp_trace_payload   _S20
+#define tmp_cmp             _S21
+#define tmp_color           _S22
+#define tmp_dot             _S23
+#define tmp_sat             _S24
+#define tmp_trace2_A        _S25
+#define tmp_trace2_B        _S26
+#define tmp_trace2_C        _S27
+#define tmp_trace2_D        _S28
+#define tmp_trace2_E        _S29
+#define tmp_trace2_ray      _S30
+#define tmp_trace2_payload  _S31
+#define tmp_storeIdx        _S32
+
 
 layout(binding = 0) uniform texture2D samplerPosition_0;
 layout(binding = 2) uniform sampler sampler_0;
@@ -17,14 +53,19 @@ struct Light_0
 
 #define NUM_LIGHTS 17
 
-layout(binding = 3)
-layout(std140) uniform ubo_0
+struct Uniforms_0
 {
     Light_0 light_0;
     vec4 viewPos_0;
-    layout(row_major) mat4x4 view_0;
-    layout(row_major) mat4x4 model_0;
+    mat4x4 view_0;
+    mat4x4 model_0;
 };
+
+layout(binding = 3)
+layout(std140) uniform tmp_ubo
+{
+    Uniforms_0 _data;
+} ubo_0;
 
 layout(binding = 5) uniform accelerationStructureNV as_0;
 
@@ -79,8 +120,8 @@ void TraceRay_0(
 
 float saturate_0(float x_0)
 {
-    float _S1 = clamp(x_0, float(0), float(1));
-    return _S1;
+    float tmp_saturate = clamp(x_0, float(0), float(1));
+    return tmp_saturate;
 }
 
 void TraceRay_1(
@@ -114,27 +155,28 @@ void main()
 {
     float atten_0;
 
-    uvec3 _S2 = gl_LaunchIDNV;
-    float _S3 = float(_S2.x) + 0.5;
-    uvec3 _S4 = gl_LaunchSizeNV;
-    float _S5 = _S3 / float(_S4.x);
-    uvec3 _S6 = gl_LaunchIDNV;
-    float _S7 = float(_S6.y) + 0.5;
-    uvec3 _S8 = gl_LaunchSizeNV;
-    float _S9 = _S7 / float(_S8.y);
-    vec2 inUV_0 = vec2(_S5, _S9);
+    uvec3 tmp_launchID_x = gl_LaunchIDNV;
+    float tmp_add_x = float(tmp_launchID_x.x) + 0.5;
+    uvec3 tmp_launchSize_x = gl_LaunchSizeNV;
+    float tmp_div_x = tmp_add_x / float(tmp_launchSize_x.x);
+
+    uvec3 tmp_launchID_y = gl_LaunchIDNV;
+    float tmp_add_y = float(tmp_launchID_y.y) + 0.5;
+    uvec3 tmp_launchSize_y = gl_LaunchSizeNV;
+    float tmp_div_y = tmp_add_y / float(tmp_launchSize_y.y);
+    vec2 inUV_0 = vec2(tmp_div_x, tmp_div_y);
     
-    vec4 _S10 = texture(sampler2D(samplerPosition_0, sampler_0), inUV_0);
-    vec3 P_0 = _S10.xyz;
+    vec4 tmp_tex_pos = texture(sampler2D(samplerPosition_0, sampler_0), inUV_0);
+    vec3 P_0 = tmp_tex_pos.xyz;
 
-    vec4 _S11 = texture(sampler2D(samplerNormal_0, sampler_0), inUV_0);
-    vec3 N_0 = _S11.xyz * 2.0 - 1.0;
+    vec4 tmp_tex_nrm = texture(sampler2D(samplerNormal_0, sampler_0), inUV_0);
+    vec3 N_0 = tmp_tex_nrm.xyz * 2.0 - 1.0;
 
-    vec3 lightDelta_0 = light_0.position_0.xyz - P_0;
+    vec3 lightDelta_0 = ubo_0._data.light_0.position_0.xyz - P_0;
     float lightDist_0 = length(lightDelta_0);
     vec3 L_0 = normalize(lightDelta_0);
 
-    float _S12 = 1.0 / (lightDist_0 * lightDist_0);
+    float tmp_light_invDist = 1.0 / (lightDist_0 * lightDist_0);
 
     RayDesc_0 ray_0;
     ray_0.Origin_0 = P_0;
@@ -144,47 +186,47 @@ void main()
 
     ShadowRay_0 shadowRay_0;
     shadowRay_0.hitDistance_0 = float(0);
-    const uint _S13 = uint(1);
-    const uint _S14 = uint(0xFF);
-    const uint _S15 = uint(0);
-    const uint _S16 = uint(0);
-    const uint _S17 = uint(2);
+    const uint tmp_trace_A = uint(1);
+    const uint tmp_trace_B = uint(0xFF);
+    const uint tmp_trace_C = uint(0);
+    const uint tmp_trace_D = uint(0);
+    const uint tmp_trace_E = uint(2);
 
-    RayDesc_0 _S18 = ray_0;
-    ShadowRay_0 _S19;
-    _S19 = shadowRay_0;
-    TraceRay_0(as_0, _S13, _S14, _S15, _S16, _S17, _S18, _S19);
-    shadowRay_0 = _S19;
+    RayDesc_0 tmp_trace_ray = ray_0;
+    ShadowRay_0 tmp_trace_payload;
+    tmp_trace_payload = shadowRay_0;
+    TraceRay_0(as_0, tmp_trace_A, tmp_trace_B, tmp_trace_C, tmp_trace_D, tmp_trace_E, tmp_trace_ray, tmp_trace_payload);
+    shadowRay_0 = tmp_trace_payload;
 
-    bool _S20 = shadowRay_0.hitDistance_0 < lightDist_0;
+    bool tmp_cmp = shadowRay_0.hitDistance_0 < lightDist_0;
     ReflectionRay_0 reflectionRay_0;
-    if(_S20)
+    if(tmp_cmp)
     {
         atten_0 = (0.00000000000000000000);
     }
     else
     {
-        atten_0 = _S12;
+        atten_0 = tmp_light_invDist;
     }
 
-    vec3 _S21 = light_0.color_0.xyz;
-    float _S22 = dot(N_0, L_0);
-    float _S23 = saturate_0(_S22);
-    vec3 color_2 = (_S21 * _S23) * atten_0;
+    vec3 tmp_color = ubo_0._data.light_0.color_0.xyz;
+    float tmp_dot = dot(N_0, L_0);
+    float tmp_sat = saturate_0(tmp_dot);
+    vec3 color_2 = (tmp_color * tmp_sat) * atten_0;
 
-    const uint _S24 = uint(1);
-    const uint _S25 = uint(255);
-    const uint _S26 = uint(0);
-    const uint _S27 = uint(0);
-    const uint _S28 = uint(2);
-    RayDesc_0 _S29 = ray_0;
-    ReflectionRay_0 _S30;
-    _S30 = reflectionRay_0;
-    TraceRay_1(as_0, _S24, _S25, _S26, _S27, _S28, _S29, _S30);
+    const uint tmp_trace2_A = uint(1);
+    const uint tmp_trace2_B = uint(255);
+    const uint tmp_trace2_C = uint(0);
+    const uint tmp_trace2_D = uint(0);
+    const uint tmp_trace2_E = uint(2);
+    RayDesc_0 tmp_trace2_ray = ray_0;
+    ReflectionRay_0 tmp_trace2_payload;
+    tmp_trace2_payload = reflectionRay_0;
+    TraceRay_1(as_0, tmp_trace2_A, tmp_trace2_B, tmp_trace2_C, tmp_trace2_D, tmp_trace2_E, tmp_trace2_ray, tmp_trace2_payload);
 
-    vec3 color_3 = color_2 + _S30.color_1;
+    vec3 color_3 = color_2 + tmp_trace2_payload.color_1;
 
-    uvec3 _S31 = gl_LaunchIDNV;
-    imageStore(outputImage_0, ivec2(uvec2(ivec2(_S31.xy))), vec4(color_3, 1.0));
+    uvec3 tmp_storeIdx = gl_LaunchIDNV;
+    imageStore(outputImage_0, ivec2(uvec2(ivec2(tmp_storeIdx.xy))), vec4(color_3, 1.0));
     return;
 }

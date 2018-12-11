@@ -7922,16 +7922,15 @@ namespace Slang
             RefPtr<Expr> expr = inExpr;
             for (;;)
             {
-                auto& type = expr->type;
-                if (auto pointerLikeType = type->As<PointerLikeType>())
+                auto baseType = expr->type;
+                if (auto pointerLikeType = baseType->As<PointerLikeType>())
                 {
-                    type = QualType(pointerLikeType->elementType);
+                    auto elementType = QualType(pointerLikeType->elementType);
+                    elementType.IsLeftValue = baseType.IsLeftValue;
 
                     auto derefExpr = new DerefExpr();
                     derefExpr->base = expr;
-                    derefExpr->type = QualType(pointerLikeType->elementType);
-
-                    // TODO(tfoley): deal with l-value-ness here
+                    derefExpr->type = elementType;
 
                     expr = derefExpr;
                     continue;

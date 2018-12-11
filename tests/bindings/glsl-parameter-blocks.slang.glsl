@@ -25,8 +25,8 @@ struct Test
 layout(binding = 0)
 uniform ParameterBlock_gTest
 {
-    Test gTest;
-};
+    Test _data;
+} gTest;
 
 layout(binding = 1)
 uniform texture2D gTest_t;
@@ -42,7 +42,7 @@ in vec2 uv;
 
 void main()
 {
-	vec4 temp_a = gTest.a;
+	vec4 temp_a = gTest._data.a;
 
     vec4 temp_sample = texture(sampler2D(gTest_t, gTest_s), uv);
 

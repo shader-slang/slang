@@ -2,50 +2,70 @@
 #version 460
 #extension GL_NV_ray_tracing : require
 
-layout(shaderRecordNV)
-buffer ShaderRecord_0
+#define tmp_shaderrecord    _S1
+#define tmp_colors          _S2
+#define tmp_hitattrs        _S3
+#define tmp_payload         _S4
+#define tmp_localattrs      _S5
+#define tmp_customidx       _S6
+#define tmp_instanceid      _S7
+#define tmp_add_0           _S8
+#define tmp_primid          _S9
+#define tmp_add_1           _S10
+#define tmp_hitkind         _S11
+#define tmp_hitt            _S12
+#define tmp_tmin            _S13
+
+struct SLANG_ParameterGroup_ShaderRecord_0
 {
-    uint shaderRecordID_0;
+    uint shaderRecordID_0;    
 };
 
-layout(std430, binding = 0) buffer _S1
+layout(shaderRecordNV)
+buffer tmp_shaderrecord
 {
-    vec4 colors_0[];
-};
+    SLANG_ParameterGroup_ShaderRecord_0 _data;
+} ShaderRecord_0;
+
+layout(std430, binding = 0) buffer tmp_colors
+{
+    vec4 _data[];
+} colors_0;
  
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
-hitAttributeNV BuiltInTriangleIntersectionAttributes_0 _S2;
+
+hitAttributeNV BuiltInTriangleIntersectionAttributes_0 tmp_hitattrs;
 
 struct ReflectionRay_0
 {
     vec4 color_0;
 };
 
-rayPayloadInNV ReflectionRay_0 _S3;
+rayPayloadInNV ReflectionRay_0 tmp_payload;
 
 void main()
 {
-    BuiltInTriangleIntersectionAttributes_0 _S4 = _S2;
+    BuiltInTriangleIntersectionAttributes_0 tmp_localattrs = tmp_hitattrs;
 
-    uint _S5 = gl_InstanceCustomIndexNV;
-    uint _S6 = gl_InstanceID;
+    uint tmp_customidx = gl_InstanceCustomIndexNV;
+    uint tmp_instanceid = gl_InstanceID;
 
-    uint _S7 = _S5 + _S6;
-    uint _S8 = gl_PrimitiveID;
+    uint tmp_add_0 = tmp_customidx + tmp_instanceid;
+    uint tmp_primid = gl_PrimitiveID;
 
-    uint _S9 = _S7 + _S8;
-    uint _S10 = gl_HitKindNV;
+    uint tmp_add_1 = tmp_add_0 + tmp_primid;
+    uint tmp_hitkind = gl_HitKindNV;
 
-    vec4 color_1 = colors_0[_S9 + _S10 + shaderRecordID_0];
+    vec4 color_1 = colors_0._data[tmp_add_1 + tmp_hitkind + ShaderRecord_0._data.shaderRecordID_0];
 
-    float _S11 = gl_HitTNV;
-    float _S12 = gl_RayTminNV;
+    float tmp_hitt = gl_HitTNV;
+    float tmp_tmin = gl_RayTminNV;
 
-    _S3.color_0 = color_1 * (_S11 - _S12);
+    tmp_payload.color_0 = color_1 * (tmp_hitt - tmp_tmin);
 
     return;
 }

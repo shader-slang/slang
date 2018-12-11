@@ -2617,7 +2617,20 @@ namespace Slang
         }
     }
 
-    bool opHasResult(IRInst* inst);
+    bool opHasResult(IRInst* inst)
+    {
+        auto type = inst->getDataType();
+        if (!type) return false;
+
+        // As a bit of a hack right now, we need to check whether
+        // the function returns the distinguished `Void` type,
+        // since that is conceptually the same as "not returning
+        // a value."
+        if(type->op == kIROp_VoidType)
+            return false;
+
+        return true;
+    }
 
     bool instHasUses(IRInst* inst)
     {
@@ -3582,7 +3595,6 @@ namespace Slang
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
-        case kIROp_BufferLoad:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_getElement:

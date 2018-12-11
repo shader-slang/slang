@@ -1,5 +1,4 @@
-//TEST:SIMPLE: -profile ps_4_0 -entry main -target glsl
-///////TEST:REFLECTION:-profile ps_4_0 -target spirv
+//TEST:CROSS_COMPILE:-profile ps_4_0 -entry main -target spirv-assembly
 
 [[vk::binding(3, 4)]]
 RWStructuredBuffer<uint> gDoneGroups : register(u3);

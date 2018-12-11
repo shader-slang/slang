@@ -5,8 +5,16 @@
 
 #ifdef __SLANG__
 #define R(X) /**/
+#define BEGIN_CBUFFER(NAME) cbuffer NAME
+#define BEGIN_CBUFFER_R(NAME, REG) cbuffer NAME : REG
+#define END_CBUFFER(NAME, REG) /**/
+#define CBUFFER_REF(NAME, FIELD) FIELD
 #else
 #define R(X) X
+#define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
+#define BEGIN_CBUFFER_R(NAME, REG) BEGIN_CBUFFER(NAME)
+#define END_CBUFFER(NAME, REG) ; cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define CA CA_0
 #define ca ca_0
@@ -49,25 +57,29 @@ SamplerState 	sc : register(s1);
 // and even to make things non-contiguous. Here we bind
 // the third constnat buffer to register `b9`
 //
-cbuffer CA R(: register(b0))
+BEGIN_CBUFFER(CA)
 {
 	float ca;
 }
+END_CBUFFER(CA, register(b0))
+
 //
-cbuffer CB R(: register(b1))
+BEGIN_CBUFFER(CB)
 {
 	float cb;
 }
+END_CBUFFER(CB, register(b1))
 //
-cbuffer CC : register(b9)
+BEGIN_CBUFFER_R(CC, register(b9))
 {
 	float cc;
 }
+END_CBUFFER(CC, register(b9))
 
 float4 main() : SV_TARGET
 {
 	// Go ahead and use everything in this case:
-	return use(ta, sa) + use(ca)
-		+  use(tb, sb) + use(cb)
-		+  use(tc, sc) + use(cc);
+	return use(ta, sa) + use(CBUFFER_REF(CA,ca))
+		+  use(tb, sb) + use(CBUFFER_REF(CB,cb))
+		+  use(tc, sc) + use(CBUFFER_REF(CC,cc));
 }
