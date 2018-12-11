@@ -147,7 +147,7 @@ IRDominatorTree::DominatedList::Iterator IRDominatorTree::DominatedList::begin()
 
 IRDominatorTree::DominatedList::Iterator IRDominatorTree::DominatedList::end() const
 {
-    return Iterator(mTree, mBegin);
+    return Iterator(mTree, mEnd);
 }
 
 
