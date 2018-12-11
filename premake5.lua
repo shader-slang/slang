@@ -708,6 +708,7 @@ standardProject "slang-glslang"
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
     filter { "system:linux" }
+        links { "dl", "pthread" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
         buildoptions{"-fPIC", "-pthread"}
         
