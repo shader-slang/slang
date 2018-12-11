@@ -215,7 +215,7 @@ struct IRInstList : IRInstListBase
     };
 
     Iterator begin() { return Iterator(first); }
-    Iterator end() { return Iterator(last ? last->next : nullptr); }
+    Iterator end();
 };
 
 
@@ -422,6 +422,15 @@ T* cast(IRInst* inst, T* /* */ = nullptr)
 {
     SLANG_ASSERT(!inst || as<T>(inst));
     return (T*)inst;
+}
+
+// Now that `IRInst` is defined we can back-fill the `IRInstList<T>` members
+// that need to access it.
+
+template<typename T>
+typename IRInstList<T>::Iterator IRInstList<T>::end()
+{
+    return Iterator(last ? last->next : nullptr);
 }
 
 
