@@ -1099,12 +1099,13 @@ createParameterGroupTypeLayout(
     // There are several different cases that need to be handled here,
     // depending on whether we have a `ParameterBlock`, a `ConstantBuffer`,
     // or some other kind of parameter group. Furthermore, in the
-    // `ParameterBlock` case, we need to deal with differnet layout
+    // `ParameterBlock` case, we need to deal with different layout
     // rules depending on whether a block should map to a register `space`
     // in HLSL or not.
 
     // Check if we are working with a parameter block...
-    auto parameterBlockType = parameterGroupType->As<ParameterBlockType>();
+    auto parameterBlockType = parameterGroupType ? parameterGroupType->As<ParameterBlockType>() : nullptr;
+
 
     // Check if we have a parameter block *and* it should be
     // allocated into its own register space(s)
