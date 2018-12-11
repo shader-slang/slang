@@ -1,7 +1,7 @@
 // mutating-methods.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -serial-ir
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -serial-ir
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -serial-ir
 
 interface IAccumulator
 {

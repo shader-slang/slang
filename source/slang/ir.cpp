@@ -166,6 +166,19 @@ namespace Slang
         }
     }
 
+    // IRInstListBase
+
+    void IRInstListBase::Iterator::operator++()
+    {
+        if (inst)
+        {
+            inst = inst->next;
+        }
+    }
+
+    IRInstListBase::Iterator IRInstListBase::begin() { return Iterator(first); }
+    IRInstListBase::Iterator IRInstListBase::end() { return Iterator(last ? last->next : nullptr); }
+
     //
 
     IRUse* IRInst::getOperands()
@@ -180,9 +193,9 @@ namespace Slang
         return (IRUse*)(this + 1);
     }
 
-    IRDecoration* IRInst::findDecorationImpl(IRDecorationOp decorationOp)
+    IRDecoration* IRInst::findDecorationImpl(IROp decorationOp)
     {
-        for( auto dd = firstDecoration; dd; dd = dd->next )
+        for(auto dd : getDecorations())
         {
             if(dd->op == decorationOp)
                 return dd;
@@ -239,14 +252,31 @@ namespace Slang
 
     void IRBlock::addParam(IRParam* param)
     {
-        auto lastParam = getLastParam();
-        if (lastParam)
+        // If there are any existing parameters,
+        // then insert after the last of them.
+        //
+        if (auto lastParam = getLastParam())
         {
             param->insertAfter(lastParam);
         }
+        //
+        // Otherwise, if there are any existing
+        // "ordinary" instructions, insert before
+        // the first of them.
+        //
+        else if(auto firstOrdinary = getFirstOrdinaryInst())
+        {
+            param->insertBefore(firstOrdinary);
+        }
+        //
+        // Otherwise the block currently has neither
+        // parameters nor orindary instructions,
+        // so we can safely insert at the end of
+        // the list of (raw) children.
+        //
         else
         {
-            param->insertAtStart(this);
+            param->insertAtEnd(this);
         }
     }
 
@@ -585,7 +615,7 @@ namespace Slang
     }
 
 
-    void IRBuilder::setInsertInto(IRParentInst* insertInto)
+    void IRBuilder::setInsertInto(IRInst* insertInto)
     {
         insertIntoParent = insertInto;
         insertBeforeInst = nullptr;
@@ -620,7 +650,7 @@ namespace Slang
     // Given two parent instructions, pick the better one to use as as
     // insertion location for a "hoistable" instruction.
     //
-    IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
+    IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     {
         // If the candidates are both the same, then who cares?
         if(left == right) return left;
@@ -681,7 +711,7 @@ namespace Slang
         // If the non-block on the left or right is a descendent of
         // the other, then that is what we should use.
         //
-        IRParentInst* parentNonBlock = nullptr;
+        IRInst* parentNonBlock = nullptr;
         for (auto ll = leftNonBlock; ll; ll = ll->getParent())
         {
             if (ll == rightNonBlock)
@@ -715,7 +745,7 @@ namespace Slang
             parentNonBlock = leftNonBlock;
         }
 
-        IRParentInst* parent = parentNonBlock;
+        IRInst* parent = parentNonBlock;
 
         // At this point we've found a non-block parent where we
         // could stick things, but we have to fix things up in
@@ -791,19 +821,6 @@ namespace Slang
         return inst;
     }
 
-
-    IRDecoration* createEmptyDecoration(
-        IRModule* module,
-        IRDecorationOp op,
-        size_t sizeInBytes)
-    {
-        SLANG_ASSERT(sizeInBytes >= sizeof(IRDecoration));
-        SLANG_ASSERT(module);
-        IRDecoration* decor = (IRDecoration*)module->memoryArena.allocateAndZero(sizeInBytes);
-        decor->op = op;
-        return decor;
-    }
-
     // Given an instruction that represents a constant, a type, etc.
     // Try to "hoist" it as far toward the global scope as possible
     // to insert it at a location where it will be maximally visible.
@@ -814,7 +831,7 @@ namespace Slang
     {
         // Start with the assumption that we would insert this instruction
         // into the global scope (the instruction that represents the module)
-        IRParentInst* parent = builder->getModule()->getModuleInst();
+        IRInst* parent = builder->getModule()->getModuleInst();
 
         // The above decision might be invalid, because there might be
         // one or more operands of the instruction that are defined in
@@ -1177,13 +1194,14 @@ namespace Slang
         return code;
     }
 
-    UnownedStringSlice IRConstant::getStringSlice() const
+    UnownedStringSlice IRConstant::getStringSlice()
     {
         assert(op == kIROp_StringLit);
         // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
         // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
         // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
-        if (firstDecoration && firstDecoration->op == kIRDecorationOp_Transitory)
+        //
+        if(findDecorationImpl(kIROp_TransitoryDecoration))
         {
             return UnownedStringSlice(value.transitoryStringVal.chars, value.transitoryStringVal.numChars);
         }
@@ -1217,6 +1235,10 @@ namespace Slang
                 // ... we can just compare as bits
                 return value.intVal == rhs.value.intVal;
             }
+            case kIROp_PtrLit:
+            {
+                return value.ptrVal == rhs.value.ptrVal;
+            }
             case kIROp_StringLit:
             {
                 return getStringSlice() == rhs.getStringSlice();
@@ -1242,6 +1264,10 @@ namespace Slang
                 SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
                 // ... we can just compare as bits
                 return combineHash(code, Slang::GetHashCode(value.intVal));
+            }
+            case kIROp_PtrLit:
+            {
+                return combineHash(code, Slang::GetHashCode(value.ptrVal));
             }
             case kIROp_StringLit:
             {
@@ -1283,6 +1309,10 @@ namespace Slang
 
         switch (keyInst.op)
         {
+        default:
+            SLANG_UNEXPECTED("missing case for IR constant");
+            break;
+
             case kIROp_BoolLit:
             case kIROp_IntLit:
             {
@@ -1294,6 +1324,12 @@ namespace Slang
             {
                 irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRFloatingPointValue)));
                 irValue->value.floatVal = keyInst.value.floatVal;
+                break;
+            }
+            case kIROp_PtrLit:
+            {
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(void*)));
+                irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
             case kIROp_StringLit:
@@ -1363,8 +1399,10 @@ namespace Slang
         memset(&keyInst, 0, sizeof(keyInst));
         
         // Mark that this is on the stack...
-        static IRDecoration stackDecoration = IRDecoration::make(kIRDecorationOp_Transitory);
-        keyInst.firstDecoration = &stackDecoration;
+        IRDecoration stackDecoration;
+        memset(&stackDecoration, 0, sizeof(stackDecoration));
+        stackDecoration.op = kIROp_TransitoryDecoration;
+        stackDecoration.insertAtEnd(&keyInst);
             
         keyInst.op = kIROp_StringLit;
         keyInst.typeUse.usedValue = getStringType();
@@ -1375,6 +1413,19 @@ namespace Slang
 
         return static_cast<IRStringLit*>(findOrEmitConstant(this, keyInst));
     }
+
+    IRPtrLit* IRBuilder::getPtrValue(void* value)
+    {
+        IRType* type = getPtrType(getVoidType());
+
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.op = kIROp_PtrLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.ptrVal = value;
+        return (IRPtrLit*) findOrEmitConstant(this, keyInst);
+    }
+
  
     IRInst* findOrEmitHoistableInst(
         IRBuilder*              builder,
@@ -2162,19 +2213,6 @@ namespace Slang
         return inst;
     }
 
-    IRNotePatchConstantFunc* IRBuilder::emitNotePatchConstantFunc(
-        IRInst* func)
-    {
-        auto inst = createInst<IRNotePatchConstantFunc>(
-            this,
-            kIROp_NotePatchConstantFunc,
-            nullptr,
-            func);
-
-        addInst(inst);
-        return inst;
-    }
-
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,
@@ -2549,18 +2587,40 @@ namespace Slang
         return inst;
     }
 
-    IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
+    IRDecoration* IRBuilder::addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount)
     {
-        auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
-        decoration->decl = decl;
+        auto decoration = createInstWithTrailingArgs<IRDecoration>(
+            this,
+            op,
+            getVoidType(),
+            operandCount,
+            operands);
+
+        // Decoration order should not, in general, be semantically
+        // meaningful, so we will elect to insert a new decoration
+        // at the start of an instruction (constant time) rather
+        // than at the end of any existing list of deocrations
+        // (which would take time linear in the number of decorations).
+        //
+        // TODO: revisit this if maintaining decoration ordering
+        // from input source code is desirable.
+        //
+        decoration->insertAtStart(value);
+
         return decoration;
     }
 
-    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+
+    void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
     {
-        auto decoration = addDecoration<IRLayoutDecoration>(inst);
-        decoration->layout = addRefObjectToFree(layout);
-        return decoration;
+        auto ptrConst = getPtrValue(addRefObjectToFree(decl));
+        addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
+    }
+
+    void IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+    {
+        auto ptrConst = getPtrValue(addRefObjectToFree(layout));
+        addDecoration(inst, kIROp_LayoutDecoration, ptrConst);
     }
 
     //
@@ -2905,74 +2965,25 @@ namespace Slang
         for(; inst; inst = inst->getNextInst())
         {
             dumpInst(context, inst);
+            dump(context, "\n");
         }
     }
+
+    static void dumpInstBody(
+        IRDumpContext*  context,
+        IRInst*         inst);
 
     void dumpIRDecorations(
         IRDumpContext*  context,
         IRInst*         inst)
     {
-        for( auto dd = inst->firstDecoration; dd; dd = dd->next )
+        for(auto dd : inst->getDecorations())
         {
-            switch( dd->op )
-            {
-            case kIRDecorationOp_Target:
-                {
-                    auto decoration = (IRTargetDecoration*) dd;
+            dump(context, "[");
+            dumpInstBody(context, dd);
+            dump(context, "]\n");
 
-                    dump(context, "\n");
-                    dumpIndent(context);
-                    dump(context, "[target(");
-                    dump(context, StringRepresentation::getData(decoration->targetName));
-                    dump(context, ")]");
-                }
-                break;
-
-            case kIRDecorationOp_TargetIntrinsic:
-                {
-                    auto decoration = (IRTargetIntrinsicDecoration*) dd;
-
-                    dump(context, "\n");
-                    dumpIndent(context);
-                    dump(context, "[targetIntrinsic(");
-                    dump(context, StringRepresentation::getData(decoration->targetName));
-                    dump(context, ", ");
-                    dump(context, StringRepresentation::getData(decoration->definition));
-                    dump(context, ")]");
-                }
-                break;
-
-            case kIRDecorationOp_VulkanRayPayload:
-                {
-                    dump(context, "\n[__vulkanRayPayload]");
-                }
-                break;
-            case kIRDecorationOp_VulkanCallablePayload:
-                {
-                    dump(context, "\n[__vulkanCallPayload]");
-                }
-                break;
-            case kIRDecorationOp_VulkanHitAttributes:
-                {
-                    dump(context, "\n[__vulkanHitAttributes]");
-                }
-                break;
-            case kIRDecorationOp_ReadNone:
-                {
-                    dump(context, "\n[__readNone]");
-                }
-                break;
-            case kIRDecorationOp_EarlyDepthStencil:
-                {
-                    dump(context, "\n[earlydepthstencil]");
-                }
-                break;
-            case kIRDecorationOp_GloballyCoherent:
-                {
-                    dump(context, "\n[globallycoherent]");
-                }
-                break;
-            }
+            dumpIndent(context);
         }
     }
 
@@ -2982,7 +2993,6 @@ namespace Slang
     {
         auto opInfo = getIROpInfo(code->op);
 
-        dump(context, "\n");
         dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
@@ -3038,11 +3048,10 @@ namespace Slang
 
     void dumpIRParentInst(
         IRDumpContext*  context,
-        IRParentInst*   inst)
+        IRInst*         inst)
     {
         auto opInfo = getIROpInfo(inst->op);
 
-        dump(context, "\n");
         dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
@@ -3063,9 +3072,10 @@ namespace Slang
         dump(context, "{\n");
         context->indent++;
 
-        for (auto child = inst->getFirstChild(); child; child = child->getNextInst())
+        for(auto child : inst->getChildren())
         {
             dumpInst(context, child);
+            dump(context, "\n");
         }
 
         context->indent--;
@@ -3086,19 +3096,19 @@ namespace Slang
         for (auto ii : witnessTable->getChildren())
         {
             dumpInst(context, ii);
+            dump(context, "\n");
         }
 
         context->indent--;
         dump(context, "}\n");
     }
 
-    static void dumpInst(
+    static void dumpInstBody(
         IRDumpContext*  context,
         IRInst*         inst)
     {
         if (!inst)
         {
-            dumpIndent(context);
             dump(context, "<null>");
             return;
         }
@@ -3121,7 +3131,7 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
-            dumpIRParentInst(context, (IRWitnessTable*)inst);
+            dumpIRParentInst(context, inst);
             return;
 
         case kIROp_WitnessTableEntry:
@@ -3133,8 +3143,6 @@ namespace Slang
         }
 
         // Okay, we have a seemingly "ordinary" op now
-        dumpIndent(context);
-
         auto opInfo = getIROpInfo(op);
         auto dataType = inst->getDataType();
         auto rate = inst->getRate();
@@ -3201,8 +3209,14 @@ namespace Slang
         }
 
         dump(context, ")");
+    }
 
-        dump(context, "\n");
+    static void dumpInst(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        dumpIndent(context);
+        dumpInstBody(context, inst);
     }
 
     void dumpIRModule(
@@ -3212,6 +3226,7 @@ namespace Slang
         for(auto ii : module->getGlobalInsts())
         {
             dumpInst(context, ii);
+            dump(context, "\n");
         }
     }
 
@@ -3256,6 +3271,57 @@ namespace Slang
     //
     //
     //
+
+    IRDecoration* IRInst::getFirstDecoration()
+    {
+        return as<IRDecoration>(getFirstDecorationOrChild());
+    }
+
+    IRDecoration* IRInst::getLastDecoration()
+    {
+        IRDecoration* decoration = getFirstDecoration();
+        if (!decoration) return nullptr;
+
+        while (auto nextDecoration = decoration->getNextDecoration())
+            decoration = nextDecoration;
+
+        return decoration;
+    }
+
+    IRInstList<IRDecoration> IRInst::getDecorations()
+    {
+        return IRInstList<IRDecoration>(
+            getFirstDecoration(),
+            getLastDecoration());
+    }
+
+    IRInst* IRInst::getFirstChild()
+    {
+        // The children come after any decorations,
+        // so if there are any decorations, then the
+        // first child is right after the last decoration.
+        //
+        if(auto lastDecoration = getLastDecoration())
+            return lastDecoration->getNextInst();
+        //
+        // Otherwise, there must be no decorations, so
+        // that the first "child or decoration" is a child.
+        //
+        return getFirstDecorationOrChild();
+    }
+
+    IRInst* IRInst::getLastChild()
+    {
+        // The children come after any decorations, so
+        // that the last item in the list of children
+        // and decorations is the last child *unless*
+        // it is a decoration, in which case there are
+        // no children.
+        //
+        auto lastChild = getLastDecorationOrChild();
+        return as<IRDecoration>(lastChild) ? nullptr : lastChild;
+    }
+
 
     IRRate* IRInst::getRate()
     {
@@ -3345,13 +3411,13 @@ namespace Slang
     void IRInst::insertBefore(IRInst* other)
     {
         SLANG_ASSERT(other);
-        insertBefore(other, other->parent);
+        _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
-    void IRInst::insertAtStart(IRParentInst* newParent)
+    void IRInst::insertAtStart(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
-        insertBefore(newParent->children.first, newParent);
+        _insertAt(nullptr, newParent->getFirstDecorationOrChild(), newParent);
     }
 
     void IRInst::moveToStart()
@@ -3361,52 +3427,49 @@ namespace Slang
         insertAtStart(p);
     }
 
-    void IRInst::insertBefore(IRInst* other, IRParentInst* newParent)
+    void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
     {
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        SLANG_ASSERT(other || newParent);
-        if (!other) other = newParent->children.first;
-        if (!newParent) newParent = other->parent;
-        SLANG_ASSERT(newParent);
+        SLANG_ASSERT(inParent);
+        SLANG_ASSERT(!inPrev || (inPrev->getNextInst() == inNext) && (inPrev->getParent() == inParent));
+        SLANG_ASSERT(!inNext || (inNext->getPrevInst() == inPrev) && (inNext->getParent() == inParent));
 
-        auto nn = other;
-        auto pp = other ? other->getPrevInst() : nullptr;
-
-        if( pp )
+        if( inPrev )
         {
-            pp->next = this;
+            inPrev->next = this;
         }
         else
         {
-            newParent->children.first = this;
+            inParent->m_decorationsAndChildren.first = this;
         }
 
-        if (nn)
+        if (inNext)
         {
-            nn->prev = this;
+            inNext->prev = this;
         }
         else
         {
-            newParent->children.last = this;
+            inParent->m_decorationsAndChildren.last = this;
         }
 
-        this->prev = pp;
-        this->next = nn;
-        this->parent = newParent;
+        this->prev = inPrev;
+        this->next = inNext;
+        this->parent = inParent;
     }
 
     void IRInst::insertAfter(IRInst* other)
     {
         SLANG_ASSERT(other);
-        insertAfter(other, other->parent);
+
+        _insertAt(other, other->getNextInst(), other->getParent());
     }
 
-    void IRInst::insertAtEnd(IRParentInst* newParent)
+    void IRInst::insertAtEnd(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
-        insertAfter(newParent->children.last, newParent);
+        _insertAt(newParent->getLastDecorationOrChild(), nullptr, newParent);
     }
 
     void IRInst::moveToEnd()
@@ -3414,42 +3477,6 @@ namespace Slang
         auto p = parent;
         removeFromParent();
         insertAtEnd(p);
-    }
-
-    void IRInst::insertAfter(IRInst* other, IRParentInst* newParent)
-    {
-        // Make sure this instruction has been removed from any previous parent
-        this->removeFromParent();
-
-        SLANG_ASSERT(other || newParent);
-        if (!other) other = newParent->children.last;
-        if (!newParent) newParent = other->parent;
-        SLANG_ASSERT(newParent);
-
-        auto pp = other;
-        auto nn = other ? other->next : nullptr;
-
-        if (pp)
-        {
-            pp->next = this;
-        }
-        else
-        {
-            newParent->children.first = this;
-        }
-
-        if (nn)
-        {
-            nn->prev = this;
-        }
-        else
-        {
-            newParent->children.last = this;
-        }
-
-        this->prev = pp;
-        this->next = nn;
-        this->parent = newParent;
     }
 
     // Remove this instruction from its parent block,
@@ -3473,7 +3500,7 @@ namespace Slang
         }
         else
         {
-            oldParent->children.first = nn;
+            oldParent->m_decorationsAndChildren.first = nn;
         }
 
         if(nn)
@@ -3483,7 +3510,7 @@ namespace Slang
         }
         else
         {
-            oldParent->children.last = pp;
+            oldParent->m_decorationsAndChildren.last = pp;
         }
 
         prev = nullptr;
@@ -3507,23 +3534,16 @@ namespace Slang
     {
         removeFromParent();
         removeArguments();
-
-        // If this is a parent instruction then we had
-        // better remove all its children as well.
-        //
-        if(auto parentInst = as<IRParentInst>(this))
-        {
-            parentInst->removeAndDeallocateAllChildren();
-        }
+        removeAndDeallocateAllDecorationsAndChildren();
 
         // Run destructor to be sure...
         this->~IRInst();
     }
 
-    void IRParentInst::removeAndDeallocateAllChildren()
+    void IRInst::removeAndDeallocateAllDecorationsAndChildren()
     {
         IRInst* nextChild = nullptr;
-        for( IRInst* child = getFirstChild(); child; child = nextChild )
+        for( IRInst* child = getFirstDecorationOrChild(); child; child = nextChild )
         {
             nextChild = child->getNextInst();
             child->removeAndDeallocate();
@@ -4153,8 +4173,7 @@ namespace Slang
 
             if(auto outerArrayName = systemValueInfo->outerArrayName)
             {
-                auto decoration = builder->addDecoration<IRGLSLOuterArrayDecoration>(globalVariable);
-                decoration->outerArrayName = outerArrayName;
+                builder->addGLSLOuterArrayDecoration(globalVariable, UnownedTerminatedStringSlice(outerArrayName));
             }
         }
 
@@ -4689,13 +4708,13 @@ namespace Slang
         IRInst*        val,
         String const&   targetName)
     {
-        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        for(auto dd : val->getDecorations())
         {
-            if(dd->op != kIRDecorationOp_TargetIntrinsic)
+            if(dd->op != kIROp_TargetIntrinsicDecoration)
                 continue;
 
             auto decoration = (IRTargetIntrinsicDecoration*) dd;
-            if(String(decoration->targetName) == targetName)
+            if(String(decoration->getTargetName()) == targetName)
                 return decoration;
         }
 
@@ -4864,7 +4883,7 @@ namespace Slang
                         if(!decoration)
                             continue;
 
-                        if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice::fromLiteral("EmitVertex()"))
+                        if(decoration->getDefinition() != UnownedStringSlice::fromLiteral("EmitVertex()"))
                         {
                             continue;
                         }
@@ -5340,117 +5359,40 @@ namespace Slang
         }
     }
 
+    IRInst* cloneInst(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRInst*                         originalInst,
+        IROriginalValuesForClone const& originalValues);
+
+    IRInst* cloneInst(
+        IRSpecContextBase*  context,
+        IRBuilder*          builder,
+        IRInst*             originalInst)
+    {
+        return cloneInst(context, builder, originalInst, originalInst);
+    }
+
+        /// Clone any decorations from `originalValue` onto `clonedValue`
     void cloneDecorations(
         IRSpecContextBase*  context,
-        IRInst*        clonedValue,
-        IRInst*        originalValue)
+        IRInst*             clonedValue,
+        IRInst*             originalValue)
     {
-        for (auto dd = originalValue->firstDecoration; dd; dd = dd->next)
+        // TODO: In many cases we might be able to use this as a general-purpose
+        // place to do cloning of *all* the children of an instruction, and
+        // not just its decorations. We should look to refactor this code
+        // later.
+
+        IRBuilder builderStorage = *context->builder;
+        IRBuilder* builder = &builderStorage;
+        builder->setInsertInto(clonedValue);
+
+
+        SLANG_UNUSED(context);
+        for(auto originalDecoration : originalValue->getDecorations())
         {
-            switch (dd->op)
-            {
-            case kIRDecorationOp_HighLevelDecl:
-                {
-                    auto originalDecoration = (IRHighLevelDeclDecoration*)dd;
-
-                    context->builder->addHighLevelDeclDecoration(clonedValue, originalDecoration->decl);
-                }
-                break;
-
-            case kIRDecorationOp_LoopControl:
-                {
-                    auto originalDecoration = (IRLoopControlDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRLoopControlDecoration>(clonedValue);
-                    newDecoration->mode = originalDecoration->mode;
-                }
-                break;
-
-            case kIRDecorationOp_TargetIntrinsic:
-                {
-                    auto originalDecoration = (IRTargetIntrinsicDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRTargetIntrinsicDecoration>(clonedValue);
-                    newDecoration->targetName = originalDecoration->targetName;
-                    newDecoration->definition = originalDecoration->definition;
-                }
-                break;
-
-            case kIRDecorationOp_Semantic:
-                {
-                    auto originalDecoration = (IRSemanticDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRSemanticDecoration>(clonedValue);
-                    newDecoration->semanticName = originalDecoration->semanticName;
-                }
-                break;
-
-            case kIRDecorationOp_InterpolationMode:
-                {
-                    auto originalDecoration = (IRInterpolationModeDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRInterpolationModeDecoration>(clonedValue);
-                    newDecoration->mode = originalDecoration->mode;
-                }
-                break;
-
-            case kIRDecorationOp_NameHint:
-                {
-                    auto originalDecoration = (IRNameHintDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRNameHintDecoration>(clonedValue);
-                    newDecoration->name = originalDecoration->name;
-                }
-                break;
-
-            case kIRDecorationOp_VulkanRayPayload:
-                {
-                    context->builder->addDecoration<IRVulkanRayPayloadDecoration>(clonedValue);
-                }
-                break;
-
-            case kIRDecorationOp_VulkanCallablePayload:
-                {
-                    context->builder->addDecoration<IRVulkanCallablePayloadDecoration>(clonedValue);
-                }
-                break;
-            case kIRDecorationOp_EarlyDepthStencil:
-                {
-                    context->builder->addDecoration<IREarlyDepthStencilDecoration>(clonedValue);
-                }
-                break;
-            case kIRDecorationOp_GloballyCoherent:
-                {
-                    context->builder->addDecoration<IRGloballyCoherentDecoration>(clonedValue);
-                }
-                break;
-            case kIRDecorationOp_VulkanHitAttributes:
-                {
-                    context->builder->addDecoration<IRVulkanHitAttributesDecoration>(clonedValue);
-                }
-                break;
-
-            case kIRDecorationOp_RequireGLSLExtension:
-                {
-                    auto originalDecoration = (IRRequireGLSLExtensionDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLExtensionDecoration>(clonedValue);
-                    newDecoration->extensionName = originalDecoration->extensionName;
-                }
-                break;
-
-            case kIRDecorationOp_RequireGLSLVersion:
-                {
-                    auto originalDecoration = (IRRequireGLSLVersionDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLVersionDecoration>(clonedValue);
-                    newDecoration->languageVersion = originalDecoration->languageVersion;
-                }
-                break;
-
-            case kIRDecorationOp_ReadNone:
-                {
-                    context->builder->addDecoration<IRReadNoneDecoration>(clonedValue);
-                }
-                break;
-
-            default:
-                // Don't clone any decorations we don't understand.
-                break;
-            }
+            cloneInst(context, builder, originalDecoration);
         }
 
         // We will also clone the location here, just because this is a convenient bottleneck
@@ -5507,6 +5449,20 @@ namespace Slang
             {
                 IRConstant* c = (IRConstant*)originalValue;
                 return builder->getFloatValue(cloneType(this, c->getDataType()), c->value.floatVal);
+            }
+            break;
+
+        case kIROp_StringLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return builder->getStringValue(c->getStringSlice());
+            }
+            break;
+
+        case kIROp_PtrLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return builder->getPtrValue(c->value.ptrVal);
             }
             break;
 
@@ -5596,20 +5552,6 @@ namespace Slang
         return cloneValue(context, originalValue);
     }
 
-    IRInst* cloneInst(
-        IRSpecContextBase*              context,
-        IRBuilder*                      builder,
-        IRInst*                         originalInst,
-        IROriginalValuesForClone const& originalValues);
-
-    IRInst* cloneInst(
-        IRSpecContextBase*  context,
-        IRBuilder*          builder,
-        IRInst*             originalInst)
-    {
-        return cloneInst(context, builder, originalInst, originalInst);
-    }
-
     void cloneGlobalValueWithCodeCommon(
         IRSpecContextBase*      context,
         IRGlobalValueWithCode*  clonedValue,
@@ -5652,8 +5594,6 @@ namespace Slang
         auto mangledName = originalVar->mangledName;
         clonedVar->mangledName = mangledName;
 
-        cloneDecorations(context, clonedVar, originalVar);
-
         VarLayout* layout = nullptr;
         if (context->globalVarLayouts.TryGetValue(mangledName, layout))
         {
@@ -5683,8 +5623,6 @@ namespace Slang
         auto mangledName = originalVal->mangledName;
         clonedVal->mangledName = mangledName;
 
-        cloneDecorations(context, clonedVal, originalVal);
-
         // Clone any code in the body of the constant, since this
         // represents the initializer.
         cloneGlobalValueWithCodeCommon(
@@ -5706,8 +5644,6 @@ namespace Slang
 
         auto mangledName = originalVal->mangledName;
         clonedVal->mangledName = mangledName;
-
-        cloneDecorations(context, clonedVal, originalVal);
 
         // Clone any code in the body of the generic, since this
         // computes its result value.
@@ -5732,15 +5668,13 @@ namespace Slang
         auto mangledName = originalInst->mangledName;
         clonedInst->mangledName = mangledName;
 
-        cloneDecorations(context, clonedInst, originalInst);
-
         // Set up an IR builder for inserting into the inst
         IRBuilder builderStorage = *context->builder;
         IRBuilder* builder = &builderStorage;
         builder->setInsertInto(clonedInst);
 
         // Clone any children of the instruction
-        for (auto child : originalInst->getChildren())
+        for (auto child : originalInst->getDecorationsAndChildren())
         {
             cloneInst(context, builder, child);
         }
@@ -5812,6 +5746,7 @@ namespace Slang
         IRBuilder* builder = &builderStorage;
         builder->setInsertInto(clonedValue);
 
+        cloneDecorations(context, clonedValue, originalValue);
 
         // We will walk through the blocks of the function, and clone each of them.
         //
@@ -5864,10 +5799,10 @@ namespace Slang
 
     }
 
-    void checkIRDuplicate(IRInst* inst, IRParentInst* moduleInst, Name* mangledName)
+    void checkIRDuplicate(IRInst* inst, IRInst* moduleInst, Name* mangledName)
     {
 #ifdef _DEBUG
-        for (auto child : moduleInst->getChildren())
+        for (auto child : moduleInst->getDecorationsAndChildren())
         {
             if (child == inst)
                 continue;
@@ -5897,8 +5832,6 @@ namespace Slang
         // First clone all the simple properties.
         clonedFunc->mangledName = originalFunc->mangledName;
         clonedFunc->setFullType(cloneType(context, originalFunc->getFullType()));
-
-        cloneDecorations(context, clonedFunc, originalFunc);
 
         cloneGlobalValueWithCodeCommon(
             context,
@@ -6052,13 +5985,13 @@ namespace Slang
         }
 
         TargetSpecializationLevel result = TargetSpecializationLevel::notSpecialized;
-        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        for(auto dd : val->getDecorations())
         {
-            if(dd->op != kIRDecorationOp_Target)
+            if(dd->op != kIROp_TargetDecoration)
                 continue;
 
             auto decoration = (IRTargetDecoration*) dd;
-            if(String(decoration->targetName) == targetName)
+            if(String(decoration->getTargetName()) == targetName)
                 return TargetSpecializationLevel::specializedForTarget;
 
             result = TargetSpecializationLevel::specializedForOtherTarget;
@@ -6124,7 +6057,7 @@ namespace Slang
         case kIROp_GlobalConstant:
         case kIROp_Func:
         case kIROp_Generic:
-            return ((IRParentInst*)val)->getFirstChild() != nullptr;
+            return val->getFirstChild() != nullptr;
 
         case kIROp_StructType:
         case kIROp_GlobalVar:
@@ -6704,18 +6637,13 @@ namespace Slang
             // We do *not* consider generics, or instructions nested under them.
             return;
         }
-        else if(auto parentInst = as<IRParentInst>(inst))
+        else
         {
-            // For a parent instruction, we will scan through its contents,
-            // since that will be where the `specialize` instructions are
-
-            for(auto child : parentInst->children)
+            for(auto child : inst->getChildren())
             {
                 addToSpecializationWorkListRec(sharedContext, child);
             }
-        }
-        else
-        {
+
             // Default case: consider this instruction for specialization.
             sharedContext->addToWorkList(inst);
         }
@@ -6806,12 +6734,9 @@ namespace Slang
             // We expect a generic to only ever contain a single block.
             SLANG_ASSERT(bb == genericVal->getFirstBlock());
 
-            for (auto ii : bb->getChildren())
+            // Iterate over the non-parameter ("ordinary") instructions.
+            for (auto ii : bb->getOrdinaryInsts())
             {
-                // Skip parameters, since they were handled earlier.
-                if (auto param = as<IRParam>(ii))
-                    continue;
-
                 // The last block of the generic is expected to end with
                 // a `return` instruction for the specialized value that
                 // comes out of the abstraction.

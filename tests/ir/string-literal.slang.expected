@@ -1,19 +1,26 @@
 result code = 0
 standard error = {
-let  %1	: _	= UInt()
-let  %2	: _	= Void()
-let  %3	: _	= Func(%2, %1)
-let  %4	: _	= BasicBlock()
-Ptr(%1)
-let  %5	: _	= String()
-let  %6	: %5	= string_constant("Hello \t\n\0x083 World")
-
-func @_S04mainp1puV	: %3
+let  %1	: _	= String()
+let  %2	: %1	= string_constant("main")
+let  %3	: _	= Void()
+let  %4	: _	= UInt()
+let  %5	: _	= Func(%3, %4)
+let  %6	: _	= BasicBlock()
+let  %7	: _	= Ptr(%3)
+let  %8	: %7	= ptr_constant()
+let  %9	: %1	= string_constant("tid")
+Ptr(%4)
+let  %10	: %1	= string_constant("Hello \t\n\0x083 World")
+let  %11	: %7	= ptr_constant()
+[highLevelDecl(%11)]
+[nameHint("main")]
+func @_S04mainp1puV	: %5
 {
-block %7(
-		param %8	: %1):
+block %12(
+		param %13	: %4):
 	return_void()
 }
+
 
 }
 standard output = {
