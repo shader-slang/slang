@@ -364,7 +364,7 @@ void maybeApplyNameHint(
     {
         if( !val->findDecoration<IRNameHintDecoration>() )
         {
-            context->getBuilder()->addDecoration<IRNameHintDecoration>(val)->name = nameHint->name;
+            context->getBuilder()->addNameHintDecoration(val, nameHint->getName());
         }
     }
 }
@@ -838,7 +838,9 @@ void processBlock(
         }
     }
 
-    blockInfo->builder.setInsertBefore(block->getLastChild());
+    auto terminator = block->getTerminator();
+    SLANG_ASSERT(terminator);
+    blockInfo->builder.setInsertBefore(terminator);
 
     // Once we are done with all of the instructions
     // in a block, we can mark it as "filled," which
@@ -1066,9 +1068,16 @@ void constructSSA(ConstructSSAContext* context)
             newArgCount,
             newArgs.Buffer());
 
-        // Swap decorations over to the new instruction
-        newTerminator->firstDecoration = oldTerminator->firstDecoration;
-        oldTerminator->firstDecoration = nullptr;
+        // Swap decorations (all children, really) over to the new instruction
+        //
+        // TODO: We might want to encapsualte this in a reusable subroutine if
+        // we often need to copy decorations from one instruction to another.
+        //
+        while( auto firstChild = oldTerminator->getFirstDecoration() )
+        {
+            firstChild->removeFromParent();
+            firstChild->insertAtEnd(newTerminator);
+        }
 
         // A terminator better not have uses, so we shouldn't have
         // to replace them.

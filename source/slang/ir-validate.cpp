@@ -35,10 +35,10 @@ namespace Slang
 
     void validateIRInstChildren(
         IRValidateContext*  context,
-        IRParentInst*       parent)
+        IRInst*             parent)
     {
         IRInst* prevChild = nullptr;
-        for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+        for(auto child : parent->getDecorationsAndChildren() )
         {
             // We need to check the integrity of the parent/next/prev links of
             // all of our instructions
@@ -53,7 +53,7 @@ namespace Slang
             // * The last instruction of a block should always be a terminator
             // * No other instruction should be a terminator
             //
-            if(as<IRBlock>(parent) && (child == parent->getLastChild()))
+            if(as<IRBlock>(parent) && (child == parent->getLastDecorationOrChild()))
             {
                 validate(context, as<IRTerminatorInst>(child) != nullptr, child, "last instruction in block must be terminator");
             }
@@ -174,10 +174,7 @@ namespace Slang
 
         // If `inst` is itself a parent instruction, then we need to recursively
         // validate its children.
-        if (auto parent = as<IRParentInst>(inst))
-        {
-            validateIRInstChildren(context, parent);
-        }
+        validateIRInstChildren(context, inst);
     }
 
     void validateIRModule(IRModule* module, DiagnosticSink* sink)
