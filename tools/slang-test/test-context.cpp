@@ -105,11 +105,11 @@ Result TestContext::init(TestOutputMode outputMode)
         StringBuilder url;
         if (SLANG_FAILED(EnvironmentVariable::getValue("APPVEYOR_API_URL", url)))
         {
-            fprintf(stderr, "%s\n", "Can't get APPVEYOR_API_URL");
+            printf("'%s'\n", "Can't get APPVEYOR_API_URL");
             return SLANG_FAIL;
         }
 
-        fprintf(stderr, "%s\n", url.Buffer());
+        printf("'%s'\n", url.Buffer());
 
         UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("http://");
         if (!url.StartsWith(prefix))
@@ -141,6 +141,8 @@ Result TestContext::init(TestOutputMode outputMode)
         m_appveyorSession = HTTPSession::create(domain.Buffer(), port);
         if (!m_appveyorSession)
         {
+            printf("'%s'\n", "Cant start a session");
+            
             return SLANG_FAIL;
         }
     }
@@ -457,7 +459,10 @@ void TestContext::_addResult(const TestInfo& info)
             List<char> headers;
             List<char> response;
 
-            m_appveyorSession->request("api/tests", &post, &headers, response);
+            if (m_appveyorSession)
+            {
+                m_appveyorSession->request("api/tests", &post, &headers, response);
+            }
             break;
         }
         case TestOutputMode::AppVeyor:
