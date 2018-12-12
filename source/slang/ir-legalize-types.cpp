@@ -335,123 +335,6 @@ static LegalVal legalizeStore(
     }
 }
 
-static LegalVal legalizeFieldAddress(
-    IRTypeLegalizationContext*    context,
-    LegalType                   type,
-    LegalVal                    legalPtrOperand,
-    IRStructKey*                fieldKey)
-{
-    auto builder = context->builder;
-
-    switch (legalPtrOperand.flavor)
-    {
-    case LegalVal::Flavor::none:
-        return LegalVal();
-
-    case LegalVal::Flavor::simple:
-        return LegalVal::simple(
-            builder->emitFieldAddress(
-                type.getSimple(),
-                legalPtrOperand.getSimple(),
-                fieldKey));
-
-    case LegalVal::Flavor::pair:
-        {
-            // There are two sides, the ordinary and the special,
-            // and we basically just dispatch to both of them.
-            auto pairVal = legalPtrOperand.getPair();
-            auto pairInfo = pairVal->pairInfo;
-            auto pairElement = pairInfo->findElement(fieldKey);
-            if (!pairElement)
-            {
-                SLANG_UNEXPECTED("didn't find tuple element");
-                UNREACHABLE_RETURN(LegalVal());
-            }
-
-            // If the field we are extracting has a pair type,
-            // that means it exists on both the ordinary and
-            // special sides.
-            RefPtr<PairInfo> fieldPairInfo;
-            LegalType ordinaryType = type;
-            LegalType specialType = type;
-            if (type.flavor == LegalType::Flavor::pair)
-            {
-                auto fieldPairType = type.getPair();
-                fieldPairInfo = fieldPairType->pairInfo;
-                ordinaryType = fieldPairType->ordinaryType;
-                specialType = fieldPairType->specialType;
-            }
-
-            LegalVal ordinaryVal;
-            LegalVal specialVal;
-
-            if (pairElement->flags & PairInfo::kFlag_hasOrdinary)
-            {
-                ordinaryVal = legalizeFieldAddress(
-                    context,
-                    ordinaryType,
-                    pairVal->ordinaryVal,
-                    fieldKey);
-            }
-
-            if (pairElement->flags & PairInfo::kFlag_hasSpecial)
-            {
-                specialVal = legalizeFieldAddress(
-                    context,
-                    specialType,
-                    pairVal->specialVal,
-                    fieldKey);
-            }
-            return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
-        }
-        break;
-
-    case LegalVal::Flavor::tuple:
-        {
-            // The operand is a tuple of pointer-like
-            // values, we want to extract the element
-            // corresponding to a field. We will handle
-            // this by simply returning the corresponding
-            // element from the operand.
-            auto ptrTupleInfo = legalPtrOperand.getTuple();
-            for (auto ee : ptrTupleInfo->elements)
-            {
-                if (ee.key == fieldKey)
-                {
-                    return ee.val;
-                }
-            }
-
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
-            UNREACHABLE_RETURN(LegalVal());
-        }
-
-    default:
-        SLANG_UNEXPECTED("unhandled");
-        UNREACHABLE_RETURN(LegalVal());
-    }
-}
-
-static LegalVal legalizeFieldAddress(
-    IRTypeLegalizationContext*    context,
-    LegalType                   type,
-    LegalVal                    legalPtrOperand,
-    LegalVal                    legalFieldOperand)
-{
-    // We don't expect any legalization to affect
-    // the "field" argument.
-    auto fieldKey = legalFieldOperand.getSimple();
-
-    return legalizeFieldAddress(
-        context,
-        type,
-        legalPtrOperand,
-        (IRStructKey*) fieldKey);
-}
-
 static LegalVal legalizeFieldExtract(
     IRTypeLegalizationContext*  context,
     LegalType                   type,
@@ -569,6 +452,249 @@ static LegalVal legalizeFieldExtract(
         (IRStructKey*) fieldKey);
 }
 
+static LegalVal legalizeFieldAddress(
+    IRTypeLegalizationContext*    context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    IRStructKey*                fieldKey)
+{
+    auto builder = context->builder;
+
+    switch (legalPtrOperand.flavor)
+    {
+    case LegalVal::Flavor::none:
+        return LegalVal();
+
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(
+            builder->emitFieldAddress(
+                type.getSimple(),
+                legalPtrOperand.getSimple(),
+                fieldKey));
+
+    case LegalVal::Flavor::pair:
+        {
+            // There are two sides, the ordinary and the special,
+            // and we basically just dispatch to both of them.
+            auto pairVal = legalPtrOperand.getPair();
+            auto pairInfo = pairVal->pairInfo;
+            auto pairElement = pairInfo->findElement(fieldKey);
+            if (!pairElement)
+            {
+                SLANG_UNEXPECTED("didn't find tuple element");
+                UNREACHABLE_RETURN(LegalVal());
+            }
+
+            // If the field we are extracting has a pair type,
+            // that means it exists on both the ordinary and
+            // special sides.
+            RefPtr<PairInfo> fieldPairInfo;
+            LegalType ordinaryType = type;
+            LegalType specialType = type;
+            if (type.flavor == LegalType::Flavor::pair)
+            {
+                auto fieldPairType = type.getPair();
+                fieldPairInfo = fieldPairType->pairInfo;
+                ordinaryType = fieldPairType->ordinaryType;
+                specialType = fieldPairType->specialType;
+            }
+
+            LegalVal ordinaryVal;
+            LegalVal specialVal;
+
+            if (pairElement->flags & PairInfo::kFlag_hasOrdinary)
+            {
+                ordinaryVal = legalizeFieldAddress(
+                    context,
+                    ordinaryType,
+                    pairVal->ordinaryVal,
+                    fieldKey);
+            }
+
+            if (pairElement->flags & PairInfo::kFlag_hasSpecial)
+            {
+                specialVal = legalizeFieldAddress(
+                    context,
+                    specialType,
+                    pairVal->specialVal,
+                    fieldKey);
+            }
+            return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
+        }
+        break;
+
+    case LegalVal::Flavor::tuple:
+        {
+            // The operand is a tuple of pointer-like
+            // values, we want to extract the element
+            // corresponding to a field. We will handle
+            // this by simply returning the corresponding
+            // element from the operand.
+            auto ptrTupleInfo = legalPtrOperand.getTuple();
+            for (auto ee : ptrTupleInfo->elements)
+            {
+                if (ee.key == fieldKey)
+                {
+                    return ee.val;
+                }
+            }
+
+            // TODO: we can legally reach this case now
+            // when the field is "ordinary".
+
+            SLANG_UNEXPECTED("didn't find tuple element");
+            UNREACHABLE_RETURN(LegalVal());
+        }
+
+    case LegalVal::Flavor::implicitDeref:
+        {
+            // The original value had a level of indirection
+            // that is now being removed, so should not be
+            // able to get at the *address* of the field any
+            // more, and need to resign ourselves to just
+            // getting at the field *value* and then
+            // adding an implicit dereference on top of that.
+            //
+            auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
+
+            return LegalVal::implicitDeref(legalizeFieldExtract(context,type, implicitDerefVal, fieldKey));
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
+static LegalVal legalizeFieldAddress(
+    IRTypeLegalizationContext*    context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    LegalVal                    legalFieldOperand)
+{
+    // We don't expect any legalization to affect
+    // the "field" argument.
+    auto fieldKey = legalFieldOperand.getSimple();
+
+    return legalizeFieldAddress(
+        context,
+        type,
+        legalPtrOperand,
+        (IRStructKey*) fieldKey);
+}
+
+static LegalVal legalizeGetElement(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    IRInst*                    indexOperand)
+{
+    auto builder = context->builder;
+
+    switch (legalPtrOperand.flavor)
+    {
+    case LegalVal::Flavor::none:
+        return LegalVal();
+
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(
+            builder->emitElementExtract(
+                type.getSimple(),
+                legalPtrOperand.getSimple(),
+                indexOperand));
+
+    case LegalVal::Flavor::pair:
+        {
+            // There are two sides, the ordinary and the special,
+            // and we basically just dispatch to both of them.
+            auto pairVal = legalPtrOperand.getPair();
+            auto pairInfo = pairVal->pairInfo;
+
+            LegalType ordinaryType = type;
+            LegalType specialType = type;
+            if (type.flavor == LegalType::Flavor::pair)
+            {
+                auto pairType = type.getPair();
+                ordinaryType = pairType->ordinaryType;
+                specialType = pairType->specialType;
+            }
+
+            LegalVal ordinaryVal = legalizeGetElement(
+                context,
+                ordinaryType,
+                pairVal->ordinaryVal,
+                indexOperand);
+
+            LegalVal specialVal = legalizeGetElement(
+                context,
+                specialType,
+                pairVal->specialVal,
+                indexOperand);
+
+            return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+        }
+        break;
+
+    case LegalVal::Flavor::tuple:
+        {
+            // The operand is a tuple of pointer-like
+            // values, we want to extract the element
+            // corresponding to a field. We will handle
+            // this by simply returning the corresponding
+            // element from the operand.
+            auto ptrTupleInfo = legalPtrOperand.getTuple();
+
+            RefPtr<TuplePseudoVal> resTupleInfo = new TuplePseudoVal();
+
+            auto tupleType = type.getTuple();
+            SLANG_ASSERT(tupleType);
+
+            auto elemCount = ptrTupleInfo->elements.Count();
+            SLANG_ASSERT(elemCount == tupleType->elements.Count());
+
+            for(UInt ee = 0; ee < elemCount; ++ee)
+            {
+                auto ptrElem = ptrTupleInfo->elements[ee];
+                auto elemType = tupleType->elements[ee].type;
+
+                TuplePseudoVal::Element resElem;
+                resElem.key = ptrElem.key;
+                resElem.val = legalizeGetElement(
+                    context,
+                    elemType,
+                    ptrElem.val,
+                    indexOperand);
+
+                resTupleInfo->elements.Add(resElem);
+            }
+
+            return LegalVal::tuple(resTupleInfo);
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
+
+static LegalVal legalizeGetElement(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type,
+    LegalVal                    legalPtrOperand,
+    LegalVal                    legalIndexOperand)
+{
+    // We don't expect any legalization to affect
+    // the "index" argument.
+    auto indexOperand = legalIndexOperand.getSimple();
+
+    return legalizeGetElement(
+        context,
+        type,
+        legalPtrOperand,
+        indexOperand);
+}
+
+
 static LegalVal legalizeGetElementPtr(
     IRTypeLegalizationContext*  context,
     LegalType                   type,
@@ -655,6 +781,23 @@ static LegalVal legalizeGetElementPtr(
             }
 
             return LegalVal::tuple(resTupleInfo);
+        }
+
+    case LegalVal::Flavor::implicitDeref:
+        {
+            // The original value used to be a pointer to an array,
+            // and somebody is trying to get at an element pointer.
+            // Now we just have an array (wrapped with an implicit
+            // dereference) and need to just fetch the chosen element
+            // instead (and then wrapp the element value with an
+            // implicit dereference).
+            //
+            auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
+            return LegalVal::implicitDeref(legalizeGetElement(
+                context,
+                type,
+                implicitDerefVal,
+                indexOperand));
         }
 
     default:
@@ -816,6 +959,9 @@ static LegalVal legalizeInst(
     case kIROp_FieldExtract:
         return legalizeFieldExtract(context, type, args[0], args[1]);
 
+    case kIROp_getElement:
+        return legalizeGetElement(context, type, args[0], args[1]);
+
     case kIROp_getElementPtr:
         return legalizeGetElementPtr(context, type, args[0], args[1]);
 
@@ -965,6 +1111,9 @@ static LegalVal legalizeGlobalConstant(
     IRTypeLegalizationContext*  context,
     IRGlobalConstant*           irGlobalConstant);
 
+static LegalVal legalizeGlobalParam(
+    IRTypeLegalizationContext*  context,
+    IRGlobalParam*              irGlobalParam);
 
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*  context,
@@ -991,6 +1140,9 @@ static LegalVal legalizeInst(
 
     case kIROp_GlobalConstant:
         return legalizeGlobalConstant(context, cast<IRGlobalConstant>(inst));
+
+    case kIROp_GlobalParam:
+        return legalizeGlobalParam(context, cast<IRGlobalParam>(inst));
 
     default:
         break;
@@ -1184,6 +1336,28 @@ static LegalVal declareSimpleVar(
         }
         break;
 
+    case kIROp_GlobalConstant:
+        {
+            auto globalConst = builder->createGlobalConstant(type);
+            globalConst->removeFromParent();
+            globalConst->insertBefore(context->insertBeforeGlobal);
+
+            irVar = globalConst;
+            legalVarVal = LegalVal::simple(globalConst);
+        }
+        break;
+
+    case kIROp_GlobalParam:
+        {
+            auto globalParam = builder->createGlobalParam(type);
+            globalParam->removeFromParent();
+            globalParam->insertBefore(context->insertBeforeGlobal);
+
+            irVar = globalParam;
+            legalVarVal = LegalVal::simple(globalParam);
+        }
+        break;
+
     case kIROp_Var:
         {
             auto localVar = builder->emitVar(type);
@@ -1355,9 +1529,6 @@ static LegalVal legalizeGlobalVar(
         context,
         irGlobalVar->getDataType()->getValueType());
 
-    RefPtr<VarLayout> varLayout = findVarLayout(irGlobalVar);
-    RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
-
     switch (legalValueType.flavor)
     {
     case LegalType::Flavor::simple:
@@ -1373,21 +1544,12 @@ static LegalVal legalizeGlobalVar(
         {
             context->insertBeforeGlobal = irGlobalVar->getNextInst();
 
-            LegalVarChain* varChain = nullptr;
-            LegalVarChain varChainStorage;
-            if (varLayout)
-            {
-                varChainStorage.next = nullptr;
-                varChainStorage.varLayout = varLayout;
-                varChain = &varChainStorage;
-            }
-
             IRGlobalNameInfo globalNameInfo;
             globalNameInfo.globalVar = irGlobalVar;
             globalNameInfo.counter = 0;
 
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
-            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, typeLayout, varChain, nameHint, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, nullptr, nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
@@ -1444,6 +1606,62 @@ static LegalVal legalizeGlobalConstant(
         break;
     }
 }
+
+static LegalVal legalizeGlobalParam(
+    IRTypeLegalizationContext*  context,
+    IRGlobalParam*              irGlobalParam)
+{
+    // Legalize the type for the variable's value
+    auto legalValueType = legalizeType(
+        context,
+        irGlobalParam->getFullType());
+
+    RefPtr<VarLayout> varLayout = findVarLayout(irGlobalParam);
+    RefPtr<TypeLayout> typeLayout = varLayout ? varLayout->typeLayout : nullptr;
+
+    switch (legalValueType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        // Easy case: the type is usable as-is, and we
+        // should just do that.
+        irGlobalParam->setFullType(legalValueType.getSimple());
+        return LegalVal::simple(irGlobalParam);
+
+    default:
+        {
+            context->insertBeforeGlobal = irGlobalParam->getNextInst();
+
+            LegalVarChain* varChain = nullptr;
+            LegalVarChain varChainStorage;
+            if (varLayout)
+            {
+                varChainStorage.next = nullptr;
+                varChainStorage.varLayout = varLayout;
+                varChain = &varChainStorage;
+            }
+
+            IRGlobalNameInfo globalNameInfo;
+            globalNameInfo.globalVar = irGlobalParam;
+            globalNameInfo.counter = 0;
+
+            // TODO: need to handle initializer here!
+
+            UnownedStringSlice nameHint = findNameHint(irGlobalParam);
+            LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, &globalNameInfo);
+
+            // Register the new value as the replacement for the old
+            registerLegalizedValue(context, irGlobalParam, newVal);
+
+            // Remove the old global from the module.
+            irGlobalParam->removeFromParent();
+            context->replacedInstructions.Add(irGlobalParam);
+
+            return newVal;
+        }
+        break;
+    }
+}
+
 
 static void legalizeTypes(
     IRTypeLegalizationContext*    context)

@@ -558,6 +558,12 @@ struct IRGlobalConstant : IRGlobalValueWithCode
     IR_LEAF_ISA(GlobalConstant)
 };
 
+struct IRGlobalParam : IRInst
+{
+    IR_LEAF_ISA(GlobalParam)
+};
+
+
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRInst
 {
@@ -797,6 +803,8 @@ struct IRBuilder
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
     IRGlobalConstant* createGlobalConstant(
+        IRType* valueType);
+    IRGlobalParam* createGlobalParam(
         IRType* valueType);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(

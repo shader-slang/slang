@@ -4,7 +4,7 @@
 // HLSL compiler would already do in the simple case (when
 // all shader parameters are actually used).
 
-float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
+float4 use(Texture2D t, SamplerState samp) { return t.Sample(samp, 0.0); }
 
 #ifdef __SLANG__
 
