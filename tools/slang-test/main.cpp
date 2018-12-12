@@ -1974,20 +1974,6 @@ int main(
 {
     AppContext::initDefault();
 
-    {
-        RefPtr<HTTPSession> session = HTTPSession::create("toytheory.com", 80);
-
-        if (session)
-        {
-            List<char> headers;
-            List<char> contents;
-
-            session->request("/", nullptr, &headers, contents);
-
-            AppContext::getStdOut().getWriter()->write(contents.Buffer(), contents.Count());
-        }
-    }
-
     // Set up our test categories here
 
     auto fullTestCategory = addTestCategory("full", nullptr);
