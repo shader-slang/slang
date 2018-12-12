@@ -97,6 +97,49 @@ Result TestContext::init(TestOutputMode outputMode)
         return SLANG_FAIL;
     }
 
+    if (outputMode == TestOutputMode::AppVeyorRest)
+    {
+        // https://www.appveyor.com/docs/build-worker-api/
+
+        // First the get connection
+        StringBuilder url;
+        if (SLANG_SUCCEEDED(EnvironmentVariable::getValue("APPVEYOR_API_URL", url)))
+        {
+            UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("http://");
+            if (!url.StartsWith(prefix))
+            {
+                return SLANG_FAIL;
+            }
+            Int endIndex = url.IndexOf(':', prefix.size());
+            if (endIndex == UInt(-1))
+            {
+                return SLANG_FAIL;
+            }
+
+            UnownedStringSlice urlSlice = url.getUnownedSlice();
+            const char* urlChars = url.begin();
+            const char* urlEnd = url.end();
+
+            String domain = UnownedStringSlice(urlChars + prefix.size(), urlChars + endIndex);
+            
+            // Extract the port
+            const char* portChars = urlChars + endIndex + 1;
+            // Extract the port
+            int port = 0;
+            for (const char* portCur = portChars; *portCur >= '0' && *portCur < '9' && portCur < urlEnd; portCur++)
+            {
+                port = port * 10 + (*portCur - '0');
+            }
+
+            // Create the session
+            m_appveyorSession = HTTPSession::create(domain.Buffer(), port);
+            if (!m_appveyorSession)
+            {
+                return SLANG_FAIL;
+            }
+        }
+    }
+
     return SLANG_OK;
 }
 
@@ -269,6 +312,21 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
     }
 }
 
+static const char* _getTestResultAsAppveyorOutcome(TestResult testResult)
+{
+    switch (testResult)
+    {
+    case TestResult::Fail:      return "Failed";
+    case TestResult::Pass:      return "Passed";
+    case TestResult::Ignored:   return "Ignored";
+    default:
+        break;
+    }
+
+    assert(!"unexpected");
+    return "None";
+}
+
 void TestContext::_addResult(const TestInfo& info)
 {
     m_totalTestCount++;
@@ -375,18 +433,31 @@ void TestContext::_addResult(const TestInfo& info)
             // Don't output anything -> we'll output all in one go at the end
             break;
         }
+        case TestOutputMode::AppVeyorRest:
+        {
+            //https://www.appveyor.com/docs/build-worker-api/#add-tests
+            StringBuilder json;
+
+            const char* outcome = _getTestResultAsAppveyorOutcome(info.testResult);
+
+            json << "{";
+            json << "\"testName\": \"" << info.name << "\",";
+            json << "\"testFramework\": \"" << "slang-test" << "\",";
+            json << "\"fileName\": \"" << info.name << "\",";
+            json << "\"outcome\": \"" << outcome << "\"";
+            json << "}";
+
+            UnownedStringSlice post = json.getUnownedSlice();
+
+            List<char> headers;
+            List<char> response;
+
+            m_appveyorSession->request("api/tests", &post, &headers, response);
+            break;
+        }
         case TestOutputMode::AppVeyor:
         {
-            char const* resultString = "None";
-            switch (info.testResult)
-            {
-                case TestResult::Fail:      resultString = "Failed";  break;
-                case TestResult::Pass:      resultString = "Passed";  break;
-                case TestResult::Ignored:   resultString = "Ignored"; break;
-                default:
-                    assert(!"unexpected");
-                    break;
-            }
+            const char* resultString = _getTestResultAsAppveyorOutcome(info.testResult);
 
             OSProcessSpawner spawner;
             spawner.pushExecutableName("appveyor");

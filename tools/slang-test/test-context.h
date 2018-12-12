@@ -5,6 +5,7 @@
 #include "../../source/core/slang-app-context.h"
 #include "../../source/core/dictionary.h"
 
+#include "../../source/core/slang-http-session.h"
 
 #define SLANG_CHECK(x) TestContext::get()->addResultWithLocation((x), #x, __FILE__, __LINE__); 
 
@@ -37,6 +38,7 @@ enum class TestOutputMode
     XUnit,         ///< xUnit original format  https://nose.readthedocs.io/en/latest/plugins/xunit.html
     XUnit2,        ///< https://xunit.github.io/docs/format-xml-v2
     TeamCity,      ///< Output suitable for teamcity
+    AppVeyorRest,   ///< AppVeyor using the REST API
 };
 
 enum class TestResult
@@ -185,6 +187,8 @@ protected:
     SlangSession* m_session;
 
     Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;
+
+    Slang::RefPtr<Slang::HTTPSession> m_appveyorSession;
 
     static TestContext* s_context;
 };

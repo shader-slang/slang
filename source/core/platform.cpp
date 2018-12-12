@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 // platform.cpp
 #include "platform.h"
 
@@ -12,11 +14,15 @@
 #else
 	#include "slang-string.h"
 	#include <dlfcn.h>
+
+    #include <stdlib.h>   
 #endif
 
 namespace Slang
 {
 	// SharedLibrary
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedLibrary !!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SlangResult SharedLibrary::load(const char* filename, SharedLibrary::Handle& handleOut)
 {
@@ -25,7 +31,23 @@ namespace Slang
     return loadWithPlatformFilename(builder.begin(), handleOut);
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnvironmentVariable !!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */SlangResult EnvironmentVariable::getValue(const char* name, StringBuilder& outValue)
+{
+    outValue.Clear();
+    const char* value = ::getenv(name);
+    if (value)
+    {
+        outValue.Append(value);
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
 #ifdef _WIN32
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedLibrary !!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, SharedLibrary::Handle& handleOut)
 {

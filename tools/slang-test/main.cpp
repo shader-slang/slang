@@ -219,7 +219,7 @@ Result parseOptions(int argc, char** argv, Slang::WriterHelper stdError)
         }
         else if( strcmp(arg, "-appveyor") == 0 )
         {
-            g_options.outputMode = TestOutputMode::AppVeyor;
+            g_options.outputMode = TestOutputMode::AppVeyorRest;
             g_options.dumpOutputOnFailure = true;
         }
         else if( strcmp(arg, "-travis") == 0 )

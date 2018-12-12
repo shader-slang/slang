@@ -7,6 +7,11 @@
 
 namespace Slang
 {
+    struct EnvironmentVariable
+    {
+        static SlangResult getValue(const char* name, StringBuilder& value);
+    };
+
 	// Interface for working with shared libraries
 	// in a platform-independent fashion.
 	struct SharedLibrary
