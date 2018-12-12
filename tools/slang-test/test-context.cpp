@@ -103,40 +103,45 @@ Result TestContext::init(TestOutputMode outputMode)
 
         // First the get connection
         StringBuilder url;
-        if (SLANG_SUCCEEDED(EnvironmentVariable::getValue("APPVEYOR_API_URL", url)))
+        if (SLANG_FAILED(EnvironmentVariable::getValue("APPVEYOR_API_URL", url)))
         {
-            UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("http://");
-            if (!url.StartsWith(prefix))
-            {
-                return SLANG_FAIL;
-            }
-            Int endIndex = url.IndexOf(':', prefix.size());
-            if (endIndex == UInt(-1))
-            {
-                return SLANG_FAIL;
-            }
+            fprintf(stderr, "%s\n", "Can't get APPVEYOR_API_URL");
+            return SLANG_FAIL;
+        }
 
-            UnownedStringSlice urlSlice = url.getUnownedSlice();
-            const char* urlChars = url.begin();
-            const char* urlEnd = url.end();
+        fprintf(stderr, "%s\n", url.Buffer());
 
-            String domain = UnownedStringSlice(urlChars + prefix.size(), urlChars + endIndex);
+        UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("http://");
+        if (!url.StartsWith(prefix))
+        {
+            return SLANG_FAIL;
+        }
+        Int endIndex = url.IndexOf(':', prefix.size());
+        if (endIndex == UInt(-1))
+        {
+            return SLANG_FAIL;
+        }
+
+        UnownedStringSlice urlSlice = url.getUnownedSlice();
+        const char* urlChars = url.begin();
+        const char* urlEnd = url.end();
+
+        String domain = UnownedStringSlice(urlChars + prefix.size(), urlChars + endIndex);
             
-            // Extract the port
-            const char* portChars = urlChars + endIndex + 1;
-            // Extract the port
-            int port = 0;
-            for (const char* portCur = portChars; *portCur >= '0' && *portCur < '9' && portCur < urlEnd; portCur++)
-            {
-                port = port * 10 + (*portCur - '0');
-            }
+        // Extract the port
+        const char* portChars = urlChars + endIndex + 1;
+        // Extract the port
+        int port = 0;
+        for (const char* portCur = portChars; *portCur >= '0' && *portCur < '9' && portCur < urlEnd; portCur++)
+        {
+            port = port * 10 + (*portCur - '0');
+        }
 
-            // Create the session
-            m_appveyorSession = HTTPSession::create(domain.Buffer(), port);
-            if (!m_appveyorSession)
-            {
-                return SLANG_FAIL;
-            }
+        // Create the session
+        m_appveyorSession = HTTPSession::create(domain.Buffer(), port);
+        if (!m_appveyorSession)
+        {
+            return SLANG_FAIL;
         }
     }
 
