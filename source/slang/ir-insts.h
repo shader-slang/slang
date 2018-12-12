@@ -297,7 +297,7 @@ struct IRLookupWitnessTable : IRInst
 
 struct IRCall : IRInst
 {
-    IRUse func;
+    IR_LEAF_ISA(Call)
 
     IRInst* getCallee() { return getOperand(0); }
 
@@ -996,6 +996,11 @@ struct IRBuilder
 
     IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount);
 
+    IRDecoration* addDecoration(IRInst* value, IROp op)
+    {
+        return addDecoration(value, op, (IRInst* const*) nullptr, 0);
+    }
+
     IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand)
     {
         return addDecoration(value, op, &operand, 1);
@@ -1086,6 +1091,22 @@ struct IRBuilder
     void addExportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
+    }
+
+    void addEntryPointDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_EntryPointDecoration);
+    }
+
+        /// Add a decoration that indicates that the given `inst` depends on the given `depdendency`.
+        ///
+        /// This decoration can be used to ensure that a value that an instruction
+        /// implicitly depends on cannot be eliminated so long as the instruction
+        /// itself is kept alive.
+        ///
+    void addDependsOnDecoration(IRInst* inst, IRInst* dependency)
+    {
+        addDecoration(inst, kIROp_DependsOnDecoration, dependency);
     }
 };
 

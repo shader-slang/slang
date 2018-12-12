@@ -2,9 +2,11 @@
 #include "emit.h"
 
 #include "../core/slang-writer.h"
+#include "ir-dce.h"
 #include "ir-insts.h"
 #include "ir-restructure.h"
 #include "ir-restructure-scoping.h"
+#include "ir-specialize-resources.h"
 #include "ir-ssa.h"
 #include "ir-validate.h"
 #include "legalize-types.h"
@@ -5603,21 +5605,56 @@ struct EmitVisitor
         emit("}\n");
     }
 
+        /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(
         EmitContext*    ctx,
-        IRType*         type)
+        IRType*         inType)
     {
         SLANG_UNUSED(ctx);
 
-        if(auto arrayType = as<IRArrayType>(type))
+        // A declaration may require zero, one, or
+        // more array brackets. When writing out array
+        // brackets from left to right, they represent
+        // the structure of the type from the "outside"
+        // in (that is, if we have a 5-element array of
+        // 3-element arrays we should output `[5][3]`),
+        // because of C-style declarator rules.
+        //
+        // This conveniently means that we can print
+        // out all the array brackets with a looping
+        // rather than a recursive structure.
+        //
+        // We will peel the input type like an onion,
+        // looking at one layer at a time until we
+        // reach a non-array type in the middle.
+        //
+        IRType* type = inType;
+        for(;;)
         {
-            emit("[");
-            EmitVal(arrayType->getElementCount(), kEOp_General);
-            emit("]");
-        }
-        else if(auto unsizedArrayType = as<IRUnsizedArrayType>(type))
-        {
-            emit("[]");
+            if(auto arrayType = as<IRArrayType>(type))
+            {
+                emit("[");
+                EmitVal(arrayType->getElementCount(), kEOp_General);
+                emit("]");
+
+                // Continue looping on the next layer in.
+                //
+                type = arrayType->getElementType();
+            }
+            else if(auto unsizedArrayType = as<IRUnsizedArrayType>(type))
+            {
+                emit("[]");
+
+                // Continue looping on the next layer in.
+                //
+                type = unsizedArrayType->getElementType();
+            }
+            else
+            {
+                // This layer wasn't an array, so we are done.
+                //
+                return;
+            }
         }
     }
 
@@ -5750,16 +5787,6 @@ struct EmitVisitor
         emitIRLayoutSemantics(ctx, varDecl);
 
         emit(";\n");
-    }
-
-    IRType* unwrapArray(IRType* type)
-    {
-        IRType* t = type;
-        while( auto arrayType = as<IRArrayTypeBase>(t) )
-        {
-            t = arrayType->getElementType();
-        }
-        return t;
     }
 
     void emitIRStructuredBuffer_GLSL(
@@ -6543,6 +6570,46 @@ String emitEntryPoint(
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "AFTER SSA");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // After type legalization and subsequent SSA clean we expect
+        // that any resource types passed to functions are exposed
+        // as their own top-level parameters (which might have
+        // resource or array-of-...-resource types).
+        //
+        // Many of our targets place restrictions on how certain
+        // resource types can be used, so that having them as
+        // function parameters is invalid. To clean this up,
+        // we will try to specialized called functions based
+        // on the actual resources that are being passed to them
+        // at specific call sites.
+        //
+        // Because the legalization may depend on what target
+        // we are compiling for (certain things might be okay
+        // for D3D targets that are not okay for Vulkan), we
+        // pass down the target request along with the IR.
+        //
+        specializeResourceParameters(compileRequest, targetRequest, irModule);
+
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // The resources-based specialization pass above
+        // may create specialized versions of functions, but
+        // it does not try to completely eliminate the original
+        // functions, so there might still be invalid code in
+        // our IR module.
+        //
+        // To clean up the code, we will apply a fairly general
+        // dead-code-elimination (DCE) pass that only retains
+        // whatever code is "live."
+        //
+        eliminateDeadCode(compileRequest, irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 

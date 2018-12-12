@@ -555,6 +555,23 @@ namespace Slang
         return entryBlock->getFirstParam();
     }
 
+    IRParam* IRGlobalValueWithParams::getLastParam()
+    {
+        auto entryBlock = getFirstBlock();
+        if(!entryBlock) return nullptr;
+
+        return entryBlock->getLastParam();
+    }
+
+    IRInstList<IRParam> IRGlobalValueWithParams::getParams()
+    {
+        auto entryBlock = getFirstBlock();
+        if(!entryBlock) return IRInstList<IRParam>();
+
+        return entryBlock->getParams();
+    }
+
+
     // IRFunc
 
     IRType* IRFunc::getResultType() { return getDataType()->getResultType(); }
@@ -2774,15 +2791,10 @@ namespace Slang
         }
     }
 
-
-    static String getName(
+    static String createName(
         IRDumpContext*  context,
         IRInst*         value)
     {
-        String name = 0;
-        if (context->mapValueToName.TryGetValue(value, name))
-            return name;
-
         if(auto nameHintDecoration = value->findDecoration<IRNameHintDecoration>())
         {
             String nameHint = nameHintDecoration->getName();
@@ -2809,6 +2821,19 @@ namespace Slang
             sb.append(id);
             return sb.ProduceString();
         }
+    }
+
+    static String getName(
+        IRDumpContext*  context,
+        IRInst*         value)
+    {
+        String name;
+        if (context->mapValueToName.TryGetValue(value, name))
+            return name;
+
+        name = createName(context, value);
+        context->mapValueToName.Add(value, name);
+        return name;
     }
 
     static void dumpID(
@@ -3747,6 +3772,7 @@ namespace Slang
         case kIROp_GlobalGenericParam:
         case kIROp_WitnessTable:
         case kIROp_WitnessTableEntry:
+        case kIROp_Block:
             return false;
 
         case kIROp_Nop:
@@ -3808,6 +3834,19 @@ namespace Slang
         return nullptr;
     }
 
+    //
+    // IRType
+    //
+
+    IRType* unwrapArray(IRType* type)
+    {
+        IRType* t = type;
+        while( auto arrayType = as<IRArrayTypeBase>(t) )
+        {
+            t = arrayType->getElementType();
+        }
+        return t;
+    }
 
     //
     // Legalization of entry points for GLSL:
@@ -4880,6 +4919,7 @@ namespace Slang
 
     void legalizeRayTracingEntryPointParameterForGLSL(
         GLSLLegalizationContext*    context,
+        IRFunc*                     func,
         IRParam*                    pp,
         VarLayout*                  paramLayout)
     {
@@ -4902,6 +4942,31 @@ namespace Slang
         builder->addLayoutDecoration(globalParam, paramLayout);
         moveValueBefore(globalParam, builder->getFunc());
         pp->replaceUsesWith(globalParam);
+
+        // Because linkage between ray-tracing shaders is
+        // based on the type of incoming/outgoing payload
+        // and attribute parameters, it would be an error to
+        // eliminate the global parameter *even if* it is
+        // not actually used inside the entry point.
+        //
+        // We attach a decoration to the entry point that
+        // makes note of the dependency, so that steps
+        // like dead code elimination cannot get rid of
+        // the parameter.
+        //
+        // TODO: We could consider using a structure like
+        // this for *all* of the entry point parameters
+        // that get moved to the global scope, since SPIR-V
+        // ends up requiring such information on an `OpEntryPoint.
+        //
+        // As a further alternative, we could decide to
+        // keep entry point varying input/outtput attached
+        // to the parameter list through all of the Slang IR
+        // steps, and only declare it as global variables at
+        // the last minute when emitting a GLSL `main` or
+        // SPIR-V for an entry point.
+        //
+        builder->addDependsOnDecoration(func, globalParam);
     }
 
     void legalizeEntryPointParameterForGLSL(
@@ -5059,7 +5124,7 @@ namespace Slang
         case Stage::Intersection:
         case Stage::Miss:
         case Stage::RayGeneration:
-            legalizeRayTracingEntryPointParameterForGLSL(context, pp, paramLayout);
+            legalizeRayTracingEntryPointParameterForGLSL(context, func, pp, paramLayout);
             return;
         }
 

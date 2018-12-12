@@ -182,6 +182,7 @@
     <ClInclude Include="glsl.meta.slang.h" />
     <ClInclude Include="hlsl.meta.slang.h" />
     <ClInclude Include="ir-constexpr.h" />
+    <ClInclude Include="ir-dce.h" />
     <ClInclude Include="ir-dominators.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
@@ -190,6 +191,7 @@
     <ClInclude Include="ir-restructure.h" />
     <ClInclude Include="ir-sccp.h" />
     <ClInclude Include="ir-serialize.h" />
+    <ClInclude Include="ir-specialize-resources.h" />
     <ClInclude Include="ir-ssa.h" />
     <ClInclude Include="ir-validate.h" />
     <ClInclude Include="ir.h" />
@@ -230,6 +232,7 @@
     <ClCompile Include="dxc-support.cpp" />
     <ClCompile Include="emit.cpp" />
     <ClCompile Include="ir-constexpr.cpp" />
+    <ClCompile Include="ir-dce.cpp" />
     <ClCompile Include="ir-dominators.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ir-missing-return.cpp" />
@@ -237,6 +240,7 @@
     <ClCompile Include="ir-restructure.cpp" />
     <ClCompile Include="ir-sccp.cpp" />
     <ClCompile Include="ir-serialize.cpp" />
+    <ClCompile Include="ir-specialize-resources.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
     <ClCompile Include="ir-validate.cpp" />
     <ClCompile Include="ir.cpp" />
@@ -300,4 +304,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project>
+</Project> 
