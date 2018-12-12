@@ -1419,7 +1419,7 @@ struct EmitVisitor
     bool isTargetIntrinsicModifierApplicable(
         IRTargetIntrinsicDecoration*    decoration)
     {
-        auto targetName = String(decoration->targetName);
+        auto targetName = String(decoration->getTargetName());
 
         // If no target name was specified, then the modifier implicitly
         // applies to all targets.
@@ -2170,7 +2170,7 @@ struct EmitVisitor
         // then use that name instead.
         if(auto intrinsicDecoration = findTargetIntrinsicDecoration(context, inst))
         {
-            return String(intrinsicDecoration->definition);
+            return String(intrinsicDecoration->getDefinition());
         }
 
         // If we have a name hint on the instruction, then we will try to use that
@@ -2200,7 +2200,7 @@ struct EmitVisitor
             // name hint already ends with one.
             //
 
-            String nameHint = nameHintDecoration->name->text;
+            String nameHint = nameHintDecoration->getName();
             nameHint = scrubName(nameHint);
 
             StringBuilder sb;
@@ -2928,9 +2928,9 @@ struct EmitVisitor
         EmitContext*    /* ctx */,
         IRInst*         inst)
     {
-        for (auto dd = inst->firstDecoration; dd; dd = dd->next)
+        for(auto dd : inst->getDecorations())
         {
-            if (dd->op != kIRDecorationOp_TargetIntrinsic)
+            if (dd->op != kIROp_TargetIntrinsicDecoration)
                 continue;
 
             auto targetIntrinsic = (IRTargetIntrinsicDecoration*)dd;
@@ -2978,7 +2978,7 @@ struct EmitVisitor
         args++;
         argCount--;
 
-        auto name = String(targetIntrinsic->definition);
+        auto name = String(targetIntrinsic->getDefinition());
 
 
         if(isOrdinaryName(name))
@@ -3512,19 +3512,19 @@ struct EmitVisitor
                 decoratedValue = getSpecializedValue(specInst);
             }
 
-            for( auto decoration = decoratedValue->firstDecoration; decoration; decoration = decoration->next )
+            for( auto decoration : decoratedValue->getDecorations() )
             {
                 switch(decoration->op)
                 {
                 default:
                     break;
 
-                case kIRDecorationOp_RequireGLSLExtension:
-                    requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->extensionName));
+                case kIROp_RequireGLSLExtensionDecoration:
+                    requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
                     break;
 
-                case kIRDecorationOp_RequireGLSLVersion:
-                    requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->languageVersion));
+                case kIROp_RequireGLSLVersionDecoration:
+                    requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
                     break;
                 }
             }
@@ -3800,7 +3800,7 @@ struct EmitVisitor
                 auto prec = kEOp_Postfix;
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                emit(decoration->outerArrayName);
+                emit(decoration->getOuterArrayName());
                 emit("[");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
                 emit("].");
@@ -3968,12 +3968,6 @@ struct EmitVisitor
             }
             break;
 
-        case kIROp_NotePatchConstantFunc:
-        {
-            // No-op
-            break;
-        }
-
         case kIROp_Var:
             {
                 auto ptrType = cast<IRPtrType>(inst->getDataType());
@@ -4108,13 +4102,13 @@ struct EmitVisitor
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             Emit(" : ");
-            emit(semanticDecoration->semanticName);
+            emit(semanticDecoration->getSemanticName());
             return;
         }
 
         if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
-            auto layout = layoutDecoration->layout;
+            auto layout = layoutDecoration->getLayout();
             if(auto varLayout = layout->dynamicCast<VarLayout>())
             {
                 emitIRSemantics(ctx, varLayout);
@@ -4137,7 +4131,7 @@ struct EmitVisitor
         if (!decoration)
             return nullptr;
 
-        return (VarLayout*) decoration->layout;
+        return (VarLayout*) decoration->getLayout();
     }
 
     void emitIRLayoutSemantics(
@@ -4354,7 +4348,7 @@ struct EmitVisitor
                     //
                     if (auto loopControlDecoration = loopInst->findDecoration<IRLoopControlDecoration>())
                     {
-                        switch (loopControlDecoration->mode)
+                        switch (loopControlDecoration->getMode())
                         {
                         case kIRLoopControl_Unroll:
                             // Note: loop unrolling control is only available in HLSL, not GLSL
@@ -4468,23 +4462,6 @@ struct EmitVisitor
         }
     }
 
-
-
-    IRInst* findFirstInst(IRFunc* irFunc, IROp op)
-    {
-        for (auto block : irFunc->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                if (inst->op == op)
-                {
-                    return inst;
-                }
-            }
-        }
-        return nullptr;
-    }
-
     void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
     {
         assert(attrib);
@@ -4543,11 +4520,11 @@ struct EmitVisitor
     {
         SLANG_UNUSED(attrib);
 
-        auto irPatchFunc = static_cast<IRNotePatchConstantFunc*>(findFirstInst(irFunc, kIROp_NotePatchConstantFunc));
+        auto irPatchFunc = irFunc->findDecoration<IRPatchConstantFuncDecoration>();
         assert(irPatchFunc);
         if (!irPatchFunc)
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find NotePatchConstantFunc instruction");
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find [patchConstantFunc(...)] decoration");
             return;
         }
 
@@ -4897,7 +4874,7 @@ struct EmitVisitor
             {
                 if (auto layoutDecor = pp->findDecoration<IRLayoutDecoration>())
                 {
-                    Layout* layout = layoutDecor->layout;
+                    Layout* layout = layoutDecor->getLayout();
                     VarLayout* varLayout = dynamic_cast<VarLayout*>(layout);
 
                     if (varLayout)
@@ -5053,7 +5030,7 @@ struct EmitVisitor
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return layoutDecoration->layout->dynamicCast<EntryPointLayout>();
+            return layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>();
         }
         return nullptr;
     }
@@ -5062,7 +5039,7 @@ struct EmitVisitor
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = layoutDecoration->layout->dynamicCast<EntryPointLayout>())
+            if (auto entryPointLayout = layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>())
             {
                 return entryPointLayout;
             }
@@ -5268,13 +5245,13 @@ struct EmitVisitor
         bool isGLSL = (ctx->shared->target == CodeGenTarget::GLSL);
         bool anyModifiers = false;
 
-        for(auto dd = varInst->firstDecoration; dd; dd = dd->next)
+        for(auto dd : varInst->getDecorations())
         {
-            if(dd->op != kIRDecorationOp_InterpolationMode)
+            if(dd->op != kIROp_InterpolationModeDecoration)
                 continue;
 
             auto decoration = (IRInterpolationModeDecoration*)dd;
-            auto mode = decoration->mode;
+            auto mode = decoration->getMode();
 
             switch(mode)
             {
@@ -6055,7 +6032,7 @@ struct EmitVisitor
 
         // We expect the terminator to be a `return`
         // instruction with a value.
-        auto returnInst = (IRReturnVal*) block->getLastInst();
+        auto returnInst = (IRReturnVal*) block->getLastDecorationOrChild();
         SLANG_RELEASE_ASSERT(returnInst->op == kIROp_ReturnVal);
 
         // We will emit the value in the `GlobalConstant` mode, which
@@ -6188,12 +6165,9 @@ struct EmitVisitor
             ensureInstOperand(ctx, inst->getOperand(ii));
         }
 
-        if(auto parentInst = as<IRParentInst>(inst))
+        for(auto child : inst->getDecorationsAndChildren())
         {
-            for(auto child : parentInst->getChildren())
-            {
-                ensureInstOperandsRec(ctx, child);
-            }
+            ensureInstOperandsRec(ctx, child);
         }
     }
 
