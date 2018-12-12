@@ -257,15 +257,7 @@ struct IRInst
     // Look up a decoration in the list of decorations
     IRDecoration* findDecorationImpl(IROp op);
     template<typename T>
-    T* findDecoration()
-    {
-        for( auto decoration : getDecorations() )
-        {
-            if(auto match = as<T>(decoration))
-                return match;
-        }
-        return nullptr;
-    }
+    T* findDecoration();
 
     // The first use of this value (start of a linked list)
     IRUse*      firstUse = nullptr;
@@ -429,8 +421,18 @@ T* cast(IRInst* inst, T* /* */ = nullptr)
     return (T*)inst;
 }
 
-// Now that `IRInst` is defined we can back-fill the `IRInstList<T>` members
-// that need to access it.
+// Now that `IRInst` is defined we can back-fill the definitions that need to access it.
+
+template<typename T>
+T* IRInst::findDecoration()
+{
+    for( auto decoration : getDecorations() )
+    {
+        if(auto match = as<T>(decoration))
+            return match;
+    }
+    return nullptr;
+}
 
 template<typename T>
 typename IRInstList<T>::Iterator IRInstList<T>::end()
