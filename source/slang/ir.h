@@ -259,7 +259,12 @@ struct IRInst
     template<typename T>
     T* findDecoration()
     {
-        return (T*) findDecorationImpl(IROp(T::kOp));
+        for( auto decoration : getDecorations() )
+        {
+            if(auto match = as<T>(decoration))
+                return match;
+        }
+        return nullptr;
     }
 
     // The first use of this value (start of a linked list)
@@ -913,36 +918,8 @@ struct IRFuncType : IRType
     IR_LEAF_ISA(FuncType)
 };
 
-// A "global value" is an instruction that might have
-// linkage, so that it can be declared in one module
-// and then resolved to a definition in another module.
-struct IRGlobalValue : IRInst
-{
-    // The mangled name, for a symbol that should have linkage,
-    // or which might have multiple declarations.
-    Name* mangledName = nullptr;
-
-#if 0
-    // TODO: these all belong on `IRInst`
-    void insertBefore(IRGlobalValue* other);
-    void insertBefore(IRGlobalValue* other, IRModule* module);
-    void insertAtStart(IRModule* module);
-
-    void insertAfter(IRGlobalValue* other);
-    void insertAfter(IRGlobalValue* other, IRModule* module);
-    void insertAtEnd(IRModule* module);
-
-    void removeFromParent();
-
-    void moveToEnd();
-#endif
-
-    IR_PARENT_ISA(GlobalValue)
-};
-
 bool isDefinition(
-    IRGlobalValue* inVal);
-
+    IRInst* inVal);
 
 // A structure type is represented as a parent instruction,
 // where the child instructions represent the fields of the
@@ -953,7 +930,7 @@ bool isDefinition(
 // (that is, they have mangled names that can be used
 // for linkage).
 //
-struct IRStructKey : IRGlobalValue
+struct IRStructKey : IRInst
 {
     IR_LEAF_ISA(StructKey)
 };
@@ -978,7 +955,7 @@ struct IRStructField : IRInst
 // *not* contain the keys, because code needs to be able to
 // reference the keys from scopes outside of the struct.
 //
-struct IRStructType : IRGlobalValue
+struct IRStructType : IRInst
 {
     IRInstList<IRStructField> getFields() { return IRInstList<IRStructField>(getChildren()); }
 
@@ -988,7 +965,7 @@ struct IRStructType : IRGlobalValue
 
 /// @brief A global value that potentially holds executable code.
 ///
-struct IRGlobalValueWithCode : IRGlobalValue
+struct IRGlobalValueWithCode : IRInst
 {
     // The children of a value with code will be the basic
     // blocks of its definition.
@@ -1102,13 +1079,36 @@ struct IRModule : RefObject
     ObjectScopeManager m_objectScopeManager;
 };
 
-void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
-String getSlangIRAssembly(IRModule* module);
+    /// How much detail to include in dumped IR.
+    ///
+    /// Used with the `dumpIR` functions to determine
+    /// whether a completely faithful, but verbose, IR
+    /// dump is produced, or something simplified for ease
+    /// or reading.
+    ///
+enum class IRDumpMode
+{
+        /// Produce a simplified IR dump.
+        ///
+        /// Simplified IR dumping will skip certain instructions
+        /// and print them at their use sites instead, so that
+        /// the overall dump is shorter and easier to read.
+    Simplified,
 
-void dumpIR(IRModule* module, ISlangWriter* writer);
-void dumpIR(IRGlobalValue* globalVal, ISlangWriter* writer);
+        /// Produce a detailed/accurate IR dump.
+        ///
+        /// A detailed IR dump will make sure to emit exactly
+        /// the instructions that were present with no attempt
+        /// to selectively skip them or give special formatting.
+        ///
+    Detailed,
+};
 
-String dumpIRFunc(IRFunc* func);
+void printSlangIRAssembly(StringBuilder& builder, IRModule* module, IRDumpMode mode = IRDumpMode::Simplified);
+String getSlangIRAssembly(IRModule* module, IRDumpMode mode = IRDumpMode::Simplified);
+
+void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode = IRDumpMode::Simplified);
+void dumpIR(IRInst* globalVal, ISlangWriter* writer, IRDumpMode mode = IRDumpMode::Simplified);
 
 IRInst* createEmptyInst(
     IRModule*   module,

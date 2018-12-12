@@ -227,6 +227,37 @@ IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 
+    /// A decoration that marks a value as having linkage.
+    ///
+    /// A value with linkage is either exported from its module,
+    /// or will have a definition imported from another module.
+    /// In either case, it requires a mangled name to use when
+    /// matching imports and exports.
+    ///
+struct IRLinkageDecoration : IRDecoration
+{
+    IR_PARENT_ISA(LinkageDecoration)
+
+    IRStringLit* getMangledNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getMangledName()
+    {
+        return getMangledNameOperand()->getStringSlice();
+    }
+};
+
+struct IRImportDecoration : IRLinkageDecoration
+{
+    enum { kOp = kIROp_ImportDecoration };
+    IR_LEAF_ISA(ImportDecoration)
+};
+
+struct IRExportDecoration : IRLinkageDecoration
+{
+    enum { kOp = kIROp_ExportDecoration };
+    IR_LEAF_ISA(ExportDecoration)
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -544,7 +575,7 @@ struct IRWitnessTableEntry : IRInst
 // interface. It basically takes the form of a
 // map from the required members of the interface
 // to the IR values that satisfy those requirements.
-struct IRWitnessTable : IRGlobalValue
+struct IRWitnessTable : IRInst
 {
     IRInstList<IRWitnessTableEntry> getEntries()
     {
@@ -565,7 +596,7 @@ struct IRUndefined : IRInst
 
 // A global-scope generic parameter (a type parameter, a
 // constraint parameter, etc.)
-struct IRGlobalGenericParam : IRGlobalValue
+struct IRGlobalGenericParam : IRInst
 {
     IR_LEAF_ISA(GlobalGenericParam)
 };
@@ -796,10 +827,6 @@ struct IRBuilder
         IRInst* const*  operands);
     IRType* getType(
         IROp            op);
-
-
-    IRWitnessTable* lookupWitnessTable(Name* mangledName);
-    void registerWitnessTable(IRWitnessTable* table);
 
         /// Create an empty basic block.
         ///
@@ -1043,6 +1070,15 @@ struct IRBuilder
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
 
+    void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ImportDecoration, getStringValue(mangledName));
+    }
+
+    void addExportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
+    }
 };
 
 // Helper to establish the source location that will be used
@@ -1090,10 +1126,6 @@ IRSpecializationState* createIRSpecializationState(
     TargetRequest*      targetReq);
 void destroyIRSpecializationState(IRSpecializationState* state);
 IRModule* getIRModule(IRSpecializationState* state);
-
-IRGlobalValue* getSpecializedGlobalValueForDeclRef(
-    IRSpecializationState*  state,
-    DeclRef<Decl> const&    declRef);
 
 struct ExtensionUsageTracker;
 
