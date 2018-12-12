@@ -352,8 +352,6 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
-#include <stdarg.h>
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -851,17 +849,23 @@ extern "C"
     struct ISlangWriter : public ISlangUnknown
     {
     public:
-            /** Write the formatted string with the used args. If returns SLANG_E_NOT_IMPLEMENTED, will use a default internal implementation, and call write with result
-            @param format Format string
-            @param args The arguments
-            @return SLANG_E_NOT_IMPLEMENTED if not implemented, SLANG_OK on success */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) = 0;
+            /** Begin an append buffer.
+            NOTE! Only one append buffer can be active at any time.
+            @param maxNumChars The maximum of chars that will be appended
+            @returns The start of the buffer for appending to. */    
+        virtual SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) = 0;
+            /** Ends the append buffer, and is equivalent to a write of the append buffer.
+            NOTE! That an endAppendBuffer is not necessary if there are no characters to write.
+            @param buffer is the start of the data to append and must be identical to last value returned from beginAppendBuffer
+            @param numChars must be a value less than or equal to what was returned from last call to beginAppendBuffer
+            @returns Result, will be SLANG_OK on success */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL endAppendBuffer(char* buffer, size_t numChars) = 0;
             /** Write text to the writer
             @param chars The characters to write out
             @param numChars The amount of characters
             @returns SLANG_OK on success */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL write(const char* chars, size_t numChars) = 0;
-            /** Flushes any content to the ouput */
+            /** Flushes any content to the output */
         virtual SLANG_NO_THROW void SLANG_MCALL flush() = 0;
             /** Determines if the writer stream is to the console, and can be used to alter the output 
             @returns Returns true if is a console writer */

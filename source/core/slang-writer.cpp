@@ -25,15 +25,23 @@ SlangResult WriterHelper::print(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
-    SlangResult res = m_writer->writeVaList(format, args);
 
-    if (res == SLANG_E_NOT_IMPLEMENTED)
+    SlangResult res = SLANG_OK;
+
+    size_t numChars;
     {
-        StringBuilder builder;
-        StringUtil::append(format, args, builder);
+        // Create a copy of args, as will be consumed by calcFormattedSize
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        numChars = StringUtil::calcFormattedSize(format, argsCopy);
+        va_end(argsCopy);
+    }
 
-        // Write if there is anything to write
-        res = (builder.Length()) ? m_writer->write(builder.Buffer(), builder.Length()) : SLANG_OK;
+    if (numChars > 0)
+    {
+        char* appendBuffer = m_writer->beginAppendBuffer(numChars);
+        StringUtil::calcFormatted(format, args, numChars, appendBuffer);
+        res = m_writer->endAppendBuffer(appendBuffer, numChars);
     }
 
     va_end(args);
@@ -50,6 +58,24 @@ SlangResult WriterHelper::put(const char* text)
 ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangWriter) ? static_cast<ISlangWriter*>(this) : nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! AppendBufferWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
+{
+    m_appendBuffer.SetSize(maxNumChars);
+    return m_appendBuffer.Buffer();
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
+{
+    SLANG_ASSERT(m_appendBuffer.Buffer() == buffer && buffer + numChars <= m_appendBuffer.end());
+    // Do the actual write
+    SlangResult res = write(buffer, numChars);
+    // Clear so that buffer can't be written from again without assert
+    m_appendBuffer.Clear();
+    return res;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! CallbackWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
@@ -76,19 +102,6 @@ FileWriter::~FileWriter()
     {
         fclose(m_file);
     }
-}
-
-SlangResult FileWriter::writeVaList(const char* format, va_list args)
-{
-    // http://www.cplusplus.com/reference/cstdio/vfprintf/
-    ::vfprintf(m_file, format, args);
-
-    if (m_flags & WriterFlag::AutoFlush)
-    {
-        ::fflush(m_file);
-    }
-
-    return SLANG_OK;
 }
 
 SlangResult FileWriter::write(const char* text, size_t numChars)
@@ -133,9 +146,14 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! StringWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult StringWriter::writeVaList(const char* format, va_list args)
+SLANG_NO_THROW char* SLANG_MCALL StringWriter::beginAppendBuffer(size_t maxNumChars)
 {
-    StringUtil::append(format, args, *m_builder);
+    return m_builder->prepareForAppend(maxNumChars);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL StringWriter::endAppendBuffer(char* buffer, size_t numChars)
+{
+    m_builder->appendInPlace(buffer, numChars);
     return SLANG_OK;
 }
 
