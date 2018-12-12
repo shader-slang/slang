@@ -186,6 +186,7 @@
     <ClInclude Include="slang-byte-encode-util.h" />
     <ClInclude Include="slang-cpu-defines.h" />
     <ClInclude Include="slang-free-list.h" />
+    <ClInclude Include="slang-http-session.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
@@ -207,6 +208,7 @@
     <ClCompile Include="slang-app-context.cpp" />
     <ClCompile Include="slang-byte-encode-util.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
+    <ClCompile Include="slang-http-session.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />

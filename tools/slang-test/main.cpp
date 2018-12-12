@@ -8,6 +8,8 @@
 
 #include "../../source/core/slang-string-util.h"
 
+#include "../../source/core/slang-http-session.h"
+
 using namespace Slang;
 
 #include "os.h"
@@ -1971,6 +1973,20 @@ int main(
     char**	argvIn)
 {
     AppContext::initDefault();
+
+    {
+        RefPtr<HTTPSession> session = HTTPSession::create("toytheory.com", 80);
+
+        if (session)
+        {
+            List<char> headers;
+            List<char> contents;
+
+            session->request("/", nullptr, &headers, contents);
+
+            AppContext::getStdOut().getWriter()->write(contents.Buffer(), contents.Count());
+        }
+    }
 
     // Set up our test categories here
 

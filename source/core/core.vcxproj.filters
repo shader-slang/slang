@@ -57,6 +57,9 @@
     <ClInclude Include="slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-http-session.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -114,6 +117,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-free-list.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-http-session.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-io.cpp">
