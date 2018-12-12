@@ -864,6 +864,23 @@ SlangResult dissassembleDXILUsingDXC(
 
     static void writeOutputFile(
         CompileRequest* compileRequest,
+        ISlangWriter*   writer, 
+        String const&   path,
+        void const*     data,
+        size_t          size)
+    {
+
+        if (SLANG_FAILED(writer->write((const char*)data, size)))
+        {
+            compileRequest->mSink.diagnose(
+                SourceLoc(),
+                Diagnostics::cannotWriteOutputFile,
+                path);
+        }
+    }
+
+    static void writeOutputFile(
+        CompileRequest* compileRequest,
         String const&   path,
         void const*     data,
         size_t          size,
@@ -924,14 +941,10 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     static void writeOutputToConsole(
-        CompileRequest*,
+        ISlangWriter* writer,
         String const&   text)
     {
-        fwrite(
-            text.begin(),
-            text.end() - text.begin(),
-            1,
-            stdout);
+        writer->write(text.Buffer(), text.Length());
     }
 
     static void writeEntryPointResultToStandardOutput(
@@ -941,17 +954,19 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto compileRequest = entryPoint->compileRequest;
 
+        ISlangWriter* writer = compileRequest->getWriter(WriterChannel::StdOutput);
+
         switch (result.format)
         {
         case ResultFormat::Text:
-            writeOutputToConsole(compileRequest, result.outputString);
+            writeOutputToConsole(writer, result.outputString);
             break;
 
         case ResultFormat::Binary:
             {
                 auto& data = result.outputBinary;
-                int stdoutFileDesc = _fileno(stdout);
-                if (_isatty(stdoutFileDesc))
+                
+                if (writer->isConsole())
                 {
                     // Writing to console, so we need to generate text output.
 
@@ -964,7 +979,7 @@ SlangResult dissassembleDXILUsingDXC(
                             dissassembleDXBC(compileRequest,
                                 data.begin(),
                                 data.end() - data.begin(), assembly);
-                            writeOutputToConsole(compileRequest, assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
                 #endif
@@ -977,7 +992,7 @@ SlangResult dissassembleDXILUsingDXC(
                                 data.begin(),
                                 data.end() - data.begin(), 
                                 assembly);
-                            writeOutputToConsole(compileRequest, assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
                 #endif
@@ -988,7 +1003,7 @@ SlangResult dissassembleDXILUsingDXC(
                             dissassembleSPIRV(compileRequest,
                                 data.begin(),
                                 data.end() - data.begin(), assembly);
-                            writeOutputToConsole(compileRequest, assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
 
@@ -1000,12 +1015,11 @@ SlangResult dissassembleDXILUsingDXC(
                 else
                 {
                     // Redirecting stdout to a file, so do the usual thing
-                #ifdef _WIN32
-                    _setmode(stdoutFileDesc, _O_BINARY);
-                #endif
+                    writer->setMode(SLANG_WRITER_MODE_BINARY);
+
                     writeOutputFile(
                         compileRequest,
-                        stdout,
+                        writer,
                         "stdout",
                         data.begin(),
                         data.end() - data.begin());

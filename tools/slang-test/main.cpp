@@ -2,6 +2,7 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
+#include "../../source/core/slang-app-context.h"
 
 #include "../../slang-com-helper.h"
 
@@ -95,6 +96,9 @@ struct Options
     // integration builds.
     bool dumpOutputOnFailure = false;
 
+    // If set, will force using of executables (not shared library) for tests
+    bool useExes = false;
+
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;
 
@@ -114,6 +118,8 @@ struct Options
 
 // Globals
 
+static const Options g_defaultOptions;
+
 Options g_options;
 Dictionary<String, TestCategory*> g_testCategories;
 TestCategory* g_defaultTestCategory;
@@ -125,13 +131,15 @@ TestCategory* findTestCategory(String const& name);
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 
-Result parseOptions(int* argc, char** argv)
+Result parseOptions(int argc, char** argv, Slang::WriterHelper stdError)
 {
-    int argCount = *argc;
+    g_options = g_defaultOptions;
+
+    List<const char*> positionalArgs;
+    
+    int argCount = argc;
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
-
-    char const** writeCursor = (char const**) argv;
 
     // first argument is the application name
     if( argCursor != argEnd )
@@ -145,7 +153,7 @@ Result parseOptions(int* argc, char** argv)
         char const* arg = *argCursor++;
         if( arg[0] != '-' )
         {
-            *writeCursor++ = arg;
+            positionalArgs.Add(arg);
             continue;
         }
 
@@ -153,8 +161,7 @@ Result parseOptions(int* argc, char** argv)
         {
             while(argCursor != argEnd)
             {
-                char const* nxtArg = *argCursor++;
-                *writeCursor++ = nxtArg;
+                positionalArgs.Add(*argCursor++);
             }
             break;
         }
@@ -163,10 +170,14 @@ Result parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                stdError.print("error: expected operand for '%s'\n", arg);
                 return SLANG_FAIL;
             }
             g_options.binDir = *argCursor++;
+        }
+        else if (strcmp(arg, "-useexes") == 0)
+        {
+            g_options.useExes = true;
         }
         else if( strcmp(arg, "-v") == 0 )
         {
@@ -188,7 +199,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                stdError.print("error: expected operand for '%s'\n", arg);
 				return SLANG_FAIL;
             }
             argCursor++;
@@ -198,7 +209,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                stdError.print("error: expected operand for '%s'\n", arg);
 				return SLANG_FAIL;
             }
             argCursor++;
@@ -230,7 +241,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                stdError.print("error: expected operand for '%s'\n", arg);
                 return SLANG_FAIL;
             }
             auto category = findTestCategory(*argCursor++);
@@ -243,7 +254,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "error: expected operand for '%s'\n", arg);
+                stdError.print("error: expected operand for '%s'\n", arg);
                 return SLANG_FAIL;
             }
             auto category = findTestCategory(*argCursor++);
@@ -256,7 +267,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if (argCursor == argEnd)
             {
-                fprintf(stderr, "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
+                stdError.print("error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -264,7 +275,7 @@ Result parseOptions(int* argc, char** argv)
             SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.enabledApis, &g_options.enabledApis);
             if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
+                stdError.print("error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
         }
@@ -272,7 +283,7 @@ Result parseOptions(int* argc, char** argv)
         {
             if (argCursor == argEnd)
             {
-                fprintf(stderr, "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
+                stdError.print("error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n", arg);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -280,13 +291,13 @@ Result parseOptions(int* argc, char** argv)
             SlangResult res = RenderApiUtil::parseApiFlags(UnownedStringSlice(apiList), g_options.synthesizedTestApis, &g_options.synthesizedTestApis);
             if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "error: unable to parse api expression '%s'\n", apiList);
+                stdError.print("error: unable to parse api expression '%s'\n", apiList);
                 return res;
             }
         }
         else
         {
-            fprintf(stderr, "unknown option '%s'\n", arg);
+            stdError.print("unknown option '%s'\n", arg);
             return SLANG_FAIL;
         }
     }
@@ -301,25 +312,21 @@ Result parseOptions(int* argc, char** argv)
         g_options.synthesizedTestApis &= g_options.enabledApis;
     }
 
-    // any arguments left over were positional arguments
-    argCount = (int)((char**)writeCursor - argv);
-    argCursor = argv;
-    argEnd = argCursor + argCount;
 
-    // first positional argument is a "filter" to apply
-    if( argCursor != argEnd )
+    // first positional argument is source shader path
+    if (positionalArgs.Count())
     {
-        g_options.testPrefix = *argCursor++;
+        g_options.testPrefix = positionalArgs[0];
+        positionalArgs.RemoveAt(0);
     }
 
     // any remaining arguments represent an error
-    if(argCursor != argEnd)
+    if (positionalArgs.Count() != 0)
     {
-        fprintf(stderr, "unexpected arguments\n");
+        stdError.print("unexpected arguments\n");
         return SLANG_FAIL;
     }
 
-    *argc = 0;
 	return SLANG_OK;
 }
 
@@ -638,7 +645,48 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
         String commandLine = spawner.getCommandLine();
         context->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
-    
+
+    if (!context->m_useExes)
+    {
+        String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+
+        auto func = context->getInnerMainFunc(String(g_options.binDir), exeName);
+        if (func)
+        {
+            StringBuilder stdErrorString;
+            StringBuilder stdOutString;
+
+            // Say static so not released
+            StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+            StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+
+            AppContext appContext;
+            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
+            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+
+            if (exeName == "slangc")
+            {
+                appContext.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
+            }
+            appContext.setReplaceWriterFlagsAll();
+
+            List<const char*> args;
+            args.Add(exeName.Buffer());
+            for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
+            {
+                args.Add(spawner.argumentList_[i].Buffer());
+            }
+
+            SlangResult res = func(&appContext, context->getSession(), int(args.Count()), args.begin());
+
+            spawner.standardError_ = stdErrorString;
+            spawner.standardOutput_ = stdOutString;
+            spawner.resultCode_ = AppContext::getReturnCode(res);
+
+            return kOSError_None;
+        }
+    }
+
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
     {
@@ -1214,7 +1262,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 }
 
 
-TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, const char * langOption)
+TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, const char *const* langOpts, size_t numLangOpts)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
 	auto filePath999 = input.filePath;
@@ -1236,7 +1284,10 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 		spawner.pushArgument(arg);
 	}
 
-	spawner.pushArgument(langOption);
+    for (int i = 0; i < int(numLangOpts); ++i)
+    {
+        spawner.pushArgument(langOpts[i]);
+    }
 	spawner.pushArgument("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
 	spawner.pushArgument(actualOutputFile);
@@ -1309,22 +1360,25 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
 {
-	return runComputeComparisonImpl(context, input, "-slang -compute");
+    const char* langOpts[] = { "-slang", "-compute" };
+	return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
 TestResult runSlangComputeComparisonTestEx(TestContext* context, TestInput& input)
 {
-	return runComputeComparisonImpl(context, input, "");
+	return runComputeComparisonImpl(context, input, nullptr, 0);
 }
 
 TestResult runHLSLComputeTest(TestContext* context, TestInput& input)
 {
-    return runComputeComparisonImpl(context, input, "-hlsl-rewrite -compute");
+    const char* langOpts[] = { "--hlsl-rewrite", "-compute" };
+    return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
 TestResult runSlangRenderComputeComparisonTest(TestContext* context, TestInput& input)
 {
-    return runComputeComparisonImpl(context, input, "-slang -gcompute");
+    const char* langOpts[] = { "-slang", "-gcompute" };
+    return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
 TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
@@ -1913,9 +1967,11 @@ void runTestsInDirectory(
 //
 
 int main(
-    int		argc,
-    char**	argv)
+    int		argcIn,
+    char**	argvIn)
 {
+    AppContext::initDefault();
+
     // Set up our test categories here
 
     auto fullTestCategory = addTestCategory("full", nullptr);
@@ -1939,7 +1995,7 @@ int main(
 
     //
 
-    if (SLANG_FAILED(parseOptions(&argc, argv)))
+    if (SLANG_FAILED(parseOptions(argcIn, argvIn, AppContext::getStdError())))
     {
     	// Return exit code with error
     	return 1;
@@ -1968,6 +2024,7 @@ int main(
     }
 
     context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
+    context.m_useExes = g_options.useExes;
     context.m_isVerbose = g_options.shouldBeVerbose;
 
     { 

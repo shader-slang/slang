@@ -185,7 +185,7 @@ static RefPtr<SamplerState> _createSamplerState(
             {
                 if (baseIndex + i != entry.glslBinding[i])
                 {
-                    assert("Bindings must be contiguous");
+                    assert(!"Bindings must be contiguous");
                     break;
                 }
             }

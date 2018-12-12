@@ -115,13 +115,13 @@ workspace "slang"
         architecture "ARM"
 
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden",  "-fno-delete-null-pointer-checks" } 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-fno-delete-null-pointer-checks", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option"} 
     	
 	filter { "toolset:gcc*"}
-		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough" }
+		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
 		
     filter { "toolset:clang" }
-         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare"}
+         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-undefined-bool-conversion"}
 		
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
@@ -193,20 +193,15 @@ end
 -- Next we will define a helper routine that all of our
 -- projects will bottleneck through. Here `name` is
 -- the name for the project (and the base name for
--- whatever output file it produces), while `baseDir`
--- is the parent directory of the project's directory.
+-- whatever output file it produces), while `sourceDir`
+-- is the directory that holds the source.
 --
 -- E.g., for the `slangc` project, the source code
 -- is nested in `source/`, so we'd (indirectly) call:
 --
---      baseSlangProject("slangc", "source")
+--      baseSlangProject("slangc", "source/slangc")
 --
-function baseSlangProject(name, baseDir)
-
-    -- The project directory will be nested inside
-    -- the base directory using the project's name.
-    --
-    local projectDir = baseDir .. "/" .. name
+function baseSlangProject(name, sourceDir)
 
     -- Start a new project in premake. This switches
     -- the "current" project over to the newly created
@@ -220,7 +215,7 @@ function baseSlangProject(name, baseDir)
     -- projects. If we don't have a stable UUID, then the
     -- output files might have spurious diffs whenever we
     -- re-run premake generation.
-    uuid(os.uuid(projectDir))
+    uuid(os.uuid(name .. '|' .. sourceDir))
 
     -- Set the location where the project file will be placed.
     -- We set the project files to reside in their source
@@ -233,7 +228,7 @@ function baseSlangProject(name, baseDir)
     -- it is less relevant to other projects.
     --
 
-    location(projectDir)
+    location(sourceDir)
     
     if os.target() == "windows" then
     else
@@ -257,7 +252,7 @@ function baseSlangProject(name, baseDir)
     -- so projects that spread their source over multiple
     -- directories will need to take more steps.
     --
-    addSourceDir(projectDir)
+    addSourceDir(sourceDir)
 
     -- By default, Premake generates VS project files that
     -- reflect the directory structure of the source code.
@@ -314,7 +309,7 @@ function tool(name)
     -- Now we invoke our shared project configuration logic,
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProject(name, "tools")
+    baseSlangProject(name, "tools/" .. name)
 
     -- Finally, we set the project "kind" to produce a console
     -- application. This is a reasonable default for tools,
@@ -339,7 +334,29 @@ function standardProject(name)
 
     -- A standard project has its code under `source/`
     --
-    baseSlangProject(name, "source")
+    baseSlangProject(name, "source/" .. name)
+end
+
+function toolSharedLibrary(name)
+    group "tool-shared-library"
+    -- specifying that the project lives under the `tools/` path.
+    --
+    baseSlangProject(name .. "-shared-library", "tools/" .. name)
+    
+    defines { "SLANG_SHARED_LIBRARY_TOOL" }
+   
+    kind "SharedLib"
+end
+
+function standardSharedLibraryProject(name)
+    group "tool-shared-library"
+    -- A standard project has its code under `source/`
+    --
+    baseSlangProject(name .. "-shared-library", "source/".. name)
+   
+    defines { "SLANG_SHARED_LIBRARY_TOOL" }
+   
+    kind "SharedLib"
 end
 
 -- Finally we have the example programs that show how to use Slang.
@@ -349,7 +366,7 @@ function example(name)
     group "examples"
 
     -- They have their source code under `examples/<project-name>/`
-    baseSlangProject(name, "examples")
+    baseSlangProject(name, "examples/" .. name)
 
     -- By default, all of our examples are GUI applications. One some
     -- platforms there is no meaningful distinction between GUI and
@@ -446,8 +463,15 @@ tool "slang-test"
 tool "slang-reflection-test"
     uuid "22C45F4F-FB6B-4535-BED1-D3F5D0C71047"
     includedirs { "." }
-    links { "slang" }
+    links { "slang", "core" }
 
+toolSharedLibrary "slang-reflection-test"
+    uuid "C5ACCA6E-C04D-4B36-8516-3752B3C13C2F"
+    
+    includedirs { "." }
+    kind "SharedLib"
+    links { "core", "slang" }      
+    
 --
 -- The most complex testing tool we have is `render-test`, but from
 -- a build perspective the most interesting thing about it is that for
@@ -475,6 +499,20 @@ if os.target() == "windows" then
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+        
+    toolSharedLibrary "render-test"
+        uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
+        
+        includedirs { ".", "external", "source", "tools/gfx" }
+        links { "core", "slang", "gfx" }
+        
+        systemversion "10.0.14393.0"
+
+        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+       
 end
             
 --
@@ -516,6 +554,11 @@ standardProject "slangc"
     kind "ConsoleApp"
     links { "core", "slang" }
 
+standardSharedLibraryProject "slangc"
+    uuid "644921BF-D228-4EEF-8CDA-11716DB06989"
+    kind "SharedLib"
+    links { "core", "slang" }    
+    
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
 -- to make sure that the binaries it generates use a "relative `RPATH`"
@@ -665,6 +708,7 @@ standardProject "slang-glslang"
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
     filter { "system:linux" }
+        links { "dl", "pthread" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
         buildoptions{"-fPIC", "-pthread"}
         

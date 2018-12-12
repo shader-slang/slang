@@ -1,9 +1,10 @@
-﻿// options.h
+// options.h
 #pragma once
 
 #include <stdint.h>
 
 #include "../../slang-com-helper.h"
+#include "../../source/core/slang-writer.h"
 
 #include "render.h"
 
@@ -52,6 +53,6 @@ struct Options
 
 extern Options gOptions;
 
-SlangResult parseOptions(int* argc, char** argv);
+SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper stdError);
 
 } // renderer_test

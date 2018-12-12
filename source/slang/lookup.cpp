@@ -177,6 +177,11 @@ void DoMemberLookupImpl(
     LookupResult&           ioResult,
     BreadcrumbInfo*         breadcrumbs)
 {
+    if (!baseType)
+    {
+        return;
+    }
+
     // If the type was pointer-like, then dereference it
     // automatically here.
     if (auto pointerLikeType = baseType->As<PointerLikeType>())
@@ -482,11 +487,14 @@ void DoLookupImpl(
             // in the target decl we are extending
             if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
             {
-                if (auto targetDeclRef = extDeclRef.getDecl()->targetType->AsDeclRefType())
+                if (extDeclRef.getDecl()->targetType)
                 {
-                    if (auto aggDeclRef = targetDeclRef->declRef.As<AggTypeDecl>())
+                    if (auto targetDeclRef = extDeclRef.getDecl()->targetType->AsDeclRefType())
                     {
-                        containerDeclRef = extDeclRef.Substitute(aggDeclRef);
+                        if (auto aggDeclRef = targetDeclRef->declRef.As<AggTypeDecl>())
+                        {
+                            containerDeclRef = extDeclRef.Substitute(aggDeclRef);
+                        }
                     }
                 }
             }

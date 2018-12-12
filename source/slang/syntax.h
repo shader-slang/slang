@@ -293,6 +293,9 @@ namespace Slang
         RefPtr<Type>	type;
         bool					IsLeftValue;
 
+        template <typename T>
+        T* As();
+
         QualType()
             : IsLeftValue(false)
         {}
@@ -1107,6 +1110,13 @@ namespace Slang
 #include "val-defs.h"
 
 #include "object-meta-end.h"
+
+
+    template <typename T>
+    SLANG_FORCE_INLINE T* QualType::As()
+    {
+        return type ? type->As<T>() : nullptr;
+    }
 
     inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
