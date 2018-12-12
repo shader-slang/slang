@@ -19,32 +19,32 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</ProjectGuid>
+    <ProjectGuid>{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>core</RootNamespace>
+    <RootNamespace>slang-reflection-test-shared-library</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
@@ -66,35 +66,39 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\bin\windows-x86\debug\</OutDir>
-    <IntDir>..\..\intermediate\windows-x86\debug\core\</IntDir>
-    <TargetName>core</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <IntDir>..\..\intermediate\windows-x86\debug\slang-reflection-test-shared-library\</IntDir>
+    <TargetName>slang-reflection-test-shared-library</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\bin\windows-x64\debug\</OutDir>
-    <IntDir>..\..\intermediate\windows-x64\debug\core\</IntDir>
-    <TargetName>core</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <IntDir>..\..\intermediate\windows-x64\debug\slang-reflection-test-shared-library\</IntDir>
+    <TargetName>slang-reflection-test-shared-library</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\bin\windows-x86\release\</OutDir>
-    <IntDir>..\..\intermediate\windows-x86\release\core\</IntDir>
-    <TargetName>core</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <IntDir>..\..\intermediate\windows-x86\release\slang-reflection-test-shared-library\</IntDir>
+    <TargetName>slang-reflection-test-shared-library</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\bin\windows-x64\release\</OutDir>
-    <IntDir>..\..\intermediate\windows-x64\release\core\</IntDir>
-    <TargetName>core</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <IntDir>..\..\intermediate\windows-x64\release\slang-reflection-test-shared-library\</IntDir>
+    <TargetName>slang-reflection-test-shared-library</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -102,17 +106,15 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\bin\windows-x86\debug\slang-reflection-test-shared-library.lib</ImportLibrary>
     </Link>
-    <Lib>
-      <TreatLibWarningAsErrors>true</TreatLibWarningAsErrors>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -120,17 +122,15 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\bin\windows-x64\debug\slang-reflection-test-shared-library.lib</ImportLibrary>
     </Link>
-    <Lib>
-      <TreatLibWarningAsErrors>true</TreatLibWarningAsErrors>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -142,17 +142,15 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\bin\windows-x86\release\slang-reflection-test-shared-library.lib</ImportLibrary>
     </Link>
-    <Lib>
-      <TreatLibWarningAsErrors>true</TreatLibWarningAsErrors>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -164,64 +162,19 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\bin\windows-x64\release\slang-reflection-test-shared-library.lib</ImportLibrary>
     </Link>
-    <Lib>
-      <TreatLibWarningAsErrors>true</TreatLibWarningAsErrors>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="allocator.h" />
-    <ClInclude Include="array-view.h" />
-    <ClInclude Include="array.h" />
-    <ClInclude Include="basic.h" />
-    <ClInclude Include="common.h" />
-    <ClInclude Include="dictionary.h" />
-    <ClInclude Include="exception.h" />
-    <ClInclude Include="hash.h" />
-    <ClInclude Include="int-set.h" />
-    <ClInclude Include="list.h" />
-    <ClInclude Include="platform.h" />
-    <ClInclude Include="secure-crt.h" />
-    <ClInclude Include="slang-app-context.h" />
-    <ClInclude Include="slang-byte-encode-util.h" />
-    <ClInclude Include="slang-cpu-defines.h" />
-    <ClInclude Include="slang-free-list.h" />
-    <ClInclude Include="slang-io.h" />
-    <ClInclude Include="slang-math.h" />
-    <ClInclude Include="slang-memory-arena.h" />
-    <ClInclude Include="slang-object-scope-manager.h" />
-    <ClInclude Include="slang-random-generator.h" />
-    <ClInclude Include="slang-shared-library.h" />
-    <ClInclude Include="slang-string-slice-pool.h" />
-    <ClInclude Include="slang-string-util.h" />
-    <ClInclude Include="slang-string.h" />
-    <ClInclude Include="slang-writer.h" />
-    <ClInclude Include="smart-pointer.h" />
-    <ClInclude Include="stream.h" />
-    <ClInclude Include="text-io.h" />
-    <ClInclude Include="token-reader.h" />
-    <ClInclude Include="type-traits.h" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="platform.cpp" />
-    <ClCompile Include="slang-app-context.cpp" />
-    <ClCompile Include="slang-byte-encode-util.cpp" />
-    <ClCompile Include="slang-free-list.cpp" />
-    <ClCompile Include="slang-io.cpp" />
-    <ClCompile Include="slang-memory-arena.cpp" />
-    <ClCompile Include="slang-object-scope-manager.cpp" />
-    <ClCompile Include="slang-random-generator.cpp" />
-    <ClCompile Include="slang-shared-library.cpp" />
-    <ClCompile Include="slang-string-slice-pool.cpp" />
-    <ClCompile Include="slang-string-util.cpp" />
-    <ClCompile Include="slang-string.cpp" />
-    <ClCompile Include="slang-writer.cpp" />
-    <ClCompile Include="stream.cpp" />
-    <ClCompile Include="text-io.cpp" />
-    <ClCompile Include="token-reader.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="core.natvis" />
+    <ProjectReference Include="..\..\source\core\core.vcxproj">
+      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\source\slang\slang.vcxproj">
+      <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

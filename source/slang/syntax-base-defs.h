@@ -22,6 +22,7 @@ ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase)
     template<typename T>
     T* As()
     {
+        SLANG_ASSERT(this);
         return dynamic_cast<T*>(this);
     }
     )

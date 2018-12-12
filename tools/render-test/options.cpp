@@ -6,7 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../source/core/slang-writer.h"
+
 namespace renderer_test {
+
+static const Options gDefaultOptions;
 
 Options gOptions;
 
@@ -16,17 +20,20 @@ void setDefaultRendererType(RendererType type)
     gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? type : gOptions.rendererType;
 }
 
-SlangResult parseOptions(int* argc, char** argv)
+SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper stdError)
 {
+    // Reset the options
+    gOptions = gDefaultOptions;
+
+    List<const char*> positionalArgs;
+
     typedef Options::ShaderProgramType ShaderProgramType;
     typedef Options::InputLanguageID InputLanguageID;
 
+    //int argCount = argc;
 
-    int argCount = *argc;
     char const* const* argCursor = argv;
-    char const* const* argEnd = argCursor + argCount;
-
-    char const** writeCursor = (char const**) argv;
+    char const* const* argEnd = argCursor + argc;
 
     // first argument is the application name
     if( argCursor != argEnd )
@@ -40,7 +47,7 @@ SlangResult parseOptions(int* argc, char** argv)
         char const* arg = *argCursor++;
         if( arg[0] != '-' )
         {
-            *writeCursor++ = arg;
+            positionalArgs.Add(arg);
             continue;
         }
 
@@ -48,8 +55,7 @@ SlangResult parseOptions(int* argc, char** argv)
         {
             while(argCursor != argEnd)
             {
-                char const* arg = *argCursor++;
-                *writeCursor++ = arg;
+                positionalArgs.Add(*argCursor++);
             }
             break;
         }
@@ -57,7 +63,7 @@ SlangResult parseOptions(int* argc, char** argv)
         {
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "expected argument for '%s' option\n", arg);
+                stdError.print("expected argument for '%s' option\n", arg);
                 return SLANG_FAIL;
             }
             gOptions.outputPath = *argCursor++;
@@ -98,12 +104,12 @@ SlangResult parseOptions(int* argc, char** argv)
 
             if( argCursor == argEnd )
             {
-                fprintf(stderr, "expected argument for '%s' option\n", arg);
+                stdError.print("expected argument for '%s' option\n", arg);
                 return SLANG_FAIL;
             }
             if( gOptions.slangArgCount == Options::kMaxSlangArgs )
             {
-                fprintf(stderr, "maximum number of '%s' options exceeded (%d)\n", arg, Options::kMaxSlangArgs);
+                stdError.print("maximum number of '%s' options exceeded (%d)\n", arg, Options::kMaxSlangArgs);
                 return SLANG_FAIL;
             }
             gOptions.slangArgs[gOptions.slangArgCount++] = *argCursor++;
@@ -145,30 +151,26 @@ SlangResult parseOptions(int* argc, char** argv)
         }
         else
         {
-            fprintf(stderr, "unknown option '%s'\n", arg);
+            stdError.print("unknown option '%s'\n", arg);
             return SLANG_FAIL;
         }
     }
     
-    // any arguments left over were positional arguments
-    argCount = (int)(writeCursor - (const char**)argv);
-    argCursor = argv;
-    argEnd = argCursor + argCount;
-
+    
     // first positional argument is source shader path
-    if( argCursor != argEnd )
+    if(positionalArgs.Count())
     {
-        gOptions.sourcePath = *argCursor++;
+        gOptions.sourcePath = positionalArgs[0];
+        positionalArgs.RemoveAt(0);
     }
 
     // any remaining arguments represent an error
-    if(argCursor != argEnd)
+    if(positionalArgs.Count() != 0)
     {
-        fprintf(stderr, "unexpected arguments\n");
+        stdError.print("unexpected arguments\n");
         return SLANG_FAIL;
     }
 
-    *argc = 0;
 	return SLANG_OK;
 }
 

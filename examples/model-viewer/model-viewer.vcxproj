@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{639B13F2-CF07-CFEC-98FB-664A0427F154}</ProjectGuid>
+    <ProjectGuid>{2F8724C6-1BC3-2730-84D5-3F277030D04A}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>model-viewer</RootNamespace>

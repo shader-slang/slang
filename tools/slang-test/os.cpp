@@ -222,6 +222,8 @@ void OSProcessSpawner::pushArgument(
     // TODO(tfoley): handle cases where arguments need some escaping
     commandLine_.Append(" ");
     commandLine_.Append(argument);
+
+    argumentList_.Add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -480,7 +482,7 @@ void OSProcessSpawner::pushExecutableName(
     Slang::String executableName)
 {
     executableName_ = executableName;
-    pushArgument(executableName);
+    arguments_.Add(executableName);
     isExecutablePath_ = false;
 }
 
@@ -488,7 +490,7 @@ void OSProcessSpawner::pushExecutablePath(
     Slang::String executablePath)
 {
     executableName_ = executablePath;
-    pushArgument(executablePath);
+    arguments_.Add(executablePath);
     isExecutablePath_ = true;
 }
 
@@ -496,6 +498,7 @@ void OSProcessSpawner::pushArgument(
     Slang::String argument)
 {
     arguments_.Add(argument);
+    argumentList_.Add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -507,7 +510,6 @@ Slang::String OSProcessSpawner::getCommandLine()
     {
         if(ii != 0) sb << " ";
         sb << arguments_[ii];
-
     }
     return sb.ProduceString();
 }

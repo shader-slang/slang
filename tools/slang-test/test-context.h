@@ -1,6 +1,10 @@
 // test-context.h
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/platform.h"
+#include "../../source/core/slang-app-context.h"
+#include "../../source/core/dictionary.h"
+
 
 #define SLANG_CHECK(x) TestContext::get()->addResultWithLocation((x), #x, __FILE__, __LINE__); 
 
@@ -54,6 +58,7 @@ enum class TestMessageType
 class TestContext
 {
     public:
+    typedef SlangResult(*InnerMainFunc)(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv);
 
     struct TestInfo
     {
@@ -124,6 +129,9 @@ class TestContext
         /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
 
+        /// Get the InnerMain function from a shared library tool
+    InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
+
         /// Get the slang session
     SlangSession* getSession() const { return m_session;  }
 
@@ -133,7 +141,6 @@ class TestContext
     TestContext();
         /// Dtor
     ~TestContext();
-
 
     static TestResult combine(TestResult a, TestResult b) { return (a > b) ? a : b; }
 
@@ -155,9 +162,17 @@ class TestContext
     bool m_dumpOutputOnFailure;
     bool m_isVerbose;
 
+    bool m_useExes;
+
     void outputSummary();
 
 protected:
+    struct SharedLibraryTool
+    {
+        Slang::SharedLibrary::Handle m_sharedLibrary;
+        InnerMainFunc m_func;
+    };
+
     void _addResult(const TestInfo& info);
     
     Slang::StringBuilder m_currentMessage;
@@ -168,7 +183,9 @@ protected:
     bool m_inTest;
 
     SlangSession* m_session;
-    
+
+    Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;
+
     static TestContext* s_context;
 };
 

@@ -3239,7 +3239,7 @@ namespace Slang
         dumpIRModule(&context, module);
     }
 
-    void dumpIR(IRGlobalValue* globalVal)
+    void dumpIR(IRGlobalValue* globalVal, ISlangWriter* writer)
     {
         StringBuilder sb;
 
@@ -3249,8 +3249,11 @@ namespace Slang
 
         dumpInst(&context, globalVal);
 
-        fprintf(stderr, "%s\n", sb.Buffer());
-        fflush(stderr);
+        writer->write(sb.Buffer(), sb.Length());
+        char cr[] = "\n";
+        writer->write(cr, 1);
+
+        writer->flush();
     }
 
     String getSlangIRAssembly(IRModule* module)
@@ -3260,13 +3263,16 @@ namespace Slang
         return sb;
     }
 
-    void dumpIR(IRModule* module)
+    void dumpIR(IRModule* module, ISlangWriter* writer)
     {
         String ir = getSlangIRAssembly(module);
-        fprintf(stderr, "%s\n", ir.Buffer());
-        fflush(stderr);
-    }
 
+        writer->write(ir.Buffer(), ir.Length());
+        char cr[] = "\n";
+        writer->write(cr, 1);
+
+        writer->flush();
+    }
 
     //
     //

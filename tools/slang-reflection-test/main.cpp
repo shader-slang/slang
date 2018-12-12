@@ -8,6 +8,8 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
+#include "../../source/core/slang-app-context.h"
+
 struct PrettyWriter
 {
     bool startOfLine = true;
@@ -16,7 +18,7 @@ struct PrettyWriter
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
-    fprintf(stdout, "%.*s", int(end - begin), begin);
+    Slang::AppContext::getStdOut().print("%.*s", int(end - begin), begin);
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -27,7 +29,7 @@ static void writeRaw(PrettyWriter& writer, char const* begin)
 static void writeRawChar(PrettyWriter& writer, int c)
 {
     char buffer[] = { (char) c, 0 };
-    writeRaw(writer, buffer);
+    writeRaw(writer, buffer, buffer + 1);
 }
 
 static void adjust(PrettyWriter& writer)
@@ -77,7 +79,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    fprintf(stdout, "%llu", (unsigned long long)val);
+    Slang::AppContext::getStdOut().print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -881,6 +883,7 @@ void emitReflectionJSON(
     auto programReflection = (slang::ShaderReflection*) reflection;
 
     PrettyWriter writer;
+    
     emitReflectionJSON(writer, programReflection);
 }
 
@@ -889,17 +892,18 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        fputs(diagnostic, stderr);
+        Slang::AppContext::getStdError().put(diagnostic);
     }
     return res;
 }
 
-static SlangResult innerMain(int argc, char*const*argv)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
-    // Parse any command-line options
-
-    SlangSession* session = spCreateSession(nullptr);
+    Slang::AppContext::setSingleton(appContext);
+    
     SlangCompileRequest* request = spCreateCompileRequest(session);
+
+    appContext->configureRequest(request);
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
@@ -914,8 +918,7 @@ static SlangResult innerMain(int argc, char*const*argv)
     emitReflectionJSON(reflection);
 
     spDestroyCompileRequest(request);
-    spDestroySession(session);
-
+    
     return SLANG_OK;
 }
 
@@ -923,6 +926,9 @@ int main(
     int argc,
     char** argv)
 {
-    SlangResult res = innerMain(argc, argv);
+    SlangSession* session = spCreateSession(nullptr);
+    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    spDestroySession(session);
+
     return SLANG_FAILED(res) ? 1 : 0;
 }

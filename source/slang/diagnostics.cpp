@@ -237,13 +237,13 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& in
     }
 
     // Did the client supply a callback for us to use?
-    if( callback )
+    if( writer )
     {
         // If so, pass the error string along to them
         StringBuilder messageBuilder;
         formatDiagnostic(this, messageBuilder, diagnostic);
 
-        callback(messageBuilder.ProduceString().begin(), callbackUserData);
+        writer->write(messageBuilder.Buffer(), messageBuilder.Length());
     }
     else
     {
@@ -269,10 +269,10 @@ void DiagnosticSink::diagnoseRaw(
     }
 
     // Did the client supply a callback for us to use?
-    if( callback )
+    if(writer)
     {
         // If so, pass the error string along to them
-        callback(message, callbackUserData);
+        writer->write(message, ::strlen(message));
     }
     else
     {

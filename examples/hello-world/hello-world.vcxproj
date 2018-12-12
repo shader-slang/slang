@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{5CF41E7B-4883-A844-F1A1-BC3FDD0FB9EA}</ProjectGuid>
+    <ProjectGuid>{010BE414-ED5B-CF56-16C0-BD18027062C0}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>hello-world</RootNamespace>

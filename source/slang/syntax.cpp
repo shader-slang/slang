@@ -153,7 +153,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* Type::GetCanonicalType()
     {
-        if (!this) return nullptr;
+        SLANG_ASSERT(this);
+
         Type* et = const_cast<Type*>(this);
         if (!et->canonicalType)
         {
@@ -1314,7 +1315,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Substitutions> GenericSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
-        if (!this) return nullptr;
+        SLANG_ASSERT(this);
 
         int diff = 0;
 
@@ -1366,7 +1367,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Substitutions> ThisTypeSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
-        if (!this) return nullptr;
+        SLANG_ASSERT(this);
 
         int diff = 0;
 
@@ -1385,8 +1386,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ThisTypeSubstitution::Equals(Substitutions* subst)
     {
+        SLANG_ASSERT(this);
         if (!subst)
-            return this == nullptr;
+            return false;
+
         if (auto thisTypeSubst = dynamic_cast<ThisTypeSubstitution*>(subst))
         {
             return witness->EqualsVal(thisTypeSubst->witness);
@@ -1914,7 +1917,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Val> Val::Substitute(SubstitutionSet subst)
     {
-        if (!this) return nullptr;
+        SLANG_ASSERT(this);
         if (!subst) return this;
         int diff = 0;
         return SubstituteImpl(subst, &diff);
