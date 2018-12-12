@@ -334,6 +334,70 @@ static const char* _getTestResultAsAppveyorOutcome(TestResult testResult)
     return "None";
 }
 
+char _getJsonEscapeChar(char c)
+{
+    switch (c)
+    {
+        case '\b': return 'b';
+        case '\f': return 'f';
+        case '\n': return 'n';
+        case '\r': return 'r';
+        case '\t': return 't';
+        case '\"': return '"';
+        case '\\': return '\\';
+        default:
+        {
+            if (c < 32 || (c & 0x80))
+            {
+                // Means can't output
+                return '!';
+            }
+            return 0;
+        }
+    }
+}
+
+static void _appendJsonEscaped(const char* chars, StringBuilder& builder)
+{
+    const char* start = chars;
+
+    builder << '"';
+
+    while (auto c = *chars)
+    {
+        const char escaped = _getJsonEscapeChar(c);
+        if (escaped)
+        {
+            // Flush
+            if (start < chars)
+            {
+                builder.Append(start, UInt(chars - start));
+            }
+
+            if (escaped != '!')
+            {
+                builder.Append('\\');
+                builder.Append(escaped);
+            }
+            chars++;
+            start = chars;
+        }
+        else
+        {
+            chars++;
+        }
+    }
+
+    if (start < chars)
+    {
+        // Flush
+        builder.Append(start, UInt(chars - start));
+    }
+
+    builder << '"';
+}
+
+
 void TestContext::_addResult(const TestInfo& info)
 {
     m_totalTestCount++;
@@ -451,7 +515,17 @@ void TestContext::_addResult(const TestInfo& info)
             json << "\"testName\": \"" << info.name << "\",";
             json << "\"testFramework\": \"" << "slang-test" << "\",";
             json << "\"fileName\": \"" << info.name << "\",";
-            json << "\"outcome\": \"" << outcome << "\"";
+            json << "\"outcome\": \"" << outcome << "\",";
+
+            json << "\"durationMilliseconds\": \"0\",";
+            json << "\"ErrorMessage\" : ";
+            _appendJsonEscaped(info.message.Buffer(), json);
+            json << ",";
+
+            json << "\"ErrorStackTrace\" : \"\",";
+            json << "\"StdOut\" : \"\",";
+            json << "\"StdErr\" : \"\"";
+
             json << "}";
 
             UnownedStringSlice post = json.getUnownedSlice();
