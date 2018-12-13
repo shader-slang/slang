@@ -1430,10 +1430,10 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     return TestResult::Pass;
 }
 
-class StbiImage
+class STBImage
 {
 public:
-    typedef StbiImage ThisType;
+    typedef STBImage ThisType;
 
         /// Reset back to default initialized state (frees any image set)
     void reset();
@@ -1454,7 +1454,7 @@ public:
         /// Read an image with filename. SLANG_OK on success
     SlangResult read(const char* filename);
 
-    ~StbiImage() { reset(); }
+    ~STBImage() { reset(); }
 
     int m_width = 0;
     int m_height = 0;
@@ -1462,7 +1462,7 @@ public:
     unsigned char* m_pixels = nullptr;
 };
 
-void StbiImage::reset()
+void STBImage::reset()
 {
     if (m_pixels)
     {
@@ -1474,7 +1474,7 @@ void StbiImage::reset()
     m_numChannels = 0;
 }
 
-SlangResult StbiImage::read(const char* filename)
+SlangResult STBImage::read(const char* filename)
 {
     reset();
 
@@ -1486,7 +1486,7 @@ SlangResult StbiImage::read(const char* filename)
     return SLANG_OK;
 }
 
-bool StbiImage::isComparable(const ThisType& rhs) const
+bool STBImage::isComparable(const ThisType& rhs) const
 {
     return (this == &rhs) ||
         (m_width == rhs.m_width && m_height == rhs.m_height && m_numChannels == rhs.m_numChannels);
@@ -1504,14 +1504,14 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     String expectedPath = filePath + ".expected.png";
     String actualPath = filePath + ".actual.png";
 
-    StbiImage expectedImage;
+    STBImage expectedImage;
     if (SLANG_FAILED(expectedImage.read(expectedPath.Buffer())))
     {
         context->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.Buffer());
         return TestResult::Fail;
     }
 
-    StbiImage actualImage;
+    STBImage actualImage;
     if (SLANG_FAILED(actualImage.read(actualPath.Buffer())))
     {
         context->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.Buffer());
