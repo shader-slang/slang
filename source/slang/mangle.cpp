@@ -1,7 +1,6 @@
 #include "mangle.h"
 
 #include "name.h"
-#include "ir-insts.h"
 #include "syntax.h"
 
 #include "../core/slang-cpu-defines.h"
@@ -193,82 +192,6 @@ namespace Slang
             // to allow demangling later.
             emitRaw(context, "k");
             emit(context, (UInt) constantIntVal->value);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unimplemented case in mangling");
-        }
-    }
-
-    void emitIRVal(
-        ManglingContext*    context,
-        IRInst*             inst);
-
-    void emitIRSimpleIntVal(
-        ManglingContext*    context,
-        IRInst*             inst)
-    {
-        if (auto intLit = as<IRIntLit>(inst))
-        {
-            auto cVal = intLit->getValue();
-            if(cVal >= 0 && cVal <= 9 )
-            {
-                emit(context, (UInt)cVal);
-                return;
-            }
-        }
-
-        // Fallback:
-        emitIRVal(context, inst);
-    }
-
-    void emitIRVal(
-        ManglingContext*    context,
-        IRInst*             inst)
-    {
-        if(auto basicType = as<IRBasicType>(inst) )
-        {
-            emitBaseType(context, basicType->getBaseType());
-            return;
-        }
-
-        if (auto globalVal = as<IRGlobalValue>(inst))
-        {
-            // If it is a global value, it has its own mangled name.
-            emit(context, getText(globalVal->mangledName));
-        }
-        // TODO: need to handle various type cases here
-        else if (auto intLit = as<IRIntLit>(inst))
-        {
-            // TODO: need to figure out what prefix/suffix is needed
-            // to allow demangling later.
-            emitRaw(context, "k");
-            emit(context, (UInt) intLit->getValue());
-        }
-        // Note: the cases here handling types really should match
-        // the cases above that handle AST-level `Type`s. This
-        // seems to be a weakness in the way we mangle names, because
-        // we may mangle in both IR-level and AST-level types.
-        else if (auto vecType = as<IRVectorType>(inst))
-        {
-            emitRaw(context, "v");
-            emitIRSimpleIntVal(context, vecType->getElementCount());
-            emitIRVal(context, vecType->getElementType());
-
-        }
-        else if( auto matType = as<IRMatrixType>(inst) )
-        {
-            emitRaw(context, "m");
-            emitIRSimpleIntVal(context, matType->getRowCount());
-            emitRaw(context, "x");
-            emitIRSimpleIntVal(context, matType->getColumnCount());
-            emitIRVal(context, matType->getElementType());
-        }
-        else if (auto arrType = as<IRArrayType>(inst))
-        {
-            emitRaw(context, "a");
-            emitIRSimpleIntVal(context, arrType->getElementCount());
-            emitIRVal(context, arrType->getElementCount());
         }
         else
         {
@@ -485,21 +408,6 @@ namespace Slang
     {
         return getMangledName(
             DeclRef<Decl>(declRef.decl, declRef.substitutions));
-    }
-
-    String mangleSpecializedFuncName(String baseName, IRSpecialize* specializeInst)
-    {
-        ManglingContext context;
-        emitRaw(&context, baseName.Buffer());
-        emitRaw(&context, "_G");
-
-        UInt argCount = specializeInst->getArgCount();
-        for (UInt aa = 0; aa < argCount; ++aa)
-        {
-            emitIRVal(&context, specializeInst->getArg(aa));
-        }
-
-        return context.sb.ProduceString();
     }
 
     String getMangledName(Decl* decl)

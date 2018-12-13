@@ -351,7 +351,6 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-            ordinaryStructType->mangledName = originalStructType->mangledName;
 
             if(auto nameHintDecoration = originalStructType->findDecoration<IRNameHintDecoration>())
             {

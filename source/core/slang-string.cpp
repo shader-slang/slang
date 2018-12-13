@@ -45,6 +45,23 @@ namespace Slang
 
     // UnownedStringSlice
 
+    bool UnownedStringSlice::startsWith(UnownedStringSlice const& other) const
+    {
+        UInt thisSize = size();
+        UInt otherSize = other.size();
+
+        if (otherSize > thisSize)
+            return false;
+
+        return UnownedStringSlice(begin(), begin() + otherSize) == other;
+    }
+
+    bool UnownedStringSlice::startsWith(char const* str) const
+    {
+        return startsWith(UnownedTerminatedStringSlice(str));
+    }
+
+
     bool UnownedStringSlice::endsWith(UnownedStringSlice const& other) const
     {
         UInt thisSize = size();

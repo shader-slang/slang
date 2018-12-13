@@ -109,7 +109,7 @@ static void registerLegalizedValue(
 
 struct IRGlobalNameInfo
 {
-    IRGlobalValue*  globalVar;
+    IRInst*         globalVar;
     UInt            counter;
 };
 
@@ -1156,6 +1156,8 @@ static LegalVal declareSimpleVar(
     UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo)
 {
+    SLANG_UNUSED(globalNameInfo);
+
     RefPtr<VarLayout> varLayout = createVarLayout(varChain, typeLayout);
 
     DeclRef<VarDeclBase> varDeclRef;
@@ -1176,25 +1178,6 @@ static LegalVal declareSimpleVar(
             auto globalVar = builder->createGlobalVar(type);
             globalVar->removeFromParent();
             globalVar->insertBefore(context->insertBeforeGlobal);
-
-            // The legalization of a global variable with linkage (one that has
-            // a mangled name), must also have an exported name, so that code
-            // can link against it.
-            //
-            // For now we do something *really* simplistic, and just append
-            // a counter to each leaf variable generated from the original
-            if (globalNameInfo)
-            {
-                String mangledNameStr = getText(globalNameInfo->globalVar->mangledName);
-                if (mangledNameStr.Length() != 0)
-                {
-                    mangledNameStr.append("L");
-                    mangledNameStr.append(Int32(globalNameInfo->counter++));
-                    globalVar->mangledName = context->session->getNameObj(mangledNameStr);
-                }
-            }
-
-
 
             irVar = globalVar;
             legalVarVal = LegalVal::simple(irVar);
@@ -1301,7 +1284,13 @@ static LegalVal declareVars(
 
             for (auto ee : tupleType->elements)
             {
-                auto fieldLayout = getFieldLayout(typeLayout, getText(ee.key->mangledName));
+                // Fields are currently required to have linkage, since we use
+                // their mangled name to look up field layout information.
+                //
+                auto fieldLinkage = ee.key->findDecoration<IRLinkageDecoration>();
+                SLANG_ASSERT(fieldLinkage);
+
+                auto fieldLayout = getFieldLayout(typeLayout, fieldLinkage->getMangledName());
                 RefPtr<TypeLayout> fieldTypeLayout = fieldLayout ? fieldLayout->typeLayout : nullptr;
 
                 // If we are processing layout information, then
