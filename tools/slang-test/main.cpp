@@ -1430,6 +1430,69 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     return TestResult::Pass;
 }
 
+class StbiImage
+{
+public:
+    typedef StbiImage ThisType;
+
+        /// Reset back to default initialized state (frees any image set)
+    void reset();
+        /// True if rhs has same size and amount of channels
+    bool isComparable(const ThisType& rhs) const;
+
+        /// The width in pixels
+    int getWidth() const { return m_width; }
+        /// The height in pixels
+    int getHeight() const { return m_height; }
+        /// The number of channels (typically held as bytes in order)
+    int getNumChannels() const { return m_numChannels; }
+
+        /// Get the contained pixels, nullptr if nothing loaded
+    const unsigned char* getPixels() const { return m_pixels; }
+    unsigned char* getPixels() { return m_pixels; }
+
+        /// Read an image with filename. SLANG_OK on success
+    SlangResult read(const char* filename);
+
+    ~StbiImage() { reset(); }
+
+    int m_width = 0;
+    int m_height = 0;
+    int m_numChannels = 0;
+    unsigned char* m_pixels = nullptr;
+};
+
+void StbiImage::reset()
+{
+    if (m_pixels)
+    {
+        stbi_image_free(m_pixels);
+        m_pixels = nullptr;
+    }
+    m_width = 0;
+    m_height = 0;
+    m_numChannels = 0;
+}
+
+SlangResult StbiImage::read(const char* filename)
+{
+    reset();
+
+    m_pixels = stbi_load(filename, &m_width, &m_height, &m_numChannels, 0);
+    if (!m_pixels)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+bool StbiImage::isComparable(const ThisType& rhs) const
+{
+    return (this == &rhs) ||
+        (m_width == rhs.m_width && m_height == rhs.m_height && m_numChannels == rhs.m_numChannels);
+}
+
+
 TestResult doImageComparison(TestContext* context, String const& filePath)
 {
     // Allow a difference in the low bits of the 8-bit result, just to play it safe
@@ -1441,78 +1504,85 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     String expectedPath = filePath + ".expected.png";
     String actualPath = filePath + ".actual.png";
 
-    int expectedX,  expectedY,  expectedN;
-    int actualX,    actualY,    actualN;
-
-    unsigned char* expectedData = stbi_load(expectedPath.begin(), &expectedX, &expectedY, &expectedN, 0);
-    unsigned char* actualData = stbi_load(actualPath.begin(), &actualX, &actualY, &actualN, 0);
-
-    if(!expectedData)   
+    StbiImage expectedImage;
+    if (SLANG_FAILED(expectedImage.read(expectedPath.Buffer())))
     {
         context->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.Buffer());
         return TestResult::Fail;
     }
-    if(!actualData)
+
+    StbiImage actualImage;
+    if (SLANG_FAILED(actualImage.read(actualPath.Buffer())))
     {
-        context->messageFormat(TestMessageType::RunError, "Unable to load image '%s'", actualPath.Buffer());
+        context->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.Buffer());
         return TestResult::Fail;
     }
 
-    if(expectedX != actualX || expectedY != actualY || expectedN != actualN)    
+    if (!expectedImage.isComparable(actualImage))
     {
         context->messageFormat(TestMessageType::TestFailure, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
         return TestResult::Fail;
     }
 
-    unsigned char* expectedCursor = expectedData;
-    unsigned char* actualCursor = actualData;
+    {
+        const unsigned char* expectedPixels = expectedImage.getPixels();
+        const unsigned char* actualPixels = actualImage.getPixels();
 
-    for( int y = 0; y < actualY; ++y )
-	{
-		for( int x = 0; x < actualX; ++x )
-		{
-			for( int n = 0; n < actualN; ++n )
-			{
-				int expectedVal = *expectedCursor++;
-				int actualVal = *actualCursor++;
+        const int height = actualImage.getHeight();
+        const int width = actualImage.getWidth();
+        const int numChannels = actualImage.getNumChannels();
+        const int rowSize = width * numChannels;
 
-				int absoluteDiff = actualVal - expectedVal;
-				if(absoluteDiff < 0) absoluteDiff = -absoluteDiff;
+        for (int y = 0; y < height; ++y)
+        {
+            for (int i = 0; i < rowSize; ++i)
+            {
+                int expectedVal = expectedPixels[i];
+                int actualVal = actualPixels[i];
 
-				if( absoluteDiff < kAbsoluteDiffCutoff )
-				{
-					// There might be a difference, but we'll consider it to be inside tolerance
-					continue;
-				}
+                int absoluteDiff = actualVal - expectedVal;
+                if (absoluteDiff < 0) absoluteDiff = -absoluteDiff;
 
-				float relativeDiff = 0.0f;
-				if( expectedVal != 0 )
-				{
-					relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
+                if (absoluteDiff < kAbsoluteDiffCutoff)
+                {
+                    // There might be a difference, but we'll consider it to be inside tolerance
+                    continue;
+                }
 
-					if( relativeDiff < kRelativeDiffCutoff )
-					{
-						// relative difference was small enough
-						continue;
-					}
-				}
+                float relativeDiff = 0.0f;
+                if (expectedVal != 0)
+                {
+                    relativeDiff = fabsf(float(actualVal) - float(expectedVal)) / float(expectedVal);
 
-				// TODO: may need to do some local search sorts of things, to deal with
-				// cases where vertex shader results lead to rendering that is off
-				// by one pixel...
+                    if (relativeDiff < kRelativeDiffCutoff)
+                    {
+                        // relative difference was small enough
+                        continue;
+                    }
+                }
+
+                // TODO: may need to do some local search sorts of things, to deal with
+                // cases where vertex shader results lead to rendering that is off
+                // by one pixel...
+
+                const int x = i / numChannels;
+                const int channelIndex = i % numChannels;
 
                 context->messageFormat(TestMessageType::TestFailure, "image compare failure at (%d,%d) channel %d. expected %d got %d (absolute error: %d, relative error: %f)\n",
-                    x, y, n,
+                    x, y, channelIndex,
                     expectedVal,
                     actualVal,
                     absoluteDiff,
                     relativeDiff);
 
-			    // There was a difference we couldn't excuse!
-			    return TestResult::Fail;
-		    }
-		}
-	}
+                // There was a difference we couldn't excuse!
+                return TestResult::Fail;
+            }
+
+            expectedPixels += rowSize;
+            actualPixels += rowSize; 
+        }
+    }
 
     return TestResult::Pass;
 }
@@ -2015,66 +2085,75 @@ int main(
         g_options.excludeCategories.Add(vulkanTestCategory, vulkanTestCategory);
     }
 
-    // Setup the context 
-    TestContext context;
-    if (SLANG_FAILED(context.init(g_options.outputMode)))
+    int returnCode = 0;
     {
-        // Unable to initialize context
-        return 1;
-    }
-
-    context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
-    context.m_useExes = g_options.useExes;
-    context.m_isVerbose = g_options.shouldBeVerbose;
-
-    { 
-        TestContext::SuiteScope suiteScope(&context, "tests");
-        // Enumerate test files according to policy
-        // TODO: add more directories to this list
-        // TODO: allow for a command-line argument to select a particular directory
-        runTestsInDirectory(&context, "tests/");
-    }
-
-    // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
-    // They are registered with SLANG_UNIT_TEST macro
-    {
-        TestContext::SuiteScope suiteScope(&context, "unit tests");
-        TestContext::set(&context);
-
-        // Run the unit tests
-        TestRegister* cur = TestRegister::s_first;
-        while (cur)
+        // Setup the context 
+        TestContext context;
+        if (SLANG_FAILED(context.init(g_options.outputMode)))
         {
-            StringBuilder filePath;
-            filePath << "unit-tests/" << cur->m_name << ".internal";
-
-            TestOptions testOptions;
-            testOptions.categories.Add(unitTestCatagory);
-            testOptions.command = filePath;
-
-            if (shouldRunTest(&context, testOptions.command))
-            {
-                if (testPassesCategoryMask(&context, testOptions))
-                {
-                    context.startTest(testOptions.command);
-                    // Run the test function
-                    cur->m_func();
-                    context.endTest();
-                }
-                else
-                {
-                    context.addTest(testOptions.command, TestResult::Ignored);
-                }
-            }
-                
-            // Next
-            cur = cur->m_next;
+            // Unable to initialize context
+            return 1;
         }
 
-        TestContext::set(nullptr);
+        context.m_dumpOutputOnFailure = g_options.dumpOutputOnFailure;
+        context.m_useExes = g_options.useExes;
+        context.m_isVerbose = g_options.shouldBeVerbose;
+
+        {
+            TestContext::SuiteScope suiteScope(&context, "tests");
+            // Enumerate test files according to policy
+            // TODO: add more directories to this list
+            // TODO: allow for a command-line argument to select a particular directory
+            runTestsInDirectory(&context, "tests/");
+        }
+
+        // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
+        // They are registered with SLANG_UNIT_TEST macro
+        {
+            TestContext::SuiteScope suiteScope(&context, "unit tests");
+            TestContext::set(&context);
+
+            // Run the unit tests
+            TestRegister* cur = TestRegister::s_first;
+            while (cur)
+            {
+                StringBuilder filePath;
+                filePath << "unit-tests/" << cur->m_name << ".internal";
+
+                TestOptions testOptions;
+                testOptions.categories.Add(unitTestCatagory);
+                testOptions.command = filePath;
+
+                if (shouldRunTest(&context, testOptions.command))
+                {
+                    if (testPassesCategoryMask(&context, testOptions))
+                    {
+                        context.startTest(testOptions.command);
+                        // Run the test function
+                        cur->m_func();
+                        context.endTest();
+                    }
+                    else
+                    {
+                        context.addTest(testOptions.command, TestResult::Ignored);
+                    }
+                }
+
+                // Next
+                cur = cur->m_next;
+            }
+
+            TestContext::set(nullptr);
+        }
+
+        context.outputSummary();
+
+        returnCode = context.didAllSucceed() ? 0 : 1;
     }
 
-    context.outputSummary();
+#ifdef _MSC_VER
+    _CrtDumpMemoryLeaks();
+#endif
 
-    return context.didAllSucceed() ? 0 : 1; 
+    return returnCode; 
 }
