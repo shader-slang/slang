@@ -96,6 +96,8 @@ public:
     virtual void waitForGpu() override {}
     virtual RendererType getRendererType() const override { return RendererType::DirectX11; }
 
+    ~D3D11Renderer() {}
+
     protected:
 
 #if 0
