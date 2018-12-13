@@ -4,10 +4,10 @@
 #include "slang-string.h"
 
 #include "../../slang-com-helper.h"
+#include "../../source/core/list.h"
 
 namespace Slang
 {
-
 
 class WriterHelper
 {
@@ -48,7 +48,6 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::IsStatic) ? 1 : (uint32_t)releaseReference(); }
 
     // ISlangWriter - default impl
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) { SLANG_UNUSED(args); SLANG_UNUSED(format); return SLANG_E_NOT_IMPLEMENTED; }
     SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE {}
     SLANG_NO_THROW virtual bool SLANG_MCALL isConsole() SLANG_OVERRIDE { return (m_flags & WriterFlag::IsConsole) != 0; }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL setMode(SlangWriterMode mode) SLANG_OVERRIDE { SLANG_UNUSED(mode);  return SLANG_FAIL; }
@@ -63,10 +62,28 @@ protected:
     WriterFlags m_flags;
 };
 
-class CallbackWriter : public BaseWriter
+/* Implemented the append buffer part of the writer, such that calls to begin/endAppendBuffer are transformed into appropriate calls to write method */
+class AppendBufferWriter : public BaseWriter
 {
 public:
-    typedef BaseWriter Parent;   
+    typedef BaseWriter Parent;
+
+    // ISlangWriter default impl for appendBuffer
+    SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL endAppendBuffer(char* buffer, size_t numChars) SLANG_OVERRIDE;
+
+    AppendBufferWriter(WriterFlags flags) :
+        Parent(flags)
+    {}
+
+protected:
+    List<char> m_appendBuffer;
+};
+
+class CallbackWriter : public AppendBufferWriter
+{
+public:
+    typedef AppendBufferWriter Parent;
     // ISlangWriter
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
@@ -82,12 +99,11 @@ protected:
     const void* m_data;
 };
 
-class FileWriter : public BaseWriter
+class FileWriter : public AppendBufferWriter
 {
 public:
-    typedef BaseWriter Parent;
+    typedef AppendBufferWriter Parent;
     // ISlangWriter
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL setMode(SlangWriterMode mode) SLANG_OVERRIDE;
@@ -113,7 +129,8 @@ class StringWriter : public BaseWriter
 public:
     typedef BaseWriter Parent;
     // ISlangWriter
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE;
+    SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL endAppendBuffer(char* buffer, size_t numChars) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
         /// Ctor
@@ -126,14 +143,12 @@ protected:
     StringBuilder* m_builder;
 };
 
-class NullWriter : public BaseWriter
+class NullWriter : public AppendBufferWriter
 {
 public:
-    typedef BaseWriter Parent;
+    typedef AppendBufferWriter Parent;
     // ISlangWriter
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL writeVaList(const char* format, va_list args) SLANG_OVERRIDE { SLANG_UNUSED(format); SLANG_UNUSED(args); return SLANG_OK; }
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE { SLANG_UNUSED(chars); SLANG_UNUSED(numChars); return SLANG_OK; }
-
     /// Ctor
     NullWriter(WriterFlags flags) :
         Parent(flags)
