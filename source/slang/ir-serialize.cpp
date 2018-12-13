@@ -20,7 +20,6 @@ variables, but only a few types include extra data, and these do not have any op
 
 * IRConstant        - Needs special-case handling
 * IRModuleInst      - Presumably we can just set to the module pointer on reconstruction
-* IRGlobalValue     - There are types derived from this type, but they don't add a parameter
 
 Note! That on an IRInst there is an IRType* variable (accessed as getFullType()). As it stands it may NOT actually point 
 to an IRType derived type. Its 'ok' as long as it's an instruction that can be used in the place of the type. So this code does not 
@@ -40,12 +39,6 @@ bother to check if it's correct, and just casts it.
     { 0, 0 },   // Float64,
     { 0, 0 }    // Int64,
 };
-
-static bool isGlobalValueDerived(IROp opIn)
-{
-    const int op = (kIROpMeta_PseudoOpMask & opIn);
-    return op >= kIROp_FirstGlobalValue && op <= kIROp_LastGlobalValue;
-}
 
 static bool isTextureTypeBase(IROp opIn)
 {
@@ -499,13 +492,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                         return SLANG_FAIL;
                     }
                 }
-                continue;
-            }
-            IRGlobalValue* globValue = as<IRGlobalValue>(srcInst);
-            if (globValue)
-            {
-                dstInst.m_payloadType = PayloadType::String_1;
-                dstInst.m_payload.m_stringIndices[0] = getStringIndex(globValue->mangledName);
                 continue;
             }
 
@@ -1340,104 +1326,90 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
         const IROp op((IROp)srcInst.m_op);
 
-        if (isGlobalValueDerived(op))
+        if (isConstant(op))
         {
-            // Cannot have operands
-            SLANG_ASSERT(srcInst.getNumOperands() == 0);
+            // Handling of constants
 
-            IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
-            insts[i] = globalValueInst;
-            // Set the global value
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            globalValueInst->mangledName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+            // Calculate the minimum object size (ie not including the payload of value)    
+            const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
+
+            IRConstant* irConst = nullptr;
+            switch (op)
+            {                    
+                case kIROp_BoolLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
+                    break;
+                }
+                case kIROp_IntLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst->value.intVal = srcInst.m_payload.m_int64; 
+                    break;
+                }
+                case kIROp_PtrLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(void*)));
+                    irConst->value.ptrVal = (void*) (intptr_t) srcInst.m_payload.m_int64; 
+                    break;
+                }
+                case kIROp_FloatLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
+                    irConst->value.floatVal = srcInst.m_payload.m_float64;
+                    break;
+                }
+                case kIROp_StringLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+
+                    const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+                        
+                    const size_t sliceSize = slice.size();
+                    const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
+
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
+
+                    IRConstant::StringValue& dstString = irConst->value.stringVal;
+
+                    dstString.numChars = uint32_t(sliceSize);
+                    // Turn into pointer to avoid warning of array overrun
+                    char* dstChars = dstString.chars;
+                    // Copy the chars
+                    memcpy(dstChars, slice.begin(), sliceSize);
+                    break;
+                }
+                default:
+                {
+                    SLANG_ASSERT(!"Unknown constant type");
+                    return SLANG_FAIL;
+                }
+            }
+
+            insts[i] = irConst;
+        }
+        else if (isTextureTypeBase(op))
+        {
+            IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
+
+            // Reintroduce the texture type bits into the the
+            const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
+            inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
+
+            insts[i] = inst;
         }
         else
         {
-            if (isConstant(op))
-            {
-                // Handling of constants
-
-                // Calculate the minimum object size (ie not including the payload of value)    
-                const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
-
-                IRConstant* irConst = nullptr;
-                switch (op)
-                {                    
-                    case kIROp_BoolLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
-                        irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
-                        break;
-                    }
-                    case kIROp_IntLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
-                        irConst->value.intVal = srcInst.m_payload.m_int64; 
-                        break;
-                    }
-                    case kIROp_PtrLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(void*)));
-                        irConst->value.ptrVal = (void*) (intptr_t) srcInst.m_payload.m_int64; 
-                        break;
-                    }
-                    case kIROp_FloatLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
-                        irConst->value.floatVal = srcInst.m_payload.m_float64;
-                        break;
-                    }
-                    case kIROp_StringLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-
-                        const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-                        
-                        const size_t sliceSize = slice.size();
-                        const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
-
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
-
-                        IRConstant::StringValue& dstString = irConst->value.stringVal;
-
-                        dstString.numChars = uint32_t(sliceSize);
-                        // Turn into pointer to avoid warning of array overrun
-                        char* dstChars = dstString.chars;
-                        // Copy the chars
-                        memcpy(dstChars, slice.begin(), sliceSize);
-                        break;
-                    }
-                    default:
-                    {
-                        SLANG_ASSERT(!"Unknown constant type");
-                        return SLANG_FAIL;
-                    }
-                }
-
-                insts[i] = irConst;
-            }
-            else if (isTextureTypeBase(op))
-            {
-                IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
-                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
-
-                // Reintroduce the texture type bits into the the
-                const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
-                inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
-
-                insts[i] = inst;
-            }
-            else
-            {
-                int numOperands = srcInst.getNumOperands();
-                insts[i] = createEmptyInst(module, op, numOperands);
-            }
-        }                    
-    } 
+            int numOperands = srcInst.getNumOperands();
+            insts[i] = createEmptyInst(module, op, numOperands);
+        }
+    }
 
     // Patch up the operands
     for (int i = 1; i < numInsts; ++i)

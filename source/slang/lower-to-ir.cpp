@@ -384,6 +384,48 @@ void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
     context->env->mapDeclToValue[decl] = value;
 }
 
+ModuleDecl* findModuleDecl(Decl* decl)
+{
+    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    {
+        if (auto moduleDecl = dynamic_cast<ModuleDecl*>(dd))
+            return moduleDecl;
+    }
+    return nullptr;
+}
+
+bool isFromStdLib(Decl* decl)
+{
+    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    {
+        if (dd->HasModifier<FromStdLibModifier>())
+            return true;
+    }
+    return false;
+}
+
+bool isImportedDecl(IRGenContext* context, Decl* decl)
+{
+    ModuleDecl* moduleDecl = findModuleDecl(decl);
+    if (!moduleDecl)
+        return false;
+
+    // HACK: don't treat standard library code as
+    // being imported for right now, just because
+    // we don't load its IR in the same way as
+    // for other imports.
+    //
+    // TODO: Fix this the right way, by having standard
+    // library declarations have IR modules that we link
+    // in via the normal means.
+    if (isFromStdLib(decl))
+        return false;
+
+    if (moduleDecl != context->shared->mainModuleDecl)
+        return true;
+
+    return false;
+}
 
     /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(
@@ -954,6 +996,51 @@ IRType* getIntType(
     return context->irBuilder->getBasicType(BaseType::Int);
 }
 
+static IRGeneric* getOuterGeneric(IRInst* gv)
+{
+    auto parentBlock = as<IRBlock>(gv->getParent());
+    if (!parentBlock) return nullptr;
+
+    auto parentGeneric = as<IRGeneric>(parentBlock->getParent());
+    return parentGeneric;
+}
+
+static void addLinkageDecoration(
+    IRGenContext*               context,
+    IRInst*                     inInst,
+    Decl*                       decl,
+    UnownedStringSlice const&   mangledName)
+{
+    // If the instruction is nested inside one or more generics,
+    // then the mangled name should really apply to the outer-most
+    // generic, and not the declaration nested inside.
+
+    auto builder = context->irBuilder;
+
+    IRInst* inst = inInst;
+    while (auto outerGeneric = getOuterGeneric(inst))
+    {
+        inst = outerGeneric;
+    }
+
+    if(isImportedDecl(context, decl))
+    {
+        builder->addImportDecoration(inst, mangledName);
+    }
+    else
+    {
+        builder->addExportDecoration(inst, mangledName);
+    }
+}
+
+static void addLinkageDecoration(
+    IRGenContext*               context,
+    IRInst*                     inst,
+    Decl*                       decl)
+{
+    addLinkageDecoration(context, inst, decl, getMangledName(decl).getUnownedSlice());
+}
+
 IRStructKey* getInterfaceRequirementKey(
     IRGenContext*   context,
     Decl*           requirementDecl)
@@ -973,8 +1060,8 @@ IRStructKey* getInterfaceRequirementKey(
     // this requirement in the IR, and to allow lookup
     // into the declaration.
     requirementKey = builder->createStructKey();
-    requirementKey->mangledName = context->getSession()->getNameObj(
-        getMangledName(requirementDecl));
+
+    addLinkageDecoration(context, requirementKey, requirementDecl);
 
     context->shared->interfaceRequirementKeys.Add(requirementDecl, requirementKey);
 
@@ -3461,7 +3548,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // alias is somehow generic.
         if(outerGeneric)
         {
-            setMangledName(outerGeneric, getMangledName(decl));
+            addLinkageDecoration(context, outerGeneric, decl);
         }
 
         auto type = lowerType(subContext, decl->type.type);
@@ -3499,7 +3586,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // and so it should lower as a parameter of its own.
 
             auto inst = getBuilder()->emitGlobalGenericParam();
-            setMangledName(inst, getMangledName(decl));
+            addLinkageDecoration(context, inst, decl);
             return LoweredValInfo::simple(inst);
         }
 
@@ -3515,7 +3602,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         auto inst = getBuilder()->emitGlobalGenericParam();
-        setMangledName(inst, getMangledName(decl));
+        addLinkageDecoration(context, inst, decl);
         return LoweredValInfo::simple(inst);
     }
 
@@ -3643,8 +3730,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // on the type that is conforming, and the type that it conforms to.
         //
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
-        auto mangledName = context->getSession()->getNameObj(
-            getMangledNameForConformanceWitness(subType, superType));
+        auto mangledName = getMangledNameForConformanceWitness(subType, superType);
 
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
@@ -3666,7 +3752,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Create the IR-level witness table
         auto irWitnessTable = subBuilder->createWitnessTable();
-        setMangledName(irWitnessTable, mangledName);
+        addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
         setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(irWitnessTable));
@@ -3762,7 +3848,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irGlobal = builder->createGlobalVar(varType);
             globalVal = LoweredValInfo::ptr(irGlobal);
         }
-        irGlobal->mangledName = context->getSession()->getNameObj(getMangledName(decl));
+        addLinkageDecoration(context, irGlobal, decl);
         addNameHint(context, irGlobal, decl);
 
         maybeSetRate(context, irGlobal, decl);
@@ -4137,35 +4223,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    IRGeneric* getOuterGeneric(IRGlobalValue* gv)
-    {
-        auto parentBlock = as<IRBlock>(gv->getParent());
-        if (!parentBlock) return nullptr;
-
-        auto parentGeneric = as<IRGeneric>(parentBlock->getParent());
-        return parentGeneric;
-    }
-
-    void setMangledName(IRGlobalValue* inst, Name* name)
-    {
-        // If the instruction is nested inside one or more generics,
-        // then the mangled name should really apply to the outer-most
-        // generic, and not the declaration nested inside.
-
-        IRGlobalValue* gv = inst;
-        while (auto outerGeneric = getOuterGeneric(gv))
-        {
-            gv = outerGeneric;
-        }
-
-        gv->mangledName = name;
-    }
-
-    void setMangledName(IRGlobalValue* inst, String const& name)
-    {
-        setMangledName(inst, context->getSession()->getNameObj(name));
-    }
-
     LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
     {
         // A case within an `enum` decl will lower to a value
@@ -4241,7 +4298,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRStructType* irStruct = subBuilder->createStructType();
         addNameHint(context, irStruct, decl);
 
-        setMangledName(irStruct, getMangledName(decl));
+        addLinkageDecoration(context, irStruct, decl);
 
         subBuilder->setInsertInto(irStruct);
 
@@ -4306,8 +4363,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addVarDecorations(context, irFieldKey, fieldDecl);
 
-        irFieldKey->mangledName = context->getSession()->getNameObj(
-            getMangledName(fieldDecl));
+        addLinkageDecoration(context, irFieldKey, fieldDecl);
 
         if (auto semanticModifier = fieldDecl->FindModifier<HLSLSimpleSemantic>())
         {
@@ -4582,47 +4638,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
-    ModuleDecl* findModuleDecl(Decl* decl)
-    {
-        for (auto dd = decl; dd; dd = dd->ParentDecl)
-        {
-            if (auto moduleDecl = dynamic_cast<ModuleDecl*>(dd))
-                return moduleDecl;
-        }
-        return nullptr;
-    }
-
-    bool isFromStdLib(Decl* decl)
-    {
-        for (auto dd = decl; dd; dd = dd->ParentDecl)
-        {
-            if (dd->HasModifier<FromStdLibModifier>())
-                return true;
-        }
-        return false;
-    }
-
     bool isImportedDecl(Decl* decl)
     {
-        ModuleDecl* moduleDecl = findModuleDecl(decl);
-        if (!moduleDecl)
-            return false;
-
-        // HACK: don't treat standard library code as
-        // being imported for right now, just because
-        // we don't load its IR in the same way as
-        // for other imports.
-        //
-        // TODO: Fix this the right way, by having standard
-        // library declarations have IR modules that we link
-        // in via the normal means.
-        if (isFromStdLib(decl))
-            return false;
-
-        if (moduleDecl != this->context->shared->mainModuleDecl)
-            return true;
-
-        return false;
+        return Slang::isImportedDecl(context, decl);
     }
 
     bool isConstExprVar(Decl* decl)
@@ -4659,20 +4677,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = subContext->irBuilder;
 
         // Of course, a generic might itself be nested inside of other generics...
-        auto nextOuterGeneric = emitOuterGenerics(subContext, genericDecl, leafDecl);
+        emitOuterGenerics(subContext, genericDecl, leafDecl);
 
         // We need to create an IR generic
 
         auto irGeneric = subBuilder->emitGeneric();
         subBuilder->setInsertInto(irGeneric);
-
-        if (!nextOuterGeneric)
-        {
-            // If this is the outer-most generic, then it will be the
-            // global symbol that gets the mangled name from the inner
-            // declaration actually being lowered.
-            irGeneric->mangledName = context->getSession()->getNameObj(getMangledName(leafDecl));
-        }
 
         auto irBlock = subBuilder->emitBlock();
         subBuilder->setInsertInto(irBlock);
@@ -4848,8 +4858,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(context, irFunc, decl);
-
-        setMangledName(irFunc, getMangledName(decl));
+        addLinkageDecoration(context, irFunc, decl);
 
         List<IRType*> paramTypes;
 

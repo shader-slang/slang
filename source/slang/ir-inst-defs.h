@@ -153,23 +153,19 @@ INST(StructType, struct, 0, PARENT)
 
 INST_RANGE(Type, VoidType, StructType)
 
-/*IRGlobalValue*/
+/*IRGlobalValueWithCode*/
+    /* IRGlobalValueWIthParams*/
+        INST(Func, func, 0, PARENT)
+        INST(Generic, generic, 0, PARENT)
+    INST_RANGE(GlobalValueWithParams, Func, Generic)
 
-    /*IRGlobalValueWithCode*/
-        /* IRGlobalValueWIthParams*/
-            INST(Func, func, 0, PARENT)
-            INST(Generic, generic, 0, PARENT)
-        INST_RANGE(GlobalValueWithParams, Func, Generic)
+    INST(GlobalVar, global_var, 0, 0)
+    INST(GlobalConstant, global_constant, 0, 0)
+INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
 
-        INST(GlobalVar, global_var, 0, 0)
-        INST(GlobalConstant, global_constant, 0, 0)
-    INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
-
-    INST(StructKey, key, 0, 0)
-    INST(GlobalGenericParam, global_generic_param, 0, 0)
-    INST(WitnessTable, witness_table, 0, 0)
-
-INST_RANGE(GlobalValue, StructType, WitnessTable)
+INST(StructKey, key, 0, 0)
+INST(GlobalGenericParam, global_generic_param, 0, 0)
+INST(WitnessTable, witness_table, 0, 0)
 
 INST(Module, module, 0, PARENT)
 
@@ -384,7 +380,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
-INST_RANGE(Decoration, HighLevelDeclDecoration, PatchConstantFuncDecoration)
+    /* LinkageDecoration */
+        INST(ImportDecoration, import, 1, 0)
+        INST(ExportDecoration, export, 1, 0)
+    INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
+
+INST_RANGE(Decoration, HighLevelDeclDecoration, ExportDecoration)
 
 
 //

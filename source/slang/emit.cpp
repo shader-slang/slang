@@ -1,6 +1,7 @@
 // emit.cpp
 #include "emit.h"
 
+#include "../core/slang-writer.h"
 #include "ir-insts.h"
 #include "ir-restructure.h"
 #include "ir-restructure-scoping.h"
@@ -2226,17 +2227,9 @@ struct EmitVisitor
 
 
         // If the instruction has a mangled name, then emit using that.
-        if (auto globalValue = as<IRGlobalValue>(inst))
+        if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
         {
-            auto mangledName = globalValue->mangledName;
-            if (mangledName)
-            {
-                auto mangledNameText = getText(mangledName);
-                if (mangledNameText.Length() != 0)
-                {
-                    return getText(mangledName);
-                }
-            }
+            return linkageDecoration->getMangledName();
         }
 
         // Otherwise fall back to a construct temporary name
@@ -3411,7 +3404,7 @@ struct EmitVisitor
         // (which is `func` above), so we need to walk
         // upwards to find it.
         //
-        IRGlobalValue* valueForName = func;
+        IRInst* valueForName = func;
         for(;;)
         {
             auto parentBlock = as<IRBlock>(valueForName->parent);
@@ -3425,9 +3418,17 @@ struct EmitVisitor
             valueForName = parentGeneric;
         }
 
+        // If we reach this point, we are assuming that the value
+        // has some kind of linkage, and thus a mangled name.
+        //
+        auto linkageDecoration = valueForName->findDecoration<IRLinkageDecoration>();
+        SLANG_ASSERT(linkageDecoration);
+        auto mangledName = String(linkageDecoration->getMangledName());
+
+
         // We will use the `UnmangleContext` utility to
         // help us split the original name into its pieces.
-        UnmangleContext um(getText(valueForName->mangledName));
+        UnmangleContext um(mangledName);
         um.startUnmangling();
 
         // We'll read through the qualified name of the
@@ -5969,13 +5970,16 @@ struct EmitVisitor
             // appropriate decoration to these variables to indicate their
             // purpose.
             //
-            if(getText(varDecl->mangledName).StartsWith("gl_"))
+            if(auto linkageDecoration = varDecl->findDecoration<IRLinkageDecoration>())
             {
-                // The variable represents an OpenGL system value,
-                // so we will assume that it doesn't need to be declared.
-                //
-                // TODO: handle case where we *should* declare the variable.
-                return;
+                if(linkageDecoration->getMangledName().startsWith("gl_"))
+                {
+                    // The variable represents an OpenGL system value,
+                    // so we will assume that it doesn't need to be declared.
+                    //
+                    // TODO: handle case where we *should* declare the variable.
+                    return;
+                }
             }
         }
 
@@ -6363,6 +6367,31 @@ void legalizeTypes(
     TypeLegalizationContext*    context,
     IRModule*                   module);
 
+static void dumpIRIfEnabled(
+    CompileRequest* compileRequest,
+    IRModule*       irModule,
+    char const*     label = nullptr)
+{
+    if(compileRequest->shouldDumpIR)
+    {
+        WriterHelper writer(compileRequest->getWriter(WriterChannel::StdError));
+
+        if(label)
+        {
+            writer.put("### ");
+            writer.put(label);
+            writer.put(":\n");
+        }
+
+        dumpIR(irModule, writer.getWriter());
+
+        if( label )
+        {
+            writer.put("###\n");
+        }
+    }
+}
+
 String emitEntryPoint(
     EntryPointRequest*  entryPoint,
     ProgramLayout*      programLayout,
@@ -6422,9 +6451,7 @@ String emitEntryPoint(
             &sharedContext.extensionUsageTracker);
 
 #if 0
-        fprintf(stderr, "### CLONED:\n");
-        dumpIR(irModule);
-        fprintf(stderr, "###\n");
+        dumpIRIfEnabled(compileRequest, irModule, "CLONED");
 #endif
 
         validateIRModuleIfEnabled(compileRequest, irModule);
@@ -6432,12 +6459,7 @@ String emitEntryPoint(
         // If the user specified the flag that they want us to dump
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
-        if (translationUnit->compileRequest->shouldDumpIR)
-        {
-            ISlangWriter* writer = translationUnit->compileRequest->getWriter(WriterChannel::StdError);
-
-            dumpIR(irModule, writer);
-        }
+        dumpIRIfEnabled(compileRequest, irModule);
 
         // Next, we need to ensure that the code we emit for
         // the target doesn't contain any operations that would
@@ -6449,9 +6471,7 @@ String emitEntryPoint(
 
         // Debugging code for IR transformations...
 #if 0
-        fprintf(stderr, "### SPECIALIZED:\n");
-        dumpIR(irModule);
-        fprintf(stderr, "###\n");
+        dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
@@ -6466,9 +6486,7 @@ String emitEntryPoint(
 
         //  Debugging output of legalization
 #if 0
-        fprintf(stderr, "### LEGALIZED:\n");
-        dumpIR(irModule);
-        fprintf(stderr, "###\n");
+        dumpIRIfEnabled(compileRequest, irModule, "LEGALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
@@ -6480,9 +6498,7 @@ String emitEntryPoint(
         constructSSA(irModule);
 
 #if 0
-        fprintf(stderr, "### AFTER SSA:\n");
-        dumpIR(irModule);
-        fprintf(stderr, "###\n");
+        dumpIRIfEnabled(compileRequest, irModule, "AFTER SSA");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
