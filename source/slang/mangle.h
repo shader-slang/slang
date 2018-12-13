@@ -14,8 +14,6 @@ namespace Slang
     String getMangledName(DeclRef<Decl> const & declRef);
     String getMangledName(DeclRefBase const & declRef);
 
-    String mangleSpecializedFuncName(String baseName, IRSpecialize* specializeInst);
-
     String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup);

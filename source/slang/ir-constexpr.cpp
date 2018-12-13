@@ -16,8 +16,8 @@ struct PropagateConstExprContext
     SharedIRBuilder sharedBuilder;
     IRBuilder builder;
 
-    List<IRGlobalValue*> workList;
-    HashSet<IRGlobalValue*> onWorkList;
+    List<IRInst*> workList;
+    HashSet<IRInst*> onWorkList;
 
     IRBuilder* getBuilder() { return &builder; }
 
@@ -158,7 +158,7 @@ bool propagateConstExprForward(
 
 void maybeAddToWorkList(
     PropagateConstExprContext*  context,
-    IRGlobalValue*              gv)
+    IRInst*                     gv)
 {
     if( !context->onWorkList.Contains(gv) )
     {
@@ -484,10 +484,7 @@ void propagateConstExpr(
     
     for( auto ii : module->getGlobalInsts() )
     {
-        auto gv = as<IRGlobalValue>(ii);
-        if (!gv)
-            continue;
-        maybeAddToWorkList(&context, gv);
+        maybeAddToWorkList(&context, ii);
     }
 
     // We will iterate applying propagation to one global value at a time

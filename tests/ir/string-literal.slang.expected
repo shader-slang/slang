@@ -1,27 +1,14 @@
 result code = 0
 standard error = {
-let  %1	: _	= String()
-let  %2	: %1	= string_constant("main")
-let  %3	: _	= Void()
-let  %4	: _	= UInt()
-let  %5	: _	= Func(%3, %4)
-let  %6	: _	= BasicBlock()
-let  %7	: _	= Ptr(%3)
-let  %8	: %7	= ptr_constant()
-let  %9	: %1	= string_constant("tid")
-Ptr(%4)
-let  %10	: %1	= string_constant("Hello \t\n\0x083 World")
-let  %11	: %7	= ptr_constant()
-[highLevelDecl(%11)]
+[export("_S04mainp1puV")]
 [nameHint("main")]
-func @_S04mainp1puV	: %5
+func %main	: Func(Void, UInt)
 {
-block %12(
-		param %13	: %4):
-	return_void()
+block %1(
+		[nameHint("tid")]
+		param %tid	: UInt):
+	return_void
 }
-
-
 }
 standard output = {
 }
