@@ -1966,6 +1966,18 @@ namespace Slang
         return globalConstant;
     }
 
+    IRGlobalParam* IRBuilder::createGlobalParam(
+        IRType* valueType)
+    {
+        IRGlobalParam* inst = createInst<IRGlobalParam>(
+            this,
+            kIROp_GlobalParam,
+            valueType);
+        maybeSetSourceLoc(this, inst);
+        addGlobalValue(this, inst);
+        return inst;
+    }
+
     IRWitnessTable* IRBuilder::createWitnessTable()
     {
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
@@ -3730,6 +3742,7 @@ namespace Slang
         case kIROp_Generic:
         case kIROp_GlobalVar:
         case kIROp_GlobalConstant:
+        case kIROp_GlobalParam:
         case kIROp_StructKey:
         case kIROp_GlobalGenericParam:
         case kIROp_WitnessTable:
@@ -3800,7 +3813,7 @@ namespace Slang
     // Legalization of entry points for GLSL:
     //
 
-    IRGlobalVar* addGlobalVariable(
+    IRGlobalParam* addGlobalParam(
         IRModule*   module,
         IRType*     valueType)
     {
@@ -3812,7 +3825,7 @@ namespace Slang
 
         IRBuilder builder;
         builder.sharedBuilder = &shared;
-        return builder.createGlobalVar(valueType);
+        return builder.createGlobalParam(valueType);
     }
 
     void moveValueBefore(
@@ -4277,18 +4290,26 @@ namespace Slang
         varLayout->stage = inVarLayout->stage;
         varLayout->AddResourceInfo(kind)->index = bindingIndex;
 
-        // Simple case: just create a global variable of the matching type,
-        // and then use the value of the global as a replacement for the
-        // value of the original parameter.
+        // We are going to be creating a global parameter to replace
+        // the function parameter, but we need to handle the case
+        // where the parameter represents a varying *output* and not
+        // just an input.
         //
-        auto globalVariable = addGlobalVariable(builder->getModule(), type);
-        moveValueBefore(globalVariable, builder->getFunc());
+        // Our IR global shader parameters are read-only, just
+        // like our IR function parameters, and need a wrapper
+        // `Out<...>` type to represent otuputs.
+        //
+        bool isOutput = kind == LayoutResourceKind::VaryingOutput;
+        IRType* paramType = isOutput ? builder->getOutType(type) : type;
 
-        ScalarizedVal val = ScalarizedVal::address(globalVariable);
+        auto globalParam = addGlobalParam(builder->getModule(), paramType);
+        moveValueBefore(globalParam, builder->getFunc());
+
+        ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
         if( systemValueInfo )
         {
-            builder->addImportDecoration(globalVariable, UnownedTerminatedStringSlice(systemValueInfo->name));
+            builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
 
             if( auto fromType = systemValueInfo->requiredType )
             {
@@ -4309,11 +4330,11 @@ namespace Slang
 
             if(auto outerArrayName = systemValueInfo->outerArrayName)
             {
-                builder->addGLSLOuterArrayDecoration(globalVariable, UnownedTerminatedStringSlice(outerArrayName));
+                builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
             }
         }
 
-        builder->addLayoutDecoration(globalVariable, varLayout);
+        builder->addLayoutDecoration(globalParam, varLayout);
 
         return val;
     }
@@ -4865,46 +4886,22 @@ namespace Slang
         auto builder = context->getBuilder();
         auto paramType = pp->getDataType();
 
-        if(auto paramPtrType = as<IROutTypeBase>(paramType) )
-        {
-            // This is either an `out` or `in out` parameter.
-            // We want to treat `out` parameters the same
-            // as `in out` for our purposes, since there are
-            // no pure `out` parameters defined for the ray
-            // tracing stages.
-
-            // Unlike the default legalization strategy for
-            // `out` and `in out` entry point parameters,
-            // we will not introduce an intermediate temporary.
-            //
-            // Instead we will simply create a global variable
-            // and replace uses of the parameter with uses
-            // of that global variable.
-
-            auto valueType = paramPtrType->getValueType();
-
-            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
-            builder->addLayoutDecoration(globalVariable, paramLayout);
-            moveValueBefore(globalVariable, builder->getFunc());
-
-            pp->replaceUsesWith(globalVariable);
-        }
-        else
-        {
-            // This is the `in` parameter case, so that the parameter
-            // was not a pointer. We will allocate a global variable
-            // to represent the parameter, and then perform a load
-            // form it at the start of the function.
-            //
-            auto valueType = paramType;
-            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
-            builder->addLayoutDecoration(globalVariable, paramLayout);
-            moveValueBefore(globalVariable, builder->getFunc());
-
-            auto irLoad = builder->emitLoad(globalVariable);
-            pp->replaceUsesWith(irLoad);
-        }
-
+        // The parameter might be either an `in` parameter,
+        // or an `out` or `in out` parameter, and in those
+        // latter cases its IR-level type will include a
+        // wrapping "pointer-like" type (e.g., `Out<Float>`
+        // instead of just `Float`).
+        //
+        // Because global shader parameters are read-only
+        // in the same way function types are, we can take
+        // care of that detail here just by allocating a
+        // global shader parameter with exactly the type
+        // of the original function parameter.
+        //
+        auto globalParam = addGlobalParam(builder->getModule(), paramType);
+        builder->addLayoutDecoration(globalParam, paramLayout);
+        moveValueBefore(globalParam, builder->getFunc());
+        pp->replaceUsesWith(globalParam);
     }
 
     void legalizeEntryPointParameterForGLSL(
@@ -5629,6 +5626,7 @@ namespace Slang
         case kIROp_Generic:
         case kIROp_GlobalVar:
         case kIROp_GlobalConstant:
+        case kIROp_GlobalParam:
         case kIROp_StructKey:
         case kIROp_GlobalGenericParam:
         case kIROp_WitnessTable:
@@ -5779,21 +5777,6 @@ namespace Slang
 
         registerClonedValue(context, clonedVar, originalValues);
 
-#if 0
-        auto mangledName = originalVar->mangledName;
-        clonedVar->mangledName = mangledName;
-#endif
-
-        if(auto linkage = originalVar->findDecoration<IRLinkageDecoration>())
-        {
-            auto mangledName = String(linkage->getMangledName());
-            VarLayout* layout = nullptr;
-            if (context->globalVarLayouts.TryGetValue(mangledName, layout))
-            {
-                builder->addLayoutDecoration(clonedVar, layout);
-            }
-        }
-
         // Clone any code in the body of the variable, since this
         // represents the initializer.
         cloneGlobalValueWithCodeCommon(
@@ -5824,25 +5807,6 @@ namespace Slang
         return clonedVal;
     }
 
-    IRGeneric* cloneGenericImpl(
-        IRSpecContextBase*              context,
-        IRBuilder*                      builder,
-        IRGeneric*                      originalVal,
-        IROriginalValuesForClone const& originalValues)
-    {
-        auto clonedVal = builder->emitGeneric();
-        registerClonedValue(context, clonedVal, originalValues);
-
-        // Clone any code in the body of the generic, since this
-        // computes its result value.
-        cloneGlobalValueWithCodeCommon(
-            context,
-            clonedVal,
-            originalVal);
-
-        return clonedVal;
-    }
-
     void cloneSimpleGlobalValueImpl(
         IRSpecContextBase*              context,
         IRInst*                         originalInst,
@@ -5863,6 +5827,48 @@ namespace Slang
         {
             cloneInst(context, builder, child);
         }
+    }
+
+    IRGlobalParam* cloneGlobalParamImpl(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRGlobalParam*                  originalVal,
+        IROriginalValuesForClone const& originalValues)
+    {
+        auto clonedVal = builder->createGlobalParam(
+            cloneType(context, originalVal->getFullType()));
+        cloneSimpleGlobalValueImpl(context, originalVal, originalValues, clonedVal);
+
+        if(auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
+        {
+            auto mangledName = String(linkage->getMangledName());
+            VarLayout* layout = nullptr;
+            if (context->globalVarLayouts.TryGetValue(mangledName, layout))
+            {
+                builder->addLayoutDecoration(clonedVal, layout);
+            }
+        }
+
+        return clonedVal;
+    }
+
+    IRGeneric* cloneGenericImpl(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRGeneric*                      originalVal,
+        IROriginalValuesForClone const& originalValues)
+    {
+        auto clonedVal = builder->emitGeneric();
+        registerClonedValue(context, clonedVal, originalValues);
+
+        // Clone any code in the body of the generic, since this
+        // computes its result value.
+        cloneGlobalValueWithCodeCommon(
+            context,
+            clonedVal,
+            originalVal);
+
+        return clonedVal;
     }
 
     IRStructKey* cloneStructKeyImpl(
@@ -6254,6 +6260,7 @@ namespace Slang
 
         case kIROp_StructType:
         case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
             return true;
 
         default:
@@ -6349,6 +6356,9 @@ namespace Slang
 
         case kIROp_GlobalConstant:
             return cloneGlobalConstantImpl(context, builder, cast<IRGlobalConstant>(originalInst), originalValues);
+
+        case kIROp_GlobalParam:
+            return cloneGlobalParamImpl(context, builder, cast<IRGlobalParam>(originalInst), originalValues);
 
         case kIROp_WitnessTable:
             return cloneWitnessTableImpl(context, builder, cast<IRWitnessTable>(originalInst), originalValues);

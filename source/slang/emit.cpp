@@ -2355,6 +2355,7 @@ struct EmitVisitor
         case kIROp_Var:
         case kIROp_GlobalVar:
         case kIROp_GlobalConstant:
+        case kIROp_GlobalParam:
         case kIROp_Param:
             return false;
 
@@ -5558,7 +5559,7 @@ struct EmitVisitor
 
     void emitHLSLParameterGroup(
         EmitContext*                    ctx,
-        IRGlobalVar*                    varDecl,
+        IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
         if(as<IRTextureBufferType>(type))
@@ -5623,7 +5624,7 @@ struct EmitVisitor
 
     void emitGLSLParameterGroup(
         EmitContext*                    ctx,
-        IRGlobalVar*                    varDecl,
+        IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
         auto varLayout = getVarLayout(ctx, varDecl);
@@ -5680,14 +5681,14 @@ struct EmitVisitor
 
         // If the underlying variable was an array (or array of arrays, etc.)
         // we need to emit all those array brackets here.
-        emitArrayBrackets(ctx, varDecl->getDataType()->getValueType());
+        emitArrayBrackets(ctx, varDecl->getDataType());
 
         emit(";\n");
     }
 
     void emitIRParameterGroup(
         EmitContext*                    ctx,
-        IRGlobalVar*                    varDecl,
+        IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
         switch (ctx->shared->target)
@@ -5763,7 +5764,7 @@ struct EmitVisitor
 
     void emitIRStructuredBuffer_GLSL(
         EmitContext*                    ctx,
-        IRGlobalVar*                    varDecl,
+        IRGlobalParam*                  varDecl,
         IRHLSLStructuredBufferTypeBase* structuredBufferType)
     {
         // Shader storage buffer is an OpenGL 430 feature
@@ -5809,14 +5810,14 @@ struct EmitVisitor
         emit("} ");
 
         emit(getIRName(varDecl));
-        emitArrayBrackets(ctx, varDecl->getDataType()->getValueType());
+        emitArrayBrackets(ctx, varDecl->getDataType());
 
         emit(";\n");
     }
 
     void emitIRByteAddressBuffer_GLSL(
         EmitContext*                    ctx,
-        IRGlobalVar*                    varDecl,
+        IRGlobalParam*                  varDecl,
         IRByteAddressBufferTypeBase*    /* byteAddressBufferType */)
     {
         // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
@@ -5862,7 +5863,7 @@ struct EmitVisitor
         emit("} ");
 
         emit(getIRName(varDecl));
-        emitArrayBrackets(ctx, varDecl->getDataType()->getValueType());
+        emitArrayBrackets(ctx, varDecl->getDataType());
 
         emit(";\n");
     }
@@ -5892,6 +5893,63 @@ struct EmitVisitor
             emitIRFunctionBody(ctx, varDecl);
             dedent();
             Emit("}\n");
+        }
+
+        // An ordinary global variable won't have a layout
+        // associated with it, since it is not a shader
+        // parameter.
+        //
+        SLANG_ASSERT(!getVarLayout(ctx, varDecl));
+        VarLayout* layout = nullptr;
+
+        // An ordinary global variable (which is not a
+        // shader parameter) may need special
+        // modifiers to indicate it as such.
+        //
+        switch (getTarget(ctx))
+        {
+        case CodeGenTarget::HLSL:
+            // HLSL requires the `static` modifier on any
+            // global variables; otherwise they are assumed
+            // to be uniforms.
+            Emit("static ");
+            break;
+
+        default:
+            break;
+        }
+
+        emitIRVarModifiers(ctx, layout, varDecl, varType);
+
+        emitIRRateQualifiers(ctx, varDecl);
+        emitIRType(ctx, varType, getIRName(varDecl));
+
+        // TODO: These shouldn't be needed for ordinary
+        // global variables.
+        //
+        emitIRSemantics(ctx, varDecl);
+        emitIRLayoutSemantics(ctx, varDecl);
+
+        if (varDecl->getFirstBlock())
+        {
+            Emit(" = ");
+            emit(initFuncName);
+            Emit("()");
+        }
+
+        emit(";\n\n");
+    }
+
+    void emitIRGlobalParam(
+        EmitContext*    ctx,
+        IRGlobalParam*  varDecl)
+    {
+        auto rawType = varDecl->getDataType();
+
+        auto varType = rawType;
+        if( auto outType = as<IROutTypeBase>(varType) )
+        {
+            varType = outType->getValueType();
         }
 
         // When a global shader parameter represents a "parameter group"
@@ -5985,26 +6043,11 @@ struct EmitVisitor
 
         // Need to emit appropriate modifiers here.
 
+        // We expect/require all shader parameters to
+        // have some kind of layout information associted with them.
+        //
         auto layout = getVarLayout(ctx, varDecl);
-
-        if (!layout)
-        {
-            // A global variable without a layout is just an
-            // ordinary global variable, and may need special
-            // modifiers to indicate it as such.
-            switch (getTarget(ctx))
-            {
-            case CodeGenTarget::HLSL:
-                // HLSL requires the `static` modifier on any
-                // global variables; otherwise they are assumed
-                // to be uniforms.
-                Emit("static ");
-                break;
-
-            default:
-                break;
-            }
-        }
+        SLANG_ASSERT(layout);
 
         emitIRVarModifiers(ctx, layout, varDecl, varType);
 
@@ -6015,15 +6058,12 @@ struct EmitVisitor
 
         emitIRLayoutSemantics(ctx, varDecl);
 
-        if (varDecl->getFirstBlock())
-        {
-            Emit(" = ");
-            emit(initFuncName);
-            Emit("()");
-        }
+        // A shader parameter cannot have an initializer,
+        // so we do need to consider emitting one here.
 
         emit(";\n\n");
     }
+
 
     void emitIRGlobalConstantInitializer(
         EmitContext*        ctx,
@@ -6096,6 +6136,10 @@ struct EmitVisitor
 
         case kIROp_GlobalVar:
             emitIRGlobalVar(ctx, (IRGlobalVar*) inst);
+            break;
+
+        case kIROp_GlobalParam:
+            emitIRGlobalParam(ctx, (IRGlobalParam*) inst);
             break;
 
         case kIROp_GlobalConstant:

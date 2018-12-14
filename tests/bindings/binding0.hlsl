@@ -24,7 +24,7 @@
 #endif
 
 float4 use(float4 val) { return val; };
-float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
+float4 use(Texture2D tex, SamplerState samp) { return tex.Sample(samp, 0.0); }
 
 Texture2D 		t R(: register(t0));
 SamplerState 	s R(: register(s0));
