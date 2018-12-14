@@ -22,16 +22,18 @@ struct TestCategory: public Slang::RefObject
 struct TestCategorySet
 {
 public:
+        /// Find a category with the specified name. Returns nullptr if not found
     TestCategory * find(Slang::String const& name);
+        /// Adds a category with the specified name, and parent. Returns the category object.
+        /// Parent can be nullptr
     TestCategory* add(Slang::String const& name, TestCategory* parent);
-
+        /// Finds a category by name, else reports and writes an error  
     TestCategory* findOrError(Slang::String const& name);
 
     Slang::RefPtr<TestCategory> defaultCategory;    ///< The default category
 
 protected:
-    
-    Slang::Dictionary<Slang::String, Slang::RefPtr<TestCategory> > m_set;
+    Slang::Dictionary<Slang::String, Slang::RefPtr<TestCategory> > m_categoryMap;
 };
 
 struct Options
