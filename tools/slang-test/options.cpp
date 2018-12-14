@@ -18,14 +18,14 @@ TestCategory* TestCategorySet::add(String const& name, TestCategory* parent)
     category->name = name;
     category->parent = parent;
 
-    m_set.Add(name, category);
+    m_categoryMap.Add(name, category);
     return category;
 }
 
 TestCategory* TestCategorySet::find(String const& name)
 {
     RefPtr<TestCategory> category;
-    if (!m_set.TryGetValue(name, category))
+    if (!m_categoryMap.TryGetValue(name, category))
     {
         return nullptr;
     }
@@ -34,11 +34,10 @@ TestCategory* TestCategorySet::find(String const& name)
 
 TestCategory* TestCategorySet::findOrError(String const& name)
 {
-    RefPtr<TestCategory> category;
-    if (!m_set.TryGetValue(name, category))
+    TestCategory* category = find(name);
+    if (!category)
     {
         AppContext::getStdError().print("error: unknown test category name '%s'\n", name.Buffer());
-        return nullptr;
     }
     return category;
 }
