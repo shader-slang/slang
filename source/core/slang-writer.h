@@ -14,7 +14,7 @@ class WriterHelper
 public:
     SlangResult print(const char* format, ...);
     SlangResult put(const char* text);
-
+    SLANG_FORCE_INLINE SlangResult write(const char* chars, size_t numChars) { return m_writer->write(chars, numChars);  }
     SLANG_FORCE_INLINE void flush() { m_writer->flush(); }
     
     ISlangWriter* getWriter() const { return m_writer;  }

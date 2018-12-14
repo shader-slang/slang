@@ -18,7 +18,8 @@ struct PrettyWriter
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
-    Slang::AppContext::getStdOut().print("%.*s", int(end - begin), begin);
+    SLANG_ASSERT(end >= begin);
+    Slang::AppContext::getStdOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
