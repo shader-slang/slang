@@ -3,6 +3,7 @@
 
 #include "../../slang.h"
 
+#include "check.h"
 #include "ir.h"
 #include "ir-constexpr.h"
 #include "ir-insts.h"
@@ -3828,8 +3829,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
+    LoweredValInfo lowerGlobalShaderParam(VarDeclBase* decl)
+    {
+        IRType* paramType = lowerType(context, decl->getType());
+
+        auto builder = getBuilder();
+
+        auto irParam = builder->createGlobalParam(paramType);
+        auto paramVal = LoweredValInfo::simple(irParam);
+
+        addLinkageDecoration(context, irParam, decl);
+        addNameHint(context, irParam, decl);
+        maybeSetRate(context, irParam, decl);
+        addVarDecorations(context, irParam, decl);
+
+        if (decl)
+        {
+            builder->addHighLevelDeclDecoration(irParam, decl);
+        }
+
+        // A global variable's SSA value is a *pointer* to
+        // the underlying storage.
+        setGlobalValue(context, decl, paramVal);
+
+        irParam->moveToEnd();
+
+        return paramVal;
+    }
+
     LoweredValInfo lowerGlobalVarDecl(VarDeclBase* decl)
     {
+        if(isGlobalShaderParameter(decl))
+        {
+            return lowerGlobalShaderParam(decl);
+        }
+
         IRType* varType = lowerType(context, decl->getType());
 
         auto builder = getBuilder();

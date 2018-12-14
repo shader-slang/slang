@@ -171,6 +171,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\slang.h" />
+    <ClInclude Include="check.h" />
     <ClInclude Include="compiler.h" />
     <ClInclude Include="core.meta.slang.h" />
     <ClInclude Include="decl-defs.h" />
