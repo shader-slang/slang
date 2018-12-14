@@ -9,6 +9,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="os.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -18,9 +21,15 @@
     <ClInclude Include="test-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="test-reporter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os.cpp">
@@ -30,6 +39,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="test-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="test-reporter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="unit-test-byte-encode.cpp">

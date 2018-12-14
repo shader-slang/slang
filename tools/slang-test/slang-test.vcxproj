@@ -162,15 +162,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="options.h" />
     <ClInclude Include="os.h" />
     <ClInclude Include="render-api-util.h" />
     <ClInclude Include="test-context.h" />
+    <ClInclude Include="test-reporter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="options.cpp" />
     <ClCompile Include="os.cpp" />
     <ClCompile Include="render-api-util.cpp" />
     <ClCompile Include="test-context.cpp" />
+    <ClCompile Include="test-reporter.cpp" />
     <ClCompile Include="unit-test-byte-encode.cpp" />
     <ClCompile Include="unit-test-free-list.cpp" />
     <ClCompile Include="unit-test-memory-arena.cpp" />
