@@ -163,6 +163,8 @@ INST_RANGE(Type, VoidType, StructType)
     INST(GlobalConstant, global_constant, 0, 0)
 INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
 
+INST(GlobalParam, global_param, 0, 0)
+
 INST(StructKey, key, 0, 0)
 INST(GlobalGenericParam, global_generic_param, 0, 0)
 INST(WitnessTable, witness_table, 0, 0)

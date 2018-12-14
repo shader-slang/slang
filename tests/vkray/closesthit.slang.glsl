@@ -6,15 +6,14 @@
 #define tmp_colors          _S2
 #define tmp_hitattrs        _S3
 #define tmp_payload         _S4
-#define tmp_localattrs      _S5
-#define tmp_customidx       _S6
-#define tmp_instanceid      _S7
-#define tmp_add_0           _S8
-#define tmp_primid          _S9
-#define tmp_add_1           _S10
-#define tmp_hitkind         _S11
-#define tmp_hitt            _S12
-#define tmp_tmin            _S13
+#define tmp_customidx       _S5
+#define tmp_instanceid      _S6
+#define tmp_add_0           _S7
+#define tmp_primid          _S8
+#define tmp_add_1           _S9
+#define tmp_hitkind         _S10
+#define tmp_hitt            _S11
+#define tmp_tmin            _S12
 
 struct SLANG_ParameterGroup_ShaderRecord_0
 {
@@ -49,8 +48,6 @@ rayPayloadInNV ReflectionRay_0 tmp_payload;
 
 void main()
 {
-    BuiltInTriangleIntersectionAttributes_0 tmp_localattrs = tmp_hitattrs;
-
     uint tmp_customidx = gl_InstanceCustomIndexNV;
     uint tmp_instanceid = gl_InstanceID;
 
