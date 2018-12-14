@@ -338,10 +338,10 @@ function standardProject(name)
 end
 
 function toolSharedLibrary(name)
-    group "tool-shared-library"
+    group "test-tool"
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProject(name .. "-shared-library", "tools/" .. name)
+    baseSlangProject(name .. "-tool", "tools/" .. name)
     
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
@@ -449,11 +449,6 @@ tool "slang-test"
 -- to do its job:
 --
 
-tool "slang-reflection-test"
-    uuid "22C45F4F-FB6B-4535-BED1-D3F5D0C71047"
-    includedirs { "." }
-    links { "slang", "core" }
-
 toolSharedLibrary "slang-reflection-test"
     uuid "C5ACCA6E-C04D-4B36-8516-3752B3C13C2F"
     
@@ -476,19 +471,7 @@ toolSharedLibrary "slang-reflection-test"
 -- TODO: Fix that requirement.
 --
 
-if os.target() == "windows" then
-    tool "render-test"
-        uuid "96610759-07B9-4EEB-A974-5C634A2E742B"
-        includedirs { ".", "external", "source", "tools/gfx" }
-        links { "core", "slang", "gfx" }
-        
-        systemversion "10.0.14393.0"
-
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
-        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-        -- directory into the output directory.
-        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
-        
+if os.target() == "windows" then    
     toolSharedLibrary "render-test"
         uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
         
