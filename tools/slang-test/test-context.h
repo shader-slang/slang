@@ -21,7 +21,9 @@ class TestContext
     SlangResult init();
 
         /// Get the inner main function (from shared library)
-    TestContext::InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
+    InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
+        /// Set the function for the shared library
+    void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
 
         /// Ctor
     TestContext();

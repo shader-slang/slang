@@ -15,10 +15,10 @@ using namespace Slang;
 #include "test-context.h"
 #include "test-reporter.h"
 #include "options.h"
+#include "slangc-tool.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
-
 
 #ifdef _WIN32
 #define SLANG_TEST_SUPPORT_HLSL 1
@@ -1745,6 +1745,7 @@ void runTestsInDirectory(
     }
 }
 
+
 SlangResult innerMain(int argc, char** argv)
 {
     AppContext::initDefault();
@@ -1765,6 +1766,11 @@ SlangResult innerMain(int argc, char** argv)
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
+
+    {
+        // We can set the slangc command line tool, to just use the function defined here
+        context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
+    }
 
     SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, AppContext::getStdError(), &context.options));
     SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))

@@ -348,17 +348,6 @@ function toolSharedLibrary(name)
     kind "SharedLib"
 end
 
-function standardSharedLibraryProject(name)
-    group "tool-shared-library"
-    -- A standard project has its code under `source/`
-    --
-    baseSlangProject(name .. "-shared-library", "source/".. name)
-   
-    defines { "SLANG_SHARED_LIBRARY_TOOL" }
-   
-    kind "SharedLib"
-end
-
 -- Finally we have the example programs that show how to use Slang.
 --
 function example(name)
@@ -553,11 +542,6 @@ standardProject "slangc"
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
-
-standardSharedLibraryProject "slangc"
-    uuid "644921BF-D228-4EEF-8CDA-11716DB06989"
-    kind "SharedLib"
-    links { "core", "slang" }    
     
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
