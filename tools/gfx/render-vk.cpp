@@ -348,7 +348,7 @@ public:
         static Binding::Type _getBindingType(RefObject* ptr);
         void _setBinding(Binding::Type type, UInt range, UInt index, RefObject* ptr);
 
-        RefPtr<VKRenderer>                  m_renderer;
+        VKRenderer*                         m_renderer = nullptr;   ///< Weak pointer, can't be strong, because if set will become circular reference
         RefPtr<DescriptorSetLayoutImpl>     m_layout;
         VkDescriptorSet                     m_descriptorSet = VK_NULL_HANDLE;
 

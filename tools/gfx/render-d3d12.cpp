@@ -313,7 +313,7 @@ protected:
             ResourceView*   textureView,
             SamplerState*   sampler) override;
 
-        RefPtr<D3D12Renderer>           m_renderer;
+        D3D12Renderer*           m_renderer = nullptr;          ///< Weak pointer - must be because if set on Renderer, will have a circular reference
         RefPtr<DescriptorSetLayoutImpl> m_layout;
 
         D3D12DescriptorHeap*        m_resourceHeap = nullptr;
@@ -336,7 +336,7 @@ protected:
 
 
     // During command submission, we need all the descriptor tables that get
-    // used to come from a single heap (for each descritpor heap type).
+    // used to come from a single heap (for each descriptor heap type).
     //
     // We will thus keep a single heap of each type that we hope will hold
     // all the descriptors that actually get needed in a frame.
@@ -2838,8 +2838,7 @@ void D3D12Renderer::setBindingState(BindingState* state)
 
 void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, BufferResource* buffer)
 {
-    auto dxDevice = m_renderer->m_device;
-
+    auto dxDevice = m_renderer->m_device.get();
 
     auto resourceImpl = (BufferResourceImpl*) buffer;
     auto resourceDesc = resourceImpl->getDesc();
@@ -3069,7 +3068,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     RefPtr<DescriptorSetLayoutImpl> descriptorSetLayoutImpl = new DescriptorSetLayoutImpl();
 
     // We know the total number of resource and sampler "slots" that an instance
-    // of this decriptor-set layout would need:
+    // of this descriptor-set layout would need:
     //
     descriptorSetLayoutImpl->m_resourceCount = combinedCount + dedicatedResourceCount;
     descriptorSetLayoutImpl->m_samplerCount = combinedCount + dedicatedSamplerCount;
@@ -3345,7 +3344,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         //
         UInt bindingSpace   = dd;
 
-        // Copy descriptor range infromation from the set layout into our
+        // Copy descriptor range information from the set layout into our
         // temporary copy (this is required because the same set layout
         // might be applied to different ranges).
         //
