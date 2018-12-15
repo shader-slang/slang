@@ -83,7 +83,7 @@ struct DeadCodeEliminationContext
     //
     void processModule()
     {
-        // First of all, we know that the whole module
+        // First of all, we know that the root module instruction
         // should be considered as live, because otherwise
         // we'd end up eliminating it, so that is a
         // good place to start.
@@ -95,73 +95,64 @@ struct DeadCodeEliminationContext
         // processing entries off of our work list
         // until it goes dry.
         //
-        // We will keep swapping our work list with
-        // a local copy so that we don't get intro
-        // trouble with trying to modify this list
-        // while we iterate over it.
-        //
-        List<IRInst*> workListCopy;
         while( workList.Count() )
         {
-            workListCopy.Clear();
-            workListCopy.SwapWith(workList);
+            auto inst = workList.Last();
+            workList.RemoveLast();
 
-            for(auto inst : workListCopy)
+            // At this point we know that `inst` is live,
+            // and we want to start considering which other
+            // instructions must be live because of that
+            // knowlege.
+            //
+            // A first easy case is that the parent (if any)
+            // of a live instruction had better be live, or
+            // else we might delete the parent, and
+            // the child with it.
+            //
+            markInstAsLive(inst->getParent());
+
+            // Next the type of a live instruction, and all
+            // of its operands must also be live, or else
+            // we won't be able to compute its value.
+            //
+            markInstAsLive(inst->getFullType());
+            UInt operandCount = inst->getOperandCount();
+            for( UInt ii = 0; ii < operandCount; ++ii )
             {
-                // At this point we know that `inst` is live,
-                // and we want to start considering which other
-                // instructions must be live because of that
-                // knowlege.
-                //
-                // A first easy case is that the parent (if any)
-                // of a live instruction had better be live, or
-                // else we might delete the parent, and
-                // the child with it.
-                //
-                markInstAsLive(inst->getParent());
+                markInstAsLive(inst->getOperand(ii));
+            }
 
-                // Next the type of a live instruction, and all
-                // of its operands must also be live, or else
-                // we won't be able to compute its value.
-                //
-                markInstAsLive(inst->getFullType());
-                UInt operandCount = inst->getOperandCount();
-                for( UInt ii = 0; ii < operandCount; ++ii )
+            // Finally, we need to consider the children
+            // and decorations of the instruction.
+            //
+            // Note that just because an instruction is
+            // live doesn't mean its children must be, or
+            // else we'd never eliminate *anything* (we
+            // marked the whole module as live, and everything
+            // is a transitive child of the module).
+            //
+            // Decorations, in contrast, are always live if their
+            // parents are (because we don't want to silently drop
+            // decorations). It is still important to *mark*
+            // decorations as live, because they have operands,
+            // and those operands need to be marked as live.
+            // We will fold decorations into the same loop
+            // as children for simplicity.
+            //
+            // To keep the code here simple, we'll defer the
+            // decision of whether a child (or decoration)
+            // should be live when its parent is to a subroutine.
+            //
+            for( auto child : inst->getDecorationsAndChildren() )
+            {
+                if(shouldInstBeLiveIfParentIsLive(child))
                 {
-                    markInstAsLive(inst->getOperand(ii));
-                }
-
-                // Finally, we need to consider the children
-                // and decorations of the instruction.
-                //
-                // Note that just because an instruction is
-                // live doesn't mean its children must be, or
-                // else we'd never eliminate *anything* (we
-                // marked the whole module as live, and everything
-                // is a transitive child of the module).
-                //
-                // Decorations, in contrast, are always live if their
-                // parents are (because we don't want to silently drop
-                // decorations). It is still important to *mark*
-                // decorations as live, because they have operands,
-                // and those operands need to be marked as live.
-                // We will fold decorations into the same loop
-                // as children for simplicity.
-                //
-                // To keep the code here simple, we'll defer the
-                // decision of whether a child (or decoration)
-                // should be live when its parent is to a subroutine.
-                //
-                for( auto child : inst->getDecorationsAndChildren() )
-                {
-                    if(shouldInstBeLiveIfParentIsLive(child))
-                    {
-                        // In this case, we know `inst` is live and
-                        // its `child` should be live if its parent is,
-                        // so the `child` must be live too.
-                        //
-                        markInstAsLive(child);
-                    }
+                    // In this case, we know `inst` is live and
+                    // its `child` should be live if its parent is,
+                    // so the `child` must be live too.
+                    //
+                    markInstAsLive(child);
                 }
             }
         }
@@ -223,11 +214,11 @@ struct DeadCodeEliminationContext
         //
         // * Should some ordinary instruction in a basic block be kept around?
         // * Should a basic block in some function be kept around?
-        // * SHould a funciton/type/variable in a module be kept around?
+        // * Should a function/type/variable in a module be kept around?
         //
         // Still, there are a few basic patterns we can observe.
         // First, if `inst` is an instruction that might have some effects
-        // by virtual of being executes, then we should keep it around.
+        // when it is executed, then we should keep it around.
         //
         if(inst->mightHaveSideEffects())
             return true;
@@ -265,6 +256,7 @@ struct DeadCodeEliminationContext
             // To determine whether this is the first block in its
             // parent function (or what-have-you) we can simply
             // check if there is a previous block before it.
+            //
             auto prevBlock = block->getPrevBlock();
             return prevBlock == nullptr;
         }
@@ -291,8 +283,8 @@ struct DeadCodeEliminationContext
             // so that they have child instructions that represent their
             // entries (effectively `(key,value)` pairs), and those child
             // instructions are never directly referenced (e.g., an access
-            // to a struct field referenes the *key* but not the `(key,value)`
-            // pair.
+            // to a struct field references the *key* but not the `(key,value)`
+            // pair that is the `IRField` instruction.
             //
             // TODO: at some point the IR should use a different representation
             // for struct types and witness tables that does away with

@@ -6573,7 +6573,7 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
-        // After type legalization and subsequent SSA clean we expect
+        // After type legalization and subsequent SSA cleanup we expect
         // that any resource types passed to functions are exposed
         // as their own top-level parameters (which might have
         // resource or array-of-...-resource types).
@@ -6581,7 +6581,7 @@ String emitEntryPoint(
         // Many of our targets place restrictions on how certain
         // resource types can be used, so that having them as
         // function parameters is invalid. To clean this up,
-        // we will try to specialized called functions based
+        // we will try to specialize called functions based
         // on the actual resources that are being passed to them
         // at specific call sites.
         //
@@ -6597,7 +6597,7 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
-        // The resources-based specialization pass above
+        // The resource-based specialization pass above
         // may create specialized versions of functions, but
         // it does not try to completely eliminate the original
         // functions, so there might still be invalid code in

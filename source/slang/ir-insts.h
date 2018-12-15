@@ -1098,7 +1098,7 @@ struct IRBuilder
         addDecoration(value, kIROp_EntryPointDecoration);
     }
 
-        /// Add a decoration that indicates that the given `inst` depends on the given `depdendency`.
+        /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.
         ///
         /// This decoration can be used to ensure that a value that an instruction
         /// implicitly depends on cannot be eliminated so long as the instruction
