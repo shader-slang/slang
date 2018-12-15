@@ -330,10 +330,10 @@ struct ResourceParameterSpecializationContext
             return true;
         }
 
-        UInt GetHashCode() const
+        int GetHashCode() const
         {
             auto valCount = vals.Count();
-            UInt hash = Slang::GetHashCode(valCount);
+            int hash = Slang::GetHashCode(valCount);
             for( UInt ii = 0; ii < valCount; ++ii )
             {
                 hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
@@ -611,7 +611,6 @@ struct ResourceParameterSpecializationContext
             // a case that this routine is not covering.
             //
             SLANG_UNEXPECTED("mising case in 'getCallInfoForArg'");
-            UNREACHABLE_RETURN(nullptr);
         }
     }
 
