@@ -116,7 +116,7 @@ struct ResourceParameterSpecializationContext
         // two conditions we care about:
         //
         // 1. Should we specialize? This amounts to whether
-        // `func` has any parameters that are need specialization.
+        // `func` has any parameters that need specialization.
         // We will call those "specializable" parameters for
         // lack of a better name.
         //
@@ -142,7 +142,7 @@ struct ResourceParameterSpecializationContext
             SLANG_ASSERT(argIndex < call->getArgCount());
             auto arg = call->getArg(argIndex);
 
-            // If the given parameer doesn't need specialization,
+            // If the given parameter doesn't need specialization,
             // then we need to keep looking.
             //
             if(!doesParamNeedSpecialization(param))
@@ -170,7 +170,7 @@ struct ResourceParameterSpecializationContext
         return anySpecializableParam;
     }
 
-    // Of course, now we need to back fill the predicates that
+    // Of course, now we need to back-fill the predicates that
     // the above function used to evaluate prameters and arguments.
 
     bool doesParamNeedSpecialization(IRParam* param)
@@ -222,8 +222,8 @@ struct ResourceParameterSpecializationContext
         //
         // TODO: We may want to perform more aggressive
         // specialization in general, especially insofar
-        // as it could simplify away functions with resource-type
-        // outputs.
+        // as it could simplify the task of supporting
+        // functions with resource-type outputs.
 
         return false;
     }
@@ -231,7 +231,7 @@ struct ResourceParameterSpecializationContext
     bool isArgSuitableForSpecialization(IRInst* inArg)
     {
         // Determining if an argument is suitable for
-        // specialization a callee function requires
+        // specializing a callee function requires
         // looking at its (recurisve) structure.
         //
         // Rather than write a recursively procedure
@@ -274,7 +274,7 @@ struct ResourceParameterSpecializationContext
             //
             // TODO: There may be other cases that are worth
             // handling here. The current code is based on
-            // obersvation of what simple shaders do in
+            // observation of what simple shaders do in
             // practice.
             //
             return false;
@@ -286,10 +286,10 @@ struct ResourceParameterSpecializationContext
     // This is where things are going to get more involved.
     //
     // There are a few different concerns we need to deal with
-    // that means we end up having two different passes that walk
+    // that mean we end up having two different passes that walk
     // over the parameters/arguments of the call (in addition to
     // the ones we had above for determining if we can/should
-    // specialize in the first place.
+    // specialize in the first place).
     //
     // The first of the two passes determines information
     // relevant to the call site, comprising both the arguments
@@ -305,7 +305,7 @@ struct ResourceParameterSpecializationContext
     struct Key
     {
         // The structure of a specialization key will be a list
-        // of instruction starting with the function to be specialized,
+        // of instructions starting with the function to be specialized,
         // and then having one or more entries for each parameter
         // that is being specialized to indicate the value to which
         // it is being specialized (e.g. the global shader parameter).
@@ -349,7 +349,7 @@ struct ResourceParameterSpecializationContext
     //
     struct CallSpecializationInfo
     {
-        Key key;
+        Key             key;
         List<IRInst*>   newArgs;
     };
 
@@ -383,7 +383,7 @@ struct ResourceParameterSpecializationContext
         // We have an existing call site `oldCall` that
         // we know can and should be specialized.
         //
-        // That means the calle should be a known function
+        // That means the callee should be a known function
         // definition, or else `canSpecializeCall` didn't
         // correctly check the preconditions.
         //
@@ -401,7 +401,7 @@ struct ResourceParameterSpecializationContext
 
         // Once we have gathered information on the call,
         // we can check if we have an existing specialization
-        // that we genereated (for another call site)
+        // that we generated before (for another call site)
         // that is suitable to this call site.
         //
         IRFunc* newFunc = nullptr;
@@ -412,7 +412,7 @@ struct ResourceParameterSpecializationContext
             //
             // We start by gathering the infromation from the call
             // site that is relevant to generating a specialized
-            // callee function, and that we avoided doing earlier
+            // callee function, which we avoided doing earlier
             // because it might have been throwaway work.
             //
             FuncSpecializationInfo funcInfo;
@@ -454,13 +454,13 @@ struct ResourceParameterSpecializationContext
     //
     // * What arguments need to be added to the specialized call?
     // * What parameters need to be added to the specialized callee?
-    // * What instructions are needed in the body of the callee to
-    //   synthesize the value that will stand in for P?
+    // * What instructions are needed in the body of the specialized
+    //   callee to synthesize the value that will stand in for P?
     // * What information, if any, needs to be used to distinguish
     //   this specialized callee from others that might be generated for F?
     //
     // An easy case is when P is a parameter that doesn't need
-    // specialization. In tha case:
+    // specialization. In that case:
     //
     // * The existing argument A shold be used as an argument in
     //   the specialized call.
@@ -468,8 +468,8 @@ struct ResourceParameterSpecializationContext
     //   parameter of the specialized callee.
     // * No additional instructions are needed in the body of
     //   the callee; the cloned parameter P' should stand in for P.
-    // * No inforamtion should be added to the specialization key
-    //   based on this P/A.
+    // * No information should be added to the specialization key
+    //   based on P and A.
     //
     // The more interesting case is when P has a resource type, and
     // A is some global shader parameter G.
@@ -480,7 +480,7 @@ struct ResourceParameterSpecializationContext
     //   the callee; the global G should stand in for P.
     // * The global G should be used to distinguish this specialized
     //   callee from those that might be specialized for a different
-    //   shader parameter.
+    //   global shader parameter.
     //
     // As a final example, imagine that P is still a resource type,
     // but A is now an indexing operation into an array: `G[idx]`:
@@ -497,7 +497,7 @@ struct ResourceParameterSpecializationContext
     // sense of the information we are tracking and how it differs
     // across the various cases. While the example only covered one
     // level of indexing, the actual implementation will handle the
-    // case of arbitrarily many levels of indexing, which can be
+    // case of arbitrarily many levels of indexing, which can mean
     // piping through any number of additional integer parameters
     // to the callee.
 
@@ -552,7 +552,7 @@ struct ResourceParameterSpecializationContext
             // If specialization is needed, we need
             // to inspect the argument value. This
             // is handled with a different function
-            // because it needs to recurse in some case.
+            // because it needs to recurse in some cases.
             //
             getCallInfoForArg(ioInfo, oldArg);
         }
@@ -568,7 +568,7 @@ struct ResourceParameterSpecializationContext
         if( auto oldGlobalParam = as<IRGlobalParam>(oldArg) )
         {
             // In this case we don't need to pass anything
-            // as an argument a the new call site (the
+            // as an argument at the new call site (the
             // global parameter will get specialized into
             // the callee), but we *do* need to make sure
             // that our key for identifying the specialized
@@ -579,10 +579,10 @@ struct ResourceParameterSpecializationContext
         }
         else if( oldArg->op == kIROp_getElement )
         {
-            // This is the case where we `oldArg` is
+            // This is the case where the `oldArg` is
             // in the form `oldBase[oldIndex]`
             //
-            auto oldBase = oldArg->getOperand(0);
+            auto oldBase  = oldArg->getOperand(0);
             auto oldIndex = oldArg->getOperand(1);
 
             // Effectively, we act as if `oldBase` and
@@ -605,7 +605,7 @@ struct ResourceParameterSpecializationContext
         }
         else
         {
-            // If we fail to match one of th cases above
+            // If we fail to match any of the cases above
             // then a precondition was violated in that
             // `isArgSuitableForSpecialization` is allowing
             // a case that this routine is not covering.
@@ -635,6 +635,10 @@ struct ResourceParameterSpecializationContext
             // function.
             //
             auto newVal = getSpecializedValueForParam(funcInfo, oldParam, oldArg);
+
+            // We will collect the replacement value to use
+            // for each of the original parameters in an array.
+            //
             funcInfo.replacementsForOldParameters.Add(newVal);
         }
     }
@@ -664,7 +668,7 @@ struct ResourceParameterSpecializationContext
         else
         {
             // If the parameter requires specialization, then it
-            // is time to look at the strucrure of the argument.
+            // is time to look at the structure of the argument.
             //
             return getSpecializedValueForArg(ioInfo, oldArg);
         }
@@ -694,7 +698,7 @@ struct ResourceParameterSpecializationContext
             // This is the case where the argument is
             // in the form `oldBase[oldIndex]`.
             //
-            auto oldBase = oldArg->getOperand(0);
+            auto oldBase  = oldArg->getOperand(0);
             auto oldIndex = oldArg->getOperand(1);
 
             // In `gatherCallInfoForArg` this case was
@@ -711,7 +715,7 @@ struct ResourceParameterSpecializationContext
 
             // Next we'll process `oldIndex` as if it
             // was an ordinary argument (not a specialized one),
-            // which means creating a parameter to recive its value,
+            // which means creating a parameter to receive its value,
             // which will also stand in for `oldIndex` in
             // the body of the specialized callee.
             //
@@ -744,7 +748,7 @@ struct ResourceParameterSpecializationContext
 
             // Because our new instruction wasn't
             // actually inserted anywhere, we need to
-            // add it to our gatehred list of instructions
+            // add it to our gathered list of instructions
             // that should be inserted into the body of
             // the specialized callee.
             //
@@ -815,7 +819,7 @@ struct ResourceParameterSpecializationContext
             // IR cloning implementations we have lying around,
             // is that when we *don't* find an instruction in
             // our map, we automatically assume it is not
-            // something we need to be clone, so that the old
+            // something taht needs to be cloned, so that the old
             // value is fine to use as-is.
             //
             // Note that this puts an ordering constraint on
@@ -901,10 +905,11 @@ struct ResourceParameterSpecializationContext
             List<OldNewPair> pairs;
             for( auto oldChild : oldInst->getDecorationsAndChildren() )
             {
-                // A a very subtle special case, if one of the children
+                // As a very subtle special case, if one of the children
                 // of our `oldInst` already has a registered replacement,
                 // then we don't want to clone it (not least because
-                // the `Dictionary::Add` method would give us an error).
+                // the `Dictionary::Add` method would give us an error
+                // when we try to insert a new value for the same key).
                 //
                 // This arises for entries in `mapOldValToNew` that were
                 // seeded before cloning begain (e.g., the function
@@ -957,7 +962,7 @@ struct ResourceParameterSpecializationContext
 
     // With all of that machinery out of the way,
     // we are now prepared to walk through the process of
-    // specializing a given calee function based on
+    // specializing a given callee function based on
     // the information we have gathered.
     //
     IRFunc* generateSpecializedFunc(
@@ -1035,7 +1040,7 @@ struct ResourceParameterSpecializationContext
 
         // We simply iterate over the list of parameters and then
         // body instructions that were produced in the information
-        // gathering, and insert each before `newfirstOrdinary`,
+        // gathering step, and insert each before `newFirstOrdinary`,
         // which has the effect or arranging them in the output
         // in the order they are enumerated here.
         //

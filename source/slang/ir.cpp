@@ -4957,7 +4957,7 @@ namespace Slang
         // TODO: We could consider using a structure like
         // this for *all* of the entry point parameters
         // that get moved to the global scope, since SPIR-V
-        // ends up requiring such information on an `OpEntryPoint.
+        // ends up requiring such information on an `OpEntryPoint`.
         //
         // As a further alternative, we could decide to
         // keep entry point varying input/outtput attached

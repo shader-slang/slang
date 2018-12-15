@@ -11,7 +11,7 @@ namespace Slang
         ///
         /// For any function that has resource-type input parameters that
         /// would be invalid on the chosen target, this pass will rewrite
-        /// an call sites that pass suitable arguments (e.g., direct
+        /// any call sites that pass suitable arguments (e.g., direct
         /// references to global shader parameters) to instead call
         /// a specialized variant of the function that does not have
         /// those resource parameters (and instead, e.g, refers to the
