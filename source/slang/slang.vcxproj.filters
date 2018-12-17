@@ -12,6 +12,9 @@
     <ClInclude Include="..\..\slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="check.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -42,6 +45,9 @@
     <ClInclude Include="ir-constexpr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-dce.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -64,6 +70,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-serialize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-specialize-resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-ssa.h">
@@ -162,9 +171,6 @@
     <ClInclude Include="visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="check.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="check.cpp">
@@ -183,6 +189,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-constexpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-dce.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-dominators.cpp">
@@ -204,6 +213,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-serialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-specialize-resources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-ssa.cpp">

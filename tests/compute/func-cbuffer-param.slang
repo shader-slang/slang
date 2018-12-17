@@ -1,0 +1,40 @@
+// func-cbuffer-param.slang
+
+// Test that passing a `ConstantBuffer<X>` parameter
+// into a function works across all target.
+
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+
+struct Data
+{
+	int4 val[4];
+}
+
+//TEST_INPUT:cbuffer(data=[0 1 2 3  16 17 18 19  32 33 34 35  48 49 50 51]):dxbinding(0),glbinding(0)
+ConstantBuffer<Data> a;
+
+//TEST_INPUT:cbuffer(data=[16 17 18 19  32 33 34 35  48 49 50 51  64 65 66 67]):dxbinding(1),glbinding(1)
+ConstantBuffer<Data> b;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(2),out
+RWStructuredBuffer<int> outputBuffer;
+
+int helper(ConstantBuffer<Data>  buffer, int index)
+{
+	return buffer.val[index].x;
+}
+
+int test(int val)
+{
+	return val + helper(a, val) + helper(b, val);
+}
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int inVal = (int) dispatchThreadID.x;
+    int outVal = test(inVal);
+    outputBuffer[dispatchThreadID.x] = outVal;
+}
