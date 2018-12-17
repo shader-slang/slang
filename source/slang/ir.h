@@ -966,7 +966,7 @@ struct IRStructType : IRInst
     IR_LEAF_ISA(StructType)
 };
 
-struct IRInterfaceType : IRGlobalValue
+struct IRInterfaceType : IRInst
 {
     IR_LEAF_ISA(InterfaceType)
 };

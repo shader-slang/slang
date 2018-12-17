@@ -58,12 +58,9 @@ void simplifyExistentialTypesRec(
         break;
     }
 
-    if( auto parentInst = as<IRParentInst>(inst) )
+    for( auto childInst : inst->getChildren() )
     {
-        for( auto childInst : parentInst->getChildren() )
-        {
-            simplifyExistentialTypesRec(context, childInst);
-        }
+        simplifyExistentialTypesRec(context, childInst);
     }
 }
 
@@ -86,12 +83,9 @@ void removeUnusedExistentialsRec(
         break;
     }
 
-    if( auto parentInst = as<IRParentInst>(inst) )
+    for( auto childInst : inst->getChildren() )
     {
-        for( auto childInst : parentInst->getChildren() )
-        {
-            removeUnusedExistentialsRec(context, childInst);
-        }
+        removeUnusedExistentialsRec(context, childInst);
     }
 }
 

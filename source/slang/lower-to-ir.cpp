@@ -4321,7 +4321,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRInterfaceType* irInterface = subBuilder->createInterfaceType();
         addNameHint(context, irInterface, decl);
-        setMangledName(irInterface, getMangledName(decl));
+        addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
 
         // TODO: are there any interface members that should be
