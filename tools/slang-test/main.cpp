@@ -1053,16 +1053,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 		auto actual = String(actualProgramOutput[i].Trim());
         if (actual != reference)
         {
-            // try to parse reference as float, and compare again
-            auto val = StringToFloat(reference);
-            auto uval = String((unsigned int)FloatAsInt(val), 16).ToUpper();
-            if (actual != uval)
-            {
-                printOutput();
-			    return TestResult::Fail;
-            }
-            else
-                return TestResult::Pass;
+            printOutput();
+            return TestResult::Fail;
         }
 	}
 	return TestResult::Pass;
