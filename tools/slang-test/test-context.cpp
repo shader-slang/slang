@@ -27,6 +27,15 @@ Result TestContext::init()
 
 TestContext::~TestContext()
 {
+    for (auto& pair : m_sharedLibTools)
+    {
+        const auto& tool = pair.Value;
+        if (tool.m_sharedLibrary)
+        {
+            SharedLibrary::unload(tool.m_sharedLibrary);
+        }
+    }
+
     if (m_session)
     {
         spDestroySession(m_session);
@@ -45,7 +54,7 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     StringBuilder sharedLibToolBuilder;
     sharedLibToolBuilder.append(name);
-    sharedLibToolBuilder.append("-shared-library");
+    sharedLibToolBuilder.append("-tool");
 
     StringBuilder builder;
     SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), builder);
@@ -60,4 +69,25 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     m_sharedLibTools.Add(name, tool);
     return tool.m_func;
+}
+
+void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
+{
+    SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
+    if (tool)
+    {
+        if (tool->m_sharedLibrary)
+        {
+            SharedLibrary::unload(tool->m_sharedLibrary);
+            tool->m_sharedLibrary = nullptr;
+        }
+
+        tool->m_func = func;
+    }
+    else
+    {
+        SharedLibraryTool tool = {};
+        tool.m_func = func;
+        m_sharedLibTools.Add(name, tool);
+    }
 }

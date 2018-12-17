@@ -15,10 +15,10 @@ using namespace Slang;
 #include "test-context.h"
 #include "test-reporter.h"
 #include "options.h"
+#include "slangc-tool.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
-
 
 #ifdef _WIN32
 #define SLANG_TEST_SUPPORT_HLSL 1
@@ -1745,12 +1745,88 @@ void runTestsInDirectory(
     }
 }
 
+struct ToolInvoke
+{
+        /// Returns true if it is a tool invoke
+    bool parse(const char*const* argv, int argc)
+    {
+        m_args.Clear();
+
+        m_binDirectory = ".";
+
+        if (argc < 2 || !_isToolName(argv[1]))
+        {
+            return false;
+        }
+        m_toolName = argv[1];
+
+        // Look for parameters that are for the slang-test, and should be skipped
+        int i = 2;
+        while (i < argc)
+        {
+            if (strcmp(argv[i], "-bindir") == 0 && i + 1 < argc)
+            {
+                m_binDirectory = argv[i + 1];
+                i += 2;
+            }
+            // If nothing found, the rest must be parsed to the tool
+            break;
+        }
+
+        m_args.Add(m_toolName.Buffer());
+        m_args.AddRange(argv + i, argc - i);
+        return true;
+    }
+
+    SlangResult invoke(AppContext* appContext, TestContext* testContext)
+    {
+        // Do I want to strip the -bindir directory that may be later
+
+            // We will just parse everything onto the underlying tool
+        auto func = testContext->getInnerMainFunc(m_binDirectory, m_toolName);
+        if (!func)
+        {
+            AppContext::getStdError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
+            return SLANG_FAIL;
+        }
+
+        return func(AppContext::getSingleton(), testContext->getSession(), int(m_args.Count()), m_args.Buffer());
+    }
+
+    String m_binDirectory;
+    String m_toolName;
+    List<const char*> m_args;
+
+private:
+    static bool _isToolName(const char* name)
+    {
+        static const char* toolNames[] =
+        {
+            "slangc",
+            "render-test",
+            "slang-reflection-test",
+        };
+
+        for (int i = 0; i < SLANG_COUNT_OF(toolNames); ++i)
+        {
+            if (::strcmp(toolNames[i], name) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+
 SlangResult innerMain(int argc, char** argv)
 {
     AppContext::initDefault();
 
     // The context holds useful things used during testing
     TestContext context;
+    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))
+
     auto& categorySet = context.categorySet;
 
     // Set up our test categories here
@@ -1766,9 +1842,21 @@ SlangResult innerMain(int argc, char** argv)
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
-    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, AppContext::getStdError(), &context.options));
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))
+    {
+        // We can set the slangc command line tool, to just use the function defined here
+        context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
+    }
 
+    {
+        ToolInvoke toolInvoke;
+        if (toolInvoke.parse(argv, argc))
+        {
+            return toolInvoke.invoke(AppContext::getSingleton(), &context);
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, AppContext::getStdError(), &context.options));
+    
     Options& options = context.options;
     if( options.includeCategories.Count() == 0 )
     {
