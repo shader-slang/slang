@@ -97,7 +97,7 @@ int wmain(int argc, wchar_t** argv)
     int result = 0;
 
     {
-        // Conver the wide-character Unicode arguments to UTF-8,
+        // Convert the wide-character Unicode arguments to UTF-8,
         // since that is what Slang expects on the API side.
 
         List<String> args;
