@@ -459,6 +459,8 @@ struct IRType : IRInst
     IR_PARENT_ISA(Type)
 };
 
+IRType* unwrapArray(IRType* type);
+
 struct IRBasicType : IRType
 {
     BaseType getBaseType() { return BaseType(op - kIROp_FirstBasicType); }
@@ -995,6 +997,8 @@ struct IRGlobalValueWithParams : IRGlobalValueWithCode
     // which are actually the parameters of the first
     // block.
     IRParam* getFirstParam();
+    IRParam* getLastParam();
+    IRInstList<IRParam> getParams();
 
     IR_PARENT_ISA(GlobalValueWithParams)
 };
@@ -1013,6 +1017,8 @@ struct IRFunc : IRGlobalValueWithParams
     IRType* getResultType();
     UInt getParamCount();
     IRType* getParamType(UInt index);
+
+    bool isDefinition() { return getFirstBlock() != nullptr; }
 
     IR_LEAF_ISA(Func)
 };

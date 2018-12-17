@@ -383,6 +383,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
+        /// An `[entryPoint]` decoration marks a function that represents a shader entry point.
+    INST(EntryPointDecoration,              entryPoint,             0, 0)
+
+        /// A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
+        /// even if it does not otherwise reference it.
+    INST(DependsOnDecoration,               dependsOn,              1, 0)
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)

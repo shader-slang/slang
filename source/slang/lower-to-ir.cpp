@@ -5602,10 +5602,14 @@ static void lowerEntryPointToIR(
     }
     auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
 
+    // Attach a marker decoraton so that we recognize
+    // this as an entry point.
+    auto builder = context->irBuilder;
+    builder->addEntryPointDecoration(getSimpleVal(context, loweredEntryPointFunc));
+
     // Now lower all the arguments supplied for global generic
     // type parameters.
     //
-    auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
     for (RefPtr<Substitutions> subst = entryPointRequest->globalGenericSubst; subst; subst = subst->outer)
     {

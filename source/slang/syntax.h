@@ -1151,6 +1151,14 @@ namespace Slang
     SyntaxNodeBase* createInstanceOfSyntaxClassByName(
         String const&   name);
 
+    // `Val`
+
+    inline bool areValsEqual(Val* left, Val* right)
+    {
+        if(!left || !right) return left == right;
+        return left->EqualsVal(right);
+    }
+
     //
 
     inline BaseType GetVectorBaseType(VectorExpressionType* vecType) {

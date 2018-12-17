@@ -344,7 +344,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto arrType = type->AsArrayType();
         if (!arrType)
             return false;
-        return (ArrayLength->EqualsVal(arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
+        return (areValsEqual(ArrayLength, arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
     }
 
     RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
