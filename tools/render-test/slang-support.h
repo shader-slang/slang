@@ -16,8 +16,9 @@ struct ShaderCompiler
     SlangSourceLanguage     sourceLanguage;
     SlangPassThrough        passThrough;
     char const*             profile;
-
-    RefPtr<ShaderProgram> compileProgram(
+    SlangSession*           slangSession;
+    
+    RefPtr<ShaderProgram> compileProgram(    
         ShaderCompileRequest const& request);
 };
 

@@ -10,7 +10,11 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
             }
         }
     ],

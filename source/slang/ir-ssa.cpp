@@ -364,7 +364,7 @@ void maybeApplyNameHint(
     {
         if( !val->findDecoration<IRNameHintDecoration>() )
         {
-            context->getBuilder()->addDecoration<IRNameHintDecoration>(val)->name = nameHint->name;
+            context->getBuilder()->addNameHintDecoration(val, nameHint->getName());
         }
     }
 }
@@ -572,6 +572,43 @@ void maybeSealBlock(
     blockInfo->isSealed = true;
 }
 
+// In some cases we may have a pointer to an IR value that
+// represents a phi node that has been replaced with another
+// IR value, because we discovered that the phi is no longer
+// needed.
+//
+// The `maybeGetPhiReplacement` function will follow any
+// chain of replacements that might be present, so that we
+// don't end up referencing a dangling/unused value in
+// the code that we generate.
+//
+IRInst* maybeGetPhiReplacement(
+    ConstructSSAContext*    context,
+    IRInst*                 inVal)
+{
+    IRInst* val = inVal;
+
+    while( val->op == kIROp_Param )
+    {
+        // The value is a parameter, but is it a phi?
+        IRParam* maybePhi = (IRParam*) val;
+        RefPtr<PhiInfo> phiInfo = nullptr;
+        if(!context->phiInfos.TryGetValue(maybePhi, phiInfo))
+            break;
+
+        // Okay, this is indeed a phi we are adding, but
+        // is it one that got replaced?
+        if(!phiInfo->replacement)
+            break;
+
+        // The phi we want to use got replaced, so we
+        // had better use the replacement instead.
+        val = phiInfo->replacement;
+    }
+
+    return val;
+}
+
 IRInst* readVarRec(
     ConstructSSAContext*    context,
     SSABlockInfo*           blockInfo,
@@ -664,8 +701,22 @@ IRInst* readVarRec(
     // value for the given variable in this block
     writeVar(context, blockInfo, var, val);
 
+    // If `val` represents a phi node (block parameter) then
+    // it is possible that some of the operations above might
+    // have caused it to be replaced with another value,
+    // and in that case we had better not return it to
+    // be referenced in user code.
+    //
+    // Note: it is okay for the `valueForVar` map that
+    // we update in `writeVar` to use the old value, so long
+    // as we do this replacement logic anywhere we might read
+    // from that map.
+    //
+    val = maybeGetPhiReplacement(context, val);
+
     return val;
 }
+
 
 
 IRInst* readVar(
@@ -682,27 +733,11 @@ IRInst* readVar(
         // Hooray, we found a value to use, and we
         // can proceed without too many complications.
 
-        // Well, let's check for one special case here, which
-        // is when the value we intend to use is a `phi`
-        // node that we ultimately decided to remove.
-        while( val->op == kIROp_Param )
-        {
-            // The value is a parameter, but is it a phi?
-            IRParam* maybePhi = (IRParam*) val;
-            RefPtr<PhiInfo> phiInfo = nullptr;
-            if(!context->phiInfos.TryGetValue(maybePhi, phiInfo))
-                break;
-
-            // Okay, this is indeed a phi we are adding, but
-            // is it one that got replaced?
-            if(!phiInfo->replacement)
-                break;
-
-            // The phi we want to use got replaced, so we
-            // had better use the replacement instead.
-            val = phiInfo->replacement;
-        }
-
+        // Just like in the `readVarRec` case above, we need
+        // to handle the case where `val` might represent
+        // a phi node that has subsequently been replaced.
+        //
+        val = maybeGetPhiReplacement(context, val);
 
         return val;
     }
@@ -803,7 +838,9 @@ void processBlock(
         }
     }
 
-    blockInfo->builder.setInsertBefore(block->getLastChild());
+    auto terminator = block->getTerminator();
+    SLANG_ASSERT(terminator);
+    blockInfo->builder.setInsertBefore(terminator);
 
     // Once we are done with all of the instructions
     // in a block, we can mark it as "filled," which
@@ -1031,9 +1068,16 @@ void constructSSA(ConstructSSAContext* context)
             newArgCount,
             newArgs.Buffer());
 
-        // Swap decorations over to the new instruction
-        newTerminator->firstDecoration = oldTerminator->firstDecoration;
-        oldTerminator->firstDecoration = nullptr;
+        // Swap decorations (all children, really) over to the new instruction
+        //
+        // TODO: We might want to encapsualte this in a reusable subroutine if
+        // we often need to copy decorations from one instruction to another.
+        //
+        while( auto firstChild = oldTerminator->getFirstDecoration() )
+        {
+            firstChild->removeFromParent();
+            firstChild->insertAtEnd(newTerminator);
+        }
 
         // A terminator better not have uses, so we shouldn't have
         // to replace them.

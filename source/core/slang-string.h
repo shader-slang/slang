@@ -133,6 +133,8 @@ namespace Slang
             return !(*this == other);
         }
 
+        bool startsWith(UnownedStringSlice const& other) const;
+        bool startsWith(char const* str) const;
 
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
@@ -329,8 +331,7 @@ namespace Slang
         }
 
         void ensureUniqueStorageWithCapacity(UInt capacity);
-        char* prepareForAppend(UInt count);
-
+     
         RefPtr<StringRepresentation> buffer;
 
     public:
@@ -346,6 +347,11 @@ namespace Slang
 		String()
 		{
 		}
+
+            /// Returns a buffer which can hold at least count chars
+        char* prepareForAppend(UInt count);
+            /// Append data written to buffer output via 'prepareForAppend' directly written 'inplace'
+        void appendInPlace(const char* chars, UInt count);
 
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return buffer; }
 

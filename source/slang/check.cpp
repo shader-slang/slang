@@ -78,6 +78,28 @@ namespace Slang
         return isEffectivelyStatic(decl, parentDecl);
     }
 
+        /// Is `decl` a global shader parameter declaration?
+    bool isGlobalShaderParameter(VarDeclBase* decl)
+    {
+        // A global shader parameter must be declared at global (module) scope.
+        //
+        if(!dynamic_cast<ModuleDecl*>(decl->ParentDecl)) return false;
+
+        // A global variable marked `static` indicates a traditional
+        // global variable (albeit one that is implicitly local to
+        // the translation unit)
+        //
+        if(decl->HasModifier<HLSLStaticModifier>()) return false;
+
+        // The `groupshared` modifier indicates that a variable cannot
+        // be a shader parameters, but is instead transient storage
+        // allocated for the duration of a thread-group's execution.
+        //
+        if(decl->HasModifier<HLSLGroupSharedModifier>()) return false;
+
+        return true;
+    }
+
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
     struct BasicTypeKey
@@ -311,7 +333,10 @@ namespace Slang
             const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
             if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
             {
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                if (sink)
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
+                }
                 return nullptr;
             }
         }
@@ -1086,6 +1111,15 @@ namespace Slang
                 }
             }
 
+            if (!type)
+            {
+                if (outProperType)
+                {
+                    *outProperType = nullptr;
+                }
+                return false;
+            }
+
             if (auto genericDeclRefType = type->As<GenericDeclRefType>())
             {
                 // We are using a reference to a generic declaration as a concrete
@@ -1114,7 +1148,7 @@ namespace Slang
                         }
 
                         // TODO: this is one place where syntax should get cloned!
-                        if(outProperType)
+                        if (outProperType)
                             args.Add(typeParam->initType.exp);
                     }
                     else if (auto valParam = member.As<GenericValueParamDecl>())
@@ -1130,7 +1164,7 @@ namespace Slang
                         }
 
                         // TODO: this is one place where syntax should get cloned!
-                        if(outProperType)
+                        if (outProperType)
                             args.Add(valParam->initExpr);
                     }
                     else
@@ -1145,15 +1179,13 @@ namespace Slang
                 }
                 return true;
             }
-            else
+            
+            // default case: we expect this to already be a proper type
+            if (outProperType)
             {
-                // default case: we expect this to already be a proper type
-                if (outProperType)
-                {
-                    *outProperType = type;
-                }
-                return true;
+                *outProperType = type;
             }
+            return true;
         }
 
 
@@ -1227,7 +1259,7 @@ namespace Slang
         {
             // TODO: we may want other cases here...
 
-            if (auto errorType = expr->type->As<ErrorType>())
+            if (auto errorType = expr->type.As<ErrorType>())
                 return true;
 
             return false;
@@ -2178,6 +2210,11 @@ namespace Slang
                     }
                 }
                 else if (attr.As<PushConstantAttribute>())
+                {
+                    // Has no args
+                    SLANG_ASSERT(attr->args.Count() == 0);
+                }
+                else if (attr.As<EarlyDepthStencilAttribute>())
                 {
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
@@ -4313,17 +4350,6 @@ namespace Slang
             if (function || checkingPhase == CheckingPhase::Header)
             {
                 TypeExp typeExp = CheckUsableType(varDecl->type);
-#if 0
-                if (typeExp.type->GetBindableResourceType() != BindableResourceType::NonBindable)
-                {
-                    // We don't want to allow bindable resource types as local variables (at least for now).
-                    auto parentDecl = varDecl->ParentDecl;
-                    if (auto parentScopeDecl = dynamic_cast<ScopeDecl*>(parentDecl))
-                    {
-                        getSink()->diagnose(varDecl->type, Diagnostics::invalidTypeForLocalVariable);
-                    }
-                }
-#endif
                 varDecl->type = typeExp;
                 if (varDecl->type.Equals(getSession()->getVoidType()))
                 {
@@ -7331,7 +7357,7 @@ namespace Slang
                 // for anything applicable.
                 AddDeclRefOverloadCandidates(LookupResultItem(declRefExpr->declRef), context);
             }
-            else if (auto funcType = funcExprType->As<FuncType>())
+            else if (auto funcType = funcExprType.As<FuncType>())
             {
                 // TODO(tfoley): deprecate this path...
                 AddFuncOverloadCandidate(funcType, context);
@@ -7352,7 +7378,7 @@ namespace Slang
                     AddOverloadCandidates(item, context);
                 }
             }
-            else if (auto typeType = funcExprType->As<TypeType>())
+            else if (auto typeType = funcExprType.As<TypeType>())
             {
                 // If none of the above cases matched, but we are
                 // looking at a type, then I suppose we have
@@ -8012,16 +8038,15 @@ namespace Slang
             RefPtr<Expr> expr = inExpr;
             for (;;)
             {
-                auto& type = expr->type;
-                if (auto pointerLikeType = type->As<PointerLikeType>())
+                auto baseType = expr->type;
+                if (auto pointerLikeType = baseType->As<PointerLikeType>())
                 {
-                    type = QualType(pointerLikeType->elementType);
+                    auto elementType = QualType(pointerLikeType->elementType);
+                    elementType.IsLeftValue = baseType.IsLeftValue;
 
                     auto derefExpr = new DerefExpr();
                     derefExpr->base = expr;
-                    derefExpr->type = QualType(pointerLikeType->elementType);
-
-                    // TODO(tfoley): deal with l-value-ness here
+                    derefExpr->type = elementType;
 
                     expr = derefExpr;
                     continue;
@@ -9105,6 +9130,18 @@ namespace Slang
 
             bool isLValue = true;
             if(varDeclRef.getDecl()->FindModifier<ConstModifier>())
+                isLValue = false;
+
+            // Global-scope shader parameters should not be writable,
+            // since they are effectively program inputs.
+            //
+            // TODO: We could eventually treat a mutable global shader
+            // parameter as a shorthand for an immutable parameter and
+            // a global variable that gets initialized from that parameter,
+            // but in order to do so we'd need to support global variables
+            // with resource types better in the back-end.
+            //
+            if(isGlobalShaderParameter(varDeclRef.getDecl()))
                 isLValue = false;
 
             qualType.IsLeftValue = isLValue;

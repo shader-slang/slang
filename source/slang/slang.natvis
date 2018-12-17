@@ -93,6 +93,15 @@
         </Expand>
       </Synthetic>
       <Item Name="[parent]">parent</Item>
+      <Synthetic Name="[decorations/children]">
+        <Expand>
+          <LinkedListItems>
+            <HeadPointer>m_decorationsAndChildren.first</HeadPointer>
+            <NextPointer>next</NextPointer>
+            <ValueNode>this</ValueNode>
+          </LinkedListItems>
+        </Expand>
+      </Synthetic>
       <Synthetic Name="[uses]">
         <Expand>
           <LinkedListItems>
@@ -104,59 +113,6 @@
       </Synthetic>
   </Expand>
   </Type>
-  <Type Name="Slang::IRParentInst">
-    <DisplayString>{{{op}}}</DisplayString>
-    <Expand>
-      <Item Name="[op]">op</Item>
-      <Item Name="[type]">typeUse.usedValue</Item>
-      <Synthetic Name="[children]">
-        <Expand>
-          <LinkedListItems>
-            <HeadPointer>children.first</HeadPointer>
-            <NextPointer>next</NextPointer>
-            <ValueNode>this</ValueNode>
-          </LinkedListItems>
-        </Expand>
-      </Synthetic>
-      <Item Name="[parent]">parent</Item>
-      <Synthetic Name="[uses]">
-        <Expand>
-          <LinkedListItems>
-            <HeadPointer>firstUse</HeadPointer>
-            <NextPointer>nextUse</NextPointer>
-            <ValueNode>user</ValueNode>
-          </LinkedListItems>
-        </Expand>
-      </Synthetic>
-    </Expand>
-  </Type>
-  <Type Name="Slang::IRGlobalValue">
-    <DisplayString>{{{op} "{mangledName}"}}</DisplayString>
-    <Expand>
-      <Item Name="[op]">op</Item>
-      <Item Name="[type]">type</Item>
-      <Synthetic Name="[children]">
-        <Expand>
-          <LinkedListItems>
-            <HeadPointer>children.first</HeadPointer>
-            <NextPointer>next</NextPointer>
-            <ValueNode>this</ValueNode>
-          </LinkedListItems>
-        </Expand>
-      </Synthetic>
-      <Item Name="[parent]">parent</Item>
-      <Synthetic Name="[uses]">
-        <Expand>
-          <LinkedListItems>
-            <HeadPointer>firstUse</HeadPointer>
-            <NextPointer>nextUse</NextPointer>
-            <ValueNode>user</ValueNode>
-          </LinkedListItems>
-        </Expand>
-      </Synthetic>
-    </Expand>
-  </Type>
-  
   <Type Name="Slang::IRDeclRef">
     <DisplayString>{{IRDeclRef {declRef}}}</DisplayString>
     <Expand>

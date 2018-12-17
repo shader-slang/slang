@@ -182,6 +182,7 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="platform.h" />
     <ClInclude Include="secure-crt.h" />
+    <ClInclude Include="slang-app-context.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
     <ClInclude Include="slang-cpu-defines.h" />
     <ClInclude Include="slang-free-list.h" />
@@ -194,6 +195,7 @@
     <ClInclude Include="slang-string-slice-pool.h" />
     <ClInclude Include="slang-string-util.h" />
     <ClInclude Include="slang-string.h" />
+    <ClInclude Include="slang-writer.h" />
     <ClInclude Include="smart-pointer.h" />
     <ClInclude Include="stream.h" />
     <ClInclude Include="text-io.h" />
@@ -202,6 +204,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="platform.cpp" />
+    <ClCompile Include="slang-app-context.cpp" />
     <ClCompile Include="slang-byte-encode-util.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-io.cpp" />
@@ -212,6 +215,7 @@
     <ClCompile Include="slang-string-slice-pool.cpp" />
     <ClCompile Include="slang-string-util.cpp" />
     <ClCompile Include="slang-string.cpp" />
+    <ClCompile Include="slang-writer.cpp" />
     <ClCompile Include="stream.cpp" />
     <ClCompile Include="text-io.cpp" />
     <ClCompile Include="token-reader.cpp" />

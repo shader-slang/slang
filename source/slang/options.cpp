@@ -103,7 +103,7 @@ struct OptionsParser
 
     // An entry point represents a function to be checked and possibly have
     // code generated in one of our translation units. An entry point
-    // needs to have an assocaited stage, which might come via the
+    // needs to have an associated stage, which might come via the
     // `-stage` command line option, or a `[shader("...")]` attribute
     // in the source code.
     //
@@ -1176,7 +1176,7 @@ struct OptionsParser
             // need to support output formats that can store multiple
             // entry points in one file).
 
-            // If an output doesn't have a target assocaited with
+            // If an output doesn't have a target associated with
             // it, then search for the target with the matching format.
             if( rawOutput.targetIndex == -1 )
             {

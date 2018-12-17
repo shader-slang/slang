@@ -424,7 +424,7 @@ void fixValueScoping(RegionTree* regionTree)
         if(!parentRegion)
             continue;
 
-        for(auto inst : block->getChildren())
+        for(auto inst : block->getDecorationsAndChildren())
         {
             fixValueScopingForInst(inst, parentRegion, regionTree);
         }

@@ -13,6 +13,10 @@ SLANG_RAW("// Modifier for variables that must resolve to compile-time constants
 SLANG_RAW("// as part of translation.\n")
 SLANG_RAW("syntax constexpr : ConstExprModifier;\n")
 SLANG_RAW("\n")
+SLANG_RAW("// Modifier for variables that should have writes be made\n")
+SLANG_RAW("// visible at the global-memory scope\n")
+SLANG_RAW("syntax globallycoherent : GloballyCoherentModifier;\n")
+SLANG_RAW("\n")
 SLANG_RAW("// A type that can be used as an operand for builtins\n")
 SLANG_RAW("interface __BuiltinType {}\n")
 SLANG_RAW("\n")
@@ -686,13 +690,30 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
             if( kBaseTextureTypes[tt].coordCount + isArray < 4 )
             {
-                int loadCoordCount = kBaseTextureTypes[tt].coordCount + isArray + (isMultisample?0:1);
+                // The `Load()` operation on an ordinary `Texture2D` takes
+                // an `int3` for the location, where `.xy` holds the texel
+                // coordinates, and `.z` holds the mip level to use.
+                //
+                // The third coordinate for mip level is absent in
+                // `Texure2DMS.Load()` and `RWTexture2D.Load`. This pattern
+                // is repreated for all the other texture shapes.
+                //
+                bool needsMipLevel = !isMultisample && (access == SLANG_RESOURCE_ACCESS_READ);
+
+                int loadCoordCount = kBaseTextureTypes[tt].coordCount + isArray + (needsMipLevel?1:0);
 
                 // When translating to GLSL, we need to break apart the `location` argument.
                 //
                 // TODO: this should realy be handled by having this member actually get lowered!
                 static const char* kGLSLLoadCoordsSwizzle[] = { "", "", "x", "xy", "xyz", "xyzw" };
                 static const char* kGLSLLoadLODSwizzle[]    = { "", "", "y", "z", "w", "error" };
+
+                // TODO: The GLSL translations here only handle the read-only texture
+                // cases (stuff that lowers to `texture*` in GLSL) and not the stuff
+                // that lowers to `image*`.
+                //
+                // At some point it may make sense to separate the read-only and
+                // `RW`/`RasterizerOrdered` cases here rather than try to share code.
 
                 if (isMultisample)
                 {
@@ -702,7 +723,16 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ")\")\n";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ";
+                    if( needsMipLevel )
+                    {
+                        sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
+                    }
+                    else
+                    {
+                        sb << "$1, 0";
+                    }
+                    sb << ")\")\n";
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -720,7 +750,16 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount] << ", $2)\")\n";
+                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ";
+                    if( needsMipLevel )
+                    {
+                        sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
+                    }
+                    else
+                    {
+                        sb << "$1, 0";
+                    }
+                    sb << ", $2)\")\n";
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -728,7 +767,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 {
                     sb << ", int sampleIndex";
                 }
-                sb << ", constexpr int" << loadCoordCount << " offset";
+                sb << ", constexpr int" << kBaseTextureTypes[tt].coordCount << " offset";
                 sb << ");\n";
 
 
@@ -1252,7 +1291,16 @@ SLANG_RAW("__attributeTarget(VarDeclBase)\n")
 SLANG_RAW("attribute_syntax [__vulkanRayPayload] : VulkanRayPayloadAttribute;\n")
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(VarDeclBase)\n")
+SLANG_RAW("attribute_syntax [__vulkanCallablePayload] : VulkanCallablePayloadAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("__attributeTarget(VarDeclBase)\n")
 SLANG_RAW("attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;\n")
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(FunctionDeclBase)\n")
 SLANG_RAW("attribute_syntax [mutating] : MutatingAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("    /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.\n")
+SLANG_RAW("    ///\n")
+SLANG_RAW("    /// This is equivalent to the LLVM `readnone` function attribute.\n")
+SLANG_RAW("__attributeTarget(FunctionDeclBase)\n")
+SLANG_RAW("attribute_syntax [__readNone] : ReadNoneAttribute;\n")

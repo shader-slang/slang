@@ -1,4 +1,4 @@
-﻿#ifndef SLANG_COMPILER_H_INCLUDED
+#ifndef SLANG_COMPILER_H_INCLUDED
 #define SLANG_COMPILER_H_INCLUDED
 
 #include "../core/basic.h"
@@ -212,6 +212,20 @@ namespace Slang
         Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
     };
 
+    enum class WriterChannel : SlangWriterChannel
+    {
+        Diagnostic = SLANG_WRITER_CHANNEL_DIAGNOSTIC,
+        StdOutput = SLANG_WRITER_CHANNEL_STD_OUTPUT,
+        StdError = SLANG_WRITER_CHANNEL_STD_ERROR,
+        CountOf = SLANG_WRITER_CHANNEL_COUNT_OF,
+    };
+
+    enum class WriterMode : SlangWriterMode
+    {
+        Text = SLANG_WRITER_MODE_TEXT,
+        Binary = SLANG_WRITER_MODE_BINARY,
+    };
+
     // A request to generate output in some target format
     class TargetRequest : public RefObject
     {
@@ -240,6 +254,12 @@ namespace Slang
 
         MatrixLayoutMode getDefaultMatrixLayoutMode();
     };
+
+        /// Are we generating code for a D3D API?
+    bool isD3DTarget(TargetRequest* targetReq);
+
+        /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
+    bool isKhronosTarget(TargetRequest* targetReq);
 
     // Compute the "effective" profile to use when outputting the given entry point
     // for the chosen code-generation target.
@@ -395,6 +415,12 @@ namespace Slang
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
+        // For output
+        ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF];
+
+        void setWriter(WriterChannel chan, ISlangWriter* writer);
+        ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
+
         /// Load a file into memory using the configured file system.
         ///
         /// @param path The path to attempt to load from
@@ -498,6 +524,9 @@ namespace Slang
         CompileRequest* compileRequest,
         char const*     text,
         CodeGenTarget   target);
+
+    /* Returns true if a codeGen target is available. */
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
 
     struct TypeCheckingCache;
     //

@@ -155,7 +155,7 @@ struct SimpleMaterial : IMaterial
     // To satisfy the requirements of the `IMaterial` interface, our
     // material type needs to provide a suitable `BRDF` type. We
     // do this by using a simple `typedef`, although a nested
-    // `struct` type can also satisfy an assocaited type requirement.
+    // `struct` type can also satisfy an associated type requirement.
     //
     // A future version of the Slang compiler may allow the "right"
     // associated type definition to be inferred from the signature
@@ -459,7 +459,7 @@ float4 fragmentMain(
     // from different light sources.
     //
     // Note that the return type here is `TMaterial.BRDF`,
-    // which is the `BRDF` type *assocaited* with the (unknown)
+    // which is the `BRDF` type *associated* with the (unknown)
     // `TMaterial` type. When `TMaterial` gets substituted for
     // a concrete type later (e.g., `SimpleMaterial`) this
     // will resolve to a concrete type too (e.g., `SimpleMaterial.BRDF`

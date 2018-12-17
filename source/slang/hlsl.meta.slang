@@ -18,19 +18,28 @@ __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
+    __target_intrinsic(glsl, "$1 = $0._data.length()")
     void GetDimensions(
         out uint dim);
 
+    __target_intrinsic(glsl, "$0._data[$1]")
     uint Load(int location);
+
     uint Load(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec2($0._data[$1], $0._data[$1+1])")
     uint2 Load2(int location);
+
     uint2 Load2(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec3($0._data[$1], $0._data[$1+1], $0._data[$1+2])")
     uint3 Load3(int location);
+
     uint3 Load3(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec4($0._data[$1], $0._data[$1+1], $0._data[$1+2], $0._data[$1+3])")
     uint4 Load4(int location);
+
     uint4 Load4(int location, out uint status);
 };
 
@@ -46,7 +55,11 @@ struct StructuredBuffer
     T Load(int location);
     T Load(int location, out uint status);
 
-    __subscript(uint index) -> T { __intrinsic_op(bufferLoad) get; };
+    __subscript(uint index) -> T
+    {
+        __target_intrinsic(glsl, "$0._data[$1]")
+        get;
+    };
 };
 
 __generic<T>
@@ -93,112 +106,136 @@ __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 struct $(item.name)
 {
-    // Note(tfoley): supports alll operations from `ByteAddressBuffer`
+    // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
+    __target_intrinsic(glsl, "$1 = $0._data.length()")
     void GetDimensions(
         out uint dim);
 
+    __target_intrinsic(glsl, "$0._data[$1]")
     uint Load(int location);
+
     uint Load(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec2($0._data[$1], $0._data[$1+4])")
     uint2 Load2(int location);
+
     uint2 Load2(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec3($0._data[$1], $0._data[$1+4], $0._data[$1+8])")
     uint3 Load3(int location);
+
     uint3 Load3(int location, out uint status);
 
+    __target_intrinsic(glsl, "uvec4($0._data[$1], $0._data[$1+4], $0._data[$1+8], $0._data[$1+12])")
     uint4 Load4(int location);
+
     uint4 Load4(int location, out uint status);
 
     // Added operations:
 
+    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1], $2))")
     void InterlockedAdd(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicAdd($0._data[$1], $2)")
     void InterlockedAdd(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicAnd($0._data[$1], $2))")
     void InterlockedAnd(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicAnd($0._data[$1], $2)")
     void InterlockedAnd(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($4 = atomicCompSwap($0._data[$1], $2, $3))")
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
         UINT value,
         out UINT original_value);
-    void InterlockedCompareExchange(
-        UINT dest,
-        UINT compare_value,
-        UINT value);
 
+    __target_intrinsic(glsl, "atomicCompSwap($0._data[$1], $2, $3)")
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
         UINT value);
-    void InterlockedCompareStore(
-        UINT dest,
-        UINT compare_value);
 
+    __target_intrinsic(glsl, "($3 = atomicExchange($0._data[$1], $2))")
     void InterlockedExchange(
         UINT dest,
         UINT value,
         out UINT original_value);
-    void InterlockedExchange(
-        UINT dest,
-        UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicMax($0._data[$1], $2))")
     void InterlockedMax(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicMax($0._data[$1], $2)")
     void InterlockedMax(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicMin($0._data[$1], $2))")
     void InterlockedMin(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicMin($0._data[$1], $2)")
     void InterlockedMin(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicOr($0._data[$1], $2))")
     void InterlockedOr(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicOr($0._data[$1], $2)")
     void InterlockedOr(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "($3 = atomicXor($0._data[$1], $2))")
     void InterlockedXor(
         UINT dest,
         UINT value,
         out UINT original_value);
+
+    __target_intrinsic(glsl, "atomicXor($0._data[$1], $2)")
     void InterlockedXor(
         UINT dest,
         UINT value);
 
+    __target_intrinsic(glsl, "$0._data[$1] = $2")
     void Store(
         uint address,
         uint value);
 
+    __target_intrinsic(glsl, "$0._data[$1] = $2.x, $0._data[$1+4] = $2.y")
     void Store2(
         uint address,
         uint2 value);
 
+    __target_intrinsic(glsl, "$0._data[$1] = $2.x, $0._data[$1+4] = $2.y, $0._data[$1+8] = $2.z")
     void Store3(
         uint address,
         uint3 value);
 
+    __target_intrinsic(glsl, "$0._data[$1] = $2.x, $0._data[$1+4] = $2.y, $0._data[$1+8] = $2.z, $0._data[$1+12] = $2.w")
     void Store4(
         uint address,
         uint4 value);
@@ -237,11 +274,11 @@ struct $(item.name)
     T Load(int location);
     T Load(int location, out uint status);
 
-	__subscript(uint index) -> T
-	{
-        __intrinsic_op(bufferElementRef)
+    __subscript(uint index) -> T
+    {
+        __target_intrinsic(glsl, "$0._data[$1]")
         ref;
-	}
+    }
 };
 
 ${{{{
@@ -305,9 +342,11 @@ __generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);
 __generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
+__target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
 void AllMemoryBarrier();
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+__target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
 void AllMemoryBarrierWithGroupSync();
 
 // Test if any components is non-zero (HLSL SM 1.0)
@@ -513,7 +552,10 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M
 __generic<T : __BuiltinFloatingPointType, let N : int> T determinant(matrix<T,N,N> m);
 
 // Barrier for device memory
+__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
 void DeviceMemoryBarrier();
+
+__target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
 void DeviceMemoryBarrierWithGroupSync();
 
 // Vector distance
@@ -534,17 +576,46 @@ __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<
 
 // Attribute evaluation
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtCentroid(T x);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
+// TODO: The matrix cases of these functions won't actuall work
+// when compiled to GLSL, since they only support scalar/vector
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeAtSample(T x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
+// TODO: Should these be constrains to `__BuiltinFloatingPointType`?
 
-__generic<T : __BuiltinArithmeticType> T EvaluateAttributeSnapped(T x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, interpolateAtCentroid)
+T EvaluateAttributeAtCentroid(T x);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, interpolateAtCentroid)
+vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, interpolateAtCentroid)
+matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+T EvaluateAttributeAtSample(T x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, "interpolateAtSample($0, int($1))")
+matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+T EvaluateAttributeSnapped(T x, int2 offset);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
+matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
 
 // Base-e exponent
 __generic<T : __BuiltinFloatingPointType> T exp(T x);
@@ -641,12 +712,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 __target_intrinsic(glsl, "groupMemoryBarrier")
 void GroupMemoryBarrier();
 
-// Note: the unmatched parentheses in the GLSL lowering are
-// to cancel out the parens that the emit logic uses, so that
-// we can emit this as if it were an expression.
-//
-// TODO: investigate whether we can just use "operator comma" here.
-__target_intrinsic(glsl, "groupMemoryBarrier()); (barrier()")
+__target_intrinsic(glsl, "groupMemoryBarrier(), barrier()")
 void GroupMemoryBarrierWithGroupSync();
 
 // Atomics
@@ -686,12 +752,6 @@ void InterlockedCompareStore(__ref  int dest,  int compare_value,  int value);
 
 __target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
-
-__target_intrinsic(glsl, "$atomicExchange($A, $1)")
-void InterlockedExchange(__ref  int dest,  int value);
-
-__target_intrinsic(glsl, "$atomicExchange($A, $1)")
-void InterlockedExchange(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value);
@@ -802,8 +862,14 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log2(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log2(matrix<T,N,M> x);
 
 // multiply-add
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType> T mad(T mvalue, T avalue, T bvalue);
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);
+
+__target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
 
 // maximum
@@ -1355,8 +1421,38 @@ struct BuiltInTriangleIntersectionAttributes
 // 10.3 - Intrinsics
 
 // 10.3.1
-__target_intrinsic(glsl, "callableShadersAreNotYetAvailableInVulkan")
-void CallShader<param_t>(uint ShaderIndex, inout param_t Parameter);
+
+void CallShader<Payload>(uint shaderIndex, inout Payload payload);
+
+// `executeCallableNV` is the GLSL intrinsic that will be used to implement
+// `CallShader()` for GLSL-based targets.
+//
+__target_intrinsic(glsl, "executeCallableNV")
+void __executeCallableNV(uint shaderIndex, int payloadLocation);
+
+// Next is the custom intrinsic that will compute the payload location
+// for a type being used in a `CallShader()` call for GLSL-based targets.
+//
+__generic<Payload>
+__target_intrinsic(glsl, "$XC")
+[__readNone]
+int __callablePayloadLocation(Payload payload);
+
+// Now we provide a hard-coded definition of `CallShader()` for GLSL-based
+// targets, which maps the generic HLSL operation into the non-generic
+// GLSL equivalent.
+//
+__generic<Payload>
+__specialized_for_target(glsl)
+void CallShader(uint shaderIndex, inout Payload payload)
+{
+    [__vulkanRayPayload]
+    static Payload p;
+
+    p = payload;
+    __executeCallableNV(shaderIndex, __callablePayloadLocation(p));
+    payload = p;
+}
 
 // 10.3.2
 void TraceRay<payload_t>(
@@ -1369,8 +1465,8 @@ void TraceRay<payload_t>(
     RayDesc                         Ray,
     inout payload_t                 Payload);
 
-__target_intrinsic(glsl, "traceNVX")
-void __traceNVX(
+__target_intrinsic(glsl, "traceNV")
+void __traceNV(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
     uint                            InstanceInclusionMask,
@@ -1391,6 +1487,7 @@ void __traceNVX(
 //
 __generic<Payload>
 __target_intrinsic(glsl, "$XP")
+[__readNone]
 int __rayPayloadLocation(Payload payload);
 
 __generic<payload_t>
@@ -1409,7 +1506,7 @@ void TraceRay(
     static payload_t p;
 
     p = Payload;
-    __traceNVX(
+    __traceNV(
         AccelerationStructure,
         RayFlags,
         InstanceInclusionMask,
@@ -1427,8 +1524,8 @@ void TraceRay(
 // 10.3.3
 bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
-__target_intrinsic(glsl, "reportIntersectionNVX")
-bool __reportIntersectionNVX(float tHit, uint hitKind);
+__target_intrinsic(glsl, "reportIntersectionNV")
+bool __reportIntersectionNV(float tHit, uint hitKind);
 
 __generic<A>
 __specialized_for_target(glsl)
@@ -1438,15 +1535,15 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     static A a;
 
     a = attributes;
-    return __reportIntersectionNVX(tHit, hitKind);
+    return __reportIntersectionNV(tHit, hitKind);
 }
 
 // 10.3.4
-__target_intrinsic(glsl, ignoreIntersectionNVX)
+__target_intrinsic(glsl, ignoreIntersectionNV)
 void IgnoreHit();
 
 // 10.3.5
-__target_intrinsic(glsl, terminateRayNVX)
+__target_intrinsic(glsl, terminateRayNV)
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
@@ -1456,25 +1553,25 @@ void AcceptHitAndEndSearch();
 
 // 10.4.1 - Ray Dispatch System Values
 
-__target_intrinsic(glsl, "uvec3(gl_LaunchIDNVX, 0)")
+__target_intrinsic(glsl, "(gl_LaunchIDNV)")
 uint3 DispatchRaysIndex();
 
-__target_intrinsic(glsl, "uvec3(gl_LaunchSizeNVX, 0)")
+__target_intrinsic(glsl, "(gl_LaunchSizeNV)")
 uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
 
-__target_intrinsic(glsl, "(gl_WorldRayOriginNVX)")
+__target_intrinsic(glsl, "(gl_WorldRayOriginNV)")
 float3 WorldRayOrigin();
 
-__target_intrinsic(glsl, "(gl_WorldRayDirectionNVX)")
+__target_intrinsic(glsl, "(gl_WorldRayDirectionNV)")
 float3 WorldRayDirection();
 
-__target_intrinsic(glsl, "(gl_RayTminNVX)")
+__target_intrinsic(glsl, "(gl_RayTminNV)")
 float RayTMin();
 
 // Note: The `RayTCurrent()` intrinsic should translate to
-// either `gl_HitTNVX` (for hit shaders) or `gl_RayTmaxNVX`
+// either `gl_HitTNV` (for hit shaders) or `gl_RayTmaxNV`
 // (for intersection shaders). Right now we are handling this
 // during code emission, for simplicity.
 //
@@ -1486,12 +1583,12 @@ float RayTMin();
 __target_intrinsic(glsl, "$XT")
 float RayTCurrent();
 
-__target_intrinsic(glsl, "(gl_RayFlagsNVX)")
+__target_intrinsic(glsl, "(gl_IncomingRayFlagsNV)")
 uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(glsl, "(gl_InstanceCustomIndexNVX)")
+__target_intrinsic(glsl, "(gl_InstanceCustomIndexNV)")
 uint InstanceIndex();
 
 __target_intrinsic(glsl, "(gl_InstanceID)")
@@ -1500,22 +1597,22 @@ uint InstanceID();
 __target_intrinsic(glsl, "(gl_PrimitiveID)")
 uint PrimitiveIndex();
 
-__target_intrinsic(glsl, "(gl_ObjectRayOriginNVX)")
+__target_intrinsic(glsl, "(gl_ObjectRayOriginNV)")
 float3 ObjectRayOrigin();
 
-__target_intrinsic(glsl, "(gl_ObjectRayDirectionNVX)")
+__target_intrinsic(glsl, "(gl_ObjectRayDirectionNV)")
 float3 ObjectRayDirection();
 
-__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNVX)")
+__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNV)")
 float3x4 ObjectToWorld3x4();
 
-__target_intrinsic(glsl, "transpose(gl_WorldToObjectNVX)")
+__target_intrinsic(glsl, "transpose(gl_WorldToObjectNV)")
 float3x4 WorldToObject3x4();
 
-__target_intrinsic(glsl, "(gl_ObjectToWorldNVX)")
+__target_intrinsic(glsl, "(gl_ObjectToWorldNV)")
 float4x3 ObjectToWorld4x3();
 
-__target_intrinsic(glsl, "(gl_WorldToObjectNVX)")
+__target_intrinsic(glsl, "(gl_WorldToObjectNV)")
 float4x3 WorldToObject4x3();
 
 // Note: The provisional DXR spec included these unadorned
@@ -1531,5 +1628,5 @@ float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
 float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
-__target_intrinsic(glsl, "(gl_HitKindNVX)")
+__target_intrinsic(glsl, "(gl_HitKindNV)")
 uint HitKind();

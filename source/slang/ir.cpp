@@ -11,10 +11,10 @@ namespace Slang
 {
     struct IRSpecContext;
 
-    IRGlobalValue* cloneGlobalValueWithMangledName(
-        IRSpecContext*  context,
-        Name*   mangledName,
-        IRGlobalValue*  originalVal);
+    IRInst* cloneGlobalValueWithLinkage(
+        IRSpecContext*          context,
+        IRInst*                 originalVal,
+        IRLinkageDecoration*    originalLinkage);
 
     struct IROpMapEntry
     {
@@ -166,6 +166,19 @@ namespace Slang
         }
     }
 
+    // IRInstListBase
+
+    void IRInstListBase::Iterator::operator++()
+    {
+        if (inst)
+        {
+            inst = inst->next;
+        }
+    }
+
+    IRInstListBase::Iterator IRInstListBase::begin() { return Iterator(first); }
+    IRInstListBase::Iterator IRInstListBase::end() { return Iterator(last ? last->next : nullptr); }
+
     //
 
     IRUse* IRInst::getOperands()
@@ -180,9 +193,9 @@ namespace Slang
         return (IRUse*)(this + 1);
     }
 
-    IRDecoration* IRInst::findDecorationImpl(IRDecorationOp decorationOp)
+    IRDecoration* IRInst::findDecorationImpl(IROp decorationOp)
     {
-        for( auto dd = firstDecoration; dd; dd = dd->next )
+        for(auto dd : getDecorations())
         {
             if(dd->op == decorationOp)
                 return dd;
@@ -239,14 +252,31 @@ namespace Slang
 
     void IRBlock::addParam(IRParam* param)
     {
-        auto lastParam = getLastParam();
-        if (lastParam)
+        // If there are any existing parameters,
+        // then insert after the last of them.
+        //
+        if (auto lastParam = getLastParam())
         {
             param->insertAfter(lastParam);
         }
+        //
+        // Otherwise, if there are any existing
+        // "ordinary" instructions, insert before
+        // the first of them.
+        //
+        else if(auto firstOrdinary = getFirstOrdinaryInst())
+        {
+            param->insertBefore(firstOrdinary);
+        }
+        //
+        // Otherwise the block currently has neither
+        // parameters nor orindary instructions,
+        // so we can safely insert at the end of
+        // the list of (raw) children.
+        //
         else
         {
-            param->insertAtStart(this);
+            param->insertAtEnd(this);
         }
     }
 
@@ -585,7 +615,7 @@ namespace Slang
     }
 
 
-    void IRBuilder::setInsertInto(IRParentInst* insertInto)
+    void IRBuilder::setInsertInto(IRInst* insertInto)
     {
         insertIntoParent = insertInto;
         insertBeforeInst = nullptr;
@@ -620,7 +650,7 @@ namespace Slang
     // Given two parent instructions, pick the better one to use as as
     // insertion location for a "hoistable" instruction.
     //
-    IRParentInst* mergeCandidateParentsForHoistableInst(IRParentInst* left, IRParentInst* right)
+    IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     {
         // If the candidates are both the same, then who cares?
         if(left == right) return left;
@@ -681,7 +711,7 @@ namespace Slang
         // If the non-block on the left or right is a descendent of
         // the other, then that is what we should use.
         //
-        IRParentInst* parentNonBlock = nullptr;
+        IRInst* parentNonBlock = nullptr;
         for (auto ll = leftNonBlock; ll; ll = ll->getParent())
         {
             if (ll == rightNonBlock)
@@ -715,7 +745,7 @@ namespace Slang
             parentNonBlock = leftNonBlock;
         }
 
-        IRParentInst* parent = parentNonBlock;
+        IRInst* parent = parentNonBlock;
 
         // At this point we've found a non-block parent where we
         // could stick things, but we have to fix things up in
@@ -791,19 +821,6 @@ namespace Slang
         return inst;
     }
 
-
-    IRDecoration* createEmptyDecoration(
-        IRModule* module,
-        IRDecorationOp op,
-        size_t sizeInBytes)
-    {
-        SLANG_ASSERT(sizeInBytes >= sizeof(IRDecoration));
-        SLANG_ASSERT(module);
-        IRDecoration* decor = (IRDecoration*)module->memoryArena.allocateAndZero(sizeInBytes);
-        decor->op = op;
-        return decor;
-    }
-
     // Given an instruction that represents a constant, a type, etc.
     // Try to "hoist" it as far toward the global scope as possible
     // to insert it at a location where it will be maximally visible.
@@ -814,7 +831,7 @@ namespace Slang
     {
         // Start with the assumption that we would insert this instruction
         // into the global scope (the instruction that represents the module)
-        IRParentInst* parent = builder->getModule()->getModuleInst();
+        IRInst* parent = builder->getModule()->getModuleInst();
 
         // The above decision might be invalid, because there might be
         // one or more operands of the instruction that are defined in
@@ -1177,13 +1194,14 @@ namespace Slang
         return code;
     }
 
-    UnownedStringSlice IRConstant::getStringSlice() const
+    UnownedStringSlice IRConstant::getStringSlice()
     {
         assert(op == kIROp_StringLit);
         // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
         // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
         // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
-        if (firstDecoration && firstDecoration->op == kIRDecorationOp_Transitory)
+        //
+        if(findDecorationImpl(kIROp_TransitoryDecoration))
         {
             return UnownedStringSlice(value.transitoryStringVal.chars, value.transitoryStringVal.numChars);
         }
@@ -1217,6 +1235,10 @@ namespace Slang
                 // ... we can just compare as bits
                 return value.intVal == rhs.value.intVal;
             }
+            case kIROp_PtrLit:
+            {
+                return value.ptrVal == rhs.value.ptrVal;
+            }
             case kIROp_StringLit:
             {
                 return getStringSlice() == rhs.getStringSlice();
@@ -1242,6 +1264,10 @@ namespace Slang
                 SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
                 // ... we can just compare as bits
                 return combineHash(code, Slang::GetHashCode(value.intVal));
+            }
+            case kIROp_PtrLit:
+            {
+                return combineHash(code, Slang::GetHashCode(value.ptrVal));
             }
             case kIROp_StringLit:
             {
@@ -1283,6 +1309,10 @@ namespace Slang
 
         switch (keyInst.op)
         {
+        default:
+            SLANG_UNEXPECTED("missing case for IR constant");
+            break;
+
             case kIROp_BoolLit:
             case kIROp_IntLit:
             {
@@ -1294,6 +1324,12 @@ namespace Slang
             {
                 irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRFloatingPointValue)));
                 irValue->value.floatVal = keyInst.value.floatVal;
+                break;
+            }
+            case kIROp_PtrLit:
+            {
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(void*)));
+                irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
             case kIROp_StringLit:
@@ -1363,8 +1399,10 @@ namespace Slang
         memset(&keyInst, 0, sizeof(keyInst));
         
         // Mark that this is on the stack...
-        static IRDecoration stackDecoration = IRDecoration::make(kIRDecorationOp_Transitory);
-        keyInst.firstDecoration = &stackDecoration;
+        IRDecoration stackDecoration;
+        memset(&stackDecoration, 0, sizeof(stackDecoration));
+        stackDecoration.op = kIROp_TransitoryDecoration;
+        stackDecoration.insertAtEnd(&keyInst);
             
         keyInst.op = kIROp_StringLit;
         keyInst.typeUse.usedValue = getStringType();
@@ -1375,6 +1413,19 @@ namespace Slang
 
         return static_cast<IRStringLit*>(findOrEmitConstant(this, keyInst));
     }
+
+    IRPtrLit* IRBuilder::getPtrValue(void* value)
+    {
+        IRType* type = getPtrType(getVoidType());
+
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+        keyInst.op = kIROp_PtrLit;
+        keyInst.typeUse.usedValue = type;
+        keyInst.value.ptrVal = value;
+        return (IRPtrLit*) findOrEmitConstant(this, keyInst);
+    }
+
  
     IRInst* findOrEmitHoistableInst(
         IRBuilder*              builder,
@@ -1876,8 +1927,8 @@ namespace Slang
     }
 
     void addGlobalValue(
-        IRBuilder*      builder,
-        IRGlobalValue*  value)
+        IRBuilder*  builder,
+        IRInst*     value)
     {
         // Try to find a suitable parent for the
         // global value we are emitting.
@@ -1964,6 +2015,18 @@ namespace Slang
         maybeSetSourceLoc(this, globalConstant);
         addGlobalValue(this, globalConstant);
         return globalConstant;
+    }
+
+    IRGlobalParam* IRBuilder::createGlobalParam(
+        IRType* valueType)
+    {
+        IRGlobalParam* inst = createInst<IRGlobalParam>(
+            this,
+            kIROp_GlobalParam,
+            valueType);
+        maybeSetSourceLoc(this, inst);
+        addGlobalValue(this, inst);
+        return inst;
     }
 
     IRWitnessTable* IRBuilder::createWitnessTable()
@@ -2065,21 +2128,6 @@ namespace Slang
         auto irGeneric = createGeneric();
         addGlobalValue(this, irGeneric);
         return irGeneric;
-    }
-
-
-    IRWitnessTable * IRBuilder::lookupWitnessTable(Name* mangledName)
-    {
-        IRWitnessTable * result;
-        if (sharedBuilder->witnessTableMap.TryGetValue(mangledName, result))
-            return result;
-        return nullptr;
-    }
-
-
-    void IRBuilder::registerWitnessTable(IRWitnessTable * table)
-    {
-        sharedBuilder->witnessTableMap[table->mangledName] = table;
     }
 
     IRBlock* IRBuilder::createBlock()
@@ -2218,19 +2266,6 @@ namespace Slang
             nullptr,
             dstPtr,
             srcVal);
-
-        addInst(inst);
-        return inst;
-    }
-
-    IRNotePatchConstantFunc* IRBuilder::emitNotePatchConstantFunc(
-        IRInst* func)
-    {
-        auto inst = createInst<IRNotePatchConstantFunc>(
-            this,
-            kIROp_NotePatchConstantFunc,
-            nullptr,
-            func);
 
         addInst(inst);
         return inst;
@@ -2610,18 +2645,40 @@ namespace Slang
         return inst;
     }
 
-    IRHighLevelDeclDecoration* IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
+    IRDecoration* IRBuilder::addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount)
     {
-        auto decoration = addDecoration<IRHighLevelDeclDecoration>(inst, kIRDecorationOp_HighLevelDecl);
-        decoration->decl = decl;
+        auto decoration = createInstWithTrailingArgs<IRDecoration>(
+            this,
+            op,
+            getVoidType(),
+            operandCount,
+            operands);
+
+        // Decoration order should not, in general, be semantically
+        // meaningful, so we will elect to insert a new decoration
+        // at the start of an instruction (constant time) rather
+        // than at the end of any existing list of deocrations
+        // (which would take time linear in the number of decorations).
+        //
+        // TODO: revisit this if maintaining decoration ordering
+        // from input source code is desirable.
+        //
+        decoration->insertAtStart(value);
+
         return decoration;
     }
 
-    IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+
+    void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
     {
-        auto decoration = addDecoration<IRLayoutDecoration>(inst);
-        decoration->layout = addRefObjectToFree(layout);
-        return decoration;
+        auto ptrConst = getPtrValue(addRefObjectToFree(decl));
+        addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
+    }
+
+    void IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+    {
+        auto ptrConst = getPtrValue(addRefObjectToFree(layout));
+        addDecoration(inst, kIROp_LayoutDecoration, ptrConst);
     }
 
     //
@@ -2629,11 +2686,13 @@ namespace Slang
 
     struct IRDumpContext
     {
-        StringBuilder* builder;
-        int     indent = 0;
+        StringBuilder*  builder = nullptr;
+        int             indent  = 0;
+        IRDumpMode      mode    = IRDumpMode::Simplified;
 
-        UInt                        idCounter = 1;
-        Dictionary<IRInst*, UInt>  mapValueToID;
+        Dictionary<IRInst*, String> mapValueToName;
+        Dictionary<String, UInt>    uniqueNameCounters;
+        UInt                        uniqueIDCounter = 1;
     };
 
     static void dump(
@@ -2645,19 +2704,25 @@ namespace Slang
 
     static void dump(
         IRDumpContext*  context,
+        String const&   text)
+    {
+        context->builder->append(text);
+    }
+
+    /*
+    static void dump(
+        IRDumpContext*  context,
         UInt            val)
     {
         context->builder->append(UnambigousUInt(val));
-//        fprintf(context->file, "%llu", (unsigned long long)val);
     }
+    */
 
     static void dump(
         IRDumpContext*          context,
         IntegerLiteralValue     val)
     {
         context->builder->append(val);
-
-//        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
     static void dump(
@@ -2665,8 +2730,6 @@ namespace Slang
         FloatingPointLiteralValue   val)
     {
         context->builder->append(val);
-
-//        fprintf(context->file, "%llu", (unsigned long long)val);
     }
 
     static void dumpIndent(
@@ -2678,28 +2741,135 @@ namespace Slang
         }
     }
 
-    bool opHasResult(IRInst* inst);
+    bool opHasResult(IRInst* inst)
+    {
+        auto type = inst->getDataType();
+        if (!type) return false;
+
+        // As a bit of a hack right now, we need to check whether
+        // the function returns the distinguished `Void` type,
+        // since that is conceptually the same as "not returning
+        // a value."
+        if(type->op == kIROp_VoidType)
+            return false;
+
+        return true;
+    }
 
     bool instHasUses(IRInst* inst)
     {
         return inst->firstUse != nullptr;
     }
 
-    static UInt getID(
+    static void scrubName(
+        String const& name,
+        StringBuilder&  sb)
+    {
+        // Note: this function duplicates a lot of the logic
+        // in `EmitVisitor::scrubName`, so we should consider
+        // whether they can share code at some point.
+        //
+        // There is no requirement that assembly dumps and output
+        // code follow the same model, though, so this is just
+        // a nice-to-have rather than a maintenance problem
+        // waiting to happen.
+
+        // Allow an empty nam
+        // Special case a name that is the empty string, just in case.
+        if(name.Length() == 0)
+        {
+            sb.append('_');
+        }
+
+        int prevChar = -1;
+        for(auto c : name)
+        {
+            if(c == '.')
+            {
+                c = '_';
+            }
+
+            if(((c >= 'a') && (c <= 'z'))
+                || ((c >= 'A') && (c <= 'Z')))
+            {
+                // Ordinary ASCII alphabetic characters are assumed
+                // to always be okay.
+            }
+            else if((c >= '0') && (c <= '9'))
+            {
+                // We don't want to allow a digit as the first
+                // byte in a name.
+                if(prevChar == -1)
+                {
+                    sb.append('_');
+                }
+            }
+            else
+            {
+                // If we run into a character that wouldn't normally
+                // be allowed in an identifier, we need to translate
+                // it into something that *is* valid.
+                //
+                // Our solution for now will be very clumsy: we will
+                // emit `x` and then the hexadecimal version of
+                // the byte we were given.
+                sb.append("x");
+                sb.append(uint32_t((unsigned char) c), 16);
+
+                // We don't want to apply the default handling below,
+                // so skip to the top of the loop now.
+                prevChar = c;
+                continue;
+            }
+
+            sb.append(c);
+            prevChar = c;
+        }
+
+        // If the whole thing ended with a digit, then add
+        // a final `_` just to make sure that we can append
+        // a unique ID suffix without risk of collisions.
+        if(('0' <= prevChar) && (prevChar <= '9'))
+        {
+            sb.append('_');
+        }
+    }
+
+
+    static String getName(
         IRDumpContext*  context,
         IRInst*         value)
     {
-        UInt id = 0;
-        if (context->mapValueToID.TryGetValue(value, id))
-            return id;
+        String name = 0;
+        if (context->mapValueToName.TryGetValue(value, name))
+            return name;
 
-        if (opHasResult(value) || instHasUses(value))
+        if(auto nameHintDecoration = value->findDecoration<IRNameHintDecoration>())
         {
-            id = context->idCounter++;
-        }
+            String nameHint = nameHintDecoration->getName();
 
-        context->mapValueToID.Add(value, id);
-        return id;
+            StringBuilder sb;
+            scrubName(nameHint, sb);
+
+            String key = sb.ProduceString();
+            UInt count = 0;
+            context->uniqueNameCounters.TryGetValue(key, count);
+
+            context->uniqueNameCounters[key] = count+1;
+
+            if(count)
+            {
+                sb.append(count);
+            }
+            return sb.ProduceString();
+        }
+        else
+        {
+            StringBuilder sb;
+            auto id = context->uniqueIDCounter++;
+            sb.append(id);
+            return sb.ProduceString();
+        }
     }
 
     static void dumpID(
@@ -2712,26 +2882,10 @@ namespace Slang
             return;
         }
 
-        if (auto globalValue = as<IRGlobalValue>(inst))
-        {
-            auto mangledName = globalValue->mangledName;
-            if(mangledName)
-            {
-                auto mangledNameText = getText(mangledName);
-                if (mangledNameText.Length() > 0)
-                {
-                    dump(context, "@");
-                    dump(context, mangledNameText.Buffer());
-                    return;
-                }
-            }
-        }
-
-        UInt id = getID(context, inst);
-        if (id)
+        if( opHasResult(inst) || instHasUses(inst) )
         {
             dump(context, "%");
-            dump(context, id);
+            dump(context, getName(context, inst));
         }
         else
         {
@@ -2847,6 +3001,38 @@ namespace Slang
         IRDumpContext*  context,
         IRType*         type);
 
+    static bool shouldFoldInstIntoUses(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        // Never fold an instruction into its use site
+        // in the "detailed" mode, so that we always
+        // accurately reflect the structure of the IR.
+        //
+        if(context->mode == IRDumpMode::Detailed)
+            return false;
+
+        if(as<IRConstant>(inst))
+            return true;
+
+        if(as<IRType>(inst))
+            return true;
+
+        return false;
+    }
+
+    static void dumpInst(
+        IRDumpContext*  context,
+        IRInst*         inst);
+
+    static void dumpInstBody(
+        IRDumpContext*  context,
+        IRInst*         inst);
+
+    static void dumpInstExpr(
+        IRDumpContext*  context,
+        IRInst*         inst);
+
     static void dumpOperand(
         IRDumpContext*  context,
         IRInst*         inst)
@@ -2858,25 +3044,10 @@ namespace Slang
             return;
         }
 
-        switch (inst->op)
+        if(shouldFoldInstIntoUses(context, inst))
         {
-        case kIROp_IntLit:
-            dump(context, ((IRConstant*)inst)->value.intVal);
+            dumpInstExpr(context, inst);
             return;
-
-        case kIROp_FloatLit:
-            dump(context, ((IRConstant*)inst)->value.floatVal);
-            return;
-
-        case kIROp_BoolLit:
-            dump(context, ((IRConstant*)inst)->value.intVal ? "true" : "false");
-            return;
-        case kIROp_StringLit:
-            dumpEncodeString(context, static_cast<IRConstant*>(inst)->getStringSlice());
-            return;
-
-        default:
-            break;
         }
 
         dumpID(context, inst);
@@ -2907,9 +3078,39 @@ namespace Slang
 
     }
 
-    static void dumpInst(
+    void dumpIRDecorations(
         IRDumpContext*  context,
-        IRInst*         inst);
+        IRInst*         inst)
+    {
+        for(auto dd : inst->getDecorations())
+        {
+            // Certain decorations aren't helpful to appear
+            // in output dumps, so we will only include them
+            // in the "detailed" dumping mode.
+            //
+            // For all other modes, we will check the opcode
+            // and skip selected decorations.
+            //
+            if(context->mode != IRDumpMode::Detailed)
+            {
+                switch(dd->op)
+                {
+                default:
+                    break;
+
+                case kIROp_HighLevelDeclDecoration:
+                case kIROp_LayoutDecoration:
+                    continue;
+                }
+            }
+
+            dump(context, "[");
+            dumpInstBody(context, dd);
+            dump(context, "]\n");
+
+            dumpIndent(context);
+        }
+    }
 
     static void dumpBlock(
         IRDumpContext*  context,
@@ -2940,6 +3141,7 @@ namespace Slang
                 inst = inst->getNextInst();
 
                 dumpIndent(context);
+                dumpIRDecorations(context, param);
                 dump(context, "param ");
                 dumpID(context, param);
                 dumpInstTypeClause(context, param->getFullType());
@@ -2956,61 +3158,12 @@ namespace Slang
         }
     }
 
-    void dumpIRDecorations(
-        IRDumpContext*  context,
-        IRInst*         inst)
-    {
-        for( auto dd = inst->firstDecoration; dd; dd = dd->next )
-        {
-            switch( dd->op )
-            {
-            case kIRDecorationOp_Target:
-                {
-                    auto decoration = (IRTargetDecoration*) dd;
-
-                    dump(context, "\n");
-                    dumpIndent(context);
-                    dump(context, "[target(");
-                    dump(context, StringRepresentation::getData(decoration->targetName));
-                    dump(context, ")]");
-                }
-                break;
-
-            case kIRDecorationOp_TargetIntrinsic:
-                {
-                    auto decoration = (IRTargetIntrinsicDecoration*) dd;
-
-                    dump(context, "\n");
-                    dumpIndent(context);
-                    dump(context, "[targetIntrinsic(");
-                    dump(context, StringRepresentation::getData(decoration->targetName));
-                    dump(context, ", ");
-                    dump(context, StringRepresentation::getData(decoration->definition));
-                    dump(context, ")]");
-                }
-                break;
-
-            case kIRDecorationOp_VulkanRayPayload:
-                {
-                    dump(context, "\n[__vulkanRayPayload]");
-                }
-                break;
-            case kIRDecorationOp_VulkanHitAttributes:
-                {
-                    dump(context, "\n[__vulkanHitAttributes]");
-                }
-                break;
-            }
-        }
-    }
-
     void dumpIRGlobalValueWithCode(
         IRDumpContext*          context,
         IRGlobalValueWithCode*  code)
     {
         auto opInfo = getIROpInfo(code->op);
 
-        dump(context, "\n");
         dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
@@ -3039,19 +3192,9 @@ namespace Slang
         }
 
         context->indent--;
-        dump(context, "}\n");
+        dump(context, "}");
     }
 
-
-    String dumpIRFunc(IRFunc* func)
-    {
-        IRDumpContext dumpContext;
-        StringBuilder sbDump;
-        dumpContext.builder = &sbDump;
-        dumpIRGlobalValueWithCode(&dumpContext, func);
-        auto strFunc = sbDump.ToString();
-        return strFunc;
-    }
 
     void dumpIRWitnessTableEntry(
         IRDumpContext*          context,
@@ -3066,11 +3209,10 @@ namespace Slang
 
     void dumpIRParentInst(
         IRDumpContext*  context,
-        IRParentInst*   inst)
+        IRInst*         inst)
     {
         auto opInfo = getIROpInfo(inst->op);
 
-        dump(context, "\n");
         dumpIndent(context);
         dump(context, opInfo.name);
         dump(context, " ");
@@ -3091,7 +3233,7 @@ namespace Slang
         dump(context, "{\n");
         context->indent++;
 
-        for (auto child = inst->getFirstChild(); child; child = child->getNextInst())
+        for(auto child : inst->getChildren())
         {
             dumpInst(context, child);
         }
@@ -3120,75 +3262,56 @@ namespace Slang
         dump(context, "}\n");
     }
 
-    static void dumpInst(
+    static void dumpInstExpr(
         IRDumpContext*  context,
         IRInst*         inst)
     {
         if (!inst)
         {
-            dumpIndent(context);
             dump(context, "<null>");
             return;
         }
 
         auto op = inst->op;
-
-        dumpIRDecorations(context, inst);
-
-        // There are several ops we want to special-case here,
-        // so that they will be more pleasant to look at.
-        //
-        switch (op)
-        {
-        case kIROp_Func:
-        case kIROp_GlobalVar:
-        case kIROp_GlobalConstant:
-        case kIROp_Generic:
-            dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst);
-            return;
-
-        case kIROp_WitnessTable:
-        case kIROp_StructType:
-            dumpIRParentInst(context, (IRWitnessTable*)inst);
-            return;
-
-        case kIROp_WitnessTableEntry:
-            dumpIRWitnessTableEntry(context, (IRWitnessTableEntry*)inst);
-            return;
-
-        default:
-            break;
-        }
-
-        // Okay, we have a seemingly "ordinary" op now
-        dumpIndent(context);
-
         auto opInfo = getIROpInfo(op);
-        auto dataType = inst->getDataType();
-        auto rate = inst->getRate();
 
-        if(rate)
+        // Special-case the literal instructions.
+        if(auto irConst = as<IRConstant>(inst))
         {
-            dump(context, "@");
-            dumpOperand(context, rate);
-            dump(context, " ");
-        }
+            switch (op)
+            {
+            case kIROp_IntLit:
+                dump(context, irConst->value.intVal);
+                return;
 
-        if(opHasResult(inst) || instHasUses(inst))
-        {
-            dump(context, "let  ");
-            dumpID(context, inst);
-            dumpInstTypeClause(context, dataType);
-            dump(context, "\t= ");
-        }
-        else
-        {
-            // No result, okay...
+            case kIROp_FloatLit:
+                dump(context, irConst->value.floatVal);
+                return;
+
+            case kIROp_BoolLit:
+                dump(context, irConst->value.intVal ? "true" : "false");
+                return;
+
+            case kIROp_StringLit:
+                dumpEncodeString(context, irConst->getStringSlice());
+                return;
+
+            case kIROp_PtrLit:
+                dump(context, "<ptr>");
+                return;
+
+            default:
+                break;
+            }
         }
 
         dump(context, opInfo.name);
 
         UInt argCount = inst->getOperandCount();
+
+        if(argCount == 0)
+            return;
+
         UInt ii = 0;
 
         // Special case: make printing of `call` a bit
@@ -3214,22 +3337,84 @@ namespace Slang
             first = false;
         }
 
-        // Special cases: literals and other instructions with no real operands
-        switch (inst->op)
+        dump(context, ")");
+
+    }
+
+    static void dumpInstBody(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        if (!inst)
         {
-        case kIROp_IntLit:
-        case kIROp_FloatLit:
-        case kIROp_BoolLit:
-        case kIROp_StringLit:
-            dumpOperand(context, inst);
-            break;
+            dump(context, "<null>");
+            return;
+        }
+
+        auto op = inst->op;
+
+        dumpIRDecorations(context, inst);
+
+        // There are several ops we want to special-case here,
+        // so that they will be more pleasant to look at.
+        //
+        switch (op)
+        {
+        case kIROp_Func:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
+        case kIROp_Generic:
+            dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst);
+            return;
+
+        case kIROp_WitnessTable:
+        case kIROp_StructType:
+            dumpIRParentInst(context, inst);
+            return;
+
+        case kIROp_WitnessTableEntry:
+            dumpIRWitnessTableEntry(context, (IRWitnessTableEntry*)inst);
+            return;
 
         default:
             break;
         }
 
-        dump(context, ")");
+        // Okay, we have a seemingly "ordinary" op now
+        auto dataType = inst->getDataType();
+        auto rate = inst->getRate();
 
+        if(rate)
+        {
+            dump(context, "@");
+            dumpOperand(context, rate);
+            dump(context, " ");
+        }
+
+        if(opHasResult(inst) || instHasUses(inst))
+        {
+            dump(context, "let  ");
+            dumpID(context, inst);
+            dumpInstTypeClause(context, dataType);
+            dump(context, "\t= ");
+        }
+        else
+        {
+            // No result, okay...
+        }
+
+        dumpInstExpr(context, inst);
+    }
+
+    static void dumpInst(
+        IRDumpContext*  context,
+        IRInst*         inst)
+    {
+        if(shouldFoldInstIntoUses(context, inst))
+            return;
+
+        dumpIndent(context);
+        dumpInstBody(context, inst);
         dump(context, "\n");
     }
 
@@ -3243,47 +3428,99 @@ namespace Slang
         }
     }
 
-    void printSlangIRAssembly(StringBuilder& builder, IRModule* module)
+    void printSlangIRAssembly(StringBuilder& builder, IRModule* module, IRDumpMode mode)
     {
         IRDumpContext context;
         context.builder = &builder;
         context.indent = 0;
+        context.mode = mode;
 
         dumpIRModule(&context, module);
     }
 
-    void dumpIR(IRGlobalValue* globalVal)
+    void dumpIR(IRInst* globalVal, ISlangWriter* writer, IRDumpMode mode)
     {
         StringBuilder sb;
 
         IRDumpContext context;
         context.builder = &sb;
         context.indent = 0;
+        context.mode = mode;
 
         dumpInst(&context, globalVal);
 
-        fprintf(stderr, "%s\n", sb.Buffer());
-        fflush(stderr);
+        writer->write(sb.Buffer(), sb.Length());
+        writer->flush();
     }
 
-    String getSlangIRAssembly(IRModule* module)
+    String getSlangIRAssembly(IRModule* module, IRDumpMode mode)
     {
         StringBuilder sb;
-        printSlangIRAssembly(sb, module);
+        printSlangIRAssembly(sb, module, mode);
         return sb;
     }
 
-    void dumpIR(IRModule* module)
+    void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode)
     {
-        String ir = getSlangIRAssembly(module);
-        fprintf(stderr, "%s\n", ir.Buffer());
-        fflush(stderr);
+        String ir = getSlangIRAssembly(module, mode);
+        writer->write(ir.Buffer(), ir.Length());
+        writer->flush();
     }
 
+    //
+    //
+    //
 
-    //
-    //
-    //
+    IRDecoration* IRInst::getFirstDecoration()
+    {
+        return as<IRDecoration>(getFirstDecorationOrChild());
+    }
+
+    IRDecoration* IRInst::getLastDecoration()
+    {
+        IRDecoration* decoration = getFirstDecoration();
+        if (!decoration) return nullptr;
+
+        while (auto nextDecoration = decoration->getNextDecoration())
+            decoration = nextDecoration;
+
+        return decoration;
+    }
+
+    IRInstList<IRDecoration> IRInst::getDecorations()
+    {
+        return IRInstList<IRDecoration>(
+            getFirstDecoration(),
+            getLastDecoration());
+    }
+
+    IRInst* IRInst::getFirstChild()
+    {
+        // The children come after any decorations,
+        // so if there are any decorations, then the
+        // first child is right after the last decoration.
+        //
+        if(auto lastDecoration = getLastDecoration())
+            return lastDecoration->getNextInst();
+        //
+        // Otherwise, there must be no decorations, so
+        // that the first "child or decoration" is a child.
+        //
+        return getFirstDecorationOrChild();
+    }
+
+    IRInst* IRInst::getLastChild()
+    {
+        // The children come after any decorations, so
+        // that the last item in the list of children
+        // and decorations is the last child *unless*
+        // it is a decoration, in which case there are
+        // no children.
+        //
+        auto lastChild = getLastDecorationOrChild();
+        return as<IRDecoration>(lastChild) ? nullptr : lastChild;
+    }
+
 
     IRRate* IRInst::getRate()
     {
@@ -3373,13 +3610,13 @@ namespace Slang
     void IRInst::insertBefore(IRInst* other)
     {
         SLANG_ASSERT(other);
-        insertBefore(other, other->parent);
+        _insertAt(other->getPrevInst(), other, other->getParent());
     }
 
-    void IRInst::insertAtStart(IRParentInst* newParent)
+    void IRInst::insertAtStart(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
-        insertBefore(newParent->children.first, newParent);
+        _insertAt(nullptr, newParent->getFirstDecorationOrChild(), newParent);
     }
 
     void IRInst::moveToStart()
@@ -3389,52 +3626,49 @@ namespace Slang
         insertAtStart(p);
     }
 
-    void IRInst::insertBefore(IRInst* other, IRParentInst* newParent)
+    void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
     {
         // Make sure this instruction has been removed from any previous parent
         this->removeFromParent();
 
-        SLANG_ASSERT(other || newParent);
-        if (!other) other = newParent->children.first;
-        if (!newParent) newParent = other->parent;
-        SLANG_ASSERT(newParent);
+        SLANG_ASSERT(inParent);
+        SLANG_ASSERT(!inPrev || (inPrev->getNextInst() == inNext) && (inPrev->getParent() == inParent));
+        SLANG_ASSERT(!inNext || (inNext->getPrevInst() == inPrev) && (inNext->getParent() == inParent));
 
-        auto nn = other;
-        auto pp = other ? other->getPrevInst() : nullptr;
-
-        if( pp )
+        if( inPrev )
         {
-            pp->next = this;
+            inPrev->next = this;
         }
         else
         {
-            newParent->children.first = this;
+            inParent->m_decorationsAndChildren.first = this;
         }
 
-        if (nn)
+        if (inNext)
         {
-            nn->prev = this;
+            inNext->prev = this;
         }
         else
         {
-            newParent->children.last = this;
+            inParent->m_decorationsAndChildren.last = this;
         }
 
-        this->prev = pp;
-        this->next = nn;
-        this->parent = newParent;
+        this->prev = inPrev;
+        this->next = inNext;
+        this->parent = inParent;
     }
 
     void IRInst::insertAfter(IRInst* other)
     {
         SLANG_ASSERT(other);
-        insertAfter(other, other->parent);
+
+        _insertAt(other, other->getNextInst(), other->getParent());
     }
 
-    void IRInst::insertAtEnd(IRParentInst* newParent)
+    void IRInst::insertAtEnd(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
-        insertAfter(newParent->children.last, newParent);
+        _insertAt(newParent->getLastDecorationOrChild(), nullptr, newParent);
     }
 
     void IRInst::moveToEnd()
@@ -3442,42 +3676,6 @@ namespace Slang
         auto p = parent;
         removeFromParent();
         insertAtEnd(p);
-    }
-
-    void IRInst::insertAfter(IRInst* other, IRParentInst* newParent)
-    {
-        // Make sure this instruction has been removed from any previous parent
-        this->removeFromParent();
-
-        SLANG_ASSERT(other || newParent);
-        if (!other) other = newParent->children.last;
-        if (!newParent) newParent = other->parent;
-        SLANG_ASSERT(newParent);
-
-        auto pp = other;
-        auto nn = other ? other->next : nullptr;
-
-        if (pp)
-        {
-            pp->next = this;
-        }
-        else
-        {
-            newParent->children.first = this;
-        }
-
-        if (nn)
-        {
-            nn->prev = this;
-        }
-        else
-        {
-            newParent->children.last = this;
-        }
-
-        this->prev = pp;
-        this->next = nn;
-        this->parent = newParent;
     }
 
     // Remove this instruction from its parent block,
@@ -3501,7 +3699,7 @@ namespace Slang
         }
         else
         {
-            oldParent->children.first = nn;
+            oldParent->m_decorationsAndChildren.first = nn;
         }
 
         if(nn)
@@ -3511,7 +3709,7 @@ namespace Slang
         }
         else
         {
-            oldParent->children.last = pp;
+            oldParent->m_decorationsAndChildren.last = pp;
         }
 
         prev = nullptr;
@@ -3535,23 +3733,16 @@ namespace Slang
     {
         removeFromParent();
         removeArguments();
-
-        // If this is a parent instruction then we had
-        // better remove all its children as well.
-        //
-        if(auto parentInst = as<IRParentInst>(this))
-        {
-            parentInst->removeAndDeallocateAllChildren();
-        }
+        removeAndDeallocateAllDecorationsAndChildren();
 
         // Run destructor to be sure...
         this->~IRInst();
     }
 
-    void IRParentInst::removeAndDeallocateAllChildren()
+    void IRInst::removeAndDeallocateAllDecorationsAndChildren()
     {
         IRInst* nextChild = nullptr;
-        for( IRInst* child = getFirstChild(); child; child = nextChild )
+        for( IRInst* child = getFirstDecorationOrChild(); child; child = nextChild )
         {
             nextChild = child->getNextInst();
             child->removeAndDeallocate();
@@ -3568,9 +3759,6 @@ namespace Slang
         if(as<IRType>(this))
             return false;
 
-        if(as<IRGlobalValue>(this))
-            return false;
-
         if(as<IRConstant>(this))
             return false;
 
@@ -3582,8 +3770,45 @@ namespace Slang
             return true;
 
         case kIROp_Call:
-            // This is the most interesting.
+            {
+                // In the general case, a function call must be assumed to
+                // have almost arbitrary side effects.
+                //
+                // However, it is possible that the callee can be identified,
+                // and it may be a function with an attribute that explicitly
+                // limits the side effects it is allowed to have.
+                //
+                // For now, we will explicitly check for the `[__readNone]`
+                // attribute, which was used to mark functions that compute
+                // their result strictly as a function of the arguments (and
+                // not anything they point to, or other non-argument state).
+                // Calls to such functions cannot have side effects (except
+                // for things like stack overflow that abstract language models
+                // tend to ignore), and can be subject to dead code elimination,
+                // common subexpression elimination, etc.
+                //
+                auto call = cast<IRCall>(this);
+                auto callee = getResolvedInstForDecorations(call->getCallee());
+                if(callee->findDecoration<IRReadNoneDecoration>())
+                {
+                    return false;
+                }
+            }
             return true;
+
+            // All of the cases for "global values" are side-effect-free.
+        case kIROp_StructType:
+        case kIROp_StructField:
+        case kIROp_Func:
+        case kIROp_Generic:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
+        case kIROp_GlobalParam:
+        case kIROp_StructKey:
+        case kIROp_GlobalGenericParam:
+        case kIROp_WitnessTable:
+        case kIROp_WitnessTableEntry:
+            return false;
 
         case kIROp_Nop:
         case kIROp_Specialize:
@@ -3594,7 +3819,6 @@ namespace Slang
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads
-        case kIROp_BufferLoad:
         case kIROp_FieldExtract:
         case kIROp_FieldAddress:
         case kIROp_getElement:
@@ -3650,7 +3874,7 @@ namespace Slang
     // Legalization of entry points for GLSL:
     //
 
-    IRGlobalVar* addGlobalVariable(
+    IRGlobalParam* addGlobalParam(
         IRModule*   module,
         IRType*     valueType)
     {
@@ -3662,12 +3886,12 @@ namespace Slang
 
         IRBuilder builder;
         builder.sharedBuilder = &shared;
-        return builder.createGlobalVar(valueType);
+        return builder.createGlobalParam(valueType);
     }
 
     void moveValueBefore(
-        IRGlobalValue*  valueToMove,
-        IRGlobalValue*  placeBefore)
+        IRInst*  valueToMove,
+        IRInst*  placeBefore)
     {
         valueToMove->removeFromParent();
         valueToMove->insertBefore(placeBefore);
@@ -4127,18 +4351,26 @@ namespace Slang
         varLayout->stage = inVarLayout->stage;
         varLayout->AddResourceInfo(kind)->index = bindingIndex;
 
-        // Simple case: just create a global variable of the matching type,
-        // and then use the value of the global as a replacement for the
-        // value of the original parameter.
+        // We are going to be creating a global parameter to replace
+        // the function parameter, but we need to handle the case
+        // where the parameter represents a varying *output* and not
+        // just an input.
         //
-        auto globalVariable = addGlobalVariable(builder->getModule(), type);
-        moveValueBefore(globalVariable, builder->getFunc());
+        // Our IR global shader parameters are read-only, just
+        // like our IR function parameters, and need a wrapper
+        // `Out<...>` type to represent otuputs.
+        //
+        bool isOutput = kind == LayoutResourceKind::VaryingOutput;
+        IRType* paramType = isOutput ? builder->getOutType(type) : type;
 
-        ScalarizedVal val = ScalarizedVal::address(globalVariable);
+        auto globalParam = addGlobalParam(builder->getModule(), paramType);
+        moveValueBefore(globalParam, builder->getFunc());
+
+        ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
         if( systemValueInfo )
         {
-            globalVariable->mangledName = builder->getSession()->getNameObj(systemValueInfo->name);
+            builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
 
             if( auto fromType = systemValueInfo->requiredType )
             {
@@ -4159,12 +4391,11 @@ namespace Slang
 
             if(auto outerArrayName = systemValueInfo->outerArrayName)
             {
-                auto decoration = builder->addDecoration<IRGLSLOuterArrayDecoration>(globalVariable);
-                decoration->outerArrayName = outerArrayName;
+                builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
             }
         }
 
-        builder->addLayoutDecoration(globalVariable, varLayout);
+        builder->addLayoutDecoration(globalParam, varLayout);
 
         return val;
     }
@@ -4695,13 +4926,13 @@ namespace Slang
         IRInst*        val,
         String const&   targetName)
     {
-        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        for(auto dd : val->getDecorations())
         {
-            if(dd->op != kIRDecorationOp_TargetIntrinsic)
+            if(dd->op != kIROp_TargetIntrinsicDecoration)
                 continue;
 
             auto decoration = (IRTargetIntrinsicDecoration*) dd;
-            if(String(decoration->targetName) == targetName)
+            if(String(decoration->getTargetName()) == targetName)
                 return decoration;
         }
 
@@ -4716,46 +4947,22 @@ namespace Slang
         auto builder = context->getBuilder();
         auto paramType = pp->getDataType();
 
-        if(auto paramPtrType = as<IROutTypeBase>(paramType) )
-        {
-            // This is either an `out` or `in out` parameter.
-            // We want to treat `out` parameters the same
-            // as `in out` for our purposes, since there are
-            // no pure `out` parameters defined for the ray
-            // tracing stages.
-
-            // Unlike the default legalization strategy for
-            // `out` and `in out` entry point parameters,
-            // we will not introduce an intermediate temporary.
-            //
-            // Instead we will simply create a global variable
-            // and replace uses of the parameter with uses
-            // of that global variable.
-
-            auto valueType = paramPtrType->getValueType();
-
-            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
-            builder->addLayoutDecoration(globalVariable, paramLayout);
-            moveValueBefore(globalVariable, builder->getFunc());
-
-            pp->replaceUsesWith(globalVariable);
-        }
-        else
-        {
-            // This is the `in` parameter case, so that the parameter
-            // was not a pointer. We will allocate a global variable
-            // to represent the parameter, and then perform a load
-            // form it at the start of the function.
-            //
-            auto valueType = paramType;
-            auto globalVariable = addGlobalVariable(builder->getModule(), valueType);
-            builder->addLayoutDecoration(globalVariable, paramLayout);
-            moveValueBefore(globalVariable, builder->getFunc());
-
-            auto irLoad = builder->emitLoad(globalVariable);
-            pp->replaceUsesWith(irLoad);
-        }
-
+        // The parameter might be either an `in` parameter,
+        // or an `out` or `in out` parameter, and in those
+        // latter cases its IR-level type will include a
+        // wrapping "pointer-like" type (e.g., `Out<Float>`
+        // instead of just `Float`).
+        //
+        // Because global shader parameters are read-only
+        // in the same way function types are, we can take
+        // care of that detail here just by allocating a
+        // global shader parameter with exactly the type
+        // of the original function parameter.
+        //
+        auto globalParam = addGlobalParam(builder->getModule(), paramType);
+        builder->addLayoutDecoration(globalParam, paramLayout);
+        moveValueBefore(globalParam, builder->getFunc());
+        pp->replaceUsesWith(globalParam);
     }
 
     void legalizeEntryPointParameterForGLSL(
@@ -4870,7 +5077,7 @@ namespace Slang
                         if(!decoration)
                             continue;
 
-                        if(StringRepresentation::asSlice(decoration->definition) != UnownedStringSlice::fromLiteral("EmitVertex()"))
+                        if(decoration->getDefinition() != UnownedStringSlice::fromLiteral("EmitVertex()"))
                         {
                             continue;
                         }
@@ -5195,7 +5402,7 @@ namespace Slang
 
     struct IRSpecSymbol : RefObject
     {
-        IRGlobalValue*          irGlobalValue;
+        IRInst*                 irGlobalValue;
         RefPtr<IRSpecSymbol>    nextWithSameName;
     };
 
@@ -5222,7 +5429,7 @@ namespace Slang
         // A map from mangled symbol names to zero or
         // more global IR values that have that name,
         // in the *original* module.
-        typedef Dictionary<Name*, RefPtr<IRSpecSymbol>> SymbolDictionary;
+        typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
         SymbolDictionary symbols;
 
         SharedIRBuilder sharedBuilderStorage;
@@ -5230,6 +5437,47 @@ namespace Slang
 
         // The "global" specialization environment.
         IRSpecEnv globalEnv;
+    };
+
+    struct IRGenericSpecKey
+    {
+        // Note: Slang::Dictionary requires key types to have default constructors
+        IRGenericSpecKey()
+        {}
+
+        IRGenericSpecKey(IRSpecialize* specializeInst)
+        {
+            m_values.Add(specializeInst->getBase());
+            auto argCount = specializeInst->getArgCount();
+            for(UInt aa = 0; aa < argCount; ++aa)
+            {
+                m_values.Add(specializeInst->getArg(aa));
+            }
+        }
+
+        List<IRInst*> m_values;
+
+        bool operator==(IRGenericSpecKey const& other) const
+        {
+            auto valueCount = m_values.Count();
+            if(valueCount != other.m_values.Count()) return false;
+            for(UInt ii = 0; ii < valueCount; ++ii)
+            {
+                if(m_values[ii] != other.m_values[ii]) return false;
+            }
+            return true;
+        }
+
+        UInt GetHashCode() const
+        {
+            auto hash = 0;
+            auto valueCount = m_values.Count();
+            for(UInt ii = 0; ii < valueCount; ++ii)
+            {
+                hash = combineHash(hash, Slang::GetHashCode(m_values[ii]));
+            }
+            return hash;
+        }
     };
 
     struct IRSharedGenericSpecContext : IRSharedSpecContext
@@ -5257,13 +5505,15 @@ namespace Slang
             }
             return nullptr;
         }
+
+        Dictionary<IRGenericSpecKey, IRInst*> specializations;
     };
 
     struct IRSpecContextBase
     {
         // A map from the mangled name of a global variable
         // to the layout to use for it.
-        Dictionary<Name*, VarLayout*> globalVarLayouts;
+        Dictionary<String, VarLayout*> globalVarLayouts;
 
         IRSharedSpecContext* shared;
 
@@ -5346,96 +5596,60 @@ namespace Slang
         }
     }
 
+    IRInst* cloneInst(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRInst*                         originalInst,
+        IROriginalValuesForClone const& originalValues);
+
+    IRInst* cloneInst(
+        IRSpecContextBase*  context,
+        IRBuilder*          builder,
+        IRInst*             originalInst)
+    {
+        return cloneInst(context, builder, originalInst, originalInst);
+    }
+
+        /// Clone any decorations from `originalValue` onto `clonedValue`
     void cloneDecorations(
         IRSpecContextBase*  context,
-        IRInst*        clonedValue,
-        IRInst*        originalValue)
+        IRInst*             clonedValue,
+        IRInst*             originalValue)
     {
-        for (auto dd = originalValue->firstDecoration; dd; dd = dd->next)
+        // TODO: In many cases we might be able to use this as a general-purpose
+        // place to do cloning of *all* the children of an instruction, and
+        // not just its decorations. We should look to refactor this code
+        // later.
+
+        IRBuilder builderStorage = *context->builder;
+        IRBuilder* builder = &builderStorage;
+        builder->setInsertInto(clonedValue);
+
+
+        SLANG_UNUSED(context);
+        for(auto originalDecoration : originalValue->getDecorations())
         {
-            switch (dd->op)
-            {
-            case kIRDecorationOp_HighLevelDecl:
-                {
-                    auto originalDecoration = (IRHighLevelDeclDecoration*)dd;
+            cloneInst(context, builder, originalDecoration);
+        }
 
-                    context->builder->addHighLevelDeclDecoration(clonedValue, originalDecoration->decl);
-                }
-                break;
+        // We will also clone the location here, just because this is a convenient bottleneck
+        clonedValue->sourceLoc = originalValue->sourceLoc;
+    }
 
-            case kIRDecorationOp_LoopControl:
-                {
-                    auto originalDecoration = (IRLoopControlDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRLoopControlDecoration>(clonedValue);
-                    newDecoration->mode = originalDecoration->mode;
-                }
-                break;
+        /// Clone any decorations and children from `originalValue` onto `clonedValue`
+    void cloneDecorationsAndChildren(
+        IRSpecContextBase*  context,
+        IRInst*             clonedValue,
+        IRInst*             originalValue)
+    {
+        IRBuilder builderStorage = *context->builder;
+        IRBuilder* builder = &builderStorage;
+        builder->setInsertInto(clonedValue);
 
-            case kIRDecorationOp_TargetIntrinsic:
-                {
-                    auto originalDecoration = (IRTargetIntrinsicDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRTargetIntrinsicDecoration>(clonedValue);
-                    newDecoration->targetName = originalDecoration->targetName;
-                    newDecoration->definition = originalDecoration->definition;
-                }
-                break;
-
-            case kIRDecorationOp_Semantic:
-                {
-                    auto originalDecoration = (IRSemanticDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRSemanticDecoration>(clonedValue);
-                    newDecoration->semanticName = originalDecoration->semanticName;
-                }
-                break;
-
-            case kIRDecorationOp_InterpolationMode:
-                {
-                    auto originalDecoration = (IRInterpolationModeDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRInterpolationModeDecoration>(clonedValue);
-                    newDecoration->mode = originalDecoration->mode;
-                }
-                break;
-
-            case kIRDecorationOp_NameHint:
-                {
-                    auto originalDecoration = (IRNameHintDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRNameHintDecoration>(clonedValue);
-                    newDecoration->name = originalDecoration->name;
-                }
-                break;
-
-            case kIRDecorationOp_VulkanRayPayload:
-                {
-                    context->builder->addDecoration<IRVulkanRayPayloadDecoration>(clonedValue);
-                }
-                break;
-
-            case kIRDecorationOp_VulkanHitAttributes:
-                {
-                    context->builder->addDecoration<IRVulkanHitAttributesDecoration>(clonedValue);
-                }
-                break;
-
-            case kIRDecorationOp_RequireGLSLExtension:
-                {
-                    auto originalDecoration = (IRRequireGLSLExtensionDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLExtensionDecoration>(clonedValue);
-                    newDecoration->extensionName = originalDecoration->extensionName;
-                }
-                break;
-
-            case kIRDecorationOp_RequireGLSLVersion:
-                {
-                    auto originalDecoration = (IRRequireGLSLVersionDecoration*)dd;
-                    auto newDecoration = context->builder->addDecoration<IRRequireGLSLVersionDecoration>(clonedValue);
-                    newDecoration->languageVersion = originalDecoration->languageVersion;
-                }
-                break;
-
-            default:
-                // Don't clone any decorations we don't understand.
-                break;
-            }
+        SLANG_UNUSED(context);
+        for(auto originalItem : originalValue->getDecorationsAndChildren())
+        {
+            cloneInst(context, builder, originalItem);
         }
 
         // We will also clone the location here, just because this is a convenient bottleneck
@@ -5454,7 +5668,7 @@ namespace Slang
     };
 
 
-    IRGlobalValue* cloneGlobalValue(IRSpecContext* context, IRGlobalValue* originalVal);
+    IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal);
 
     IRInst* cloneValue(
         IRSpecContextBase*  context,
@@ -5466,13 +5680,19 @@ namespace Slang
 
     IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     {
-        if (auto globalValue = as<IRGlobalValue>(originalValue))
-        {
-            return cloneGlobalValue(this, globalValue);
-        }
-
         switch (originalValue->op)
         {
+        case kIROp_StructType:
+        case kIROp_Func:
+        case kIROp_Generic:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalConstant:
+        case kIROp_GlobalParam:
+        case kIROp_StructKey:
+        case kIROp_GlobalGenericParam:
+        case kIROp_WitnessTable:
+            return cloneGlobalValue(this, originalValue);
+
         case kIROp_BoolLit:
             {
                 IRConstant* c = (IRConstant*)originalValue;
@@ -5495,6 +5715,20 @@ namespace Slang
             }
             break;
 
+        case kIROp_StringLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return builder->getStringValue(c->getStringSlice());
+            }
+            break;
+
+        case kIROp_PtrLit:
+            {
+                IRConstant* c = (IRConstant*)originalValue;
+                return builder->getPtrValue(c->value.ptrVal);
+            }
+            break;
+
         default:
             {
                 // In the deafult case, assume that we have some sort of "hoistable"
@@ -5514,7 +5748,7 @@ namespace Slang
                     IRInst* clonedArg = cloneValue(this, originalArg);
                     clonedValue->getOperands()[aa].init(clonedValue, clonedArg);
                 }
-                cloneDecorations(this, clonedValue, originalValue);
+                cloneDecorationsAndChildren(this, clonedValue, originalValue);
 
                 addHoistableInst(builder, clonedValue);
 
@@ -5565,36 +5799,6 @@ namespace Slang
         return (IRType*)cloneValue(context, originalType);
     }
 
-    IRInst* maybeCloneValueWithMangledName(
-        IRSpecContextBase*  context,
-        IRGlobalValue*      originalValue)
-    {
-        for(auto ii : context->shared->module->getGlobalInsts())
-        {
-            auto gv = as<IRGlobalValue>(ii);
-            if (!gv)
-                continue;
-
-            if (gv->mangledName == originalValue->mangledName)
-                return gv;
-        }
-        return cloneValue(context, originalValue);
-    }
-
-    IRInst* cloneInst(
-        IRSpecContextBase*              context,
-        IRBuilder*                      builder,
-        IRInst*                         originalInst,
-        IROriginalValuesForClone const& originalValues);
-
-    IRInst* cloneInst(
-        IRSpecContextBase*  context,
-        IRBuilder*          builder,
-        IRInst*             originalInst)
-    {
-        return cloneInst(context, builder, originalInst, originalInst);
-    }
-
     void cloneGlobalValueWithCodeCommon(
         IRSpecContextBase*      context,
         IRGlobalValueWithCode*  clonedValue,
@@ -5634,17 +5838,6 @@ namespace Slang
 
         registerClonedValue(context, clonedVar, originalValues);
 
-        auto mangledName = originalVar->mangledName;
-        clonedVar->mangledName = mangledName;
-
-        cloneDecorations(context, clonedVar, originalVar);
-
-        VarLayout* layout = nullptr;
-        if (context->globalVarLayouts.TryGetValue(mangledName, layout))
-        {
-            builder->addLayoutDecoration(clonedVar, layout);
-        }
-
         // Clone any code in the body of the variable, since this
         // represents the initializer.
         cloneGlobalValueWithCodeCommon(
@@ -5665,17 +5858,57 @@ namespace Slang
             cloneType(context, originalVal->getFullType()));
         registerClonedValue(context, clonedVal, originalValues);
 
-        auto mangledName = originalVal->mangledName;
-        clonedVal->mangledName = mangledName;
-
-        cloneDecorations(context, clonedVal, originalVal);
-
         // Clone any code in the body of the constant, since this
         // represents the initializer.
         cloneGlobalValueWithCodeCommon(
             context,
             clonedVal,
             originalVal);
+
+        return clonedVal;
+    }
+
+    void cloneSimpleGlobalValueImpl(
+        IRSpecContextBase*              context,
+        IRInst*                         originalInst,
+        IROriginalValuesForClone const& originalValues,
+        IRInst*                         clonedInst,
+        bool                            registerValue = true)
+    {
+        if (registerValue)
+            registerClonedValue(context, clonedInst, originalValues);
+
+        // Set up an IR builder for inserting into the inst
+        IRBuilder builderStorage = *context->builder;
+        IRBuilder* builder = &builderStorage;
+        builder->setInsertInto(clonedInst);
+
+        // Clone any children of the instruction
+        for (auto child : originalInst->getDecorationsAndChildren())
+        {
+            cloneInst(context, builder, child);
+        }
+    }
+
+    IRGlobalParam* cloneGlobalParamImpl(
+        IRSpecContextBase*              context,
+        IRBuilder*                      builder,
+        IRGlobalParam*                  originalVal,
+        IROriginalValuesForClone const& originalValues)
+    {
+        auto clonedVal = builder->createGlobalParam(
+            cloneType(context, originalVal->getFullType()));
+        cloneSimpleGlobalValueImpl(context, originalVal, originalValues, clonedVal);
+
+        if(auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
+        {
+            auto mangledName = String(linkage->getMangledName());
+            VarLayout* layout = nullptr;
+            if (context->globalVarLayouts.TryGetValue(mangledName, layout))
+            {
+                builder->addLayoutDecoration(clonedVal, layout);
+            }
+        }
 
         return clonedVal;
     }
@@ -5689,11 +5922,6 @@ namespace Slang
         auto clonedVal = builder->emitGeneric();
         registerClonedValue(context, clonedVal, originalValues);
 
-        auto mangledName = originalVal->mangledName;
-        clonedVal->mangledName = mangledName;
-
-        cloneDecorations(context, clonedVal, originalVal);
-
         // Clone any code in the body of the generic, since this
         // computes its result value.
         cloneGlobalValueWithCodeCommon(
@@ -5702,33 +5930,6 @@ namespace Slang
             originalVal);
 
         return clonedVal;
-    }
-
-    void cloneSimpleGlobalValueImpl(
-        IRSpecContextBase*              context,
-        IRGlobalValue*                  originalInst,
-        IROriginalValuesForClone const& originalValues,
-        IRGlobalValue*                  clonedInst,
-        bool                            registerValue = true)
-    {
-        if (registerValue)
-            registerClonedValue(context, clonedInst, originalValues);
-
-        auto mangledName = originalInst->mangledName;
-        clonedInst->mangledName = mangledName;
-
-        cloneDecorations(context, clonedInst, originalInst);
-
-        // Set up an IR builder for inserting into the inst
-        IRBuilder builderStorage = *context->builder;
-        IRBuilder* builder = &builderStorage;
-        builder->setInsertInto(clonedInst);
-
-        // Clone any children of the instruction
-        for (auto child : originalInst->getChildren())
-        {
-            cloneInst(context, builder, child);
-        }
     }
 
     IRStructKey* cloneStructKeyImpl(
@@ -5809,6 +6010,7 @@ namespace Slang
         IRBuilder* builder = &builderStorage;
         builder->setInsertInto(clonedValue);
 
+        cloneDecorations(context, clonedValue, originalValue);
 
         // We will walk through the blocks of the function, and clone each of them.
         //
@@ -5861,21 +6063,20 @@ namespace Slang
 
     }
 
-    void checkIRDuplicate(IRInst* inst, IRParentInst* moduleInst, Name* mangledName)
+    void checkIRDuplicate(IRInst* inst, IRInst* moduleInst, UnownedStringSlice const& mangledName)
     {
 #ifdef _DEBUG
-        for (auto child : moduleInst->getChildren())
+        for (auto child : moduleInst->getDecorationsAndChildren())
         {
             if (child == inst)
                 continue;
 
-            if (child->op == kIROp_Func)
+            if(auto childLinkage = child->findDecoration<IRLinkageDecoration>())
             {
-                auto extName = ((IRGlobalValue*)child)->mangledName;
-                if (extName == mangledName ||
-                    (extName && mangledName &&
-                        extName->text == mangledName->text))
-                    SLANG_UNEXPECTED("duplicate global var");
+                if(mangledName == childLinkage->getMangledName())
+                {
+                    SLANG_UNEXPECTED("duplicate global instruction");
+                }
             }
         }
 #else
@@ -5892,10 +6093,7 @@ namespace Slang
         bool checkDuplicate = true)
     {
         // First clone all the simple properties.
-        clonedFunc->mangledName = originalFunc->mangledName;
         clonedFunc->setFullType(cloneType(context, originalFunc->getFullType()));
-
-        cloneDecorations(context, clonedFunc, originalFunc);
 
         cloneGlobalValueWithCodeCommon(
             context,
@@ -5907,8 +6105,14 @@ namespace Slang
         //
         // TODO: This isn't really a good requirement to place on the IR...
         clonedFunc->moveToEnd();
-        if (checkDuplicate)
-            checkIRDuplicate(clonedFunc, context->getModule()->getModuleInst(), clonedFunc->mangledName);
+
+        if( checkDuplicate )
+        {
+            if( auto linkage = clonedFunc->findDecoration<IRLinkageDecoration>() )
+            {
+                checkIRDuplicate(clonedFunc, context->getModule()->getModuleInst(), linkage->getMangledName());
+            }
+        }
     }
 
     IRFunc* specializeIRForEntryPoint(
@@ -5917,7 +6121,7 @@ namespace Slang
         EntryPointLayout*   entryPointLayout)
     {
         // Look up the IR symbol by name
-        auto mangledName = context->getModule()->session->getNameObj(getMangledName(entryPointRequest->decl));
+        auto mangledName = getMangledName(entryPointRequest->decl);
         RefPtr<IRSpecSymbol> sym;
         if (!context->getSymbols().TryGetValue(mangledName, sym))
         {
@@ -6028,7 +6232,7 @@ namespace Slang
     };
 
     TargetSpecializationLevel getTargetSpecialiationLevel(
-        IRGlobalValue*  inVal,
+        IRInst*         inVal,
         String const&   targetName)
     {
         // HACK: Currently the front-end is placing modifiers related
@@ -6049,13 +6253,13 @@ namespace Slang
         }
 
         TargetSpecializationLevel result = TargetSpecializationLevel::notSpecialized;
-        for( auto dd = val->firstDecoration; dd; dd = dd->next )
+        for(auto dd : val->getDecorations())
         {
-            if(dd->op != kIRDecorationOp_Target)
+            if(dd->op != kIROp_TargetDecoration)
                 continue;
 
             auto decoration = (IRTargetDecoration*) dd;
-            if(String(decoration->targetName) == targetName)
+            if(String(decoration->getTargetName()) == targetName)
                 return TargetSpecializationLevel::specializedForTarget;
 
             result = TargetSpecializationLevel::specializedForOtherTarget;
@@ -6078,8 +6282,26 @@ namespace Slang
         return val;
     }
 
+    IRInst* getResolvedInstForDecorations(IRInst* inst)
+    {
+        IRInst* candidate = inst;
+        while(auto specInst = as<IRSpecialize>(candidate))
+        {
+            auto genericInst = as<IRGeneric>(specInst->getBase());
+            if(!genericInst)
+                break;
+
+            auto returnVal = findGenericReturnVal(genericInst);
+            if(!returnVal)
+                break;
+
+            candidate = returnVal;
+        }
+        return candidate;
+    }
+
     bool isDefinition(
-        IRGlobalValue* inVal)
+        IRInst* inVal)
     {
         IRInst* val = inVal;
         // unwrap any generic declarations to see
@@ -6097,16 +6319,21 @@ namespace Slang
             val = returnVal;
         }
 
+        // TODO: the logic here should probably
+        // be that anything with an `IRImportDecoration`
+        // is considered to be a declaration rather than definition.
+
         switch (val->op)
         {
         case kIROp_WitnessTable:
         case kIROp_GlobalConstant:
         case kIROp_Func:
         case kIROp_Generic:
-            return ((IRParentInst*)val)->getFirstChild() != nullptr;
+            return val->getFirstChild() != nullptr;
 
         case kIROp_StructType:
         case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
             return true;
 
         default:
@@ -6121,8 +6348,8 @@ namespace Slang
     // to check if things are even available in the first place...
     bool isBetterForTarget(
         IRSpecContext*  context,
-        IRGlobalValue*  newVal,
-        IRGlobalValue*  oldVal)
+        IRInst*         newVal,
+        IRInst*         oldVal)
     {
         String targetName = getTargetName(context);
 
@@ -6203,6 +6430,9 @@ namespace Slang
         case kIROp_GlobalConstant:
             return cloneGlobalConstantImpl(context, builder, cast<IRGlobalConstant>(originalInst), originalValues);
 
+        case kIROp_GlobalParam:
+            return cloneGlobalParamImpl(context, builder, cast<IRGlobalParam>(originalInst), originalValues);
+
         case kIROp_WitnessTable:
             return cloneWitnessTableImpl(context, builder, cast<IRWitnessTable>(originalInst), originalValues);
 
@@ -6250,24 +6480,26 @@ namespace Slang
         return clonedInst;
     }
 
-    IRGlobalValue* cloneGlobalValueImpl(
+    IRInst* cloneGlobalValueImpl(
         IRSpecContext*                  context,
-        IRGlobalValue*                  originalInst,
+        IRInst*                         originalInst,
         IROriginalValuesForClone const& originalValues)
     {
         auto clonedValue = cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
         clonedValue->moveToEnd();
-        return cast<IRGlobalValue>(clonedValue);
+        return clonedValue;
     }
 
 
-    // Clone a global value, which has the given `mangledName`.
-    // The `originalVal` is a known global IR value with that name, if one is available.
-    // (It is okay for this parameter to be null).
-    IRGlobalValue* cloneGlobalValueWithMangledName(
-        IRSpecContext*  context,
-        Name*           mangledName,
-        IRGlobalValue*  originalVal)
+        /// Clone a global value, which has the given `originalLinkage`.
+        ///
+        /// The `originalVal` is a known global IR value with that linkage, if one is available.
+        /// (It is okay for this parameter to be null).
+        ///
+    IRInst* cloneGlobalValueWithLinkage(
+        IRSpecContext*          context,
+        IRInst*                 originalVal,
+        IRLinkageDecoration*    originalLinkage)
     {
         // If the global value being cloned is already in target module, don't clone
         // Why checking this?
@@ -6284,11 +6516,11 @@ namespace Slang
         {
             if (IRInst* clonedVal = findClonedValue(context, originalVal))
             {
-                return cast<IRGlobalValue>(clonedVal);
+                return clonedVal;
             }
         }
 
-        if(getText(mangledName).Length() == 0)
+        if(!originalLinkage)
         {
             // If there is no mangled name, then we assume this is a local symbol,
             // and it can't possibly have multiple declarations.
@@ -6300,6 +6532,7 @@ namespace Slang
         // with the same mangled name as `originalVal` and try
         // to pick the "best" one for our target.
 
+        auto mangledName = String(originalLinkage->getMangledName());
         RefPtr<IRSpecSymbol> sym;
         if( !context->getSymbols().TryGetValue(mangledName, sym) )
         {
@@ -6317,10 +6550,10 @@ namespace Slang
         // more specialized for the chosen target. Otherwise, we simply favor
         // definitions over declarations.
         //
-        IRGlobalValue* bestVal = sym->irGlobalValue;
+        IRInst* bestVal = sym->irGlobalValue;
         for( auto ss = sym->nextWithSameName; ss; ss = ss->nextWithSameName )
         {
-            IRGlobalValue* newVal = ss->irGlobalValue;
+            IRInst* newVal = ss->irGlobalValue;
             if(isBetterForTarget(context, newVal, bestVal))
                 bestVal = newVal;
         }
@@ -6332,30 +6565,25 @@ namespace Slang
         {
             if (IRInst* clonedVal = findClonedValue(context, bestVal))
             {
-                return cast<IRGlobalValue>(clonedVal);
+                return clonedVal;
             }
         }
 
         return cloneGlobalValueImpl(context, bestVal, IROriginalValuesForClone(sym));
     }
 
-    IRGlobalValue* cloneGlobalValueWithMangledName(IRSpecContext* context, Name* mangledName)
-    {
-        return cloneGlobalValueWithMangledName(context, mangledName, nullptr);
-    }
-
     // Clone a global value, where `originalVal` is one declaration/definition, but we might
     // have to consider others, in order to find the "best" version of the symbol.
-    IRGlobalValue* cloneGlobalValue(IRSpecContext* context, IRGlobalValue* originalVal)
+    IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal)
     {
         // We are being asked to clone a particular global value, but in
         // the IR that comes out of the front-end there could still
         // be multiple, target-specific, declarations of any given
         // global value, all of which share the same mangled name.
-        return cloneGlobalValueWithMangledName(
+        return cloneGlobalValueWithLinkage(
             context,
-            originalVal->mangledName,
-            originalVal);
+            originalVal,
+            originalVal->findDecoration<IRLinkageDecoration>());
     }
 
     StructTypeLayout* getGlobalStructLayout(
@@ -6363,15 +6591,17 @@ namespace Slang
 
     void insertGlobalValueSymbol(
         IRSharedSpecContext*    sharedContext,
-        IRGlobalValue*          gv)
+        IRInst*                 gv)
     {
-        auto mangledName = gv->mangledName;
+        auto linkage = gv->findDecoration<IRLinkageDecoration>();
 
         // Don't try to register a symbol for global values
-        // with no mangled name, since these represent symbols
-        // that shouldn't get "linkage"
-        if (!getText(mangledName).Length())
+        // that don't have linkage.
+        //
+        if (!linkage)
             return;
+
+        auto mangledName = String(linkage->getMangledName());
 
         RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
         sym->irGlobalValue = gv;
@@ -6397,10 +6627,7 @@ namespace Slang
 
         for(auto ii : originalModule->getGlobalInsts())
         {
-            auto gv = as<IRGlobalValue>(ii);
-            if (!gv)
-                continue;
-            insertGlobalValueSymbol(sharedContext, gv);
+            insertGlobalValueSymbol(sharedContext, ii);
         }
     }
 
@@ -6532,7 +6759,7 @@ namespace Slang
         auto globalStructLayout = getGlobalStructLayout(newProgramLayout);
         for (auto globalVarLayout : globalStructLayout->fields)
         {
-            auto mangledName = compileRequest->mSession->getNameObj(getMangledName(globalVarLayout->varDecl));
+            auto mangledName = getMangledName(globalVarLayout->varDecl);
             context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
         }
 
@@ -6553,32 +6780,6 @@ namespace Slang
     IRModule* getIRModule(IRSpecializationState* state)
     {
         return state->irModule;
-    }
-
-    IRGlobalValue* getSpecializedGlobalValueForDeclRef(
-        IRSpecializationState*  state,
-        DeclRef<Decl> const&    declRef)
-    {
-        // We will start be ensuring that we have code for
-        // the declaration itself.
-        auto decl = declRef.getDecl();
-        auto mangledDeclName = getMangledName(decl);
-
-        IRGlobalValue* irDeclVal = cloneGlobalValueWithMangledName(
-            state->getContext(),
-            state->getContext()->getModule()->session->getNameObj(mangledDeclName));
-        if(!irDeclVal)
-            return nullptr;
-
-        // Now we need to deal with specializing the given
-        // IR value based on the substitutions applied to
-        // our declaration reference.
-
-        if(!declRef.substitutions)
-            return irDeclVal;
-
-        SLANG_UNEXPECTED("unhandled");
-        UNREACHABLE_RETURN(nullptr);
     }
 
     void specializeIRForEntryPoint(
@@ -6686,18 +6887,13 @@ namespace Slang
             // We do *not* consider generics, or instructions nested under them.
             return;
         }
-        else if(auto parentInst = as<IRParentInst>(inst))
+        else
         {
-            // For a parent instruction, we will scan through its contents,
-            // since that will be where the `specialize` instructions are
-
-            for(auto child : parentInst->children)
+            for(auto child : inst->getChildren())
             {
                 addToSpecializationWorkListRec(sharedContext, child);
             }
-        }
-        else
-        {
+
             // Default case: consider this instruction for specialization.
             sharedContext->addToWorkList(inst);
         }
@@ -6710,31 +6906,14 @@ namespace Slang
         IRSpecialize*               specializeInst)
     {
         // First, we want to see if an existing specialization
-        // has already been made. To do that we will need to
-        // compute the mangled name of the specialized value,
-        // so that we can look for existing declarations.
-        String specMangledName = mangleSpecializedFuncName(getText(genericVal->mangledName), specializeInst);
-        auto specMangledNameObj = sharedContext->module->session->getNameObj(specMangledName);
-
-        // Now look up an existing symbol with a matching name
-        RefPtr<IRSpecSymbol> symb;
-        if (sharedContext->symbols.TryGetValue(specMangledNameObj, symb))
+        // has already been made. To do that we will construct a key
+        // for lookup in the generic specialization context.
+        //
+        IRGenericSpecKey specializationKey(specializeInst);
         {
-            return symb->irGlobalValue;
-        }
-
-        // TODO: This is a terrible linear search, and we should
-        // avoid it by building a dictionary ahead of time,
-        // as is being done for the `IRSpecContext` used above.
-        // We can probalby use the same basic context, actually.
-        for(auto ii : sharedContext->module->getGlobalInsts())
-        {
-            auto gv = as<IRGlobalValue>(ii);
-            if (!gv)
-                continue;
-
-            if (gv->mangledName == specMangledNameObj)
-                return gv;
+            IRInst* specializedValue = nullptr;
+            if(sharedContext->specializations.TryGetValue(specializationKey, specializedValue))
+                return specializedValue;
         }
 
         // If we get to this point, then we need to construct a
@@ -6788,12 +6967,9 @@ namespace Slang
             // We expect a generic to only ever contain a single block.
             SLANG_ASSERT(bb == genericVal->getFirstBlock());
 
-            for (auto ii : bb->getChildren())
+            // Iterate over the non-parameter ("ordinary") instructions.
+            for (auto ii : bb->getOrdinaryInsts())
             {
-                // Skip parameters, since they were handled earlier.
-                if (auto param = as<IRParam>(ii))
-                    continue;
-
                 // The last block of the generic is expected to end with
                 // a `return` instruction for the specialized value that
                 // comes out of the abstraction.
@@ -6803,12 +6979,8 @@ namespace Slang
                 if (auto returnValInst = as<IRReturnVal>(ii))
                 {
                     auto clonedResult = cloneValue(&context, returnValInst->getVal());
-                    if (auto clonedGlobalValue = as<IRGlobalValue>(clonedResult))
-                    {
-                        clonedGlobalValue->mangledName = specMangledNameObj;
 
-                        // TODO: create a symbol for it and add it to the map.
-                    }
+                    sharedContext->specializations.Add(specializationKey, clonedResult);
 
                     return clonedResult;
                 }
@@ -6874,20 +7046,10 @@ namespace Slang
             // We've found the leaf value that will be produced after
             // all of the specialization is done. Now we want to know
             // if that is a value suitable for actually specializing
-
-            if (auto globalValue = as<IRGlobalValue>(val))
-            {
-                if (isDefinition(globalValue))
-                    return true;
-                return false;
-            }
-            else
-            {
-                // There might be other cases with a declaration-vs-definition
-                // thing that we need to handle.
-
+            //
+            if (isDefinition(val))
                 return true;
-            }
+            return false;
         }
     }
 

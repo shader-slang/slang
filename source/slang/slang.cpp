@@ -1,4 +1,4 @@
-﻿#include "../../slang.h"
+#include "../../slang.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
@@ -13,6 +13,7 @@
 #include "../slang/type-layout.h"
 
 #include "slang-file-system.h"
+#include "../core/slang-writer.h"
 
 #include "ir-serialize.h"
 
@@ -305,6 +306,12 @@ CompileRequest::CompileRequest(Session* session)
 
     sourceManager->initialize(session->getBuiltinSourceManager());
 
+    // Set all the default writers
+    for (int i = 0; i < int(WriterChannel::CountOf); ++i)
+    {
+        setWriter(WriterChannel(i), nullptr);
+    }
+
     // Set up the default file system
     SLANG_ASSERT(fileSystem == nullptr);
     fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
@@ -368,8 +375,37 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 }
 
 
-
 //
+
+static ISlangWriter* _getDefaultWriter(WriterChannel chan)
+{
+    static FileWriter stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    static NullWriter nullWriter(WriterFlag::IsStatic | WriterFlag::IsConsole);
+
+    switch (chan)
+    {
+        case WriterChannel::StdError:    return &stdError;
+        case WriterChannel::StdOutput:   return &stdOut;
+        case WriterChannel::Diagnostic:  return &nullWriter;
+        default:
+        {
+            SLANG_ASSERT(!"Unknown type");
+            return &stdError;
+        }
+    }
+}
+
+void CompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
+{
+    writer = writer ? writer : _getDefaultWriter(chan);
+    m_writers[int(chan)] = writer;
+
+    if (chan == WriterChannel::Diagnostic)
+    {
+        mSink.writer = writer;
+    }
+}
 
 SlangResult CompileRequest::loadFile(String const& path, ISlangBlob** outBlob)
 {
@@ -1147,6 +1183,14 @@ SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
     return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
 }
 
+SLANG_API SlangResult spSessionCheckCompileTargetSupport(
+    SlangSession*                session,
+    SlangCompileTarget           target)
+{
+    auto s = SESSION(session);
+    return Slang::checkCompileTargetSupport(s, Slang::CodeGenTarget(target));
+}
+
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
 {
@@ -1196,7 +1240,6 @@ SLANG_API void spSetFileSystem(
         }
     }
 }
-
 
 SLANG_API void spSetCompileFlags(
     SlangCompileRequest*    request,
@@ -1311,11 +1354,33 @@ SLANG_API void spSetDiagnosticCallback(
     SlangDiagnosticCallback callback,
     void const*             userData)
 {
+    using namespace Slang;
+
     if(!request) return;
     auto req = REQ(request);
 
-    req->mSink.callback = callback;
-    req->mSink.callbackUserData = (void*) userData;
+    ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
+    req->setWriter(WriterChannel::Diagnostic, writer);
+}
+
+SLANG_API void spSetWriter(
+    SlangCompileRequest*    request,
+    SlangWriterChannel      chan, 
+    ISlangWriter*           writer)
+{
+    if (!request) return;
+    auto req = REQ(request);
+
+    req->setWriter(Slang::WriterChannel(chan), writer);
+}
+
+SLANG_API ISlangWriter* spGetWriter(
+    SlangCompileRequest*    request,
+    SlangWriterChannel      chan)
+{
+    if (!request) return nullptr;
+    auto req = REQ(request);
+    return req->getWriter(Slang::WriterChannel(chan));
 }
 
 SLANG_API void spAddSearchPath(

@@ -178,8 +178,11 @@ struct OSProcessSpawner
     Slang::StringBuilder commandLine_;
 #else
     Slang::List<Slang::String>  arguments_;
-
 #endif
+
+    // Only holds the argumements in order
+    Slang::List<Slang::String>  argumentList_;          
+
     // Is the executable specified by path, rather than just by name?
     bool isExecutablePath_;
 };

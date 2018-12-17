@@ -8,6 +8,8 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
+#include "../../source/core/slang-app-context.h"
+
 struct PrettyWriter
 {
     bool startOfLine = true;
@@ -16,7 +18,8 @@ struct PrettyWriter
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
-    fprintf(stdout, "%.*s", int(end - begin), begin);
+    SLANG_ASSERT(end >= begin);
+    Slang::AppContext::getStdOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -27,7 +30,7 @@ static void writeRaw(PrettyWriter& writer, char const* begin)
 static void writeRawChar(PrettyWriter& writer, int c)
 {
     char buffer[] = { (char) c, 0 };
-    writeRaw(writer, buffer);
+    writeRaw(writer, buffer, buffer + 1);
 }
 
 static void adjust(PrettyWriter& writer)
@@ -77,7 +80,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    fprintf(stdout, "%llu", (unsigned long long)val);
+    Slang::AppContext::getStdOut().print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -141,7 +144,14 @@ static void emitReflectionVarBindingInfoJSON(
         {
             write(writer, ", ");
             write(writer, "\"count\": ");
-            write(writer, count);
+            if( count == SLANG_UNBOUNDED_SIZE )
+            {
+                write(writer, "\"unbounded\"");
+            }
+            else
+            {
+                write(writer, count);
+            }
         }
     }
 }
@@ -364,6 +374,27 @@ static void emitReflectionTypeInfoJSON(
                 case SLANG_RESOURCE_ACCESS_CONSUME:         write(writer, "consume"); break;
                 }
                 write(writer, "\"");
+            }
+
+            // TODO: We should really print the result type for all resource
+            // types, but current test output depends on the old behavior, so
+            // we only add result type output for structured buffers at first.
+            //
+            switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+            {
+            default:
+                break;
+
+            case SLANG_STRUCTURED_BUFFER:
+                if( auto resultType = type->getResourceResultType() )
+                {
+                    write(writer, ",\n");
+                    write(writer, "\"resultType\": ");
+                    emitReflectionTypeJSON(
+                        writer,
+                        resultType);
+                }
+                break;
             }
         }
         break;
@@ -853,6 +884,7 @@ void emitReflectionJSON(
     auto programReflection = (slang::ShaderReflection*) reflection;
 
     PrettyWriter writer;
+    
     emitReflectionJSON(writer, programReflection);
 }
 
@@ -861,17 +893,18 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        fputs(diagnostic, stderr);
+        Slang::AppContext::getStdError().put(diagnostic);
     }
     return res;
 }
 
-static SlangResult innerMain(int argc, char*const*argv)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
-    // Parse any command-line options
-
-    SlangSession* session = spCreateSession(nullptr);
+    Slang::AppContext::setSingleton(appContext);
+    
     SlangCompileRequest* request = spCreateCompileRequest(session);
+
+    appContext->configureRequest(request);
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
@@ -886,8 +919,7 @@ static SlangResult innerMain(int argc, char*const*argv)
     emitReflectionJSON(reflection);
 
     spDestroyCompileRequest(request);
-    spDestroySession(session);
-
+    
     return SLANG_OK;
 }
 
@@ -895,6 +927,9 @@ int main(
     int argc,
     char** argv)
 {
-    SlangResult res = innerMain(argc, argv);
+    SlangSession* session = spCreateSession(nullptr);
+    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    spDestroySession(session);
+
     return SLANG_FAILED(res) ? 1 : 0;
 }

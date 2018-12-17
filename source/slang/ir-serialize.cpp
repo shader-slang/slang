@@ -16,14 +16,10 @@ namespace Slang {
 
 /* Note that an IRInst can be derived from, but when it derived from it's new members are IRUse variables, and they in 
 effect alias over the operands - and reflected in the operand count. There _could_ be other members after these IRUse 
-variables, but in practice there do not appear to be.
+variables, but only a few types include extra data, and these do not have any operands:
 
-The only difference to this is IRParentInst derived types, as it contains IRInstListBase children. Thus IRParentInst derived classes can 
-have no operands - because it would write over the top of IRInstListBase.  BUT they can contain members after the list 
-types which do this are
-
+* IRConstant        - Needs special-case handling
 * IRModuleInst      - Presumably we can just set to the module pointer on reconstruction
-* IRGlobalValue     - There are types derived from this type, but they don't add a parameter
 
 Note! That on an IRInst there is an IRType* variable (accessed as getFullType()). As it stands it may NOT actually point 
 to an IRType derived type. Its 'ok' as long as it's an instruction that can be used in the place of the type. So this code does not 
@@ -43,18 +39,6 @@ bother to check if it's correct, and just casts it.
     { 0, 0 },   // Float64,
     { 0, 0 }    // Int64,
 };
-
-static bool isParentDerived(IROp opIn)
-{
-    const int op = (kIROpMeta_PseudoOpMask & opIn);
-    return op >= kIROp_FirstParentInst && op <= kIROp_LastParentInst;
-}
-
-static bool isGlobalValueDerived(IROp opIn)
-{
-    const int op = (kIROpMeta_PseudoOpMask & opIn);
-    return op >= kIROp_FirstGlobalValue && op <= kIROp_LastGlobalValue;
-}
 
 static bool isTextureTypeBase(IROp opIn)
 {
@@ -273,7 +257,6 @@ size_t IRSerialData::calcSizeInBytes() const
     return 
         _calcArraySize(m_insts) + 
         _calcArraySize(m_childRuns) + 
-        _calcArraySize(m_decorationRuns) + 
         _calcArraySize(m_externalOperands) + 
         _calcArraySize(m_stringTable) + 
         /* Raw source locs */
@@ -293,7 +276,6 @@ void IRSerialData::clear()
     memset(&m_insts[0], 0, sizeof(Inst));
 
     m_childRuns.Clear();
-    m_decorationRuns.Clear();
     m_externalOperands.Clear();
     m_rawSourceLocs.Clear();
 
@@ -307,8 +289,6 @@ void IRSerialData::clear()
     m_stringTable.SetSize(2);
     m_stringTable[int(kNullStringIndex)] = 0;
     m_stringTable[int(kEmptyStringIndex)] = 0;
-
-    m_decorationBaseIndex = 0;
 }
 
 template <typename T>
@@ -344,10 +324,8 @@ static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
 bool IRSerialData::operator==(const ThisType& rhs) const
 {
     return (this == &rhs) || 
-        (m_decorationBaseIndex == rhs.m_decorationBaseIndex &&
-        _isEqual(m_insts, rhs.m_insts) &&
+        (_isEqual(m_insts, rhs.m_insts) &&
         _isEqual(m_childRuns, rhs.m_childRuns) &&
-        _isEqual(m_decorationRuns, rhs.m_decorationRuns) &&
         _isEqual(m_externalOperands, rhs.m_externalOperands) &&
         _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
         _isEqual(m_stringTable, rhs.m_stringTable));
@@ -363,33 +341,6 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     // Add to the map
     m_instMap.Add(inst, Ser::InstIndex(m_insts.Count()));
     m_insts.Add(inst);
-
-    // Add all the decorations, to the list. 
-    // We don't add to the decoration map, as we only want to do this once all the instructions have been hit
-    if (inst->firstDecoration)
-    {
-        m_instWithFirstDecoration.Add(inst);
-
-        IRDecoration* decor = inst->firstDecoration;
-  
-        const int initialNumDecor = int(m_decorations.Count());
-        while (decor)
-        {
-            m_decorations.Add(decor);
-            decor = decor->next;
-        }
-        
-        const Ser::SizeType numDecor = Ser::SizeType(int(m_decorations.Count()) - initialNumDecor);
-        
-        Ser::InstRun run;
-        run.m_parentIndex = m_instMap[inst];
-
-        // NOTE! This isn't quite correct, as we need to correct for when all the instructions are added, this is done at the end
-        run.m_startInstIndex = Ser::InstIndex(initialNumDecor);
-        run.m_numChildren = numDecor;
-
-        m_serialData->m_decorationRuns.Add(run);
-    }
 }
 
 // Find a view index that matches the view by file (and perhaps other characteristics in the future)
@@ -433,7 +384,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     m_decorations.Clear();
     
     // Stack for parentInst
-    List<IRParentInst*> parentInstStack;
+    List<IRInst*> parentInstStack;
   
     IRModuleInst* moduleInst = module->getModuleInst();
     parentInstStack.Add(moduleInst);
@@ -445,7 +396,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     while (parentInstStack.Count())
     {
         // If it's in the stack it is assumed it is already in the inst map
-        IRParentInst* parentInst = parentInstStack.Last();
+        IRInst* parentInst = parentInstStack.Last();
         parentInstStack.RemoveLast();
         SLANG_ASSERT(m_instMap.ContainsKey(parentInst));
 
@@ -453,7 +404,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         // cos we want breadth first so the order of children is the same as their index order, meaning we don't need to store explicit indices
         const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.Count());
         
-        IRInstListBase childrenList = parentInst->getChildren();
+        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
         for (IRInst* child : childrenList)
         {
             // This instruction can't be in the map...
@@ -461,11 +412,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
             _addInstruction(child);
             
-            IRParentInst* childAsParent = as<IRParentInst>(child);
-            if (childAsParent)
-            {
-                parentInstStack.Add(childAsParent);
-            }
+            parentInstStack.Add(child);
         }
 
         // If it had any children, then store the information about it
@@ -480,32 +427,10 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    // Now fix the decorations 
-    {
-        const int decorationBaseIndex = int(m_insts.Count());
-        m_serialData->m_decorationBaseIndex = decorationBaseIndex;
-        const int numDecorRuns = int(m_serialData->m_decorationRuns.Count());
-
-        // Work out the total num of decoration
-        int totalNumDecorations = 0;
-        if (numDecorRuns)
-        {
-            const auto& lastDecorInfo = m_serialData->m_decorationRuns.Last();
-            totalNumDecorations = int(lastDecorInfo.m_startInstIndex) + lastDecorInfo.m_numChildren;
-        }
-
-        // Fix the indices
-        for (int i = 0; i < numDecorRuns; ++i)
-        {
-            Ser::InstRun& info = m_serialData->m_decorationRuns[i];
-            info.m_startInstIndex = Ser::InstIndex(decorationBaseIndex + int(info.m_startInstIndex));
-        }
-
-        // Set to the right size
-        m_serialData->m_insts.SetSize(decorationBaseIndex + totalNumDecorations);
-        // Clear all instructions
-        memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.Count());
-    }
+    // Set to the right size
+    m_serialData->m_insts.SetSize(m_insts.Count());
+    // Clear all instructions
+    memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.Count());
 
     // Need to set up the actual instructions
     {
@@ -543,6 +468,12 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                         dstInst.m_payload.m_int64 = irConst->value.intVal;
                         break;
                     }
+                    case kIROp_PtrLit:
+                    {
+                        dstInst.m_payloadType = PayloadType::Int64;
+                        dstInst.m_payload.m_int64 = (intptr_t) irConst->value.ptrVal;
+                        break;
+                    }
                     case kIROp_FloatLit:
                     {
                         dstInst.m_payloadType = PayloadType::Float64;
@@ -561,13 +492,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                         return SLANG_FAIL;
                     }
                 }
-                continue;
-            }
-            IRGlobalValue* globValue = as<IRGlobalValue>(srcInst);
-            if (globValue)
-            {
-                dstInst.m_payloadType = PayloadType::String_1;
-                dstInst.m_payload.m_stringIndices[0] = getStringIndex(globValue->mangledName);
                 continue;
             }
 
@@ -612,124 +536,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             {
                 const Ser::InstIndex dstInstIndex = getInstIndex(srcInst->getOperand(j));
                 dstOperands[j] = dstInstIndex;
-            }
-        }
-    }
-
-    // Now need to do the decorations
-
-    {
-        const int decorationBaseIndex = m_serialData->m_decorationBaseIndex;
-        const int numDecor = int(m_decorations.Count());
-        SLANG_ASSERT(decorationBaseIndex + numDecor == int(m_serialData->m_insts.Count()));
-
-        // Have to be able to store in a byte!
-        SLANG_COMPILE_TIME_ASSERT(kIROpCount + kIRDecorationOp_CountOf < 0x100);
-
-        for (int i = 0; i < numDecor; ++i)
-        {
-            IRDecoration* srcDecor = m_decorations[i];
-            Ser::Inst& dstInst = m_serialData->m_insts[decorationBaseIndex + i];
-
-            dstInst.m_op = uint8_t(kIROpCount + srcDecor->op);
-
-            switch (srcDecor->op)
-            {
-                case kIRDecorationOp_HighLevelDecl:
-                {
-                    // TODO!
-                    // Decl* decl;
-                    break;
-                }
-                case kIRDecorationOp_Layout:
-                {
-                    // TODO!
-                    // Layout* layout;
-                    break;
-                }
-                case kIRDecorationOp_LoopControl:
-                {
-                    auto loopDecor = static_cast<IRLoopControlDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::UInt32;
-                    dstInst.m_payload.m_uint32 = uint32_t(loopDecor->mode);
-                    break;
-                }
-                case kIRDecorationOp_Target:
-                {
-                    auto targetDecor = static_cast<IRTargetDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::String_1;
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
-                    break;
-                }
-                case kIRDecorationOp_TargetIntrinsic:
-                {
-                    auto targetDecor = static_cast<IRTargetIntrinsicDecoration*>(srcDecor);
-                    dstInst.m_payloadType = PayloadType::String_2;
-
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(targetDecor->targetName);
-                    dstInst.m_payload.m_stringIndices[1] = getStringIndex(targetDecor->definition);
-                    break;
-                }
-                case kIRDecorationOp_GLSLOuterArray:
-                {
-                    auto arrayDecor = static_cast<IRGLSLOuterArrayDecoration*>(srcDecor);
-                    dstInst.m_payloadType = PayloadType::String_1;
-
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(arrayDecor->outerArrayName);
-                    break;
-                }
-                case kIRDecorationOp_Semantic:
-                {
-                    auto semanticDecor = static_cast<IRSemanticDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::String_1;
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(semanticDecor->semanticName);
-                    break;
-                }
-                case kIRDecorationOp_InterpolationMode:
-                {
-                    auto semanticDecor = static_cast<IRInterpolationModeDecoration*>(srcDecor);
-                    dstInst.m_payloadType = PayloadType::UInt32;
-                    dstInst.m_payload.m_uint32 = uint32_t(semanticDecor->mode);
-                    break;
-                }
-                case kIRDecorationOp_NameHint:
-                {
-                    auto nameDecor = static_cast<IRNameHintDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::String_1;
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(nameDecor->name);
-                    break;
-                }
-                case kIRDecorationOp_VulkanRayPayload:
-                case kIRDecorationOp_VulkanHitAttributes:
-                {
-                    dstInst.m_payloadType = PayloadType::Empty;
-                    break;
-                }
-                case kIRDecorationOp_RequireGLSLExtension:
-                {
-                    auto extDecor = static_cast<IRRequireGLSLExtensionDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::String_1;
-                    dstInst.m_payload.m_stringIndices[0] = getStringIndex(extDecor->extensionName);
-                    break;
-                }
-                case kIRDecorationOp_RequireGLSLVersion:
-                {
-                    auto verDecor = static_cast<IRRequireGLSLVersionDecoration*>(srcDecor);
-
-                    dstInst.m_payloadType = PayloadType::UInt32;
-                    dstInst.m_payload.m_uint32 = uint32_t(verDecor->languageVersion);
-                    break;
-                }
-                default:
-                {
-                    SLANG_ASSERT(!"Unhandled decoration type");
-                    return SLANG_FAIL;
-                }
             }
         }
     }
@@ -1079,7 +885,6 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     totalSize += sizeof(Bin::SlangHeader) + 
         _calcInstChunkSize(compressionType, data.m_insts) +
         _calcChunkSize(compressionType, data.m_childRuns) +
-        _calcChunkSize(compressionType, data.m_decorationRuns) +
         _calcChunkSize(compressionType, data.m_externalOperands) +
         _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) + 
         _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
@@ -1095,7 +900,6 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         Bin::SlangHeader slangHeader;
         slangHeader.m_chunk.m_type = Bin::kSlangFourCc;
         slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(Bin::Chunk));
-        slangHeader.m_decorationBase = uint32_t(data.m_decorationBaseIndex);
         slangHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
 
         stream->Write(&slangHeader, sizeof(slangHeader));
@@ -1103,7 +907,6 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
 
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, stream));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kDecoratorRunFourCc, data.m_decorationRuns, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, stream));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_stringTable, stream));
 
@@ -1426,7 +1229,6 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
                 stream->Read(&slangHeader.m_chunk + 1, sizeof(slangHeader) - sizeof(chunk));
 
-                dataOut->m_decorationBaseIndex = slangHeader.m_decorationBase;
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
@@ -1436,13 +1238,6 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
                 SLANG_RETURN_ON_FAIL(_readInstArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_insts));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;    
-            }
-            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDecoratorRunFourCc):
-            case Bin::kDecoratorRunFourCc:
-            {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_decorationRuns));
-                remainingBytes -= _calcChunkTotalSize(chunk);
-                break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
             case Bin::kChildRunFourCc:
@@ -1482,111 +1277,6 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
     return SLANG_OK;
 }
 
-IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
-{
-    typedef Ser::Inst::PayloadType PayloadType;
-
-    IRDecorationOp decorOp = IRDecorationOp(srcInst.m_op - kIROpCount);
-    SLANG_ASSERT(decorOp < kIRDecorationOp_CountOf);
-
-    switch (decorOp)
-    {
-        case kIRDecorationOp_HighLevelDecl:
-        {
-            // TODO!
-            // Decl* decl;
-            return createEmptyDecoration<IRHighLevelDeclDecoration>(m_module);
-        }
-        case kIRDecorationOp_Layout:
-        {
-            // TODO!
-            // Layout* layout;
-            return createEmptyDecoration<IRLayoutDecoration>(m_module);
-        }
-        case kIRDecorationOp_LoopControl:
-        {
-            auto decor = createEmptyDecoration<IRLoopControlDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
-            decor->mode = IRLoopControl(srcInst.m_payload.m_uint32);
-            return decor;
-        }
-        case kIRDecorationOp_Target:
-        {
-            auto decor = createEmptyDecoration<IRTargetDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->targetName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            return decor;
-        }
-        case kIRDecorationOp_TargetIntrinsic:
-        {
-            auto decor = createEmptyDecoration<IRTargetIntrinsicDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_2);
-            decor->targetName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            decor->definition = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[1]));
-            return decor;
-        }
-        case kIRDecorationOp_GLSLOuterArray:
-        {
-            auto decor = createEmptyDecoration<IRGLSLOuterArrayDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->outerArrayName = m_stringRepresentationCache.getCStr(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            return decor;
-        }
-        case kIRDecorationOp_Semantic:
-        {
-            auto decor = createEmptyDecoration<IRSemanticDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->semanticName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            return decor;
-        }
-        case kIRDecorationOp_InterpolationMode:
-        {
-            auto decor = createEmptyDecoration<IRInterpolationModeDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == Ser::Inst::PayloadType::UInt32);
-            decor->mode = IRInterpolationMode(srcInst.m_payload.m_uint32);
-            return decor;
-        }
-        case kIRDecorationOp_NameHint:
-        {
-            auto decor = createEmptyDecoration<IRNameHintDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->name = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            return decor;
-        }
-        case kIRDecorationOp_VulkanRayPayload:
-        {
-            auto decor = createEmptyDecoration<IRVulkanRayPayloadDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
-            return decor;
-        }
-        case kIRDecorationOp_VulkanHitAttributes:
-        {
-            auto decor = createEmptyDecoration<IRVulkanHitAttributesDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
-            return decor;
-        }
-        case kIRDecorationOp_RequireGLSLExtension:
-        {
-            auto decor = createEmptyDecoration<IRRequireGLSLExtensionDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-            decor->extensionName = m_stringRepresentationCache.getStringRepresentation(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-            return decor;
-        }
-        case kIRDecorationOp_RequireGLSLVersion:
-        {
-            auto decor = createEmptyDecoration<IRRequireGLSLVersionDecoration>(m_module);
-            SLANG_ASSERT(srcInst.m_payloadType == Ser::Inst::PayloadType::UInt32);
-            decor->languageVersion = Int(srcInst.m_payload.m_uint32);
-            return decor;
-        }
-        default:
-        {
-            SLANG_ASSERT(!"Unhandled decoration type");
-            return nullptr;
-        }
-    }
-}
-
 /* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut)
 {
     typedef Ser::Inst::PayloadType PayloadType;
@@ -1605,17 +1295,13 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
     // Add all the instructions
 
     List<IRInst*> insts;
-    List<IRDecoration*> decorations;
 
-    const int numInsts = data.m_decorationBaseIndex;
-    const int numDecorations = int(data.m_insts.Count() - numInsts);
+    const int numInsts = int(data.m_insts.Count());
 
     SLANG_ASSERT(numInsts > 0);
 
     insts.SetSize(numInsts);
     insts[0] = nullptr;
-
-    decorations.SetSize(numDecorations);
 
     // 0 holds null
     // 1 holds the IRModuleInst
@@ -1640,106 +1326,90 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
 
         const IROp op((IROp)srcInst.m_op);
 
-        if (isParentDerived(op))
+        if (isConstant(op))
         {
-            // Cannot have operands
-            SLANG_ASSERT(srcInst.getNumOperands() == 0);
+            // Handling of constants
 
-            if (isGlobalValueDerived(op))
-            {
-                IRGlobalValue* globalValueInst = static_cast<IRGlobalValue*>(createEmptyInstWithSize(module, op, sizeof(IRGlobalValue)));
-                insts[i] = globalValueInst;
-                // Set the global value
-                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-                globalValueInst->mangledName = m_stringRepresentationCache.getName(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+            // Calculate the minimum object size (ie not including the payload of value)    
+            const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
+
+            IRConstant* irConst = nullptr;
+            switch (op)
+            {                    
+                case kIROp_BoolLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
+                    break;
+                }
+                case kIROp_IntLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst->value.intVal = srcInst.m_payload.m_int64; 
+                    break;
+                }
+                case kIROp_PtrLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(void*)));
+                    irConst->value.ptrVal = (void*) (intptr_t) srcInst.m_payload.m_int64; 
+                    break;
+                }
+                case kIROp_FloatLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
+                    irConst->value.floatVal = srcInst.m_payload.m_float64;
+                    break;
+                }
+                case kIROp_StringLit:
+                {
+                    SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
+
+                    const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+                        
+                    const size_t sliceSize = slice.size();
+                    const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
+
+                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
+
+                    IRConstant::StringValue& dstString = irConst->value.stringVal;
+
+                    dstString.numChars = uint32_t(sliceSize);
+                    // Turn into pointer to avoid warning of array overrun
+                    char* dstChars = dstString.chars;
+                    // Copy the chars
+                    memcpy(dstChars, slice.begin(), sliceSize);
+                    break;
+                }
+                default:
+                {
+                    SLANG_ASSERT(!"Unknown constant type");
+                    return SLANG_FAIL;
+                }
             }
-            else
-            {
-                // Just needs to big enough to hold IRParentInst
-                IRParentInst* parentInst = static_cast<IRParentInst*>(createEmptyInstWithSize(module, op, sizeof(IRParentInst)));
-                insts[i] = parentInst;
-            }
+
+            insts[i] = irConst;
+        }
+        else if (isTextureTypeBase(op))
+        {
+            IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
+            SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
+
+            // Reintroduce the texture type bits into the the
+            const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
+            inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
+
+            insts[i] = inst;
         }
         else
         {
-            if (isConstant(op))
-            {
-                // Handling of constants
-
-                // Calculate the minimum object size (ie not including the payload of value)    
-                const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
-
-                IRConstant* irConst = nullptr;
-                switch (op)
-                {                    
-                    case kIROp_BoolLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
-                        irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
-                        break;
-                    }
-                    case kIROp_IntLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
-                        irConst->value.intVal = srcInst.m_payload.m_int64; 
-                        break;
-                    }
-                    case kIROp_FloatLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
-                        irConst->value.floatVal = srcInst.m_payload.m_float64;
-                        break;
-                    }
-                    case kIROp_StringLit:
-                    {
-                        SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
-
-                        const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
-                        
-                        const size_t sliceSize = slice.size();
-                        const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
-
-                        irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
-
-                        IRConstant::StringValue& dstString = irConst->value.stringVal;
-
-                        dstString.numChars = uint32_t(sliceSize);
-                        // Turn into pointer to avoid warning of array overrun
-                        char* dstChars = dstString.chars;
-                        // Copy the chars
-                        memcpy(dstChars, slice.begin(), sliceSize);
-                        break;
-                    }
-                    default:
-                    {
-                        SLANG_ASSERT(!"Unknown constant type");
-                        return SLANG_FAIL;
-                    }
-                }
-
-                insts[i] = irConst;
-            }
-            else if (isTextureTypeBase(op))
-            {
-                IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
-                SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
-
-                // Reintroduce the texture type bits into the the
-                const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
-                inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
-
-                insts[i] = inst;
-            }
-            else
-            {
-                int numOperands = srcInst.getNumOperands();
-                insts[i] = createEmptyInst(module, op, numOperands);
-            }
-        }                    
-    } 
+            int numOperands = srcInst.getNumOperands();
+            insts[i] = createEmptyInst(module, op, numOperands);
+        }
+    }
 
     // Patch up the operands
     for (int i = 1; i < numInsts; ++i)
@@ -1780,56 +1450,12 @@ IRDecoration* IRSerialReader::_createDecoration(const Ser::Inst& srcInst)
             const auto& run = data.m_childRuns[i];
 
             IRInst* inst = insts[int(run.m_parentIndex)];
-            IRParentInst* parentInst = as<IRParentInst>(inst);
-            SLANG_ASSERT(parentInst);
 
             for (int j = 0; j < int(run.m_numChildren); ++j)
             {
                 IRInst* child = insts[j + int(run.m_startInstIndex)];
                 SLANG_ASSERT(child->parent == nullptr);
-                //child->parent = parentInst;
-                child->insertAtEnd(parentInst);
-            }
-        }
-    }
-
-    // Create the decorations
-    for (int i = 0; i < numDecorations; ++i)
-    {
-        IRDecoration* decor = _createDecoration(data.m_insts[i + numInsts]);
-        if (!decor)
-        {
-            return SLANG_FAIL;
-        }
-        decorations[i] = decor;
-    }
-
-    // Associate the decorations with the instructions
-
-    {
-        const int decorationBaseIndex = m_serialData->m_decorationBaseIndex;
-
-        const int numRuns = int(m_serialData->m_decorationRuns.Count());
-        for (int i = 0; i < numRuns; ++i)
-        {
-            const Ser::InstRun& run = m_serialData->m_decorationRuns[i];
-
-            // Decorations must be associated with instructions
-            SLANG_ASSERT(int(run.m_parentIndex) < decorationBaseIndex);
-
-            IRInst* inst = insts[int(run.m_parentIndex)];
-            SLANG_ASSERT(int(run.m_startInstIndex) >= decorationBaseIndex && int(run.m_startInstIndex) + run.m_numChildren <= m_serialData->m_insts.Count());
-
-            // Calculate the offset in the decoration list, which index 0, is decorationBaseIndex in instruction indices
-            const int decorStartIndex = int(run.m_startInstIndex) - decorationBaseIndex;
-
-            // Go in reverse order so that linked list is in same order as original
-            for (int j = int(run.m_numChildren) - 1; j >= 0; --j)
-            {
-                IRDecoration* decor = decorations[decorStartIndex + j]; 
-                // And to the linked list on the 
-                decor->next = inst->firstDecoration;
-                inst->firstDecoration = decor;
+                child->insertAtEnd(inst);
             }
         }
     }

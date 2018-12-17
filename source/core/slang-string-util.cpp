@@ -39,32 +39,39 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
     }
 }
 
+/* static */size_t StringUtil::calcFormattedSize(const char* format, va_list args)
+{
+#if SLANG_WINDOWS_FAMILY
+    return _vscprintf(format, args);
+#else
+     return vsnprintf(nullptr, 0, format, args);
+#endif
+}
+
+/* static */void StringUtil::calcFormatted(const char* format, va_list args, size_t numChars, char* dst)
+{
+#if SLANG_WINDOWS_FAMILY
+    vsnprintf_s(dst, numChars + 1, _TRUNCATE, format, args);
+#else
+    vsnprintf(dst, numChars + 1, format, args);
+#endif
+}
 
 /* static */void StringUtil::append(const char* format, va_list args, StringBuilder& buf)
 {
-    int numChars = 0;
-
-#if SLANG_WINDOWS_FAMILY
-    numChars = _vscprintf(format, args);
-#else
+    // Calculate the size 
+    size_t numChars;
     {
+        // Create a copy of args, as will be consumed by calcFormattedSize
         va_list argsCopy;
         va_copy(argsCopy, args);
-        numChars = vsnprintf(nullptr, 0, format, argsCopy);
+        numChars = calcFormattedSize(format, argsCopy);
         va_end(argsCopy);
     }
-#endif
 
-    List<char> chars;
-    chars.SetSize(numChars + 1);
-
-#if SLANG_WINDOWS_FAMILY
-    vsnprintf_s(chars.Buffer(), numChars + 1, _TRUNCATE, format, args);
-#else
-    vsnprintf(chars.Buffer(), numChars + 1, format, args);
-#endif
-
-    buf.Append(chars.Buffer(), numChars);
+    char* dst = buf.prepareForAppend(numChars + 1);
+    calcFormatted(format, args, numChars, dst);
+    buf.appendInPlace(dst, numChars);
 }
 
 /* static */void StringUtil::appendFormat(StringBuilder& buf, const char* format, ...)

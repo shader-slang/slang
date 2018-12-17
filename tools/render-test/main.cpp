@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../../source/core/slang-app-context.h"
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
@@ -33,6 +35,141 @@ using Slang::Result;
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
+
+class Window: public RefObject
+{
+public:
+    SlangResult initialize(int width, int height);
+
+    void show();
+
+    void* getHandle() const { return m_hwnd; }
+
+    Window() {}
+    ~Window();
+
+    static LRESULT CALLBACK windowProc(HWND    windowHandle,
+        UINT    message,
+        WPARAM  wParam,
+        LPARAM  lParam);
+
+protected:
+
+    HINSTANCE m_hinst = nullptr;
+    HWND m_hwnd = nullptr;
+};
+
+//
+// We use a bare-minimum window procedure to get things up and running.
+//
+
+/* static */LRESULT CALLBACK Window::windowProc(
+    HWND    windowHandle,
+    UINT    message,
+    WPARAM  wParam,
+    LPARAM  lParam)
+{
+    switch (message)
+    {
+    case WM_CLOSE:
+        PostQuitMessage(0);
+        return 0;
+    }
+
+    return DefWindowProcW(windowHandle, message, wParam, lParam);
+}
+
+static ATOM _getWindowClassAtom(HINSTANCE hinst)
+{
+    static ATOM s_windowClassAtom;
+
+    if (s_windowClassAtom)
+    {
+        return s_windowClassAtom;
+    }
+    WNDCLASSEXW windowClassDesc;
+    windowClassDesc.cbSize = sizeof(windowClassDesc);
+    windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+    windowClassDesc.lpfnWndProc = &Window::windowProc;
+    windowClassDesc.cbClsExtra = 0;
+    windowClassDesc.cbWndExtra = 0;
+    windowClassDesc.hInstance = hinst;
+    windowClassDesc.hIcon = 0;
+    windowClassDesc.hCursor = 0;
+    windowClassDesc.hbrBackground = 0;
+    windowClassDesc.lpszMenuName = 0;
+    windowClassDesc.lpszClassName = L"SlangRenderTest";
+    windowClassDesc.hIconSm = 0;
+    s_windowClassAtom = RegisterClassExW(&windowClassDesc);
+        
+    return s_windowClassAtom;
+}
+
+SlangResult Window::initialize(int widthIn, int heightIn)
+{
+    // Do initial window-creation stuff here, rather than in the renderer-specific files
+
+    m_hinst = GetModuleHandleA(0);
+
+    // First we register a window class.
+    ATOM windowClassAtom = _getWindowClassAtom(m_hinst);
+    if (!windowClassAtom)
+    {
+        fprintf(stderr, "error: failed to register window class\n");
+        return SLANG_FAIL;
+    }
+
+    // Next, we create a window using that window class.
+
+    // We will create a borderless window since our screen-capture logic in GL
+    // seems to get thrown off by having to deal with a window frame.
+    DWORD windowStyle = WS_POPUP;
+    DWORD windowExtendedStyle = 0;
+
+    RECT windowRect = { 0, 0, widthIn, heightIn };
+    AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
+
+    {
+        auto width = windowRect.right - windowRect.left;
+        auto height = windowRect.bottom - windowRect.top;
+
+        LPWSTR windowName = L"Slang Render Test";
+        m_hwnd = CreateWindowExW(
+            windowExtendedStyle,
+            (LPWSTR)windowClassAtom,
+            windowName,
+            windowStyle,
+            0, 0, // x, y
+            width, height,
+            NULL, // parent
+            NULL, // menu
+            m_hinst,
+            NULL);
+    }
+    if (!m_hwnd)
+    {
+        fprintf(stderr, "error: failed to create window\n");
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+
+void Window::show()
+{
+    // Once initialization is all complete, we show the window...
+    int showCommand = SW_SHOW;
+    ShowWindow(m_hwnd, showCommand);
+}
+
+Window::~Window()
+{
+    if (m_hwnd)
+    {
+        DestroyWindow(m_hwnd);
+    }
+}
 
 //
 // For the purposes of a small example, we will define the vertex data for a
@@ -355,88 +492,20 @@ Result RenderTestApp::writeScreen(const char* filename)
     return PngSerializeUtil::write(filename, surface);
 }
 
-//
-// We use a bare-minimum window procedure to get things up and running.
-//
+} //  namespace renderer_test
 
-static LRESULT CALLBACK windowProc(
-    HWND    windowHandle,
-    UINT    message,
-    WPARAM  wParam,
-    LPARAM  lParam)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argcIn, const char*const* argvIn)
 {
-    switch (message)
-    {
-    case WM_CLOSE:
-        PostQuitMessage(0);
-        return 0;
-    }
+    using namespace renderer_test;
+    using namespace Slang;
 
-    return DefWindowProcW(windowHandle, message, wParam, lParam);
-}
+    AppContext::setSingleton(appContext);
 
-SlangResult innerMain(int argc, char** argv)
-{
 	// Parse command-line options
-	SLANG_RETURN_ON_FAIL(parseOptions(&argc, argv));
+	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, AppContext::getStdError()));
 
-	// Do initial window-creation stuff here, rather than in the renderer-specific files
-
-	HINSTANCE instance = GetModuleHandleA(0);
-	int showCommand = SW_SHOW;
-
-	// First we register a window class.
-
-	WNDCLASSEXW windowClassDesc;
-	windowClassDesc.cbSize = sizeof(windowClassDesc);
-	windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-	windowClassDesc.lpfnWndProc = &windowProc;
-	windowClassDesc.cbClsExtra = 0;
-	windowClassDesc.cbWndExtra = 0;
-	windowClassDesc.hInstance = instance;
-	windowClassDesc.hIcon = 0;
-	windowClassDesc.hCursor = 0;
-	windowClassDesc.hbrBackground = 0;
-	windowClassDesc.lpszMenuName = 0;
-	windowClassDesc.lpszClassName = L"HelloWorld";
-	windowClassDesc.hIconSm = 0;
-	ATOM windowClassAtom = RegisterClassExW(&windowClassDesc);
-	if (!windowClassAtom)
-	{
-		fprintf(stderr, "error: failed to register window class\n");
-		return SLANG_FAIL;
-	}
-
-	// Next, we create a window using that window class.
-
-	// We will create a borderless window since our screen-capture logic in GL
-	// seems to get thrown off by having to deal with a window frame.
-	DWORD windowStyle = WS_POPUP;
-	DWORD windowExtendedStyle = 0;
-
-	RECT windowRect = { 0, 0, gWindowWidth, gWindowHeight };
-	AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
-
-	auto width = windowRect.right - windowRect.left;
-	auto height = windowRect.bottom - windowRect.top;
-
-	LPWSTR windowName = L"Slang Render Test";
-	HWND windowHandle = CreateWindowExW(
-		windowExtendedStyle,
-		(LPWSTR)windowClassAtom,
-		windowName,
-		windowStyle,
-		0, 0, // x, y
-		width, height,
-		NULL, // parent
-		NULL, // menu
-		instance,
-		NULL);
-	if (!windowHandle)
-	{
-		fprintf(stderr, "error: failed to create window\n");
-		return SLANG_FAIL;
-	}
+    RefPtr<renderer_test::Window> window(new renderer_test::Window);
+    SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
 
 	Slang::RefPtr<Renderer> renderer;
 
@@ -489,16 +558,31 @@ SlangResult innerMain(int argc, char** argv)
 			return SLANG_FAIL;
 	}
 
+    if (!renderer)
+    {
+        fprintf(stderr, "Unable to create renderer\n");
+        return SLANG_FAIL;
+    }
+
     Renderer::Desc desc;
     desc.width = gWindowWidth;
     desc.height = gWindowHeight;
 
-	SLANG_RETURN_ON_FAIL(renderer->initialize(desc, windowHandle));
+    {
+        SlangResult res = renderer->initialize(desc, (HWND)window->getHandle());
+        if (SLANG_FAILED(res))
+        {
+            fprintf(stderr, "Unable to initialize renderer\n");
+            return res;
+        }
+    }
 
     ShaderCompiler shaderCompiler;
     shaderCompiler.renderer = renderer;
     shaderCompiler.target = slangTarget;
     shaderCompiler.profile = profileName;
+    shaderCompiler.slangSession = session;
+
 	switch (gOptions.inputLanguageID)
 	{
 		case Options::InputLanguageID::Slang:
@@ -520,8 +604,7 @@ SlangResult innerMain(int argc, char** argv)
 
 		SLANG_RETURN_ON_FAIL(app.initialize(renderer, &shaderCompiler));
 
-		// Once initialization is all complete, we show the window...
-		ShowWindow(windowHandle, showCommand);
+        window->show();
 
 		// ... and enter the event loop:
 		for (;;)
@@ -568,7 +651,7 @@ SlangResult innerMain(int argc, char** argv)
                     }
 					else
                     {
-						Result res = app.writeScreen(gOptions.outputPath);
+						SlangResult res = app.writeScreen(gOptions.outputPath);
 
                         if (SLANG_FAILED(res))
                         {
@@ -587,11 +670,12 @@ SlangResult innerMain(int argc, char** argv)
 	return SLANG_OK;
 }
 
-} //  namespace renderer_test
 
 int main(int argc, char**  argv)
 {
-	SlangResult res = renderer_test::innerMain(argc, argv);
+    SlangSession* session = spCreateSession(nullptr);
+    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    spDestroySession(session);
 
 	return SLANG_FAILED(res) ? 1 : 0;
 }

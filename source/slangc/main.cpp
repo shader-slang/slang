@@ -1,23 +1,24 @@
-﻿// main.cpp
+// main.cpp
 
 #include "../../slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 #include "../core/slang-io.h"
+#include "../core/slang-app-context.h"
+#include "../core/slang-writer.h"
 
 using namespace Slang;
 
 #include <assert.h>
 
-// Try to read an argument for a command-line option.
-
 static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    fputs(message, stderr);
-    fflush(stderr);
+    auto stdError = AppContext::getStdError();
+    stdError.put(message);
+    stdError.flush();
 }
 
 #ifdef _WIN32
@@ -26,14 +27,10 @@ static void diagnosticCallback(
 #define MAIN main
 #endif
 
-// Used to identify that compilation was the failure - with a unique 'internal' code
-#define SLANG_E_INTERNAL_COMPILE_FAILED SLANG_MAKE_ERROR(SLANG_FACILITY_INTERNAL, 0x7fab)
-
-static SlangResult innerMain(int argc, char** argv)
+SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
 {
-    // Parse any command-line options
+    AppContext::setSingleton(appContext);
 
-    SlangSession* session = spCreateSession(nullptr);
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
     spSetDiagnosticCallback(
@@ -42,6 +39,9 @@ static SlangResult innerMain(int argc, char** argv)
         nullptr);
 
     spSetCommandLineCompilerMode(compileRequest);
+
+    // Do any app specific configuration
+    appContext->configureRequest(compileRequest);
 
     char const* appName = "slangc";
     if (argc > 0) appName = argv[0];
@@ -55,47 +55,40 @@ static SlangResult innerMain(int argc, char** argv)
         }
     }
 
+    SlangResult res = SLANG_OK;
+
 #ifndef _DEBUG
     try
 #endif
     {
-        // Run the compiler (this will produce any diagnostics through
-        // our callback above).
-        if (SLANG_FAILED(spCompile(compileRequest)))
-        {
-            // If the compilation failed, then get out of here...
-            // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
-            return SLANG_E_INTERNAL_COMPILE_FAILED;
-        }
-
-        // Now that we are done, clean up after ourselves
-
-        spDestroyCompileRequest(compileRequest);
-        spDestroySession(session);
+        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        res = spCompile(compileRequest);
+        // If the compilation failed, then get out of here...
+        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
     }
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        printf("internal compiler error: %S\n", e.Message.ToWString().begin());
-        return SLANG_FAIL;
+        AppContext::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        res = SLANG_FAIL;
     }
 #endif
-    return SLANG_OK;    
+
+    // Now that we are done, clean up after ourselves
+    spDestroyCompileRequest(compileRequest);
+    return res;
 }
 
 int MAIN(int argc, char** argv)
 {
-    SlangResult res =  innerMain(argc, argv);
-
-    if (SLANG_SUCCEEDED(res))
+    SlangResult res;
     {
-        return 0;
+        SlangSession* session = spCreateSession(nullptr);
+        res = innerMain(AppContext::initDefault(), session, argc, argv);
+        spDestroySession(session);
     }
-    else if (res == SLANG_E_INTERNAL_COMPILE_FAILED)
-    {
-        return -1;
-    }
-    return 1;
+    return AppContext::getReturnCode(res);
 }
 
 #ifdef _WIN32
@@ -104,7 +97,7 @@ int wmain(int argc, wchar_t** argv)
     int result = 0;
 
     {
-        // Conver the wide-character Unicode arguments to UTF-8,
+        // Convert the wide-character Unicode arguments to UTF-8,
         // since that is what Slang expects on the API side.
 
         List<String> args;

@@ -1,16 +1,17 @@
 //TEST(compute):COMPARE_COMPUTE:
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 
-RWStructuredBuffer<float> outputBuffer;
+
+RWStructuredBuffer<int> outputBuffer;
 
 interface IAdd
 {
-    float addf(float u, float v);
+    int addf(int u, int v);
 }
 
 interface ISub
 {
-    float subf(float u, float v);
+    int subf(int u, int v);
 }
 
 interface IAddAndSub : IAdd, ISub
@@ -19,19 +20,19 @@ interface IAddAndSub : IAdd, ISub
 
 struct Simple : IAddAndSub
 {
-    float addf(float u, float v)
+    int addf(int u, int v)
     {
         return u+v;
     }
-    float subf(float u, float v)
+    int subf(int u, int v)
     {
         return u-v;
     }
 };
 
-float testAdd<T:IAdd>(T t)
+int testAdd<T:IAdd>(T t)
 {
-    return t.addf(1.0, 1.0);
+    return t.addf(1, 1);
 }
 
 interface IAssoc
@@ -44,23 +45,28 @@ struct AssocImpl : IAssoc
     typedef Simple AT;
 };
 
-float testAdd2<T:IAssoc>(T assoc)
+int testAdd2<T:IAssoc>(T assoc)
 {
     T.AT obj;
-    return obj.addf(1.0, 1.0);
+    return obj.addf(1, 1);
 }
 
-float testSub<T:ISub>(T t, float base)
+int testSub<T:ISub>(T t, int base)
 {
-    return t.subf(base, 1.0);
+    return t.subf(base, 1);
 }
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     AssocImpl s;
-	float outVal = testAdd2(s);
+
+    // expected value: 1 + 1 = 2
+	int outVal = testAdd2(s);
     Simple s1;
+
+    // expected value: 2 + (2-1) = 3
     outVal += testSub(s1, outVal);
+
 	outputBuffer[dispatchThreadID.x] = outVal;
 }

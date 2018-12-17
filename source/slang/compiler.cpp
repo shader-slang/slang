@@ -5,7 +5,6 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 
-#include "bytecode.h"
 #include "compiler.h"
 #include "lexer.h"
 #include "lower-to-ir.h"
@@ -180,6 +179,65 @@ namespace Slang
         return Stage::Unknown;
     }
 
+
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
+    {
+        switch (target)
+        {
+            case CodeGenTarget::None:
+            {
+                return SLANG_OK;
+            }
+            case CodeGenTarget::GLSL:
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                // Can always output GLSL
+                return SLANG_OK;
+            }
+            case CodeGenTarget::HLSL:
+            {
+                // Can always output HLSL
+                return SLANG_OK;
+            }
+            case CodeGenTarget::SPIRVAssembly:
+            case CodeGenTarget::SPIRV:
+            {
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#else
+                return SLANG_E_NOT_IMPLEMENTED;
+#endif
+            }            
+            case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::DXBytecodeAssembly:
+            {
+#if SLANG_ENABLE_DXBC_SUPPORT
+                // Must have fxc
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND; 
+#else
+                return SLANG_E_NOT_IMPLEMENTED;
+#endif
+            }
+
+            case CodeGenTarget::DXIL:
+            case CodeGenTarget::DXILAssembly:
+            {
+#if SLANG_ENABLE_DXIL_SUPPORT
+                // Must have dxc
+                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
+                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#else
+                return SLANG_E_NOT_IMPLEMENTED;
+#endif
+            }
+            
+            default: break;
+        }
+
+        SLANG_ASSERT(!"Unhandled target");
+        return SLANG_FAIL;
+    }
 
     //
 
@@ -419,6 +477,19 @@ namespace Slang
             break;
         }
 
+        // Some of the `D3DCOMPILE_*` constants aren't available in all
+        // versions of `d3dcompiler.h`, so we define them here just in case
+        #ifndef D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES
+        #define D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES (1 << 20)
+        #endif
+
+        #ifndef D3DCOMPILE_ALL_RESOURCES_BOUND
+        #define D3DCOMPILE_ALL_RESOURCES_BOUND (1 << 21)
+        #endif
+
+        flags |= D3DCOMPILE_ENABLE_STRICTNESS;
+        flags |= D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
+
         ID3DBlob* codeBlob;
         ID3DBlob* diagnosticsBlob;
         HRESULT hr = compileFunc(
@@ -491,12 +562,11 @@ namespace Slang
         ComPtr<ID3DBlob> codeBlob;
         SlangResult res = disassembleFunc(data, size, 0, nullptr, codeBlob.writeRef());
 
-        String result;
         if (codeBlob)
         {
             char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
             char const* codeEnd = codeBegin + codeBlob->GetBufferSize() - 1;
-            result.append(codeBegin, codeEnd);
+            stringOut = String(codeBegin, codeEnd);
         }
         if (FAILED(res))
         {
@@ -576,11 +646,14 @@ SlangResult dissassembleDXILUsingDXC(
         return 0;
     }
 
-    String dissassembleSPIRV(
+    SlangResult dissassembleSPIRV(
         CompileRequest*     slangRequest,
         void const*         data,
-        size_t              size)
+        size_t              size, 
+        String&             stringOut)
     {
+        stringOut = String();
+
         String output;
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
@@ -597,13 +670,13 @@ SlangResult dissassembleDXILUsingDXC(
         request.outputUserData = &output;
 
         int err = invokeGLSLCompiler(slangRequest, request);
-
         if (err)
         {
-            String();
+            return SLANG_FAIL;
         }
 
-        return output;
+        stringOut = output;
+        return SLANG_OK;
     }
 
     List<uint8_t> emitSPIRVForEntryPoint(
@@ -648,7 +721,8 @@ SlangResult dissassembleDXILUsingDXC(
         if (spirv.Count() == 0)
             return String();
 
-        String result = dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count());
+        String result;
+        dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count(), result);
         return result;
     }
 #endif
@@ -790,6 +864,23 @@ SlangResult dissassembleDXILUsingDXC(
 
     static void writeOutputFile(
         CompileRequest* compileRequest,
+        ISlangWriter*   writer, 
+        String const&   path,
+        void const*     data,
+        size_t          size)
+    {
+
+        if (SLANG_FAILED(writer->write((const char*)data, size)))
+        {
+            compileRequest->mSink.diagnose(
+                SourceLoc(),
+                Diagnostics::cannotWriteOutputFile,
+                path);
+        }
+    }
+
+    static void writeOutputFile(
+        CompileRequest* compileRequest,
         String const&   path,
         void const*     data,
         size_t          size,
@@ -850,14 +941,10 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     static void writeOutputToConsole(
-        CompileRequest*,
+        ISlangWriter* writer,
         String const&   text)
     {
-        fwrite(
-            text.begin(),
-            text.end() - text.begin(),
-            1,
-            stdout);
+        writer->write(text.Buffer(), text.Length());
     }
 
     static void writeEntryPointResultToStandardOutput(
@@ -867,17 +954,19 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto compileRequest = entryPoint->compileRequest;
 
+        ISlangWriter* writer = compileRequest->getWriter(WriterChannel::StdOutput);
+
         switch (result.format)
         {
         case ResultFormat::Text:
-            writeOutputToConsole(compileRequest, result.outputString);
+            writeOutputToConsole(writer, result.outputString);
             break;
 
         case ResultFormat::Binary:
             {
                 auto& data = result.outputBinary;
-                int stdoutFileDesc = _fileno(stdout);
-                if (_isatty(stdoutFileDesc))
+                
+                if (writer->isConsole())
                 {
                     // Writing to console, so we need to generate text output.
 
@@ -890,7 +979,7 @@ SlangResult dissassembleDXILUsingDXC(
                             dissassembleDXBC(compileRequest,
                                 data.begin(),
                                 data.end() - data.begin(), assembly);
-                            writeOutputToConsole(compileRequest, assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
                 #endif
@@ -903,17 +992,18 @@ SlangResult dissassembleDXILUsingDXC(
                                 data.begin(),
                                 data.end() - data.begin(), 
                                 assembly);
-                            writeOutputToConsole(compileRequest, assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
                 #endif
 
                     case CodeGenTarget::SPIRV:
                         {
-                            String assembly = dissassembleSPIRV(compileRequest,
+                            String assembly;
+                            dissassembleSPIRV(compileRequest,
                                 data.begin(),
-                                data.end() - data.begin());
-                            writeOutputToConsole(compileRequest, assembly);
+                                data.end() - data.begin(), assembly);
+                            writeOutputToConsole(writer, assembly);
                         }
                         break;
 
@@ -925,12 +1015,11 @@ SlangResult dissassembleDXILUsingDXC(
                 else
                 {
                     // Redirecting stdout to a file, so do the usual thing
-                #ifdef _WIN32
-                    _setmode(stdoutFileDesc, _O_BINARY);
-                #endif
+                    writer->setMode(SLANG_WRITER_MODE_BINARY);
+
                     writeOutputFile(
                         compileRequest,
-                        stdout,
+                        writer,
                         "stdout",
                         data.begin(),
                         data.end() - data.begin());
@@ -1001,18 +1090,6 @@ SlangResult dissassembleDXILUsingDXC(
         for (auto targetReq : compileRequest->targets)
         {
             generateOutputForTarget(targetReq);
-        }
-
-        // If we are being asked to generate code in a container
-        // format, then we are now in a position to do so.
-        switch (compileRequest->containerFormat)
-        {
-        default:
-            break;
-
-        case ContainerFormat::SlangModule:
-            generateBytecodeForCompileRequest(compileRequest);
-            break;
         }
 
         // If we are in command-line mode, we might be expected to actually
@@ -1135,7 +1212,8 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::SPIRV:
             dumpIntermediateBinary(compileRequest, data, size, ".spv");
             {
-                String spirvAssembly = dissassembleSPIRV(compileRequest, data, size);
+                String spirvAssembly;
+                dissassembleSPIRV(compileRequest, data, size, spirvAssembly);
                 dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.Length(), ".spv.asm");
             }
             break;

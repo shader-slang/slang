@@ -1,0 +1,135 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "aa",
+            "binding": {"kind": "samplerState", "space": 2, "index": 0, "count": "unbounded"},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "samplerState"
+                }
+            }
+        },
+        {
+            "name": "bb",
+            "binding": {"kind": "shaderResource", "index": 2, "count": "unbounded"},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "resource",
+                    "baseShape": "texture2D"
+                }
+            }
+        },
+        {
+            "name": "b0",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "b1",
+            "binding": {"kind": "shaderResource", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "cc",
+            "binding": {"kind": "shaderResource", "space": 1, "index": 1, "count": "unbounded"},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "resource",
+                    "baseShape": "textureCube"
+                }
+            }
+        },
+        {
+            "name": "c0",
+            "binding": {"kind": "shaderResource", "space": 1, "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "ee",
+            "binding": {"kind": "registerSpace", "index": 3, "count": 2},
+            "type": {
+                "kind": "array",
+                "elementCount": 0,
+                "elementType": {
+                    "kind": "struct",
+                    "name": "X",
+                    "fields": [
+                        {
+                            "name": "t",
+                            "type": {
+                                "kind": "resource",
+                                "baseShape": "texture3D"
+                            },
+                            "binding": {"kind": "shaderResource", "index": 0}
+                        },
+                        {
+                            "name": "s",
+                            "type": {
+                                "kind": "samplerState"
+                            },
+                            "binding": {"kind": "samplerState", "space": 1, "index": 0}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "data",
+            "binding": {"kind": "unorderedAccess", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "tid",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [4, 1, 1]
+        }
+    ]
+}
+}

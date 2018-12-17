@@ -12,9 +12,6 @@
     <ClInclude Include="..\..\slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bytecode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -168,14 +165,11 @@
     <ClInclude Include="visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vm.h">
+    <ClInclude Include="check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="bytecode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -285,9 +279,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="type-system-shared.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

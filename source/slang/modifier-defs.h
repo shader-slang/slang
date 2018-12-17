@@ -23,6 +23,7 @@ SIMPLE_MODIFIER(Prefix);
 SIMPLE_MODIFIER(Postfix);
 SIMPLE_MODIFIER(Exported);
 SIMPLE_MODIFIER(ConstExpr);
+SIMPLE_MODIFIER(GloballyCoherent)
 
 #undef SIMPLE_MODIFIER
 
@@ -134,6 +135,8 @@ SIMPLE_SYNTAX_CLASS(GLSLLocalSizeLayoutModifier,    GLSLUnparsedLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeXLayoutModifier,    GLSLLocalSizeLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeYLayoutModifier,    GLSLLocalSizeLayoutModifier)
 SIMPLE_SYNTAX_CLASS(GLSLLocalSizeZLayoutModifier,    GLSLLocalSizeLayoutModifier)
+
+SIMPLE_SYNTAX_CLASS(ShaderRecordNVLayoutModifier, GLSLParsedLayoutModifier)
 
 // A catch-all for single-keyword modifiers
 SIMPLE_SYNTAX_CLASS(SimpleModifier, Modifier)
@@ -327,6 +330,7 @@ SIMPLE_SYNTAX_CLASS(FlattenAttribute, Attribute)            // `[flatten]`
 SIMPLE_SYNTAX_CLASS(ForceCaseAttribute, Attribute)          // `[forcecase]`
 SIMPLE_SYNTAX_CLASS(CallAttribute, Attribute)               // `[call]`
 
+
 // [[vk_push_constant]] [[push_constant]]
 SIMPLE_SYNTAX_CLASS(PushConstantAttribute, Attribute)
 
@@ -348,7 +352,7 @@ SYNTAX_CLASS(PatchConstantFuncAttribute, Attribute)
 END_SYNTAX_CLASS()
 SIMPLE_SYNTAX_CLASS(DomainAttribute, Attribute)
 
-SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)
+SIMPLE_SYNTAX_CLASS(EarlyDepthStencilAttribute, Attribute)  // `[earlydepthstencil]`
 
 // An HLSL `[numthreads(x,y,z)]` attribute
 SYNTAX_CLASS(NumThreadsAttribute, Attribute)
@@ -393,6 +397,12 @@ END_SYNTAX_CLASS()
 // ray tracing shader to pass per-ray payload information.
 SIMPLE_SYNTAX_CLASS(VulkanRayPayloadAttribute, Attribute)
 
+// A `[__vulkanCallablePayload]` attribute, which is used in the
+// standard library implementation to indicate that a variable
+// actually represents the input/output interface for a Vulkan
+// ray tracing shader to pass payload information to/from a callee.
+SIMPLE_SYNTAX_CLASS(VulkanCallablePayloadAttribute, Attribute)
+
 // A `[__vulkanHitAttributes]` attribute, which is used in the
 // standard library implementation to indicate that a variable
 // actually represents the output interface for a Vulkan
@@ -404,6 +414,14 @@ SIMPLE_SYNTAX_CLASS(VulkanHitAttributesAttribute, Attribute)
 // argument.
 //
 SIMPLE_SYNTAX_CLASS(MutatingAttribute, Attribute)
+
+// A `[__readNone]` attribute, which indicates that a function
+// computes its results strictly based on argument values, without
+// reading or writing through any pointer arguments, or any other
+// state that could be observed by a caller.
+//
+SIMPLE_SYNTAX_CLASS(ReadNoneAttribute, Attribute)
+
 
 // HLSL modifiers for geometry shader input topology
 SIMPLE_SYNTAX_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier, Modifier)

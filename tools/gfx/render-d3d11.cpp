@@ -96,6 +96,8 @@ public:
     virtual void waitForGpu() override {}
     virtual RendererType getRendererType() const override { return RendererType::DirectX11; }
 
+    ~D3D11Renderer() {}
+
     protected:
 
 #if 0
@@ -458,35 +460,44 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     // `D3D11CreateDeviceAndSwapChain` up to twice: the first time with 11_1
     // at the start of the list of requested feature levels, and the second
     // time without it.
+    // 
+    // We first try create using hardware and then software (reference) driver
+    // Test until we get a successful result
 
-    for (int ii = 0; ii < 2; ++ii)
     {
-        const HRESULT hr = D3D11CreateDeviceAndSwapChain_(
-            nullptr,                    // adapter (use default)
-            D3D_DRIVER_TYPE_REFERENCE,
-//            D3D_DRIVER_TYPE_HARDWARE,
-            nullptr,                    // software
-            deviceFlags,
-            &featureLevels[ii],
-            totalNumFeatureLevels - ii,
-            D3D11_SDK_VERSION,
-            &swapChainDesc,
-            m_swapChain.writeRef(),
-            m_device.writeRef(),
-            &featureLevel,
-            m_immediateContext.writeRef());
-
-        // Failures with `E_INVALIDARG` might be due to feature level 11_1
-        // not being supported.
-        if (hr == E_INVALIDARG)
+        Result res = SLANG_FAIL;
+        for (int ii = 0; ii < 4; ++ii)
         {
-            continue;
-        }
+            const D3D_DRIVER_TYPE driverType = (ii & 2) ? D3D_DRIVER_TYPE_REFERENCE : D3D_DRIVER_TYPE_HARDWARE;
+            const int startFeatureIndex = (ii & 1);
 
-        // Other failures are real, though.
-        SLANG_RETURN_ON_FAIL(hr);
-        // We must have a swap chain
-        break;
+            res = D3D11CreateDeviceAndSwapChain_(
+                nullptr,                    // adapter (use default)
+                driverType,
+                nullptr,                    // software
+                deviceFlags,
+                &featureLevels[startFeatureIndex],
+                totalNumFeatureLevels - startFeatureIndex,
+                D3D11_SDK_VERSION,
+                &swapChainDesc,
+                m_swapChain.writeRef(),
+                m_device.writeRef(),
+                &featureLevel,
+                m_immediateContext.writeRef());
+
+            // Check if successfully constructed - if so we are done. 
+            if (SLANG_SUCCEEDED(res))
+            {
+                break;
+            }
+        }
+        // If res is failure, means all styles have have failed, and so initialization fails.
+        if (SLANG_FAILED(res))
+        {
+            return res;
+        }
+        // Check we have a swap chain, context and device
+        SLANG_ASSERT(m_immediateContext && m_swapChain && m_device);
     }
 
     // TODO: Add support for debugging to help detect leaks:

@@ -162,15 +162,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="options.h" />
     <ClInclude Include="os.h" />
     <ClInclude Include="render-api-util.h" />
+    <ClInclude Include="slangc-tool.h" />
     <ClInclude Include="test-context.h" />
+    <ClInclude Include="test-reporter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="options.cpp" />
     <ClCompile Include="os.cpp" />
     <ClCompile Include="render-api-util.cpp" />
+    <ClCompile Include="slangc-tool.cpp" />
     <ClCompile Include="test-context.cpp" />
+    <ClCompile Include="test-reporter.cpp" />
     <ClCompile Include="unit-test-byte-encode.cpp" />
     <ClCompile Include="unit-test-free-list.cpp" />
     <ClCompile Include="unit-test-memory-arena.cpp" />
@@ -179,6 +185,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\source\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\source\slang\slang.vcxproj">
+      <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -143,8 +143,7 @@ namespace Slang
 //            List<Diagnostic> diagnostics;
         int errorCount = 0;
 
-        SlangDiagnosticCallback callback            = nullptr;
-        void*                   callbackUserData    = nullptr;
+        ISlangWriter* writer                        = nullptr;
 
 /*
         void Error(int id, const String & msg, const SourceLoc & pos)

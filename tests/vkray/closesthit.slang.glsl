@@ -1,45 +1,68 @@
 // closesthit.slang.glsl
 #version 460
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
-layout(std430) buffer _S1
+#define tmp_shaderrecord    _S1
+#define tmp_colors          _S2
+#define tmp_hitattrs        _S3
+#define tmp_payload         _S4
+#define tmp_customidx       _S5
+#define tmp_instanceid      _S6
+#define tmp_add_0           _S7
+#define tmp_primid          _S8
+#define tmp_add_1           _S9
+#define tmp_hitkind         _S10
+#define tmp_hitt            _S11
+#define tmp_tmin            _S12
+
+struct SLANG_ParameterGroup_ShaderRecord_0
 {
-    vec4 colors_0[];
+    uint shaderRecordID_0;    
 };
 
+layout(shaderRecordNV)
+buffer tmp_shaderrecord
+{
+    SLANG_ParameterGroup_ShaderRecord_0 _data;
+} ShaderRecord_0;
+
+layout(std430, binding = 0) buffer tmp_colors
+{
+    vec4 _data[];
+} colors_0;
+ 
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
-hitAttributeNVX BuiltInTriangleIntersectionAttributes_0 _S2;
+
+hitAttributeNV BuiltInTriangleIntersectionAttributes_0 tmp_hitattrs;
 
 struct ReflectionRay_0
 {
     vec4 color_0;
 };
 
-rayPayloadInNVX ReflectionRay_0 _S3;
+rayPayloadInNV ReflectionRay_0 tmp_payload;
 
 void main()
 {
-    BuiltInTriangleIntersectionAttributes_0 _S4 = _S2;
+    uint tmp_customidx = gl_InstanceCustomIndexNV;
+    uint tmp_instanceid = gl_InstanceID;
 
-    uint _S5 = gl_InstanceCustomIndexNVX;
-    uint _S6 = gl_InstanceID;
+    uint tmp_add_0 = tmp_customidx + tmp_instanceid;
+    uint tmp_primid = gl_PrimitiveID;
 
-    uint _S7 = _S5 + _S6;
-    uint _S8 = gl_PrimitiveID;
+    uint tmp_add_1 = tmp_add_0 + tmp_primid;
+    uint tmp_hitkind = gl_HitKindNV;
 
-    uint _S9 = _S7 + _S8;
-    uint _S10 = gl_HitKindNVX;
+    vec4 color_1 = colors_0._data[tmp_add_1 + tmp_hitkind + ShaderRecord_0._data.shaderRecordID_0];
 
-    vec4 color_1 = colors_0[_S9 + _S10];
+    float tmp_hitt = gl_HitTNV;
+    float tmp_tmin = gl_RayTminNV;
 
-    float _S11 = gl_HitTNVX;
-    float _S12 = gl_RayTminNVX;
-
-    _S3.color_0 = color_1 * (_S11 - _S12);
+    tmp_payload.color_0 = color_1 * (tmp_hitt - tmp_tmin);
 
     return;
 }

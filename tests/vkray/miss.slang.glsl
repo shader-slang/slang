@@ -1,14 +1,14 @@
 //TEST_IGNORE_FILE:
 #version 460                  
 
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
 struct ShadowRay_0
 {
 	float hitDistance_0;
 };
 
-rayPayloadInNVX ShadowRay_0 _S1;
+rayPayloadInNV ShadowRay_0 _S1;
 
 void main()
 {

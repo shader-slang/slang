@@ -200,6 +200,7 @@
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\iomapper.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\localintermediate.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\parseVersions.h" />
+    <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\pch.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpContext.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpTokens.h" />
     <ClInclude Include="..\..\external\glslang\glslang\MachineIndependent\propagateNoContraction.h" />
@@ -242,6 +243,7 @@
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\limits.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\linkValidate.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\parseConst.cpp" />
+    <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\pch.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\Pp.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpAtom.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\preprocessor\PpContext.cpp" />

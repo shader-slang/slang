@@ -2,12 +2,20 @@
 
 // Confirm that resources inside constant buffers get correct locations,
 // including the case where there are *multiple* constant buffers
-// with reosurces.
+// with resources.
 
 #ifdef __SLANG__
 #define R(X) /**/
+#define BEGIN_CBUFFER(NAME) cbuffer NAME {
+#define MID_CBUFFER(NAME) /**/
+#define END_CBUFFER(NAME, REG) /**/ }
+#define CBUFFER_REF(NAME, FIELD) FIELD
 #else
 #define R(X) X
+#define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME {
+#define MID_CBUFFER(NAME) };
+#define END_CBUFFER(NAME, REG) cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define CA CA_0
 #define caa caa_0
@@ -46,43 +54,52 @@ float4 use(float3 val) { return float4(val,0.0); };
 float4 use(float4 val) { return val; };
 float4 use(Texture2D t, SamplerState s) { return t.Sample(s, 0.0); }
 
-cbuffer CA R(: register(b0))
-{
-	float4 caa R(: packoffset(c0));
-	float3 cab R(: packoffset(c1.x));
-	float  cac R(: packoffset(c1.w));
-	float2 cad R(: packoffset(c2.x));
-	float2 cae R(: packoffset(c2.z));
+BEGIN_CBUFFER(CA)
+
+	float4 caa;
+	float3 cab;
+	float  cac;
+	float2 cad;
+	float2 cae;
+
+MID_CBUFFER(CA)
 
 	Texture2D ta R(: register(t0));
 	SamplerState sa R(: register(s0));
-}
 
-cbuffer CB R(: register(b1))
-{
-	float4 cba R(: packoffset(c0));
-	float3 cbb R(: packoffset(c1.x));
-	float  cbc R(: packoffset(c1.w));
-	float2 cbd R(: packoffset(c2.x));
-	float2 cbe R(: packoffset(c2.z));
+END_CBUFFER(CA, register(b0))
+
+BEGIN_CBUFFER(CB)
+
+	float4 cba;
+	float3 cbb;
+	float  cbc;
+	float2 cbd;
+	float2 cbe;
+
+MID_CBUFFER(CB)
 
 	Texture2D tbx R(: register(t1));
 	Texture2D tby R(: register(t2));
 	SamplerState sb R(: register(s1));
-}
 
-cbuffer CC R(: register(b2))
-{
-	float4 cca R(: packoffset(c0));
-	float3 ccb R(: packoffset(c1.x));
-	float  ccc R(: packoffset(c1.w));
-	float2 ccd R(: packoffset(c2.x));
-	float2 cce R(: packoffset(c2.z));
+END_CBUFFER(CB, register(b1))
+
+BEGIN_CBUFFER(CC)
+
+	float4 cca;
+	float3 ccb;
+	float  ccc;
+	float2 ccd;
+	float2 cce;
+
+MID_CBUFFER(CC)
 
 	Texture2D tc R(: register(t3));
 	SamplerState scx R(: register(s2));
 	SamplerState scy R(: register(s3));
-}
+
+END_CBUFFER(CC, register(b2))
 
 float4 main() : SV_TARGET
 {
@@ -91,8 +108,8 @@ float4 main() : SV_TARGET
 		+  use(tbx, sb)
 		+  use(tby, scx)
 		+  use(tc,  scy)
-		+  use(cae)
-		+  use(cbe)
-		+  use(cce)
+		+  use(CBUFFER_REF(CA, cae))
+		+  use(CBUFFER_REF(CB, cbe))
+		+  use(CBUFFER_REF(CC, cce))
 		;
 }

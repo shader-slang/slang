@@ -41,6 +41,15 @@ struct StringUtil
         /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
     static void split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);
 
+        /// Returns the size in bytes needed to hold the formatted string using the specified args, NOT including a terminating 0
+        /// NOTE! The caller *should* assume this will consume the va_list (use va_copy to make a copy to be consumed)
+    static size_t calcFormattedSize(const char* format, va_list args);
+
+        /// Calculate the formatted string using the specified args.
+        /// NOTE! The caller *should* assume this will consume the va_list
+        /// The buffer should be at least calcFormattedSize + 1 bytes. The +1 is needed because a terminating 0 is written. 
+    static void calcFormatted(const char* format, va_list args, size_t numChars, char* dst);
+
         /// Appends formatted string with args into buf
     static void append(const char* format, va_list args, StringBuilder& buf);
 

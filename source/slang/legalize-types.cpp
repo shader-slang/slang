@@ -351,11 +351,10 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-            ordinaryStructType->mangledName = originalStructType->mangledName;
 
             if(auto nameHintDecoration = originalStructType->findDecoration<IRNameHintDecoration>())
             {
-                builder->addDecoration<IRNameHintDecoration>(ordinaryStructType)->name = nameHintDecoration->name;
+                builder->addNameHintDecoration(ordinaryStructType, nameHintDecoration->getNameOperand());
             }
 
             // The new struct type will appear right after the original in the IR,

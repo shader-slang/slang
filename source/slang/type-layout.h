@@ -36,12 +36,152 @@ enum class LayoutRulesFamily
 };
 #endif
 
+// A "size" that can either be a simple finite size or
+// the special case of an infinite/unbounded size.
+//
+struct LayoutSize
+{
+    typedef size_t RawValue;
+
+    LayoutSize()
+        : raw(0)
+    {}
+
+    LayoutSize(RawValue size)
+        : raw(size)
+    {
+        SLANG_ASSERT(size != RawValue(-1));
+    }
+
+    static LayoutSize infinite()
+    {
+        LayoutSize result;
+        result.raw = RawValue(-1);
+        return result;
+    }
+
+    bool isInfinite() const { return raw == RawValue(-1); }
+
+    bool isFinite() const { return raw != RawValue(-1); }
+    RawValue getFiniteValue() const { SLANG_ASSERT(isFinite()); return raw; }
+
+    bool operator==(LayoutSize that) const
+    {
+        return raw == that.raw;
+    }
+
+    bool operator!=(LayoutSize that) const
+    {
+        return raw != that.raw;
+    }
+
+    void operator+=(LayoutSize right)
+    {
+        if( isInfinite() ) {}
+        else if( right.isInfinite() )
+        {
+            *this = LayoutSize::infinite();
+        }
+        else
+        {
+            *this = LayoutSize(raw + right.raw);
+        }
+    }
+
+    void operator*=(LayoutSize right)
+    {
+        // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
+        if( raw == 0 )
+        {
+            return;
+        }
+
+        if( right.raw == 0 )
+        {
+            raw = 0;
+            return;
+        }
+
+        // Next we deal with infinite cases, so that infinite times anything non-zero is infinite
+        if( isInfinite() )
+        {
+            return;
+        }
+
+        if( right.isInfinite() )
+        {
+            *this = LayoutSize::infinite();
+            return;
+        }
+
+        // Finally deal with the case where both sides are finite
+        *this = LayoutSize(raw * right.raw);
+    }
+
+    void operator-=(RawValue right)
+    {
+        if( isInfinite() ) {}
+        else
+        {
+            *this = LayoutSize(raw - right);
+        }
+    }
+
+    void operator/=(RawValue right)
+    {
+        if( isInfinite() ) {}
+        else
+        {
+            *this = LayoutSize(raw / right);
+        }
+    }
+    RawValue raw;
+};
+
+inline LayoutSize operator+(LayoutSize left, LayoutSize right)
+{
+    LayoutSize result(left);
+    result += right;
+    return result;
+}
+
+inline LayoutSize operator*(LayoutSize left, LayoutSize right)
+{
+    LayoutSize result(left);
+    result *= right;
+    return result;
+}
+
+inline LayoutSize operator-(LayoutSize left, LayoutSize::RawValue right)
+{
+    LayoutSize result(left);
+    result -= right;
+    return result;
+}
+
+inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
+{
+    LayoutSize result(left);
+    result /= right;
+    return result;
+}
+
+inline LayoutSize maximum(LayoutSize left, LayoutSize right)
+{
+    if(left.isInfinite() || right.isInfinite())
+        return LayoutSize::infinite();
+
+    return LayoutSize(Math::Max(
+            left.getFiniteValue(),
+            right.getFiniteValue()));
+}
+
 // Layout appropriate to "just memory" scenarios,
 // such as laying out the members of a constant buffer.
 struct UniformLayoutInfo
 {
-    size_t size;
-    size_t alignment;
+    LayoutSize  size;
+    size_t      alignment;
 
     UniformLayoutInfo()
         : size(0)
@@ -49,8 +189,8 @@ struct UniformLayoutInfo
     {}
 
     UniformLayoutInfo(
-        size_t size,
-        size_t alignment)
+        LayoutSize  size,
+        size_t      alignment)
         : size(size)
         , alignment(alignment)
     {}
@@ -68,9 +208,9 @@ struct UniformArrayLayoutInfo : UniformLayoutInfo
     {}
 
     UniformArrayLayoutInfo(
-        size_t size,
-        size_t alignment,
-        size_t elementStride)
+        LayoutSize  size,
+        size_t      alignment,
+        size_t      elementStride)
         : UniformLayoutInfo(size, alignment)
         , elementStride(elementStride)
     {}
@@ -86,7 +226,7 @@ struct SimpleLayoutInfo
     LayoutResourceKind kind;
 
     // How many resources of that kind?
-    size_t size;
+    LayoutSize size;
 
     // only useful in the uniform case
     size_t alignment;
@@ -104,7 +244,7 @@ struct SimpleLayoutInfo
         , alignment(uniformInfo.alignment)
     {}
 
-    SimpleLayoutInfo(LayoutResourceKind kind, size_t size, size_t alignment=1)
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, size_t alignment=1)
         : kind(kind)
         , size(size)
         , alignment(alignment)
@@ -168,7 +308,7 @@ public:
         LayoutResourceKind  kind = LayoutResourceKind::None;
 
         // How many registers of the above kind did we use?
-        UInt                 count;
+        LayoutSize          count;
     };
 
     List<ResourceInfo>      resourceInfos;
@@ -207,13 +347,20 @@ public:
         findOrAddResourceInfo(info.kind)->count += info.count;
     }
 
-    void addResourceUsage(LayoutResourceKind kind, UInt count)
+    void addResourceUsage(LayoutResourceKind kind, LayoutSize count)
     {
         ResourceInfo info;
         info.kind = kind;
         info.count = count;
         addResourceUsage(info);
     }
+
+        /// "Unwrap" any layers of array-ness from this type layout.
+        ///
+        /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the elemnt type layout.
+        /// Otherwise, returns this type layout.
+        ///
+    RefPtr<TypeLayout> unwrapArray();
 };
 
 typedef unsigned int VarLayoutFlags;
@@ -507,7 +654,7 @@ struct SimpleLayoutRulesImpl
     virtual SimpleLayoutInfo GetScalarLayout(BaseType baseType) = 0;
 
     // Get size and alignment for an array of elements
-    virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
+    virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) = 0;
 
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
@@ -517,7 +664,7 @@ struct SimpleLayoutRulesImpl
     virtual UniformLayoutInfo BeginStructLayout() = 0;
 
     // Add a field to a `struct` type, and return the offset for the field
-    virtual size_t AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) = 0;
+    virtual LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) = 0;
 
     // End layout for a struct, and finalize its size/alignment.
     virtual void EndStructLayout(UniformLayoutInfo* ioStructInfo) = 0;
@@ -542,7 +689,7 @@ struct LayoutRulesImpl
         return simpleRules->GetScalarLayout(baseType);
     }
 
-    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, size_t elementCount)
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
     }
@@ -562,7 +709,7 @@ struct LayoutRulesImpl
         return simpleRules->BeginStructLayout();
     }
 
-    size_t AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
+    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
     {
         return simpleRules->AddStructField(ioStructInfo, fieldInfo);
     }
@@ -596,7 +743,10 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getParameterBlockRules()       = 0;
 
     virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
+    virtual LayoutRulesImpl* getCallablePayloadParameterRules()  = 0;
     virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
+
+    virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
 };
 
 struct TypeLayoutContext

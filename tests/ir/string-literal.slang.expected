@@ -1,20 +1,14 @@
 result code = 0
 standard error = {
-let  %1	: _	= UInt()
-let  %2	: _	= Void()
-let  %3	: _	= Func(%2, %1)
-let  %4	: _	= BasicBlock()
-Ptr(%1)
-let  %5	: _	= String()
-let  %6	: %5	= string_constant("Hello \t\n\0x083 World")
-
-func @_S04mainp1puV	: %3
+[export("_S04mainp1puV")]
+[nameHint("main")]
+func %main	: Func(Void, UInt)
 {
-block %7(
-		param %8	: %1):
-	return_void()
+block %1(
+		[nameHint("tid")]
+		param %tid	: UInt):
+	return_void
 }
-
 }
 standard output = {
 }

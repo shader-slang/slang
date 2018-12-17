@@ -17,22 +17,36 @@ namespace Slang {
 
 class Decl;
 
+struct IRDecoration : IRInst
+{
+    IR_PARENT_ISA(Decoration)
+
+    IRDecoration* getNextDecoration()
+    {
+        return as<IRDecoration>(getNextInst());
+    }
+};
+
 // Associates an IR-level decoration with a source declaration
 // in the high-level AST, that can be used to extract
 // additional information that informs code emission.
 struct IRHighLevelDeclDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_HighLevelDecl };
+    enum { kOp = kIROp_HighLevelDeclDecoration };
+    IR_LEAF_ISA(HighLevelDeclDecoration)
 
-    Decl* decl;
+    IRPtrLit* getDeclOperand() { return cast<IRPtrLit>(getOperand(0)); }
+    Decl* getDecl() { return (Decl*) getDeclOperand()->getValue(); }
 };
 
 // Associates an IR-level decoration with a source layout
 struct IRLayoutDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_Layout };
+    enum { kOp = kIROp_LayoutDecoration };
+    IR_LEAF_ISA(LayoutDecoration)
 
-    Layout* layout;
+    IRPtrLit* getLayoutOperand() { return cast<IRPtrLit>(getOperand(0)); }
+    Layout* getLayout() { return (Layout*) getLayoutOperand()->getValue(); }
 };
 
 enum IRLoopControl
@@ -42,35 +56,60 @@ enum IRLoopControl
 
 struct IRLoopControlDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_LoopControl };
+    enum { kOp = kIROp_LoopControlDecoration };
+    IR_LEAF_ISA(LoopControlDecoration)
 
-    IRLoopControl mode;
+    IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
+
+    IRLoopControl getMode()
+    {
+        return IRLoopControl(getModeOperand()->value.intVal);
+    }
 };
 
 
 struct IRTargetSpecificDecoration : IRDecoration
 {
-    // TODO: have a more structured representation of target specifiers
-    StringRepresentation* targetName;
+    IR_PARENT_ISA(TargetSpecificDecoration)
+
+    IRStringLit* getTargetNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getTargetName()
+    {
+        return getTargetNameOperand()->getStringSlice();
+    }
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_Target };
+    enum { kOp = kIROp_TargetDecoration };
+    IR_LEAF_ISA(TargetDecoration)
 };
 
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_TargetIntrinsic };
+    enum { kOp = kIROp_TargetIntrinsicDecoration };
+    IR_LEAF_ISA(TargetIntrinsicDecoration)
 
-    StringRepresentation* definition;
+    IRStringLit* getDefinitionOperand() { return cast<IRStringLit>(getOperand(1)); }
+
+    UnownedStringSlice getDefinition()
+    {
+        return getDefinitionOperand()->getStringSlice();
+    }
 };
 
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_GLSLOuterArray };
+    enum { kOp = kIROp_GLSLOuterArrayDecoration };
+    IR_LEAF_ISA(GLSLOuterArrayDecoration)
 
-    char const* outerArrayName;
+    IRStringLit* getOuterArraynameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getOuterArrayName()
+    {
+        return getOuterArraynameOperand()->getStringSlice();
+    }
 };
 
 // A decoration that marks a field key as having been associated
@@ -84,9 +123,15 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
 //
 struct IRSemanticDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_Semantic };
+    enum { kOp = kIROp_SemanticDecoration };
+    IR_LEAF_ISA(SemanticDecoration)
 
-    Name* semanticName;
+    IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getSemanticName()
+    {
+        return getSemanticNameOperand()->getStringSlice();
+    }
 };
 
 enum class IRInterpolationMode
@@ -101,9 +146,15 @@ enum class IRInterpolationMode
 
 struct IRInterpolationModeDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_InterpolationMode };
+    enum { kOp = kIROp_InterpolationModeDecoration };
+    IR_LEAF_ISA(InterpolationModeDecoration)
 
-    IRInterpolationMode mode;
+    IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
+
+    IRInterpolationMode getMode()
+    {
+        return IRInterpolationMode(getModeOperand()->value.intVal);
+    }
 };
 
 /// A decoration that provides a desired name to be used
@@ -112,39 +163,99 @@ struct IRInterpolationModeDecoration : IRDecoration
 /// names, emit debug information, etc.
 struct IRNameHintDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_NameHint };
+    enum { kOp = kIROp_NameHintDecoration };
+    IR_LEAF_ISA(NameHintDecoration)
 
-    Name* name;
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getName()
+    {
+        return getNameOperand()->getStringSlice();
+    }
 };
+
+#define IR_SIMPLE_DECORATION(NAME)      \
+    struct IR##NAME : IRDecoration      \
+    {                                   \
+        enum { kOp = kIROp_##NAME };    \
+    IR_LEAF_ISA(NAME)                   \
+    };                                  \
+    /**/
 
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.
-struct IRVulkanRayPayloadDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_VulkanRayPayload };
-};
+IR_SIMPLE_DECORATION(VulkanRayPayloadDecoration)
+
+/// A decoration that indicates that a variable represents
+/// a vulkan callable shader payload, and should have a location assigned
+/// to it.
+IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 
 /// A decoration that indicates that a variable represents
 /// vulkan hit attributes, and should have a location assigned
 /// to it.
-struct IRVulkanHitAttributesDecoration : IRDecoration
-{
-    enum { kDecorationOp = kIRDecorationOp_VulkanHitAttributes };
-};
+IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_RequireGLSLVersion };
+    enum { kOp = kIROp_RequireGLSLVersionDecoration };
+    IR_LEAF_ISA(RequireGLSLVersionDecoration)
 
-    Int languageVersion;
+    IRConstant* getLanguageVersionOperand() { return cast<IRConstant>(getOperand(0)); }
+
+    Int getLanguageVersion()
+    {
+        return Int(getLanguageVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireGLSLExtensionDecoration : IRDecoration
 {
-    enum { kDecorationOp = kIRDecorationOp_RequireGLSLExtension };
+    enum { kOp = kIROp_RequireGLSLExtensionDecoration };
+    IR_LEAF_ISA(RequireGLSLExtensionDecoration)
 
-    StringRepresentation* extensionName;
+    IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getExtensionName()
+    {
+        return getExtensionNameOperand()->getStringSlice();
+    }
+};
+
+IR_SIMPLE_DECORATION(ReadNoneDecoration)
+IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
+IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
+
+    /// A decoration that marks a value as having linkage.
+    ///
+    /// A value with linkage is either exported from its module,
+    /// or will have a definition imported from another module.
+    /// In either case, it requires a mangled name to use when
+    /// matching imports and exports.
+    ///
+struct IRLinkageDecoration : IRDecoration
+{
+    IR_PARENT_ISA(LinkageDecoration)
+
+    IRStringLit* getMangledNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getMangledName()
+    {
+        return getMangledNameOperand()->getStringSlice();
+    }
+};
+
+struct IRImportDecoration : IRLinkageDecoration
+{
+    enum { kOp = kIROp_ImportDecoration };
+    IR_LEAF_ISA(ImportDecoration)
+};
+
+struct IRExportDecoration : IRLinkageDecoration
+{
+    enum { kOp = kIROp_ExportDecoration };
+    IR_LEAF_ISA(ExportDecoration)
 };
 
 // An instruction that specializes another IR value
@@ -187,6 +298,11 @@ struct IRLookupWitnessTable : IRInst
 struct IRCall : IRInst
 {
     IRUse func;
+
+    IRInst* getCallee() { return getOperand(0); }
+
+    UInt getArgCount() { return getOperandCount() - 1; }
+    IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
 struct IRLoad : IRInst
@@ -398,10 +514,12 @@ struct IRSwizzledStore : IRInst
 };
 
 
-struct IRNotePatchConstantFunc: IRInst
+struct IRPatchConstantFuncDecoration : IRDecoration
 {
+    enum { kOp = kIROp_PatchConstantFuncDecoration };
+    IR_LEAF_ISA(PatchConstantFuncDecoration)
+
     IRInst* getFunc() { return getOperand(0); }
-    IR_LEAF_ISA(NotePatchConstantFunc)
 }; 
 
 // An IR `var` instruction conceptually represents
@@ -440,6 +558,12 @@ struct IRGlobalConstant : IRGlobalValueWithCode
     IR_LEAF_ISA(GlobalConstant)
 };
 
+struct IRGlobalParam : IRInst
+{
+    IR_LEAF_ISA(GlobalParam)
+};
+
+
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRInst
 {
@@ -457,7 +581,7 @@ struct IRWitnessTableEntry : IRInst
 // interface. It basically takes the form of a
 // map from the required members of the interface
 // to the IR values that satisfy those requirements.
-struct IRWitnessTable : IRGlobalValue
+struct IRWitnessTable : IRInst
 {
     IRInstList<IRWitnessTableEntry> getEntries()
     {
@@ -478,7 +602,7 @@ struct IRUndefined : IRInst
 
 // A global-scope generic parameter (a type parameter, a
 // constraint parameter, etc.)
-struct IRGlobalGenericParam : IRGlobalValue
+struct IRGlobalGenericParam : IRInst
 {
     IR_LEAF_ISA(GlobalGenericParam)
 };
@@ -556,7 +680,7 @@ struct IRBuilder
     // The current parent being inserted into (this might
     // be the global scope, a function, a block inside
     // a function, etc.)
-    IRParentInst*   insertIntoParent = nullptr;
+    IRInst*   insertIntoParent = nullptr;
     //
     // An instruction in the current parent that we should insert before
     IRInst*         insertBeforeInst = nullptr;
@@ -568,7 +692,7 @@ struct IRBuilder
     // that we are inserting into (if any).
     IRGlobalValueWithCode*  getFunc();
 
-    void setInsertInto(IRParentInst* insertInto);
+    void setInsertInto(IRInst* insertInto);
     void setInsertBefore(IRInst* insertBefore);
 
     IRBuilderSourceLocRAII* sourceLocInfo = nullptr;
@@ -579,6 +703,7 @@ struct IRBuilder
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRPtrLit* getPtrValue(void* value);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
@@ -708,6 +833,8 @@ struct IRBuilder
         IRType* valueType);
     IRGlobalConstant* createGlobalConstant(
         IRType* valueType);
+    IRGlobalParam* createGlobalParam(
+        IRType* valueType);
     IRWitnessTable* createWitnessTable();
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
@@ -741,10 +868,6 @@ struct IRBuilder
     IRType* getType(
         IROp            op);
 
-
-    IRWitnessTable* lookupWitnessTable(Name* mangledName);
-    void registerWitnessTable(IRWitnessTable* table);
-
         /// Create an empty basic block.
         ///
         /// The created block will not be inserted into the current
@@ -774,9 +897,6 @@ struct IRBuilder
         IRType* type);
     IRParam* emitParam(
         IRType* type);
-
-    IRNotePatchConstantFunc* emitNotePatchConstantFunc(
-        IRInst* func);
 
     IRVar* emitVar(
         IRType* type);
@@ -906,21 +1026,17 @@ struct IRBuilder
         IRInst* param,
         IRInst* val);
 
-    template<typename T>
-    T* addDecoration(IRInst* value, IRDecorationOp op)
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount);
+
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand)
     {
-        SLANG_ASSERT(getModule());
-        auto decorationSize = sizeof(T);
-        auto decoration = (T*)getModule()->memoryArena.allocateAndZero(decorationSize);
+        return addDecoration(value, op, &operand, 1);
+    }
 
-        // TODO: Do we need to run ctor after zeroing?
-        new(decoration)T();
-
-        decoration->op = op;
-
-        decoration->next = value->firstDecoration;
-        value->firstDecoration = decoration;
-        return decoration;
+    IRDecoration* addDecoration(IRInst* value, IROp op, IRInst* operand0, IRInst* operand1)
+    {
+        IRInst* operands[] = { operand0, operand1 };
+        return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
     }
 
     template <typename T>
@@ -929,22 +1045,80 @@ struct IRBuilder
         getModule()->getObjectScopeManager()->addMaybeNull(ptr);
         return ptr;
     }
-    StringRepresentation* addStringToFree(const String& string)
-    {
-        StringRepresentation* stringRep = string.getStringRepresentation();
-        getModule()->getObjectScopeManager()->addMaybeNull(stringRep);
-        return stringRep;
-    }
-
 
     template<typename T>
-    T* addDecoration(IRInst* value)
+    void addSimpleDecoration(IRInst* value)
     {
-        return addDecoration<T>(value, IRDecorationOp(T::kDecorationOp));
+        addDecoration(value, IROp(T::kOp), (IRInst* const*) nullptr, 0);
     }
 
-    IRHighLevelDeclDecoration* addHighLevelDeclDecoration(IRInst* value, Decl* decl);
-    IRLayoutDecoration* addLayoutDecoration(IRInst* value, Layout* layout);
+    void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+    void addLayoutDecoration(IRInst* value, Layout* layout);
+
+    void addNameHintDecoration(IRInst* value, IRStringLit* name)
+    {
+        addDecoration(value, kIROp_NameHintDecoration, name);
+    }
+
+    void addNameHintDecoration(IRInst* value, UnownedStringSlice const& text)
+    {
+        addNameHintDecoration(value, getStringValue(text));
+    }
+
+    void addGLSLOuterArrayDecoration(IRInst* value, UnownedStringSlice const& text)
+    {
+        addDecoration(value, kIROp_GLSLOuterArrayDecoration, getStringValue(text));
+    }
+
+    void addInterpolationModeDecoration(IRInst* value, IRInterpolationMode mode)
+    {
+        addDecoration(value, kIROp_InterpolationModeDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
+    }
+
+    void addLoopControlDecoration(IRInst* value, IRLoopControl mode)
+    {
+        addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
+    }
+
+    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text)
+    {
+        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text));
+    }
+
+    void addTargetIntrinsicDecoration(IRInst* value, UnownedStringSlice const& target, UnownedStringSlice const& definition)
+    {
+        addDecoration(value, kIROp_TargetIntrinsicDecoration, getStringValue(target), getStringValue(definition));
+    }
+
+    void addTargetDecoration(IRInst* value, UnownedStringSlice const& target)
+    {
+        addDecoration(value, kIROp_TargetDecoration, getStringValue(target));
+    }
+
+    void addRequireGLSLExtensionDecoration(IRInst* value, UnownedStringSlice const& extensionName)
+    {
+        addDecoration(value, kIROp_RequireGLSLExtensionDecoration, getStringValue(extensionName));
+    }
+
+    void addRequireGLSLVersionDecoration(IRInst* value, Int version)
+    {
+        addDecoration(value, kIROp_RequireGLSLVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
+    }
+
+    void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)
+    {
+        addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
+    }
+
+    void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ImportDecoration, getStringValue(mangledName));
+    }
+
+    void addExportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
+    {
+        addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
+    }
 };
 
 // Helper to establish the source location that will be used
@@ -993,14 +1167,10 @@ IRSpecializationState* createIRSpecializationState(
 void destroyIRSpecializationState(IRSpecializationState* state);
 IRModule* getIRModule(IRSpecializationState* state);
 
-IRGlobalValue* getSpecializedGlobalValueForDeclRef(
-    IRSpecializationState*  state,
-    DeclRef<Decl> const&    declRef);
-
 struct ExtensionUsageTracker;
 
 // Clone the IR values reachable from the given entry point
-// into the IR module assocaited with the specialization state.
+// into the IR module associated with the specialization state.
 // When multiple definitions of a symbol are found, the one
 // that is best specialized for the given `targetReq` will be
 // used.

@@ -137,63 +137,93 @@ struct IRUse
     void debugValidate();
 };
 
-enum IRDecorationOp : uint16_t
-{
-    kIRDecorationOp_HighLevelDecl,
-    kIRDecorationOp_Layout,
-    kIRDecorationOp_LoopControl,
-    kIRDecorationOp_Target,
-    kIRDecorationOp_TargetIntrinsic,
-    kIRDecorationOp_GLSLOuterArray,
-    kIRDecorationOp_Semantic,
-    kIRDecorationOp_InterpolationMode,
-    kIRDecorationOp_NameHint,
-
-        /**  The _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module. 
-        Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
-        needs to be special cased for lookup. */ 
-    kIRDecorationOp_Transitory,   
-    kIRDecorationOp_VulkanRayPayload,
-    kIRDecorationOp_VulkanHitAttributes,
-    kIRDecorationOp_RequireGLSLVersion,
-    kIRDecorationOp_RequireGLSLExtension,
-    
-    kIRDecorationOp_CountOf          
-};
-
-// represents an object allocated in an IR memory arena
-struct IRObject
-{
-};
-
-// A "decoration" that gets applied to an instruction.
-// These usually don't affect semantics, but are useful
-// for preserving high-level source information.
-struct IRDecoration : public IRObject
-{
-    static IRDecoration make(IRDecorationOp opIn, IRDecoration* nextIn = nullptr)
-    {
-        IRDecoration dec;
-        dec.next = nextIn;
-        dec.op = opIn;
-        return dec;
-    }
-
-    // Next decoration attached to the same instruction
-    IRDecoration* next;
-
-    IRDecorationOp op;
-};
-
 struct IRBlock;
-struct IRParentInst;
+struct IRDecoration;
 struct IRRate;
 struct IRType;
+
+// A double-linked list of instruction
+struct IRInstListBase
+{
+    IRInstListBase()
+    {}
+
+    IRInstListBase(IRInst* first, IRInst* last)
+        : first(first)
+        , last(last)
+    {}
+
+
+
+    IRInst* first = nullptr;
+    IRInst* last = nullptr;
+
+    IRInst* getFirst() { return first; }
+    IRInst* getLast() { return last; }
+
+    struct Iterator
+    {
+        IRInst* inst;
+
+        Iterator() : inst(nullptr) {}
+        Iterator(IRInst* inst) : inst(inst) {}
+
+        void operator++();
+        IRInst* operator*()
+        {
+            return inst;
+        }
+
+        bool operator!=(Iterator const& i)
+        {
+            return inst != i.inst;
+        }
+    };
+
+    Iterator begin();
+    Iterator end();
+};
+
+// Specialization of `IRInstListBase` for the case where
+// we know (or at least expect) all of the instructions
+// to be of type `T`
+template<typename T>
+struct IRInstList : IRInstListBase
+{
+    IRInstList() {}
+
+    IRInstList(T* first, T* last)
+        : IRInstListBase(first, last)
+    {}
+
+    explicit IRInstList(IRInstListBase const& list)
+        : IRInstListBase(list)
+    {}
+
+    T* getFirst() { return (T*) first; }
+    T* getLast() { return (T*) last; }
+
+    struct Iterator : public IRInstListBase::Iterator
+    {
+        Iterator() {}
+        Iterator(IRInst* inst) : IRInstListBase::Iterator(inst) {}
+
+        T* operator*()
+        {
+            return (T*) inst;
+        }
+    };
+
+    Iterator begin() { return Iterator(first); }
+    Iterator end();
+};
+
+
 
 // Every value in the IR is an instruction (even things
 // like literal values).
 //
-struct IRInst : public IRObject
+struct IRInst
 {
     // The operation that this value represents
     IROp op;
@@ -215,25 +245,28 @@ struct IRInst : public IRObject
     // Source location information for this value, if any
     SourceLoc sourceLoc;
 
-    // The linked list of decorations attached to this value
-    IRDecoration* firstDecoration = nullptr;
+    // Each instruction can have zero or more "decorations"
+    // attached to it. A decoration is a specialized kind
+    // of instruction that either attaches metadata to,
+    // or modifies the sematnics of, its parent instruction.
+    //
+    IRDecoration* getFirstDecoration();
+    IRDecoration* getLastDecoration();
+    IRInstList<IRDecoration> getDecorations();
 
     // Look up a decoration in the list of decorations
-    IRDecoration* findDecorationImpl(IRDecorationOp op);
+    IRDecoration* findDecorationImpl(IROp op);
     template<typename T>
-    T* findDecoration()
-    {
-        return (T*) findDecorationImpl(IRDecorationOp(T::kDecorationOp));
-    }
+    T* findDecoration();
 
     // The first use of this value (start of a linked list)
     IRUse*      firstUse = nullptr;
 
 
     // The parent of this instruction.
-    IRParentInst*   parent;
+    IRInst*   parent;
 
-    IRParentInst* getParent() { return parent; }
+    IRInst* getParent() { return parent; }
 
     // The next and previous instructions with the same parent
     IRInst*         next;
@@ -241,6 +274,42 @@ struct IRInst : public IRObject
 
     IRInst* getNextInst() { return next; }
     IRInst* getPrevInst() { return prev; }
+
+    // An instruction can have zero or more children, although
+    // only certain instruction opcodes are allowed to have
+    // children.
+    //
+    // For example, a function will have children that are
+    // its basic blocks, and the basic blocks will have children
+    // that represent parameters and ordinary executable instructions.
+    //
+    IRInst* getFirstChild();
+    IRInst* getLastChild();
+    IRInstList<IRInst> getChildren()
+    {
+        return IRInstList<IRInst>(
+            getFirstChild(),
+            getLastChild());
+    }
+
+        /// A doubly-linked list containing any decorations and then any children of this instruction.
+        ///
+        /// We store both the decorations and children of an instruction
+        /// in the same list, to conserve space in the instruction itself
+        /// (rather than storing distinct lists for decorations and children).
+        ///
+        // Note: This field is *not* being declared `private` because doing so could
+        // mess with our required memory layout, where `typeUse` below is assumed
+        // to be the last field in `IRInst` and to come right before any additional
+        // `IRUse` values that represent operands.
+        //
+    IRInstListBase m_decorationsAndChildren;
+
+    IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
+    IRInst* getLastDecorationOrChild()  { return m_decorationsAndChildren.last;  }
+    IRInstListBase getDecorationsAndChildren() { return m_decorationsAndChildren; }
+
+    void removeAndDeallocateAllDecorationsAndChildren();
 
     // The type of the result value of this instruction,
     // or `null` to indicate that the instruction has
@@ -284,16 +353,12 @@ struct IRInst : public IRObject
     void insertAfter(IRInst* other);
 
     // Insert as first/last child of given parent
-    void insertAtStart(IRParentInst* parent);
-    void insertAtEnd(IRParentInst* parent);
+    void insertAtStart(IRInst* parent);
+    void insertAtEnd(IRInst* parent);
 
     // Move to the start/end of current parent
     void moveToStart();
     void moveToEnd();
-
-    // Insert before/after the given instruction, in a specific block
-    void insertBefore(IRInst* other, IRParentInst* parent);
-    void insertAfter(IRInst* other, IRParentInst* parent);
 
     // Remove this instruction from its parent block,
     // but don't delete it, or replace uses.
@@ -327,6 +392,16 @@ struct IRInst : public IRObject
     /// If this instruction is transitively nested inside some IR module,
     /// this function will return it, and will otherwise return `null`.
     IRModule* getModule();
+
+        /// Insert this instruction into `inParent`, after `inPrev` and before `inNext`.
+        ///
+        /// `inParent` must be non-null
+        /// If `inPrev` is non-null it must satisfy `inPrev->getNextInst() == inNext` and `inPrev->getParent() == inParent`
+        /// If `inNext` is non-null it must satisfy `inNext->getPrevInst() == inPrev` and `inNext->getParent() == inParent`
+        ///
+        /// If both `inPrev` and `inNext` are null, then `inParent` must have no (raw) children.
+        ///
+    void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 };
 
 // `dynamic_cast` equivalent
@@ -346,89 +421,25 @@ T* cast(IRInst* inst, T* /* */ = nullptr)
     return (T*)inst;
 }
 
+// Now that `IRInst` is defined we can back-fill the definitions that need to access it.
 
-// A double-linked list of instruction
-struct IRInstListBase
-{
-    IRInstListBase()
-    {}
-
-    IRInstListBase(IRInst* first, IRInst* last)
-        : first(first)
-        , last(last)
-    {}
-
-
-
-    IRInst* first = nullptr;
-    IRInst* last = nullptr;
-
-    IRInst* getFirst() { return first; }
-    IRInst* getLast() { return last; }
-
-    struct Iterator
-    {
-        IRInst* inst;
-
-        Iterator() : inst(nullptr) {}
-        Iterator(IRInst* inst) : inst(inst) {}
-
-        void operator++()
-        {
-            if (inst)
-            {
-                inst = inst->next;
-            }
-        }
-
-        IRInst* operator*()
-        {
-            return inst;
-        }
-
-        bool operator!=(Iterator const& i)
-        {
-            return inst != i.inst;
-        }
-    };
-
-    Iterator begin() { return Iterator(first); }
-    Iterator end() { return Iterator(last ? last->next : nullptr); }
-};
-
-// Specialization of `IRInstListBase` for the case where
-// we know (or at least expect) all of the instructions
-// to be of type `T`
 template<typename T>
-struct IRInstList : IRInstListBase
+T* IRInst::findDecoration()
 {
-    IRInstList() {}
-
-    IRInstList(T* first, T* last)
-        : IRInstListBase(first, last)
-    {}
-
-    explicit IRInstList(IRInstListBase const& list)
-        : IRInstListBase(list)
-    {}
-
-    T* getFirst() { return (T*) first; }
-    T* getLast() { return (T*) last; }
-
-    struct Iterator : public IRInstListBase::Iterator
+    for( auto decoration : getDecorations() )
     {
-        Iterator() {}
-        Iterator(IRInst* inst) : IRInstListBase::Iterator(inst) {}
+        if(auto match = as<T>(decoration))
+            return match;
+    }
+    return nullptr;
+}
 
-        T* operator*()
-        {
-            return (T*) inst;
-        }
-    };
+template<typename T>
+typename IRInstList<T>::Iterator IRInstList<T>::end()
+{
+    return Iterator(last ? last->next : nullptr);
+}
 
-    Iterator begin() { return Iterator(first); }
-    Iterator end() { return Iterator(last ? last->next : nullptr); }
-};
 
 // Types
 
@@ -489,16 +500,17 @@ struct IRConstant : IRInst
     {
         IRIntegerValue          intVal;         ///< Used for integrals and boolean
         IRFloatingPointValue    floatVal;
+        void*                   ptrVal;
 
         /// Either of these types could be set with kIROp_StringLit. 
-        /// Which is used is currently determined with IRDecorationOp - if a kDecorationOp_Transitory is set, then the transitory StringVal is used, else stringVal
+        /// Which is used is currently determined with decorations - if a kIROp_TransitoryDecoration is set, then the transitory StringVal is used, else stringVal
         // which relies on chars being held after the struct).
         StringValue             stringVal;
         StringSliceValue        transitoryStringVal;           
     };
 
         /// Returns a string slice (or empty string if not appropriate)
-    UnownedStringSlice getStringSlice() const;
+    UnownedStringSlice getStringSlice();
 
         /// True if constants are equal
     bool equal(IRConstant& rhs);
@@ -537,6 +549,13 @@ struct IRStringLit : IRConstant
     IR_LEAF_ISA(StringLit);
 };
 
+struct IRPtrLit : IRConstant
+{
+    IR_LEAF_ISA(PtrLit);
+
+    void* getValue() { return value.ptrVal; }
+};
+
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {
@@ -559,49 +578,36 @@ struct IRParam : IRInst
     IR_LEAF_ISA(Param)
 };
 
-// A "parent" instruction is one that contains other instructions
-// as its children. The most common case of a parent instruction
-// is a basic block, but there are other cases (e.g., a function
-// is in turn a parent for basic blocks).
-struct IRParentInst : IRInst
-{
-    // The instructions stored under this parent
-    IRInstListBase children;
-
-    IRInst* getFirstChild() { return children.first; }
-    IRInst* getLastChild()  { return children.last;  }
-    IRInstListBase getChildren() { return children; }
-
-    void removeAndDeallocateAllChildren();
-
-    IR_PARENT_ISA(ParentInst)
-};
-
 // A basic block is a parent instruction that adds the constraint
 // that all the children need to be "ordinary" instructions (so
 // no function declarations, or nested blocks). We also expect
 // that the previous/next instruction are always a basic block.
 //
-struct IRBlock : IRParentInst
+struct IRBlock : IRInst
 {
     // Linked list of the instructions contained in this block
     //
-    IRInstListBase getChildren() { return children; }
-    IRInst* getFirstInst() { return children.first; }
-    IRInst* getLastInst() { return children.last; }
+    IRInst* getFirstInst() { return getChildren().first; }
+    IRInst* getLastInst() { return getChildren().last; }
 
     // In a valid program, every basic block should end with
     // a "terminator" instruction.
     //
     // This function will return the terminator, if it exists,
     // or `null` if there is none.
-    IRTerminatorInst* getTerminator() { return as<IRTerminatorInst>(getLastInst()); }
+    IRTerminatorInst* getTerminator() { return as<IRTerminatorInst>(getLastDecorationOrChild()); }
 
     // We expect that the siblings of a basic block will
     // always be other basic blocks (we don't allow
     // mixing of blocks and other instructions in the
     // same parent).
-    IRBlock* getPrevBlock() { return cast<IRBlock>(getPrevInst()); }
+    //
+    // The exception to this is that decorations on the function
+    // that contains a block could appear before the first block,
+    // so we need to be careful to do a dynamic cast (`as`) in
+    // the `getPrevBlock` case, but don't need to worry about
+    // it for `getNextBlock`.
+    IRBlock* getPrevBlock() { return as<IRBlock>(getPrevInst()); }
     IRBlock* getNextBlock() { return cast<IRBlock>(getNextInst()); }
 
     // The parameters of a block are represented by `IRParam`
@@ -785,9 +791,10 @@ SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
 
 SIMPLE_IR_PARENT_TYPE(UntypedBufferResourceType, Type)
-SIMPLE_IR_TYPE(HLSLByteAddressBufferType, UntypedBufferResourceType)
-SIMPLE_IR_TYPE(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
-SIMPLE_IR_TYPE(HLSLRasterizerOrderedByteAddressBufferType, UntypedBufferResourceType)
+SIMPLE_IR_PARENT_TYPE(ByteAddressBufferTypeBase, UntypedBufferResourceType)
+SIMPLE_IR_TYPE(HLSLByteAddressBufferType, ByteAddressBufferTypeBase)
+SIMPLE_IR_TYPE(HLSLRWByteAddressBufferType, ByteAddressBufferTypeBase)
+SIMPLE_IR_TYPE(HLSLRasterizerOrderedByteAddressBufferType, ByteAddressBufferTypeBase)
 
 SIMPLE_IR_TYPE(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
 SIMPLE_IR_TYPE(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
@@ -913,36 +920,8 @@ struct IRFuncType : IRType
     IR_LEAF_ISA(FuncType)
 };
 
-// A "global value" is an instruction that might have
-// linkage, so that it can be declared in one module
-// and then resolved to a definition in another module.
-struct IRGlobalValue : IRParentInst
-{
-    // The mangled name, for a symbol that should have linkage,
-    // or which might have multiple declarations.
-    Name* mangledName = nullptr;
-
-#if 0
-    // TODO: these all belong on `IRInst`
-    void insertBefore(IRGlobalValue* other);
-    void insertBefore(IRGlobalValue* other, IRModule* module);
-    void insertAtStart(IRModule* module);
-
-    void insertAfter(IRGlobalValue* other);
-    void insertAfter(IRGlobalValue* other, IRModule* module);
-    void insertAtEnd(IRModule* module);
-
-    void removeFromParent();
-
-    void moveToEnd();
-#endif
-
-    IR_PARENT_ISA(GlobalValue)
-};
-
 bool isDefinition(
-    IRGlobalValue* inVal);
-
+    IRInst* inVal);
 
 // A structure type is represented as a parent instruction,
 // where the child instructions represent the fields of the
@@ -953,7 +932,7 @@ bool isDefinition(
 // (that is, they have mangled names that can be used
 // for linkage).
 //
-struct IRStructKey : IRGlobalValue
+struct IRStructKey : IRInst
 {
     IR_LEAF_ISA(StructKey)
 };
@@ -978,7 +957,7 @@ struct IRStructField : IRInst
 // *not* contain the keys, because code needs to be able to
 // reference the keys from scopes outside of the struct.
 //
-struct IRStructType : IRGlobalValue
+struct IRStructType : IRInst
 {
     IRInstList<IRStructField> getFields() { return IRInstList<IRStructField>(getChildren()); }
 
@@ -992,7 +971,7 @@ struct IRInterfaceType : IRGlobalValue
 
 /// @brief A global value that potentially holds executable code.
 ///
-struct IRGlobalValueWithCode : IRGlobalValue
+struct IRGlobalValueWithCode : IRInst
 {
     // The children of a value with code will be the basic
     // blocks of its definition.
@@ -1052,9 +1031,17 @@ struct IRGeneric : IRGlobalValueWithParams
 // a pass can glean information from it.
 IRInst* findGenericReturnVal(IRGeneric* generic);
 
+// Resolve an instruction that might reference a static definition
+// to the most specific IR node possible, so that we can read
+// decorations from it (e.g., if this is a `specialize` instruction,
+// then try to chase down the generic being specialized, and what
+// it seems to return).
+//
+IRInst* getResolvedInstForDecorations(IRInst* inst);
+
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.
-struct IRModuleInst : IRParentInst
+struct IRModuleInst : IRInst
 {
     // Pointer back to the non-instruction object that represents
     // the module, so that we can get back to it in algorithms
@@ -1098,13 +1085,36 @@ struct IRModule : RefObject
     ObjectScopeManager m_objectScopeManager;
 };
 
-void printSlangIRAssembly(StringBuilder& builder, IRModule* module);
-String getSlangIRAssembly(IRModule* module);
+    /// How much detail to include in dumped IR.
+    ///
+    /// Used with the `dumpIR` functions to determine
+    /// whether a completely faithful, but verbose, IR
+    /// dump is produced, or something simplified for ease
+    /// or reading.
+    ///
+enum class IRDumpMode
+{
+        /// Produce a simplified IR dump.
+        ///
+        /// Simplified IR dumping will skip certain instructions
+        /// and print them at their use sites instead, so that
+        /// the overall dump is shorter and easier to read.
+    Simplified,
 
-void dumpIR(IRModule* module);
-void dumpIR(IRGlobalValue* globalVal);
+        /// Produce a detailed/accurate IR dump.
+        ///
+        /// A detailed IR dump will make sure to emit exactly
+        /// the instructions that were present with no attempt
+        /// to selectively skip them or give special formatting.
+        ///
+    Detailed,
+};
 
-String dumpIRFunc(IRFunc* func);
+void printSlangIRAssembly(StringBuilder& builder, IRModule* module, IRDumpMode mode = IRDumpMode::Simplified);
+String getSlangIRAssembly(IRModule* module, IRDumpMode mode = IRDumpMode::Simplified);
+
+void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode = IRDumpMode::Simplified);
+void dumpIR(IRInst* globalVal, ISlangWriter* writer, IRDumpMode mode = IRDumpMode::Simplified);
 
 IRInst* createEmptyInst(
     IRModule*   module,
@@ -1115,18 +1125,6 @@ IRInst* createEmptyInstWithSize(
     IRModule*   module,
     IROp        op,
     size_t      totalSizeInBytes);
-
-IRDecoration* createEmptyDecoration(
-    IRModule* module, 
-    IRDecorationOp op, 
-    size_t sizeInBytes);
-
-template <typename T>
-T* createEmptyDecoration(IRModule* module)
-{
-    return static_cast<T*>(createEmptyDecoration(module, IRDecorationOp(T::kDecorationOp), sizeof(T)));
-}
-
 }
 
 
