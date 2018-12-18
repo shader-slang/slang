@@ -561,6 +561,80 @@ namespace Slang
             return isDeclUsableAsStaticMember(decl);
         }
 
+        RefPtr<Expr> maybeOpenExistential(RefPtr<Expr> expr)
+        {
+            auto exprType = expr->type.type;
+
+            if(auto declRefType = exprType->As<DeclRefType>())
+            {
+                if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
+                {
+                    // Is there an this-type substitution being applied, so that
+                    // we are referencing the interface type through a concrete
+                    // type (e.g., a type parameter constrainted to this interface)?
+                    //
+                    // Because of the way that substitutions need to mirror the nesting
+                    // hierarchy of declarations, any this-type substitution pertaining
+                    // to the chosen interface decl must be the first substitution on
+                    // the list (which is a linked list from the "inside" out).
+                    //
+                    auto thisTypeSubst = interfaceDeclRef.substitutions.substitutions.As<ThisTypeSubstitution>();
+                    if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.decl)
+                    {
+                        // This isn't really an existential type, because somebody
+                        // has already filled in a this-type substitution.
+                    }
+                    else
+                    {
+                        // Okay, here is the case that matters.
+                        //
+
+                        auto interfaceDecl = interfaceDeclRef.getDecl();
+
+                        RefPtr<Variable> varDecl = new Variable();
+                        varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
+                        varDecl->checkState = DeclCheckState::Checked;
+                        varDecl->nameAndLoc.loc = expr->loc;
+                        varDecl->initExpr = expr;
+                        varDecl->type.type = expr->type.type;
+
+                        auto varDeclRef = makeDeclRef(varDecl.Ptr());
+
+                        RefPtr<LetExpr> letExpr = new LetExpr();
+                        letExpr->decl = varDecl;
+
+                        RefPtr<ExtractExistentialType> openedType = new ExtractExistentialType();
+                        openedType->declRef = varDeclRef;
+
+                        RefPtr<ExtractExistentialSubtypeWitness> openedWitness = new ExtractExistentialSubtypeWitness();
+                        openedWitness->sub = openedType;
+                        openedWitness->sup = expr->type.type;
+                        openedWitness->declRef = varDeclRef;
+
+                        RefPtr<ThisTypeSubstitution> openedThisType = new ThisTypeSubstitution();
+                        openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
+                        openedThisType->interfaceDecl = interfaceDecl;
+                        openedThisType->witness = openedWitness;
+
+                        DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
+                        auto substDeclRefType = DeclRefType::Create(getSession(), substDeclRef);
+
+                        RefPtr<ExtractExistentialValueExpr> openedValue = new ExtractExistentialValueExpr();
+                        openedValue->declRef = varDeclRef;
+                        openedValue->type = QualType(substDeclRefType);
+
+                        letExpr->body = openedValue;
+                        letExpr->type = openedValue->type;
+
+                        return letExpr;
+                    }
+                }
+            }
+
+            // Default: apply the callback to the original expression;
+            return expr;
+        }
+
         RefPtr<Expr> ConstructDeclRefExpr(
             DeclRef<Decl>   declRef,
             RefPtr<Expr>    baseExpr,
@@ -577,6 +651,15 @@ namespace Slang
             {
                 // If there was a base expression, we will have some kind of
                 // member expression.
+
+                // We want to check for the case where the base "expression"
+                // actually names a type, because in that case we are doing
+                // a static member reference.
+                //
+                // TODO: Should we be checking if the member is static here?
+                // If it isn't, should we be automatically producing a "curried"
+                // form (e.g., for a member function, return a value usable
+                // for referencing it as a free function).
                 //
                 if (baseExpr->type->As<TypeType>())
                 {
@@ -1440,15 +1523,22 @@ namespace Slang
                     // Trying to convert to an interface type.
                     //
                     // We will allow this if the type conforms to the interface.
-                    if (DoesTypeConformToInterface(fromType, interfaceDeclRef))
+
+                    if(auto witness = tryGetInterfaceConformanceWitness(fromType, interfaceDeclRef))
                     {
                         if (outToExpr)
-                            *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+                            *outToExpr = createCastToInterfaceExpr(toType, fromExpr, witness);
                         if (outCost)
                             *outCost = kConversionCost_CastToInterface;
                         return true;
                     }
                 }
+
+                // Note: The following seems completely broken, and we should be using
+                // a `fromTypeDeclRef` here for the case when casting *from* a generic
+                // type parameter to an interface type...
+                //
+#if 0
                 else if (auto genParamDeclRef = toTypeDeclRef.As<GenericTypeParamDecl>())
                 {
                     // We need to enumerate the constraints placed on this type by its outer
@@ -1483,6 +1573,7 @@ namespace Slang
                     }
 
                 }
+#endif
 
             }
 
@@ -1719,6 +1810,25 @@ namespace Slang
             castExpr->type = QualType(toType);
             castExpr->Arguments.Add(fromExpr);
             return castExpr;
+        }
+
+            /// Create an "up-cast" from a value to an interface type
+            ///
+            /// This operation logically constructs an "existential" value,
+            /// which packages up the value, its type, and the witness
+            /// of its conformance to the interface.
+            ///
+        RefPtr<Expr> createCastToInterfaceExpr(
+            RefPtr<Type>    toType,
+            RefPtr<Expr>    fromExpr,
+            RefPtr<Val>     witness)
+        {
+            RefPtr<CastToInterfaceExpr> expr = new CastToInterfaceExpr();
+            expr->loc = fromExpr->loc;
+            expr->type = QualType(toType);
+            expr->valueArg = fromExpr;
+            expr->witnessArg = witness;
+            return expr;
         }
 
         // Perform type coercion, and emit errors if it isn't possible
@@ -7900,36 +8010,24 @@ namespace Slang
         // deal with this cases here, even if they are no-ops.
         //
 
-        RefPtr<Expr> visitDerefExpr(DerefExpr* expr)
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
-            return expr;
+    #define CASE(NAME)                                  \
+        RefPtr<Expr> visit##NAME(NAME* expr)            \
+        {                                               \
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr,  \
+                "should not appear in input syntax");   \
+            return expr;                                \
         }
 
-        RefPtr<Expr> visitSwizzleExpr(SwizzleExpr* expr)
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
-            return expr;
-        }
+        CASE(DerefExpr)
+        CASE(SwizzleExpr)
+        CASE(OverloadedExpr)
+        CASE(OverloadedExpr2)
+        CASE(AggTypeCtorExpr)
+        CASE(CastToInterfaceExpr)
+        CASE(LetExpr)
+        CASE(ExtractExistentialValueExpr)
 
-        RefPtr<Expr> visitOverloadedExpr(OverloadedExpr* expr)
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
-            return expr;
-        }
-
-        RefPtr<Expr> visitOverloadedExpr2(OverloadedExpr2* expr)
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
-            return expr;
-        }
-
-
-        RefPtr<Expr> visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax");
-            return expr;
-        }
+    #undef CASE
 
         //
         //
@@ -8090,6 +8188,14 @@ namespace Slang
             expr->BaseExpression = CheckExpr(expr->BaseExpression);
 
             expr->BaseExpression = MaybeDereference(expr->BaseExpression);
+
+            // If the base of the member lookup has an interface type
+            // *without* a suitable this-type substitution, then we are
+            // trying to perform lookup on a value of existential type,
+            // and we should "open" the existential here so that we
+            // can expose its structure.
+            //
+            expr->BaseExpression = maybeOpenExistential(expr->BaseExpression);
 
             auto & baseType = expr->BaseExpression->type;
 

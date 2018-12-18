@@ -121,3 +121,18 @@ RAW(
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
 )
 END_SYNTAX_CLASS()
+
+// A witness taht `sub : sup` because `sub` was wrapped into
+// an existential of type `sup`.
+SYNTAX_CLASS(ExtractExistentialSubtypeWitness, SubtypeWitness)
+RAW(
+    // The declaration of the existential value that has been opened
+    DeclRef<VarDeclBase> declRef;
+
+    virtual bool EqualsVal(Val* val) override;
+    virtual String ToString() override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
+)
+END_SYNTAX_CLASS()
+
