@@ -4,9 +4,12 @@
 #include "../core/slang-writer.h"
 #include "ir-dce.h"
 #include "ir-existential.h"
+#include "ir-glsl-legalize.h"
 #include "ir-insts.h"
+#include "ir-link.h"
 #include "ir-restructure.h"
 #include "ir-restructure-scoping.h"
+#include "ir-specialize.h"
 #include "ir-specialize-resources.h"
 #include "ir-ssa.h"
 #include "ir-validate.h"
@@ -6517,10 +6520,9 @@ String emitEntryPoint(
             session,
             irModule);
 
-        specializeIRForEntryPoint(
+        auto irEntryPoint = specializeIRForEntryPoint(
             irSpecializationState,
-            entryPoint,
-            &sharedContext.extensionUsageTracker);
+            entryPoint);
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "CLONED");
@@ -6532,6 +6534,38 @@ String emitEntryPoint(
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
+
+
+
+        // For GLSL only, we will need to perform "legalization" of
+        // the entry point and any entry-point parameters.
+        //
+        // TODO: We should consider moving this legalization work
+        // as late as possible, so that it doesn't affect how other
+        // optimization passes need to work.
+        //
+        switch (target)
+        {
+        case CodeGenTarget::GLSL:
+            {
+                legalizeEntryPointForGLSL(
+                    session,
+                    irModule,
+                    irEntryPoint,
+                    &compileRequest->mSink,
+                    &sharedContext.extensionUsageTracker);
+            }
+            break;
+
+        default:
+            break;
+        }
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
 
         // Any code that makes use of existential (interface) types
         // needs to be simplified to use concrete types instead,
@@ -6559,7 +6593,7 @@ String emitEntryPoint(
         // none of our target supports generics, or interfaces,
         // so we need to specialize those away.
         //
-        specializeGenerics(irModule, sharedContext.target);
+        specializeGenerics(irModule);
 
 
 

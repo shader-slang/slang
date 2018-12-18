@@ -42,6 +42,9 @@
     <ClInclude Include="hlsl.meta.slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-clone.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-constexpr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -54,10 +57,16 @@
     <ClInclude Include="ir-existential.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-glsl-legalize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-inst-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-insts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-link.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-missing-return.h">
@@ -76,6 +85,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-specialize-resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ir-specialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-ssa.h">
@@ -191,6 +203,9 @@
     <ClCompile Include="emit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ir-clone.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ir-constexpr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -203,7 +218,13 @@
     <ClCompile Include="ir-existential.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ir-glsl-legalize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ir-legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-link.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-missing-return.cpp">
@@ -222,6 +243,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-specialize-resources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-specialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-ssa.cpp">
