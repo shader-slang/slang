@@ -139,6 +139,17 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(ImplicitCastExpr, TypeCastExpr)
 END_SYNTAX_CLASS()
 
+    /// A cast from a value to an interface ("existential") type.
+SYNTAX_CLASS(CastToInterfaceExpr, Expr)
+RAW(
+        /// The value being cast to an interface type
+    RefPtr<Expr>    valueArg;
+
+        /// A witness showing that `valueArg` conforms to the chosen interface
+    RefPtr<Val>     witnessArg;
+)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(SelectExpr, OperatorExpr)
 
 SIMPLE_SYNTAX_CLASS(GenericAppExpr, AppExprBase)
@@ -169,3 +180,16 @@ SYNTAX_CLASS(ThisExpr, Expr)
     FIELD(RefPtr<Scope>, scope);
 END_SYNTAX_CLASS()
 
+// An expression that binds a temporary variable in a local expression context
+SYNTAX_CLASS(LetExpr, Expr)
+RAW(
+    RefPtr<VarDeclBase> decl;
+    RefPtr<Expr> body;
+)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(ExtractExistentialValueExpr, Expr)
+RAW(
+    DeclRef<VarDeclBase> declRef;
+)
+END_SYNTAX_CLASS()

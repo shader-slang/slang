@@ -617,6 +617,17 @@ struct IRBindGlobalGenericParam : IRInst
     IR_LEAF_ISA(BindGlobalGenericParam)
 };
 
+
+    /// An instruction that packs a concrete value into an existential-type "box"
+struct IRMakeExistential : IRInst
+{
+    IRInst* getWrappedValue() { return getOperand(0); }
+    IRInst* getWitnessTable() { return getOperand(1); }
+
+    IR_LEAF_ISA(MakeExistential)
+};
+
+
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
 {
@@ -750,6 +761,19 @@ struct IRBuilder
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
 
+        /// Given an existential value, extract the underlying "real" value
+    IRInst* emitExtractExistentialValue(
+        IRType* type,
+        IRInst* existentialValue);
+
+        /// Given an existential value, extract the underlying "real" type
+    IRType* emitExtractExistentialType(
+        IRInst* existentialValue);
+
+        /// Given an existential value, extract the witness table showing how the value conforms to the existential type.
+    IRInst* emitExtractExistentialWitnessTable(
+        IRInst* existentialValue);
+
     IRInst* emitSpecializeInst(
         IRType*         type,
         IRInst*         genericVal,
@@ -793,6 +817,11 @@ struct IRBuilder
         UInt            argCount,
         IRInst* const* args);
 
+    IRInst* emitMakeExistential(
+        IRType* type,
+        IRInst* value,
+        IRInst* witnessTable);
+
     IRUndefined* emitUndefined(IRType* type);
 
 
@@ -814,6 +843,9 @@ struct IRBuilder
 
     // Create an initially empty `struct` type.
     IRStructType*   createStructType();
+
+    // Create an empty `interface` type.
+    IRInterfaceType* createInterfaceType();
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey*    createStructKey();

@@ -1288,6 +1288,22 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return lowerGenericIntrinsicType(type, elementType, count);
     }
 
+    IRType* visitExtractExistentialType(ExtractExistentialType* type)
+    {
+        auto declRef = type->declRef;
+        auto existentialType = lowerType(context, GetType(declRef));
+        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        return getBuilder()->emitExtractExistentialType(existentialVal);
+    }
+
+    LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
+    {
+        auto declRef = witness->declRef;
+        auto existentialType = lowerType(context, GetType(declRef));
+        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
+    }
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }
@@ -2088,6 +2104,32 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitCastToInterfaceExpr(
+        CastToInterfaceExpr* expr)
+    {
+        // We have an expression that is "up-casting" some concrete value
+        // to an existential type (aka interface type), using a subtype witness
+        // (which will lower as a witness table) to show that the conversion
+        // is valid.
+        //
+        // At the IR level, this will become a `makeExistential` instruction,
+        // which collects the above information into a single IR-level value.
+        // A dynamic CPU implementation of Slang might encode an existential
+        // as a "fat pointer" representation, which includes a pointer to
+        // data for the concrete value, plus a pointer to the witness table.
+        //
+        // Note: if/when Slang supports more general existential types, such
+        // as compositions of interface (e.g., `IReadable & IWritable`), then
+        // we should probably extend the AST and IR mechanism here to accept
+        // a sequence of witness tables.
+        //
+        auto existentialType = lowerType(context, expr->type);
+        auto concreteValue = getSimpleVal(context, lowerRValueExpr(context, expr->valueArg));
+        auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+        auto existentialValue = getBuilder()->emitMakeExistential(existentialType, concreteValue, witnessTable);
+        return LoweredValInfo::simple(existentialValue);
+    }
+
     LoweredValInfo subscriptValue(
         IRType*         type,
         LoweredValInfo  baseVal,
@@ -2160,6 +2202,27 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // to be an l-value).
         return leftVal;
     }
+
+    LoweredValInfo visitLetExpr(LetExpr* expr)
+    {
+        // TODO: deal with the case where we might want to capture
+        // a reference to the bound value...
+
+        auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
+        setGlobalValue(context, expr->decl, initVal);
+        auto bodyVal = lowerSubExpr(expr->body);
+        return bodyVal;
+    }
+
+    LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
+    {
+        auto existentialType = lowerType(context, GetType(expr->declRef));
+        auto existentialVal = getSimpleVal(context, emitDeclRef(context, expr->declRef, existentialType));
+
+        auto openedType = lowerType(context, expr->type);
+
+        return LoweredValInfo::simple(getBuilder()->emitExtractExistentialValue(openedType, existentialVal));
+    }
 };
 
 struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVisitor>
@@ -2230,7 +2293,6 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         context->shared->extValues.Add(swizzledLValue);
         return LoweredValInfo::swizzledLValue(swizzledLValue);
     }
-
 };
 
 struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVisitor>
@@ -4220,12 +4282,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
-        // The interface decl is not itself a type in the IR
-        // (yet), so the only thing we need to do here is
-        // enumerate the requirements that the interface
-        // imposes on implementations.
-        //
-        // These members will turn into the keys that will
+        // The members of an interface will turn into the keys that will
         // be used for lookup operations into witness
         // tables that promise conformance to the interface.
         //
@@ -4254,7 +4311,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        return LoweredValInfo();
+
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
+
+        // Emit any generics that should wrap the actual type.
+        emitOuterGenerics(subContext, decl, decl);
+
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType();
+        addNameHint(context, irInterface, decl);
+        addLinkageDecoration(context, irInterface, decl);
+        subBuilder->setInsertInto(irInterface);
+
+        // TODO: are there any interface members that should be
+        // nested inside the interface type itself?
+
+        irInterface->moveToEnd();
+
+        addTargetIntrinsicDecorations(irInterface, decl);
+
+
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irInterface));
     }
 
     LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
@@ -5451,6 +5529,14 @@ LoweredValInfo emitDeclRef(
     }
     else if(auto thisTypeSubst = subst.As<ThisTypeSubstitution>())
     {
+        if(decl.Ptr() == thisTypeSubst->interfaceDecl)
+        {
+            // This is a reference to the interface type itself,
+            // through the this-type substitution, so it is really
+            // a reference to the this-type.
+            return lowerType(context, thisTypeSubst->witness->sub);
+        }
+
         // Somebody is trying to look up an interface requirement
         // "through" some concrete type. We need to lower this decl-ref
         // as a lookup of the corresponding member in a witness table.
