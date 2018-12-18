@@ -51,7 +51,7 @@ void main()
 
     vec4 _S9 = _S7 + _S8.f_0;
     vec4 _S10 = _S9 + sb2_0[C_0._data.index_0]._data[C_0._data.index_0];
-    uint _S11 = bb_0[C_0._data.index_0]._data[int(C_0._data.index_0 * uint(4))];
+    uint _S11 = bb_0[C_0._data.index_0]._data[int(C_0._data.index_0 * uint(4))/4];
     _S6 = _S10 + vec4(_S11);
     return;
 }
