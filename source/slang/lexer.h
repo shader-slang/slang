@@ -106,8 +106,8 @@ namespace Slang
     typedef int64_t IntegerLiteralValue;
     typedef double FloatingPointLiteralValue;
 
-    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix = 0);
-    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix = 0);
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix = 0);
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, UnownedStringSlice* outSuffix = 0);
 }
 
 #endif

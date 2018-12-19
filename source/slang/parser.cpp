@@ -3999,7 +3999,7 @@ namespace Slang
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
 
-                String suffix;
+                UnownedStringSlice suffix;
                 IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix);
 
                 // Look at any suffix on the value
@@ -4077,7 +4077,7 @@ namespace Slang
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
 
-                String suffix;
+                UnownedStringSlice suffix;
                 FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
 
                 // Look at any suffix on the value
@@ -4112,9 +4112,9 @@ namespace Slang
                         }
                     }
 
-                    if(unknownCount)
+                    if (unknownCount)
                     {
-                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
                         suffixType = parser->getSession()->getErrorType();
                     }
                     // `f` suffix -> `float`
@@ -4135,7 +4135,7 @@ namespace Slang
                     // TODO: are there other suffixes we need to handle?
                     else
                     {
-                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
                         suffixType = parser->getSession()->getErrorType();
                     }
                 }

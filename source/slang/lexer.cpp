@@ -548,7 +548,7 @@ namespace Slang
 
 
 
-    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix)
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix)
     {
         IntegerLiteralValue value = 0;
 
@@ -568,13 +568,13 @@ namespace Slang
 
         if(outSuffix)
         {
-            *outSuffix = String(cursor, end);
+            *outSuffix = UnownedStringSlice(cursor, end);
         }
 
         return value;
     }
 
-    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix)
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, UnownedStringSlice* outSuffix)
     {
         FloatingPointLiteralValue value = 0;
 
@@ -661,7 +661,7 @@ namespace Slang
 
         if(outSuffix)
         {
-            *outSuffix = String(cursor, end);
+            *outSuffix = UnownedStringSlice(cursor, end);
         }
 
         return value;
