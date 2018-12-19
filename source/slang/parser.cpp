@@ -2211,8 +2211,8 @@ namespace Slang
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
-        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
+        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
+        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
 
         addModifier(bufferDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
         addModifier(bufferVarDecl, new ImplicitParameterGroupVariableModifier());
