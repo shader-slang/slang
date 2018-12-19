@@ -196,9 +196,10 @@ struct SpecializationContext
         //
         IRCloneEnv      env;
 
-        // We will walk through the parqme
-        // Register the arguments of the `specialize` instruction to be used
-        // as the "cloned" value for each of the parameters of the generic.
+        // We will walk through the parameters of the generic and
+        // register the corresponding argument of the `specialize`
+        // instruction to be used as the "cloned" value for each
+        // parameter.
         //
         // Suppose we are looking at `specialize(g, a, b, c)` and `g` has
         // three generic parameters: `T`, `U`, and `V`. Then we will
@@ -591,7 +592,7 @@ struct SpecializationContext
         //    that specifies both the generic and the (concrete) type
         //    arguments that should be provided to it.
         //
-        // Our primary goal is then to fine `specialize` instructions that
+        // Our primary goal is then to find `specialize` instructions that
         // can be replaced with references to, e.g., a suitably
         // specialized function, and to resolve any `lookup_interface_method`
         // instructions to the concrete value fetched from a witness
@@ -600,7 +601,7 @@ struct SpecializationContext
         // We need to be careful of a few things:
         //
         // * It would not in general make sense to consider specialize-able
-        //   instructions under an `IRGeneric`, since that could mean "specialziing"
+        //   instructions under an `IRGeneric`, since that could mean "specializing"
         //   code to parameter values that are still unknown.
         //
         // * We *also* need to be careful not to specialize something when one

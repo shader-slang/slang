@@ -742,7 +742,7 @@ struct ResourceParameterSpecializationContext
         // We will make use of the infrastructure for cloning
         // IR code, that is defined in `ir-clone.{h,cpp}`.
         //
-        // In ordedr to do the cloning work we need an
+        // In order to do the cloning work we need an
         // "environment" that will map old values to
         // their replacements.
         //

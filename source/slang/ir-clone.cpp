@@ -115,8 +115,8 @@ struct IRCloningOldNewPair
 
 // We will use an internal variant of `cloneInstDecorationsAndChildren`
 // that modifies the provided `env` as it goes as the main
-// workhorse, since we need to make sure that instructiosn in
-// earlier blocks are vsibile to those in other, later, blocks
+// workhorse, since we need to make sure that instructions in
+// earlier blocks are visible to those in other, later, blocks
 // when cloning a function, so that strict scoping along the
 // lines of the nesting of instructions isn't sufficient.
 //
