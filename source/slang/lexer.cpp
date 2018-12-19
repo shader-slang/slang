@@ -1270,14 +1270,14 @@ namespace Slang
             // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
             if(textEnd != textBegin)
             {
+                // "scrubbing" token value here to remove escaped newlines...
+                //
+                // Only perform this work if we encountered an escaped newline
+                // while lexing this token (e.g., keep a flag on the lexer), or
+                // do it on-demand when the actual value of the token is needed.
                 if (tokenFlags & TokenFlag::ScrubbingNeeded)
                 {
-                    // HACK(tfoley): "scrubbing" token value here to remove escaped newlines...
-                    //
-                    // TODO: Only perform this work if we encountered an escaped newline
-                    // while lexing this token (e.g., keep a flag on the lexer), or
-                    // do it on-demand when the actual value of the token is needed.
-
+                    // Allocate space that will always be more than enough for stripped contents
                     char* startDst = (char*)memoryArena->allocateUnaligned(textEnd - textBegin);
                     char* dst = startDst;
 
