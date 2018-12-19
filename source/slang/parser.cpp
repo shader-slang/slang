@@ -2380,7 +2380,7 @@ namespace Slang
         parser->FillPosition(blockVarDecl.Ptr());
 
         // Generate a unique name for the data type
-        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
+        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -2425,7 +2425,7 @@ namespace Slang
         else
         {
             // synthesize a dummy name
-            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
+            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
 
             // Otherwise we have a transparent declaration, similar
             // to an HLSL `cbuffer`
