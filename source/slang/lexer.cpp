@@ -786,7 +786,7 @@ namespace Slang
                 return valueBuilder.ProduceString();
             }
 
-            // Charcters that don't being escape sequences are easy;
+            // Characters that don't being escape sequences are easy;
             // just append them to the buffer and move on.
             if(c != '\\')
             {

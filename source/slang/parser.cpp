@@ -693,7 +693,13 @@ namespace Slang
         SourceManager* sourceManager = parser->sink->sourceManager;
         const UnownedStringSlice scopedIdentifier(sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));   
         Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
-        
+
+        // Get the name pool
+        auto namePool = parser->translationUnit->compileRequest->getNamePool();
+
+        // Since it's an Identifier have to set the name.
+        token.ptrValue = namePool->getName(token.Content);
+
         return token;
     }
 

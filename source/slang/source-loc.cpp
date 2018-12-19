@@ -301,6 +301,7 @@ UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& 
 
     return UnownedStringSlice(dst, numChars);
 }
+
 UnownedStringSlice SourceManager::allocateConcatStringSlice(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
     UInt sizeA = a.size();
