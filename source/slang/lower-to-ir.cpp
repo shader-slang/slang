@@ -458,9 +458,9 @@ IROp getIntrinsicOp(
     // based on the name of the declaration...
 
     auto name = decl->getName();
-    auto nameText = getText(name);
+    auto nameText = getUnownedStringSliceText(name);
 
-    IROp op = findIROp(nameText.getUnownedSlice());
+    IROp op = findIROp(nameText);
     SLANG_ASSERT(op != kIROp_Invalid);
     return op;
 }

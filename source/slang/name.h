@@ -36,6 +36,9 @@ public:
 // (e.g., so that it can be printed).
 String getText(Name* name);
 
+/// Get the text as unowned string slice 
+UnownedStringSlice getUnownedStringSliceText(Name* name);
+
 // A `RootNamePool` is used to store and look up names.
 // If two systems need to work together with names, and be sure that they
 // get equivalent names for a string like `"Foo"`, then they need to use
