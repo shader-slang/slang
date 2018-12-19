@@ -1268,40 +1268,47 @@ namespace Slang
             // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
             if(textEnd != textBegin)
             {
-                // HACK(tfoley): "scrubbing" token value here to remove escaped newlines...
-                //
-                // TODO: Only perform this work if we encountered an escaped newline
-                // while lexing this token (e.g., keep a flag on the lexer), or
-                // do it on-demand when the actual value of the token is needed.
-
-                StringBuilder valueBuilder;
-                auto tt = textBegin;
-                while(tt != textEnd)
+                if (tokenFlags & TokenFlag::ScrubbingNeeded)
                 {
-                    char c = *tt++;
-                    if(c == '\\')
+                    // HACK(tfoley): "scrubbing" token value here to remove escaped newlines...
+                    //
+                    // TODO: Only perform this work if we encountered an escaped newline
+                    // while lexing this token (e.g., keep a flag on the lexer), or
+                    // do it on-demand when the actual value of the token is needed.
+
+                    StringBuilder valueBuilder;
+                    auto tt = textBegin;
+                    while (tt != textEnd)
                     {
-                        char d = *tt;
-                        switch(d)
+                        char c = *tt++;
+                        if (c == '\\')
                         {
-                        case '\r': case '\n':
+                            char d = *tt;
+                            switch (d)
+                            {
+                            case '\r': case '\n':
                             {
                                 tt++;
                                 char e = *tt;
-                                if((d ^ e) == ('\r' ^ '\n'))
+                                if ((d ^ e) == ('\r' ^ '\n'))
                                 {
                                     tt++;
                                 }
                             }
                             continue;
 
-                        default:
-                            break;
+                            default:
+                                break;
+                            }
                         }
+                        valueBuilder.Append(c);
                     }
-                    valueBuilder.Append(c);
+                    token.Content = valueBuilder.ProduceString();
                 }
-                token.Content = valueBuilder.ProduceString();
+                else
+                {
+                    token.Content = String(textBegin, textEnd);
+                }
             }
 
             token.flags = flags;
