@@ -118,12 +118,6 @@ void TraceRay_0(
     return;
 }
 
-float saturate_0(float x_0)
-{
-    float tmp_saturate = clamp(x_0, float(0), float(1));
-    return tmp_saturate;
-}
-
 void TraceRay_1(
     accelerationStructureNV AccelerationStructure_1,
     uint RayFlags_1,
@@ -149,6 +143,12 @@ void TraceRay_1(
         1);
     Payload_1 = p_1;
     return;
+}
+
+float saturate_0(float x_0)
+{
+    float tmp_saturate = clamp(x_0, float(0), float(1));
+    return tmp_saturate;
 }
 
 void main() 

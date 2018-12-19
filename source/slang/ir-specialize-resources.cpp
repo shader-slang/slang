@@ -2,6 +2,7 @@
 #include "ir-specialize-resources.h"
 
 #include "ir.h"
+#include "ir-clone.h"
 #include "ir-insts.h"
 
 namespace Slang
@@ -297,50 +298,11 @@ struct ResourceParameterSpecializationContext
     // well as a "key" to identify the specialized function
     // that is required.
     //
-    // The key type is similar to that used for generic specialization
-    // elsewhere in the IR code. It might be worth pulling this
-    // notion out somewhere more centralized, but we are dealing
-    // with the code duplication for now.
+    // We will use the key type defined as part of the IR cloning
+    // infrastructure, which uses a sequence of `IRInst*`s
+    // to hold the state of the key:
     //
-    struct Key
-    {
-        // The structure of a specialization key will be a list
-        // of instructions starting with the function to be specialized,
-        // and then having one or more entries for each parameter
-        // that is being specialized to indicate the value to which
-        // it is being specialized (e.g. the global shader parameter).
-        //
-        List<IRInst*> vals;
-
-        // In order to use this type as a `Dictionary` key we
-        // need it to support equality and hashing, but the
-        // implementaitons are straightforward.
-        //
-        // TODO: honestly we might consider having `GetHashCode`
-        // and `operator==` defined for `List<T>`.
-
-        bool operator==(Key const& other) const
-        {
-            auto valCount = vals.Count();
-            if(valCount != other.vals.Count()) return false;
-            for( UInt ii = 0; ii < valCount; ++ii )
-            {
-                if(vals[ii] != other.vals[ii]) return false;
-            }
-            return true;
-        }
-
-        int GetHashCode() const
-        {
-            auto valCount = vals.Count();
-            int hash = Slang::GetHashCode(valCount);
-            for( UInt ii = 0; ii < valCount; ++ii )
-            {
-                hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
-            }
-            return hash;
-        }
-    };
+    typedef IRSimpleSpecializationKey Key;
 
     // As indicated above, the information we collect about a call
     // site consists of the key for the specialized function we
@@ -768,199 +730,7 @@ struct ResourceParameterSpecializationContext
         }
     }
 
-    // Now that we've covered how all the relevant information
-    // gets gathered, we can turn our attention to the
-    // meat of actually generating a specialized version
-    // of a function.
-    //
-    // For the most part, this is just a matter of *cloning*
-    // the original function, while keeping around a mapping
-    // from original values/instructions to their replacements.
-    //
-    // Because we might perform specialization many times,
-    // it will get is own nested context type.
-    //
-    struct CloneContext
-    {
-        // When cloning, we need an IR builder to use for
-        // making new instructions.
-        //
-        IRBuilder* builder;
-
-        // We also need a mapping from old instruction to their
-        // new equivalents, which will serve double duty:
-        //
-        // * Before we start cloning, this will be used to
-        //   register the mapping from things that are to be
-        //   replaced entirely (like function parameters to
-        //   be specialized away) to their replacements (like
-        //   a global shader parameter).
-        //
-        // * During the process of cloning, this will be
-        //   updated as we clone instructions so that when
-        //   an instruction later in the function refers to
-        //   something from earlier, we can look up the
-        //   replacement.
-        //
-        Dictionary<IRInst*, IRInst*> mapOldValToNew;
-
-        // Whenever we need to look up an operand value
-        // during the cloning process we'll use `cloneOperand`,
-        // which mostly just uses `mapOldValToNew`.
-        //
-        IRInst* cloneOperand(IRInst* oldOperand)
-        {
-            IRInst* newOperand = nullptr;
-            if(mapOldValToNew.TryGetValue(oldOperand, newOperand))
-                return newOperand;
-
-            // The one wrinkle here, and the place where
-            // this cloning logic differs from some other
-            // IR cloning implementations we have lying around,
-            // is that when we *don't* find an instruction in
-            // our map, we automatically assume it is not
-            // something taht needs to be cloned, so that the old
-            // value is fine to use as-is.
-            //
-            // Note that this puts an ordering constraint on
-            // our work: if we are going to clone some instruction
-            // A, then we had better clone it *before* anything
-            // that uses A as an operand.
-            //
-            return oldOperand;
-        }
-
-        // The SSA property and the way we have structured
-        // our "phi nodes" (block parameters) means that
-        // just going through the children of a function,
-        // and then the children of a block will generally
-        // do the Right Thing and always visit an instruction
-        // before its uses.
-        //
-        // The big exception to this is that branch instructions
-        // can refer to blocks later in the same function.
-        //
-        // We work around this sort of problem in a fairly
-        // general fashion, by splitting the cloning of
-        // an instruction into two steps.
-        //
-        // The first step is just to clone the instruction
-        // and its direct operands, but not any decorations
-        // or children.
-        //
-        IRInst* cloneInstAndOperands(IRInst* oldInst)
-        {
-            // In order to clone an instruction we first
-            // need to map its operands over to their
-            // new values.
-            //
-            List<IRInst*> newOperands;
-            UInt operandCount = oldInst->getOperandCount();
-            for(UInt ii = 0; ii < operandCount; ++ii)
-            {
-                auto oldOperand = oldInst->getOperand(ii);
-                auto newOperand = cloneOperand(oldOperand);
-                newOperands.Add(newOperand);
-            }
-
-            // Now we can just tell the IR builder to
-            // go and create an instruction directly
-            //
-            // Note: this logic would not handle any instructions
-            // with special-case data attached, but that only
-            // applies to `IRConstant`s at this point, and those
-            // should only appear at the global scope rather than
-            // in function bodies.
-            //
-            SLANG_ASSERT(!as<IRConstant>(oldInst));
-            auto newInst = builder->emitIntrinsicInst(
-                oldInst->getFullType(),
-                oldInst->op,
-                newOperands.Count(),
-                newOperands.Buffer());
-
-            return newInst;
-        }
-
-        // The second phase of cloning an instruction is to clone
-        // its decorations and children. This step only needs to
-        // be performed on those instructions that *have* decorations
-        // and/or children.
-        //
-        // The complexity of this step comes from the fact that it
-        // needs to sequence the two phases of cloning for any
-        // child instructions. We will do this by performing the
-        // first phase of cloning, and building up a list of
-        // children that require the second phase of processing.
-        // Each entry in that list will be a pair of an old instruction
-        // and its new clone.
-        //
-        struct OldNewPair
-        {
-            IRInst* oldInst;
-            IRInst* newInst;
-        };
-        void cloneInstDecorationsAndChildren(IRInst* oldInst, IRInst* newInst)
-        {
-            List<OldNewPair> pairs;
-            for( auto oldChild : oldInst->getDecorationsAndChildren() )
-            {
-                // As a very subtle special case, if one of the children
-                // of our `oldInst` already has a registered replacement,
-                // then we don't want to clone it (not least because
-                // the `Dictionary::Add` method would give us an error
-                // when we try to insert a new value for the same key).
-                //
-                // This arises for entries in `mapOldValToNew` that were
-                // seeded before cloning begain (e.g., the function
-                // parameters that are to be replaced).
-                //
-                if(mapOldValToNew.ContainsKey(oldChild))
-                    continue;
-
-                // Because we are re-using the same IR builder in
-                // multiple places, we need to make sure to set
-                // its insertion location before creating the
-                // child instruction.
-                //
-                builder->setInsertInto(newInst);
-
-                // Now we can perform the first phase of cloning
-                // on the child, and register it in our map from
-                // old to new values.
-                //
-                auto newChild = cloneInstAndOperands(oldChild);
-                mapOldValToNew.Add(oldChild, newChild);
-
-                // If an only if the old child had decorations
-                // or children, we will register it into our
-                // list for processing in the second phase.
-                //
-                if( oldChild->getFirstDecorationOrChild() )
-                {
-                    OldNewPair pair;
-                    pair.oldInst = oldChild;
-                    pair.newInst = newChild;
-                    pairs.Add(pair);
-                }
-            }
-
-            // Once we have done first-phase processing for
-            // all child instructions, we scan through those
-            // in the list that required second-phase processing,
-            // and clone their decorations and/or children recursively.
-            //
-            for( auto pair : pairs )
-            {
-                auto oldChild = pair.oldInst;
-                auto newChild = pair.newInst;
-
-                cloneInstDecorationsAndChildren(oldChild, newChild);
-            }
-        }
-    };
-
-    // With all of that machinery out of the way,
+    // With all of that data-gathering code out of the way,
     // we are now prepared to walk through the process of
     // specializing a given callee function based on
     // the information we have gathered.
@@ -969,12 +739,14 @@ struct ResourceParameterSpecializationContext
         IRFunc*                         oldFunc,
         FuncSpecializationInfo const&   funcInfo)
     {
-        // We start by setting up our context for cloning
-        // the blocks and instructions in the old function.
+        // We will make use of the infrastructure for cloning
+        // IR code, that is defined in `ir-clone.{h,cpp}`.
         //
-        auto builder = getBuilder();
-        CloneContext cloneContext;
-        cloneContext.builder = builder;
+        // In order to do the cloning work we need an
+        // "environment" that will map old values to
+        // their replacements.
+        //
+        IRCloneEnv cloneEnv;
 
         // Next we iterate over the parameters of the old
         // function, and register each as being mapped
@@ -986,7 +758,7 @@ struct ResourceParameterSpecializationContext
         {
             UInt paramIndex = paramCounter++;
             auto newVal = funcInfo.replacementsForOldParameters[paramIndex];
-            cloneContext.mapOldValToNew.Add(oldParam, newVal);
+            cloneEnv.mapOldValToNew.Add(oldParam, newVal);
         }
 
         // Next we will create the skeleton of the new
@@ -1003,6 +775,8 @@ struct ResourceParameterSpecializationContext
         {
             paramTypes.Add(param->getFullType());
         }
+
+        auto builder = getBuilder();
         IRType* funcType = builder->getFuncType(
             paramTypes.Count(),
             paramTypes.Buffer(),
@@ -1015,11 +789,15 @@ struct ResourceParameterSpecializationContext
         // of cloning the function (since `IRFunc`s have no
         // operands).
         //
-        // We can now call into our `CloneContext` to perform
-        // the second phase of cloning, which will recursively
+        // We can now use the shared IR cloning infrastructure
+        // to perform the second phase of cloning, which will recursively
         // clone any nested decorations, blocks, and instructions.
         //
-        cloneContext.cloneInstDecorationsAndChildren(oldFunc, newFunc);
+        cloneInstDecorationsAndChildren(
+            &cloneEnv,
+            builder->sharedBuilder,
+            oldFunc,
+            newFunc);
 
         // We are almost done at this point, except that `newFunc`
         // is lacking its parameters, as well as any of the body
