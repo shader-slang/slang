@@ -392,7 +392,7 @@ struct SpecializationContext
         // is that the operands to `inst` have all been fully
         // specialized.
         //
-        SLANG_ASSERT(areOperandsAllFullySpecialized(inst));
+        SLANG_ASSERT(areAllOperandsFullySpecialized(inst));
 
         switch(inst->op)
         {
