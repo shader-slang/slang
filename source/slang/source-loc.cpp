@@ -292,6 +292,27 @@ void SourceManager::initialize(
     m_nextLoc = m_startLoc;
 }
 
+UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)
+{
+    const UInt numChars = slice.size();
+
+    char* dst = (char*)m_memoryArena.allocate(numChars);
+    ::memcpy(dst, slice.begin(), numChars);
+
+    return UnownedStringSlice(dst, numChars);
+}
+UnownedStringSlice SourceManager::allocateConcatStringSlice(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    UInt sizeA = a.size();
+    UInt sizeB = b.size();
+
+    char* dst = (char*)m_memoryArena.allocate(sizeA + sizeB);
+    ::memcpy(dst, a.begin(), sizeA);
+    ::memcpy(dst + sizeA, b.begin(), sizeB);
+
+    return UnownedStringSlice(dst, sizeA + sizeB);
+}
+
 SourceRange SourceManager::allocateSourceRange(UInt size)
 {
     // TODO: consider using atomics here

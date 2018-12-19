@@ -306,6 +306,11 @@ struct SourceManager
         /// A memory arena to hold allocations that are in scope for the same time as SourceManager
     MemoryArena* getMemoryArena() { return &m_memoryArena;  }
 
+        /// Allocate a string slice
+    UnownedStringSlice allocateStringSlice(const UnownedStringSlice& slice);
+        /// Allocate the concatination of two string slices
+    UnownedStringSlice allocateConcatStringSlice(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
     SourceManager() :
         m_memoryArena(2048)
     {}
@@ -327,6 +332,8 @@ struct SourceManager
     List<RefPtr<SourceView> > m_sourceViews;                
     StringSlicePool m_slicePool;
 
+    // Memory arena that can be used for holding data to held in scope as long as the Source is
+    // Can be used for storing the decoded contents of Token.Content for exampel
     MemoryArena m_memoryArena;
 
     // Maps canonical paths to source files

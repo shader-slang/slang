@@ -690,19 +690,11 @@ namespace Slang
         }
 
         // Make a 'token'
-        {
-            MemoryArena* memoryArena = parser->sink->sourceManager->getMemoryArena();
-            const UInt numChars = scopedIdentifierBuilder.Length();
-            char* dst = (char*)memoryArena->allocateUnaligned(numChars);
-            ::memcpy(dst, scopedIdentifierBuilder.Buffer(), numChars);
-
-            UnownedStringSlice scopedIdentifier(dst, numChars);
-
-            Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
-            token.ptrValue = getName(parser, token.Content);
-
-            return token;
-        }
+        SourceManager* sourceManager = parser->sink->sourceManager;
+        const UnownedStringSlice scopedIdentifier(sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));   
+        Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
+        
+        return token;
     }
 
     // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
@@ -998,15 +990,8 @@ namespace Slang
             case TokenType::QuestionMark:
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    MemoryArena* memoryArena = parser->sink->sourceManager->getMemoryArena();
-
                     // Allocate a new slice, so we can concat : at the end
-                    const UInt numChars = nameToken.Content.size();
-                    char* dst = (char*)memoryArena->allocateUnaligned(numChars + 1);
-                    ::memcpy(dst, nameToken.Content.begin(), numChars);
-                    dst[numChars] = ':';
-
-                    nameToken.Content = UnownedStringSlice(dst, numChars + 1);
+                    nameToken.Content = parser->sink->sourceManager->allocateConcatStringSlice(nameToken.Content, UnownedStringSlice::fromLiteral(":"));
                     break;
                 }
                 ;       // fall-thru
