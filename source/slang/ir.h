@@ -92,7 +92,7 @@ enum IROpMeta
 // True if op is pseudo (or invalid which is 'pseudo-like' at least in as so far as current behavior)
 SLANG_FORCE_INLINE bool isPseudoOp(IROp op) { return (op & kIROpMeta_IsPseudoOp) != 0; }
 
-IROp findIROp(char const* name);
+IROp findIROp(const UnownedStringSlice& name);
 
 // A logical operation/opcode in the IR
 struct IROpInfo

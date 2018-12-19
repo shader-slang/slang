@@ -111,9 +111,9 @@ namespace Slang
             return -1;
         }
 
-        const char& operator[](int i) const
+        const char& operator[](UInt i) const
         {
-            assert(i >= 0 && i < int(endData - beginData));
+            assert(i < UInt(endData - beginData));
             return beginData[i];
         }
 

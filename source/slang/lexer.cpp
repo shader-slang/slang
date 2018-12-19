@@ -14,7 +14,7 @@ namespace Slang
 {
     static Token GetEndOfFileToken()
     {
-        return Token(TokenType::EndOfFile, "", SourceLoc());
+        return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
     }
 
     Token* TokenList::begin() const
@@ -86,11 +86,13 @@ namespace Slang
     void Lexer::initialize(
         SourceView*     inSourceView,
         DiagnosticSink* inSink,
-        NamePool*       inNamePool)
+        NamePool*       inNamePool,
+        MemoryArena*    inMemoryArena)
     {
         sourceView  = inSourceView;
         sink        = inSink;
         namePool    = inNamePool;
+        memoryArena = inMemoryArena;
 
         auto content = inSourceView->getContent();
         
@@ -888,11 +890,11 @@ namespace Slang
     {
         // A file name usually doesn't process escape sequences
         // (this is import on Windows, where `\\` is a valid
-        // path separator cahracter).
+        // path separator character).
 
         // Just trim off the first and last characters to remove the quotes
         // (whether they were `""` or `<>`.
-        return token.Content.SubString(1, token.Content.Length()-2);
+        return String(token.Content.begin() + 1, token.Content.end() - 1); 
     }
 
 
@@ -1276,7 +1278,9 @@ namespace Slang
                     // while lexing this token (e.g., keep a flag on the lexer), or
                     // do it on-demand when the actual value of the token is needed.
 
-                    StringBuilder valueBuilder;
+                    char* startDst = (char*)memoryArena->allocateUnaligned(textEnd - textBegin);
+                    char* dst = startDst;
+
                     auto tt = textBegin;
                     while (tt != textEnd)
                     {
@@ -1301,13 +1305,13 @@ namespace Slang
                                 break;
                             }
                         }
-                        valueBuilder.Append(c);
+                        *dst++ = c;
                     }
-                    token.Content = valueBuilder.ProduceString();
+                    token.Content = UnownedStringSlice(startDst, dst);
                 }
                 else
                 {
-                    token.Content = String(textBegin, textEnd);
+                    token.Content = UnownedStringSlice(textBegin, textEnd);
                 }
             }
 

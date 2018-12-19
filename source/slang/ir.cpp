@@ -75,11 +75,11 @@ namespace Slang
         return kIROps[kIROpCount].info;
     }
 
-    IROp findIROp(char const* name)
+    IROp findIROp(const UnownedStringSlice& name)
     {
         for (auto ee : kIROps)
         {
-            if (strcmp(name, ee.info.name) == 0)
+            if (name == ee.info.name)
                 return ee.op;
         }
 

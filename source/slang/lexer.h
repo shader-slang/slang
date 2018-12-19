@@ -75,7 +75,8 @@ namespace Slang
         void initialize(
             SourceView*     sourceView,
             DiagnosticSink* sink,
-            NamePool*       namePool);
+            NamePool*       namePool,
+            MemoryArena*    memoryArena);
 
         ~Lexer();
 
@@ -97,6 +98,8 @@ namespace Slang
 
         TokenFlags      tokenFlags;
         LexerFlags      lexerFlags;
+
+        MemoryArena*    memoryArena;
     };
 
     // Helper routines for extracting values from tokens

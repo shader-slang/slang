@@ -690,11 +690,19 @@ namespace Slang
         }
 
         // Make a 'token'
-        const String scopedIdentifier(scopedIdentifierBuilder.ToString());
-        Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
-        token.ptrValue = getName(parser, token.Content);
+        {
+            MemoryArena* memoryArena = parser->sink->sourceManager->getMemoryArena();
+            const UInt numChars = scopedIdentifierBuilder.Length();
+            char* dst = (char*)memoryArena->allocateUnaligned(numChars);
+            ::memcpy(dst, scopedIdentifierBuilder.Buffer(), numChars);
 
-        return token;
+            UnownedStringSlice scopedIdentifier(dst, numChars);
+
+            Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
+            token.ptrValue = getName(parser, token.Content);
+
+            return token;
+        }
     }
 
     // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
@@ -990,7 +998,15 @@ namespace Slang
             case TokenType::QuestionMark:
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    nameToken.Content = nameToken.Content + ":";
+                    MemoryArena* memoryArena = parser->sink->sourceManager->getMemoryArena();
+
+                    // Allocate a new slice, so we can concat : at the end
+                    const UInt numChars = nameToken.Content.size();
+                    char* dst = (char*)memoryArena->allocateUnaligned(numChars + 1);
+                    ::memcpy(dst, nameToken.Content.begin(), numChars);
+                    dst[numChars] = ':';
+
+                    nameToken.Content = UnownedStringSlice(dst, numChars + 1);
                     break;
                 }
                 ;       // fall-thru
@@ -3718,7 +3734,7 @@ namespace Slang
         {
         case TokenType::QuestionMark:
             opToken = parser->ReadToken();
-            opToken.Content = "?:";
+            opToken.Content = UnownedStringSlice::fromLiteral("?:");
             break;
 
         default:
@@ -4004,14 +4020,15 @@ namespace Slang
 
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
+                const char*const suffixEnd = suffix.end();
 
                 RefPtr<Type> suffixType = nullptr;
-                if( suffixCursor && *suffixCursor )
+                if( suffixCursor < suffixEnd )
                 {
                     int lCount = 0;
                     int uCount = 0;
                     int unknownCount = 0;
-                    while(*suffixCursor)
+                    while(suffixCursor < suffixEnd)
                     {
                         switch( *suffixCursor++ )
                         {
@@ -4082,15 +4099,16 @@ namespace Slang
 
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
+                const char*const suffixEnd = suffix.end();
 
                 RefPtr<Type> suffixType = nullptr;
-                if( suffixCursor && *suffixCursor )
+                if( suffixCursor < suffixEnd )
                 {
                     int fCount = 0;
                     int lCount = 0;
                     int hCount = 0;
                     int unknownCount = 0;
-                    while(*suffixCursor)
+                    while(suffixCursor < suffixEnd)
                     {
                         switch( *suffixCursor++ )
                         {
@@ -4424,7 +4442,7 @@ namespace Slang
             {
                 modifier->opToken = parser->ReadToken(TokenType::Identifier);
 
-                modifier->op = findIROp(modifier->opToken.Content.Buffer());
+                modifier->op = findIROp(modifier->opToken.Content);
 
                 if (modifier->op == kIROp_Invalid)
                 {
