@@ -37,7 +37,7 @@ TestCategory* TestCategorySet::findOrError(String const& name)
     TestCategory* category = find(name);
     if (!category)
     {
-        StdWriters::getStdError().print("error: unknown test category name '%s'\n", name.Buffer());
+        StdWriters::getError().print("error: unknown test category name '%s'\n", name.Buffer());
     }
     return category;
 }

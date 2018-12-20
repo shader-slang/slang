@@ -499,7 +499,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     StdWriters::setSingleton(stdWriters);
 
 	// Parse command-line options
-	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getStdError()));
+	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getError()));
 
     RefPtr<renderer_test::Window> window(new renderer_test::Window);
     SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));

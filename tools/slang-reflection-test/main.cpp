@@ -19,7 +19,7 @@ struct PrettyWriter
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
     SLANG_ASSERT(end >= begin);
-    Slang::StdWriters::getStdOut().write(begin, size_t(end - begin));
+    Slang::StdWriters::getOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -80,7 +80,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    Slang::StdWriters::getStdOut().print("%llu", (unsigned long long)val);
+    Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -893,7 +893,7 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        Slang::StdWriters::getStdError().put(diagnostic);
+        Slang::StdWriters::getError().put(diagnostic);
     }
     return res;
 }

@@ -15,7 +15,7 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    auto stdError = StdWriters::getStdError();
+    auto stdError = StdWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
@@ -69,7 +69,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        StdChannels::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
         res = SLANG_FAIL;
     }
 #endif

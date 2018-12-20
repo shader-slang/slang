@@ -28,8 +28,8 @@ public:
     static StdWriters* getSingleton() { return s_singleton; }
     static void setSingleton(StdWriters* context) { s_singleton = context;  }
 
-    static WriterHelper getStdError() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR); }
-    static WriterHelper getStdOut() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT); }
+    static WriterHelper getError() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR); }
+    static WriterHelper getOut() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT); }
     static WriterHelper getDiagnostic() { return getSingleton()->getWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC); }
 
 protected:

@@ -1782,7 +1782,7 @@ struct ToolInvoke
         auto func = testContext->getInnerMainFunc(m_binDirectory, m_toolName);
         if (!func)
         {
-            StdWriters::getStdError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
+            StdWriters::getError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
             return SLANG_FAIL;
         }
 
@@ -1851,7 +1851,7 @@ SlangResult innerMain(int argc, char** argv)
         }
     }
 
-    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getStdError(), &context.options));
+    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
     
     Options& options = context.options;
     if( options.includeCategories.Count() == 0 )

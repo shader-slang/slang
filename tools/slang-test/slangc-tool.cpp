@@ -7,7 +7,7 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 static void _diagnosticCallback(char const* message, void* /*userData*/)
 {
-    auto stdError = StdWriters::getStdError();
+    auto stdError = StdWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
@@ -45,7 +45,7 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session,
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        StdWriters::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
         res = SLANG_FAIL;
     }
 #endif
