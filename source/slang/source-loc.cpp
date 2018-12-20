@@ -302,18 +302,6 @@ UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& 
     return UnownedStringSlice(dst, numChars);
 }
 
-UnownedStringSlice SourceManager::allocateConcatStringSlice(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    UInt sizeA = a.size();
-    UInt sizeB = b.size();
-
-    char* dst = (char*)m_memoryArena.allocate(sizeA + sizeB);
-    ::memcpy(dst, a.begin(), sizeA);
-    ::memcpy(dst + sizeA, b.begin(), sizeB);
-
-    return UnownedStringSlice(dst, sizeA + sizeB);
-}
-
 SourceRange SourceManager::allocateSourceRange(UInt size)
 {
     // TODO: consider using atomics here

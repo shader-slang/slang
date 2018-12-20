@@ -996,8 +996,8 @@ namespace Slang
             case TokenType::QuestionMark:
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    // Allocate a new slice, so we can concat : at the end
-                    nameToken.Content = parser->sink->sourceManager->allocateConcatStringSlice(nameToken.Content, UnownedStringSlice::fromLiteral(":"));
+                    // Concat : onto ?
+                    nameToken.Content = UnownedStringSlice::fromLiteral("?:"); 
                     break;
                 }
                 ;       // fall-thru

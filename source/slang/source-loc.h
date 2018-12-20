@@ -308,9 +308,7 @@ struct SourceManager
 
         /// Allocate a string slice
     UnownedStringSlice allocateStringSlice(const UnownedStringSlice& slice);
-        /// Allocate the concatination of two string slices
-    UnownedStringSlice allocateConcatStringSlice(const UnownedStringSlice& a, const UnownedStringSlice& b);
-
+    
     SourceManager() :
         m_memoryArena(2048)
     {}
