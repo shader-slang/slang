@@ -43,7 +43,7 @@ struct Options
     // Directory to use when looking for binaries to run
     char const* binDir = "";
 
-    // only run test cases with names that have this prefix
+    // only run test cases with names that have this prefix. 
     char const* testPrefix = nullptr;
 
     // generate extra output (notably: command lines we run)
@@ -71,6 +71,12 @@ struct Options
 
     // By default we can test against all apis
     RenderApiFlags enabledApis = RenderApiFlag::AllOf;
+
+    // The subCommand to execute. Will be empty if there is no subCommand 
+    Slang::String subCommand;      
+
+    // Arguments to the sub command. Note that if there is a subCommand the first parameter is always the subCommand itself.
+    Slang::List<Slang::String> subCommandArgs;
 
     // By default we potentially synthesize test for all 
     // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests fail  

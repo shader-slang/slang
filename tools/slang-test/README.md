@@ -1,6 +1,6 @@
 # Slang Test
 
-Slang Test is a command line tool that is used to coordinate tests via other command line tools. The actual executable is 'slang-test'. It is typically run from the test.bat script in the root directory of the project.
+Slang Test is a command line tool that is used to coordinate tests via other tools. The actual executable is 'slang-test'. It is typically run from the test.bat script in the root directory of the project.
 
 Slang Test can be thought of as the 'hub' running multiple tests and accumulating the results. In the distribution tests are held in the 'tests' directory. Inside this directory there are tests grouped together via other directories. Inside those directories are the actual tests themselves. The tests exist as .hlsl, .slang and .glsl and other file extensions. The top line of each of these files describe what kind of test will be performed with a specialized comment '//TEST'. 
 
@@ -15,6 +15,20 @@ slang-test -bindir E:\slang\bin\windows-x64\Debug\\ -category full tests/compute
 * The -bindir value means that the tools slang-test will use the binaries found in this directory. 
 * The -category full means that all tests can be run.
 * The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
+
+Most types of test use 'test tools' to implement actual tests. There are currently 3 'tools' that are typically used 
+
+* slangc
+* render-test
+* slang-reflection-test
+
+These are typically implemeted as dlls/shared libraries that are loaded when a test is needed. Sometimes it is necessary or useful to just call one of these test tools directly with the parameters the tool takes. This can be achieved by giving the tool as a 'sub command' name on the command line. All of the parameters after the tool name will be passed directly to the tool. For example
+
+ ```
+slang-test -bindir E:\slang\bin\windows-x64\Debug\\ slangc tests/compute/array-param.slang
+```
+
+Will run the 'slangc' tool with the parameters listed after 'slangc' on the command line. Any parameters before the sub command will be parsed as usual by slang-test, and if not applicable to invoking the tool will be ignored. bindir will be used for finding the tool directory. This is by design so that the sub command invocation can just be placed after the normal slang-test commands, and removed when no longer needed. 
 
 The command line can control which tests are run with a couple of switches
 
@@ -54,6 +68,7 @@ There are the following test categories
 * render
 * compute
 * vulkan
+* compatibility-issue
 
 A test may be in one or more categories. The categories are specified in the test line, for example: 
 //TEST(smoke,compute):COMPARE_COMPUTE:
