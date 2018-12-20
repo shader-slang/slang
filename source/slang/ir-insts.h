@@ -573,6 +573,9 @@ struct IRWitnessTableEntry : IRInst
     // The IR-level value that satisfies the requirement
     IRUse satisfyingVal;
 
+    IRInst* getRequirementKey() { return getOperand(0); }
+    IRInst* getSatisfyingVal()  { return getOperand(1); }
+
     IR_LEAF_ISA(WitnessTableEntry)
 };
 
@@ -788,6 +791,12 @@ struct IRBuilder
     IRInst* emitCallInst(
         IRType*         type,
         IRInst*         func,
+        UInt            argCount,
+        IRInst* const*  args);
+
+    IRInst* createIntrinsicInst(
+        IRType*         type,
+        IROp            op,
         UInt            argCount,
         IRInst* const*  args);
 
@@ -1142,6 +1151,10 @@ struct IRBuilder
     }
 };
 
+void addHoistableInst(
+    IRBuilder*  builder,
+    IRInst*     inst);
+
 // Helper to establish the source location that will be used
 // by an IRBuilder.
 struct IRBuilderSourceLocRAII
@@ -1168,44 +1181,6 @@ struct IRBuilderSourceLocRAII
     }
 };
 
-
-//
-
-// Interface to IR specialization for use when cloning target-specific
-// IR as part of compiling an entry point.
-//
-// TODO: we really need to move all of this logic to its own files.
-
-// `IRSpecializationState` is used as an opaque type to wrap up all
-// the data needed to perform IR specialization, without exposing
-// implementation details.
-struct IRSpecializationState;
-IRSpecializationState* createIRSpecializationState(
-    EntryPointRequest*  entryPointRequest,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target,
-    TargetRequest*      targetReq);
-void destroyIRSpecializationState(IRSpecializationState* state);
-IRModule* getIRModule(IRSpecializationState* state);
-
-struct ExtensionUsageTracker;
-
-// Clone the IR values reachable from the given entry point
-// into the IR module associated with the specialization state.
-// When multiple definitions of a symbol are found, the one
-// that is best specialized for the given `targetReq` will be
-// used.
-void specializeIRForEntryPoint(
-    IRSpecializationState*  state,
-    EntryPointRequest*  entryPointRequest,
-    ExtensionUsageTracker*  extensionUsageTracker);
-
-// Find suitable uses of the `specialize` instruction that
-// can be replaced with references to specialized functions.
-void specializeGenerics(
-    IRModule*   module,
-    CodeGenTarget target);
-
 //
 
 void markConstExpr(
@@ -1213,6 +1188,10 @@ void markConstExpr(
     IRInst*     irValue);
 
 //
+
+IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
+        IRInst*        val,
+        String const&   targetName);
 
 }
 

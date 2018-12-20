@@ -1133,5 +1133,4 @@ IRInst* createEmptyInstWithSize(
     size_t      totalSizeInBytes);
 }
 
-
 #endif
