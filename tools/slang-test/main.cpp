@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"
-#include "../../source/core/slang-app-context.h"
+#include "../../source/core/slang-std-channels.h"
 
 #include "../../slang-com-helper.h"
 
@@ -369,16 +369,17 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
             StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
             StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
-            AppContext appContext;
-            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
-            appContext.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+            StdChannels* prevStdChannels = StdChannels::getSingleton();
+
+            StdChannels stdChannels;
+            stdChannels.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
+            stdChannels.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
 
             if (exeName == "slangc")
             {
-                appContext.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
+                stdChannels.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
             }
-            appContext.setReplaceWriterFlagsAll();
-
+            
             List<const char*> args;
             args.Add(exeName.Buffer());
             for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
@@ -386,11 +387,14 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
                 args.Add(spawner.argumentList_[i].Buffer());
             }
 
-            SlangResult res = func(&appContext, context->getSession(), int(args.Count()), args.begin());
+            SlangResult res = func(&stdChannels, context->getSession(), int(args.Count()), args.begin());
+
+            StdChannels::setSingleton(prevStdChannels);
 
             spawner.standardError_ = stdErrorString;
             spawner.standardOutput_ = stdOutString;
-            spawner.resultCode_ = AppContext::getReturnCode(res);
+
+            spawner.resultCode_ = TestToolUtil::getReturnCode(res);
 
             return kOSError_None;
         }
@@ -1770,7 +1774,7 @@ struct ToolInvoke
         return true;
     }
 
-    SlangResult invoke(AppContext* appContext, TestContext* testContext)
+    SlangResult invoke(StdChannels* stdChannels, TestContext* testContext)
     {
         // Do I want to strip the -bindir directory that may be later
 
@@ -1778,11 +1782,11 @@ struct ToolInvoke
         auto func = testContext->getInnerMainFunc(m_binDirectory, m_toolName);
         if (!func)
         {
-            AppContext::getStdError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
+            StdChannels::getStdError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
             return SLANG_FAIL;
         }
 
-        return func(AppContext::getSingleton(), testContext->getSession(), int(m_args.Count()), m_args.Buffer());
+        return func(StdChannels::getSingleton(), testContext->getSession(), int(m_args.Count()), m_args.Buffer());
     }
 
     String m_binDirectory;
@@ -1813,7 +1817,7 @@ private:
 
 SlangResult innerMain(int argc, char** argv)
 {
-    AppContext::initDefault();
+    StdChannels::initDefault();
 
     // The context holds useful things used during testing
     TestContext context;
@@ -1843,11 +1847,11 @@ SlangResult innerMain(int argc, char** argv)
         ToolInvoke toolInvoke;
         if (toolInvoke.parse(argv, argc))
         {
-            return toolInvoke.invoke(AppContext::getSingleton(), &context);
+            return toolInvoke.invoke(StdChannels::getSingleton(), &context);
         }
     }
 
-    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, AppContext::getStdError(), &context.options));
+    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdChannels::getStdError(), &context.options));
     
     Options& options = context.options;
     if( options.includeCategories.Count() == 0 )

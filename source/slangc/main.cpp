@@ -5,8 +5,7 @@
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 #include "../core/slang-io.h"
-#include "../core/slang-app-context.h"
-#include "../core/slang-writer.h"
+#include "../core/slang-test-tool-util.h"
 
 using namespace Slang;
 
@@ -16,7 +15,7 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    auto stdError = AppContext::getStdError();
+    auto stdError = StdChannels::getStdError();
     stdError.put(message);
     stdError.flush();
 }
@@ -27,9 +26,9 @@ static void diagnosticCallback(
 #define MAIN main
 #endif
 
-SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(StdChannels* stdChannels, SlangSession* session, int argc, const char*const* argv)
 {
-    AppContext::setSingleton(appContext);
+    StdChannels::setSingleton(stdChannels);
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
@@ -41,7 +40,7 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
     spSetCommandLineCompilerMode(compileRequest);
 
     // Do any app specific configuration
-    appContext->configureRequest(compileRequest);
+    stdChannels->setRequestWriters(compileRequest);
 
     char const* appName = "slangc";
     if (argc > 0) appName = argv[0];
@@ -70,7 +69,7 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(AppContext* appContext, Slan
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        AppContext::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        StdChannels::getStdOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
         res = SLANG_FAIL;
     }
 #endif
@@ -85,10 +84,10 @@ int MAIN(int argc, char** argv)
     SlangResult res;
     {
         SlangSession* session = spCreateSession(nullptr);
-        res = innerMain(AppContext::initDefault(), session, argc, argv);
+        res = innerMain(StdChannels::initDefault(), session, argc, argv);
         spDestroySession(session);
     }
-    return AppContext::getReturnCode(res);
+    return TestToolUtil::getReturnCode(res);
 }
 
 #ifdef _WIN32
