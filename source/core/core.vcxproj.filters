@@ -72,7 +72,7 @@
     <ClInclude Include="slang-shared-library.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-std-channels.h">
+    <ClInclude Include="slang-std-writers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-string-slice-pool.h">
@@ -131,7 +131,7 @@
     <ClCompile Include="slang-shared-library.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-std-channels.cpp">
+    <ClCompile Include="slang-std-writers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-string-slice-pool.cpp">

@@ -491,15 +491,15 @@ Result RenderTestApp::writeScreen(const char* filename)
 
 } //  namespace renderer_test
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdChannels* stdChannels, SlangSession* session, int argcIn, const char*const* argvIn)
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
 {
     using namespace renderer_test;
     using namespace Slang;
 
-    StdChannels::setSingleton(stdChannels);
+    StdWriters::setSingleton(stdWriters);
 
 	// Parse command-line options
-	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdChannels::getStdError()));
+	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getStdError()));
 
     RefPtr<renderer_test::Window> window(new renderer_test::Window);
     SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
@@ -671,7 +671,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdChannels* stdChannels, Slang
 int main(int argc, char**  argv)
 {
     SlangSession* session = spCreateSession(nullptr);
-    SlangResult res = innerMain(Slang::StdChannels::initDefault(), session, argc, argv);
+    SlangResult res = innerMain(Slang::StdWriters::initDefault(), session, argc, argv);
     spDestroySession(session);
 
 	return SLANG_FAILED(res) ? 1 : 0;

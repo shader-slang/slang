@@ -15,7 +15,7 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    auto stdError = StdChannels::getStdError();
+    auto stdError = StdWriters::getStdError();
     stdError.put(message);
     stdError.flush();
 }
@@ -26,9 +26,9 @@ static void diagnosticCallback(
 #define MAIN main
 #endif
 
-SLANG_TEST_TOOL_API SlangResult innerMain(StdChannels* stdChannels, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
 {
-    StdChannels::setSingleton(stdChannels);
+    StdWriters::setSingleton(stdWriters);
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
@@ -40,7 +40,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdChannels* stdChannels, SlangSession
     spSetCommandLineCompilerMode(compileRequest);
 
     // Do any app specific configuration
-    stdChannels->setRequestWriters(compileRequest);
+    stdWriters->setRequestWriters(compileRequest);
 
     char const* appName = "slangc";
     if (argc > 0) appName = argv[0];
@@ -84,7 +84,7 @@ int MAIN(int argc, char** argv)
     SlangResult res;
     {
         SlangSession* session = spCreateSession(nullptr);
-        res = innerMain(StdChannels::initDefault(), session, argc, argv);
+        res = innerMain(StdWriters::initDefault(), session, argc, argv);
         spDestroySession(session);
     }
     return TestToolUtil::getReturnCode(res);

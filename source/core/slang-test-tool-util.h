@@ -1,7 +1,7 @@
 #ifndef SLANG_TEST_TOOL_UTIL_H
 #define SLANG_TEST_TOOL_UTIL_H
 
-#include "slang-std-channels.h"
+#include "slang-std-writers.h"
 
 namespace Slang {
 
@@ -14,7 +14,7 @@ namespace Slang {
 /* Utility functions for 'test tools' */
 struct TestToolUtil
 {
-    typedef SlangResult(*InnerMainFunc)(Slang::StdChannels* stdChannels, SlangSession* session, int argc, const char*const* argv);
+    typedef SlangResult(*InnerMainFunc)(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv);
 
         /// Given a slang result, returns a return code that can be returned from an executable
     static int getReturnCode(SlangResult res);

@@ -19,7 +19,7 @@ struct PrettyWriter
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
     SLANG_ASSERT(end >= begin);
-    Slang::StdChannels::getStdOut().write(begin, size_t(end - begin));
+    Slang::StdWriters::getStdOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -80,7 +80,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    Slang::StdChannels::getStdOut().print("%llu", (unsigned long long)val);
+    Slang::StdWriters::getStdOut().print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -893,18 +893,18 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        Slang::StdChannels::getStdError().put(diagnostic);
+        Slang::StdWriters::getStdError().put(diagnostic);
     }
     return res;
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdChannels* stdChannels, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
 {
-    Slang::StdChannels::setSingleton(stdChannels);
+    Slang::StdWriters::setSingleton(stdWriters);
     
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
-    stdChannels->setRequestWriters(request);
+    stdWriters->setRequestWriters(request);
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
@@ -928,7 +928,7 @@ int main(
     char** argv)
 {
     SlangSession* session = spCreateSession(nullptr);
-    SlangResult res = innerMain(Slang::StdChannels::initDefault(), session, argc, argv);
+    SlangResult res = innerMain(Slang::StdWriters::initDefault(), session, argc, argv);
     spDestroySession(session);
 
     return SLANG_FAILED(res) ? 1 : 0;
