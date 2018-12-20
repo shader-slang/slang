@@ -267,11 +267,13 @@ static PreprocessorInputStream* CreateInputStreamForSource(
     Preprocessor*   preprocessor,
     SourceView*     sourceView)
 {
+    MemoryArena* memoryArena = sourceView->getSourceManager()->getMemoryArena();
+
     PrimaryInputStream* inputStream = new PrimaryInputStream();
     initializePrimaryInputStream(preprocessor, inputStream);
 
     // initialize the embedded lexer so that it can generate a token stream
-    inputStream->lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor));
+    inputStream->lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor), memoryArena);
     inputStream->token = inputStream->lexer.lexToken();
 
     return inputStream;
@@ -845,7 +847,7 @@ top:
         SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
         Lexer lexer;
-        lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor));
+        lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor), sourceManager->getMemoryArena());
 
         SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
         initializeInputStream(preprocessor, inputStream);
@@ -925,7 +927,7 @@ inline Token const& GetDirective(PreprocessorDirectiveContext* context)
 }
 
 // Get the name of the directive being parsed.
-inline String const& GetDirectiveName(PreprocessorDirectiveContext* context)
+inline UnownedStringSlice const& GetDirectiveName(PreprocessorDirectiveContext* context)
 {
     return context->directiveToken.Content;
 }
@@ -2274,7 +2276,7 @@ static void DefineMacro(
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
-    lexer.initialize(valueView, GetSink(preprocessor), getNamePool(preprocessor));
+    lexer.initialize(valueView, GetSink(preprocessor), getNamePool(preprocessor), sourceManager->getMemoryArena());
     macro->tokens = lexer.lexAllTokens();
 
     Name* keyName = preprocessor->translationUnit->compileRequest->getNamePool()->getName(key);

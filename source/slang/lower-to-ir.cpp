@@ -458,9 +458,9 @@ IROp getIntrinsicOp(
     // based on the name of the declaration...
 
     auto name = decl->getName();
-    auto nameText = getText(name);
+    auto nameText = getUnownedStringSliceText(name);
 
-    IROp op = findIROp(nameText.Buffer());
+    IROp op = findIROp(nameText);
     SLANG_ASSERT(op != kIROp_Invalid);
     return op;
 }
@@ -4909,7 +4909,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 definition = definitionToken.Content;
             }
 
-            builder->addTargetIntrinsicDecoration(irInst, targetMod->targetToken.Content.getUnownedSlice(), definition.getUnownedSlice());
+            builder->addTargetIntrinsicDecoration(irInst, targetMod->targetToken.Content, definition.getUnownedSlice());
         }
     }
 
@@ -5240,7 +5240,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a specialized definition of the particular function for the given
             // target, and we need to reflect that at the IR level.
 
-            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.Content.getUnownedSlice());
+            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.Content);
         }
 
         // If this declaration was marked as having a target-specific lowering
@@ -5255,7 +5255,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
         {
-            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.Content.getUnownedSlice());
+            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.Content);
         }
         for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
         {

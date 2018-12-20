@@ -14,7 +14,7 @@ namespace Slang
 {
     static Token GetEndOfFileToken()
     {
-        return Token(TokenType::EndOfFile, "", SourceLoc());
+        return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
     }
 
     Token* TokenList::begin() const
@@ -86,11 +86,13 @@ namespace Slang
     void Lexer::initialize(
         SourceView*     inSourceView,
         DiagnosticSink* inSink,
-        NamePool*       inNamePool)
+        NamePool*       inNamePool,
+        MemoryArena*    inMemoryArena)
     {
         sourceView  = inSourceView;
         sink        = inSink;
         namePool    = inNamePool;
+        memoryArena = inMemoryArena;
 
         auto content = inSourceView->getContent();
         
@@ -548,7 +550,7 @@ namespace Slang
 
 
 
-    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix)
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix)
     {
         IntegerLiteralValue value = 0;
 
@@ -568,13 +570,13 @@ namespace Slang
 
         if(outSuffix)
         {
-            *outSuffix = String(cursor, end);
+            *outSuffix = UnownedStringSlice(cursor, end);
         }
 
         return value;
     }
 
-    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix)
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, UnownedStringSlice* outSuffix)
     {
         FloatingPointLiteralValue value = 0;
 
@@ -661,7 +663,7 @@ namespace Slang
 
         if(outSuffix)
         {
-            *outSuffix = String(cursor, end);
+            *outSuffix = UnownedStringSlice(cursor, end);
         }
 
         return value;
@@ -784,7 +786,7 @@ namespace Slang
                 return valueBuilder.ProduceString();
             }
 
-            // Charcters that don't being escape sequences are easy;
+            // Characters that don't being escape sequences are easy;
             // just append them to the buffer and move on.
             if(c != '\\')
             {
@@ -888,11 +890,11 @@ namespace Slang
     {
         // A file name usually doesn't process escape sequences
         // (this is import on Windows, where `\\` is a valid
-        // path separator cahracter).
+        // path separator character).
 
         // Just trim off the first and last characters to remove the quotes
         // (whether they were `""` or `<>`.
-        return token.Content.SubString(1, token.Content.Length()-2);
+        return String(token.Content.begin() + 1, token.Content.end() - 1); 
     }
 
 
@@ -1268,40 +1270,49 @@ namespace Slang
             // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
             if(textEnd != textBegin)
             {
-                // HACK(tfoley): "scrubbing" token value here to remove escaped newlines...
+                // "scrubbing" token value here to remove escaped newlines...
                 //
-                // TODO: Only perform this work if we encountered an escaped newline
+                // Only perform this work if we encountered an escaped newline
                 // while lexing this token (e.g., keep a flag on the lexer), or
                 // do it on-demand when the actual value of the token is needed.
-
-                StringBuilder valueBuilder;
-                auto tt = textBegin;
-                while(tt != textEnd)
+                if (tokenFlags & TokenFlag::ScrubbingNeeded)
                 {
-                    char c = *tt++;
-                    if(c == '\\')
+                    // Allocate space that will always be more than enough for stripped contents
+                    char* startDst = (char*)memoryArena->allocateUnaligned(textEnd - textBegin);
+                    char* dst = startDst;
+
+                    auto tt = textBegin;
+                    while (tt != textEnd)
                     {
-                        char d = *tt;
-                        switch(d)
+                        char c = *tt++;
+                        if (c == '\\')
                         {
-                        case '\r': case '\n':
+                            char d = *tt;
+                            switch (d)
+                            {
+                            case '\r': case '\n':
                             {
                                 tt++;
                                 char e = *tt;
-                                if((d ^ e) == ('\r' ^ '\n'))
+                                if ((d ^ e) == ('\r' ^ '\n'))
                                 {
                                     tt++;
                                 }
                             }
                             continue;
 
-                        default:
-                            break;
+                            default:
+                                break;
+                            }
                         }
+                        *dst++ = c;
                     }
-                    valueBuilder.Append(c);
+                    token.Content = UnownedStringSlice(startDst, dst);
                 }
-                token.Content = valueBuilder.ProduceString();
+                else
+                {
+                    token.Content = UnownedStringSlice(textBegin, textEnd);
+                }
             }
 
             token.flags = flags;

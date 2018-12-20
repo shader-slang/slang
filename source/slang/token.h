@@ -36,13 +36,13 @@ public:
     SourceLoc   loc;
     void*       ptrValue;
 
-    String Content;
+    UnownedStringSlice Content;
 
     Token() = default;
 
     Token(
         TokenType typeIn,
-        const String & contentIn,
+        const UnownedStringSlice & contentIn,
         SourceLoc locIn,
         TokenFlags flagsIn = 0)
         : flags(flagsIn)

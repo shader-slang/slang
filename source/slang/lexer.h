@@ -75,7 +75,8 @@ namespace Slang
         void initialize(
             SourceView*     sourceView,
             DiagnosticSink* sink,
-            NamePool*       namePool);
+            NamePool*       namePool,
+            MemoryArena*    memoryArena);
 
         ~Lexer();
 
@@ -97,6 +98,8 @@ namespace Slang
 
         TokenFlags      tokenFlags;
         LexerFlags      lexerFlags;
+
+        MemoryArena*    memoryArena;
     };
 
     // Helper routines for extracting values from tokens
@@ -106,8 +109,8 @@ namespace Slang
     typedef int64_t IntegerLiteralValue;
     typedef double FloatingPointLiteralValue;
 
-    IntegerLiteralValue getIntegerLiteralValue(Token const& token, String* outSuffix = 0);
-    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, String* outSuffix = 0);
+    IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix = 0);
+    FloatingPointLiteralValue getFloatingPointLiteralValue(Token const& token, UnownedStringSlice* outSuffix = 0);
 }
 
 #endif

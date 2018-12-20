@@ -1,4 +1,4 @@
-﻿// source-loc.h
+// source-loc.h
 #ifndef SLANG_SOURCE_LOC_H_INCLUDED
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
@@ -303,6 +303,16 @@ struct SourceManager
         /// Get the parent manager to this manager. Returns nullptr if there isn't any.
     SourceManager* getParent() const { return m_parent; }
 
+        /// A memory arena to hold allocations that are in scope for the same time as SourceManager
+    MemoryArena* getMemoryArena() { return &m_memoryArena;  }
+
+        /// Allocate a string slice
+    UnownedStringSlice allocateStringSlice(const UnownedStringSlice& slice);
+    
+    SourceManager() :
+        m_memoryArena(2048)
+    {}
+
     protected:
 
     // The first location available to this source manager
@@ -319,6 +329,10 @@ struct SourceManager
     // All of the SourceViews. These are held in increasing order of range, so can find by doing a binary chop.
     List<RefPtr<SourceView> > m_sourceViews;                
     StringSlicePool m_slicePool;
+
+    // Memory arena that can be used for holding data to held in scope as long as the Source is
+    // Can be used for storing the decoded contents of Token.Content for exampel
+    MemoryArena m_memoryArena;
 
     // Maps canonical paths to source files
     Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;  

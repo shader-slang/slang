@@ -425,7 +425,7 @@ static bool isDigit(char c)
 /// Given a string that specifies a name and index (e.g., `COLOR0`),
 /// split it into slices for the name part and the index part.
 static void splitNameAndIndex(
-    String const&       text,
+    UnownedStringSlice const&       text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits)
 {
@@ -482,8 +482,8 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     info.index = 0;
     info.kind = LayoutResourceKind::None;
 
-    String registerName = semantic->registerName.Content;
-    if (registerName.Length() == 0)
+    UnownedStringSlice registerName = semantic->registerName.Content;
+    if (registerName.size() == 0)
         return info;
 
     // The register name is expected to be in the form:
@@ -526,7 +526,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     if( auto registerSemantic = dynamic_cast<HLSLRegisterSemantic*>(semantic) )
     {
         auto const& spaceName = registerSemantic->spaceName.Content;
-        if(spaceName.Length() != 0)
+        if(spaceName.size() != 0)
         {
             UnownedStringSlice spaceSpelling;
             UnownedStringSlice spaceDigits;
@@ -556,7 +556,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     }
 
     // TODO: handle component mask part of things...
-    if( semantic->componentMask.Content.Length() != 0 )
+    if( semantic->componentMask.Content.size() != 0 )
     {
         getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
     }
@@ -999,7 +999,7 @@ static bool findLayoutArg(
     {
         if( modifier )
         {
-            *outVal = (UInt) strtoull(modifier->valToken.Content.Buffer(), nullptr, 10);
+            *outVal = (UInt) strtoull(String(modifier->valToken.Content).Buffer(), nullptr, 10);
             return true;
         }
     }
@@ -1981,7 +1981,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
     // look for a trailing sequence of decimal digits
     // at the end of the composed name
-    UInt length = composedName.Length();
+    UInt length = composedName.size();
     UInt indexLoc = length;
     while( indexLoc > 0 )
     {
@@ -2009,8 +2009,10 @@ SimpleSemanticInfo decomposeSimpleSemantic(
     else
     {
         // The name is everything before the digits
-        info.name = composedName.SubString(0, indexLoc);
-        info.index = strtol(composedName.SubString(indexLoc, length - indexLoc).begin(), nullptr, 10);
+        String stringComposedName(composedName);
+
+        info.name = stringComposedName.SubString(0, indexLoc);
+        info.index = strtol(stringComposedName.begin() + indexLoc, nullptr, 10);
     }
     return info;
 }

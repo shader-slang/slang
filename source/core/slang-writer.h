@@ -85,6 +85,7 @@ class CallbackWriter : public AppendBufferWriter
 public:
     typedef AppendBufferWriter Parent;
     // ISlangWriter
+    SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE;
     
     CallbackWriter(SlangDiagnosticCallback callback, const void* data, WriterFlags flags) :

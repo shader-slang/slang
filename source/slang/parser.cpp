@@ -690,9 +690,15 @@ namespace Slang
         }
 
         // Make a 'token'
-        const String scopedIdentifier(scopedIdentifierBuilder.ToString());
+        SourceManager* sourceManager = parser->sink->sourceManager;
+        const UnownedStringSlice scopedIdentifier(sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));   
         Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
-        token.ptrValue = getName(parser, token.Content);
+
+        // Get the name pool
+        auto namePool = parser->translationUnit->compileRequest->getNamePool();
+
+        // Since it's an Identifier have to set the name.
+        token.ptrValue = namePool->getName(token.Content);
 
         return token;
     }
@@ -990,7 +996,8 @@ namespace Slang
             case TokenType::QuestionMark:
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    nameToken.Content = nameToken.Content + ":";
+                    // Concat : onto ?
+                    nameToken.Content = UnownedStringSlice::fromLiteral("?:"); 
                     break;
                 }
                 ;       // fall-thru
@@ -2210,8 +2217,8 @@ namespace Slang
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
-        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
+        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
+        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
 
         addModifier(bufferDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
         addModifier(bufferVarDecl, new ImplicitParameterGroupVariableModifier());
@@ -2379,7 +2386,7 @@ namespace Slang
         parser->FillPosition(blockVarDecl.Ptr());
 
         // Generate a unique name for the data type
-        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + reflectionNameToken.Content);
+        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
 
         // TODO(tfoley): We end up constructing unchecked syntax here that
         // is expected to type check into the right form, but it might be
@@ -2424,7 +2431,7 @@ namespace Slang
         else
         {
             // synthesize a dummy name
-            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + reflectionNameToken.Content);
+            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
 
             // Otherwise we have a transparent declaration, similar
             // to an HLSL `cbuffer`
@@ -3718,7 +3725,7 @@ namespace Slang
         {
         case TokenType::QuestionMark:
             opToken = parser->ReadToken();
-            opToken.Content = "?:";
+            opToken.Content = UnownedStringSlice::fromLiteral("?:");
             break;
 
         default:
@@ -3999,19 +4006,20 @@ namespace Slang
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
 
-                String suffix;
+                UnownedStringSlice suffix;
                 IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix);
 
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
+                const char*const suffixEnd = suffix.end();
 
                 RefPtr<Type> suffixType = nullptr;
-                if( suffixCursor && *suffixCursor )
+                if( suffixCursor < suffixEnd )
                 {
                     int lCount = 0;
                     int uCount = 0;
                     int unknownCount = 0;
-                    while(*suffixCursor)
+                    while(suffixCursor < suffixEnd)
                     {
                         switch( *suffixCursor++ )
                         {
@@ -4077,20 +4085,21 @@ namespace Slang
                 auto token = parser->tokenReader.AdvanceToken();
                 constExpr->token = token;
 
-                String suffix;
+                UnownedStringSlice suffix;
                 FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
 
                 // Look at any suffix on the value
                 char const* suffixCursor = suffix.begin();
+                const char*const suffixEnd = suffix.end();
 
                 RefPtr<Type> suffixType = nullptr;
-                if( suffixCursor && *suffixCursor )
+                if( suffixCursor < suffixEnd )
                 {
                     int fCount = 0;
                     int lCount = 0;
                     int hCount = 0;
                     int unknownCount = 0;
-                    while(*suffixCursor)
+                    while(suffixCursor < suffixEnd)
                     {
                         switch( *suffixCursor++ )
                         {
@@ -4112,9 +4121,9 @@ namespace Slang
                         }
                     }
 
-                    if(unknownCount)
+                    if (unknownCount)
                     {
-                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
                         suffixType = parser->getSession()->getErrorType();
                     }
                     // `f` suffix -> `float`
@@ -4135,7 +4144,7 @@ namespace Slang
                     // TODO: are there other suffixes we need to handle?
                     else
                     {
-                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPOintLiteralSuffix, suffix);
+                        parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
                         suffixType = parser->getSession()->getErrorType();
                     }
                 }
@@ -4424,7 +4433,7 @@ namespace Slang
             {
                 modifier->opToken = parser->ReadToken(TokenType::Identifier);
 
-                modifier->op = findIROp(modifier->opToken.Content.Buffer());
+                modifier->op = findIROp(modifier->opToken.Content);
 
                 if (modifier->op == kIROp_Invalid)
                 {

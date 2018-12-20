@@ -80,15 +80,35 @@ SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char*
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! CallbackWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
+SLANG_NO_THROW char* SLANG_MCALL CallbackWriter::beginAppendBuffer(size_t maxNumChars)
+{
+    // Add one so there is always space for end termination, we need for the callback.
+    m_appendBuffer.SetSize(maxNumChars + 1);
+    return m_appendBuffer.Buffer();
+}
+
 SlangResult CallbackWriter::write(const char* chars, size_t numChars)
 {
     if (numChars > 0)
     {
-        // Make sure zero terminated
-        StringBuilder builder;
-        builder.Append(chars, numChars);
+        char* appendBuffer = m_appendBuffer.Buffer();
+        // See if it's from an append buffer
+        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.Count()))
+        {
+            // Set terminating 0
+            appendBuffer[(chars + numChars) - appendBuffer] = 0;
 
-        m_callback(builder.Buffer(), (void*)m_data);
+            m_callback(chars, (void*)m_data);
+        }
+        else
+        {
+            // Use the append buffer to add the terminating 0
+            m_appendBuffer.SetSize(numChars + 1);
+            ::memcpy(m_appendBuffer.Buffer(), chars, numChars);
+            m_appendBuffer[numChars] = 0;
+
+            m_callback(m_appendBuffer.Buffer(), (void*)m_data);
+        }
     }
 
     return SLANG_OK;

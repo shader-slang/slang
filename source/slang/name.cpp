@@ -9,6 +9,11 @@ String getText(Name* name)
     return name->text;
 }
 
+UnownedStringSlice getUnownedStringSliceText(Name* name)
+{
+    return name ? name->text.getUnownedSlice() : UnownedStringSlice();
+}
+
 Name* NamePool::getName(String const& text)
 {
     RefPtr<Name> name;

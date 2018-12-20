@@ -348,13 +348,10 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	fseek(sourceFile, 0, SEEK_END);
 	size_t sourceSize = ftell(sourceFile);
 	fseek(sourceFile, 0, SEEK_SET);
-	char* sourceText = (char*)malloc(sourceSize + 1);
-	if (!sourceText)
-	{
-		fprintf(stderr, "error: out of memory");
-		return SLANG_FAIL;
-	}
-	fread(sourceText, sourceSize, 1, sourceFile);
+
+    List<char> sourceText;
+    sourceText.SetSize(sourceSize + 1);
+	fread(sourceText.Buffer(), sourceSize, 1, sourceFile);
 	fclose(sourceFile);
 	sourceText[sourceSize] = 0;
 
@@ -368,12 +365,12 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
         m_shaderInputLayout.numRenderTargets = 0;
         break;
     }
-	m_shaderInputLayout.Parse(sourceText);
+	m_shaderInputLayout.Parse(sourceText.Buffer());
 
 	ShaderCompileRequest::SourceInfo sourceInfo;
 	sourceInfo.path = sourcePath;
-	sourceInfo.dataBegin = sourceText;
-	sourceInfo.dataEnd = sourceText + sourceSize;
+	sourceInfo.dataBegin = sourceText.Buffer();
+	sourceInfo.dataEnd = sourceText.Buffer() + sourceSize;
 
 	ShaderCompileRequest compileRequest;
 	compileRequest.source = sourceInfo;

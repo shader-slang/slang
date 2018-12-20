@@ -292,6 +292,16 @@ void SourceManager::initialize(
     m_nextLoc = m_startLoc;
 }
 
+UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)
+{
+    const UInt numChars = slice.size();
+
+    char* dst = (char*)m_memoryArena.allocate(numChars);
+    ::memcpy(dst, slice.begin(), numChars);
+
+    return UnownedStringSlice(dst, numChars);
+}
+
 SourceRange SourceManager::allocateSourceRange(UInt size)
 {
     // TODO: consider using atomics here
