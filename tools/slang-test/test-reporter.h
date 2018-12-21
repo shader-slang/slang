@@ -5,7 +5,7 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/platform.h"
-#include "../../source/core/slang-app-context.h"
+#include "../../source/core/slang-std-writers.h"
 #include "../../source/core/dictionary.h"
 
 

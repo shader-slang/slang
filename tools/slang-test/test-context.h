@@ -5,15 +5,18 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/platform.h"
-#include "../../source/core/slang-app-context.h"
+#include "../../source/core/slang-std-writers.h"
 #include "../../source/core/dictionary.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 #include "options.h"
 
 class TestContext
 {
     public:
-    typedef SlangResult(*InnerMainFunc)(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv);
+
+    typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
+
 
         /// Get the slang session
     SlangSession* getSession() const { return m_session;  }

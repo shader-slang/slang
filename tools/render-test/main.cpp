@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../source/core/slang-app-context.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -491,15 +491,15 @@ Result RenderTestApp::writeScreen(const char* filename)
 
 } //  namespace renderer_test
 
-SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argcIn, const char*const* argvIn)
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
 {
     using namespace renderer_test;
     using namespace Slang;
 
-    AppContext::setSingleton(appContext);
+    StdWriters::setSingleton(stdWriters);
 
 	// Parse command-line options
-	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, AppContext::getStdError()));
+	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getError()));
 
     RefPtr<renderer_test::Window> window(new renderer_test::Window);
     SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
@@ -671,7 +671,7 @@ SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContex
 int main(int argc, char**  argv)
 {
     SlangSession* session = spCreateSession(nullptr);
-    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    SlangResult res = innerMain(Slang::StdWriters::initDefault(), session, argc, argv);
     spDestroySession(session);
 
 	return SLANG_FAILED(res) ? 1 : 0;

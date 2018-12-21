@@ -8,7 +8,7 @@
 #include <slang.h>
 #include <slang-com-helper.h>
 
-#include "../../source/core/slang-app-context.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 struct PrettyWriter
 {
@@ -19,7 +19,7 @@ struct PrettyWriter
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
     SLANG_ASSERT(end >= begin);
-    Slang::AppContext::getStdOut().write(begin, size_t(end - begin));
+    Slang::StdWriters::getOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -80,7 +80,7 @@ static void write(PrettyWriter& writer, char const* text)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    Slang::AppContext::getStdOut().print("%llu", (unsigned long long)val);
+    Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -893,18 +893,18 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        Slang::AppContext::getStdError().put(diagnostic);
+        Slang::StdWriters::getError().put(diagnostic);
     }
     return res;
 }
 
-SLANG_SHARED_LIBRARY_TOOL_API SlangResult innerMain(Slang::AppContext* appContext, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
 {
-    Slang::AppContext::setSingleton(appContext);
+    Slang::StdWriters::setSingleton(stdWriters);
     
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
-    appContext->configureRequest(request);
+    stdWriters->setRequestWriters(request);
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
@@ -928,7 +928,7 @@ int main(
     char** argv)
 {
     SlangSession* session = spCreateSession(nullptr);
-    SlangResult res = innerMain(Slang::AppContext::initDefault(), session, argc, argv);
+    SlangResult res = innerMain(Slang::StdWriters::initDefault(), session, argc, argv);
     spDestroySession(session);
 
     return SLANG_FAILED(res) ? 1 : 0;
