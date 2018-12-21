@@ -42,6 +42,23 @@ TestCategory* TestCategorySet::findOrError(String const& name)
     return category;
 }
 
+/* We need a way to differentiate a subCommand from say a test prefix. Here
+we assume a command is just alpha characters or -, and this would differentiate it from
+typical prefix usage (which is generally a directory). */
+static bool _isSubCommand(const char* arg)
+{
+    for (; *arg; arg++)
+    {
+        const char c = *arg;
+        // A command is just letters
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-'))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /* static */Result Options::parse(int argc, char** argv, TestCategorySet* categorySet, Slang::WriterHelper stdError, Options* optionsOut)
@@ -67,12 +84,32 @@ TestCategory* TestCategorySet::findOrError(String const& name)
         char const* arg = *argCursor++;
         if (arg[0] != '-')
         {
+            // We need to determine if this is a command, the confusion is that
+            // previously we can specify a test prefix as just a single positional arg.
+            // To rule this out, here it can only be a subCommand if it is just text
+
+            if (_isSubCommand(arg))
+            {
+                optionsOut->subCommand = arg;
+                // Make the first arg the command name
+                optionsOut->subCommandArgs.Add(optionsOut->subCommand);
+
+                // Add all the remaining commands to subCommands
+                for (; argCursor != argEnd; ++argCursor)
+                {
+                    optionsOut->subCommandArgs.Add(*argCursor);
+                }
+                // Done
+                return SLANG_OK;
+            }
+
             positionalArgs.Add(arg);
             continue;
         }
 
         if (strcmp(arg, "--") == 0)
         {
+            // Add all positional args at the end
             while (argCursor != argEnd)
             {
                 positionalArgs.Add(*argCursor++);
