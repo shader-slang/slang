@@ -347,17 +347,34 @@ TestResult gatherTestsForFile(
 
 OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpawner& spawner)
 {
-    SLANG_UNUSED(context);
-
-    if(context->options.shouldBeVerbose)
-    {
-        String commandLine = spawner.getCommandLine();
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
-    }
-
-    if (!context->options.useExes)
+    const auto& options = context->options;
+    
+    if (!options.useExes)
     {
         String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+
+        if (options.shouldBeVerbose)
+        {
+            StringBuilder builder;
+
+            builder << "slang-test";
+
+            if (options.binDir)
+            {
+                builder << " -bindir " << options.binDir; 
+            }
+
+            builder << " " << exeName;
+
+            // TODO(js): Potentially this should handle escaping parameters for the command line if need be
+            const auto& argList = spawner.argumentList_;
+            for (UInt i = 0; i < argList.Count(); ++i)
+            {
+                builder << " " << argList[i];
+            }
+
+            context->reporter->messageFormat(TestMessageType::Info, "%s\n", builder.begin());
+        }
 
         auto func = context->getInnerMainFunc(String(context->options.binDir), exeName);
         if (func)
@@ -395,6 +412,13 @@ OSError spawnAndWait(TestContext* context, const String& testPath, OSProcessSpaw
             return kOSError_None;
         }
     }
+
+    if (options.shouldBeVerbose)
+    {
+        String commandLine = spawner.getCommandLine();
+        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
+    }
+
 
     OSError err = spawner.spawnAndWaitForCompletion();
     if (err != kOSError_None)
@@ -1737,80 +1761,6 @@ void runTestsInDirectory(
     }
 }
 
-struct ToolInvoke
-{
-        /// Returns true if it is a tool invoke
-    bool parse(const char*const* argv, int argc)
-    {
-        m_args.Clear();
-
-        m_binDirectory = ".";
-
-        if (argc < 2 || !_isToolName(argv[1]))
-        {
-            return false;
-        }
-        m_toolName = argv[1];
-
-        // Look for parameters that are for the slang-test, and should be skipped
-        int i = 2;
-        while (i < argc)
-        {
-            if (strcmp(argv[i], "-bindir") == 0 && i + 1 < argc)
-            {
-                m_binDirectory = argv[i + 1];
-                i += 2;
-            }
-            // If nothing found, the rest must be parsed to the tool
-            break;
-        }
-
-        m_args.Add(m_toolName.Buffer());
-        m_args.AddRange(argv + i, argc - i);
-        return true;
-    }
-
-    SlangResult invoke(AppContext* appContext, TestContext* testContext)
-    {
-        // Do I want to strip the -bindir directory that may be later
-
-            // We will just parse everything onto the underlying tool
-        auto func = testContext->getInnerMainFunc(m_binDirectory, m_toolName);
-        if (!func)
-        {
-            AppContext::getStdError().print("error: Unable to launch tool '%s'\n", m_toolName.Buffer());
-            return SLANG_FAIL;
-        }
-
-        return func(AppContext::getSingleton(), testContext->getSession(), int(m_args.Count()), m_args.Buffer());
-    }
-
-    String m_binDirectory;
-    String m_toolName;
-    List<const char*> m_args;
-
-private:
-    static bool _isToolName(const char* name)
-    {
-        static const char* toolNames[] =
-        {
-            "slangc",
-            "render-test",
-            "slang-reflection-test",
-        };
-
-        for (int i = 0; i < SLANG_COUNT_OF(toolNames); ++i)
-        {
-            if (::strcmp(toolNames[i], name) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-};
-
-
 SlangResult innerMain(int argc, char** argv)
 {
     AppContext::initDefault();
@@ -1839,17 +1789,32 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
     }
 
-    {
-        ToolInvoke toolInvoke;
-        if (toolInvoke.parse(argv, argc))
-        {
-            return toolInvoke.invoke(AppContext::getSingleton(), &context);
-        }
-    }
-
     SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, AppContext::getStdError(), &context.options));
     
     Options& options = context.options;
+
+    if (options.subCommand.Length())
+    {
+        // Get the function from the tool
+        auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
+        if (!func)
+        {
+            AppContext::getStdError().print("error: Unable to launch tool '%s'\n", options.subCommand.Buffer());
+            return SLANG_FAIL;
+        }
+
+        // Copy args to a char* list
+        const auto& srcArgs = options.subCommandArgs;
+        List<const char*> args;
+        args.SetSize(srcArgs.Count());
+        for (UInt i = 0; i < srcArgs.Count(); ++i)
+        {
+            args[i] = srcArgs[i].Buffer();
+        }
+
+        return func(AppContext::getSingleton(), context.getSession(), int(args.Count()), args.Buffer());
+    }
+
     if( options.includeCategories.Count() == 0 )
     {
         options.includeCategories.Add(fullTestCategory, fullTestCategory);
