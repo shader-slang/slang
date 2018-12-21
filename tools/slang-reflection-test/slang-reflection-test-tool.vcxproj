@@ -166,7 +166,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="slang-reflection-test-main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\source\core\core.vcxproj">

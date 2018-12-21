@@ -1,4 +1,4 @@
-// main.cpp
+// slang-reflection-test-main.cpp
 
 #include <assert.h>
 #include <stdio.h>

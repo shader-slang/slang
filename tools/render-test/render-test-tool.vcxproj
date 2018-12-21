@@ -186,9 +186,9 @@
     <ClInclude Include="slang-support.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="png-serialize-util.cpp" />
+    <ClCompile Include="render-test-main.cpp" />
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="shader-renderer-util.cpp" />
     <ClCompile Include="slang-support.cpp" />
