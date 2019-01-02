@@ -254,19 +254,24 @@ static size_t _calcArraySize(const List<T>& list)
 
 size_t IRSerialData::calcSizeInBytes() const
 {
-    return 
-        _calcArraySize(m_insts) + 
-        _calcArraySize(m_childRuns) + 
-        _calcArraySize(m_externalOperands) + 
-        _calcArraySize(m_stringTable) + 
+    return
+        _calcArraySize(m_insts) +
+        _calcArraySize(m_childRuns) +
+        _calcArraySize(m_externalOperands) +
+        _calcArraySize(m_stringTable) +
         /* Raw source locs */
         _calcArraySize(m_rawSourceLocs) +
         /* Debug */
-        _calcArraySize(m_debugSourceFiles) + 
-        _calcArraySize(m_debugLineOffsets) + 
-        _calcArraySize(m_debugViewEntries) + 
-        _calcArraySize(m_debugLocRuns) + 
-        _calcArraySize(m_debugStrings);
+        _calcArraySize(m_debugStringTable) +
+        _calcArraySize(m_debugLineInfo) +
+        _calcArraySize(m_debugSourceInfo);
+}
+
+static void _clearStringTable(List<char>& stringTable)
+{
+    stringTable.SetSize(2);
+    stringTable[int(IRSerialData::kNullStringIndex)] = 0;
+    stringTable[int(IRSerialData::kEmptyStringIndex)] = 0;
 }
 
 void IRSerialData::clear()
@@ -279,16 +284,13 @@ void IRSerialData::clear()
     m_externalOperands.Clear();
     m_rawSourceLocs.Clear();
 
-    // Debug data
-    m_debugSourceFiles.Clear(); 
-    m_debugLineOffsets.Clear(); 
-    m_debugViewEntries.Clear(); 
-    m_debugLocRuns.Clear();     
-    m_debugStrings.Clear();
+    _clearStringTable(m_stringTable);
 
-    m_stringTable.SetSize(2);
-    m_stringTable[int(kNullStringIndex)] = 0;
-    m_stringTable[int(kEmptyStringIndex)] = 0;
+    // Debug data
+    m_debugLineInfo.Clear();
+    m_debugSourceInfo.Clear();
+    
+    _clearStringTable(m_debugStringTable);
 }
 
 template <typename T>
@@ -320,7 +322,6 @@ static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
     return true;
 }
 
-
 bool IRSerialData::operator==(const ThisType& rhs) const
 {
     return (this == &rhs) || 
@@ -328,7 +329,11 @@ bool IRSerialData::operator==(const ThisType& rhs) const
         _isEqual(m_childRuns, rhs.m_childRuns) &&
         _isEqual(m_externalOperands, rhs.m_externalOperands) &&
         _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
-        _isEqual(m_stringTable, rhs.m_stringTable));
+        _isEqual(m_stringTable, rhs.m_stringTable) &&
+        /* Debug */
+        _isEqual(m_debugStringTable, rhs.m_debugStringTable) &&
+        _isEqual(m_debugLineInfo, rhs.m_debugLineInfo) && 
+        _isEqual(m_debugSourceInfo, rhs.m_debugSourceInfo));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -545,7 +550,6 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         SerialStringTableUtil::encodeStringTable(m_stringSlicePool, serialData->m_stringTable);
     }
 
-
     // If the option to use RawSourceLocations is enabled, serialize out as is
     if (options & OptionFlag::RawSourceLocation)
     {
@@ -561,7 +565,100 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
         }
     }
-    
+
+    bool useDebugInfo = true;
+    if (useDebugInfo || (options & OptionFlag::DebugInfo))
+    {
+        // We need to find the unique source Locs
+        // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
+        // the same underlying source file, so we are going to use the smallest ViewIndex
+
+        struct InstLoc
+        {
+            typedef InstLoc ThisType;
+
+            SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return sourceLoc < rhs.sourceLoc || (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex); }
+            
+            uint32_t instIndex;
+            uint32_t sourceLoc;
+        };
+
+        List<InstLoc> instLocs;
+
+        // Maps a view to an entry 
+        Dictionary<SourceFile*, Int> sourceMap;
+
+        UInt32 startLoc = 1;
+
+        const int numInsts = int(m_insts.Count());
+        for (int i = 1; i < numInsts; ++i)
+        {
+            IRInst* srcInst = m_insts[i];
+            if (!srcInst->sourceLoc.isValid())
+            {
+                continue;
+            }
+
+            // Find the associated view
+            SourceView* sourceView = sourceManager->findSourceView(srcInst->sourceLoc);
+            if (!sourceView)
+            {
+                continue;
+            }
+
+            SourceFile* sourceFile = sourceView->getSourceFile();
+            if (!sourceFile)
+            {
+                continue;
+            }
+
+            // Look it up
+            Int sourceIndex = 0;
+            const Int* sourceIndexPtr = sourceMap.TryGetValue(sourceFile);
+            if (!sourceIndexPtr)
+            {
+                IRSerialData::DebugSourceInfo sourceInfo;
+                ::memset(&sourceInfo, 0, sizeof(sourceInfo));
+
+                sourceInfo.m_byteOffset = startLoc;
+                // Move the startLoc on
+                startLoc += uint32_t(sourceView->getRange().getSize() + 1);
+
+                sourceInfo.m_sizeInBytes = uint32_t(sourceView->getRange().getSize());
+                sourceInfo.m_pathIndex = Ser::StringIndex(getDebugStringPool().add(sourceFile->pathInfo.foundPath));
+                sourceInfo.m_numLineInfos = 0;
+                sourceInfo.m_lineInfosStartIndex = 0;
+
+                sourceIndex = serialData->m_debugSourceInfo.Count();
+
+                serialData->m_debugSourceInfo.Add(sourceInfo);
+
+                sourceMap.Add(sourceFile, sourceIndex);
+            }
+            else
+            {
+                sourceIndex = *sourceIndexPtr;
+            }
+
+            IRSerialData::DebugSourceInfo& sourceInfo = serialData->m_debugSourceInfo[sourceIndex];
+
+            // Work out the source file relative position
+            uint32_t sourceLoc = (srcInst->sourceLoc.getRaw() - sourceView->getRange().begin.getRaw()) + sourceInfo.m_byteOffset;
+
+            InstLoc instLoc;
+            instLoc.instIndex = uint32_t(i);
+            instLoc.sourceLoc = sourceLoc;
+
+            instLocs.Add(instLoc);
+
+        }
+
+        instLocs.Sort();
+
+        // Because lots of instructions 'in a run' map to a single location often, lets save them off as such 
+
+    }
+
     m_serialData = nullptr;
     return SLANG_OK;
 }
@@ -823,7 +920,6 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
             size_t numInsts = size_t(instsIn.Count());
             size += numInsts * 2;           // op and payload
 
-            
             IRSerialData::Inst* insts = instsIn.begin();
 
             for (size_t i = 0; i < numInsts; ++i)
@@ -888,6 +984,11 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         _calcChunkSize(compressionType, data.m_externalOperands) +
         _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) + 
         _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
+
+    if (data.m_debugSourceInfo.Count())
+    {
+        // Add the debug data
+    }
 
     {
         Bin::Chunk riffHeader;

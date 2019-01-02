@@ -95,6 +95,15 @@ struct IRSerialData
         SizeType m_numChildren;                 ///< The number of children
     };
 
+    struct SourceLocRun
+    {
+        typedef SourceLocRun ThisType;
+
+        uint32_t m_sourceLoc;           ///< The source location
+        InstIndex m_startInstIndex;         ///< The index to the first instruction
+        SizeType m_numInst;                 ///< The number of children
+    };
+
     struct PayloadInfo
     {
         uint8_t m_numOperands;
@@ -173,32 +182,6 @@ struct IRSerialData
         Payload m_payload;
     };
  
-    struct DebugSourceFile
-    {
-        uint32_t m_startLoc;                    ///< Start of the location range 
-        uint32_t m_endLoc;                      ///< The end of the location range
-
-        uint32_t m_pathIndex;                   ///< Path associated
-
-        uint32_t m_numLocRuns;                  ///< The number of location runs associated with this source file
-        uint32_t m_numLineOffsets;              ///< The number of offsets associated with the file
-        uint32_t m_numDebugViewEntries;         ///< The number of debug view entries
-    };
-
-    struct DebugViewEntry
-    {
-        uint32_t m_startLoc;                    ///< Where does this entry begin?
-        uint32_t m_pathIndex;                   ///< What is the presumed path for this entry. If 0 it means there is no path.
-        int32_t m_lineAdjust;                   ///< The line adjustment
-    };
-
-    struct DebugLocRun
-    {
-        uint32_t m_sourceLoc;                   ///< The location
-        uint32_t startInstIndex;                ///< The start instruction index
-        uint32_t numInst;                       ///< The amount of instructions
-    };
-
         /// Clear to initial state
     void clear();
         /// Get the operands of an instruction
@@ -221,15 +204,47 @@ struct IRSerialData
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
-    List<char> m_stringTable;                       ///< All strings. Indexed into by StringIndex
+    List<char> m_stringTable;                   ///< All strings. Indexed into by StringIndex
 
     List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
 
-    List<DebugSourceFile> m_debugSourceFiles;   ///< The files associated 
-    List<uint32_t> m_debugLineOffsets;          ///< All of the debug line offsets
-    List<uint32_t> m_debugViewEntries;          ///< The debug view entries - that modify line meanings
-    List<DebugLocRun> m_debugLocRuns;           ///< Maps source locations to instructions
-    List<char> m_debugStrings;                  ///< All of the debug strings
+    struct DebugLineInfo
+    {
+        typedef DebugLineInfo ThisType;
+
+        bool operator==(const ThisType& rhs) const { return m_sourceByteOffset == rhs.m_sourceByteOffset && m_line == rhs.m_line;  }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        UInt32 m_sourceByteOffset;              ///< The byte offset of this in the source
+        UInt32 m_line;                          ///< The line number at this byte offset
+    };
+    struct DebugSourceInfo
+    {
+        typedef DebugSourceInfo ThisType;
+
+        bool operator==(const ThisType& rhs) const
+        {
+            return m_pathIndex == rhs.m_pathIndex &&
+                m_byteOffset == rhs.m_byteOffset &&
+                m_sizeInBytes == rhs.m_sizeInBytes &&
+                m_lineInfosStartIndex == rhs.m_lineInfosStartIndex &&
+                m_numLineInfos == rhs.m_numLineInfos;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        StringIndex m_pathIndex;                ///< Index to the string table
+        uint32_t m_byteOffset;                  ///< The offset to the source
+        uint32_t m_sizeInBytes;                 ///< The number of bytes in the source
+
+        uint32_t m_lineInfosStartIndex;         ///< Index into m_debugLineInfos
+        uint32_t m_numLineInfos;                ///< The number of line infos
+    };
+
+    // Data only set if we have debug information
+
+    List<char> m_debugStringTable;              ///< String table for debug use only
+    List<DebugLineInfo> m_debugLineInfo;        ///< Debug line information
+    List<DebugSourceInfo> m_debugSourceInfo;    ///< Debug source information
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
 };
@@ -275,6 +290,7 @@ SLANG_FORCE_INLINE bool IRSerialData::Inst::operator==(const ThisType& rhs) cons
             default: break;
         }
     }
+
     return false;
 }
 // --------------------------------------------------------------------------
@@ -360,6 +376,7 @@ struct IRSerialWriter
         enum Enum: Type
         {
             RawSourceLocation       = 0x01,
+            DebugInfo               = 0x02,
         };
     };
     typedef OptionFlag::Type OptionFlags;
@@ -380,6 +397,9 @@ struct IRSerialWriter
     Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text) : Ser::kNullStringIndex; }
     Ser::StringIndex getStringIndex(const char* chars) { return Ser::StringIndex(m_stringSlicePool.add(chars)); }
     Ser::StringIndex getStringIndex(const String& string) { return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice())); }
+
+    StringSlicePool& getStringPool() { return m_stringSlicePool;  }
+    StringSlicePool& getDebugStringPool() { return m_debugStringSlicePool; }
 
     IRSerialWriter() :
         m_serialData(nullptr)
