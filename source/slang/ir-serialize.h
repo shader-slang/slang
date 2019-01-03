@@ -501,7 +501,7 @@ struct IRSerialReader
     static Result readStream(Stream* stream, IRSerialData* dataOut);
 
         /// Read a module from serial data
-    Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
+    Result read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut);
 
         /// Get the representation cache
     StringRepresentationCache& getStringRepresentationCache() { return m_stringRepresentationCache; }

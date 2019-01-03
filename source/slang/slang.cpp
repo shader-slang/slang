@@ -15,6 +15,8 @@
 #include "slang-file-system.h"
 #include "../core/slang-writer.h"
 
+#include "source-loc.h"
+
 #include "ir-serialize.h"
 
 // Used to print exception type names in internal-compiler-error messages
@@ -418,7 +420,7 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
     SourceManager localSourceManager;
     localSourceManager.initialize(sourceManager);
         
-    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFile(PathInfo::makeTypeParse(), typeStr));
+    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr));
     
     // We'll use a temporary diagnostic sink  
     DiagnosticSink sink;
@@ -559,7 +561,7 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-#if 0
+#if 1
         // Verify if we can stream out with debug information
         {
             IRSerialData serialData;
@@ -585,6 +587,14 @@ void CompileRequest::generateIR()
 
             SLANG_ASSERT(readData == serialData);
 
+            SourceManager workSourceManager;
+            workSourceManager.initialize(sourceManager);
+
+            RefPtr<IRModule> irReadModule;
+            {
+                IRSerialReader reader;
+                reader.read(serialData, mSession, &workSourceManager, irReadModule);
+            }
         }
 #endif
 
@@ -603,7 +613,7 @@ void CompileRequest::generateIR()
             {
                 // Read IR back from serialData
                 IRSerialReader reader;
-                reader.read(serialData, mSession, irReadModule);
+                reader.read(serialData, mSession, nullptr, irReadModule);
             }
 
             // Use the serialized irModule
@@ -778,8 +788,8 @@ void CompileRequest::addTranslationUnitSourceBlob(
     ISlangBlob*     sourceBlob)
 {
     PathInfo pathInfo = PathInfo::makePath(path);
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, sourceBlob);
-
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+    
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
@@ -789,8 +799,8 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   source)
 {
     PathInfo pathInfo = PathInfo::makePath(path);
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(pathInfo, source);
-
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithString(pathInfo, source);
+    
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
@@ -914,8 +924,8 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     translationUnit->compileFlags = 0;
 
     // Create with the 'friendly' name
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFile(filePathInfo, sourceBlob);
-
+    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithBlob(filePathInfo, sourceBlob);
+    
     translationUnit->sourceFiles.Add(sourceFile);
 
     int errorCountBefore = mSink.GetErrorCount();

@@ -155,11 +155,36 @@ public:
         /// Calculate the offset for a line
     int calcColumnIndex(int line, int offset);
 
-    PathInfo pathInfo;                  ///< The path The logical file path to report for locations inside this span.
-    ComPtr<ISlangBlob> contentBlob;     ///< A blob that owns the storage for the file contents
-    UnownedStringSlice content;         ///< The actual contents of the file.
+        /// Get the content holding blob
+    ISlangBlob* getContentBlob() const { return m_contentBlob;  }
 
+        /// True if has full set content
+    bool hasContent() const { return m_contentBlob != nullptr;  }
+
+        /// Get the content size
+    size_t getContentSize() const { return m_contentSize;  }
+
+        /// Get the content
+    const UnownedStringSlice& getContent() const { return m_content;  }
+
+        /// Get path info
+    const PathInfo& getPathInfo() const { return m_pathInfo;  }
+
+        /// Set the content as a blob
+    void setContents(ISlangBlob* blob);
+        /// Set the content as a string
+    void setContents(const String& content);
+
+        /// Ctor
+    SourceFile(const PathInfo& pathInfo, size_t contentSize);
+    
     protected:
+
+    PathInfo m_pathInfo;                  ///< The path The logical file path to report for locations inside this span.
+    ComPtr<ISlangBlob> m_contentBlob;     ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
+    UnownedStringSlice m_content;         ///< The actual contents of the file.
+    size_t m_contentSize;                 ///< The size of the actual contents
+
     // In order to speed up lookup of line number information,
     // we will cache the starting offset of each line break in
     // the input file:
@@ -227,7 +252,10 @@ class SourceView: public RefObject
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
         /// Get the associated 'content' (the source text)
-    const UnownedStringSlice& getContent() const { return m_sourceFile->content; }
+    const UnownedStringSlice& getContent() const { return m_sourceFile->getContent(); }
+
+        /// Get the size of the content
+    size_t getContentSize() const { return m_sourceFile->getContentSize(); }
 
         /// Get the humane location 
         /// Type determines if the location wanted is the original, or the 'normal' (which modifys behavior based on #line directives)
@@ -262,9 +290,9 @@ struct SourceManager
     SourceRange allocateSourceRange(UInt size);
 
         /// Create a SourceFile defined with the specified path, and content held within a blob
-    SourceFile* createSourceFile(const PathInfo& pathInfo, ISlangBlob* content);
-        /// Create a SourceFile with specified path. Create a Blob that contains the content.
-    SourceFile* createSourceFile(const PathInfo& pathInfo, String const& content);
+    SourceFile* createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
+    SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
+    SourceFile* createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
 
         /// Get the humane source location
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);

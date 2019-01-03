@@ -159,7 +159,7 @@ PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
     // If there is no override path, then just the source files path
     if (pathHandle == StringSlicePool::Handle(0))
     {
-        return m_sourceFile->pathInfo;
+        return m_sourceFile->getPathInfo();
     }
     else
     {
@@ -172,7 +172,7 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 {
     if (type == SourceLocType::Actual)
     {
-        return m_sourceFile->pathInfo;
+        return m_sourceFile->getPathInfo();
     }
 
     const int entryIndex = findEntryIndex(loc);
@@ -188,6 +188,8 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     // cache an array of line break locations in the file.
     if (m_lineBreakOffsets.Count() == 0)
     {
+        UnownedStringSlice content = getContent();
+
         char const* begin = content.begin();
         char const* end = content.end();
 
@@ -232,7 +234,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
 
 int SourceFile::calcLineIndexFromOffset(int offset)
 {
-    SLANG_ASSERT(UInt(offset) <= content.size());
+    SLANG_ASSERT(UInt(offset) <= getContentSize());
 
     // Make sure we have the line break offsets
     const auto& lineBreakOffsets = getLineBreakOffsets();
@@ -264,6 +266,33 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset)
 {
     const auto& lineBreakOffsets = getLineBreakOffsets();
     return offset - lineBreakOffsets[lineIndex];   
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void SourceFile::setContents(ISlangBlob* blob)
+{
+    const UInt contentSize = blob->getBufferSize();
+
+    SLANG_ASSERT(contentSize == m_contentSize);
+
+    char const* contentBegin = (char const*)blob->getBufferPointer();
+    char const* contentEnd = contentBegin + contentSize;
+
+    m_contentBlob = blob;
+    m_content = UnownedStringSlice(contentBegin, contentEnd);
+}
+
+void SourceFile::setContents(const String& content)
+{
+    ComPtr<ISlangBlob> contentBlob = StringUtil::createStringBlob(content);
+    setContents(contentBlob);
+}
+
+SourceFile::SourceFile(const PathInfo& pathInfo, size_t contentSize) :
+    m_pathInfo(pathInfo),
+    m_contentSize(contentSize)
+{
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -319,29 +348,29 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, ISlangBlob* contentBlob)
+SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
-    char const* contentBegin = (char const*) contentBlob->getBufferPointer();
-    UInt contentSize = contentBlob->getBufferSize();
-    char const* contentEnd = contentBegin + contentSize;
-
-    SourceFile* sourceFile = new SourceFile();
-    sourceFile->pathInfo = pathInfo;
-    sourceFile->contentBlob = contentBlob;
-    sourceFile->content = UnownedStringSlice(contentBegin, contentEnd);
- 
+    SourceFile* sourceFile = new SourceFile(pathInfo, contentSize);
     return sourceFile;
 }
- 
-SourceFile* SourceManager::createSourceFile(const PathInfo& pathInfo, const String& content)
+
+SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
-    ComPtr<ISlangBlob> contentBlob = StringUtil::createStringBlob(content);
-    return createSourceFile(pathInfo, contentBlob);
+    RefPtr<SourceFile> sourceFile(new SourceFile(pathInfo, contents.Length()));
+    sourceFile->setContents(contents);
+    return sourceFile;
+}
+
+SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
+{
+    RefPtr<SourceFile> sourceFile(new SourceFile(pathInfo, blob->getBufferSize()));
+    sourceFile->setContents(blob);
+    return sourceFile;
 }
 
 SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
 {
-    SourceRange range = allocateSourceRange(sourceFile->content.size());
+    SourceRange range = allocateSourceRange(sourceFile->getContentSize());
     SourceView* sourceView = new SourceView(this, sourceFile, range);
     m_sourceViews.Add(sourceView);
 

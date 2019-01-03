@@ -842,7 +842,7 @@ top:
         // We create a dummy file to represent the token-paste operation
         PathInfo pathInfo = PathInfo::makeTokenPaste();
        
-        SourceFile* sourceFile = sourceManager->createSourceFile(pathInfo, sb.ProduceString());
+        SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
 
         SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
@@ -1645,7 +1645,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
             return;
         }
 
-        sourceFile = sourceManager->createSourceFile(filePathInfo, foundSourceBlob);
+        sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
         sourceManager->addSourceFile(filePathInfo.canonicalPath, sourceFile);
     }
 
@@ -2268,8 +2268,8 @@ static void DefineMacro(
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
 
-    SourceFile* keyFile = sourceManager->createSourceFile(pathInfo, key);
-    SourceFile* valueFile = sourceManager->createSourceFile(pathInfo, value);
+    SourceFile* keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
+    SourceFile* valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
 
     SourceView* keyView = sourceManager->createSourceView(keyFile);
     SourceView* valueView = sourceManager->createSourceView(valueFile);

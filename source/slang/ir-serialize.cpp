@@ -524,9 +524,9 @@ Result IRSerialWriter::_calcDebugInfo()
         IRSerialData::DebugSourceInfo sourceInfo;
 
         sourceInfo.m_startSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc);
-        sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->content.size());
-
-        sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->pathInfo.foundPath));
+        sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->getContentSize());
+        
+        sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->getPathInfo().foundPath));
 
         sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.Count());
         sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(m_serialData->m_debugAdjustedLineInfos.Count());
@@ -1511,7 +1511,7 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
     return SLANG_OK;
 }
 
-/* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut)
+/* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
@@ -1703,6 +1703,51 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
             IRInst* dstInst = insts[i];
             
             dstInst->sourceLoc.setRaw(Slang::SourceLoc::RawValue(srcLocs[i]));
+        }
+    }
+
+    if (sourceManager && m_serialData->m_debugSourceInfos.Count())
+    {
+        List<UnownedStringSlice> debugStringSlices;
+        SerialStringTableUtil::decodeStringTable(m_serialData->m_debugStringTable, debugStringSlices);
+
+        // Mark the map as invalid
+        List<int> stringIndexMap;
+        stringIndexMap.SetSize(debugStringSlices.Count());
+
+        // Remap into the string pool
+        StringSlicePool& slicePool = sourceManager->getStringSlicePool();
+
+        for (int i = 0; i < int(debugStringSlices.Count()); ++i)
+        {
+            if (i < StringSlicePool::kNumDefaultHandles)
+            {
+                stringIndexMap[i] = i;
+            }
+            else
+            {
+                stringIndexMap[i] = int(slicePool.add(debugStringSlices[i]));
+            }
+        }
+
+        // We want to reconstruct the source file, well in so far as it has the correct source line information
+
+        int numSourceFiles = int(m_serialData->m_debugSourceInfos.Count());
+        for (int i = 0; i < numSourceFiles; ++i)
+        {
+            const IRSerialData::DebugSourceInfo& sourceInfo = m_serialData->m_debugSourceInfos[i];
+
+            PathInfo pathInfo;
+            pathInfo.type = PathInfo::Type::FoundPath;
+            pathInfo.foundPath = debugStringSlices[UInt(sourceInfo.m_pathIndex)];
+
+            SourceFile* sourceFile = sourceManager->createSourceFileWithSize(pathInfo, sourceInfo.m_endSourceLoc - sourceInfo.m_startSourceLoc);
+            SourceView* sourceView = sourceManager->createSourceView(sourceFile);
+
+            SLANG_UNUSED(sourceView);
+
+            // Fill in the line no info
+            // Fill in the adjusted line info into sourceView
         }
     }
 
