@@ -559,6 +559,35 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
+#if 0
+        // Verify if we can stream out with debug information
+        {
+            IRSerialData serialData;
+            {
+                /// Generate IR for translation unit
+                RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+
+                // Write IR out to serialData - copying over SourceLoc information directly
+                IRSerialWriter writer;
+                writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::DebugInfo, &serialData);
+            }
+
+            // Write the data out
+
+            MemoryStream memoryStream(FileAccess::ReadWrite);
+
+            IRSerialWriter::writeStream(serialData, IRSerialBinary::CompressionType::None, &memoryStream);
+            memoryStream.Seek(SeekOrigin::Start, 0);
+
+            IRSerialData readData;
+
+            IRSerialReader::readStream(&memoryStream, &readData);
+
+            SLANG_ASSERT(readData == serialData);
+
+        }
+#endif
+
         if (useSerialIRBottleneck)
         {              
             IRSerialData serialData;

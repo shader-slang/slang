@@ -263,8 +263,10 @@ size_t IRSerialData::calcSizeInBytes() const
         _calcArraySize(m_rawSourceLocs) +
         /* Debug */
         _calcArraySize(m_debugStringTable) +
-        _calcArraySize(m_debugLineInfo) +
-        _calcArraySize(m_debugSourceInfo);
+        _calcArraySize(m_debugLineInfos) +
+        _calcArraySize(m_debugSourceInfos) +
+        _calcArraySize(m_debugAdjustedLineInfos) +
+        _calcArraySize(m_debugSourceLocRuns);
 }
 
 static void _clearStringTable(List<char>& stringTable)
@@ -287,8 +289,10 @@ void IRSerialData::clear()
     _clearStringTable(m_stringTable);
 
     // Debug data
-    m_debugLineInfo.Clear();
-    m_debugSourceInfo.Clear();
+    m_debugLineInfos.Clear();
+    m_debugAdjustedLineInfos.Clear();
+    m_debugSourceInfos.Clear();
+    m_debugSourceLocRuns.Clear();
     
     _clearStringTable(m_debugStringTable);
 }
@@ -324,7 +328,7 @@ static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
 
 bool IRSerialData::operator==(const ThisType& rhs) const
 {
-    return (this == &rhs) || 
+    return (this == &rhs) ||
         (_isEqual(m_insts, rhs.m_insts) &&
         _isEqual(m_childRuns, rhs.m_childRuns) &&
         _isEqual(m_externalOperands, rhs.m_externalOperands) &&
@@ -332,8 +336,10 @@ bool IRSerialData::operator==(const ThisType& rhs) const
         _isEqual(m_stringTable, rhs.m_stringTable) &&
         /* Debug */
         _isEqual(m_debugStringTable, rhs.m_debugStringTable) &&
-        _isEqual(m_debugLineInfo, rhs.m_debugLineInfo) && 
-        _isEqual(m_debugSourceInfo, rhs.m_debugSourceInfo));
+        _isEqual(m_debugLineInfos, rhs.m_debugLineInfos) &&
+        _isEqual(m_debugAdjustedLineInfos, rhs.m_debugAdjustedLineInfos) &&
+        _isEqual(m_debugSourceInfos, rhs.m_debugSourceInfos) &&
+        _isEqual(m_debugSourceLocRuns, rhs.m_debugSourceLocRuns));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -348,8 +354,9 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     m_insts.Add(inst);
 }
 
+#if 0
 // Find a view index that matches the view by file (and perhaps other characteristics in the future)
-int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
+static int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
 {
     const int numViews = int(viewsIn.Count());
     SourceView*const* views = viewsIn.begin();
@@ -368,14 +375,184 @@ int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
     }
     return -1;
 }
+#endif
 
+void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startInstIndex, uint32_t numInsts)
+{
+    SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
+    if (!sourceView)
+    {
+        return;
+    }
+
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    DebugSourceFile* debugSourceFile;
+    {
+        RefPtr<DebugSourceFile>* ptrDebugSourceFile = m_debugSourceFileMap.TryGetValue(sourceFile);
+        if (ptrDebugSourceFile == nullptr)
+        {
+            const SourceLoc::RawValue baseSourceLoc = m_debugFreeSourceLoc;
+            m_debugFreeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
+
+            debugSourceFile = new DebugSourceFile(sourceFile, baseSourceLoc);
+            m_debugSourceFileMap.Add(sourceFile, debugSourceFile);
+        }
+        else
+        {
+            debugSourceFile = *ptrDebugSourceFile;
+        }
+    }
+
+    // We need to work out the line index
+
+    int offset = sourceView->getRange().getOffset(sourceLoc);
+    int lineIndex = sourceFile->calcLineIndexFromOffset(offset);
+
+    IRSerialData::DebugLineInfo lineInfo;
+    lineInfo.m_lineStartOffset = sourceFile->getLineBreakOffsets()[lineIndex];
+    lineInfo.m_lineIndex = lineIndex;
+
+    if (!debugSourceFile->hasLineIndex(lineIndex))
+    {
+        // Add the information about the line        
+        int entryIndex = sourceView->findEntryIndex(sourceLoc);
+        if (entryIndex < 0)
+        {
+            debugSourceFile->m_lineInfos.Add(lineInfo);
+        }
+        else
+        {
+            const auto& entry = sourceView->getEntries()[entryIndex];
+
+            IRSerialData::DebugAdjustedLineInfo adjustedLineInfo;
+            adjustedLineInfo.m_lineInfo = lineInfo;
+            adjustedLineInfo.m_pathStringIndex = Ser::kNullStringIndex;
+
+            if (StringSlicePool::isNonZeroLength(entry.m_pathHandle))
+            {
+                UnownedStringSlice slice = m_sourceManager->getStringSlicePool().getSlice(entry.m_pathHandle);
+                SLANG_ASSERT(slice.size() > 0);
+                adjustedLineInfo.m_pathStringIndex = Ser::StringIndex(m_debugStringSlicePool.add(slice));
+            }
+
+            adjustedLineInfo.m_adjustedLineIndex = lineIndex + entry.m_lineAdjust;
+
+            debugSourceFile->m_adjustedLineInfos.Add(adjustedLineInfo);
+        }
+
+        debugSourceFile->setHasLineIndex(lineIndex);
+    }
+
+    // Add the run
+    IRSerialData::SourceLocRun sourceLocRun;
+    sourceLocRun.m_numInst = numInsts;
+    sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstIndex);
+    sourceLocRun.m_sourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + offset);
+
+    m_serialData->m_debugSourceLocRuns.Add(sourceLocRun);
+}
+
+Result IRSerialWriter::_calcDebugInfo()
+{
+    // We need to find the unique source Locs
+    // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
+    // the same underlying source file
+
+    // First find all the unique locs
+    struct InstLoc
+    {
+        typedef InstLoc ThisType;
+
+        SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return sourceLoc < rhs.sourceLoc || (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex); }
+
+        uint32_t instIndex;
+        uint32_t sourceLoc;
+    };
+
+    // Find all of the source locations and their associated instructions
+    List<InstLoc> instLocs;
+    const int numInsts = int(m_insts.Count());
+    for (int i = 1; i < numInsts; i++)
+    {
+        IRInst* srcInst = m_insts[i];
+        if (!srcInst->sourceLoc.isValid())
+        {
+            continue;
+        }
+        InstLoc instLoc;
+        instLoc.instIndex = uint32_t(i);
+        instLoc.sourceLoc = uint32_t(srcInst->sourceLoc.getRaw());
+        instLocs.Add(instLoc);
+    }
+
+    // Sort them
+    instLocs.Sort();
+    m_debugFreeSourceLoc = 1;
+
+    // Look for runs
+    const InstLoc* startInstLoc = instLocs.begin();
+    const InstLoc* endInstLoc = instLocs.end();
+
+    while (startInstLoc < endInstLoc)
+    {
+        const uint32_t startSourceLoc = startInstLoc->sourceLoc;
+        
+        // Find the run with the same source loc
+
+        const InstLoc* curInstLoc = startInstLoc + 1;
+        uint32_t curInstIndex = startInstLoc->instIndex + 1;
+
+        // Find the run size with same source loc and run of instruction indices
+        for (; curInstLoc < endInstLoc && curInstLoc->sourceLoc == startSourceLoc && curInstLoc->instIndex == curInstIndex; ++curInstLoc, ++curInstIndex)
+        {
+        }
+
+        // Try adding the run
+        _addDebugSourceLocRun(SourceLoc::fromRaw(startSourceLoc), startInstLoc->instIndex, curInstIndex - startInstLoc->instIndex);
+
+        // Next
+        startInstLoc = curInstLoc;
+    }
+
+    // Okay we can now calculate the final source information
+
+    for (auto& pair : m_debugSourceFileMap)
+    {
+        DebugSourceFile* debugSourceFile = pair.Value;
+        SourceFile* sourceFile = debugSourceFile->m_sourceFile;
+
+        IRSerialData::DebugSourceInfo sourceInfo;
+
+        sourceInfo.m_startSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc);
+        sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->content.size());
+
+        sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->pathInfo.foundPath));
+
+        sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.Count());
+        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(m_serialData->m_debugAdjustedLineInfos.Count());
+
+        sourceInfo.m_numLineInfos = uint32_t(debugSourceFile->m_lineInfos.Count());
+        sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.Count());
+
+        // Add the line infos
+        m_serialData->m_debugLineInfos.AddRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.Count());
+        m_serialData->m_debugAdjustedLineInfos.AddRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.Count());
+
+        // Add the source info
+        m_serialData->m_debugSourceInfos.Add(sourceInfo);
+    }
+
+    // Convert the string pool
+    SerialStringTableUtil::encodeStringTable(m_debugStringSlicePool, m_serialData->m_debugStringTable);
+
+    return SLANG_OK;
+}
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
-    SLANG_UNUSED(sourceManager);
-
+    m_sourceManager = sourceManager;
     m_serialData = serialData;
 
     serialData->clear();
@@ -566,97 +743,9 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    bool useDebugInfo = true;
-    if (useDebugInfo || (options & OptionFlag::DebugInfo))
+    if (options & OptionFlag::DebugInfo)
     {
-        // We need to find the unique source Locs
-        // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
-        // the same underlying source file, so we are going to use the smallest ViewIndex
-
-        struct InstLoc
-        {
-            typedef InstLoc ThisType;
-
-            SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return sourceLoc < rhs.sourceLoc || (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex); }
-            
-            uint32_t instIndex;
-            uint32_t sourceLoc;
-        };
-
-        List<InstLoc> instLocs;
-
-        // Maps a view to an entry 
-        Dictionary<SourceFile*, Int> sourceMap;
-
-        UInt32 startLoc = 1;
-
-        const int numInsts = int(m_insts.Count());
-        for (int i = 1; i < numInsts; ++i)
-        {
-            IRInst* srcInst = m_insts[i];
-            if (!srcInst->sourceLoc.isValid())
-            {
-                continue;
-            }
-
-            // Find the associated view
-            SourceView* sourceView = sourceManager->findSourceView(srcInst->sourceLoc);
-            if (!sourceView)
-            {
-                continue;
-            }
-
-            SourceFile* sourceFile = sourceView->getSourceFile();
-            if (!sourceFile)
-            {
-                continue;
-            }
-
-            // Look it up
-            Int sourceIndex = 0;
-            const Int* sourceIndexPtr = sourceMap.TryGetValue(sourceFile);
-            if (!sourceIndexPtr)
-            {
-                IRSerialData::DebugSourceInfo sourceInfo;
-                ::memset(&sourceInfo, 0, sizeof(sourceInfo));
-
-                sourceInfo.m_byteOffset = startLoc;
-                // Move the startLoc on
-                startLoc += uint32_t(sourceView->getRange().getSize() + 1);
-
-                sourceInfo.m_sizeInBytes = uint32_t(sourceView->getRange().getSize());
-                sourceInfo.m_pathIndex = Ser::StringIndex(getDebugStringPool().add(sourceFile->pathInfo.foundPath));
-                sourceInfo.m_numLineInfos = 0;
-                sourceInfo.m_lineInfosStartIndex = 0;
-
-                sourceIndex = serialData->m_debugSourceInfo.Count();
-
-                serialData->m_debugSourceInfo.Add(sourceInfo);
-
-                sourceMap.Add(sourceFile, sourceIndex);
-            }
-            else
-            {
-                sourceIndex = *sourceIndexPtr;
-            }
-
-            IRSerialData::DebugSourceInfo& sourceInfo = serialData->m_debugSourceInfo[sourceIndex];
-
-            // Work out the source file relative position
-            uint32_t sourceLoc = (srcInst->sourceLoc.getRaw() - sourceView->getRange().begin.getRaw()) + sourceInfo.m_byteOffset;
-
-            InstLoc instLoc;
-            instLoc.instIndex = uint32_t(i);
-            instLoc.sourceLoc = sourceLoc;
-
-            instLocs.Add(instLoc);
-
-        }
-
-        instLocs.Sort();
-
-        // Because lots of instructions 'in a run' map to a single location often, lets save them off as such 
-
+        _calcDebugInfo();
     }
 
     m_serialData = nullptr;
@@ -978,16 +1067,20 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
 {
     size_t totalSize = 0;
     
-    totalSize += sizeof(Bin::SlangHeader) + 
+    totalSize += sizeof(Bin::SlangHeader) +
         _calcInstChunkSize(compressionType, data.m_insts) +
         _calcChunkSize(compressionType, data.m_childRuns) +
         _calcChunkSize(compressionType, data.m_externalOperands) +
-        _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) + 
+        _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) +
         _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
 
-    if (data.m_debugSourceInfo.Count())
+    if (data.m_debugSourceInfos.Count())
     {
-        // Add the debug data
+        totalSize += _calcChunkSize(Bin::CompressionType::None, data.m_debugStringTable) +
+            _calcChunkSize(Bin::CompressionType::None, data.m_debugLineInfos) +
+            _calcChunkSize(Bin::CompressionType::None, data.m_debugAdjustedLineInfos) +
+            _calcChunkSize(Bin::CompressionType::None, data.m_debugSourceInfos) +
+            _calcChunkSize(compressionType, data.m_debugSourceLocRuns);
     }
 
     {
@@ -1012,7 +1105,16 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_stringTable, stream));
 
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, stream));
-    
+
+    if (data.m_debugSourceInfos.Count())
+    {
+        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugStringFourCc, data.m_debugStringTable, stream);
+        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugLineInfoFourCc, data.m_debugLineInfos, stream);
+        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugAdjustedLineInfoFourCc, data.m_debugAdjustedLineInfos, stream);
+        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugSourceInfoFourCc, data.m_debugSourceInfos, stream);
+        _writeArrayChunk(compressionType, Bin::kDebugSourceLocRunFourCc, data.m_debugSourceLocRuns, stream);
+    }
+
     return SLANG_OK;
 }
 
@@ -1362,11 +1464,42 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
             }
             case Bin::kUInt32SourceLocFourCc:
             {
-                
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_rawSourceLocs));
                 remainingBytes -= _calcChunkTotalSize(chunk);
                 break;
             }
+            case Bin::kDebugStringFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugStringTable));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kDebugLineInfoFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugLineInfos));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kDebugAdjustedLineInfoFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugAdjustedLineInfos));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case Bin::kDebugSourceInfoFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugSourceInfos));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
+            case Bin::kDebugSourceLocRunFourCc:
+            {
+                SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugSourceLocRuns));
+                remainingBytes -= _calcChunkTotalSize(chunk);
+                break;
+            } 
+
             default:
             {
                 SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
