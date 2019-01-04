@@ -1,4 +1,5 @@
 //TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0
+//TEST:COMPARE_HLSL:-no-mangle -profile cs_5_0 -verify-debug-serial-ir
 
 // Check output for `[allow_uav_conditional]`
 

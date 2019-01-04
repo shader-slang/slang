@@ -567,15 +567,17 @@ void CompileRequest::generateIR()
         // So here, we only create once even if we run verification.
         RefPtr<IRModule> irModule;
 
-#if 0
+        if (verifyDebugSerialization)
         {
             /// Generate IR for translation unit
             irModule = generateIRForTranslationUnit(translationUnit);
 
             // Verify debug information
-            SLANG_ASSERT(SLANG_SUCCEEDED(IRSerialUtil::verifySerialize(irModule, mSession, sourceManager, IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)));
+            if (SLANG_FAILED(IRSerialUtil::verifySerialize(irModule, mSession, sourceManager, IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)))
+            {
+                mSink.diagnose(irModule->moduleInst->sourceLoc, Diagnostics::serialDebugVerificationFailed);
+            }
         }
-#endif
 
         if (useSerialIRBottleneck)
         {              
