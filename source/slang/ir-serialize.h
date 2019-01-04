@@ -428,10 +428,7 @@ struct IRSerialWriter
     typedef OptionFlag::Type OptionFlags;
 
     Result write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData);
-
-        /// Produces an instruction list which is in same order as written
-    static void calcInstructionList(IRModule* module, List<IRInst*>& instsOut);
-
+  
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
     /// Get an instruction index from an instruction
@@ -536,6 +533,16 @@ struct IRSerialReader
     const IRSerialData* m_serialData;
     IRModule* m_module;
 };
+
+struct IRSerialUtil
+{
+        /// Produces an instruction list which is in same order as written through IRSerialWriter
+    static void calcInstructionList(IRModule* module, List<IRInst*>& instsOut);
+
+        /// Verify serialization
+    static SlangResult verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialBinary::CompressionType compressionType, IRSerialWriter::OptionFlags optionFlags);
+};
+
 
 } // namespace Slang
 

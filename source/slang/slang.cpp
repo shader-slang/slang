@@ -561,78 +561,13 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-#if 1
-        // Verify if we can stream out with debug information
+#if 0
         {
             /// Generate IR for translation unit
             RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
 
-            List<IRInst*> originalInsts;
-            IRSerialWriter::calcInstructionList(irModule, originalInsts);
-
-            IRSerialData serialData;
-            {
-                // Write IR out to serialData - copying over SourceLoc information directly
-                IRSerialWriter writer;
-                writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::DebugInfo, &serialData);
-            }
-
-            // Write the data out
-
-            MemoryStream memoryStream(FileAccess::ReadWrite);
-
-            IRSerialWriter::writeStream(serialData, IRSerialBinary::CompressionType::None, &memoryStream);
-            memoryStream.Seek(SeekOrigin::Start, 0);
-
-            IRSerialData readData;
-
-            IRSerialReader::readStream(&memoryStream, &readData);
-
-            SLANG_ASSERT(readData == serialData);
-
-            SourceManager workSourceManager;
-            workSourceManager.initialize(sourceManager);
-
-            RefPtr<IRModule> irReadModule;
-            {
-                IRSerialReader reader;
-                reader.read(serialData, mSession, &workSourceManager, irReadModule);
-            }
-
-            List<IRInst*> readInsts;
-            IRSerialWriter::calcInstructionList(irReadModule, readInsts);
-
-            SLANG_ASSERT(readInsts.Count() == originalInsts.Count());
-
-            // They should be on the same line nos
-
-            for (UInt i = 1; i < readInsts.Count(); ++i)
-            {
-                IRInst* origInst = originalInsts[i];
-                IRInst* readInst = readInsts[i];
-
-                if (origInst->sourceLoc.getRaw() == readInst->sourceLoc.getRaw())
-                {
-                    continue;
-                }
-
-                // Work out the
-                SourceView* origSourceView = sourceManager->findSourceView(origInst->sourceLoc);
-                SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
-
-                // if both are null we are done
-                if (origSourceView == nullptr && origSourceView == readSourceView)
-                {
-                    continue;
-                }
-                SLANG_ASSERT(origSourceView && readSourceView);
-
-                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
-                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
-
-                SLANG_ASSERT(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath);
-            }
-
+            // Verify debug information
+            SLANG_ASSERT(SLANG_SUCCEEDED(IRSerialUtil::verifySerialize(irModule, mSession, sourceManager, IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)));
         }
 #endif
 

@@ -456,7 +456,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
 
             if (StringSlicePool::hasContents(entry.m_pathHandle))
             {
-                UnownedStringSlice slice = m_sourceManager->getStringSlicePool().getSlice(entry.m_pathHandle);
+                UnownedStringSlice slice = sourceView->getSourceManager()->getStringSlicePool().getSlice(entry.m_pathHandle);
                 SLANG_ASSERT(slice.size() > 0);
                 adjustedLineInfo.m_pathStringIndex = Ser::StringIndex(m_debugStringSlicePool.add(slice));
             }
@@ -575,38 +575,6 @@ Result IRSerialWriter::_calcDebugInfo()
 
     return SLANG_OK;
 }
-
-/* static */void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
-{
-    // We reserve 0 for null
-    instsOut.SetSize(1);
-    instsOut[0] = nullptr;
-
-    // Stack for parentInst
-    List<IRInst*> parentInstStack;
-
-    IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.Add(moduleInst);
-
-    // Add to list
-    instsOut.Add(moduleInst);
-
-    // Traverse all of the instructions
-    while (parentInstStack.Count())
-    {
-        // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.Last();
-        parentInstStack.RemoveLast();
-       
-        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
-        for (IRInst* child : childrenList)
-        {
-            instsOut.Add(child);
-            parentInstStack.Add(child);
-        }
-    }
-}
-
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
@@ -1810,6 +1778,8 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     {
         List<UnownedStringSlice> debugStringSlices;
         SerialStringTableUtil::decodeStringTable(m_serialData->m_debugStringTable, debugStringSlices);
+
+        // All of the strings are placed in the manager (and its StringSlicePool) where the SourceView and SourceFile are constructed from
         List<StringSlicePool::Handle> stringMap;
         SerialStringTableUtil::calcStringSlicePoolMap(debugStringSlices, sourceManager->getStringSlicePool(), stringMap);
 
@@ -1959,6 +1929,161 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 for (int j = 0; j < runSize; ++j)
                 {
                     dstInsts[j]->sourceLoc = sourceLoc;
+                }
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/* static */void IRSerialUtil::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
+{
+    // We reserve 0 for null
+    instsOut.SetSize(1);
+    instsOut[0] = nullptr;
+
+    // Stack for parentInst
+    List<IRInst*> parentInstStack;
+
+    IRModuleInst* moduleInst = module->getModuleInst();
+    parentInstStack.Add(moduleInst);
+
+    // Add to list
+    instsOut.Add(moduleInst);
+
+    // Traverse all of the instructions
+    while (parentInstStack.Count())
+    {
+        // If it's in the stack it is assumed it is already in the inst map
+        IRInst* parentInst = parentInstStack.Last();
+        parentInstStack.RemoveLast();
+
+        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
+        for (IRInst* child : childrenList)
+        {
+            instsOut.Add(child);
+            parentInstStack.Add(child);
+        }
+    }
+}
+
+/* static */SlangResult IRSerialUtil::verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialBinary::CompressionType compressionType, IRSerialWriter::OptionFlags optionFlags)
+{
+    // Verify if we can stream out with debug information
+        
+    List<IRInst*> originalInsts;
+    calcInstructionList(module, originalInsts);
+    
+    IRSerialData serialData;
+    {
+        // Write IR out to serialData - copying over SourceLoc information directly
+        IRSerialWriter writer;
+        SLANG_RETURN_ON_FAIL(writer.write(module, sourceManager, optionFlags, &serialData));
+    }
+
+    // Write the data out to stream
+    MemoryStream memoryStream(FileAccess::ReadWrite);
+    SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, compressionType, &memoryStream));
+
+    // Reset stream
+    memoryStream.Seek(SeekOrigin::Start, 0);
+
+    IRSerialData readData;
+
+    SLANG_RETURN_ON_FAIL(IRSerialReader::readStream(&memoryStream, &readData));
+
+    // Check the stream read data is the same
+    if (readData != serialData)
+    {
+        SLANG_ASSERT(!"Streamed in data doesn't match");
+        return SLANG_FAIL;
+    }
+
+    RefPtr<IRModule> irReadModule;
+
+    SourceManager workSourceManager;
+    workSourceManager.initialize(sourceManager);
+
+    {
+        IRSerialReader reader;
+        SLANG_RETURN_ON_FAIL(reader.read(serialData, session, &workSourceManager, irReadModule));
+    }
+
+    List<IRInst*> readInsts;
+    calcInstructionList(irReadModule, readInsts);
+
+    if (readInsts.Count() != originalInsts.Count())
+    {
+        SLANG_ASSERT(!"Instruction counts don't match");
+        return SLANG_FAIL;
+    }
+
+    if (optionFlags & IRSerialWriter::OptionFlag::RawSourceLocation)
+    {
+        SLANG_ASSERT(readInsts[0] == originalInsts[0]);
+        // All the source locs should be identical
+        for (UInt i = 1; i < readInsts.Count(); ++i)
+        {
+            IRInst* origInst = originalInsts[i];
+            IRInst* readInst = readInsts[i];
+
+            if (origInst->sourceLoc.getRaw() != readInst->sourceLoc.getRaw())
+            {
+                SLANG_ASSERT(!"Source locs don't match");
+                return SLANG_FAIL;
+            }
+        }
+    }
+    else if (optionFlags & IRSerialWriter::OptionFlag::DebugInfo)
+    {
+        // They should be on the same line nos
+        for (UInt i = 1; i < readInsts.Count(); ++i)
+        {
+            IRInst* origInst = originalInsts[i];
+            IRInst* readInst = readInsts[i];
+
+            if (origInst->sourceLoc.getRaw() == readInst->sourceLoc.getRaw())
+            {
+                continue;
+            }
+
+            // Work out the
+            SourceView* origSourceView = sourceManager->findSourceView(origInst->sourceLoc);
+            SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
+
+            // if both are null we are done
+            if (origSourceView == nullptr && origSourceView == readSourceView)
+            {
+                continue;
+            }
+            SLANG_ASSERT(origSourceView && readSourceView);
+
+            {
+                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
+                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
+
+                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
+                {
+                    SLANG_ASSERT(!"Debug data didn't match");
+                    return SLANG_FAIL;
+                }
+            }
+
+            // We may have adjusted line numbers -> but they may not match, because we only reconstruct one view
+            // So for now disable this test
+
+            if (false)
+            {
+                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Nominal);
+                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Nominal);
+
+                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
+                {
+                    SLANG_ASSERT(!"Debug data didn't match");
+                    return SLANG_FAIL;
                 }
             }
         }
