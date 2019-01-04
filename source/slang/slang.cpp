@@ -561,10 +561,16 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
+        // TODO JS:
+        // This is a bit of HACK. Apparently if we call generateIRForTranslationUnit(translationUnit) twice
+        // we get a different result (!).
+        // So here, we only create once even if we run verification.
+        RefPtr<IRModule> irModule;
+
 #if 0
         {
             /// Generate IR for translation unit
-            RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+            irModule = generateIRForTranslationUnit(translationUnit);
 
             // Verify debug information
             SLANG_ASSERT(SLANG_SUCCEEDED(IRSerialUtil::verifySerialize(irModule, mSession, sourceManager, IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)));
@@ -576,11 +582,13 @@ void CompileRequest::generateIR()
             IRSerialData serialData;
             {
                 /// Generate IR for translation unit
-                RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+                irModule = irModule ? irModule : generateIRForTranslationUnit(translationUnit);
 
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
                 writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData);
+
+                irModule = nullptr;
             }
             RefPtr<IRModule> irReadModule;
             {
@@ -594,7 +602,9 @@ void CompileRequest::generateIR()
         }
         else
         {
-            translationUnit->irModule = generateIRForTranslationUnit(translationUnit);
+            irModule = irModule ? irModule : generateIRForTranslationUnit(translationUnit);
+
+            translationUnit->irModule = irModule; 
         }
     }
 }
