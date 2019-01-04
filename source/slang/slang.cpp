@@ -582,7 +582,10 @@ void CompileRequest::generateIR()
             IRSerialData serialData;
             {
                 /// Generate IR for translation unit
-                irModule = irModule ? irModule : generateIRForTranslationUnit(translationUnit);
+                if (!irModule)
+                {
+                    irModule = generateIRForTranslationUnit(translationUnit);
+                }
 
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
@@ -602,7 +605,10 @@ void CompileRequest::generateIR()
         }
         else
         {
-            irModule = irModule ? irModule : generateIRForTranslationUnit(translationUnit);
+            if (!irModule)
+            {
+                irModule = generateIRForTranslationUnit(translationUnit);
+            }
 
             translationUnit->irModule = irModule; 
         }
