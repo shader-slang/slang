@@ -149,6 +149,9 @@ public:
         /// Note that this is lazily evaluated - the line breaks are only calculated on the first request 
     const List<uint32_t>& getLineBreakOffsets();
 
+        /// Set the line break offsets
+    void setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets);
+
         /// Calculate the line based on the offset 
     int calcLineIndexFromOffset(int offset);
 
@@ -177,7 +180,9 @@ public:
 
         /// Ctor
     SourceFile(const PathInfo& pathInfo, size_t contentSize);
-    
+        /// Dtor
+    ~SourceFile();
+
     protected:
 
     PathInfo m_pathInfo;                  ///< The path The logical file path to report for locations inside this span.
@@ -246,6 +251,9 @@ class SourceView: public RefObject
     const SourceRange& getRange() const { return m_range; }
         /// Get the entries
     const List<Entry>& getEntries() const { return m_entries; }
+        /// Set the entries list
+    void setEntries(const Entry* entries, UInt numEntries) { m_entries.Clear(); m_entries.AddRange(entries, numEntries); }
+
         /// Get the source file holds the contents this view 
     SourceFile* getSourceFile() const { return m_sourceFile; }
         /// Get the source manager
@@ -290,9 +298,9 @@ struct SourceManager
     SourceRange allocateSourceRange(UInt size);
 
         /// Create a SourceFile defined with the specified path, and content held within a blob
-    SourceFile* createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
-    SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
-    SourceFile* createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
+    RefPtr<SourceFile> createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
+    RefPtr<SourceFile> createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
+    RefPtr<SourceFile> createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
 
         /// Get the humane source location
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);

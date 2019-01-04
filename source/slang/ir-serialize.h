@@ -52,11 +52,16 @@ class StringRepresentationCache
 
 struct SerialStringTableUtil
 {
-    /// Convert a pool into a string table
+        /// Convert a pool into a string table
     static void encodeStringTable(const StringSlicePool& pool, List<char>& stringTable);
     static void encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable);
-    /// Converts a pool into a string table, appending the strings to the slices
+        /// Appends the decoded strings into slicesOut
+    static void appendDecodedStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+        /// Decodes a string table (and does so such that the indices are compatible with StringSlicePool)
     static void decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+
+        /// Produces an index map, from slices to indices in pool
+    static void calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMap);
 };
 
 // Pre-declare
@@ -101,6 +106,7 @@ struct IRSerialData
 
         bool operator==(const ThisType& rhs) const { return m_sourceLoc == rhs.m_sourceLoc && m_startInstIndex == rhs.m_startInstIndex && m_numInst == rhs.m_numInst;  }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        bool operator<(const ThisType& rhs) const { return m_sourceLoc < rhs.m_sourceLoc;  }
 
         uint32_t m_sourceLoc;               ///< The source location
         InstIndex m_startInstIndex;         ///< The index to the first instruction
@@ -122,14 +128,19 @@ struct IRSerialData
             return m_pathIndex == rhs.m_pathIndex &&
                 m_startSourceLoc == rhs.m_startSourceLoc &&
                 m_endSourceLoc == rhs.m_endSourceLoc &&
+                m_numLineInfos == rhs.m_numLineInfos &&
                 m_lineInfosStartIndex == rhs.m_lineInfosStartIndex &&
                 m_numLineInfos == rhs.m_numLineInfos;
         }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
+        bool isSourceLocInRange(uint32_t sourceLoc) const { return sourceLoc >= m_startSourceLoc && sourceLoc <= m_endSourceLoc;  }
+
         StringIndex m_pathIndex;                ///< Index to the string table
         uint32_t m_startSourceLoc;              ///< The offset to the source
         uint32_t m_endSourceLoc;                ///< The number of bytes in the source
+
+        uint32_t m_numLines;                    ///< Total number of lines in source file
 
         uint32_t m_lineInfosStartIndex;         ///< Index into m_debugLineInfos
         uint32_t m_numLineInfos;                ///< The number of line infos
@@ -141,6 +152,7 @@ struct IRSerialData
     struct DebugLineInfo
     {
         typedef DebugLineInfo ThisType;
+        bool operator<(const ThisType& rhs) const { return m_lineStartOffset < rhs.m_lineStartOffset;  }
         bool operator==(const ThisType& rhs) const
         {
             return m_lineStartOffset == rhs.m_lineStartOffset &&
@@ -162,6 +174,7 @@ struct IRSerialData
                 m_pathStringIndex == rhs.m_pathStringIndex;
         }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        bool operator<(const ThisType& rhs) const { return m_lineInfo < rhs.m_lineInfo;  }
 
         DebugLineInfo m_lineInfo;
         uint32_t m_adjustedLineIndex;             ///< The line index with the adjustment (if there is any). Is 0 if m_pathStringIndex is 0.
@@ -253,9 +266,8 @@ struct IRSerialData
     size_t calcSizeInBytes() const;
 
     /// Ctor
-    IRSerialData()
-    {}
-
+    IRSerialData();
+    
     List<Inst> m_insts;                         ///< The instructions
 
     List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
@@ -416,6 +428,9 @@ struct IRSerialWriter
     typedef OptionFlag::Type OptionFlags;
 
     Result write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData);
+
+        /// Produces an instruction list which is in same order as written
+    static void calcInstructionList(IRModule* module, List<IRInst*>& instsOut);
 
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 

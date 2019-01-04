@@ -50,8 +50,8 @@ public:
 
         /// Convert a handle to and index. (A handle is just an index!) 
     static int asIndex(Handle handle) { return int(handle); }
-        /// Returns true if the handle is to some non zero length slice
-    static bool isNonZeroLength(Handle handle) { return int(handle) > kNumDefaultHandles; }
+        /// Returns true if the handle is to a slice that contains characters (ie not null or empty)
+    static bool hasContents(Handle handle) { return int(handle) > kNumDefaultHandles; }
 
         /// Ctor
     StringSlicePool();

@@ -229,7 +229,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
     }
 }
 
-/* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slices)
+/* static */void SerialStringTableUtil::appendDecodedStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut)
 {
     const char* start = stringTable.begin();
     const char* cur = start;
@@ -239,8 +239,37 @@ char* StringRepresentationCache::getCStr(Handle handle)
     {
         CharReader reader(cur);
         const int len = GetUnicodePointFromUTF8(reader);
-        slices.Add(UnownedStringSlice(reader.m_pos, len));
+        slicesOut.Add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
+    }
+}
+
+/* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut)
+{
+    slicesOut.SetSize(2);
+    slicesOut[0] = UnownedStringSlice(nullptr, size_t(0));
+    slicesOut[1] = UnownedStringSlice("", size_t(0));
+
+    appendDecodedStringTable(stringTable, slicesOut);
+}
+
+/* static */void SerialStringTableUtil::calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMapOut)
+{
+    SLANG_ASSERT(slices.Count() >= StringSlicePool::kNumDefaultHandles);
+    SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
+    SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
+
+    indexMapOut.SetSize(slices.Count());
+    // Set up all of the defaults
+    for (int i = 0; i < StringSlicePool::kNumDefaultHandles; ++i)
+    {
+        indexMapOut[i] = StringSlicePool::Handle(i);
+    }
+
+    const int numSlices = int(slices.Count());
+    for (int i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
+    {
+        indexMapOut[i] = pool.add(slices[i]);
     }
 }
 
@@ -269,11 +298,9 @@ size_t IRSerialData::calcSizeInBytes() const
         _calcArraySize(m_debugSourceLocRuns);
 }
 
-static void _clearStringTable(List<char>& stringTable)
+IRSerialData::IRSerialData()
 {
-    stringTable.SetSize(2);
-    stringTable[int(IRSerialData::kNullStringIndex)] = 0;
-    stringTable[int(IRSerialData::kEmptyStringIndex)] = 0;
+    clear();
 }
 
 void IRSerialData::clear()
@@ -286,15 +313,14 @@ void IRSerialData::clear()
     m_externalOperands.Clear();
     m_rawSourceLocs.Clear();
 
-    _clearStringTable(m_stringTable);
-
+    m_stringTable.Clear();
+    
     // Debug data
     m_debugLineInfos.Clear();
     m_debugAdjustedLineInfos.Clear();
     m_debugSourceInfos.Clear();
     m_debugSourceLocRuns.Clear();
-    
-    _clearStringTable(m_debugStringTable);
+    m_debugStringTable.Clear();
 }
 
 template <typename T>
@@ -428,7 +454,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
             adjustedLineInfo.m_lineInfo = lineInfo;
             adjustedLineInfo.m_pathStringIndex = Ser::kNullStringIndex;
 
-            if (StringSlicePool::isNonZeroLength(entry.m_pathHandle))
+            if (StringSlicePool::hasContents(entry.m_pathHandle))
             {
                 UnownedStringSlice slice = m_sourceManager->getStringSlicePool().getSlice(entry.m_pathHandle);
                 SLANG_ASSERT(slice.size() > 0);
@@ -523,9 +549,11 @@ Result IRSerialWriter::_calcDebugInfo()
 
         IRSerialData::DebugSourceInfo sourceInfo;
 
+        sourceInfo.m_numLines = uint32_t(debugSourceFile->m_sourceFile->getLineBreakOffsets().Count());
+
         sourceInfo.m_startSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc);
         sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->getContentSize());
-        
+
         sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->getPathInfo().foundPath));
 
         sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.Count());
@@ -547,6 +575,38 @@ Result IRSerialWriter::_calcDebugInfo()
 
     return SLANG_OK;
 }
+
+/* static */void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
+{
+    // We reserve 0 for null
+    instsOut.SetSize(1);
+    instsOut[0] = nullptr;
+
+    // Stack for parentInst
+    List<IRInst*> parentInstStack;
+
+    IRModuleInst* moduleInst = module->getModuleInst();
+    parentInstStack.Add(moduleInst);
+
+    // Add to list
+    instsOut.Add(moduleInst);
+
+    // Traverse all of the instructions
+    while (parentInstStack.Count())
+    {
+        // If it's in the stack it is assumed it is already in the inst map
+        IRInst* parentInst = parentInstStack.Last();
+        parentInstStack.RemoveLast();
+       
+        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
+        for (IRInst* child : childrenList)
+        {
+            instsOut.Add(child);
+            parentInstStack.Add(child);
+        }
+    }
+}
+
 
 Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
 {
@@ -608,6 +668,18 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             m_serialData->m_childRuns.Add(run);
         }
     }
+
+#if 0
+    {
+        List<IRInst*> workInsts;
+        calcInstructionList(module, workInsts);
+        SLANG_ASSERT(workInsts.Count() == m_insts.Count());
+        for (UInt i = 0; i < workInsts.Count(); ++i)
+        {
+            SLANG_ASSERT(workInsts[i] == m_insts[i]);
+        }
+    }
+#endif
 
     // Set to the right size
     m_serialData->m_insts.SetSize(m_insts.Count());
@@ -1511,6 +1583,34 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
     return SLANG_OK;
 }
 
+static SourceRange _toSourceRange(const IRSerialData::DebugSourceInfo& info)
+{
+    SourceRange range;
+    range.begin = SourceLoc::fromRaw(info.m_startSourceLoc);
+    range.end = SourceLoc::fromRaw(info.m_endSourceLoc);
+    return range;
+}
+
+static int _findIndex(const List<IRSerialData::DebugSourceInfo>& infos, SourceLoc sourceLoc)
+{
+    const int numInfos = int(infos.Count());
+    for (int i = 0; i < numInfos; ++i)
+    {
+        if (_toSourceRange(infos[i]).contains(sourceLoc))
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceView* sourceView, SourceRange& rangeOut)
+{
+    rangeOut = _toSourceRange(info);
+    return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
+}
+
 /* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut)
 {
     typedef Ser::Inst::PayloadType PayloadType;
@@ -1710,44 +1810,157 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
     {
         List<UnownedStringSlice> debugStringSlices;
         SerialStringTableUtil::decodeStringTable(m_serialData->m_debugStringTable, debugStringSlices);
+        List<StringSlicePool::Handle> stringMap;
+        SerialStringTableUtil::calcStringSlicePoolMap(debugStringSlices, sourceManager->getStringSlicePool(), stringMap);
 
-        // Mark the map as invalid
-        List<int> stringIndexMap;
-        stringIndexMap.SetSize(debugStringSlices.Count());
+        const List<IRSerialData::DebugSourceInfo>& sourceInfos = m_serialData->m_debugSourceInfos;
 
-        // Remap into the string pool
-        StringSlicePool& slicePool = sourceManager->getStringSlicePool();
+        // Construct the source files
+        int numSourceFiles = int(sourceInfos.Count());
 
-        for (int i = 0; i < int(debugStringSlices.Count()); ++i)
-        {
-            if (i < StringSlicePool::kNumDefaultHandles)
-            {
-                stringIndexMap[i] = i;
-            }
-            else
-            {
-                stringIndexMap[i] = int(slicePool.add(debugStringSlices[i]));
-            }
-        }
+        // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
+        List<SourceView*> sourceViews;
+        sourceViews.SetSize(numSourceFiles);
 
-        // We want to reconstruct the source file, well in so far as it has the correct source line information
-
-        int numSourceFiles = int(m_serialData->m_debugSourceInfos.Count());
         for (int i = 0; i < numSourceFiles; ++i)
         {
-            const IRSerialData::DebugSourceInfo& sourceInfo = m_serialData->m_debugSourceInfos[i];
+            const IRSerialData::DebugSourceInfo& srcSourceInfo = sourceInfos[i];
 
             PathInfo pathInfo;
             pathInfo.type = PathInfo::Type::FoundPath;
-            pathInfo.foundPath = debugStringSlices[UInt(sourceInfo.m_pathIndex)];
+            pathInfo.foundPath = debugStringSlices[UInt(srcSourceInfo.m_pathIndex)];
 
-            SourceFile* sourceFile = sourceManager->createSourceFileWithSize(pathInfo, sourceInfo.m_endSourceLoc - sourceInfo.m_startSourceLoc);
+            RefPtr<SourceFile> sourceFile = sourceManager->createSourceFileWithSize(pathInfo, srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
             SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
-            SLANG_UNUSED(sourceView);
+            // We need to accumulate all line numbers, for this source file, both adjusted and unadjusted
+            List<IRSerialData::DebugLineInfo> lineInfos;
+            // Add the adjusted lines
+            {
+                lineInfos.SetSize(srcSourceInfo.m_numAdjustedLineInfos);
+                IRSerialData::DebugAdjustedLineInfo* srcAdjustedLineInfos = m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex;
+                const int numAdjustedLines = int(srcSourceInfo.m_numAdjustedLineInfos);
+                for (int j = 0; j < numAdjustedLines; ++j)
+                {
+                    lineInfos[j] = srcAdjustedLineInfos[j].m_lineInfo;
+                }
+            }
+            // Add regular lines
+            lineInfos.AddRange(m_serialData->m_debugLineInfos.Buffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
+            // Put in sourceloc order
+            lineInfos.Sort();
 
-            // Fill in the line no info
-            // Fill in the adjusted line info into sourceView
+            List<uint32_t> lineBreakOffsets;
+
+            // We can now set up the line breaks array
+            const int numLines = int(srcSourceInfo.m_numLines);
+            lineBreakOffsets.SetSize(numLines);
+
+            {
+                const int numLineInfos = int(lineInfos.Count());
+                int lineIndex = 0;
+                
+                // Every line up and including should hold the same offset
+                for (int lineInfoIndex = 0; lineInfoIndex < numLineInfos; ++lineInfoIndex)
+                {
+                    const auto& lineInfo = lineInfos[lineInfoIndex];
+
+                    const uint32_t offset = lineInfo.m_lineStartOffset;
+                    SLANG_ASSERT(offset > 0);
+                    const int finishIndex = int(lineInfo.m_lineIndex);
+
+                    SLANG_ASSERT(finishIndex < numLines);
+
+                    for (; lineIndex < finishIndex; ++lineIndex)
+                    {
+                        lineBreakOffsets[lineIndex] = offset - 1;
+                    }
+                    lineBreakOffsets[lineIndex] = offset;
+                    lineIndex++;
+                }
+
+                // Do the remaining lines
+                const uint32_t offset = uint32_t(srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
+                for (; lineIndex < numLines; ++lineIndex)
+                {
+                    lineBreakOffsets[lineIndex] = offset;
+                }
+            }
+
+            sourceFile->setLineBreakOffsets(lineBreakOffsets.Buffer(), lineBreakOffsets.Count());
+
+            if (srcSourceInfo.m_numAdjustedLineInfos)
+            {
+                List<IRSerialData::DebugAdjustedLineInfo> adjustedLineInfos;
+
+                int numEntries = int(srcSourceInfo.m_numAdjustedLineInfos);
+
+                adjustedLineInfos.AddRange(m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
+                adjustedLineInfos.Sort();
+
+                // Work out the views adjustments, and place in dstEntries
+                List<SourceView::Entry> dstEntries;
+                dstEntries.SetSize(numEntries);
+
+                const uint32_t sourceLocOffset = uint32_t(sourceView->getRange().begin.getRaw());
+
+                for (int j = 0; j < numEntries; ++j)
+                {
+                    const auto& srcEntry = adjustedLineInfos[j];
+                    auto& dstEntry = dstEntries[j];
+
+                    dstEntry.m_pathHandle = stringMap[int(srcEntry.m_pathStringIndex)];
+                    dstEntry.m_startLoc = SourceLoc::fromRaw(srcEntry.m_lineInfo.m_lineStartOffset + sourceLocOffset);
+                    dstEntry.m_lineAdjust = int32_t(srcEntry.m_adjustedLineIndex) - int32_t(srcEntry.m_lineInfo.m_lineIndex);
+                }
+
+                // Set the adjustments on the view
+                sourceView->setEntries(dstEntries.Buffer(), dstEntries.Count());
+            }
+
+            sourceViews[i] = sourceView;
+        }
+
+        // We now need to apply the runs
+        {
+            List<IRSerialData::SourceLocRun> sourceRuns(m_serialData->m_debugSourceLocRuns);
+            // They are now in source location order
+            sourceRuns.Sort();
+
+            // Just guess initially 0 for the source file that contains the initial run
+            SourceRange range;
+            int fixSourceLoc = _calcFixSourceLoc(sourceInfos[0], sourceViews[0], range);
+
+            const int numRuns = int(sourceRuns.Count());
+            for (int i = 0; i < numRuns; ++i)
+            {
+                const auto& run = sourceRuns[i];
+                const SourceLoc srcSourceLoc = SourceLoc::fromRaw(run.m_sourceLoc);
+
+                if (!range.contains(srcSourceLoc))
+                {
+                    int index = _findIndex(sourceInfos, srcSourceLoc);
+                    if (index < 0)
+                    {
+                        // Didn't find the match
+                        continue;
+                    }
+                    fixSourceLoc = _calcFixSourceLoc(sourceInfos[index], sourceViews[index], range);
+                    SLANG_ASSERT(range.contains(srcSourceLoc));
+                }
+
+                // Work out the fixed source location
+                SourceLoc sourceLoc = SourceLoc::fromRaw(int(run.m_sourceLoc) + fixSourceLoc); 
+
+                SLANG_ASSERT(uint32_t(run.m_startInstIndex) + run.m_numInst <= insts.Count());
+                IRInst** dstInsts = insts.Buffer() + int(run.m_startInstIndex);
+
+                const int runSize = int(run.m_numInst);
+                for (int j = 0; j < runSize; ++j)
+                {
+                    dstInsts[j]->sourceLoc = sourceLoc;
+                }
+            }
         }
     }
 

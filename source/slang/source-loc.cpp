@@ -181,6 +181,12 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+void SourceFile::setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets)
+{
+    m_lineBreakOffsets.Clear();
+    m_lineBreakOffsets.AddRange(offsets, numOffsets);
+}
+
 const List<uint32_t>& SourceFile::getLineBreakOffsets()
 {
     // We now have a raw input file that we can search for line breaks.
@@ -295,6 +301,11 @@ SourceFile::SourceFile(const PathInfo& pathInfo, size_t contentSize) :
 {
 }
 
+SourceFile::~SourceFile()
+{
+
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void SourceManager::initialize(
@@ -348,20 +359,20 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
+RefPtr<SourceFile> SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
     SourceFile* sourceFile = new SourceFile(pathInfo, contentSize);
     return sourceFile;
 }
 
-SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
+RefPtr<SourceFile> SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
-    RefPtr<SourceFile> sourceFile(new SourceFile(pathInfo, contents.Length()));
+    SourceFile* sourceFile = new SourceFile(pathInfo, contents.Length());
     sourceFile->setContents(contents);
     return sourceFile;
 }
 
-SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
+RefPtr<SourceFile> SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
 {
     RefPtr<SourceFile> sourceFile(new SourceFile(pathInfo, blob->getBufferSize()));
     sourceFile->setContents(blob);

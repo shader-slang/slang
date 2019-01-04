@@ -564,11 +564,14 @@ void CompileRequest::generateIR()
 #if 1
         // Verify if we can stream out with debug information
         {
+            /// Generate IR for translation unit
+            RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+
+            List<IRInst*> originalInsts;
+            IRSerialWriter::calcInstructionList(irModule, originalInsts);
+
             IRSerialData serialData;
             {
-                /// Generate IR for translation unit
-                RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
-
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
                 writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::DebugInfo, &serialData);
@@ -595,6 +598,41 @@ void CompileRequest::generateIR()
                 IRSerialReader reader;
                 reader.read(serialData, mSession, &workSourceManager, irReadModule);
             }
+
+            List<IRInst*> readInsts;
+            IRSerialWriter::calcInstructionList(irReadModule, readInsts);
+
+            SLANG_ASSERT(readInsts.Count() == originalInsts.Count());
+
+            // They should be on the same line nos
+
+            for (UInt i = 1; i < readInsts.Count(); ++i)
+            {
+                IRInst* origInst = originalInsts[i];
+                IRInst* readInst = readInsts[i];
+
+                if (origInst->sourceLoc.getRaw() == readInst->sourceLoc.getRaw())
+                {
+                    continue;
+                }
+
+                // Work out the
+                SourceView* origSourceView = sourceManager->findSourceView(origInst->sourceLoc);
+                SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
+
+                // if both are null we are done
+                if (origSourceView == nullptr && origSourceView == readSourceView)
+                {
+                    continue;
+                }
+                SLANG_ASSERT(origSourceView && readSourceView);
+
+                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
+                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
+
+                SLANG_ASSERT(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath);
+            }
+
         }
 #endif
 
