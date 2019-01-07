@@ -561,10 +561,9 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-        // TODO JS:
-        // This is a bit of HACK. Apparently if we call generateIRForTranslationUnit(translationUnit) twice
-        // we get a different result (!).
-        // So here, we only create once even if we run verification.
+        // We want to only run generateIRForTranslationUnit once here. This is for two side effects:
+        // * it can dump ir 
+        // * it can generate diagnostics
 
         /// Generate IR for translation unit
         RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
