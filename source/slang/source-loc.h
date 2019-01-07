@@ -141,7 +141,7 @@ struct SourceRange
 
 // A logical or physical storage object for a range of input code
 // that has logically contiguous source locations.
-class SourceFile : public RefObject
+class SourceFile 
 {
 public:
 
@@ -217,7 +217,7 @@ struct SourceManager;
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
 on #defines for example).
 */ 
-class SourceView: public RefObject
+class SourceView
 {
     public:
 
@@ -285,7 +285,7 @@ class SourceView: public RefObject
 
     SourceManager* m_sourceManager;     /// Get the manager this belongs to 
     SourceRange m_range;                ///< The range that this SourceView applies to
-    RefPtr<SourceFile> m_sourceFile;    ///< The source file can hold the line breaks
+    SourceFile* m_sourceFile;           ///< The source file. Can hold the line breaks
     List<Entry> m_entries;              ///< An array entries describing how we should interpret a range, starting from the start location. 
 };
 
@@ -298,9 +298,9 @@ struct SourceManager
     SourceRange allocateSourceRange(UInt size);
 
         /// Create a SourceFile defined with the specified path, and content held within a blob
-    RefPtr<SourceFile> createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
-    RefPtr<SourceFile> createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
-    RefPtr<SourceFile> createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
+    SourceFile* createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
+    SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
+    SourceFile* createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
 
         /// Get the humane source location
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
@@ -348,6 +348,7 @@ struct SourceManager
     SourceManager() :
         m_memoryArena(2048)
     {}
+    ~SourceManager();
 
     protected:
 
@@ -362,16 +363,19 @@ struct SourceManager
     // The location to be used by the next source file to be loaded
     SourceLoc m_nextLoc;
 
-    // All of the SourceViews. These are held in increasing order of range, so can find by doing a binary chop.
-    List<RefPtr<SourceView> > m_sourceViews;                
+    // All of the SourceViews constructed on this SourceManager. These are held in increasing order of range, so can find by doing a binary chop.
+    List<SourceView*> m_sourceViews;
+    // All of the SourceFiles constructed on this SourceManager. This owns the SourceFile.
+    List<SourceFile*> m_sourceFiles;
+
     StringSlicePool m_slicePool;
 
     // Memory arena that can be used for holding data to held in scope as long as the Source is
-    // Can be used for storing the decoded contents of Token.Content for exampel
+    // Can be used for storing the decoded contents of Token. Content for example.
     MemoryArena m_memoryArena;
 
     // Maps canonical paths to source files
-    Dictionary<String, RefPtr<SourceFile> > m_sourceFiles;  
+    Dictionary<String, SourceFile*> m_sourceFileMap;  
 };
 
 } // namespace Slang

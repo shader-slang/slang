@@ -183,7 +183,7 @@ namespace Slang
         // The source file(s) that will be compiled to form this translation unit
         //
         // Usually, for HLSL or GLSL there will be only one file.
-        List<RefPtr<SourceFile> > sourceFiles;
+        List<SourceFile*> sourceFiles;
 
         // The entry points associated with this translation unit
         List<RefPtr<EntryPointRequest> > entryPoints;

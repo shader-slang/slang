@@ -473,7 +473,7 @@ protected:
 
         SourceLoc::RawValue m_baseSourceLoc;            ///< The base source location
 
-        RefPtr<SourceFile> m_sourceFile;                ///< The source file
+        SourceFile* m_sourceFile;                       ///< The source file
         List<uint8_t> m_lineIndexUsed;                  ///< Has 1 if the line is used
         List<uint32_t> m_usedLineIndices;               ///< Holds the lines that have been hit                 
 

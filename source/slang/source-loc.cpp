@@ -332,6 +332,26 @@ void SourceManager::initialize(
     m_nextLoc = m_startLoc;
 }
 
+template <typename T>
+static void _deleteListContents(const List<T*>& list)
+{
+    const int num = int(list.Count());
+    for (int i = 0; i < num; ++i)
+    {
+        T* item = list[i];
+        if (item)
+        {
+            delete item;
+        }
+    }
+}
+
+SourceManager::~SourceManager()
+{
+    _deleteListContents(m_sourceFiles);
+    _deleteListContents(m_sourceViews);
+}
+
 UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)
 {
     const UInt numChars = slice.size();
@@ -359,22 +379,25 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     return SourceRange(beginLoc, endLoc);
 }
 
-RefPtr<SourceFile> SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
+SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
     SourceFile* sourceFile = new SourceFile(pathInfo, contentSize);
+    m_sourceFiles.Add(sourceFile);
     return sourceFile;
 }
 
-RefPtr<SourceFile> SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
+SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
     SourceFile* sourceFile = new SourceFile(pathInfo, contents.Length());
+    m_sourceFiles.Add(sourceFile);
     sourceFile->setContents(contents);
     return sourceFile;
 }
 
-RefPtr<SourceFile> SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
+SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
 {
-    RefPtr<SourceFile> sourceFile(new SourceFile(pathInfo, blob->getBufferSize()));
+    SourceFile* sourceFile = new SourceFile(pathInfo, blob->getBufferSize());
+    m_sourceFiles.Add(sourceFile);
     sourceFile->setContents(blob);
     return sourceFile;
 }
@@ -465,8 +488,8 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
 
 SourceFile* SourceManager::findSourceFile(const String& canonicalPath) const
 {
-    RefPtr<SourceFile>* filePtr = m_sourceFiles.TryGetValue(canonicalPath);
-    return (filePtr) ? filePtr->Ptr() : nullptr;
+    SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(canonicalPath);
+    return (filePtr) ? *filePtr : nullptr;
 }
 
 SourceFile* SourceManager::findSourceFileRecursively(const String& canonicalPath) const
@@ -487,7 +510,7 @@ SourceFile* SourceManager::findSourceFileRecursively(const String& canonicalPath
 void SourceManager::addSourceFile(const String& canonicalPath, SourceFile* sourceFile)
 {
     SLANG_ASSERT(!findSourceFileRecursively(canonicalPath));
-    m_sourceFiles.Add(canonicalPath, sourceFile);
+    m_sourceFileMap.Add(canonicalPath, sourceFile);
 }
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
