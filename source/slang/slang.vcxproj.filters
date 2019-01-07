@@ -93,6 +93,9 @@
     <ClInclude Include="ir-ssa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ir-union.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ir-validate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -249,6 +252,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-ssa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ir-union.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ir-validate.cpp">

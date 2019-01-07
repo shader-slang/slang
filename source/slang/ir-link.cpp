@@ -1284,6 +1284,30 @@ IRFunc* specializeIRForEntryPoint(
         cloneValue(context, bindInst);
     }
 
+    // HACK: we need to ensure that any tagged union types
+    // in the IR module have layout information copied over to them.
+    //
+    // Note that we do this *after* cloning the `bindGlobalGenericParam`
+    // instructions, since we expected the tagged union type(s) to
+    // be referenced by them.
+    //
+    for( auto taggedUnionTypeLayout : entryPointLayout->taggedUnionTypeLayouts )
+    {
+        auto taggedUnionType = taggedUnionTypeLayout->getType();
+        auto mangledName = getMangledTypeName(taggedUnionType);
+
+        RefPtr<IRSpecSymbol> sym;
+        if(!context->getSymbols().TryGetValue(mangledName, sym))
+            continue;
+
+        IRInst* clonedType = findClonedValue(context, sym->irGlobalValue);
+        if(!clonedType)
+            continue;
+
+        context->builder->addLayoutDecoration(clonedType, taggedUnionTypeLayout);
+    }
+
+
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

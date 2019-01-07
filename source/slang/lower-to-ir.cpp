@@ -1121,6 +1121,259 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             requirementKey));
     }
 
+    LoweredValInfo visitTaggedUnionSubtypeWitness(
+        TaggedUnionSubtypeWitness* val)
+    {
+        // The sub-type in this case is a tagged union `A | B | ...`,
+        // and the witness holds an array of witnesses showing that each
+        // "case" (`A`, `B`, etc.) is a subtype of the super-type.
+
+        // We will start by getting the IR-level representation of the
+        // sub type (the tagged union type).
+        //
+        auto irTaggedUnionType = lowerType(context, val->sub);
+
+        // We can turn each of those per-case witnesses into a witness
+        // table value:
+        //
+        auto caseCount = val->caseWitnesses.Count();
+        List<IRInst*> caseWitnessTables;
+        for( auto caseWitness : val->caseWitnesses )
+        {
+            auto caseWitnessTable = lowerSimpleVal(context, caseWitness);
+            caseWitnessTables.Add(caseWitnessTable);
+        }
+
+        // Now we need to synthesize a witness table for the tagged union
+        // value, showing how it can implement all of the requirements
+        // of the super type by delegating to the appropriate implementation
+        // on a per-case basis.
+        //
+        // We will assume here that the super-type is an interface, and it
+        // will be left to the front-end to ensure this property.
+        //
+        auto supDeclRefType = val->sup->As<DeclRefType>();
+        if(!supDeclRefType)
+        {
+            SLANG_UNEXPECTED("super-type not a decl-ref type when generating tagged union witness table");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
+        auto supInterfaceDeclRef = supDeclRefType->declRef.As<InterfaceDecl>();
+        if( !supInterfaceDeclRef )
+        {
+            SLANG_UNEXPECTED("super-type not an interface type when generating tagged union witness table");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
+
+        auto irWitnessTable = getBuilder()->createWitnessTable();
+
+        // Now we will iterate over the requirements (members) of the
+        // interface and try to synthesize an appropriate value for each.
+        //
+        for( auto reqDeclRef : getMembers(supInterfaceDeclRef) )
+        {
+            // TODO: if there are any members we shouldn't process as a requirement,
+            // then we should detect and skip them here.
+            //
+
+            // Every interface requirement will have a unique key that is used
+            // when looking up the requirement in a concrete witness table.
+            //
+            auto irReqKey = getInterfaceRequirementKey(context, reqDeclRef.getDecl());
+
+            // We expect that each of the witness tables in `caseWitnessTables`
+            // will have an entry to match these keys. However, we may not
+            // have a concrete `IRWitnessTable` for each of the case types, either
+            // because they are a specialization of a generic (so that the witness
+            // table reference is a `specialize` instruction at this point), or
+            // they are a type external to this module (so that we have a declaration
+            // rather than a definition of the witness table).
+
+            // Our task is to create an IR value that can satisfy the interface
+            // requirement for the tagged union type, by appropriately delegating
+            // to the implementations of the same requirement in the case types.
+            //
+            IRInst* irSatisfyingVal = nullptr;
+
+
+
+            if(auto callableDeclRef = reqDeclRef.As<CallableDecl>())
+            {
+                // We have something callable, so we need to synthesize
+                // a function to satisfy it.
+                //
+                auto irFunc = getBuilder()->createFunc();
+                irSatisfyingVal = irFunc;
+
+                IRBuilder subBuilderStorage;
+                auto subBuilder = &subBuilderStorage;
+                subBuilder->sharedBuilder = getBuilder()->sharedBuilder;
+                subBuilder->setInsertInto(irFunc);
+
+                // We will start by setting up the function parameters,
+                // which live in the entry block of the IR function.
+                //
+                auto entryBlock = subBuilder->emitBlock();
+                subBuilder->setInsertInto(entryBlock);
+
+                // Create a `this` parameter of the tagged-union type.
+                //
+                // TODO: need to handle the `[mutating]` case here...
+                //
+                auto irThisType = irTaggedUnionType;
+                auto irThisParam = subBuilder->emitParam(irThisType);
+
+                List<IRType*> irParamTypes;
+                irParamTypes.Add(irThisType);
+
+                // Create the remaining parameters of the callable,
+                // using a decl-ref specialized to the tagged union
+                // type (so that things like associated types are
+                // mapped to the correct witness value).
+                //
+                List<IRParam*> irParams;
+                for( auto paramDeclRef : getMembersOfType<ParamDecl>(callableDeclRef) )
+                {
+                    // TODO: need to handle `out` and `in out` here. Over all
+                    // there is a lot of duplication here with the existing logic
+                    // for emitting the signature of a `CallableDecl`, and we should
+                    // try to re-use that if at all possible.
+                    //
+                    auto irParamType = lowerType(context, GetType(paramDeclRef));
+                    auto irParam = subBuilder->emitParam(irParamType);
+
+                    irParams.Add(irParam);
+                    irParamTypes.Add(irParamType);
+                }
+
+                auto irResultType = lowerType(context, GetResultType(callableDeclRef));
+
+                auto irFuncType = subBuilder->getFuncType(
+                    irParamTypes,
+                    irResultType);
+                irFunc->setFullType(irFuncType);
+
+                // The first thing our function needs to do is extract the tag
+                // from the incoming `this` parameter.
+                //
+                auto irTagVal = subBuilder->emitExtractTaggedUnionTag(irThisParam);
+
+                // Next we want to emit a `switch` on the tag value, but before we
+                // do that we need to generate the code for each of the cases so that
+                // our `switch` has somewhere to branch to.
+                //
+                List<IRInst*> switchCaseOperands;
+
+                IRBlock* defaultLabel = nullptr;
+
+                for( UInt ii = 0; ii < caseCount; ++ii )
+                {
+                    auto caseTag = subBuilder->getIntValue(irTagVal->getDataType(), ii);
+
+                    subBuilder->setInsertInto(irFunc);
+                    auto caseLabel = subBuilder->emitBlock();
+
+                    if(!defaultLabel)
+                        defaultLabel = caseLabel;
+
+                    switchCaseOperands.Add(caseTag);
+                    switchCaseOperands.Add(caseLabel);
+
+                    subBuilder->setInsertInto(caseLabel);
+
+                    // We need to look up the satisfying value for this interface
+                    // requirement on the witness table of the particular case value.
+                    //
+                    // We already have the witness table, and the requirement key is
+                    // just `irReqKey`.
+                    //
+                    auto caseWitnessTable = caseWitnessTables[ii];
+
+                    // The subtle bit here is determining the type we expect the
+                    // satisfying value to have, since that depends on the actual
+                    // type that is satisfying the requirement.
+                    //
+                    IRType* caseResultType = irResultType;
+                    IRType* caseFuncType = nullptr;
+                    auto caseFunc = subBuilder->emitLookupInterfaceMethodInst(
+                        caseFuncType,
+                        caseWitnessTable,
+                        irReqKey);
+
+                    // We are going to emit a `call` to the satisfying value
+                    // for the case type, so we will collect the arguments for that call.
+                    //
+                    List<IRInst*> caseArgs;
+
+                    // The `this` argument to the call will need to represent the
+                    // appropriate field of our tagged union.
+                    //
+                    IRType* caseThisType = (IRType*) irTaggedUnionType->getOperand(ii);
+                    auto caseThisArg = subBuilder->emitExtractTaggedUnionPayload(
+                        caseThisType,
+                        irThisParam, caseTag);
+                    caseArgs.Add(caseThisArg);
+
+                    // The remaining arguments to the call will just be forwarded from
+                    // the parameters of the wrapper functon.
+                    //
+                    // TODO: This would need to change if/when we started allowing `This` type
+                    // or assocaited-type parameters to be used at call sites where a tagged
+                    // union is used.
+                    //
+                    for( auto param : irParams )
+                    {
+                        caseArgs.Add(param);
+                    }
+
+                    auto caseCall = subBuilder->emitCallInst(caseResultType, caseFunc, caseArgs);
+
+                    if( as<IRVoidType>(irResultType->getDataType()) )
+                    {
+                        subBuilder->emitReturn();
+                    }
+                    else
+                    {
+                        subBuilder->emitReturn(caseCall);
+                    }
+                }
+
+                // We will create a block to represent the supposedly-unreachable
+                // code that will run if no `case` matches.
+                //
+                subBuilder->setInsertInto(irFunc);
+                auto invalidLabel = subBuilder->emitBlock();
+                subBuilder->setInsertInto(invalidLabel);
+                subBuilder->emitUnreachable();
+
+                if(!defaultLabel) defaultLabel = invalidLabel;
+
+                // Now we have enough information to go back and emit the `switch` instruction
+                // into the entry block.
+                subBuilder->setInsertInto(entryBlock);
+                subBuilder->emitSwitch(
+                    irTagVal,       // value to `switch` on
+                    invalidLabel,   // `break` label (block after the `switch` statement ends)
+                    defaultLabel,   // `default` label (where to go if no `case` matches)
+                    switchCaseOperands.Count(),
+                    switchCaseOperands.Buffer());
+            }
+            else
+            {
+                // TODO: We need to handle other cases of interface requirements.
+                SLANG_UNEXPECTED("unexpceted interface requirement when generating tagged union witness table");
+                UNREACHABLE_RETURN(LoweredValInfo());
+            }
+
+            // Once we've generating a value to satisfying the requirement, we install
+            // it into the witness table for our tagged-union type.
+            //
+            getBuilder()->createWitnessTableEntry(irWitnessTable, irReqKey, irSatisfyingVal);
+        }
+
+        return LoweredValInfo::simple(irWitnessTable);
+    }
+
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
         // TODO: it is a bit messy here that the `ConstantIntVal` representation
@@ -1302,6 +1555,37 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto existentialType = lowerType(context, GetType(declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
+    }
+
+    LoweredValInfo visitTaggedUnionType(TaggedUnionType* type)
+    {
+        // A tagged union type will lower into an IR `union` over the cases,
+        // along with an IR `struct` with a field for the union and a tag.
+        // (Note: we are placing the tag after the payload to avoid padding
+        // in the case where the payload is more aligned than the tag)
+        //
+        // TODO: should we be lowering directly like this, or have
+        // an IR-level representation of tagged unions?
+        //
+
+        List<IRType*> irCaseTypes;
+        for(auto caseType : type->caseTypes)
+        {
+            auto irCaseType = lowerType(context, caseType);
+            irCaseTypes.Add(irCaseType);
+        }
+
+        auto irType = getBuilder()->getTaggedUnionType(irCaseTypes);
+        if(!irType->findDecoration<IRLinkageDecoration>())
+        {
+            // We need a way for later passes to attach layout information
+            // to this type, so we will give it a mangled name here.
+            //
+            getBuilder()->addExportDecoration(
+                irType,
+                getMangledTypeName(type).getUnownedSlice());
+        }
+        return LoweredValInfo::simple(irType);
     }
 
     // We do not expect to encounter the following types in ASTs that have
@@ -2182,6 +2466,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitSharedTypeExpr(SharedTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("shared type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("tagged union type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 

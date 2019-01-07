@@ -12,6 +12,7 @@
 #include "ir-specialize.h"
 #include "ir-specialize-resources.h"
 #include "ir-ssa.h"
+#include "ir-union.h"
 #include "ir-validate.h"
 #include "legalize-types.h"
 #include "lower-to-ir.h"
@@ -3922,11 +3923,98 @@ struct EmitVisitor
             }
             break;
 
+        case kIROp_BitCast:
+            {
+                // TODO: we can simplify the logic for arbitrary bitcasts
+                // by always bitcasting the source to a `uint*` type (if it
+                // isn't already) and then bitcasting that to the desitnation
+                // type (if it isn't already `uint*`.
+                //
+                // For now we are assuming the source type is *already*
+                // a `uint*` type of the appropriate size.
+                //
+//                auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
+                auto toType = extractBaseType(inst->getDataType());
+                switch(getTarget(ctx))
+                {
+                case CodeGenTarget::GLSL:
+                    switch(toType)
+                    {
+                    default:
+                        emit("/* unhandled */");
+                        break;
+
+                    case BaseType::UInt:
+                        break;
+
+                    case BaseType::Int:
+                        emitIRType(ctx, inst->getDataType());
+                        break;
+
+                    case BaseType::Float:
+                        emit("uintBitsToFloat(");
+                        break;
+                    }
+                    break;
+
+                case CodeGenTarget::HLSL:
+                    switch(toType)
+                    {
+                    default:
+                        emit("/* unhandled */");
+                        break;
+
+                    case BaseType::UInt:
+                        break;
+                    case BaseType::Int:
+                        emit("(");
+                        emitIRType(ctx, inst->getDataType());
+                        emit(")");
+                        break;
+                    case BaseType::Float:
+                        emit("asfloat");
+                        break;
+                    }
+                    break;
+
+
+                default:
+                    SLANG_UNEXPECTED("unhandled codegen target");
+                    break;
+                }
+
+                emit("(");
+                emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+                emit(")");
+            }
+            break;
+
         default:
             emit("/* unhandled */");
             break;
         }
         maybeCloseParens(needClose);
+    }
+
+    BaseType extractBaseType(IRType* inType)
+    {
+        auto type = inType;
+        for(;;)
+        {
+            if(auto irBaseType = as<IRBasicType>(type))
+            {
+                return irBaseType->getBaseType();
+            }
+            else if(auto vecType = as<IRVectorType>(type))
+            {
+                type = vecType->getElementType();
+                continue;
+            }
+            else
+            {
+                return BaseType::Void;
+            }
+        }
     }
 
     void emitIRInst(
@@ -6565,6 +6653,14 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
+        // Desguar any union types, since these will be illegal on
+        // various targets.
+        //
+        desugarUnionTypes(irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "UNIONS DESUGARED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
 
         // Any code that makes use of existential (interface) types
@@ -6594,8 +6690,6 @@ String emitEntryPoint(
         // so we need to specialize those away.
         //
         specializeGenerics(irModule);
-
-
 
         // Debugging code for IR transformations...
 #if 0

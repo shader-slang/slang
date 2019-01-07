@@ -136,3 +136,20 @@ RAW(
 )
 END_SYNTAX_CLASS()
 
+// A witness that `sub : sup`, because `sub` is a tagged union
+// of the form `A | B | C | ...` and each of `A : sup`,
+// `B : sup`, `C : sup`, etc.
+//
+SYNTAX_CLASS(TaggedUnionSubtypeWitness, SubtypeWitness)
+RAW(
+    // Witnesses that each of the "case" types in the union
+    // is a subtype of `sup`.
+    //
+    List<RefPtr<Val>> caseWitnesses;
+
+    virtual bool EqualsVal(Val* val) override;
+    virtual String ToString() override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
+)
+END_SYNTAX_CLASS()

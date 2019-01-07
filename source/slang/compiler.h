@@ -122,9 +122,8 @@ namespace Slang
         // The name of the entry point function (e.g., `main`)
         Name* name;
 
-        // The type names we want to substitute into the
-        // global generic type parameters
-        List<String> genericParameterTypeNames;
+            /// Source code for the generic arguments to use for the generic parameters of the entry point.
+        List<String> genericArgStrings;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target stage, and also
@@ -156,6 +155,9 @@ namespace Slang
         RefPtr<FuncDecl> decl;
 
         RefPtr<Substitutions> globalGenericSubst;
+
+            /// Any tagged union types that were referenced by the generic arguments of the entry point.
+        List<RefPtr<TaggedUnionType>> taggedUnionTypes;
     };
 
     enum class PassThroughMode : SlangPassThrough

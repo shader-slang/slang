@@ -41,6 +41,8 @@ INST(Nop, nop, 0, 0)
     INST(VectorType, Vec, 2, 0)
     INST(MatrixType, Mat, 3, 0)
 
+    INST(TaggedUnionType, TaggedUnion, 0, 0)
+
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, 0)
         INST(GroupSharedRate, GroupShared, 0, 0)
@@ -405,6 +407,11 @@ INST(MakeExistential,                   makeExistential,                2, 0)
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, 0)
 INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, 0)
+
+INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
+INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
+
+INST(BitCast,                           bitCast,                    1, 0)
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)

@@ -9,6 +9,8 @@
 
 namespace Slang
 {
+    RefPtr<TypeType> getTypeType(
+        Type* type);
 
         /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
@@ -677,7 +679,7 @@ namespace Slang
                     auto baseExprType = baseExpr->type.type;
                     RefPtr<SharedTypeExpr> baseTypeExpr = new SharedTypeExpr();
                     baseTypeExpr->base.type = baseExprType;
-                    baseTypeExpr->type = new TypeType(baseExprType);
+                    baseTypeExpr->type.type = getTypeType(baseExprType);
 
                     auto expr = new StaticMemberExpr();
                     expr->loc = loc;
@@ -1797,9 +1799,7 @@ namespace Slang
         {
             RefPtr<TypeCastExpr> castExpr = createImplicitCastExpr();
 
-            auto typeType = new TypeType();
-            typeType->setSession(getSession());
-            typeType->type = toType;
+            auto typeType = getTypeType(toType);
 
             auto typeExpr = new SharedTypeExpr();
             typeExpr->type.type = typeType;
@@ -5313,6 +5313,60 @@ namespace Slang
             return witness;
         }
 
+            /// Is the given interface one that a tagged-union type can conform to?
+            ///
+            /// If a tagged union type `__TaggedUnion(A,B)` is going to be
+            /// plugged in for a type parameter `T : IFoo` then we need to
+            /// be sure that the interface `IFoo` doesn't have anything
+            /// that could lead to unsafe/unsound behavior. This function
+            /// checks that all the requirements on the interfaceare safe ones.
+            ///
+        bool isInterfaceSafeForTaggedUnion(
+            DeclRef<InterfaceDecl> interfaceDeclRef)
+        {
+            for( auto memberDeclRef : getMembers(interfaceDeclRef) )
+            {
+                if(!isInterfaceRequirementSafeForTaggedUnion(interfaceDeclRef, memberDeclRef))
+                    return false;
+            }
+
+            return true;
+        }
+
+            /// Is the given interface requirement one that a tagged-union type can satisfy?
+            ///
+            /// Unsafe requirements include any `static` requirements,
+            /// any associated types, and also any requirements that make
+            /// use of the `This` type (once we support it).
+            ///
+        bool isInterfaceRequirementSafeForTaggedUnion(
+            DeclRef<InterfaceDecl>  interfaceDeclRef,
+            DeclRef<Decl>           requirementDeclRef)
+        {
+            if(auto callableDeclRef = requirementDeclRef.As<CallableDecl>())
+            {
+                // A `static` method requirement can't be satisfied by a
+                // tagged union, because there is no tag to dispatch on.
+                //
+                if(requirementDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+                    return false;
+
+                // TODO: We will eventually want to check that any callable
+                // requirements do not use the `This` type or any associated
+                // types in ways that could lead to errors.
+                //
+                // For now we are disallowing interfaces that have associated
+                // types completely, and we haven't implemented the `This`
+                // type, so we should be safe.
+
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
         bool doesTypeConformToInterfaceImpl(
             RefPtr<Type>            originalType,
             RefPtr<Type>            type,
@@ -5426,6 +5480,69 @@ namespace Slang
                         }
                     }
                 }
+            }
+            else if(auto taggedUnionType = type->As<TaggedUnionType>())
+            {
+                // A tagged union type conforms to an interface if all of
+                // the constituent types in the tagged union conform.
+                //
+                // We will iterate over the "case" types in the tagged
+                // union, and check if they conform to the interface.
+                // Along the way we will collect the conformance witness
+                // values *if* we are being asked to produce a witness
+                // value for the tagged union itself (that is, if
+                // `outWitness` is non-null).
+                //
+                List<RefPtr<Val>> caseWitnesses;
+                for(auto caseType : taggedUnionType->caseTypes)
+                {
+                    RefPtr<Val> caseWitness;
+
+                    if(!doesTypeConformToInterfaceImpl(
+                        caseType,
+                        caseType,
+                        interfaceDeclRef,
+                        outWitness ? &caseWitness : nullptr,
+                        nullptr))
+                    {
+                        return false;
+                    }
+
+                    if(outWitness)
+                    {
+                        caseWitnesses.Add(caseWitness);
+                    }
+                }
+
+                // We also need to validate the requirements on
+                // the interface to make sure that they are suitable for
+                // use with a tagged-union type.
+                //
+                // For example, if the interface includes a `static` method
+                // (which can therefore be called without a particular instance),
+                // then we wouldn't know what implementation of that method
+                // to use because there is no tag value to dispatch on.
+                //
+                // We will start out being conservative about what we accept
+                // here, just to keep things simple.
+                //
+                if(!isInterfaceSafeForTaggedUnion(interfaceDeclRef))
+                    return false;
+
+                // If we reach this point then we have a concrete
+                // witness for each of the case types, and that is
+                // enough to build a witness for the tagged union.
+                //
+                if(outWitness)
+                {
+                    RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = new TaggedUnionSubtypeWitness();
+                    taggedUnionWitness->sub = taggedUnionType;
+                    taggedUnionWitness->sup = DeclRefType::Create(getSession(), interfaceDeclRef);
+                    taggedUnionWitness->caseWitnesses.SwapWith(caseWitnesses);
+
+                    *outWitness = taggedUnionWitness;
+                }
+                return true;
             }
 
             // default is failure
@@ -7856,6 +7973,23 @@ namespace Slang
             return expr;
         }
 
+        RefPtr<Expr> visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
+        {
+            // We have an expression of the form `__TaggedUnion(A, B, ...)`
+            // which will evaluate to a tagged-union type over `A`, `B`, etc.
+            //
+            RefPtr<TaggedUnionType> type = new TaggedUnionType();
+            expr->type = QualType(getTypeType(type));
+
+            for( auto& caseTypeExpr : expr->caseTypes )
+            {
+                caseTypeExpr = CheckProperType(caseTypeExpr);
+                type->caseTypes.Add(caseTypeExpr.type);
+            }
+
+            return expr;
+        }
+
 
 
 
@@ -8805,7 +8939,7 @@ namespace Slang
             scopesToTry.Add(module->moduleDecl->scope);
 
         List<RefPtr<Type>> globalGenericArgs;
-        for (auto name : entryPoint->genericParameterTypeNames)
+        for (auto name : entryPoint->genericArgStrings)
         {
             // parse type name
             RefPtr<Type> type;
@@ -8823,6 +8957,25 @@ namespace Slang
             {
                 sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
                 return;
+            }
+
+            // The following is a bit of a hack.
+            //
+            // Back-end code generation relies on us having computed layouts for all tagged
+            // unions that end up being used in the code, which means we need a way to find
+            // all such types that get used in a module (and the stuff it imports).
+            //
+            // The Right Way to handle this would probably be to have each `ModuleDecl` track
+            // any tagged union types that get created in the context of that module, and
+            // then combine those lists later.
+            //
+            // For now we are assuming a tagged union type only comes into existence
+            // as a (top-level) argument for a generic type parameter, so that we
+            // can check for them here and cache them on the entry point request.
+            //
+            if( auto taggedUnionType = type->As<TaggedUnionType>() )
+            {
+                entryPoint->taggedUnionTypes.Add(taggedUnionType);
             }
 
             globalGenericArgs.Add(type);

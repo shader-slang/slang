@@ -827,7 +827,7 @@ int CompileRequest::addEntryPoint(
     entryPoint->profile = entryPointProfile;
     entryPoint->translationUnitIndex = translationUnitIndex;
     for (auto typeName : genericTypeNames)
-        entryPoint->genericParameterTypeNames.Add(typeName);
+        entryPoint->genericArgStrings.Add(typeName);
     auto translationUnit = translationUnits[translationUnitIndex].Ptr();
     translationUnit->entryPoints.Add(entryPoint);
 
