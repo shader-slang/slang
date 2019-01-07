@@ -332,24 +332,17 @@ void SourceManager::initialize(
     m_nextLoc = m_startLoc;
 }
 
-template <typename T>
-static void _deleteListContents(const List<T*>& list)
-{
-    const int num = int(list.Count());
-    for (int i = 0; i < num; ++i)
-    {
-        T* item = list[i];
-        if (item)
-        {
-            delete item;
-        }
-    }
-}
-
 SourceManager::~SourceManager()
 {
-    _deleteListContents(m_sourceFiles);
-    _deleteListContents(m_sourceViews);
+    for (auto item : m_sourceViews)
+    {
+        delete item;
+    }
+
+    for (auto item : m_sourceFiles)
+    {
+        delete item;
+    }
 }
 
 UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)
