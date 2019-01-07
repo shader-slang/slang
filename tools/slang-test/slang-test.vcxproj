@@ -170,10 +170,10 @@
     <ClInclude Include="test-reporter.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="os.cpp" />
     <ClCompile Include="render-api-util.cpp" />
+    <ClCompile Include="slang-test-main.cpp" />
     <ClCompile Include="slangc-tool.cpp" />
     <ClCompile Include="test-context.cpp" />
     <ClCompile Include="test-reporter.cpp" />

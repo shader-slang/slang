@@ -1,4 +1,4 @@
-// main.cpp
+// slang-test-main.cpp
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/token-reader.h"

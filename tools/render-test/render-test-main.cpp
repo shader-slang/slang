@@ -1,4 +1,4 @@
-// main.cpp
+// render-test-main.cpp
 
 #include "options.h"
 #include "render.h"
