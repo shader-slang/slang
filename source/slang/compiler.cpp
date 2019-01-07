@@ -260,7 +260,7 @@ namespace Slang
             {
                 codeBuilder << "#line 1 \"";
 
-                const String& path = sourceFile->pathInfo.foundPath;
+                const String& path = sourceFile->getPathInfo().foundPath;
 
                 for(auto c : path)
                 {
@@ -277,7 +277,7 @@ namespace Slang
                 }
                 codeBuilder << "\"\n";
 
-                codeBuilder << sourceFile->content << "\n";
+                codeBuilder << sourceFile->getContent() << "\n";
             }
 
             return codeBuilder.ProduceString();
@@ -322,7 +322,7 @@ namespace Slang
                 {
                     codeBuilder << "#line 1 " << translationUnitIndex << "\n";
                 }
-                codeBuilder << sourceFile->content << "\n";
+                codeBuilder << sourceFile->getContent() << "\n";
             }
 
             return codeBuilder.ProduceString();

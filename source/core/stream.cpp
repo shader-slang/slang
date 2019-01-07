@@ -153,6 +153,7 @@ namespace Slang
 			break;
 		case Slang::SeekOrigin::End:
 			_origin = SEEK_END;
+            // JS TODO: This doesn't seem right, the offset can mean it's not at the end
 			endReached = true;
 			break;
 		case Slang::SeekOrigin::Current:
@@ -215,4 +216,79 @@ namespace Slang
 	{
 		return endReached;
 	}
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    void MemoryStream::Seek(SeekOrigin origin, Int64 offset)
+    {
+        Int64 pos = 0;
+        switch (origin)
+        {
+        case Slang::SeekOrigin::Start:
+            pos = offset;
+            break;
+        case Slang::SeekOrigin::End:
+            pos = Int64(m_contents.Count()) + offset;
+            break;
+        case Slang::SeekOrigin::Current:
+            pos = Int64(m_position) + offset;
+            break;
+        default:
+            throw NotSupportedException("Unsupported seek origin.");
+            break;
+        }
+
+        m_atEnd = false;
+
+        // Clamp to the valid range
+        pos = (pos < 0) ? 0 : pos;
+        pos = (pos > Int64(m_contents.Count())) ? Int64(m_contents.Count()) : pos;
+
+        m_position = UInt(pos);
+    }
+
+    Int64 MemoryStream::Read(void * buffer, Int64 length)
+    {
+        if (!CanRead())
+        {
+            throw IOException("Cannot read this stream.");
+        }
+
+        const Int64 maxRead = Int64(m_contents.Count() - m_position);
+        
+        if (maxRead == 0 && length > 0)
+        {
+            m_atEnd = true;
+            throw EndOfStreamException("End of file is reached.");
+        }
+
+        length = length > maxRead ? maxRead : length;
+
+        ::memcpy(buffer, m_contents.begin() + m_position, size_t(length));
+        m_position += UInt(length);
+        return maxRead;
+    }
+    
+    Int64 MemoryStream::Write(const void * buffer, Int64 length)
+    {
+        if (!CanWrite())
+        {
+            throw IOException("Cannot write this stream.");
+        }
+
+        if (m_position == m_contents.Count())
+        {
+            m_contents.AddRange((const uint8_t*)buffer, UInt(length));
+        }
+        else
+        {
+            m_contents.InsertRange(m_position, (const uint8_t*)buffer, UInt(length));
+        }
+
+        m_atEnd = false;
+
+        m_position += UInt(length);
+        return length;
+    }
+
 }

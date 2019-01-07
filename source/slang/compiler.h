@@ -361,6 +361,9 @@ namespace Slang
         // serialization a bottleneck or firewall between the front end and the backend
         bool useSerialIRBottleneck = false; 
 
+        // If true will serialize and de-serialize with debug information
+        bool verifyDebugSerialization = false;
+
         // How should `#line` directives be emitted (if at all)?
         LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
 

@@ -456,6 +456,10 @@ struct OptionsParser
                 {
                     requestImpl->useSerialIRBottleneck = true;
                 }
+                else if (argStr == "-verify-debug-serial-ir")
+                {
+                    requestImpl->verifyDebugSerialization = true;
+                }
                 else if(argStr == "-validate-ir" )
                 {
                     requestImpl->shouldValidateIR = true;

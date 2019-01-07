@@ -52,11 +52,16 @@ class StringRepresentationCache
 
 struct SerialStringTableUtil
 {
-    /// Convert a pool into a string table
+        /// Convert a pool into a string table
     static void encodeStringTable(const StringSlicePool& pool, List<char>& stringTable);
     static void encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable);
-    /// Converts a pool into a string table, appending the strings to the slices
+        /// Appends the decoded strings into slicesOut
+    static void appendDecodedStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+        /// Decodes a string table (and does so such that the indices are compatible with StringSlicePool)
     static void decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
+
+        /// Produces an index map, from slices to indices in pool
+    static void calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMap);
 };
 
 // Pre-declare
@@ -95,10 +100,85 @@ struct IRSerialData
         SizeType m_numChildren;                 ///< The number of children
     };
 
+    struct SourceLocRun
+    {
+        typedef SourceLocRun ThisType;
+
+        bool operator==(const ThisType& rhs) const { return m_sourceLoc == rhs.m_sourceLoc && m_startInstIndex == rhs.m_startInstIndex && m_numInst == rhs.m_numInst;  }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        bool operator<(const ThisType& rhs) const { return m_sourceLoc < rhs.m_sourceLoc;  }
+
+        uint32_t m_sourceLoc;               ///< The source location
+        InstIndex m_startInstIndex;         ///< The index to the first instruction
+        SizeType m_numInst;                 ///< The number of children
+    };
+
     struct PayloadInfo
     {
         uint8_t m_numOperands;
         uint8_t m_numStrings;
+    };
+
+    struct DebugSourceInfo
+    {
+        typedef DebugSourceInfo ThisType;
+
+        bool operator==(const ThisType& rhs) const
+        {
+            return m_pathIndex == rhs.m_pathIndex &&
+                m_startSourceLoc == rhs.m_startSourceLoc &&
+                m_endSourceLoc == rhs.m_endSourceLoc &&
+                m_numLineInfos == rhs.m_numLineInfos &&
+                m_lineInfosStartIndex == rhs.m_lineInfosStartIndex &&
+                m_numLineInfos == rhs.m_numLineInfos;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        bool isSourceLocInRange(uint32_t sourceLoc) const { return sourceLoc >= m_startSourceLoc && sourceLoc <= m_endSourceLoc;  }
+
+        StringIndex m_pathIndex;                ///< Index to the string table
+        uint32_t m_startSourceLoc;              ///< The offset to the source
+        uint32_t m_endSourceLoc;                ///< The number of bytes in the source
+
+        uint32_t m_numLines;                    ///< Total number of lines in source file
+
+        uint32_t m_lineInfosStartIndex;         ///< Index into m_debugLineInfos
+        uint32_t m_numLineInfos;                ///< The number of line infos
+
+        uint32_t m_adjustedLineInfosStartIndex; ///< Adjusted start index
+        uint32_t m_numAdjustedLineInfos;        ///< The number of line infos
+    };
+
+    struct DebugLineInfo
+    {
+        typedef DebugLineInfo ThisType;
+        bool operator<(const ThisType& rhs) const { return m_lineStartOffset < rhs.m_lineStartOffset;  }
+        bool operator==(const ThisType& rhs) const
+        {
+            return m_lineStartOffset == rhs.m_lineStartOffset &&
+                m_lineIndex == rhs.m_lineIndex;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        uint32_t m_lineStartOffset;               ///< The offset into the source file 
+        uint32_t m_lineIndex;                     ///< Original line index
+    };
+
+    struct DebugAdjustedLineInfo
+    {
+        typedef DebugAdjustedLineInfo ThisType;
+        bool operator==(const ThisType& rhs) const
+        {
+            return m_lineInfo == rhs.m_lineInfo &&
+                m_adjustedLineIndex == rhs.m_adjustedLineIndex &&
+                m_pathStringIndex == rhs.m_pathStringIndex;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+        bool operator<(const ThisType& rhs) const { return m_lineInfo < rhs.m_lineInfo;  }
+
+        DebugLineInfo m_lineInfo;
+        uint32_t m_adjustedLineIndex;             ///< The line index with the adjustment (if there is any). Is 0 if m_pathStringIndex is 0.
+        StringIndex m_pathStringIndex;            ///< The path as an index
     };
 
     // Instruction...
@@ -173,32 +253,6 @@ struct IRSerialData
         Payload m_payload;
     };
  
-    struct DebugSourceFile
-    {
-        uint32_t m_startLoc;                    ///< Start of the location range 
-        uint32_t m_endLoc;                      ///< The end of the location range
-
-        uint32_t m_pathIndex;                   ///< Path associated
-
-        uint32_t m_numLocRuns;                  ///< The number of location runs associated with this source file
-        uint32_t m_numLineOffsets;              ///< The number of offsets associated with the file
-        uint32_t m_numDebugViewEntries;         ///< The number of debug view entries
-    };
-
-    struct DebugViewEntry
-    {
-        uint32_t m_startLoc;                    ///< Where does this entry begin?
-        uint32_t m_pathIndex;                   ///< What is the presumed path for this entry. If 0 it means there is no path.
-        int32_t m_lineAdjust;                   ///< The line adjustment
-    };
-
-    struct DebugLocRun
-    {
-        uint32_t m_sourceLoc;                   ///< The location
-        uint32_t startInstIndex;                ///< The start instruction index
-        uint32_t numInst;                       ///< The amount of instructions
-    };
-
         /// Clear to initial state
     void clear();
         /// Get the operands of an instruction
@@ -212,24 +266,25 @@ struct IRSerialData
     size_t calcSizeInBytes() const;
 
     /// Ctor
-    IRSerialData()
-    {}
-
+    IRSerialData();
+    
     List<Inst> m_insts;                         ///< The instructions
 
     List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
-    List<char> m_stringTable;                       ///< All strings. Indexed into by StringIndex
+    List<char> m_stringTable;                   ///< All strings. Indexed into by StringIndex
 
     List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
 
-    List<DebugSourceFile> m_debugSourceFiles;   ///< The files associated 
-    List<uint32_t> m_debugLineOffsets;          ///< All of the debug line offsets
-    List<uint32_t> m_debugViewEntries;          ///< The debug view entries - that modify line meanings
-    List<DebugLocRun> m_debugLocRuns;           ///< Maps source locations to instructions
-    List<char> m_debugStrings;                  ///< All of the debug strings
+    // Data only set if we have debug information
+
+    List<char> m_debugStringTable;              ///< String table for debug use only
+    List<DebugLineInfo> m_debugLineInfos;        ///< Debug line information
+    List<DebugAdjustedLineInfo> m_debugAdjustedLineInfos;        ///< Adjusted line infos
+    List<DebugSourceInfo> m_debugSourceInfos;    ///< Debug source information
+    List<SourceLocRun> m_debugSourceLocRuns;    ///< Runs of instructions that use a source loc
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
 };
@@ -275,6 +330,7 @@ SLANG_FORCE_INLINE bool IRSerialData::Inst::operator==(const ThisType& rhs) cons
             default: break;
         }
     }
+
     return false;
 }
 // --------------------------------------------------------------------------
@@ -327,8 +383,14 @@ struct IRSerialBinary
     static const uint32_t kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
 
     static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
-        /// 4 bytes per entry
+
     static const uint32_t kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+
+    static const uint32_t kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
+    static const uint32_t kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
+    static const uint32_t kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
+    static const uint32_t kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
+    static const uint32_t kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
 
     struct SlangHeader
     {
@@ -360,15 +422,15 @@ struct IRSerialWriter
         enum Enum: Type
         {
             RawSourceLocation       = 0x01,
+            DebugInfo               = 0x02,
         };
     };
     typedef OptionFlag::Type OptionFlags;
 
     Result write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData);
-
+  
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
-    
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
@@ -381,13 +443,49 @@ struct IRSerialWriter
     Ser::StringIndex getStringIndex(const char* chars) { return Ser::StringIndex(m_stringSlicePool.add(chars)); }
     Ser::StringIndex getStringIndex(const String& string) { return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice())); }
 
+    StringSlicePool& getStringPool() { return m_stringSlicePool;  }
+    StringSlicePool& getDebugStringPool() { return m_debugStringSlicePool; }
+
     IRSerialWriter() :
         m_serialData(nullptr)
     {}
 
 protected:
+    class DebugSourceFile : public RefObject
+    {
+    public:
+        DebugSourceFile(SourceFile* sourceFile, SourceLoc::RawValue baseSourceLoc):
+            m_sourceFile(sourceFile),
+            m_baseSourceLoc(baseSourceLoc)
+        {
+            // Need to know how many lines there are
+            const List<uint32_t>& lineOffsets = sourceFile->getLineBreakOffsets();
+
+            const auto numLineIndices = lineOffsets.Count();
+
+            // Set none as being used initially
+            m_lineIndexUsed.SetSize(numLineIndices);
+            ::memset(m_lineIndexUsed.begin(), 0, numLineIndices * sizeof(uint8_t));
+        }
+            /// True if we have information on that line index
+        bool hasLineIndex(int lineIndex) const { return m_lineIndexUsed[lineIndex] != 0; }
+        void setHasLineIndex(int lineIndex) { m_lineIndexUsed[lineIndex] = 1; }
+
+        SourceLoc::RawValue m_baseSourceLoc;            ///< The base source location
+
+        RefPtr<SourceFile> m_sourceFile;                ///< The source file
+        List<uint8_t> m_lineIndexUsed;                  ///< Has 1 if the line is used
+        List<uint32_t> m_usedLineIndices;               ///< Holds the lines that have been hit                 
+
+        List<IRSerialData::DebugLineInfo> m_lineInfos;   ///< The line infos
+        List<IRSerialData::DebugAdjustedLineInfo> m_adjustedLineInfos;  ///< The adjusted line infos
+    };
+
     void _addInstruction(IRInst* inst);
-    
+    Result _calcDebugInfo();
+        /// Returns the remapped sourceLoc, or 0 if sourceLoc couldn't be added
+    void _addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startInstIndex, uint32_t numInst);
+
     List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
 
     List<IRDecoration*> m_decorations;                  ///< Holds all decorations in order of the instructions as found
@@ -399,6 +497,11 @@ protected:
     IRSerialData* m_serialData;                         ///< Where the data is stored
 
     StringSlicePool m_debugStringSlicePool;             ///< Slices held just for debug usage
+
+    SourceLoc::RawValue m_debugFreeSourceLoc;           /// Locations greater than this are free
+    Dictionary<SourceFile*, RefPtr<DebugSourceFile> > m_debugSourceFileMap;
+    
+    SourceManager* m_sourceManager;                     ///< The source manager
 };
 
 struct IRSerialReader
@@ -410,7 +513,7 @@ struct IRSerialReader
     static Result readStream(Stream* stream, IRSerialData* dataOut);
 
         /// Read a module from serial data
-    Result read(const IRSerialData& data, Session* session, RefPtr<IRModule>& moduleOut);
+    Result read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut);
 
         /// Get the representation cache
     StringRepresentationCache& getStringRepresentationCache() { return m_stringRepresentationCache; }
@@ -423,7 +526,6 @@ struct IRSerialReader
 
     protected:
 
-    IRDecoration* _createDecoration(const Ser::Inst& srcIns);
     static Result _skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
 
     StringRepresentationCache m_stringRepresentationCache;
@@ -431,6 +533,16 @@ struct IRSerialReader
     const IRSerialData* m_serialData;
     IRModule* m_module;
 };
+
+struct IRSerialUtil
+{
+        /// Produces an instruction list which is in same order as written through IRSerialWriter
+    static void calcInstructionList(IRModule* module, List<IRInst*>& instsOut);
+
+        /// Verify serialization
+    static SlangResult verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialBinary::CompressionType compressionType, IRSerialWriter::OptionFlags optionFlags);
+};
+
 
 } // namespace Slang
 

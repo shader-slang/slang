@@ -842,7 +842,7 @@ top:
         // We create a dummy file to represent the token-paste operation
         PathInfo pathInfo = PathInfo::makeTokenPaste();
        
-        SourceFile* sourceFile = sourceManager->createSourceFile(pathInfo, sb.ProduceString());
+        RefPtr<SourceFile> sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
 
         SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
@@ -1634,7 +1634,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
     // See if this an already loaded source file
-    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
+    RefPtr<SourceFile> sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {
@@ -1645,7 +1645,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
             return;
         }
 
-        sourceFile = sourceManager->createSourceFile(filePathInfo, foundSourceBlob);
+        sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
         sourceManager->addSourceFile(filePathInfo.canonicalPath, sourceFile);
     }
 
@@ -2268,8 +2268,8 @@ static void DefineMacro(
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
 
-    SourceFile* keyFile = sourceManager->createSourceFile(pathInfo, key);
-    SourceFile* valueFile = sourceManager->createSourceFile(pathInfo, value);
+    RefPtr<SourceFile> keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
+    RefPtr<SourceFile> valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
 
     SourceView* keyView = sourceManager->createSourceView(keyFile);
     SourceView* valueView = sourceManager->createSourceView(valueFile);
