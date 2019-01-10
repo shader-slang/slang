@@ -421,7 +421,7 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
     SourceManager localSourceManager;
     localSourceManager.initialize(sourceManager);
         
-    Slang::RefPtr<Slang::SourceFile> srcFile(localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr));
+    Slang::SourceFile* srcFile = localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr);
     
     // We'll use a temporary diagnostic sink  
     DiagnosticSink sink;
@@ -562,17 +562,15 @@ void CompileRequest::generateIR()
     // in isolation.
     for( auto& translationUnit : translationUnits )
     {
-        // TODO JS:
-        // This is a bit of HACK. Apparently if we call generateIRForTranslationUnit(translationUnit) twice
-        // we get a different result (!).
-        // So here, we only create once even if we run verification.
-        RefPtr<IRModule> irModule;
+        // We want to only run generateIRForTranslationUnit once here. This is for two side effects:
+        // * it can dump ir 
+        // * it can generate diagnostics
+
+        /// Generate IR for translation unit
+        RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
 
         if (verifyDebugSerialization)
         {
-            /// Generate IR for translation unit
-            irModule = generateIRForTranslationUnit(translationUnit);
-
             // Verify debug information
             if (SLANG_FAILED(IRSerialUtil::verifySerialize(irModule, mSession, sourceManager, IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)))
             {
@@ -584,16 +582,11 @@ void CompileRequest::generateIR()
         {              
             IRSerialData serialData;
             {
-                /// Generate IR for translation unit
-                if (!irModule)
-                {
-                    irModule = generateIRForTranslationUnit(translationUnit);
-                }
-
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
                 writer.write(irModule, sourceManager, IRSerialWriter::OptionFlag::RawSourceLocation, &serialData);
 
+                // Destroy irModule such that memory can be used for newly constructed read irReadModule  
                 irModule = nullptr;
             }
             RefPtr<IRModule> irReadModule;
@@ -603,18 +596,12 @@ void CompileRequest::generateIR()
                 reader.read(serialData, mSession, nullptr, irReadModule);
             }
 
-            // Use the serialized irModule
-            translationUnit->irModule = irReadModule;
+            // Set irModule to the read module
+            irModule = irReadModule;
         }
-        else
-        {
-            if (!irModule)
-            {
-                irModule = generateIRForTranslationUnit(translationUnit);
-            }
 
-            translationUnit->irModule = irModule; 
-        }
+        // Set the module on the translation unit
+        translationUnit->irModule = irModule;
     }
 }
 
@@ -780,7 +767,7 @@ void CompileRequest::addTranslationUnitSourceBlob(
     ISlangBlob*     sourceBlob)
 {
     PathInfo pathInfo = PathInfo::makePath(path);
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
     
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -791,7 +778,7 @@ void CompileRequest::addTranslationUnitSourceString(
     String const&   source)
 {
     PathInfo pathInfo = PathInfo::makePath(path);
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithString(pathInfo, source);
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithString(pathInfo, source);
     
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -916,7 +903,7 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     translationUnit->compileFlags = 0;
 
     // Create with the 'friendly' name
-    RefPtr<SourceFile> sourceFile = getSourceManager()->createSourceFileWithBlob(filePathInfo, sourceBlob);
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(filePathInfo, sourceBlob);
     
     translationUnit->sourceFiles.Add(sourceFile);
 

@@ -1800,7 +1800,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             pathInfo.type = PathInfo::Type::FoundPath;
             pathInfo.foundPath = debugStringSlices[UInt(srcSourceInfo.m_pathIndex)];
 
-            RefPtr<SourceFile> sourceFile = sourceManager->createSourceFileWithSize(pathInfo, srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
+            SourceFile* sourceFile = sourceManager->createSourceFileWithSize(pathInfo, srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
             SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
             // We need to accumulate all line numbers, for this source file, both adjusted and unadjusted
