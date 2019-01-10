@@ -400,12 +400,13 @@ static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 
 void CompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
 {
-    writer = writer ? writer : _getDefaultWriter(chan);
-    m_writers[int(chan)] = writer;
+    // If the user passed in null, we will use the default writer on that channel
+    m_writers[int(chan)] = writer ? writer : _getDefaultWriter(chan);
 
+    // For diagnostic output, if the user passes in nullptr, we set on mSink.writer as that enables buffering on DiagnosticSink
     if (chan == WriterChannel::Diagnostic)
     {
-        mSink.writer = writer;
+        mSink.writer = writer; 
     }
 }
 
