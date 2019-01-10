@@ -842,8 +842,7 @@ top:
         // We create a dummy file to represent the token-paste operation
         PathInfo pathInfo = PathInfo::makeTokenPaste();
        
-        RefPtr<SourceFile> sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
-
+        SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
         SourceView* sourceView = sourceManager->createSourceView(sourceFile);
 
         Lexer lexer;
@@ -1634,7 +1633,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
     // See if this an already loaded source file
-    RefPtr<SourceFile> sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
+    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {
@@ -2268,8 +2267,8 @@ static void DefineMacro(
 
     auto sourceManager = preprocessor->translationUnit->compileRequest->getSourceManager();
 
-    RefPtr<SourceFile> keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
-    RefPtr<SourceFile> valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
+    SourceFile* keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
+    SourceFile* valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
 
     SourceView* keyView = sourceManager->createSourceView(keyFile);
     SourceView* valueView = sourceManager->createSourceView(valueFile);
