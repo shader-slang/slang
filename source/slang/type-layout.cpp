@@ -100,8 +100,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             // N chunks of size `elementStride` and then "giving back"
             // the final `elementStride - elementSize` bytes.
             //
-            arraySize = (elementStride * elementCount)
-                      - (elementStride - elementSize);
+            arraySize = (elementStride * (elementCount-1)) + elementSize;
         }
 
         SimpleArrayLayoutInfo arrayInfo;
@@ -204,7 +203,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     /// Common behavior for GLSL-family layout.
 struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
 {
-    typedef DefaultLayoutRulesImpl Base;
+    typedef DefaultLayoutRulesImpl Super;
 
     SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
@@ -230,7 +229,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // The size of an array must be rounded up to be a multiple of its alignment.
         //
-        auto info = Base::GetArrayLayout(elementInfo, elementCount);
+        auto info = Super::GetArrayLayout(elementInfo, elementCount);
         info.size = RoundToAlignment(info.size, info.alignment);
         return info;
     }
@@ -253,7 +252,7 @@ struct Std430LayoutRulesImpl : GLSLBaseLayoutRulesImpl
     /// The GLSL `std430` layout rules.
 struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
 {
-    typedef GLSLBaseLayoutRulesImpl Base;
+    typedef GLSLBaseLayoutRulesImpl Super;
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
@@ -265,7 +264,7 @@ struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
             if (elementInfo.alignment < 16)
                 elementInfo.alignment = 16;
         }
-        return Base::GetArrayLayout(elementInfo, elementCount);
+        return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
     UniformLayoutInfo BeginStructLayout() override
@@ -279,7 +278,7 @@ struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
 
 struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
-    typedef DefaultLayoutRulesImpl Base;
+    typedef DefaultLayoutRulesImpl Super;
 
     // Similar to GLSL `std140` rules, an HLSL constant buffer requires that
     // `struct` and array types have 16-byte alignement.
@@ -303,7 +302,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
             if (elementInfo.alignment < 16)
                 elementInfo.alignment = 16;
         }
-        return Base::GetArrayLayout(elementInfo, elementCount);
+        return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
     UniformLayoutInfo BeginStructLayout() override
