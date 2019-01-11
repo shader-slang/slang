@@ -1,0 +1,192 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "cb",
+            "binding": {"kind": "descriptorTableSlot", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "S",
+                    "fields": [
+                        {
+                            "name": "z",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "struct",
+                                "name": "A",
+                                "fields": [
+                                    {
+                                        "name": "x",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                    },
+                                    {
+                                        "name": "y",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                    }
+                                ]
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 32, "size": 4}
+                        },
+                        {
+                            "name": "c",
+                            "type": {
+                                "kind": "array",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "uniformStride": 16
+                            },
+                            "binding": {"kind": "uniform", "offset": 48, "size": 32}
+                        },
+                        {
+                            "name": "d",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 80, "size": 4}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "sb",
+            "binding": {"kind": "descriptorTableSlot", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "struct",
+                    "name": "S",
+                    "fields": [
+                        {
+                            "name": "z",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "struct",
+                                "name": "A",
+                                "fields": [
+                                    {
+                                        "name": "x",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                    },
+                                    {
+                                        "name": "y",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                    }
+                                ]
+                            },
+                            "binding": {"kind": "uniform", "offset": 4, "size": 8}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                        },
+                        {
+                            "name": "c",
+                            "type": {
+                                "kind": "array",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "uniformStride": 8
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                        },
+                        {
+                            "name": "d",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 32, "size": 4}
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [1, 1, 1]
+        }
+    ]
+}
+}
