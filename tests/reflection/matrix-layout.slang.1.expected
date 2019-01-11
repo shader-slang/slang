@@ -49,7 +49,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 96, "size": 64}
+                            "binding": {"kind": "uniform", "offset": 96, "size": 60}
                         }
                     ]
                 }
@@ -106,11 +106,11 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 96, "size": 64}
+                                        "binding": {"kind": "uniform", "offset": 96, "size": 60}
                                     }
                                 ]
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 160}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 156}
                         }
                     ]
                 }

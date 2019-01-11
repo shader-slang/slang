@@ -176,6 +176,16 @@ inline LayoutSize maximum(LayoutSize left, LayoutSize right)
             right.getFiniteValue()));
 }
 
+inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
+{
+    return left.isInfinite() || (left.getFiniteValue() > right);
+}
+
+inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
+{
+    return left.isFinite() && (left.getFiniteValue() <= right);
+}
+
 // Layout appropriate to "just memory" scenarios,
 // such as laying out the members of a constant buffer.
 struct UniformLayoutInfo

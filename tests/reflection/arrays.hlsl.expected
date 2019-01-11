@@ -31,7 +31,7 @@ standard output = {
                                 },
                                 "uniformStride": 16
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 160}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 148}
                         },
                         {
                             "name": "y",
@@ -39,7 +39,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 176, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 164, "size": 4}
                         }
                     ]
                 }

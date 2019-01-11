@@ -23,7 +23,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 60}
                         },
                         {
                             "name": "ab",
@@ -49,7 +49,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 112, "size": 64}
+                            "binding": {"kind": "uniform", "offset": 112, "size": 60}
                         }
                     ]
                 }
@@ -80,7 +80,7 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 0, "size": 64}
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 60}
                                     },
                                     {
                                         "name": "bb",
@@ -106,11 +106,11 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 112, "size": 64}
+                                        "binding": {"kind": "uniform", "offset": 112, "size": 60}
                                     }
                                 ]
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 176}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 172}
                         }
                     ]
                 }

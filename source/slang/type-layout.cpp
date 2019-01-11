@@ -78,13 +78,37 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
-        auto stride = elementInfo.size.getFiniteValue();
+        auto elementSize = elementInfo.size.getFiniteValue();
+        auto elementAlignment = elementInfo.alignment;
+        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
+
+        // An array with no elements will have zero size.
+        //
+        LayoutSize arraySize = 0;
+        //
+        // Any array with a non-zero number of elements will need
+        // to have space for N elements of size `elementSize`, with
+        // the constraints that there must be `elementStride` bytes
+        // between consecutive elements.
+        //
+        if( elementCount > 0 )
+        {
+            // We can think of this as either allocating (N-1)
+            // chunks of size `elementStride` (for most of the elements)
+            // and then one final chunk of size `elementSize`  for
+            // the last element, or equivalently as allocating
+            // N chunks of size `elementStride` and then "giving back"
+            // the final `elementStride - elementSize` bytes.
+            //
+            arraySize = (elementStride * elementCount)
+                      - (elementStride - elementSize);
+        }
 
         SimpleArrayLayoutInfo arrayInfo;
         arrayInfo.kind = elementInfo.kind;
-        arrayInfo.size = stride * elementCount;
-        arrayInfo.alignment = elementInfo.alignment;
-        arrayInfo.elementStride = stride;
+        arrayInfo.size = arraySize;
+        arrayInfo.alignment = elementAlignment;
+        arrayInfo.elementStride = elementStride;
         return arrayInfo;
     }
 
@@ -125,86 +149,179 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         if(fieldInfo.size == 0)
             return ioStructInfo->size;
 
+        // A struct type must be at least as aligned as its most-aligned field.
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
-        LayoutSize fieldOffset = ioStructInfo->size;
-        ioStructInfo->size += fieldInfo.size;
+
+        // The new field will be added to the end of the struct.
+        auto fieldBaseOffset = ioStructInfo->size;
+
+        // We need to ensure that the offset for the field will respect its alignment
+        auto fieldOffset = RoundToAlignment(fieldBaseOffset, fieldInfo.alignment);
+
+        // The size of the struct must be adjusted to cover the bytes consumed
+        // by this field.
+        ioStructInfo->size = fieldOffset + fieldInfo.size;
+
         return fieldOffset;
     }
 
 
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
+        SLANG_UNUSED(ioStructInfo);
+
+        // Note: A traditional C layout algorithm would adjust the size
+        // of a struct type so that it is a multiple of the alignment.
+        // This is a parsimonious design choice because it means that
+        // `sizeof(T)` can both be used when copying/allocating a single
+        // value of type `T` or an array of N values, without having to
+        // consider more details.
+        //
+        // Of course the choice also has down-sides in that wrapping things
+        // into a `struct` can affect layout in ways that waste space. E.g.,
+        // the following two cases don't lay out the same:
+        //
+        //      struct S0 { double d; float f; float g; };
+        //
+        //      struct X  { double d; float f; }
+        //      struct S1 { X x;               float g; }
+        //
+        // Even though `S0::g` and `S1::g` have the same amount of useful
+        // data in front of them, they will not land at the same offset,
+        // and the resulting struct sizes will differ (`sizeof(S0)` will be
+        // 16 while `sizeof(S1)` will be 24).
+        //
+        // Slang doesn't get to be opinionated about this stuff because
+        // there is already precedent in both HLSL and GLSL for types
+        // that have a size that is not rounded up to their alignment.
+        //
+        // Our default layout rules won't implement the C-like policy,
+        // and instead it will be injected in the concrete implementations
+        // that require it.
+    }
+};
+
+    /// Common behavior for GLSL-family layout.
+struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Base;
+
+    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    {
+        // The `std140` and `std430` rules require vectors to be aligned to the next power of
+        // two up from their size (so a `float2` is 8-byte aligned, and a `float3` is
+        // 16-byte aligned).
+        //
+        // Note that in this case we have a type layout where the size is *not* a multiple
+        // of the alignment, so it should be possible to pack a scalar after a `float3`.
+        //
+        SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
+        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+
+        auto size = elementInfo.size.getFiniteValue() * elementCount;
+        SimpleLayoutInfo vectorInfo(
+            LayoutResourceKind::Uniform,
+            size,
+            RoundUpToPowerOfTwo(size));
+        return vectorInfo;
+    }
+
+    SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        // The size of an array must be rounded up to be a multiple of its alignment.
+        //
+        auto info = Base::GetArrayLayout(elementInfo, elementCount);
+        info.size = RoundToAlignment(info.size, info.alignment);
+        return info;
+    }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // The size of a `struct` must be rounded up to be a multiple of its alignment.
+        //
         ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
-// Capture common behavior betwen HLSL and GLSL (`std140`) constnat buffer rules
-struct DefaultConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
+    /// The GLSL `std430` layout rules.
+struct Std430LayoutRulesImpl : GLSLBaseLayoutRulesImpl
 {
-    // The `std140` rules require that all array elements
-    // be a multiple of 16 bytes.
+    // These rules don't actually need any differences from our
+    // base/common GLSL layout rules.
+};
+
+    /// The GLSL `std430` layout rules.
+struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
+{
+    typedef GLSLBaseLayoutRulesImpl Base;
+
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        // The `std140` rules require that array elements
+        // be aligned on 16-byte boundaries.
+        //
+        if(elementInfo.kind == LayoutResourceKind::Uniform)
+        {
+            if (elementInfo.alignment < 16)
+                elementInfo.alignment = 16;
+        }
+        return Base::GetArrayLayout(elementInfo, elementCount);
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        // The `std140` rules require that a `struct` type
+        // be at least 16-byte aligned.
+        //
+        return UniformLayoutInfo(0, 16);
+    }
+};
+
+struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Base;
+
+    // Similar to GLSL `std140` rules, an HLSL constant buffer requires that
+    // `struct` and array types have 16-byte alignement.
     //
-    // HLSL agrees.
+    // Unlike GLSL `std140`, the overall size of an array or `struct` type
+    // is *not* rounded up to the alignment, so it is possible for later
+    // fields to sneak into the "tail space" left behind by a preceding
+    // structure or array. E.g., in this example:
+    //
+    //     struct S { float3 a[2]; float b; };
+    //
+    // The stride of the array `a` is 16 bytes per element, but the size
+    // of `a` will only be 28 bytes (not 32), so that `b` can fit into
+    // the space after the last array element and the overall structure
+    // will have a size of 32 bytes.
+
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         if(elementInfo.kind == LayoutResourceKind::Uniform)
         {
             if (elementInfo.alignment < 16)
                 elementInfo.alignment = 16;
-            elementInfo.size = RoundToAlignment(elementInfo.size, elementInfo.alignment);
         }
-        return DefaultLayoutRulesImpl::GetArrayLayout(elementInfo, elementCount);
+        return Base::GetArrayLayout(elementInfo, elementCount);
     }
 
-    // The `std140` rules require that a `struct` type be
-    // aligned to at least 16.
-    //
-    // HLSL agrees.
     UniformLayoutInfo BeginStructLayout() override
     {
         return UniformLayoutInfo(0, 16);
     }
-};
 
-struct GLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
-{
-};
-
-// The `std140` and `std430` rules require vectors to be aligned to the next power of
-// two up from their size (so a `float2` is 8-byte aligned, and a `float3` is
-// 16-byte aligned).
-//
-// Note that in this case we have a type layout where the size is *not* a multiple
-// of the alignment, so it should be possible to pack a scalar after a `float3`.
-static SimpleLayoutInfo getGLSLVectorLayout(
-    SimpleLayoutInfo elementInfo, size_t elementCount)
-{
-    SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
-    SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
-
-    auto size = elementInfo.size.getFiniteValue() * elementCount;
-    SimpleLayoutInfo vectorInfo(
-        LayoutResourceKind::Uniform,
-        size,
-        RoundUpToPowerOfTwo(size));
-    return vectorInfo;
-}
-
-// The `std140` rules combine the GLSL-specific layout for 3-vectors with the
-// alignment padding for structures and arrays that is common to both HLSL
-// and GLSL constant buffers.
-struct Std140LayoutRulesImpl : GLSLConstantBufferLayoutRulesImpl
-{
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
-    {
-        return getGLSLVectorLayout(elementInfo, elementCount);
-    }
-};
-
-struct HLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
-{
-    // Can't let a `struct` field straddle a register (16-byte) boundary
+    // HLSL layout rules do *not* impose additional alignment
+    // constraints on vectors (e.g., all of `float`, `float2`,
+    // `float3`, and `float4` have 4-byte alignment), but instead
+    // they impose a rule that any `struct` field must not
+    // "straddle" a 16-byte boundary.
+    //
+    // This has the effect of making it *look* like `float4`
+    // values have 16-byte alignment in practice, but the
+    // effects on `float2` and `float3` are more nuanched and
+    // lead to different result than the GLSL rules.
+    //
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
@@ -234,18 +351,10 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultConstantBufferLayoutRulesImpl
 
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
-    // TODO: customize these to be correct...
-};
-
-// The `std430` rules don't include the array/structure alignment padding that
-// gets applied to constant buffers, but they do include the padding of 3-vectors
-// to be aligned as 4-vectors.
-struct Std430LayoutRulesImpl : DefaultLayoutRulesImpl
-{
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
-    {
-        return getGLSLVectorLayout(elementInfo, elementCount);
-    }
+    // HLSL structured buffers drop the restrictions added for constant buffers,
+    // but retain the rules around not adjusting the size of an array or
+    // structure to its alignment. In this way they should match our
+    // default layout rules.
 };
 
 struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl

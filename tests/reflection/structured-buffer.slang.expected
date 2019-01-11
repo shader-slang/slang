@@ -40,25 +40,35 @@ standard output = {
                 "baseShape": "structuredBuffer",
                 "resultType": {
                     "kind": "struct",
+                    "name": "S",
                     "fields": [
-                        "name": "a",
-                        "type": {
-                            "kind": "vector",
-                            "elementCount": 2,
-                            "elementType": {
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
                                 "kind": "scalar",
                                 "scalarType": "float32"
-                            }
+                            },
+                            "binding": {"kind": "uniform", "offset": 8, "size": 4}
                         },
-                        "name": "b",
-                        "type": {
-                            "kind": "scalar",
-                            "scalarType": "float32"
-                        },
-                        "name": "c",
-                        "type": {
-                            "kind": "scalar",
-                            "scalarType": "uint32"
+                        {
+                            "name": "c",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "uint32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
                         }
                     ]
                 }
