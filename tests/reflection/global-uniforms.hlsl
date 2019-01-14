@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE
 //TEST:REFLECTION:-profile ps_4_0 -target hlsl
 
 // Confirm that we handle uniforms at global scope

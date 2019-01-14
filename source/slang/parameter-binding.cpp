@@ -2622,6 +2622,29 @@ static void collectParameters(
     }
 }
 
+    /// Emit a diagnostic about a uniform parameter at global scope.
+void diagnoseGlobalUniform(
+    SharedParameterBindingContext*  sharedContext,
+    VarDeclBase*                    varDecl)
+{
+    // It is entirely possible for Slang to support uniform parameters at the global scope,
+    // by bundling them into an implicit constant buffer, and indeed the layout algorithm
+    // implemented in this file computes a layout *as if* the Slang compiler does just that.
+    //
+    // The missing link is the downstream IR and code generation steps, where we would need
+    // to collect all of the global-scope uniforms into a common `struct` type and then
+    // create a new constant buffer parameter over that type.
+    //
+    // For now it is easier to simply ban this case, since most shader authors have
+    // switched to modern HLSL/GLSL style with `cbuffer` or `uniform` block declarations.
+    //
+    // TODO: In the long run it may be best to require *all* global-scope shader parameters
+    // to be marked with a keyword (e.g., `uniform`) so that ordinary global variable syntax can be
+    // used safely.
+    //
+    getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformsNotSupported, varDecl->getName());
+}
+
 void generateParameterBindings(
     TargetRequest*     targetReq)
 {
@@ -2678,7 +2701,7 @@ void generateParameterBindings(
         if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
         {
             needDefaultConstantBuffer = true;
-            break;
+            diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
         }
     }
 
@@ -3016,6 +3039,8 @@ RefPtr<ProgramLayout> specializeProgramLayout(
                     fieldInfo);
                 newVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
                 anyUniforms = true;
+
+                diagnoseGlobalUniform(&sharedContext, varLayout->varDecl);
             }
             structLayout->fields[varId] = newVarLayout;
             varLayoutMapping[varLayout] = newVarLayout;
