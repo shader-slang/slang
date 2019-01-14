@@ -40,7 +40,7 @@ struct Impl : IBase
 
 __generic_param TImpl : IBase;
 
-TImpl impl;
+ParameterBlock<TImpl> impl;
 
 // at binding c0:
 cbuffer existingBuffer
