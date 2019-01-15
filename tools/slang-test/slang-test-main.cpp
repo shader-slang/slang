@@ -1784,6 +1784,14 @@ SlangResult innerMain(int argc, char** argv)
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto compatibilityIssueCatagory = categorySet.add("compatibility-issue", fullTestCategory);
+    
+#if SLANG_WINDOWS_FAMILY
+    auto windowsCatagory = categorySet.add("windows", fullTestCategory);
+#endif
+
+#if SLANG_UNIX_FAMILY
+    auto unixCatagory = categorySet.add("unix", fullTestCategory);
+#endif
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
