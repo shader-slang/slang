@@ -1793,6 +1793,29 @@ SlangResult innerMain(int argc, char** argv)
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
 
+    TestCategory* fxcCategory = nullptr;
+    TestCategory* dxcCategory = nullptr;
+    TestCategory* glslangCategory = nullptr;
+
+    // Might be better if we had an API on slang so we could get what 'pass-through's are available
+    // This works whilst these targets imply the pass-through/backends
+    {
+        SlangSession* session = context.getSession();
+
+        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_DXBC)))
+        {
+            fxcCategory = categorySet.add("fxc", fullTestCategory);
+        }
+        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_SPIRV)))
+        {
+            glslangCategory = categorySet.add("glslang", fullTestCategory);
+        }
+        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_DXIL)))
+        {
+            dxcCategory = categorySet.add("dxc", fullTestCategory);
+        }
+    }
+
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
