@@ -3221,221 +3221,230 @@ namespace Slang
             if (decl->IsChecked(getCheckedState()))
                 return;
 
-            // Look at inheritance clauses, and
-            // see if one of them is making the enum
-            // "inherit" from a concrete type.
-            // This will become the "tag" type
-            // of the enum.
-            RefPtr<Type>        tagType;
-            InheritanceDecl*    tagTypeInheritanceDecl = nullptr;
-            for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+            // We need to be careful to avoid recursion in the
+            // type-checking logic. We will do the minimal work
+            // to make the type usable in the first phase, and
+            // then check the actual cases in the second phase.
+            //
+            if(this->checkingPhase == CheckingPhase::Header)
             {
-                checkDecl(inheritanceDecl);
-
-                // Look at the type being inherited from.
-                auto superType = inheritanceDecl->base.type;
-
-                if(auto errorType = superType->As<ErrorType>())
+                // Look at inheritance clauses, and
+                // see if one of them is making the enum
+                // "inherit" from a concrete type.
+                // This will become the "tag" type
+                // of the enum.
+                RefPtr<Type>        tagType;
+                InheritanceDecl*    tagTypeInheritanceDecl = nullptr;
+                for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                 {
-                    // Ignore any erroneous inheritance clauses.
-                    continue;
-                }
-                else if(auto declRefType = superType->As<DeclRefType>())
-                {
-                    if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
+                    checkDecl(inheritanceDecl);
+
+                    // Look at the type being inherited from.
+                    auto superType = inheritanceDecl->base.type;
+
+                    if(auto errorType = superType->As<ErrorType>())
                     {
-                        // Don't consider interface bases as candidates for
-                        // the tag type.
+                        // Ignore any erroneous inheritance clauses.
                         continue;
+                    }
+                    else if(auto declRefType = superType->As<DeclRefType>())
+                    {
+                        if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
+                        {
+                            // Don't consider interface bases as candidates for
+                            // the tag type.
+                            continue;
+                        }
+                    }
+
+                    if(tagType)
+                    {
+                        // We already found a tag type.
+                        getSink()->diagnose(inheritanceDecl, Diagnostics::enumTypeAlreadyHasTagType);
+                        getSink()->diagnose(tagTypeInheritanceDecl, Diagnostics::seePreviousTagType);
+                        break;
+                    }
+                    else
+                    {
+                        tagType = superType;
+                        tagTypeInheritanceDecl = inheritanceDecl;
                     }
                 }
 
-                if(tagType)
+                // If a tag type has not been set, then we
+                // default it to the built-in `int` type.
+                //
+                // TODO: In the far-flung future we may want to distinguish
+                // `enum` types that have a "raw representation" like this from
+                // ones that are purely abstract and don't expose their
+                // type of their tag.
+                if(!tagType)
                 {
-                    // We already found a tag type.
-                    getSink()->diagnose(inheritanceDecl, Diagnostics::enumTypeAlreadyHasTagType);
-                    getSink()->diagnose(tagTypeInheritanceDecl, Diagnostics::seePreviousTagType);
-                    break;
+                    tagType = getSession()->getIntType();
                 }
                 else
                 {
-                    tagType = superType;
-                    tagTypeInheritanceDecl = inheritanceDecl;
+                    // TODO: Need to establish that the tag
+                    // type is suitable. (e.g., if we are going
+                    // to allow raw values for case tags to be
+                    // derived automatically, then the tag
+                    // type needs to be some kind of interer type...)
+                    //
+                    // For now we will just be harsh and require it
+                    // to be one of a few builtin types.
+                    validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
                 }
-            }
-
-            // If a tag type has not been set, then we
-            // default it to the built-in `int` type.
-            //
-            // TODO: In the far-flung future we may want to distinguish
-            // `enum` types that have a "raw representation" like this from
-            // ones that are purely abstract and don't expose their
-            // type of their tag.
-            if(!tagType)
-            {
-                tagType = getSession()->getIntType();
-            }
-            else
-            {
-                // TODO: Need to establish that the tag
-                // type is suitable. (e.g., if we are going
-                // to allow raw values for case tags to be
-                // derived automatically, then the tag
-                // type needs to be some kind of interer type...)
-                //
-                // For now we will just be harsh and require it
-                // to be one of a few builtin types.
-                validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
-            }
-            decl->tagType = tagType;
+                decl->tagType = tagType;
 
 
-            // An `enum` type should automatically conform to the `__EnumType` interface.
-            // The compiler needs to insert this conformance behind the scenes, and this
-            // seems like the best place to do it.
-            {
-                // First, look up the type of the `__EnumType` interface.
-                RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
-
-                RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
-                enumConformanceDecl->ParentDecl = decl;
-                enumConformanceDecl->loc = decl->loc;
-                enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-                decl->Members.Add(enumConformanceDecl);
-
-                // The `__EnumType` interface has one required member, the `__Tag` type.
-                // We need to satisfy this requirement automatically, rather than require
-                // the user to actually declare a member with this name (otherwise we wouldn't
-                // let them define a tag value with the name `__Tag`).
-                //
-                RefPtr<WitnessTable> witnessTable = new WitnessTable();
-                enumConformanceDecl->witnessTable = witnessTable;
-
-                Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
-                Decl* tagAssociatedTypeDecl = nullptr;
-                if(auto enumTypeTypeDeclRefType = enumTypeType.As<DeclRefType>())
+                // An `enum` type should automatically conform to the `__EnumType` interface.
+                // The compiler needs to insert this conformance behind the scenes, and this
+                // seems like the best place to do it.
                 {
-                    if(auto enumTypeTypeInterfaceDecl = enumTypeTypeDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
+                    // First, look up the type of the `__EnumType` interface.
+                    RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
+
+                    RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
+                    enumConformanceDecl->ParentDecl = decl;
+                    enumConformanceDecl->loc = decl->loc;
+                    enumConformanceDecl->base.type = getSession()->getEnumTypeType();
+                    decl->Members.Add(enumConformanceDecl);
+
+                    // The `__EnumType` interface has one required member, the `__Tag` type.
+                    // We need to satisfy this requirement automatically, rather than require
+                    // the user to actually declare a member with this name (otherwise we wouldn't
+                    // let them define a tag value with the name `__Tag`).
+                    //
+                    RefPtr<WitnessTable> witnessTable = new WitnessTable();
+                    enumConformanceDecl->witnessTable = witnessTable;
+
+                    Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
+                    Decl* tagAssociatedTypeDecl = nullptr;
+                    if(auto enumTypeTypeDeclRefType = enumTypeType.As<DeclRefType>())
                     {
-                        for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
+                        if(auto enumTypeTypeInterfaceDecl = enumTypeTypeDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
                         {
-                            if(memberDecl->getName() == tagAssociatedTypeName)
+                            for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
                             {
-                                tagAssociatedTypeDecl = memberDecl;
-                                break;
+                                if(memberDecl->getName() == tagAssociatedTypeName)
+                                {
+                                    tagAssociatedTypeDecl = memberDecl;
+                                    break;
+                                }
                             }
                         }
                     }
-                }
-                if(!tagAssociatedTypeDecl)
-                {
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), decl, "failed to find built-in declaration '__Tag'");
-                }
-
-                // Okay, add the conformance withess for `__Tag` being satisfied by `tagType`
-                witnessTable->requirementDictionary.Add(tagAssociatedTypeDecl, RequirementWitness(tagType));
-
-                // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
-                // to the `__BuiltinIntegerType` interface, because that is a constraint on the
-                // associated type `__Tag`.
-
-                // TODO: eventually we should consider synthesizing other requirements for
-                // the min/max tag values, or the total number of tags, so that people don't
-                // have to declare these as additional cases.
-
-                enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
-            }
-
-
-            decl->SetCheckState(DeclCheckState::CheckedHeader);
-
-            auto enumType = DeclRefType::Create(
-                getSession(),
-                makeDeclRef(decl));
-
-            // Check the enum cases in order.
-            for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
-            {
-                // Each case defines a value of the enum's type.
-                //
-                // TODO: If we ever support enum cases with payloads,
-                // then they would probably have a type that is a
-                // `FunctionType` from the payload types to the
-                // enum type.
-                //
-                caseDecl->type.type = enumType;
-
-                checkDecl(caseDecl);
-            }
-
-            // For any enum case that didn't provide an explicit
-            // tag value, derived an appropriate tag value.
-            IntegerLiteralValue defaultTag = 0;
-            for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
-            {
-                if(auto explicitTagValExpr = caseDecl->initExpr)
-                {
-                    // This tag has an initializer, so it should establish
-                    // the tag value for a successor case that doesn't
-                    // provide an explicit tag.
-
-                    RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
-                    if(explicitTagVal)
+                    if(!tagAssociatedTypeDecl)
                     {
-                        if(auto constIntVal = explicitTagVal.As<ConstantIntVal>())
+                        SLANG_DIAGNOSE_UNEXPECTED(getSink(), decl, "failed to find built-in declaration '__Tag'");
+                    }
+
+                    // Okay, add the conformance withess for `__Tag` being satisfied by `tagType`
+                    witnessTable->requirementDictionary.Add(tagAssociatedTypeDecl, RequirementWitness(tagType));
+
+                    // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
+                    // to the `__BuiltinIntegerType` interface, because that is a constraint on the
+                    // associated type `__Tag`.
+
+                    // TODO: eventually we should consider synthesizing other requirements for
+                    // the min/max tag values, or the total number of tags, so that people don't
+                    // have to declare these as additional cases.
+
+                    enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
+                }
+            }
+            else if( checkingPhase == CheckingPhase::Body )
+            {
+                auto enumType = DeclRefType::Create(
+                    getSession(),
+                    makeDeclRef(decl));
+
+                auto tagType = decl->tagType;
+
+                // Check the enum cases in order.
+                for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
+                {
+                    // Each case defines a value of the enum's type.
+                    //
+                    // TODO: If we ever support enum cases with payloads,
+                    // then they would probably have a type that is a
+                    // `FunctionType` from the payload types to the
+                    // enum type.
+                    //
+                    caseDecl->type.type = enumType;
+
+                    checkDecl(caseDecl);
+                }
+
+                // For any enum case that didn't provide an explicit
+                // tag value, derived an appropriate tag value.
+                IntegerLiteralValue defaultTag = 0;
+                for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
+                {
+                    if(auto explicitTagValExpr = caseDecl->initExpr)
+                    {
+                        // This tag has an initializer, so it should establish
+                        // the tag value for a successor case that doesn't
+                        // provide an explicit tag.
+
+                        RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
+                        if(explicitTagVal)
                         {
-                            defaultTag = constIntVal->value;
+                            if(auto constIntVal = explicitTagVal.As<ConstantIntVal>())
+                            {
+                                defaultTag = constIntVal->value;
+                            }
+                            else
+                            {
+                                // TODO: need to handle other possibilities here
+                                getSink()->diagnose(explicitTagValExpr, Diagnostics::unexpectedEnumTagExpr);
+                            }
                         }
                         else
                         {
-                            // TODO: need to handle other possibilities here
-                            getSink()->diagnose(explicitTagValExpr, Diagnostics::unexpectedEnumTagExpr);
+                            // If this happens, then the explicit tag value expression
+                            // doesn't seem to be a constant after all. In this case
+                            // we expect the checking logic to have applied already.
                         }
                     }
                     else
                     {
-                        // If this happens, then the explicit tag value expression
-                        // doesn't seem to be a constant after all. In this case
-                        // we expect the checking logic to have applied already.
+                        // This tag has no initializer, so it should use
+                        // the default tag value we are tracking.
+                        RefPtr<IntegerLiteralExpr> tagValExpr = new IntegerLiteralExpr();
+                        tagValExpr->loc = caseDecl->loc;
+                        tagValExpr->type = QualType(tagType);
+                        tagValExpr->value = defaultTag;
+
+                        caseDecl->initExpr = tagValExpr;
                     }
+
+                    // Default tag for the next case will be one more than
+                    // for the most recent case.
+                    //
+                    // TODO: We might consider adding a `[flags]` attribute
+                    // that modifies this behavior to be `defaultTagForCase <<= 1`.
+                    //
+                    defaultTag++;
                 }
-                else
+
+                // Now check any other member declarations.
+                for(auto memberDecl : decl->Members)
                 {
-                    // This tag has no initializer, so it should use
-                    // the default tag value we are tracking.
-                    RefPtr<IntegerLiteralExpr> tagValExpr = new IntegerLiteralExpr();
-                    tagValExpr->loc = caseDecl->loc;
-                    tagValExpr->type = QualType(tagType);
-                    tagValExpr->value = defaultTag;
+                    // Already checked inheritance declarations above.
+                    if(auto inheritanceDecl = memberDecl->As<InheritanceDecl>())
+                        continue;
 
-                    caseDecl->initExpr = tagValExpr;
+                    // Already checked enum case declarations above.
+                    if(auto caseDecl = memberDecl->As<EnumCaseDecl>())
+                        continue;
+
+                    // TODO: Right now we don't support other kinds of
+                    // member declarations on an `enum`, but that is
+                    // something we may want to allow in the long run.
+                    //
+                    checkDecl(memberDecl);
                 }
-
-                // Default tag for the next case will be one more than
-                // for the most recent case.
-                //
-                // TODO: We might consider adding a `[flags]` attribute
-                // that modifies this behavior to be `defaultTagForCase <<= 1`.
-                //
-                defaultTag++;
-            }
-
-            // Now check any other member declarations.
-            for(auto memberDecl : decl->Members)
-            {
-                // Already checked inheritance declarations above.
-                if(auto inheritanceDecl = memberDecl->As<InheritanceDecl>())
-                    continue;
-
-                // Already checked enum case declarations above.
-                if(auto caseDecl = memberDecl->As<EnumCaseDecl>())
-                    continue;
-
-                // TODO: Right now we don't support other kinds of
-                // member declarations on an `enum`, but that is
-                // something we may want to allow in the long run.
-                //
-                checkDecl(memberDecl);
             }
             decl->SetCheckState(getCheckedState());
         }
@@ -3445,31 +3454,35 @@ namespace Slang
             if (decl->IsChecked(getCheckedState()))
                 return;
 
-            // An enum case had better appear inside an enum!
-            //
-            // TODO: Do we need/want to support generic cases some day?
-            auto parentEnumDecl = decl->ParentDecl->As<EnumDecl>();
-            SLANG_ASSERT(parentEnumDecl);
-
-            // The tag type should have already been set by
-            // the surrounding `enum` declaration.
-            auto tagType = parentEnumDecl->tagType;
-            SLANG_ASSERT(tagType);
-
-            // Need to check the init expression, if present, since
-            // that represents the explicit tag for this case.
-            if(auto initExpr = decl->initExpr)
+            if(checkingPhase == CheckingPhase::Body)
             {
-                initExpr = CheckExpr(initExpr);
-                initExpr = Coerce(tagType, initExpr);
+                // An enum case had better appear inside an enum!
+                //
+                // TODO: Do we need/want to support generic cases some day?
+                auto parentEnumDecl = decl->ParentDecl->As<EnumDecl>();
+                SLANG_ASSERT(parentEnumDecl);
 
-                // We want to enforce that this is an integer constant
-                // expression, but we don't actually care to retain
-                // the value.
-                CheckIntegerConstantExpression(initExpr);
+                // The tag type should have already been set by
+                // the surrounding `enum` declaration.
+                auto tagType = parentEnumDecl->tagType;
+                SLANG_ASSERT(tagType);
 
-                decl->initExpr = initExpr;
+                // Need to check the init expression, if present, since
+                // that represents the explicit tag for this case.
+                if(auto initExpr = decl->initExpr)
+                {
+                    initExpr = CheckExpr(initExpr);
+                    initExpr = Coerce(tagType, initExpr);
+
+                    // We want to enforce that this is an integer constant
+                    // expression, but we don't actually care to retain
+                    // the value.
+                    CheckIntegerConstantExpression(initExpr);
+
+                    decl->initExpr = initExpr;
+                }
             }
+
             decl->SetCheckState(getCheckedState());
         }
 
