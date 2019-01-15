@@ -531,6 +531,14 @@ namespace Slang
     /* Returns true if a codeGen target is available. */
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
 
+    /* Report an error appearing from external compiler to the diagnostic sink error to the diagnostic sink.
+    @param compilerName The name of the compiler the error came for (or nullptr if not known)
+    @param res Result associated with the error. The error code will be reported. (Can take HRESULT - and will expand to string if known)
+    @param diagnostic The diagnostic string associated with the compile failure
+    @param sink The diagnostic sink to report to */
+    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink);
+
+
     struct TypeCheckingCache;
     //
 
