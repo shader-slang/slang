@@ -639,6 +639,10 @@ namespace Slang
             Type*   elementType,
             IntVal* elementCount);
 
+        RefPtr<VectorExpressionType> getVectorType(
+            RefPtr<Type>    elementType,
+            RefPtr<IntVal>  elementCount);
+
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 
         Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;

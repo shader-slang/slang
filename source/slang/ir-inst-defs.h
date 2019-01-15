@@ -192,7 +192,7 @@ INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 INST(Construct, construct, 0, 0)
 
 INST(makeVector, makeVector, 0, 0)
-INST(makeMatrix, makeMatrix, 0, 0)
+INST(MakeMatrix, makeMatrix, 0, 0)
 INST(makeArray, makeArray, 0, 0)
 INST(makeStruct, makeStruct, 0, 0)
 
