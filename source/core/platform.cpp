@@ -27,6 +27,34 @@ namespace Slang
 
 #ifdef _WIN32
 
+/* static */void PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+{
+    {
+        char tmp[17];
+        sprintf_s(tmp, SLANG_COUNT_OF(tmp), "0x%08x", uint32_t(res));
+        builderOut << "Result(" << tmp << ")";
+    }
+
+    {
+        LPWSTR buffer = nullptr;
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+            nullptr,
+            res,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+            (LPWSTR)&buffer,
+            0,
+            nullptr);
+
+        if (buffer)
+        {
+            builderOut << " ";
+            // Convert to string
+            builderOut.Append(String::FromWString(buffer));
+            LocalFree(buffer);
+        }
+    }
+}
+
 /* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, SharedLibrary::Handle& handleOut)
 {
     handleOut = nullptr;
@@ -77,6 +105,13 @@ namespace Slang
 }
 
 #else // _WIN32
+
+/* static */void PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+{
+    char tmp[17];
+    sprintf_s(tmp, SLANG_COUNT_OF(tmp), "0x%08x", uint32_t(res));
+    builderOut << "Result(" << tmp << ")";
+}
 
 /* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, Handle& handleOut)
 {

@@ -47,6 +47,11 @@ namespace Slang
         SharedLibrary();
     };
 
+    struct PlatformUtil
+    {
+        static void appendResult(SlangResult res, StringBuilder& builderOut);
+    };
+
 #ifndef _MSC_VER
 	#define _fileno fileno
 	#define _isatty isatty
