@@ -5,18 +5,6 @@ standard output = {
 {
     "parameters": [
         {
-            "name": "u",
-            "binding": {"kind": "uniform", "offset": 0, "size": 16},
-            "type": {
-                "kind": "vector",
-                "elementCount": 4,
-                "elementType": {
-                    "kind": "scalar",
-                    "scalarType": "float32"
-                }
-            }
-        },
-        {
             "name": "arg",
             "binding": {"kind": "generic", "index": 0},
             "type": {
@@ -65,12 +53,24 @@ standard output = {
         },
         {
             "name": "CB",
-            "binding": {"kind": "constantBuffer", "index": 1},
+            "binding": {"kind": "constantBuffer", "index": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
                     "fields": [
+                        {
+                            "name": "u",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                        },
                         {
                             "name": "v",
                             "type": {
@@ -81,21 +81,21 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                        },
+                        {
+                            "name": "w",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 32, "size": 16}
                         }
                     ]
-                }
-            }
-        },
-        {
-            "name": "w",
-            "binding": {"kind": "uniform", "offset": 16, "size": 16},
-            "type": {
-                "kind": "vector",
-                "elementCount": 4,
-                "elementType": {
-                    "kind": "scalar",
-                    "scalarType": "float32"
                 }
             }
         }

@@ -28,9 +28,12 @@ struct Impl : IBase
 
 __generic_param TImpl : IBase;
 
-TImpl impl;
+ParameterBlock<TImpl> impl;
 
-float base0; // = 0.5
+cbuffer C
+{
+    float base0; // = 0.5    
+}
 
 Texture2D tex1;  // = 0.0
 SamplerState sampler;

@@ -3,7 +3,6 @@
 // Confirm that we handle global generic parameters
 
 
-float4 u;
 
 interface IBase
 {};
@@ -24,10 +23,11 @@ SamplerState s;
 
 cbuffer CB
 {
+	float4 u;
 	float4 v;
+	float4 w;
 }
 
-float4 w;
 
 float4 main() : SV_Target
 {
