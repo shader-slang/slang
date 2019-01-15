@@ -416,12 +416,12 @@ namespace Slang
         return result;
     }
 
-    void reportExternalCompileError(const char* compilerName, SlangResult hres, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
+    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
     {
         StringBuilder builder;
         if (compilerName)
         {
-            builder << " " << compilerName << ": ";
+            builder << compilerName << ": ";
         }
 
         if (diagnostic.size() > 0)
@@ -429,15 +429,21 @@ namespace Slang
             builder.Append(diagnostic);
         }
 
-        if (SLANG_FAILED(hres))
+        if (SLANG_FAILED(res) && res != SLANG_FAIL)
         {
-            PlatformUtil::appendResult(hres, builder);
+            {
+                char tmp[17];
+                sprintf_s(tmp, SLANG_COUNT_OF(tmp), "0x%08x", uint32_t(res));
+                builder << "Result(" << tmp << ") ";
+            }
+
+            PlatformUtil::appendResult(res, builder);
         }
 
         // TODO(tfoley): need a better policy for how we translate diagnostics
         // back into the Slang world (although we should always try to generate
         // HLSL that doesn't produce any diagnostics...)
-        sink->diagnoseRaw(SLANG_FAILED(hres) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
+        sink->diagnoseRaw(SLANG_FAILED(res) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
     }
 
 #if SLANG_ENABLE_DXBC_SUPPORT
