@@ -928,6 +928,19 @@ extern "C"
         SlangCompileTarget  target);
 
     /*!
+    @brief Returns SLANG_OK if a the pass through support is supported for this session
+    @param session Session
+    @param target The compilation target to test
+    @return SLANG_OK if the target is available
+    SLANG_E_NOT_IMPLEMENTED if not implemented in this build
+    SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
+    SLANG_FAIL other kinds of failures */
+    SLANG_API SlangResult spSessionCheckPassThroughSupport(
+        SlangSession*       session,
+        SlangPassThrough    passThrough
+    );
+
+    /*!
     @brief Add new builtin declarations to be used in subsequent compiles.
     */
     SLANG_API void spAddBuiltins(

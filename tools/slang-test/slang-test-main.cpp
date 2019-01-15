@@ -1801,16 +1801,15 @@ SlangResult innerMain(int argc, char** argv)
     // This works whilst these targets imply the pass-through/backends
     {
         SlangSession* session = context.getSession();
-
-        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_DXBC)))
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_FXC)))
         {
             fxcCategory = categorySet.add("fxc", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_SPIRV)))
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GLSLANG)))
         {
             glslangCategory = categorySet.add("glslang", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckCompileTargetSupport(session, SLANG_DXIL)))
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_DXC)))
         {
             dxcCategory = categorySet.add("dxc", fullTestCategory);
         }

@@ -1209,6 +1209,14 @@ SLANG_API SlangResult spSessionCheckCompileTargetSupport(
     return Slang::checkCompileTargetSupport(s, Slang::CodeGenTarget(target));
 }
 
+SLANG_API SlangResult spSessionCheckPassThroughSupport(
+    SlangSession*       session,
+    SlangPassThrough    passThrough)
+{
+    auto s = SESSION(session);
+    return Slang::checkExternalCompilerSupport(s, Slang::PassThroughMode(passThrough));
+}
+
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
 {

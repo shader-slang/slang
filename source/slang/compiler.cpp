@@ -179,64 +179,92 @@ namespace Slang
         return Stage::Unknown;
     }
 
+    SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
+    {
+        switch (passThrough)
+        {
+            case PassThroughMode::None:
+            {
+                // If no pass through -> that will always work!
+                return SLANG_OK;
+            }
+            case PassThroughMode::dxc:
+            {
+#if SLANG_ENABLE_DXIL_SUPPORT
+                // Must have dxc
+                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
+                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+            case PassThroughMode::fxc:
+            {
+#if SLANG_ENABLE_DXBC_SUPPORT
+                // Must have fxc
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+            case PassThroughMode::glslang:
+            {
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+        }
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
 
-    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
+    static PassThroughMode _getExternalCompilerRequiredForTarget(CodeGenTarget target)
     {
         switch (target)
         {
             case CodeGenTarget::None:
             {
-                return SLANG_OK;
+                return PassThroughMode::None;
             }
             case CodeGenTarget::GLSL:
             case CodeGenTarget::GLSL_Vulkan:
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 // Can always output GLSL
-                return SLANG_OK;
+                return PassThroughMode::None; 
             }
             case CodeGenTarget::HLSL:
             {
                 // Can always output HLSL
-                return SLANG_OK;
+                return PassThroughMode::None;
             }
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-#if SLANG_ENABLE_GLSLANG_SUPPORT
-                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
-            }            
+                return PassThroughMode::glslang;
+            }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
             {
-#if SLANG_ENABLE_DXBC_SUPPORT
-                // Must have fxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND; 
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
+                return PassThroughMode::fxc;
             }
-
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXILAssembly:
             {
-#if SLANG_ENABLE_DXIL_SUPPORT
-                // Must have dxc
-                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
-                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
+                return PassThroughMode::dxc;
             }
-            
+
             default: break;
         }
 
         SLANG_ASSERT(!"Unhandled target");
-        return SLANG_FAIL;
+        return PassThroughMode::None;
+    }
+
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
+    {
+        const PassThroughMode mode = _getExternalCompilerRequiredForTarget(target);
+        return (mode != PassThroughMode::None) ?
+            checkExternalCompilerSupport(session, mode) :
+            SLANG_OK;
     }
 
     //

@@ -528,8 +528,10 @@ namespace Slang
         char const*     text,
         CodeGenTarget   target);
 
-    /* Returns true if a codeGen target is available. */
+    /* Returns SLANG_OK if a codeGen target is available. */
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
+    /* Returns SLANG_OK if pass through support is available */
+    SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
 
     /* Report an error appearing from external compiler to the diagnostic sink error to the diagnostic sink.
     @param compilerName The name of the compiler the error came for (or nullptr if not known)
