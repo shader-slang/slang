@@ -553,6 +553,28 @@ public:
     int paramIndex = 0;
 };
 
+    /// Layout information for a tagged union type.
+class TaggedUnionTypeLayout : public TypeLayout
+{
+public:
+        /// The layouts of each of the case types.
+        ///
+        /// The order of entries in this array matches
+        /// the order of case types on the original
+        /// `TaggedUnionType`, and the index of a case
+        /// type is also the tag value for that case.
+        ///
+    List<RefPtr<TypeLayout>> caseTypeLayouts;
+
+        /// The byte offset for the tag field.
+        ///
+        /// The tag field will always be allocted as
+        /// a `uint`, so we don't store a separate layout
+        /// for it.
+        ///
+    LayoutSize tagOffset;
+};
+
 // Layout information for a single shader entry point
 // within a program
 //
@@ -579,6 +601,12 @@ public:
         usesAnySampleRateInput = 0x1,
     };
     unsigned flags = 0;
+
+        /// Layouts for all tagged union types required by this entry point.
+        ///
+        /// These are any tagged union types used by the generic
+        /// arguments that this entry point is being compiled with.
+    List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
 };
 
 class GenericParamLayout : public Layout

@@ -1068,16 +1068,9 @@ void constructSSA(ConstructSSAContext* context)
             newArgCount,
             newArgs.Buffer());
 
-        // Swap decorations (all children, really) over to the new instruction
+        // Transfer decorations (a terminator should have no children) over to the new instruction.
         //
-        // TODO: We might want to encapsualte this in a reusable subroutine if
-        // we often need to copy decorations from one instruction to another.
-        //
-        while( auto firstChild = oldTerminator->getFirstDecoration() )
-        {
-            firstChild->removeFromParent();
-            firstChild->insertAtEnd(newTerminator);
-        }
+        oldTerminator->transferDecorationsTo(newTerminator);
 
         // A terminator better not have uses, so we shouldn't have
         // to replace them.

@@ -1769,6 +1769,25 @@ namespace Slang
         return typeExpr;
     }
 
+    static RefPtr<Expr> parseTaggedUnionType(Parser* parser)
+    {
+        RefPtr<TaggedUnionTypeExpr> taggedUnionType = new TaggedUnionTypeExpr();
+
+        parser->ReadToken(TokenType::LParent);
+        while(!AdvanceIfMatch(parser, TokenType::RParent))
+        {
+            auto caseType = parser->ParseTypeExp();
+            taggedUnionType->caseTypes.Add(caseType);
+
+            if(AdvanceIf(parser, TokenType::RParent))
+                break;
+
+            parser->ReadToken(TokenType::Comma);
+        }
+
+        return taggedUnionType;
+    }
+
     static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
@@ -1810,6 +1829,11 @@ namespace Slang
             auto decl = parseEnumDecl(parser);
             typeSpec.decl = decl;
             typeSpec.expr = createDeclRefType(parser, decl);
+            return typeSpec;
+        }
+        else if(AdvanceIf(parser, "__TaggedUnion"))
+        {
+            typeSpec.expr = parseTaggedUnionType(parser);
             return typeSpec;
         }
 

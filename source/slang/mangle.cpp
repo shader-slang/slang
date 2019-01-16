@@ -144,6 +144,15 @@ namespace Slang
             emitSimpleIntVal(context, arrType->ArrayLength);
             emitType(context, arrType->baseType);
         }
+        else if( auto taggedUnionType = dynamic_cast<TaggedUnionType*>(type) )
+        {
+            emitRaw(context, "u");
+            for( auto caseType : taggedUnionType->caseTypes )
+            {
+                emitType(context, caseType);
+            }
+            emitRaw(context, "U");
+        }
         else
         {
             SLANG_UNEXPECTED("unimplemented case in mangling");

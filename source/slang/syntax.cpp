@@ -2539,7 +2539,160 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return substValue;
     }
 
+    //
+    // TaggedUnionType
+    //
+
+    String TaggedUnionType::ToString()
+    {
+        String result;
+        result.append("__TaggedUnion(");
+        bool first = true;
+        for( auto caseType : caseTypes )
+        {
+            if(!first) result.append(", ");
+            first = false;
+
+            result.append(caseType->ToString());
+        }
+        result.append(")");
+        return result;
+    }
+
+    bool TaggedUnionType::EqualsImpl(Type* type)
+    {
+        auto taggedUnion = type->As<TaggedUnionType>();
+        if(!taggedUnion)
+            return false;
+
+        auto caseCount = caseTypes.Count();
+        if(caseCount != taggedUnion->caseTypes.Count())
+            return false;
+
+        for( UInt ii = 0; ii < caseCount; ++ii )
+        {
+            if(!caseTypes[ii]->Equals(taggedUnion->caseTypes[ii]))
+                return false;
+        }
+        return true;
+    }
+
+    int TaggedUnionType::GetHashCode()
+    {
+        int hashCode = 0;
+        for( auto caseType : caseTypes )
+        {
+            hashCode = combineHash(hashCode, caseType->GetHashCode());
+        }
+        return hashCode;
+    }
+
+    RefPtr<Type> TaggedUnionType::CreateCanonicalType()
+    {
+        RefPtr<TaggedUnionType> canType = new TaggedUnionType();
+        canType->setSession(getSession());
+
+        for( auto caseType : caseTypes )
+        {
+            auto canCaseType = caseType->GetCanonicalType();
+            canType->caseTypes.Add(canCaseType);
+        }
+
+        return canType;
+    }
+
+    RefPtr<Val> TaggedUnionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    {
+        int diff = 0;
+
+        List<RefPtr<Type>> substCaseTypes;
+        for( auto caseType : caseTypes )
+        {
+            substCaseTypes.Add(caseType->SubstituteImpl(subst, &diff).As<Type>());
+        }
+        if(!diff)
+            return this;
+
+        (*ioDiff)++;
+
+        RefPtr<TaggedUnionType> substType = new TaggedUnionType();
+        substType->setSession(getSession());
+        substType->caseTypes.SwapWith(substCaseTypes);
+        return substType;
+    }
+
+//
+// TaggedUnionSubtypeWitness
+//
 
 
+bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
+{
+    auto taggedUnionWitness = val->dynamicCast<TaggedUnionSubtypeWitness>();
+    if(!taggedUnionWitness)
+        return false;
+
+    auto caseCount = caseWitnesses.Count();
+    if(caseCount != taggedUnionWitness->caseWitnesses.Count())
+        return false;
+
+    for(UInt ii = 0; ii < caseCount; ++ii)
+    {
+        if(!caseWitnesses[ii]->EqualsVal(taggedUnionWitness->caseWitnesses[ii]))
+            return false;
+    }
+
+    return true;
 }
 
+String TaggedUnionSubtypeWitness::ToString()
+{
+    String result;
+    result.append("TaggedUnionSubtypeWitness(");
+    bool first = true;
+    for( auto caseWitness : caseWitnesses )
+    {
+        if(!first) result.append(", ");
+        first = false;
+
+        result.append(caseWitness->ToString());
+    }
+    return result;
+}
+
+int TaggedUnionSubtypeWitness::GetHashCode()
+{
+    int hash = 0;
+    for( auto caseWitness : caseWitnesses )
+    {
+        hash = combineHash(hash, caseWitness->GetHashCode());
+    }
+    return hash;
+}
+
+RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
+    auto substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+
+    List<RefPtr<Val>> substCaseWitnesses;
+    for( auto caseWitness : caseWitnesses )
+    {
+        substCaseWitnesses.Add(caseWitness->SubstituteImpl(subst, &diff));
+    }
+
+    if(!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    RefPtr<TaggedUnionSubtypeWitness> substWitness = new TaggedUnionSubtypeWitness();
+    substWitness->sub = substSub;
+    substWitness->sup = substSup;
+    substWitness->caseWitnesses.SwapWith(substCaseWitnesses);
+    return substWitness;
+}
+
+} // namespace Slang

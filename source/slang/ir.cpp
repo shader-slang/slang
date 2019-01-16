@@ -1731,6 +1731,18 @@ namespace Slang
             operands);
     }
 
+    IRType* IRBuilder::getTaggedUnionType(
+        UInt            caseCount,
+        IRType* const*  caseTypes)
+    {
+        return (IRType*) findOrEmitHoistableInst(
+            this,
+            getTypeKind(),
+            kIROp_TaggedUnionType,
+            caseCount,
+            (IRInst* const*) caseTypes);
+    }
+
     void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
     {
         if (auto oldRateQualifiedType = as<IRRateQualifiedType>(inst->getFullType()))
@@ -2683,6 +2695,50 @@ namespace Slang
         addInst(inst);
         return inst;
     }
+
+    IRInst* IRBuilder::emitExtractTaggedUnionTag(
+        IRInst* val)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_ExtractTaggedUnionTag,
+            getBasicType(BaseType::UInt),
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitExtractTaggedUnionPayload(
+        IRType* type,
+        IRInst* val,
+        IRInst* tag)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_ExtractTaggedUnionPayload,
+            type,
+            val,
+            tag);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBitCast(
+        IRType* type,
+        IRInst* val)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_BitCast,
+            type,
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    //
+    // Decorations
+    //
 
     IRDecoration* IRBuilder::addDecoration(IRInst* value, IROp op, IRInst* const* operands, Int operandCount)
     {
@@ -3796,6 +3852,14 @@ namespace Slang
         }
     }
 
+    void IRInst::transferDecorationsTo(IRInst* target)
+    {
+        while( auto decoration = getFirstDecoration() )
+        {
+            decoration->removeFromParent();
+            decoration->insertAtStart(target);
+        }
+    }
 
     bool IRInst::mightHaveSideEffects()
     {

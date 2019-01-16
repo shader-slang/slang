@@ -457,3 +457,21 @@ RAW(
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 )
 END_SYNTAX_CLASS()
+
+    /// A tagged union of zero or more other types.
+SYNTAX_CLASS(TaggedUnionType, Type)
+RAW(
+        /// The distinct "cases" the tagged union can store.
+        ///
+        /// For each type in this array, the array index is the
+        /// tag value for that case.
+        ///
+    List<RefPtr<Type>> caseTypes;
+
+    virtual String ToString() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+)
+END_SYNTAX_CLASS()
