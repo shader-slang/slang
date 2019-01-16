@@ -3581,7 +3581,7 @@ struct EmitVisitor
 
         case kIROp_Construct:
         case kIROp_makeVector:
-        case kIROp_makeMatrix:
+        case kIROp_MakeMatrix:
             // Simple constructor call
             if( inst->getOperandCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
             {
