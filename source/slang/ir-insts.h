@@ -816,6 +816,11 @@ struct IRBuilder
         UInt            argCount,
         IRInst* const* args);
 
+    IRInst* emitMakeMatrix(
+        IRType*         type,
+        UInt            argCount,
+        IRInst* const* args);
+
     IRInst* emitMakeArray(
         IRType*         type,
         UInt            argCount,
