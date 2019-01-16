@@ -2349,6 +2349,101 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
+    else if( auto taggedUnionType = type->As<TaggedUnionType>() )
+    {
+        // A tagged union type needs to be laid out as the maximum
+        // size of any constituent type.
+        //
+        // In practice, only a tagged union of uniform data will
+        // work, but for now we will compute the maximum usage
+        // for each resource kind for generality.
+        //
+        // For the uniform data we will start with a size
+        // of zero and an alignment of one for our base case
+        // (this is what a tagged union of no cases would consume).
+        //
+        UniformLayoutInfo info(0, 1);
+
+        // If we are being asked to construct a full `TypeLayout`
+        // object, then we'll allocate it up front.
+        //
+        RefPtr<TaggedUnionTypeLayout> taggedUnionLayout;
+        if( outTypeLayout )
+        {
+            taggedUnionLayout = new TaggedUnionTypeLayout();
+            taggedUnionLayout->type = type;
+            taggedUnionLayout->rules = rules;
+            *outTypeLayout = taggedUnionLayout;
+        }
+
+        // Now we iterate over the case types and see if they
+        // change our computed maximum size/alignement.
+        //
+        for( auto caseType : taggedUnionType->caseTypes )
+        {
+            RefPtr<TypeLayout> caseTypeLayout;
+            UniformLayoutInfo caseTypeInfo = GetLayoutImpl(context, caseType, outTypeLayout ? &caseTypeLayout : nullptr).getUniformLayout();
+
+            info.size      = maximum(info.size, caseTypeInfo.size);
+            info.alignment = std::max(info.alignment, caseTypeInfo.alignment);
+
+            // If we are building a full `TypeLayout` we need to
+            // do a few more steps for each case type.
+            //
+            if( outTypeLayout )
+            {
+                // We need to remember the layout of the case type
+                // on the final `TaggedUnionTypeLayout`.
+                //
+                taggedUnionLayout->caseTypeLayouts.Add(caseTypeLayout);
+
+                // We also need to consider contributions for other
+                // resource kinds beyond uniform data.
+                //
+                for( auto caseResInfo : caseTypeLayout->resourceInfos )
+                {
+                    auto unionResInfo = taggedUnionLayout->findOrAddResourceInfo(caseResInfo.kind);
+                    unionResInfo->count = maximum(unionResInfo->count, caseResInfo.count);
+                }
+            }
+        }
+
+        // After we've computed the size required to hold all the
+        // case types, we will allocate space for the tag field.
+        //
+        // TODO: This assumes the tag will always be allocated out
+        // of uniform storage, which means we can't support a tagged
+        // union as part of a varying input/output signature. That is
+        // probably a valid limitation, but it should get enforced
+        // somewhere along the way.
+        //
+        {
+            // The tag is always a `uint` for now.
+            //
+            auto tagInfo = context.rules->GetScalarLayout(BaseType::UInt);
+            info.size = RoundToAlignment(info.size, tagInfo.alignment);
+
+            if( outTypeLayout )
+            {
+                taggedUnionLayout->tagOffset = info.size;
+            }
+
+            info.size += tagInfo.size;
+            info.alignment = std::max(info.alignment, tagInfo.alignment);
+        }
+
+        // As a final step, if we are computing a full `TypeLayout`
+        // we will make sure that its information on uniform layout
+        // matches what we've computed in the `UniformLayoutInfo` we return.
+        //
+        if( outTypeLayout )
+        {
+            taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
+            taggedUnionLayout->uniformAlignment = info.alignment;
+        }
+
+        return info;
+    }
 
     // catch-all case in case nothing matched
     SLANG_ASSERT(!"unimplemented");

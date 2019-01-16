@@ -2429,9 +2429,19 @@ static void collectEntryPointParameters(
     entryPointLayout->entryPoint = entryPointFuncDecl;
 
     context->entryPointLayout = entryPointLayout;
-
-
     context->shared->programLayout->entryPoints.Add(entryPointLayout);
+
+    // Note: this isn't really the best place for this logic to sit,
+    // but it is the simplest place where we have a direct correspondance
+    // between a single `EntryPointRequest` and its matching `EntryPointLayout`,
+    // so we'll use it.
+    //
+    for( auto taggedUnionType : entryPoint->taggedUnionTypes )
+    {
+        auto substType = taggedUnionType->Substitute(typeSubst).As<Type>();
+        auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
+        entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
+    }
 
     // Okay, we seemingly have an entry-point function, and now we need to collect info on its parameters too
     //

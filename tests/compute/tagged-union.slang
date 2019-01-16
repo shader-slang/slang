@@ -1,0 +1,108 @@
+// tagged-union.slang
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+
+
+// The goal of this test is to show that we can generate
+// dynamic-dispatch logic from Slang code written using
+// interface+generics, entirely from the compiler API side
+// and without code changes.
+
+// We are going to define a dummy interface just for testing
+// purposes, that can be used to see which implmentation
+// got invoked at runtime.
+//
+interface IFrobnicator
+{
+    int frobnicate(int value);
+}
+
+// Now we will define two different implemetnations that
+// "frobnicate" values differently. The first will just
+// add to the value from a member variable.
+//
+struct A : IFrobnicator
+{
+    int a;
+    int frobnicate(int value)
+    {
+        return value + a;
+    }
+}
+
+// The second implementation will have an additional field
+// of local state, and will do a tiny bit more math.
+//
+struct B : IFrobnicator
+{
+    int b;
+    int y;
+    int frobnicate(int value)
+    {
+        return value * b + y;
+    }
+}
+
+// Now we will define the generic type parameter for our shader,
+// which will be constraints to be a type that implements our
+// `IFrobnicator` interface.
+//
+type_param T : IFrobnicator;
+//
+// For the actual test runner, we will instruct it to plug in
+// a tagged-union type over the two concrete implemetnations.
+// Note that while we are writing this line in the source file,
+// it is in comments so that the Slang compiler only knows about
+// our intention when it is informed via the API.
+//
+//TEST_INPUT: type __TaggedUnion(A,B)
+
+// Next we need to pass in the actual parameter data for our
+// chosen `IFrobnicator` implementation. The decalration of
+// the constant buffer follows the conventional approach for
+// using global generic parameters, so there is nothing much
+// to say.
+//
+// Note: We are not using `ParameterBlock<_>` here because
+// the `render-test` tool doesn't yet support code that
+// uses multiple descriptor tables/sets.
+//
+ConstantBuffer<T> gFrobnicator;
+
+// Where things get interesting is when we go to provide the
+// data that will be used by the parameter block.
+//
+// Because we are plugging in a taggd union type, the actual
+// data type that we fill in will be something kind of like:
+//
+//      struct S { union { A a; B b; }; uint tag; };
+//
+// When compiling for D3D, the size of that union will be
+// 8 bytes (for the largest case), and so the tag will come
+// as the third 32-bit value. We will initialize our data
+// buffer for a `B` value then, which will get the tag `1`
+// since it was the second option in our `__TaggedUnion`.
+//
+// In the Vulkan case the size of both `A` and `B` is 16 bytes
+// (because they round up structure sizes to their alignement)
+// and so the tag value will be the fifth 32-bit value.
+// We will thus set up the same data buffer to look like an `A`
+// value to Vulkan!
+//
+//TEST_INPUT: cbuffer(data=[16 9 1 0 0], stride=4):dxbinding(0),glbinding(0)
+
+int test(int val)
+{
+    return gFrobnicator.frobnicate(val);
+}
+
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(1),out
+RWStructuredBuffer<int> gOutputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint tid = dispatchThreadID.x;
+    gOutputBuffer[tid] = test(tid);
+}

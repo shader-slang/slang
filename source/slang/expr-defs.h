@@ -193,3 +193,14 @@ RAW(
     DeclRef<VarDeclBase> declRef;
 )
 END_SYNTAX_CLASS()
+
+    /// A type expression of the form `__TaggedUnion(A, ...)`.
+    ///
+    /// An expression of this form will resolve to a `TaggedUnionType`
+    /// when checked.
+    ///
+SYNTAX_CLASS(TaggedUnionTypeExpr, Expr)
+RAW(
+    List<TypeExp> caseTypes;
+)
+END_SYNTAX_CLASS()

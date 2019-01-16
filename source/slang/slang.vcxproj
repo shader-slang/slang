@@ -198,6 +198,7 @@
     <ClInclude Include="ir-specialize-resources.h" />
     <ClInclude Include="ir-specialize.h" />
     <ClInclude Include="ir-ssa.h" />
+    <ClInclude Include="ir-union.h" />
     <ClInclude Include="ir-validate.h" />
     <ClInclude Include="ir.h" />
     <ClInclude Include="legalize-types.h" />
@@ -252,6 +253,7 @@
     <ClCompile Include="ir-specialize-resources.cpp" />
     <ClCompile Include="ir-specialize.cpp" />
     <ClCompile Include="ir-ssa.cpp" />
+    <ClCompile Include="ir-union.cpp" />
     <ClCompile Include="ir-validate.cpp" />
     <ClCompile Include="ir.cpp" />
     <ClCompile Include="legalize-types.cpp" />
@@ -314,4 +316,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project>
+</Project> 

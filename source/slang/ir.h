@@ -373,6 +373,9 @@ struct IRInst
     // for those values.
     void removeArguments();
 
+        /// Transfer any decorations of this instruction to the `target` instruction.
+    void transferDecorationsTo(IRInst* target);
+
     /// Does this instruction have any uses?
     bool hasUses() const { return firstUse != nullptr; }
 
@@ -959,16 +962,21 @@ struct IRStructField : IRInst
 // *not* contain the keys, because code needs to be able to
 // reference the keys from scopes outside of the struct.
 //
-struct IRStructType : IRInst
+struct IRStructType : IRType
 {
     IRInstList<IRStructField> getFields() { return IRInstList<IRStructField>(getChildren()); }
 
     IR_LEAF_ISA(StructType)
 };
 
-struct IRInterfaceType : IRInst
+struct IRInterfaceType : IRType
 {
     IR_LEAF_ISA(InterfaceType)
+};
+
+struct IRTaggedUnionType : IRType
+{
+    IR_LEAF_ISA(TaggedUnionType)
 };
 
 /// @brief A global value that potentially holds executable code.
