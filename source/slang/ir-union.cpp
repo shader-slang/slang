@@ -25,7 +25,7 @@ struct DesugarUnionTypesContext
     IRBuilder* getBuilder() { return &builderStorage; }
 
     // Because we will be replacing instructions that refer to unions with
-    // differnet logic, we'll want to remove the original instructions.
+    // different logic, we'll want to remove the original instructions.
     // However, we need to be careful about modifying the IR tree while also
     // iterating it, and to keep things simple for ourselves we'll go ahead
     // and build up a list of instruction to remove along the way, and then
@@ -89,7 +89,7 @@ struct DesugarUnionTypesContext
     struct TaggedUnionInfo : public RefObject
     {
         // We obviously need to know the tagged union itself, and
-        // we will also use this structure to tract the instruction
+        // we will also use this structure to track the instruction
         // (an IR struct type) that will replace it.
         //
         IRTaggedUnionType*  taggedUnionType;
@@ -352,7 +352,7 @@ struct DesugarUnionTypesContext
         auto builder = getBuilder();
 
         // The basic approach here will be to look at the type we
-        // are trying to exract from the union, and whenever possible
+        // are trying to extract from the union, and whenever possible
         // recursively walk its structure so that we can express things
         // in terms of extraction of smaller/simpler types.
         //
@@ -657,7 +657,7 @@ struct DesugarUnionTypesContext
         auto builder = getBuilder();
         builder->setInsertBefore(type);
 
-        // A tagged union type will be replaced with an orindary
+        // A tagged union type will be replaced with an ordinary
         // `struct` type with fields to store all the relevant
         // data from any of the cases, plus a tag field.
         //

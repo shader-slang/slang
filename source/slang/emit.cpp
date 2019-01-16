@@ -3927,7 +3927,7 @@ struct EmitVisitor
             {
                 // TODO: we can simplify the logic for arbitrary bitcasts
                 // by always bitcasting the source to a `uint*` type (if it
-                // isn't already) and then bitcasting that to the desitnation
+                // isn't already) and then bitcasting that to the destination
                 // type (if it isn't already `uint*`.
                 //
                 // For now we are assuming the source type is *already*
