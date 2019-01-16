@@ -161,9 +161,11 @@ namespace Slang
             args[argCount++] = L"-enable-16bit-types";
         }
 
+        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
-            L"slang",
+            sourcePath.ToWString().begin(),
             profile.GetStage() == Stage::Unknown ? L"" : wideEntryPointName.begin(),
             wideProfileName.begin(),
             args,

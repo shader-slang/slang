@@ -540,6 +540,12 @@ namespace Slang
     @param sink The diagnostic sink to report to */
     void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink);
 
+    /* Given a translationUnitRequest determines a filename that is most suitable to identify the input.
+    If the translation is a pass through will attempt to get the source file pathname. If the source is slang generated
+    there is no equivalent name so will return 'slang-generated'
+    @param translationUnitRequest The request to find an appropriate source path for
+    @return the appropriate source filename */
+    String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest);
 
     struct TypeCheckingCache;
     //

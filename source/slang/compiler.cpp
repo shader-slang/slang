@@ -474,6 +474,36 @@ namespace Slang
         sink->diagnoseRaw(SLANG_FAILED(res) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
     }
 
+    String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest)
+    {
+        CompileRequest* compileRequest = translationUnitRequest->compileRequest;
+        if (compileRequest->passThrough == PassThroughMode::None)
+        {
+            return "slang-generated";
+        }
+
+        const auto& sourceFiles = translationUnitRequest->sourceFiles;
+
+        const int numSourceFiles = int(sourceFiles.Count());
+
+        switch (numSourceFiles)
+        {
+            case 0:     return "unknown";
+            case 1:     return sourceFiles[0]->getPathInfo().foundPath;
+            default:
+            {
+                StringBuilder builder;
+                builder << sourceFiles[0]->getPathInfo().foundPath;
+                for (int i = 1; i < numSourceFiles; ++i)
+                {
+                    builder << ";" << sourceFiles[i]->getPathInfo().foundPath;
+                }
+
+                return builder;
+            }
+        }
+    }
+
 #if SLANG_ENABLE_DXBC_SUPPORT
 
     static UnownedStringSlice _getSlice(ID3DBlob* blob)
@@ -563,12 +593,14 @@ namespace Slang
         flags |= D3DCOMPILE_ENABLE_STRICTNESS;
         flags |= D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
 
+        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+
         ComPtr<ID3DBlob> codeBlob;
         ComPtr<ID3DBlob> diagnosticsBlob;
         HRESULT hr = compileFunc(
             hlslCode.begin(),
             hlslCode.Length(),
-            "slang",
+            sourcePath.Buffer(),
             dxMacros,
             nullptr,
             getText(entryPoint->name).begin(),
@@ -712,6 +744,8 @@ SlangResult dissassembleDXILUsingDXC(
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
 
+        request.sourcePath = nullptr;
+
         request.inputBegin  = data;
         request.inputEnd    = (char*)data + size;
 
@@ -739,9 +773,11 @@ SlangResult dissassembleDXILUsingDXC(
             ((List<uint8_t>*)userData)->AddRange((uint8_t*)data, size);
         };
 
+        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-        request.sourcePath = "slang";
+        request.sourcePath = sourcePath.Buffer();
         request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin  = rawGLSL.begin();
