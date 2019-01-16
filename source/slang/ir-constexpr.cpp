@@ -78,7 +78,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Construct:
     case kIROp_makeVector:
     case kIROp_makeArray:
-    case kIROp_makeMatrix:
+    case kIROp_MakeMatrix:
     // TODO: more cases
         return true;
 

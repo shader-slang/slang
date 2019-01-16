@@ -314,11 +314,15 @@ RAW(
     IntVal*         getRowCount();
     IntVal*         getColumnCount();
 
+    RefPtr<Type> getRowType();
 
     virtual String ToString() override;
 
 protected:
     virtual BasicExpressionType* GetScalarType() override;
+
+private:
+    RefPtr<Type> mRowType;
 )
 END_SYNTAX_CLASS()
 

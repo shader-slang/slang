@@ -69,9 +69,10 @@ namespace Slang
 
     class Name;
     class Decl;
+    struct QualType;
     class Type;
     struct TypeExp;
-    struct QualType;
+    class Val;
 
     enum class CodeGenTarget;
     enum class Stage : SlangStage;
@@ -92,6 +93,7 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
     void printDiagnosticArg(StringBuilder& sb, Stage val);
     void printDiagnosticArg(StringBuilder& sb, ProfileVersion val);
+    void printDiagnosticArg(StringBuilder& sb, Val* val);
 
     template<typename T>
     void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)
@@ -201,6 +203,9 @@ namespace Slang
         void diagnoseRaw(
             Severity    severity,
             char const* message);
+        void diagnoseRaw(
+            Severity    severity,
+            const UnownedStringSlice& message);
     };
 
     namespace Diagnostics

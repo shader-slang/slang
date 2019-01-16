@@ -1321,6 +1321,432 @@ namespace Slang
             return kConversionCost_Explicit;
         }
 
+        bool isEffectivelyScalarForInitializerLists(
+            RefPtr<Type>    type)
+        {
+            if(type->As<ArrayExpressionType>()) return false;
+            if(type->As<VectorExpressionType>()) return false;
+            if(type->As<MatrixExpressionType>()) return false;
+
+            if(type->As<BasicExpressionType>())
+            {
+                return true;
+            }
+
+            if(type->As<ResourceType>())
+            {
+                return true;
+            }
+            if(type->As<UntypedBufferResourceType>())
+            {
+                return true;
+            }
+            if(type->As<SamplerStateType>())
+            {
+                return true;
+            }
+
+            if(auto declRefType = type->As<DeclRefType>())
+            {
+                if(declRefType->declRef.As<StructDecl>())
+                    return false;
+            }
+
+            return true;
+        }
+
+            /// Should the provided expression (from an initializer list) be used directly to initialize `toType`?
+        bool shouldUseInitializerDirectly(
+            RefPtr<Type>    toType,
+            RefPtr<Expr>    fromExpr)
+        {
+            // A nested initializer list should always be used directly.
+            //
+            if(fromExpr.As<InitializerListExpr>())
+            {
+                return true;
+            }
+
+            // If the desired type is a scalar, then we should always initialize
+            // directly, since it isn't an aggregate.
+            //
+            if(isEffectivelyScalarForInitializerLists(toType))
+                return true;
+
+            // If the type we are initializing isn't effectively scalar,
+            // but the initialization expression *is*, then it doesn't
+            // seem like direct initialization is intended.
+            //
+            if(isEffectivelyScalarForInitializerLists(fromExpr->type))
+                return false;
+
+            // Once the above cases are handled, the main thing
+            // we want to check for is whether a direct initialization
+            // is possible (a type conversion exists).
+            //
+            return CanCoerce(toType, fromExpr->type);
+        }
+
+        bool tryReadArgFromInitializerList(
+            RefPtr<Type>                toType,
+            RefPtr<Expr>*               outToExpr,
+            RefPtr<InitializerListExpr> fromInitializerListExpr,
+            UInt                       &ioInitArgIndex)
+        {
+            // First, we will check if we have run out of arguments
+            // on the initializer list.
+            //
+            UInt initArgCount = fromInitializerListExpr->args.Count();
+            if(ioInitArgIndex >= initArgCount)
+            {
+                // If we are at the end of the initializer list,
+                // then our ability to read an argument depends
+                // on whether the type we are trying to read
+                // is default-initializable.
+                //
+                // For now, we will just pretend like everything
+                // is default-initializable and move along.
+                return true;
+            }
+
+            // Okay, we have at least one initializer list expression,
+            // so we will look at the next expression and decide
+            // whether to use it to initialize the desired type
+            // directly (possibly via casts), or as the first sub-expression
+            // for aggregate initialization.
+            //
+            auto firstInitExpr = fromInitializerListExpr->args[ioInitArgIndex];
+            if(shouldUseInitializerDirectly(toType, firstInitExpr))
+            {
+                ioInitArgIndex++;
+                return TryCoerceImpl(
+                    toType,
+                    outToExpr,
+                    firstInitExpr->type,
+                    firstInitExpr,
+                    nullptr);
+            }
+
+            // If there is somehow an error in one of the initialization
+            // expressions, then everything could be thrown off and we
+            // shouldn't keep trying to read arguments.
+            //
+            if( IsErrorExpr(firstInitExpr) )
+            {
+                // Stop reading arguments, as if we'd reached
+                // the end of the list.
+                //
+                ioInitArgIndex = initArgCount;
+                return true;
+            }
+
+            // The fallback case is to recursively read the
+            // type from the same list as an aggregate.
+            //
+            return tryReadAggregateFromInitializerList(
+                toType,
+                outToExpr,
+                fromInitializerListExpr,
+                ioInitArgIndex);
+        }
+
+        bool tryReadAggregateFromInitializerList(
+            RefPtr<Type>                inToType,
+            RefPtr<Expr>*               outToExpr,
+            RefPtr<InitializerListExpr> fromInitializerListExpr,
+            UInt                       &ioArgIndex)
+        {
+            auto toType = inToType;
+            UInt argCount = fromInitializerListExpr->args.Count();
+
+            // In the case where we need to build a reuslt expression,
+            // we will collect the new arguments here
+            List<RefPtr<Expr>> coercedArgs;
+
+            if(isEffectivelyScalarForInitializerLists(toType))
+            {
+                // For any type that is effectively a non-aggregate,
+                // we expect to read a single value from the initializer list
+                //
+                if(ioArgIndex < argCount)
+                {
+                    auto arg = fromInitializerListExpr->args[ioArgIndex++];
+                    return TryCoerceImpl(
+                        toType,
+                        outToExpr,
+                        arg->type,
+                        arg,
+                        nullptr);
+                }
+                else
+                {
+                    // If there wasn't an initialization
+                    // expression to be found, then we need
+                    // to perform default initialization here.
+                    //
+                    // We will let this case come through the front-end
+                    // as an `InitializerListExpr` with zero arguments,
+                    // and then have the IR generation logic deal with
+                    // synthesizing default values.
+                }
+            }
+            else if (auto toVecType = toType->As<VectorExpressionType>())
+            {
+                auto toElementCount = toVecType->elementCount;
+                auto toElementType = toVecType->elementType;
+
+                UInt elementCount = 0;
+                if (auto constElementCount = toElementCount.As<ConstantIntVal>())
+                {
+                    elementCount = (UInt) constElementCount->value;
+                }
+                else
+                {
+                    // We don't know the element count statically,
+                    // so what are we supposed to be doing?
+                    //
+                    if(outToExpr)
+                    {
+                        getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForVectorOfUnknownSize, toElementCount);
+                    }
+                    return false;
+                }
+
+                for(UInt ee = 0; ee < elementCount; ++ee)
+                {
+                    RefPtr<Expr> coercedArg;
+                    bool argResult = tryReadArgFromInitializerList(
+                        toElementType,
+                        outToExpr ? &coercedArg : nullptr,
+                        fromInitializerListExpr,
+                        ioArgIndex);
+
+                    // No point in trying further if any argument fails
+                    if(!argResult)
+                        return false;
+
+                    if( coercedArg )
+                    {
+                        coercedArgs.Add(coercedArg);
+                    }
+                }
+            }
+            else if(auto toArrayType = toType->As<ArrayExpressionType>())
+            {
+                // TODO(tfoley): If we can compute the size of the array statically,
+                // then we want to check that there aren't too many initializers present
+
+                auto toElementType = toArrayType->baseType;
+
+                if(auto toElementCount = toArrayType->ArrayLength)
+                {
+                    // In the case of a sized array, we need to check that the number
+                    // of elements being initialized matches what was declared.
+                    //
+                    UInt elementCount = 0;
+                    if (auto constElementCount = toElementCount.As<ConstantIntVal>())
+                    {
+                        elementCount = (UInt) constElementCount->value;
+                    }
+                    else
+                    {
+                        // We don't know the element count statically,
+                        // so what are we supposed to be doing?
+                        //
+                        if(outToExpr)
+                        {
+                            getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForArrayOfUnknownSize, toElementCount);
+                        }
+                        return false;
+                    }
+
+                    for(UInt ee = 0; ee < elementCount; ++ee)
+                    {
+                        RefPtr<Expr> coercedArg;
+                        bool argResult = tryReadArgFromInitializerList(
+                            toElementType,
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndex);
+
+                        // No point in trying further if any argument fails
+                        if(!argResult)
+                            return false;
+
+                        if( coercedArg )
+                        {
+                            coercedArgs.Add(coercedArg);
+                        }
+                    }
+                }
+                else
+                {
+                    // In the case of an unsized array type, we will use the
+                    // number of arguments to the initializer to determine
+                    // the element count.
+                    //
+                    UInt elementCount = 0;
+                    while(ioArgIndex < argCount)
+                    {
+                        RefPtr<Expr> coercedArg;
+                        bool argResult = tryReadArgFromInitializerList(
+                            toElementType,
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndex);
+
+                        // No point in trying further if any argument fails
+                        if(!argResult)
+                            return false;
+
+                        elementCount++;
+
+                        if( coercedArg )
+                        {
+                            coercedArgs.Add(coercedArg);
+                        }
+                    }
+
+                    // We have a new type for the conversion, based on what
+                    // we learned.
+                    toType = getSession()->getArrayType(
+                        toElementType,
+                        new ConstantIntVal(elementCount));
+                }
+            }
+            else if(auto toMatrixType = toType->As<MatrixExpressionType>())
+            {
+                // In the general case, the initializer list might comprise
+                // both vectors and scalars.
+                //
+                // The traditional HLSL compilers treat any vectors in
+                // the initializer list exactly equivalent to their sequence
+                // of scalar elements, and don't care how this might, or
+                // might not, align with the rows of the matrix.
+                //
+                // We will draw a line in the sand and say that an initializer
+                // list for a matrix will act as if the matrix type were an
+                // array of vectors for the rows.
+
+
+                UInt rowCount = 0;
+                auto toRowType = createVectorType(
+                    toMatrixType->getElementType(),
+                    toMatrixType->getColumnCount());
+
+                if (auto constRowCount = dynamic_cast<ConstantIntVal*>(toMatrixType->getRowCount()))
+                {
+                    rowCount = (UInt) constRowCount->value;
+                }
+                else
+                {
+                    // We don't know the element count statically,
+                    // so what are we supposed to be doing?
+                    //
+                    if(outToExpr)
+                    {
+                        getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForMatrixOfUnknownSize, toMatrixType->getRowCount());
+                    }
+                    return false;
+                }
+
+                for(UInt rr = 0; rr < rowCount; ++rr)
+                {
+                    RefPtr<Expr> coercedArg;
+                    bool argResult = tryReadArgFromInitializerList(
+                        toRowType,
+                        outToExpr ? &coercedArg : nullptr,
+                        fromInitializerListExpr,
+                        ioArgIndex);
+
+                    // No point in trying further if any argument fails
+                    if(!argResult)
+                        return false;
+
+                    if( coercedArg )
+                    {
+                        coercedArgs.Add(coercedArg);
+                    }
+                }
+            }
+            else if(auto toDeclRefType = toType->As<DeclRefType>())
+            {
+                auto toTypeDeclRef = toDeclRefType->declRef;
+                if(auto toStructDeclRef = toTypeDeclRef.As<StructDecl>())
+                {
+                    // Trying to initialize a `struct` type given an initializer list.
+                    // We will go through the fields in order and try to match them
+                    // up with initializer arguments.
+                    //
+                    for(auto fieldDeclRef : getMembersOfType<StructField>(toStructDeclRef))
+                    {
+                        RefPtr<Expr> coercedArg;
+                        bool argResult = tryReadArgFromInitializerList(
+                            GetType(fieldDeclRef),
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndex);
+
+                        // No point in trying further if any argument fails
+                        if(!argResult)
+                            return false;
+
+                        if( coercedArg )
+                        {
+                            coercedArgs.Add(coercedArg);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // We shouldn't get to this case in practice,
+                // but just in case we'll consider an initializer
+                // list invalid if we are trying to read something
+                // off of it that wasn't handled by the cases above.
+                //
+                return false;
+            }
+
+            // We were able to coerce all the arguments given, and so
+            // we need to construct a suitable expression to remember the result
+            //
+            if(outToExpr)
+            {
+                auto toInitializerListExpr = new InitializerListExpr();
+                toInitializerListExpr->loc = fromInitializerListExpr->loc;
+                toInitializerListExpr->type = QualType(toType);
+                toInitializerListExpr->args = coercedArgs;
+
+                *outToExpr = toInitializerListExpr;
+            }
+
+            return true;
+        }
+
+        bool tryCoerceInitializerList(
+            RefPtr<Type>                toType,
+            RefPtr<Expr>*               outToExpr,
+            RefPtr<InitializerListExpr> fromInitializerListExpr)
+        {
+            UInt argCount = fromInitializerListExpr->args.Count();
+            UInt argIndex = 0;
+
+            // TODO: we should handle the special case of `{0}` as an initializer
+            // for arbitrary `struct` types here.
+
+            if(!tryReadAggregateFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
+                return false;
+
+            if(argIndex != argCount)
+            {
+                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
+            }
+
+            return true;
+        }
+
+
         // Central engine for implementing implicit coercion logic
         bool TryCoerceImpl(
             RefPtr<Type>			toType,		// the target type for conversion
@@ -1352,165 +1778,13 @@ namespace Slang
             // Coercion from an initializer list is allowed for many types
             if( auto fromInitializerListExpr = fromExpr.As<InitializerListExpr>())
             {
-                auto argCount = fromInitializerListExpr->args.Count();
-
-                // In the case where we need to build a reuslt expression,
-                // we will collect the new arguments here
-                List<RefPtr<Expr>> coercedArgs;
-
-                if (auto toVecType = toType->As<VectorExpressionType>())
-                {
-                    auto toElementCount = toVecType->elementCount;
-                    auto toElementType = toVecType->elementType;
-
-                    UInt elementCount = 0;
-                    if (auto constElementCount = toElementCount.As<ConstantIntVal>())
-                    {
-                        elementCount = (UInt) constElementCount->value;
-                    }
-                    else
-                    {
-                        // We don't know the element count statically,
-                        // so what are we supposed to be doing?
-                        elementCount = fromInitializerListExpr->args.Count();
-                    }
-
-                    // TODO: need to check that the element count
-                    // for the vector type matches the argument
-                    // count for the initializer list, or else
-                    // fix them up to match.
-
-                    for(auto arg : fromInitializerListExpr->args)
-                    {
-                        RefPtr<Expr> coercedArg;
-                        ConversionCost argCost;
-
-                        bool argResult = TryCoerceImpl(
-                            toElementType,
-                            outToExpr ? &coercedArg : nullptr,
-                            arg->type,
-                            arg,
-                            outCost ? &argCost : nullptr);
-
-                        // No point in trying further if any argument fails
-                        if(!argResult)
-                            return false;
-
-                        // TODO(tfoley): what to do with cost?
-                        // This only matters if/when we allow an initializer list as an argument to
-                        // an overloaded call.
-
-                        if( outToExpr )
-                        {
-                            coercedArgs.Add(coercedArg);
-                        }
-                    }
-                }
-                //
-                // TODO(tfoley): How to handle matrices here?
-                // Should they expect individual scalars, or support
-                // vectors for the rows?
-                //
-                if(auto toDeclRefType = toType->As<DeclRefType>())
-                {
-                    auto toTypeDeclRef = toDeclRefType->declRef;
-                    if(auto toStructDeclRef = toTypeDeclRef.As<StructDecl>())
-                    {
-                        // Trying to initialize a `struct` type given an initializer list.
-                        // We will go through the fields in order and try to match them
-                        // up with initializer arguments.
-
-
-                        UInt argIndex = 0;
-                        for(auto fieldDeclRef : getMembersOfType<StructField>(toStructDeclRef))
-                        {
-                            if(argIndex >= argCount)
-                            {
-                                // We've consumed all the arguments, so we should stop
-                                break;
-                            }
-
-                            auto arg = fromInitializerListExpr->args[argIndex++];
-
-                            //
-                            RefPtr<Expr> coercedArg;
-                            ConversionCost argCost;
-
-                            bool argResult = TryCoerceImpl(
-                                GetType(fieldDeclRef),
-                                outToExpr ? &coercedArg : nullptr,
-                                arg->type,
-                                arg,
-                                outCost ? &argCost : nullptr);
-
-                            // No point in trying further if any argument fails
-                            if(!argResult)
-                                return false;
-
-                            // TODO(tfoley): what to do with cost?
-                            // This only matters if/when we allow an initializer list as an argument to
-                            // an overloaded call.
-
-                            if( outToExpr )
-                            {
-                                coercedArgs.Add(coercedArg);
-                            }
-                        }
-                    }
-                }
-                else if(auto toArrayType = toType->As<ArrayExpressionType>())
-                {
-                    // TODO(tfoley): If we can compute the size of the array statically,
-                    // then we want to check that there aren't too many initializers present
-
-                    auto toElementType = toArrayType->baseType;
-
-                    for(auto& arg : fromInitializerListExpr->args)
-                    {
-                        RefPtr<Expr> coercedArg;
-                        ConversionCost argCost;
-
-                        bool argResult = TryCoerceImpl(
-                                toElementType,
-                                outToExpr ? &coercedArg : nullptr,
-                                arg->type,
-                                arg,
-                                outCost ? &argCost : nullptr);
-
-                        // No point in trying further if any argument fails
-                        if(!argResult)
-                            return false;
-
-                        if( outToExpr )
-                        {
-                            coercedArgs.Add(coercedArg);
-                        }
-                    }
-                }
-                else
-                {
-                    // By default, we don't allow a type to be initialized using
-                    // an initializer list.
+                if(!tryCoerceInitializerList(toType, outToExpr, fromInitializerListExpr))
                     return false;
-                }
 
                 // For now, coercion from an initializer list has no cost
                 if(outCost)
                 {
                     *outCost = kConversionCost_None;
-                }
-
-                // We were able to coerce all the arguments given, and so
-                // we need to construct a suitable expression to remember the result
-                if(outToExpr)
-                {
-                    auto toInitializerListExpr = new InitializerListExpr();
-                    toInitializerListExpr->loc = fromInitializerListExpr->loc;
-                    toInitializerListExpr->type = QualType(toType);
-                    toInitializerListExpr->args = coercedArgs;
-
-
-                    *outToExpr = toInitializerListExpr;
                 }
 
                 return true;
@@ -1859,42 +2133,41 @@ namespace Slang
 
         void CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl)
         {
-            // Check the type, if one was given
-            TypeExp type = CheckUsableType(varDecl->type);
-
-            // TODO: Additional validation rules on types should go here,
-            // but we need to deal with the fact that some cases might be
-            // allowed in one context (e.g., an unsized array parameter)
-            // but not in othters (e.g., an unsized array field in a struct).
-
-            // Check the initializers, if one was given
-            RefPtr<Expr> initExpr = CheckTerm(varDecl->initExpr);
-
-            // If a type was given, ...
-            if (type.Ptr())
+            if (function || checkingPhase == CheckingPhase::Header)
             {
-                // then coerce any initializer to the type
-                if (initExpr)
+                TypeExp typeExp = CheckUsableType(varDecl->type);
+                varDecl->type = typeExp;
+                if (varDecl->type.Equals(getSession()->getVoidType()))
                 {
-                    initExpr = Coerce(type.Ptr(), initExpr);
-                }
-            }
-            else
-            {
-                // TODO: infer a type from the initializers
-
-                if (!initExpr)
-                {
-                    getSink()->diagnose(varDecl, Diagnostics::unimplemented, "variable declaration with no type must have initializer");
-                }
-                else
-                {
-                    getSink()->diagnose(varDecl, Diagnostics::unimplemented, "type inference for variable declaration");
+                    getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
                 }
             }
 
-            varDecl->type = type;
-            varDecl->initExpr = initExpr;
+            if (checkingPhase == CheckingPhase::Body)
+            {
+                if (auto initExpr = varDecl->initExpr)
+                {
+                    initExpr = CheckTerm(initExpr);
+                    initExpr = Coerce(varDecl->type.Ptr(), initExpr);
+                    varDecl->initExpr = initExpr;
+
+                    // If this is an array variable, then we first want to give
+                    // it a chance to infer an array size from its initializer
+                    //
+                    // TODO(tfoley): May need to extend this to handle the
+                    // multi-dimensional case...
+                    //
+                    maybeInferArraySizeForVariable(varDecl);
+                    //
+                    // Next we want to make sure that the declared (or inferred)
+                    // size for the array meets whatever language-specific
+                    // constraints we want to enforce (e.g., disallow empty
+                    // arrays in specific cases)
+                    //
+                    validateArraySizeForVariable(varDecl);
+                }
+            }
+            varDecl->SetCheckState(getCheckedState());
         }
 
         // Fill in default substitutions for the 'subtype' part of a type constraint decl
@@ -2535,12 +2808,7 @@ namespace Slang
 
         void visitStructField(StructField* field)
         {
-            if (field->IsChecked(DeclCheckState::CheckedHeader))
-                return;
-            // TODO: bottleneck through general-case variable checking
-
-            field->type = CheckUsableType(field->type);
-            field->SetCheckState(getCheckedState());
+            CheckVarDeclCommon(field);
         }
 
         bool doesSignatureMatchRequirement(
@@ -3221,221 +3489,230 @@ namespace Slang
             if (decl->IsChecked(getCheckedState()))
                 return;
 
-            // Look at inheritance clauses, and
-            // see if one of them is making the enum
-            // "inherit" from a concrete type.
-            // This will become the "tag" type
-            // of the enum.
-            RefPtr<Type>        tagType;
-            InheritanceDecl*    tagTypeInheritanceDecl = nullptr;
-            for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+            // We need to be careful to avoid recursion in the
+            // type-checking logic. We will do the minimal work
+            // to make the type usable in the first phase, and
+            // then check the actual cases in the second phase.
+            //
+            if(this->checkingPhase == CheckingPhase::Header)
             {
-                checkDecl(inheritanceDecl);
-
-                // Look at the type being inherited from.
-                auto superType = inheritanceDecl->base.type;
-
-                if(auto errorType = superType->As<ErrorType>())
+                // Look at inheritance clauses, and
+                // see if one of them is making the enum
+                // "inherit" from a concrete type.
+                // This will become the "tag" type
+                // of the enum.
+                RefPtr<Type>        tagType;
+                InheritanceDecl*    tagTypeInheritanceDecl = nullptr;
+                for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                 {
-                    // Ignore any erroneous inheritance clauses.
-                    continue;
-                }
-                else if(auto declRefType = superType->As<DeclRefType>())
-                {
-                    if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
+                    checkDecl(inheritanceDecl);
+
+                    // Look at the type being inherited from.
+                    auto superType = inheritanceDecl->base.type;
+
+                    if(auto errorType = superType->As<ErrorType>())
                     {
-                        // Don't consider interface bases as candidates for
-                        // the tag type.
+                        // Ignore any erroneous inheritance clauses.
                         continue;
+                    }
+                    else if(auto declRefType = superType->As<DeclRefType>())
+                    {
+                        if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
+                        {
+                            // Don't consider interface bases as candidates for
+                            // the tag type.
+                            continue;
+                        }
+                    }
+
+                    if(tagType)
+                    {
+                        // We already found a tag type.
+                        getSink()->diagnose(inheritanceDecl, Diagnostics::enumTypeAlreadyHasTagType);
+                        getSink()->diagnose(tagTypeInheritanceDecl, Diagnostics::seePreviousTagType);
+                        break;
+                    }
+                    else
+                    {
+                        tagType = superType;
+                        tagTypeInheritanceDecl = inheritanceDecl;
                     }
                 }
 
-                if(tagType)
+                // If a tag type has not been set, then we
+                // default it to the built-in `int` type.
+                //
+                // TODO: In the far-flung future we may want to distinguish
+                // `enum` types that have a "raw representation" like this from
+                // ones that are purely abstract and don't expose their
+                // type of their tag.
+                if(!tagType)
                 {
-                    // We already found a tag type.
-                    getSink()->diagnose(inheritanceDecl, Diagnostics::enumTypeAlreadyHasTagType);
-                    getSink()->diagnose(tagTypeInheritanceDecl, Diagnostics::seePreviousTagType);
-                    break;
+                    tagType = getSession()->getIntType();
                 }
                 else
                 {
-                    tagType = superType;
-                    tagTypeInheritanceDecl = inheritanceDecl;
+                    // TODO: Need to establish that the tag
+                    // type is suitable. (e.g., if we are going
+                    // to allow raw values for case tags to be
+                    // derived automatically, then the tag
+                    // type needs to be some kind of interer type...)
+                    //
+                    // For now we will just be harsh and require it
+                    // to be one of a few builtin types.
+                    validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
                 }
-            }
-
-            // If a tag type has not been set, then we
-            // default it to the built-in `int` type.
-            //
-            // TODO: In the far-flung future we may want to distinguish
-            // `enum` types that have a "raw representation" like this from
-            // ones that are purely abstract and don't expose their
-            // type of their tag.
-            if(!tagType)
-            {
-                tagType = getSession()->getIntType();
-            }
-            else
-            {
-                // TODO: Need to establish that the tag
-                // type is suitable. (e.g., if we are going
-                // to allow raw values for case tags to be
-                // derived automatically, then the tag
-                // type needs to be some kind of interer type...)
-                //
-                // For now we will just be harsh and require it
-                // to be one of a few builtin types.
-                validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
-            }
-            decl->tagType = tagType;
+                decl->tagType = tagType;
 
 
-            // An `enum` type should automatically conform to the `__EnumType` interface.
-            // The compiler needs to insert this conformance behind the scenes, and this
-            // seems like the best place to do it.
-            {
-                // First, look up the type of the `__EnumType` interface.
-                RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
-
-                RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
-                enumConformanceDecl->ParentDecl = decl;
-                enumConformanceDecl->loc = decl->loc;
-                enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-                decl->Members.Add(enumConformanceDecl);
-
-                // The `__EnumType` interface has one required member, the `__Tag` type.
-                // We need to satisfy this requirement automatically, rather than require
-                // the user to actually declare a member with this name (otherwise we wouldn't
-                // let them define a tag value with the name `__Tag`).
-                //
-                RefPtr<WitnessTable> witnessTable = new WitnessTable();
-                enumConformanceDecl->witnessTable = witnessTable;
-
-                Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
-                Decl* tagAssociatedTypeDecl = nullptr;
-                if(auto enumTypeTypeDeclRefType = enumTypeType.As<DeclRefType>())
+                // An `enum` type should automatically conform to the `__EnumType` interface.
+                // The compiler needs to insert this conformance behind the scenes, and this
+                // seems like the best place to do it.
                 {
-                    if(auto enumTypeTypeInterfaceDecl = enumTypeTypeDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
+                    // First, look up the type of the `__EnumType` interface.
+                    RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
+
+                    RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
+                    enumConformanceDecl->ParentDecl = decl;
+                    enumConformanceDecl->loc = decl->loc;
+                    enumConformanceDecl->base.type = getSession()->getEnumTypeType();
+                    decl->Members.Add(enumConformanceDecl);
+
+                    // The `__EnumType` interface has one required member, the `__Tag` type.
+                    // We need to satisfy this requirement automatically, rather than require
+                    // the user to actually declare a member with this name (otherwise we wouldn't
+                    // let them define a tag value with the name `__Tag`).
+                    //
+                    RefPtr<WitnessTable> witnessTable = new WitnessTable();
+                    enumConformanceDecl->witnessTable = witnessTable;
+
+                    Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
+                    Decl* tagAssociatedTypeDecl = nullptr;
+                    if(auto enumTypeTypeDeclRefType = enumTypeType.As<DeclRefType>())
                     {
-                        for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
+                        if(auto enumTypeTypeInterfaceDecl = enumTypeTypeDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
                         {
-                            if(memberDecl->getName() == tagAssociatedTypeName)
+                            for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
                             {
-                                tagAssociatedTypeDecl = memberDecl;
-                                break;
+                                if(memberDecl->getName() == tagAssociatedTypeName)
+                                {
+                                    tagAssociatedTypeDecl = memberDecl;
+                                    break;
+                                }
                             }
                         }
                     }
-                }
-                if(!tagAssociatedTypeDecl)
-                {
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), decl, "failed to find built-in declaration '__Tag'");
-                }
-
-                // Okay, add the conformance withess for `__Tag` being satisfied by `tagType`
-                witnessTable->requirementDictionary.Add(tagAssociatedTypeDecl, RequirementWitness(tagType));
-
-                // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
-                // to the `__BuiltinIntegerType` interface, because that is a constraint on the
-                // associated type `__Tag`.
-
-                // TODO: eventually we should consider synthesizing other requirements for
-                // the min/max tag values, or the total number of tags, so that people don't
-                // have to declare these as additional cases.
-
-                enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
-            }
-
-
-            decl->SetCheckState(DeclCheckState::CheckedHeader);
-
-            auto enumType = DeclRefType::Create(
-                getSession(),
-                makeDeclRef(decl));
-
-            // Check the enum cases in order.
-            for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
-            {
-                // Each case defines a value of the enum's type.
-                //
-                // TODO: If we ever support enum cases with payloads,
-                // then they would probably have a type that is a
-                // `FunctionType` from the payload types to the
-                // enum type.
-                //
-                caseDecl->type.type = enumType;
-
-                checkDecl(caseDecl);
-            }
-
-            // For any enum case that didn't provide an explicit
-            // tag value, derived an appropriate tag value.
-            IntegerLiteralValue defaultTag = 0;
-            for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
-            {
-                if(auto explicitTagValExpr = caseDecl->initExpr)
-                {
-                    // This tag has an initializer, so it should establish
-                    // the tag value for a successor case that doesn't
-                    // provide an explicit tag.
-
-                    RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
-                    if(explicitTagVal)
+                    if(!tagAssociatedTypeDecl)
                     {
-                        if(auto constIntVal = explicitTagVal.As<ConstantIntVal>())
+                        SLANG_DIAGNOSE_UNEXPECTED(getSink(), decl, "failed to find built-in declaration '__Tag'");
+                    }
+
+                    // Okay, add the conformance withess for `__Tag` being satisfied by `tagType`
+                    witnessTable->requirementDictionary.Add(tagAssociatedTypeDecl, RequirementWitness(tagType));
+
+                    // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
+                    // to the `__BuiltinIntegerType` interface, because that is a constraint on the
+                    // associated type `__Tag`.
+
+                    // TODO: eventually we should consider synthesizing other requirements for
+                    // the min/max tag values, or the total number of tags, so that people don't
+                    // have to declare these as additional cases.
+
+                    enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
+                }
+            }
+            else if( checkingPhase == CheckingPhase::Body )
+            {
+                auto enumType = DeclRefType::Create(
+                    getSession(),
+                    makeDeclRef(decl));
+
+                auto tagType = decl->tagType;
+
+                // Check the enum cases in order.
+                for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
+                {
+                    // Each case defines a value of the enum's type.
+                    //
+                    // TODO: If we ever support enum cases with payloads,
+                    // then they would probably have a type that is a
+                    // `FunctionType` from the payload types to the
+                    // enum type.
+                    //
+                    caseDecl->type.type = enumType;
+
+                    checkDecl(caseDecl);
+                }
+
+                // For any enum case that didn't provide an explicit
+                // tag value, derived an appropriate tag value.
+                IntegerLiteralValue defaultTag = 0;
+                for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
+                {
+                    if(auto explicitTagValExpr = caseDecl->initExpr)
+                    {
+                        // This tag has an initializer, so it should establish
+                        // the tag value for a successor case that doesn't
+                        // provide an explicit tag.
+
+                        RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
+                        if(explicitTagVal)
                         {
-                            defaultTag = constIntVal->value;
+                            if(auto constIntVal = explicitTagVal.As<ConstantIntVal>())
+                            {
+                                defaultTag = constIntVal->value;
+                            }
+                            else
+                            {
+                                // TODO: need to handle other possibilities here
+                                getSink()->diagnose(explicitTagValExpr, Diagnostics::unexpectedEnumTagExpr);
+                            }
                         }
                         else
                         {
-                            // TODO: need to handle other possibilities here
-                            getSink()->diagnose(explicitTagValExpr, Diagnostics::unexpectedEnumTagExpr);
+                            // If this happens, then the explicit tag value expression
+                            // doesn't seem to be a constant after all. In this case
+                            // we expect the checking logic to have applied already.
                         }
                     }
                     else
                     {
-                        // If this happens, then the explicit tag value expression
-                        // doesn't seem to be a constant after all. In this case
-                        // we expect the checking logic to have applied already.
+                        // This tag has no initializer, so it should use
+                        // the default tag value we are tracking.
+                        RefPtr<IntegerLiteralExpr> tagValExpr = new IntegerLiteralExpr();
+                        tagValExpr->loc = caseDecl->loc;
+                        tagValExpr->type = QualType(tagType);
+                        tagValExpr->value = defaultTag;
+
+                        caseDecl->initExpr = tagValExpr;
                     }
+
+                    // Default tag for the next case will be one more than
+                    // for the most recent case.
+                    //
+                    // TODO: We might consider adding a `[flags]` attribute
+                    // that modifies this behavior to be `defaultTagForCase <<= 1`.
+                    //
+                    defaultTag++;
                 }
-                else
+
+                // Now check any other member declarations.
+                for(auto memberDecl : decl->Members)
                 {
-                    // This tag has no initializer, so it should use
-                    // the default tag value we are tracking.
-                    RefPtr<IntegerLiteralExpr> tagValExpr = new IntegerLiteralExpr();
-                    tagValExpr->loc = caseDecl->loc;
-                    tagValExpr->type = QualType(tagType);
-                    tagValExpr->value = defaultTag;
+                    // Already checked inheritance declarations above.
+                    if(auto inheritanceDecl = memberDecl->As<InheritanceDecl>())
+                        continue;
 
-                    caseDecl->initExpr = tagValExpr;
+                    // Already checked enum case declarations above.
+                    if(auto caseDecl = memberDecl->As<EnumCaseDecl>())
+                        continue;
+
+                    // TODO: Right now we don't support other kinds of
+                    // member declarations on an `enum`, but that is
+                    // something we may want to allow in the long run.
+                    //
+                    checkDecl(memberDecl);
                 }
-
-                // Default tag for the next case will be one more than
-                // for the most recent case.
-                //
-                // TODO: We might consider adding a `[flags]` attribute
-                // that modifies this behavior to be `defaultTagForCase <<= 1`.
-                //
-                defaultTag++;
-            }
-
-            // Now check any other member declarations.
-            for(auto memberDecl : decl->Members)
-            {
-                // Already checked inheritance declarations above.
-                if(auto inheritanceDecl = memberDecl->As<InheritanceDecl>())
-                    continue;
-
-                // Already checked enum case declarations above.
-                if(auto caseDecl = memberDecl->As<EnumCaseDecl>())
-                    continue;
-
-                // TODO: Right now we don't support other kinds of
-                // member declarations on an `enum`, but that is
-                // something we may want to allow in the long run.
-                //
-                checkDecl(memberDecl);
             }
             decl->SetCheckState(getCheckedState());
         }
@@ -3445,31 +3722,35 @@ namespace Slang
             if (decl->IsChecked(getCheckedState()))
                 return;
 
-            // An enum case had better appear inside an enum!
-            //
-            // TODO: Do we need/want to support generic cases some day?
-            auto parentEnumDecl = decl->ParentDecl->As<EnumDecl>();
-            SLANG_ASSERT(parentEnumDecl);
-
-            // The tag type should have already been set by
-            // the surrounding `enum` declaration.
-            auto tagType = parentEnumDecl->tagType;
-            SLANG_ASSERT(tagType);
-
-            // Need to check the init expression, if present, since
-            // that represents the explicit tag for this case.
-            if(auto initExpr = decl->initExpr)
+            if(checkingPhase == CheckingPhase::Body)
             {
-                initExpr = CheckExpr(initExpr);
-                initExpr = Coerce(tagType, initExpr);
+                // An enum case had better appear inside an enum!
+                //
+                // TODO: Do we need/want to support generic cases some day?
+                auto parentEnumDecl = decl->ParentDecl->As<EnumDecl>();
+                SLANG_ASSERT(parentEnumDecl);
 
-                // We want to enforce that this is an integer constant
-                // expression, but we don't actually care to retain
-                // the value.
-                CheckIntegerConstantExpression(initExpr);
+                // The tag type should have already been set by
+                // the surrounding `enum` declaration.
+                auto tagType = parentEnumDecl->tagType;
+                SLANG_ASSERT(tagType);
 
-                decl->initExpr = initExpr;
+                // Need to check the init expression, if present, since
+                // that represents the explicit tag for this case.
+                if(auto initExpr = decl->initExpr)
+                {
+                    initExpr = CheckExpr(initExpr);
+                    initExpr = Coerce(tagType, initExpr);
+
+                    // We want to enforce that this is an integer constant
+                    // expression, but we don't actually care to retain
+                    // the value.
+                    CheckIntegerConstantExpression(initExpr);
+
+                    decl->initExpr = initExpr;
+                }
             }
+
             decl->SetCheckState(getCheckedState());
         }
 
@@ -4282,7 +4563,7 @@ namespace Slang
             return 1;
         }
 
-        void maybeInferArraySizeForVariable(Variable* varDecl)
+        void maybeInferArraySizeForVariable(VarDeclBase* varDecl)
         {
             // Not an array?
             auto arrayType = varDecl->type->AsArrayType();
@@ -4296,14 +4577,8 @@ namespace Slang
             auto initExpr = varDecl->initExpr;
             if(!initExpr) return;
 
-            // Is the initializer an initializer list?
-            if(auto initializerListExpr = initExpr.As<InitializerListExpr>())
-            {
-                auto argCount = initializerListExpr->args.Count();
-                elementCount = new ConstantIntVal(argCount);
-            }
             // Is the type of the initializer an array type?
-            else if(auto arrayInitType = initExpr->type->As<ArrayExpressionType>())
+            if(auto arrayInitType = initExpr->type->As<ArrayExpressionType>())
             {
                 elementCount = arrayInitType->ArrayLength;
             }
@@ -4320,7 +4595,7 @@ namespace Slang
                 elementCount);
         }
 
-        void ValidateArraySizeForVariable(Variable* varDecl)
+        void validateArraySizeForVariable(VarDeclBase* varDecl)
         {
             auto arrayType = varDecl->type->AsArrayType();
             if (!arrayType) return;
@@ -4347,48 +4622,7 @@ namespace Slang
 
         void visitVariable(Variable* varDecl)
         {
-            if (function || checkingPhase == CheckingPhase::Header)
-            {
-                TypeExp typeExp = CheckUsableType(varDecl->type);
-                varDecl->type = typeExp;
-                if (varDecl->type.Equals(getSession()->getVoidType()))
-                {
-                    getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
-                }
-            }
-
-            if (checkingPhase == CheckingPhase::Body)
-            {
-                if (auto initExpr = varDecl->initExpr)
-                {
-                    initExpr = CheckTerm(initExpr);
-                    varDecl->initExpr = initExpr;
-                }
-
-                // If this is an array variable, then we first want to give
-                // it a chance to infer an array size from its initializer
-                //
-                // TODO(tfoley): May need to extend this to handle the
-                // multi-dimensional case...
-                maybeInferArraySizeForVariable(varDecl);
-                //
-                // Next we want to make sure that the declared (or inferred)
-                // size for the array meets whatever language-specific
-                // constraints we want to enforce (e.g., disallow empty
-                // arrays in specific cases)
-                ValidateArraySizeForVariable(varDecl);
-
-
-                if (auto initExpr = varDecl->initExpr)
-                {
-                    // TODO(tfoley): should coercion of initializer lists be special-cased
-                    // here, or handled as a general case for coercion?
-
-                    initExpr = Coerce(varDecl->type.Ptr(), initExpr);
-                    varDecl->initExpr = initExpr;
-                }
-            }
-            varDecl->SetCheckState(getCheckedState());
+            CheckVarDeclCommon(varDecl);
         }
 
         void visitWhileStmt(WhileStmt *stmt)

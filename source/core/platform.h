@@ -47,6 +47,15 @@ namespace Slang
         SharedLibrary();
     };
 
+    struct PlatformUtil
+    {
+            /// Appends a text interpretation of a result (as defined by supporting OS)
+            /// @param res Result to produce a string for
+            /// @param builderOut Append the string produced to builderOut
+            /// @return SLANG_OK if string is found and appended. Fail otherwise. SLANG_E_NOT_IMPLEMENTED if there is no impl for this platform.
+        static SlangResult appendResult(SlangResult res, StringBuilder& builderOut);
+    };
+
 #ifndef _MSC_VER
 	#define _fileno fileno
 	#define _isatty isatty

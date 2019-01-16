@@ -530,8 +530,24 @@ namespace Slang
         char const*     text,
         CodeGenTarget   target);
 
-    /* Returns true if a codeGen target is available. */
+    /* Returns SLANG_OK if a codeGen target is available. */
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
+    /* Returns SLANG_OK if pass through support is available */
+    SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
+
+    /* Report an error appearing from external compiler to the diagnostic sink error to the diagnostic sink.
+    @param compilerName The name of the compiler the error came for (or nullptr if not known)
+    @param res Result associated with the error. The error code will be reported. (Can take HRESULT - and will expand to string if known)
+    @param diagnostic The diagnostic string associated with the compile failure
+    @param sink The diagnostic sink to report to */
+    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink);
+
+    /* Given a translationUnitRequest determines a filename that is most suitable to identify the input.
+    If the translation is a pass through will attempt to get the source file pathname. If the source is slang generated
+    there is no equivalent name so will return 'slang-generated'
+    @param translationUnitRequest The request to find an appropriate source path for
+    @return the appropriate source filename */
+    String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest);
 
     struct TypeCheckingCache;
     //
@@ -640,6 +656,10 @@ namespace Slang
         RefPtr<ArrayExpressionType> getArrayType(
             Type*   elementType,
             IntVal* elementCount);
+
+        RefPtr<VectorExpressionType> getVectorType(
+            RefPtr<Type>    elementType,
+            RefPtr<IntVal>  elementCount);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 

@@ -990,7 +990,7 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         // If there is no mangled name, then we assume this is a local symbol,
         // and it can't possibly have multiple declarations.
-        return cloneGlobalValueImpl(context, originalVal, IROriginalValuesForClone());
+        return cloneGlobalValueImpl(context, originalVal, IROriginalValuesForClone(originalVal));
     }
 
     //

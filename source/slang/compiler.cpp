@@ -179,64 +179,92 @@ namespace Slang
         return Stage::Unknown;
     }
 
+    SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
+    {
+        switch (passThrough)
+        {
+            case PassThroughMode::None:
+            {
+                // If no pass through -> that will always work!
+                return SLANG_OK;
+            }
+            case PassThroughMode::dxc:
+            {
+#if SLANG_ENABLE_DXIL_SUPPORT
+                // Must have dxc
+                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
+                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+            case PassThroughMode::fxc:
+            {
+#if SLANG_ENABLE_DXBC_SUPPORT
+                // Must have fxc
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+            case PassThroughMode::glslang:
+            {
+#if SLANG_ENABLE_GLSLANG_SUPPORT
+                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#endif
+                break;
+            }
+        }
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
 
-    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
+    static PassThroughMode _getExternalCompilerRequiredForTarget(CodeGenTarget target)
     {
         switch (target)
         {
             case CodeGenTarget::None:
             {
-                return SLANG_OK;
+                return PassThroughMode::None;
             }
             case CodeGenTarget::GLSL:
             case CodeGenTarget::GLSL_Vulkan:
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 // Can always output GLSL
-                return SLANG_OK;
+                return PassThroughMode::None; 
             }
             case CodeGenTarget::HLSL:
             {
                 // Can always output HLSL
-                return SLANG_OK;
+                return PassThroughMode::None;
             }
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-#if SLANG_ENABLE_GLSLANG_SUPPORT
-                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
-            }            
+                return PassThroughMode::glslang;
+            }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
             {
-#if SLANG_ENABLE_DXBC_SUPPORT
-                // Must have fxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND; 
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
+                return PassThroughMode::fxc;
             }
-
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXILAssembly:
             {
-#if SLANG_ENABLE_DXIL_SUPPORT
-                // Must have dxc
-                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
-                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
-#else
-                return SLANG_E_NOT_IMPLEMENTED;
-#endif
+                return PassThroughMode::dxc;
             }
-            
+
             default: break;
         }
 
         SLANG_ASSERT(!"Unhandled target");
-        return SLANG_FAIL;
+        return PassThroughMode::None;
+    }
+
+    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
+    {
+        const PassThroughMode mode = _getExternalCompilerRequiredForTarget(target);
+        return (mode != PassThroughMode::None) ?
+            checkExternalCompilerSupport(session, mode) :
+            SLANG_OK;
     }
 
     //
@@ -416,18 +444,93 @@ namespace Slang
         return result;
     }
 
-#if SLANG_ENABLE_DXBC_SUPPORT
-   
-    List<uint8_t> EmitDXBytecodeForEntryPoint(
-        EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq)
+    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
     {
+        StringBuilder builder;
+        if (compilerName)
+        {
+            builder << compilerName << ": ";
+        }
+
+        if (diagnostic.size() > 0)
+        {
+            builder.Append(diagnostic);
+        }
+
+        if (SLANG_FAILED(res) && res != SLANG_FAIL)
+        {
+            {
+                char tmp[17];
+                sprintf_s(tmp, SLANG_COUNT_OF(tmp), "0x%08x", uint32_t(res));
+                builder << "Result(" << tmp << ") ";
+            }
+
+            PlatformUtil::appendResult(res, builder);
+        }
+
+        // TODO(tfoley): need a better policy for how we translate diagnostics
+        // back into the Slang world (although we should always try to generate
+        // HLSL that doesn't produce any diagnostics...)
+        sink->diagnoseRaw(SLANG_FAILED(res) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
+    }
+
+    String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest)
+    {
+        CompileRequest* compileRequest = translationUnitRequest->compileRequest;
+        if (compileRequest->passThrough == PassThroughMode::None)
+        {
+            return "slang-generated";
+        }
+
+        const auto& sourceFiles = translationUnitRequest->sourceFiles;
+
+        const int numSourceFiles = int(sourceFiles.Count());
+
+        switch (numSourceFiles)
+        {
+            case 0:     return "unknown";
+            case 1:     return sourceFiles[0]->getPathInfo().foundPath;
+            default:
+            {
+                StringBuilder builder;
+                builder << sourceFiles[0]->getPathInfo().foundPath;
+                for (int i = 1; i < numSourceFiles; ++i)
+                {
+                    builder << ";" << sourceFiles[i]->getPathInfo().foundPath;
+                }
+
+                return builder;
+            }
+        }
+    }
+
+#if SLANG_ENABLE_DXBC_SUPPORT
+
+    static UnownedStringSlice _getSlice(ID3DBlob* blob)
+    {
+        if (blob)
+        {
+            const char* chars = (const char*)blob->GetBufferPointer();
+            size_t len = blob->GetBufferSize();
+            len -= size_t(len > 0 && chars[len - 1] == 0);
+            return UnownedStringSlice(chars, len);
+        }
+        return UnownedStringSlice();
+    }
+
+    SlangResult emitDXBytecodeForEntryPoint(
+        EntryPointRequest*  entryPoint,
+        TargetRequest*      targetReq,
+        List<uint8_t>&      byteCodeOut)
+    {
+        byteCodeOut.Clear();
+
         auto session = entryPoint->compileRequest->mSession;
 
         auto compileFunc = (pD3DCompile)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Fxc_D3DCompile, &entryPoint->compileRequest->mSink);
         if (!compileFunc)
         {
-            return List<uint8_t>();
+            return SLANG_FAIL;
         }
 
         auto hlslCode = emitHLSLForEntryPoint(entryPoint, targetReq);
@@ -490,61 +593,43 @@ namespace Slang
         flags |= D3DCOMPILE_ENABLE_STRICTNESS;
         flags |= D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
 
-        ID3DBlob* codeBlob;
-        ID3DBlob* diagnosticsBlob;
+        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+
+        ComPtr<ID3DBlob> codeBlob;
+        ComPtr<ID3DBlob> diagnosticsBlob;
         HRESULT hr = compileFunc(
             hlslCode.begin(),
             hlslCode.Length(),
-            "slang",
+            sourcePath.Buffer(),
             dxMacros,
             nullptr,
             getText(entryPoint->name).begin(),
             GetHLSLProfileName(profile).Buffer(),
             flags,
             0, // unused: effect flags
-            &codeBlob,
-            &diagnosticsBlob);
+            codeBlob.writeRef(),
+            diagnosticsBlob.writeRef());
 
-        List<uint8_t> data;
-        if (codeBlob)
+        if (codeBlob && SLANG_SUCCEEDED(hr))
         {
-            data.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
-            codeBlob->Release();
+            byteCodeOut.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
         }
 
-        // Note: we will only output diagnostics coming from a downstream
-        // compiler in the event of an error (although in that case we will
-        // end up including any warning diagnostics that are produced as well).
-        //
-        // TODO: some day we should aspire to make Slang's output always compile
-        // cleanly without warnings on downstream compilers (or else suppress those
-        // warnings), but this is difficult to do in practice without a lot of
-        // tailoring for the quirks of each compiler (version).
-        //
-        if (diagnosticsBlob && FAILED(hr))
-        {
-            // TODO(tfoley): need a better policy for how we translate diagnostics
-            // back into the Slang world (although we should always try to generate
-            // HLSL that doesn't produce any diagnostics...)
-            entryPoint->compileRequest->mSink.diagnoseRaw(
-                FAILED(hr) ? Severity::Error : Severity::Warning,
-                (char const*) diagnosticsBlob->GetBufferPointer());
-            diagnosticsBlob->Release();
-        }
         if (FAILED(hr))
         {
-            return List<uint8_t>();
+            reportExternalCompileError("fxc", hr, _getSlice(diagnosticsBlob), &entryPoint->compileRequest->mSink);
         }
-        return data;
+                
+        return hr;
     }
 
     SlangResult dissassembleDXBC(
         CompileRequest*     compileRequest,
         void const*         data,
         size_t              size, 
-        String& stringOut)
+        String&             assemOut)
     {
-        stringOut = String();
+        assemOut = String();
 
         auto session = compileRequest->mSession;
 
@@ -564,33 +649,30 @@ namespace Slang
 
         if (codeBlob)
         {
-            char const* codeBegin = (char const*)codeBlob->GetBufferPointer();
-            char const* codeEnd = codeBegin + codeBlob->GetBufferSize() - 1;
-            stringOut = String(codeBegin, codeEnd);
+            assemOut = _getSlice(codeBlob);
         }
         if (FAILED(res))
         {
             // TODO(tfoley): need to figure out what to diagnose here...
+            reportExternalCompileError("fxc", res, UnownedStringSlice(), &compileRequest->mSink);
         }
 
         return res;
     }
 
-    String EmitDXBytecodeAssemblyForEntryPoint(
+    SlangResult emitDXBytecodeAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq)
+        TargetRequest*      targetReq,
+        String&             assemOut)
     {
 
-        List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(entryPoint, targetReq);
+        List<uint8_t> dxbc;
+        SLANG_RETURN_ON_FAIL(emitDXBytecodeForEntryPoint(entryPoint, targetReq, dxbc));
         if (!dxbc.Count())
         {
-            return String();
+            return SLANG_FAIL;
         }
-
-        String result;
-        dissassembleDXBC(entryPoint->compileRequest, dxbc.Buffer(), dxbc.Count(), result);
-
-        return result;
+        return dissassembleDXBC(entryPoint->compileRequest, dxbc.Buffer(), dxbc.Count(), assemOut);
     }
 #endif
 
@@ -612,7 +694,7 @@ SlangResult dissassembleDXILUsingDXC(
 #endif
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
-    int invokeGLSLCompiler(
+    SlangResult invokeGLSLCompiler(
         CompileRequest*             slangCompileRequest,
         glslang_CompileRequest&     request)
     {
@@ -621,13 +703,14 @@ SlangResult dissassembleDXILUsingDXC(
         auto glslang_compile = (glslang_CompileFunc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile, &slangCompileRequest->mSink);
         if (!glslang_compile)
         {
-            return 1;
+            return SLANG_FAIL;
         }
 
-        String diagnosticOutput;
+        StringBuilder diagnosticOutput;
+        
         auto diagnosticOutputFunc = [](void const* data, size_t size, void* userData)
         {
-            (*(String*)userData).append((char const*)data, (char const*)data + size);
+            (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
         };
 
         request.diagnosticFunc = diagnosticOutputFunc;
@@ -637,13 +720,11 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (err)
         {
-            slangCompileRequest->mSink.diagnoseRaw(
-                Severity::Error,
-                diagnosticOutput.begin());
-            return err;
+            reportExternalCompileError("glslang", SLANG_FAIL, diagnosticOutput.getUnownedSlice(), &slangCompileRequest->mSink);
+            return SLANG_FAIL;
         }
 
-        return 0;
+        return SLANG_OK;
     }
 
     SlangResult dissassembleSPIRV(
@@ -663,67 +744,64 @@ SlangResult dissassembleDXILUsingDXC(
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
 
+        request.sourcePath = nullptr;
+
         request.inputBegin  = data;
         request.inputEnd    = (char*)data + size;
 
         request.outputFunc = outputFunc;
         request.outputUserData = &output;
 
-        int err = invokeGLSLCompiler(slangRequest, request);
-        if (err)
-        {
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
 
         stringOut = output;
         return SLANG_OK;
     }
 
-    List<uint8_t> emitSPIRVForEntryPoint(
+    SlangResult emitSPIRVForEntryPoint(
         EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq)
+        TargetRequest*      targetReq,
+        List<uint8_t>&      spirvOut)
     {
+        spirvOut.Clear();
+
         String rawGLSL = emitGLSLForEntryPoint(entryPoint, targetReq);
         maybeDumpIntermediate(entryPoint->compileRequest, rawGLSL.Buffer(), CodeGenTarget::GLSL);
 
-        List<uint8_t> output;
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
             ((List<uint8_t>*)userData)->AddRange((uint8_t*)data, size);
         };
 
+        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-        request.sourcePath = "slang";
+        request.sourcePath = sourcePath.Buffer();
         request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin  = rawGLSL.begin();
         request.inputEnd    = rawGLSL.end();
 
         request.outputFunc = outputFunc;
-        request.outputUserData = &output;
+        request.outputUserData = &spirvOut;
 
-        int err = invokeGLSLCompiler(entryPoint->compileRequest, request);
-
-        if (err)
-        {
-            return List<uint8_t>();
-        }
-
-        return output;
+        SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(entryPoint->compileRequest, request));
+        return SLANG_OK;
     }
 
-    String emitSPIRVAssemblyForEntryPoint(
+    SlangResult emitSPIRVAssemblyForEntryPoint(
         EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq)
+        TargetRequest*      targetReq,
+        String&             assemblyOut)
     {
-        List<uint8_t> spirv = emitSPIRVForEntryPoint(entryPoint, targetReq);
-        if (spirv.Count() == 0)
-            return String();
+        List<uint8_t> spirv;
+        SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPoint(entryPoint, targetReq, spirv));
 
-        String result;
-        dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count(), result);
-        return result;
+        if (spirv.Count() == 0)
+            return SLANG_FAIL;
+
+        return dissassembleSPIRV(entryPoint->compileRequest, spirv.begin(), spirv.Count(), assemblyOut);
     }
 #endif
 
@@ -758,17 +836,23 @@ SlangResult dissassembleDXILUsingDXC(
 #if SLANG_ENABLE_DXBC_SUPPORT
         case CodeGenTarget::DXBytecode:
             {
-                List<uint8_t> code = EmitDXBytecodeForEntryPoint(entryPoint, targetReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
-                result = CompileResult(code);
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitDXBytecodeForEntryPoint(entryPoint, targetReq, code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
+                    result = CompileResult(code);
+                }
             }
             break;
 
         case CodeGenTarget::DXBytecodeAssembly:
             {
-                String code = EmitDXBytecodeAssemblyForEntryPoint(entryPoint, targetReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
-                result = CompileResult(code);
+                String code;
+                if (SLANG_SUCCEEDED(emitDXBytecodeAssemblyForEntryPoint(entryPoint, targetReq, code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                    result = CompileResult(code);
+                }
             }
             break;
 #endif
@@ -777,8 +861,7 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::DXIL:
             {
                 List<uint8_t> code;
-                int err = emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code);
-                if (!err)
+                if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code)))
                 {
                     maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
                     result = CompileResult(code);
@@ -789,8 +872,7 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::DXILAssembly:
             {
                 List<uint8_t> code;
-                int err = emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code);
-                if (!err)
+                if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(entryPoint, targetReq, code)))
                 {
                     String assembly; 
                     dissassembleDXILUsingDXC(
@@ -809,17 +891,23 @@ SlangResult dissassembleDXILUsingDXC(
 
         case CodeGenTarget::SPIRV:
             {
-                List<uint8_t> code = emitSPIRVForEntryPoint(entryPoint, targetReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
-                result = CompileResult(code);
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitSPIRVForEntryPoint(entryPoint, targetReq, code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.Count(), target);
+                    result = CompileResult(code);
+                }
             }
             break;
 
         case CodeGenTarget::SPIRVAssembly:
             {
-                String code = emitSPIRVAssemblyForEntryPoint(entryPoint, targetReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
-                result = CompileResult(code);
+                String code;
+                if (SLANG_SUCCEEDED(emitSPIRVAssemblyForEntryPoint(entryPoint, targetReq, code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                    result = CompileResult(code);
+                }
             }
             break;
 

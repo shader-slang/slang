@@ -1923,6 +1923,14 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_makeVector, argCount, args);
     }
 
+    IRInst* IRBuilder::emitMakeMatrix(
+        IRType*         type,
+        UInt            argCount,
+        IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeMatrix, argCount, args);
+    }
+
     IRInst* IRBuilder::emitMakeArray(
         IRType*         type,
         UInt            argCount,
@@ -3919,7 +3927,7 @@ namespace Slang
         case kIROp_lookup_interface_method:
         case kIROp_Construct:
         case kIROp_makeVector:
-        case kIROp_makeMatrix:
+        case kIROp_MakeMatrix:
         case kIROp_makeArray:
         case kIROp_makeStruct:
         case kIROp_Load:    // We are ignoring the possibility of loads from bad addresses, or `volatile` loads

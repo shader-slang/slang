@@ -847,6 +847,11 @@ struct IRBuilder
         return emitMakeVector(type, args.Count(), args.Buffer());
     }
 
+    IRInst* emitMakeMatrix(
+        IRType*         type,
+        UInt            argCount,
+        IRInst* const* args);
+
     IRInst* emitMakeArray(
         IRType*         type,
         UInt            argCount,

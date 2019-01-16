@@ -1241,6 +1241,36 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return findInnerMostGenericSubstitution(declRef.substitutions)->args[2].As<IntVal>().Ptr();
     }
 
+    RefPtr<Type> MatrixExpressionType::getRowType()
+    {
+        if( !mRowType )
+        {
+            mRowType = getSession()->getVectorType(getElementType(), getColumnCount());
+        }
+        return mRowType;
+    }
+
+    RefPtr<VectorExpressionType> Session::getVectorType(
+        RefPtr<Type>    elementType,
+        RefPtr<IntVal>  elementCount)
+    {
+        auto vectorGenericDecl = findMagicDecl(
+            this, "Vector").As<GenericDecl>();
+        auto vectorTypeDecl = vectorGenericDecl->inner;
+
+        auto substitutions = new GenericSubstitution();
+        substitutions->genericDecl = vectorGenericDecl.Ptr();
+        substitutions->args.Add(elementType);
+        substitutions->args.Add(elementCount);
+
+        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+
+        return DeclRefType::Create(
+            this,
+            declRef)->As<VectorExpressionType>();
+    }
+
+
     // PtrTypeBase
 
     Type* PtrTypeBase::getValueType()

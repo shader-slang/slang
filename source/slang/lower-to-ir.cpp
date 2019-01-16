@@ -1941,6 +1941,127 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         return lowerSubExpr(expr->base);
     }
 
+    LoweredValInfo getSimpleDefaultVal(IRType* type)
+    {
+        if(auto basicType = as<IRBasicType>(type))
+        {
+            switch( basicType->getBaseType() )
+            {
+            default:
+                SLANG_UNEXPECTED("missing case for getting IR default value");
+                UNREACHABLE_RETURN(LoweredValInfo());
+                break;
+
+            case BaseType::Bool:
+            case BaseType::Int8:
+            case BaseType::Int16:
+            case BaseType::Int:
+            case BaseType::Int64:
+            case BaseType::UInt8:
+            case BaseType::UInt16:
+            case BaseType::UInt:
+            case BaseType::UInt64:
+                return LoweredValInfo::simple(getBuilder()->getIntValue(type, 0));
+
+            case BaseType::Half:
+            case BaseType::Float:
+            case BaseType::Double:
+                return LoweredValInfo::simple(getBuilder()->getFloatValue(type, 0.0));
+            }
+        }
+
+        SLANG_UNEXPECTED("missing case for getting IR default value");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo getDefaultVal(Type* type)
+    {
+        auto irType = lowerType(context, type);
+        if (auto basicType = type->As<BasicExpressionType>())
+        {
+            return getSimpleDefaultVal(irType);
+        }
+        else if (auto vectorType = type->As<VectorExpressionType>())
+        {
+            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+
+            auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
+
+            List<IRInst*> args;
+            for(UInt ee = 0; ee < elementCount; ++ee)
+            {
+                args.Add(irDefaultValue);
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
+        }
+        else if (auto matrixType = type->As<MatrixExpressionType>())
+        {
+            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+
+            auto rowType = matrixType->getRowType();
+
+            auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
+
+            List<IRInst*> args;
+            for(UInt rr = 0; rr < rowCount; ++rr)
+            {
+                args.Add(irDefaultValue);
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
+        }
+        else if (auto arrayType = type->As<ArrayExpressionType>())
+        {
+            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+
+            auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
+
+            List<IRInst*> args;
+            for(UInt ee = 0; ee < elementCount; ++ee)
+            {
+                args.Add(irDefaultElement);
+            }
+
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
+        }
+        else if (auto declRefType = type->As<DeclRefType>())
+        {
+            DeclRef<Decl> declRef = declRefType->declRef;
+            if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+            {
+                List<IRInst*> args;
+                for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
+                {
+                    if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
+                        continue;
+
+                    auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
+                    args.Add(irFieldVal);
+                }
+
+                return LoweredValInfo::simple(
+                    getBuilder()->emitMakeStruct(irType, args.Count(), args.Buffer()));
+            }
+        }
+
+        SLANG_UNEXPECTED("unexpected type when creating default value");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo getDefaultVal(StructField* decl)
+    {
+        if(auto initExpr = decl->initExpr)
+        {
+            return lowerRValueExpr(context, initExpr);
+        }
+        else
+        {
+            return getDefaultVal(decl->type);
+        }
+    }
+
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
     {
         // Allocate a temporary of the given type
@@ -1950,23 +2071,33 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         UInt argCount = expr->args.Count();
 
+        // If the initializer list was empty, then the user was
+        // asking for default initialization, which should apply
+        // to (almost) any type.
+        //
+        if(argCount == 0)
+        {
+            return getDefaultVal(type.type);
+        }
+
         // Now for each argument in the initializer list,
         // fill in the appropriate field of the result
         if (auto arrayType = type->As<ArrayExpressionType>())
         {
             UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
-            for (UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < argCount; ++ee)
             {
-                if (ee < argCount)
+                auto argExpr = expr->args[ee];
+                LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                args.Add(getSimpleVal(context, argVal));
+            }
+            if(elementCount > argCount)
+            {
+                auto irDefaultValue = getSimpleVal(context, getDefaultVal(arrayType->baseType));
+                for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
-                    auto argExpr = expr->args[ee];
-                    LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                    args.Add(getSimpleVal(context, argVal));
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("need to default-initialize array elements");
+                    args.Add(irDefaultValue);
                 }
             }
 
@@ -1976,25 +2107,48 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else if (auto vectorType = type->As<VectorExpressionType>())
         {
             UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
-            UInt argCounter = 0;
 
-            for (UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < argCount; ++ee)
             {
-                UInt argIndex = argCounter++;
-                if (argIndex < argCount)
+                auto argExpr = expr->args[ee];
+                LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                args.Add(getSimpleVal(context, argVal));
+            }
+            if(elementCount > argCount)
+            {
+                auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
+                for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
-                    auto argExpr = expr->args[argIndex];
-                    LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                    args.Add(getSimpleVal(context, argVal));
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("need to default-initialize vector elements");
+                    args.Add(irDefaultValue);
                 }
             }
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
+        }
+        else if (auto matrixType = type->As<MatrixExpressionType>())
+        {
+            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+
+            for (UInt rr = 0; rr < argCount; ++rr)
+            {
+                auto argExpr = expr->args[rr];
+                LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                args.Add(getSimpleVal(context, argVal));
+            }
+            if(rowCount > argCount)
+            {
+                auto rowType = matrixType->getRowType();
+                auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
+
+                for(UInt rr = argCount; rr < rowCount; ++rr)
+                {
+                    args.Add(irDefaultValue);
+                }
+            }
+
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
         }
         else if (auto declRefType = type->As<DeclRefType>())
         {
@@ -2016,23 +2170,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     }
                     else
                     {
-                        SLANG_UNEXPECTED("need to default-initialize struct fields");
+                        auto irDefaultValue = getSimpleVal(context, getDefaultVal(ff));
+                        args.Add(irDefaultValue);
                     }
                 }
 
                 return LoweredValInfo::simple(
                     getBuilder()->emitMakeStruct(irType, args.Count(), args.Buffer()));
             }
-            else
-            {
-                SLANG_UNEXPECTED("not sure how to initialize this type");
-            }
-        }
-        else
-        {
-            SLANG_UNEXPECTED("not sure how to initialize this type");
         }
 
+        // If none of the above cases matched, then we had better
+        // have zero arguments in the initailizer list, in which
+        // case we are just looking for default initialization.
+        //
+        SLANG_UNEXPECTED("unhandled case for initializer list codegen");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -4397,10 +4549,56 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext* getContet() { return &subContextStorage; }
     };
 
+    LoweredValInfo lowerFunctionStaticConstVarDecl(
+        VarDeclBase* decl)
+    {
+        // We need to insert the constant at a level above
+        // the function being emitted. This will usually
+        // be the global scope, but it might be an outer
+        // generic if we are lowering a generic function.
+        //
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
+
+        subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+
+        IRType* subVarType = lowerType(subContext, decl->getType());
+
+        IRGlobalConstant* irConstant = subBuilder->createGlobalConstant(subVarType);
+        addVarDecorations(subContext, irConstant, decl);
+        addNameHint(context, irConstant, decl);
+        maybeSetRate(context, irConstant, decl);
+        subBuilder->addHighLevelDeclDecoration(irConstant, decl);
+
+        LoweredValInfo constantVal = LoweredValInfo::ptr(irConstant);
+        setValue(context, decl, constantVal);
+
+        if( auto initExpr = decl->initExpr )
+        {
+            NestedContext nestedInitContext(this);
+            auto initBuilder = nestedInitContext.getBuilder();
+            auto initContext = nestedInitContext.getContet();
+
+            initBuilder->setInsertInto(irConstant);
+
+            IRBlock* entryBlock = initBuilder->emitBlock();
+            initBuilder->setInsertInto(entryBlock);
+
+            LoweredValInfo initVal = lowerRValueExpr(initContext, initExpr);
+            initBuilder->emitReturn(getSimpleVal(initContext, initVal));
+        }
+
+        return constantVal;
+    }
 
     LoweredValInfo lowerFunctionStaticVarDecl(
         VarDeclBase*    decl)
     {
+        // We know the variable is `static`, but it might also be `const.
+        if(decl->HasModifier<ConstModifier>())
+            return lowerFunctionStaticConstVarDecl(decl);
+
         // A global variable may need to be generic, if one
         // of the outer declarations is generic.
         NestedContext nestedContext(this);
