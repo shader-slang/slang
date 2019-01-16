@@ -192,8 +192,7 @@ namespace Slang
             {
 #if SLANG_ENABLE_DXIL_SUPPORT
                 // Must have dxc
-                return (session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) &&
-                    session->getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr)) ? SLANG_OK : SLANG_E_NOT_FOUND;
+                return session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
 #endif
                 break;
             }
