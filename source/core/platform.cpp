@@ -27,6 +27,39 @@ namespace Slang
 
 #ifdef _WIN32
 
+// Make sure SlangResult match for common standard window HRESULT
+SLANG_COMPILE_TIME_ASSERT(E_FAIL == SLANG_FAIL);
+SLANG_COMPILE_TIME_ASSERT(E_NOINTERFACE == SLANG_E_NO_INTERFACE);
+SLANG_COMPILE_TIME_ASSERT(E_HANDLE == SLANG_E_INVALID_HANDLE);
+SLANG_COMPILE_TIME_ASSERT(E_NOTIMPL == SLANG_E_NOT_IMPLEMENTED);
+SLANG_COMPILE_TIME_ASSERT(E_INVALIDARG == SLANG_E_INVALID_ARG);
+SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
+
+/* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+{
+    if (SLANG_FAILED(res) && res != SLANG_FAIL)
+    {
+        LPWSTR buffer = nullptr;
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+            nullptr,
+            res,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+            (LPWSTR)&buffer,
+            0,
+            nullptr);
+
+        if (buffer)
+        {
+            builderOut << " ";
+            // Convert to string
+            builderOut.Append(String::FromWString(buffer));
+            LocalFree(buffer);
+            return SLANG_OK;
+        }
+    }
+    return SLANG_FAIL;
+}
+
 /* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, SharedLibrary::Handle& handleOut)
 {
     handleOut = nullptr;
@@ -77,6 +110,11 @@ namespace Slang
 }
 
 #else // _WIN32
+
+/* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+{
+    return SLANG_E_NOT_IMPLEMENTED;
+}
 
 /* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, Handle& handleOut)
 {

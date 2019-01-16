@@ -263,6 +263,13 @@ void DiagnosticSink::diagnoseRaw(
     Severity    severity,
     char const* message)
 {
+    return diagnoseRaw(severity, UnownedStringSlice(message));
+}
+
+void DiagnosticSink::diagnoseRaw(
+    Severity    severity,
+    const UnownedStringSlice& message)
+{
     if (severity >= Severity::Error)
     {
         errorCount++;
@@ -272,7 +279,7 @@ void DiagnosticSink::diagnoseRaw(
     if(writer)
     {
         // If so, pass the error string along to them
-        writer->write(message, ::strlen(message));
+        writer->write(message.begin(), message.size());
     }
     else
     {

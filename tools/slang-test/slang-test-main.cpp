@@ -1791,6 +1791,36 @@ SlangResult innerMain(int argc, char** argv)
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto compatibilityIssueCatagory = categorySet.add("compatibility-issue", fullTestCategory);
+    
+#if SLANG_WINDOWS_FAMILY
+    auto windowsCatagory = categorySet.add("windows", fullTestCategory);
+#endif
+
+#if SLANG_UNIX_FAMILY
+    auto unixCatagory = categorySet.add("unix", fullTestCategory);
+#endif
+
+    TestCategory* fxcCategory = nullptr;
+    TestCategory* dxcCategory = nullptr;
+    TestCategory* glslangCategory = nullptr;
+
+    // Might be better if we had an API on slang so we could get what 'pass-through's are available
+    // This works whilst these targets imply the pass-through/backends
+    {
+        SlangSession* session = context.getSession();
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_FXC)))
+        {
+            fxcCategory = categorySet.add("fxc", fullTestCategory);
+        }
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GLSLANG)))
+        {
+            glslangCategory = categorySet.add("glslang", fullTestCategory);
+        }
+        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_DXC)))
+        {
+            dxcCategory = categorySet.add("dxc", fullTestCategory);
+        }
+    }
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
