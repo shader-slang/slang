@@ -697,6 +697,13 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
                 expectedSpawner.pushArgument("dxc");
                 break;
             }
+            case SLANG_DXBC_ASM:
+            {
+                expectedSpawner.pushArgument(filePath + ".hlsl");
+                expectedSpawner.pushArgument("-pass-through");
+                expectedSpawner.pushArgument("fxc");
+                break;
+            }
             default:
             {
                 expectedSpawner.pushArgument(filePath + ".glsl");
