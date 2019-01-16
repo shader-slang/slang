@@ -615,17 +615,16 @@ extern "C"
     //! SLANG_OK indicates success, and is equivalent to SLANG_MAKE_SUCCESS(SLANG_FACILITY_WIN_GENERAL, 0)
 #define SLANG_OK                          0
     //! SLANG_FAIL is the generic failure code - meaning a serious error occurred and the call couldn't complete
-#define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, 5)
+#define SLANG_FAIL                          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, 0x4005)
 
-#define SLANG_MAKE_WIN_INTERFACE_ERROR(code)    SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_INTERFACE, code)
-#define SLANG_MAKE_WIN_API_ERROR(code)          SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, code)
+#define SLANG_MAKE_WIN_GENERAL_ERROR(code)  SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_GENERAL, code)
 
     //! Functionality is not implemented
-#define SLANG_E_NOT_IMPLEMENTED             SLANG_MAKE_WIN_INTERFACE_ERROR(1)
+#define SLANG_E_NOT_IMPLEMENTED             SLANG_MAKE_WIN_GENERAL_ERROR(0x4001)
     //! Interface not be found
-#define SLANG_E_NO_INTERFACE                SLANG_MAKE_WIN_INTERFACE_ERROR(2)
+#define SLANG_E_NO_INTERFACE                SLANG_MAKE_WIN_GENERAL_ERROR(0x4002)
     //! Operation was aborted (did not correctly complete)
-#define SLANG_E_ABORT                       SLANG_MAKE_WIN_INTERFACE_ERROR(4)
+#define SLANG_E_ABORT                       SLANG_MAKE_WIN_GENERAL_ERROR(0x4004) 
 
     //! Indicates that a handle passed in as parameter to a method is invalid.
 #define SLANG_E_INVALID_HANDLE              SLANG_MAKE_ERROR(SLANG_FACILITY_WIN_API, 6)
@@ -927,6 +926,19 @@ extern "C"
     SLANG_API SlangResult spSessionCheckCompileTargetSupport(
         SlangSession*       session,
         SlangCompileTarget  target);
+
+    /*!
+    @brief Returns SLANG_OK if a the pass through support is supported for this session
+    @param session Session
+    @param target The compilation target to test
+    @return SLANG_OK if the target is available
+    SLANG_E_NOT_IMPLEMENTED if not implemented in this build
+    SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
+    SLANG_FAIL other kinds of failures */
+    SLANG_API SlangResult spSessionCheckPassThroughSupport(
+        SlangSession*       session,
+        SlangPassThrough    passThrough
+    );
 
     /*!
     @brief Add new builtin declarations to be used in subsequent compiles.

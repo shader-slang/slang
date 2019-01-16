@@ -4259,10 +4259,56 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGenContext* getContet() { return &subContextStorage; }
     };
 
+    LoweredValInfo lowerFunctionStaticConstVarDecl(
+        VarDeclBase* decl)
+    {
+        // We need to insert the constant at a level above
+        // the function being emitted. This will usually
+        // be the global scope, but it might be an outer
+        // generic if we are lowering a generic function.
+        //
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContet();
+
+        subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
+
+        IRType* subVarType = lowerType(subContext, decl->getType());
+
+        IRGlobalConstant* irConstant = subBuilder->createGlobalConstant(subVarType);
+        addVarDecorations(subContext, irConstant, decl);
+        addNameHint(context, irConstant, decl);
+        maybeSetRate(context, irConstant, decl);
+        subBuilder->addHighLevelDeclDecoration(irConstant, decl);
+
+        LoweredValInfo constantVal = LoweredValInfo::ptr(irConstant);
+        setValue(context, decl, constantVal);
+
+        if( auto initExpr = decl->initExpr )
+        {
+            NestedContext nestedInitContext(this);
+            auto initBuilder = nestedInitContext.getBuilder();
+            auto initContext = nestedInitContext.getContet();
+
+            initBuilder->setInsertInto(irConstant);
+
+            IRBlock* entryBlock = initBuilder->emitBlock();
+            initBuilder->setInsertInto(entryBlock);
+
+            LoweredValInfo initVal = lowerRValueExpr(initContext, initExpr);
+            initBuilder->emitReturn(getSimpleVal(initContext, initVal));
+        }
+
+        return constantVal;
+    }
 
     LoweredValInfo lowerFunctionStaticVarDecl(
         VarDeclBase*    decl)
     {
+        // We know the variable is `static`, but it might also be `const.
+        if(decl->HasModifier<ConstModifier>())
+            return lowerFunctionStaticConstVarDecl(decl);
+
         // A global variable may need to be generic, if one
         // of the outer declarations is generic.
         NestedContext nestedContext(this);

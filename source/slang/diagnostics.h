@@ -203,6 +203,9 @@ namespace Slang
         void diagnoseRaw(
             Severity    severity,
             char const* message);
+        void diagnoseRaw(
+            Severity    severity,
+            const UnownedStringSlice& message);
     };
 
     namespace Diagnostics
