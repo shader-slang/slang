@@ -39,9 +39,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
 
     spSetCommandLineCompilerMode(compileRequest);
 
-    // Do any app specific configuration
-    stdWriters->setRequestWriters(compileRequest);
-
     char const* appName = "slangc";
     if (argc > 0) appName = argv[0];
 
