@@ -102,16 +102,16 @@ struct IncludeHandlerImpl : IncludeHandler
         ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
 
         // Get relative path
-        ComPtr<ISlangBlob> relPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->calcRelativePath(fromPathType, fromPath.begin(), path.begin(), relPathBlob.writeRef()));
-        String relPath(StringUtil::getString(relPathBlob));
-        if (relPath.Length() <= 0)
+        ComPtr<ISlangBlob> combinedPathBlob;
+        SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
+        String combinedPath(StringUtil::getString(combinedPathBlob));
+        if (combinedPath.Length() <= 0)
         {
             return SLANG_FAIL;
         }
      
         SlangPathType pathType;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(relPath.begin(), &pathType));
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(combinedPath.begin(), &pathType));
         if (pathType != SLANG_PATH_TYPE_FILE)
         {
             return SLANG_E_NOT_FOUND;
@@ -119,7 +119,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
         // Get the canonical path
         ComPtr<ISlangBlob> canonicalPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(relPath.begin(), canonicalPathBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(combinedPath.begin(), canonicalPathBlob.writeRef()));
 
         // If the rel path exists -> the canonical path MUST exists too
         String canonicalPath(StringUtil::getString(canonicalPathBlob));
@@ -130,7 +130,7 @@ struct IncludeHandlerImpl : IncludeHandler
         }
         
         pathInfoOut.type = PathInfo::Type::Normal;
-        pathInfoOut.foundPath = relPath;
+        pathInfoOut.foundPath = combinedPath;
         pathInfoOut.canonicalPath = canonicalPath;
         return SLANG_OK;     
     }

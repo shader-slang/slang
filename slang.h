@@ -798,7 +798,7 @@ extern "C"
             const char* path,
             ISlangBlob** canonicalPathOut) = 0;
 
-        /** Get a path relative to a 'from' path.
+        /** Calculate a path combining the 'fromPath' with 'path'
 
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
@@ -808,7 +808,7 @@ extern "C"
         @param pathOut Holds the string which is the relative path. The string is held in the blob zero terminated.  
         @returns A `SlangResult` to indicate success or failure in loading the file.
         */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
             SlangPathType fromPathType,
             const char* fromPath,
             const char* path,

@@ -27,6 +27,10 @@
 #include "pragma-once-a.h"
 #include "pragma-once-b.h"
 
+// Make sure relative paths are handled
+#include "./pragma-once-a.h"
+#include "./pragma-once-a.h"
+
 // Now let's use both the function and the
 // macro, to confirm that they are both
 // defined as expected.
