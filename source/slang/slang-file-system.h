@@ -68,6 +68,15 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 {
     public:
 
+    enum CanonicalMode
+    {
+        Default,                    ///< If passed, will default to the others depending on what kind of ISlangFileSystem is passed in
+        Path,                       ///< Just use the path as is
+        SimplifiedPath,             ///< Use the input path 'simplified' (ie removing . and .. aspects)
+        Hash,                       ///< Use hashing 
+        FileSystemExt,              ///< Use the file system extended interface. 
+    };
+
     /* Cannot change order/add members without changing s_compressedResultToResult */
     enum class CompressedResult: uint8_t
     {   
@@ -103,7 +112,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         SlangPathType* pathTypeOut) SLANG_OVERRIDE;
 
         /// Ctor
-    CacheFileSystem(ISlangFileSystem* fileSystem, bool useSimplifyForCanonicalPath = false);
+    CacheFileSystem(ISlangFileSystem* fileSystem, CanonicalMode canonicalMode = CanonicalMode::Default);
         /// Dtor
     virtual ~CacheFileSystem();
 
@@ -123,6 +132,8 @@ protected:
 
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
+
+            m_pathType = SLANG_PATH_TYPE_FILE;
         }
         ~PathInfo()
         {
@@ -140,6 +151,8 @@ protected:
 
         /// For a given relPath gets a PathInfo
     PathInfo* _getPathInfo(const String& relPath);
+        /// Get path from a canonical path
+    PathInfo* _getPathInfoFromCanonical(const String& canonicalPath);
 
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
@@ -149,7 +162,7 @@ protected:
     Dictionary<String, PathInfo*> m_pathMap;        ///< Maps a path to a canonical path
     Dictionary<String, PathInfo*> m_canonicalMap;   ///< Maps a canonical path to a files contents. This OWNs the PathInfo.
 
-    bool m_useSimplifyForCanonicalPath;             ///< If set will use Path::Simplify to create 'canonical' paths
+    CanonicalMode m_canonicalMode;                  ///< Determines how 'canonicalPath' is produced. Cannot be Default in usage.
 
     ComPtr<ISlangFileSystem> m_fileSystem;          ///< Must always be set
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;    ///< Optionally set -> if not will fall back on the m_fileSystem
