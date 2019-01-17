@@ -30,7 +30,7 @@ public:
             const char* path,
             ISlangBlob** canonicalPathOut) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
         SlangPathType fromPathType,
         const char* fromPath,
         const char* path,
@@ -92,7 +92,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         const char* path,
         ISlangBlob** canonicalPathOut) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcRelativePath(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
         SlangPathType fromPathType,
         const char* fromPath,
         const char* path,

@@ -14,8 +14,8 @@ static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 
-// Cacluate a relative path, just using Path:: string processing
-static SlangResult _calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+// Cacluate a combined path, just using Path:: string processing
+static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String relPath;
     switch (fromPathType)
@@ -60,9 +60,9 @@ SlangResult DefaultFileSystem::getCanoncialPath(const char* path, ISlangBlob** c
     return SLANG_OK;
 }
 
-SlangResult DefaultFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult DefaultFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
-    return _calcRelativePath(fromPathType, fromPath, path, pathOut);
+    return _calcCombinedPath(fromPathType, fromPath, path, pathOut);
 }
 
 SlangResult SLANG_MCALL DefaultFileSystem::getPathType(
@@ -224,17 +224,17 @@ SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** can
     return SLANG_OK;
 }
 
-SlangResult CacheFileSystem::calcRelativePath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult CacheFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     // Just defer to contained implementation
     if (m_fileSystemExt)
     {
-        return m_fileSystemExt->calcRelativePath(fromPathType, fromPath, path, pathOut);
+        return m_fileSystemExt->calcCombinedPath(fromPathType, fromPath, path, pathOut);
     }
     else
     {
         // Just use the default implementation
-        return _calcRelativePath(fromPathType, fromPath, path, pathOut);
+        return _calcCombinedPath(fromPathType, fromPath, path, pathOut);
     }
 }
 
