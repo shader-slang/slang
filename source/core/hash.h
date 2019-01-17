@@ -43,7 +43,18 @@ namespace Slang
         }
         return hash;
     }
-    
+
+    inline uint64_t GetHashCode64(const char * buffer, size_t numChars)
+    {
+        // Use uints because hash requires wrap around behavior and int is undefined on over/underflows
+        uint64_t hash = 0;
+        for (size_t i = 0; i < numChars; ++i)
+        {
+            hash = uint64_t(int64_t(buffer[i])) + (hash << 6) + (hash << 16) - hash;
+        }
+        return hash;
+    }
+
 	template<int IsInt>
 	class Hash
 	{
