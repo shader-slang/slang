@@ -2134,39 +2134,74 @@ namespace Slang
 
         void CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl)
         {
-            if (function || checkingPhase == CheckingPhase::Header)
+            // A variable that didn't have an explicit type written must
+            // have its type inferred from the initial-value expresison.
+            //
+            if(!varDecl->type.exp)
             {
-                TypeExp typeExp = CheckUsableType(varDecl->type);
-                varDecl->type = typeExp;
-                if (varDecl->type.Equals(getSession()->getVoidType()))
-                {
-                    getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
-                }
-            }
+                // In this case we need to perform all checking of the
+                // variable (including semantic checking of the initial-value
+                // expression) during the first phase of checking.
 
-            if (checkingPhase == CheckingPhase::Body)
-            {
-                if (auto initExpr = varDecl->initExpr)
+                auto initExpr = varDecl->initExpr;
+                if(!initExpr)
                 {
-                    initExpr = CheckTerm(initExpr);
-                    initExpr = Coerce(varDecl->type.Ptr(), initExpr);
+                    getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
+                    varDecl->type.type = getSession()->getErrorType();
+                }
+                else
+                {
+                    initExpr = CheckExpr(initExpr);
+
+                    // TODO: We might need some additional steps here to ensure
+                    // that the type of the expression is one we are okay with
+                    // inferring. E.g., if we ever decide that integer and floating-point
+                    // literals have a distinct type from the standard int/float types,
+                    // then we would need to "decay" a literal to an explicit type here.
+
                     varDecl->initExpr = initExpr;
-
-                    // If this is an array variable, then we first want to give
-                    // it a chance to infer an array size from its initializer
-                    //
-                    // TODO(tfoley): May need to extend this to handle the
-                    // multi-dimensional case...
-                    //
-                    maybeInferArraySizeForVariable(varDecl);
-                    //
-                    // Next we want to make sure that the declared (or inferred)
-                    // size for the array meets whatever language-specific
-                    // constraints we want to enforce (e.g., disallow empty
-                    // arrays in specific cases)
-                    //
-                    validateArraySizeForVariable(varDecl);
+                    varDecl->type.type = initExpr->type;
                 }
+
+                varDecl->SetCheckState(DeclCheckState::Checked);
+            }
+            else
+            {
+                if (function || checkingPhase == CheckingPhase::Header)
+                {
+                    TypeExp typeExp = CheckUsableType(varDecl->type);
+                    varDecl->type = typeExp;
+                    if (varDecl->type.Equals(getSession()->getVoidType()))
+                    {
+                        getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+                    }
+                }
+
+                if (checkingPhase == CheckingPhase::Body)
+                {
+                    if (auto initExpr = varDecl->initExpr)
+                    {
+                        initExpr = CheckTerm(initExpr);
+                        initExpr = Coerce(varDecl->type.Ptr(), initExpr);
+                        varDecl->initExpr = initExpr;
+
+                        // If this is an array variable, then we first want to give
+                        // it a chance to infer an array size from its initializer
+                        //
+                        // TODO(tfoley): May need to extend this to handle the
+                        // multi-dimensional case...
+                        //
+                        maybeInferArraySizeForVariable(varDecl);
+                        //
+                        // Next we want to make sure that the declared (or inferred)
+                        // size for the array meets whatever language-specific
+                        // constraints we want to enforce (e.g., disallow empty
+                        // arrays in specific cases)
+                        //
+                        validateArraySizeForVariable(varDecl);
+                    }
+                }
+
             }
             varDecl->SetCheckState(getCheckedState());
         }
@@ -4289,8 +4324,19 @@ namespace Slang
             functionNode->SetCheckState(DeclCheckState::CheckingHeader);
             auto oldFunc = this->function;
             this->function = functionNode;
-            auto returnType = CheckProperType(functionNode->ReturnType);
-            functionNode->ReturnType = returnType;
+
+            auto resultType = functionNode->ReturnType;
+            if(resultType.exp)
+            {
+                resultType = CheckProperType(functionNode->ReturnType);
+            }
+            else
+            {
+                resultType = TypeExp(getSession()->getVoidType());
+            }
+            functionNode->ReturnType = resultType;
+
+
             HashSet<Name*> paraNames;
             for (auto & para : functionNode->GetParameters())
             {
@@ -9534,6 +9580,28 @@ namespace Slang
             //
             if(isGlobalShaderParameter(varDeclRef.getDecl()))
                 isLValue = false;
+
+            // Variables declared with `let` are always immutable.
+            if(varDeclRef.As<LetDecl>())
+                isLValue = false;
+
+            // Generic value parameters are always immutable
+            if(varDeclRef.As<GenericValueParamDecl>())
+                isLValue = false;
+
+            // Function parameters declared in the "modern" style
+            // are immutable unless they have an `out` or `inout` modifier.
+            if( varDeclRef.As<ModernParamDecl>() )
+            {
+                // Note: the `inout` modifier AST class inherits from
+                // the class for the `out` modifier so that we can
+                // make simple checks like this.
+                //
+                if( !varDeclRef.getDecl()->HasModifier<OutModifier>() )
+                {
+                    isLValue = false;
+                }
+            }
 
             qualType.IsLeftValue = isLValue;
             return qualType;
