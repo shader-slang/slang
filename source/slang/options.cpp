@@ -1101,8 +1101,6 @@ struct OptionsParser
 
         for(auto& rawTarget : rawTargets)
         {
-            if(rawTarget.redundantProfileSet )
-
             if( rawTarget.conflictingProfilesSet )
             {
                 sink->diagnose(SourceLoc(), Diagnostics::conflictingProfilesSpecifiedForTarget, rawTarget.format);
