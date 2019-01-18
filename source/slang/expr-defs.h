@@ -183,7 +183,7 @@ END_SYNTAX_CLASS()
 // An expression that binds a temporary variable in a local expression context
 SYNTAX_CLASS(LetExpr, Expr)
 RAW(
-    RefPtr<VarDeclBase> decl;
+    RefPtr<VarDecl> decl;
     RefPtr<Expr> body;
 )
 END_SYNTAX_CLASS()

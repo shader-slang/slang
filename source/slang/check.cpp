@@ -593,7 +593,7 @@ namespace Slang
 
                         auto interfaceDecl = interfaceDeclRef.getDecl();
 
-                        RefPtr<Variable> varDecl = new Variable();
+                        RefPtr<VarDecl> varDecl = new VarDecl();
                         varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
                         varDecl->checkState = DeclCheckState::Checked;
                         varDecl->nameAndLoc.loc = expr->loc;
@@ -1039,7 +1039,8 @@ namespace Slang
             // the scope that was in place *before* the variable was declared, but
             // this is a quick fix that at least alerts the user to how we are
             // interpreting their code.
-            if (auto varDecl = decl.As<Variable>())
+            //
+            if (auto varDecl = decl.As<VarDecl>())
             {
                 if (auto parenScope = varDecl->ParentDecl->As<ScopeDecl>())
                 {
@@ -1678,7 +1679,7 @@ namespace Slang
                     // We will go through the fields in order and try to match them
                     // up with initializer arguments.
                     //
-                    for(auto fieldDeclRef : getMembersOfType<StructField>(toStructDeclRef))
+                    for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef))
                     {
                         RefPtr<Expr> coercedArg;
                         bool argResult = tryReadArgFromInitializerList(
@@ -2806,11 +2807,6 @@ namespace Slang
             }
         }
 
-        void visitStructField(StructField* field)
-        {
-            CheckVarDeclCommon(field);
-        }
-
         bool doesSignatureMatchRequirement(
             DeclRef<CallableDecl>   satisfyingMemberDeclRef,
             DeclRef<CallableDecl>   requiredMemberDeclRef,
@@ -3649,7 +3645,7 @@ namespace Slang
                 IntegerLiteralValue defaultTag = 0;
                 for(auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
                 {
-                    if(auto explicitTagValExpr = caseDecl->initExpr)
+                    if(auto explicitTagValExpr = caseDecl->tagExpr)
                     {
                         // This tag has an initializer, so it should establish
                         // the tag value for a successor case that doesn't
@@ -3684,7 +3680,7 @@ namespace Slang
                         tagValExpr->type = QualType(tagType);
                         tagValExpr->value = defaultTag;
 
-                        caseDecl->initExpr = tagValExpr;
+                        caseDecl->tagExpr = tagValExpr;
                     }
 
                     // Default tag for the next case will be one more than
@@ -3737,7 +3733,7 @@ namespace Slang
 
                 // Need to check the init expression, if present, since
                 // that represents the explicit tag for this case.
-                if(auto initExpr = decl->initExpr)
+                if(auto initExpr = decl->tagExpr)
                 {
                     initExpr = CheckExpr(initExpr);
                     initExpr = Coerce(tagType, initExpr);
@@ -3747,7 +3743,7 @@ namespace Slang
                     // the value.
                     CheckIntegerConstantExpression(initExpr);
 
-                    decl->initExpr = initExpr;
+                    decl->tagExpr = initExpr;
                 }
             }
 
@@ -4620,7 +4616,7 @@ namespace Slang
             }
         }
 
-        void visitVariable(Variable* varDecl)
+        void visitVarDecl(VarDecl* varDecl)
         {
             CheckVarDeclCommon(varDecl);
         }
@@ -4894,6 +4890,14 @@ namespace Slang
                         break;
                     }
 
+                }
+                else if(auto enumRef = declRef.As<EnumCaseDecl>())
+                {
+                    // The cases in an `enum` declaration can also be used as constant expressions,
+                    if(auto tagExpr = getTagExpr(enumRef))
+                    {
+                        return TryConstantFoldExpr(tagExpr.Ptr());
+                    }
                 }
             }
 
@@ -9532,6 +9536,13 @@ namespace Slang
                 isLValue = false;
 
             qualType.IsLeftValue = isLValue;
+            return qualType;
+        }
+        else if( auto enumCaseDeclRef = declRef.As<EnumCaseDecl>() )
+        {
+            QualType qualType;
+            qualType.type = getType(enumCaseDeclRef);
+            qualType.IsLeftValue = false;
             return qualType;
         }
         else if (auto typeAliasDeclRef = declRef.As<TypeDefDecl>())

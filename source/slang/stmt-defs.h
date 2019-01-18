@@ -98,7 +98,7 @@ END_SYNTAX_CLASS()
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
 SYNTAX_CLASS(CompileTimeForStmt, ScopeStmt)
-    SYNTAX_FIELD(RefPtr<Variable>, varDecl)
+    SYNTAX_FIELD(RefPtr<VarDecl>, varDecl)
     SYNTAX_FIELD(RefPtr<Expr>, rangeBeginExpr)
     SYNTAX_FIELD(RefPtr<Expr>, rangeEndExpr)
     SYNTAX_FIELD(RefPtr<Stmt>, body)

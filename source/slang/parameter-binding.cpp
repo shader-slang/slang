@@ -658,10 +658,10 @@ static void diagnoseTypeFieldsMismatch(
 }
 
 static void collectFields(
-    DeclRef<AggTypeDecl>        declRef,
-    List<DeclRef<StructField>>& outFields)
+    DeclRef<AggTypeDecl>    declRef,
+    List<DeclRef<VarDecl>>& outFields)
 {
-    for( auto fieldDeclRef : getMembersOfType<StructField>(declRef) )
+    for( auto fieldDeclRef : getMembersOfType<VarDecl>(declRef) )
     {
         if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
             continue;
@@ -883,8 +883,8 @@ static bool validateTypesMatch(
                 {
                     if( auto rightStructDeclRef = rightDeclRef.As<AggTypeDecl>() )
                     {
-                        List<DeclRef<StructField>> leftFields;
-                        List<DeclRef<StructField>> rightFields;
+                        List<DeclRef<VarDecl>> leftFields;
+                        List<DeclRef<VarDecl>> rightFields;
 
                         collectFields(leftStructDeclRef, leftFields);
                         collectFields(rightStructDeclRef, rightFields);

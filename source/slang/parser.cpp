@@ -1322,17 +1322,17 @@ namespace Slang
     static RefPtr<VarDeclBase> CreateVarDeclForContext(
         ContainerDecl*  containerDecl )
     {
-        if (dynamic_cast<StructDecl*>(containerDecl) || dynamic_cast<ClassDecl*>(containerDecl))
+        if (dynamic_cast<CallableDecl*>(containerDecl))
         {
-            return new StructField();
-        }
-        else if (dynamic_cast<CallableDecl*>(containerDecl))
-        {
+            // Function parameters always use their dedicated syntax class.
+            //
             return new ParamDecl();
         }
         else
         {
-            return new Variable();
+            // Globals, locals, and member variables all use the same syntax class.
+            //
+            return new VarDecl();
         }
     }
 
@@ -2227,7 +2227,7 @@ namespace Slang
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
         RefPtr<StructDecl> bufferDataTypeDecl = new StructDecl();
-        RefPtr<Variable> bufferVarDecl = new Variable();
+        RefPtr<VarDecl> bufferVarDecl = new VarDecl();
 
         // Both declarations will have a location that points to the name
         parser->FillPosition(bufferDataTypeDecl.Ptr());
@@ -2395,7 +2395,7 @@ namespace Slang
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
         RefPtr<StructDecl> blockDataTypeDecl = new StructDecl();
-        RefPtr<Variable> blockVarDecl = new Variable();
+        RefPtr<VarDecl> blockVarDecl = new VarDecl();
 
         addModifier(blockDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
         addModifier(blockVarDecl, new ImplicitParameterGroupVariableModifier());
@@ -3135,7 +3135,7 @@ namespace Slang
 
         if(AdvanceIf(parser, TokenType::OpAssign))
         {
-            decl->initExpr = parser->ParseArgExpr();
+            decl->tagExpr = parser->ParseArgExpr();
         }
 
         return decl;
@@ -3270,7 +3270,7 @@ namespace Slang
         parser->ReadToken(TokenType::LParent);
 
         NameLoc varNameAndLoc = expectIdentifier(parser);
-        RefPtr<Variable> varDecl = new Variable();
+        RefPtr<VarDecl> varDecl = new VarDecl();
         varDecl->nameAndLoc = varNameAndLoc;
         varDecl->loc = varNameAndLoc.loc;
 

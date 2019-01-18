@@ -1223,14 +1223,24 @@ namespace Slang
         return declRef.Substitute(declRef.getDecl()->initExpr);
     }
 
+    inline RefPtr<Type> getType(DeclRef<EnumCaseDecl> const& declRef)
+    {
+        return declRef.Substitute(declRef.getDecl()->type.Ptr());
+    }
+
+    inline RefPtr<Expr> getTagExpr(DeclRef<EnumCaseDecl> const& declRef)
+    {
+        return declRef.Substitute(declRef.getDecl()->tagExpr);
+    }
+
     inline RefPtr<Type> GetTargetType(DeclRef<ExtensionDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->targetType.Ptr());
     }
     
-    inline FilteredMemberRefList<StructField> GetFields(DeclRef<StructDecl> const& declRef)
+    inline FilteredMemberRefList<VarDecl> GetFields(DeclRef<StructDecl> const& declRef)
     {
-        return getMembersOfType<StructField>(declRef);
+        return getMembersOfType<VarDecl>(declRef);
     }
 
     inline RefPtr<Type> getBaseType(DeclRef<InheritanceDecl> const& declRef)
