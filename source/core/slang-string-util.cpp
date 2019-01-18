@@ -59,7 +59,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
 
 /* static */void StringUtil::append(const char* format, va_list args, StringBuilder& buf)
 {
-    // Calculate the size 
+    // Calculate the size required (not including terminating 0)
     size_t numChars;
     {
         // Create a copy of args, as will be consumed by calcFormattedSize
@@ -69,6 +69,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
         va_end(argsCopy);
     }
 
+    // Requires + 1 , because calcFormatted appends a terminating 0
     char* dst = buf.prepareForAppend(numChars + 1);
     calcFormatted(format, args, numChars, dst);
     buf.appendInPlace(dst, numChars);

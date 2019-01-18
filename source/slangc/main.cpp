@@ -81,7 +81,10 @@ int MAIN(int argc, char** argv)
     SlangResult res;
     {
         SlangSession* session = spCreateSession(nullptr);
-        res = innerMain(StdWriters::initDefault(), session, argc, argv);
+
+        auto stdWriters = StdWriters::initDefaultSingleton();
+        
+        res = innerMain(stdWriters, session, argc, argv);
         spDestroySession(session);
     }
     return TestToolUtil::getReturnCode(res);

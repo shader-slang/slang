@@ -71,9 +71,10 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     enum CanonicalMode
     {
         Default,                    ///< If passed, will default to the others depending on what kind of ISlangFileSystem is passed in
-        Path,                       ///< Just use the path as is
-        SimplifiedPath,             ///< Use the input path 'simplified' (ie removing . and .. aspects)
-        Hash,                       ///< Use hashing 
+        Path,                       ///< Just use the path as is (old style slang behavior)
+        SimplifyPath,               ///< Use the input path 'simplified' (ie removing . and .. aspects)
+        Hash,                       ///< Use hashing
+        SimplifyPathAndHash,        ///< Tries simplifying path first, and if that doesn't work it hashes
         FileSystemExt,              ///< Use the file system extended interface. 
     };
 
@@ -153,7 +154,9 @@ protected:
     PathInfo* _getPathInfo(const String& relPath);
         /// Get path from a canonical path
     PathInfo* _getPathInfoFromCanonical(const String& canonicalPath);
-
+        
+    PathInfo* _createPathInfo(const String& relPath);
+    
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
     It is probably the case we cannot do dynamic_cast on ISlangBlob if we don't know where constructed -> if outside of slang codebase 

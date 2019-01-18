@@ -139,11 +139,12 @@ CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, CanonicalMode can
         case CanonicalMode::Default:
         case CanonicalMode::FileSystemExt:
         {
-            m_canonicalMode = m_fileSystemExt ? CanonicalMode::FileSystemExt : CanonicalMode::Hash;
+            m_canonicalMode = m_fileSystemExt ? CanonicalMode::FileSystemExt : CanonicalMode::SimplifyPathAndHash;
             break;
         }
         default: break;
     }
+
     // It can't be default
     SLANG_ASSERT(m_canonicalMode != CanonicalMode::Default);
 }
@@ -173,15 +174,8 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfoFromCanonical(const Stri
     }
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& relPath)
+CacheFileSystem::PathInfo* CacheFileSystem::_createPathInfo(const String& path)
 {
-    PathInfo** infoPtr = m_pathMap.TryGetValue(relPath);
-    if (infoPtr)
-    {
-        return *infoPtr;
-    }
-
-    PathInfo* pathInfo = nullptr;
     switch (m_canonicalMode)
     {
         case CanonicalMode::FileSystemExt:
@@ -189,43 +183,47 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& relPath)
             // Try getting the canonical path
             // Okay request from the underlying file system the canonical path
             ComPtr<ISlangBlob> canonicalBlob;
-            if (SLANG_FAILED(m_fileSystemExt->getCanoncialPath(relPath.Buffer(), canonicalBlob.writeRef())))
+            if (SLANG_FAILED(m_fileSystemExt->getCanoncialPath(path.Buffer(), canonicalBlob.writeRef())))
             {
                 // Write in result as being null ptr so not tried again
-                m_pathMap.Add(relPath, nullptr);
+                m_pathMap.Add(path, nullptr);
                 return nullptr;
             }
             // Get the path as a string
             String canonicalPath = StringUtil::getString(canonicalBlob);
-            pathInfo = _getPathInfoFromCanonical(canonicalPath);
-            break;
+            return _getPathInfoFromCanonical(canonicalPath);
         }
         case CanonicalMode::Path:
         {
-            pathInfo = _getPathInfoFromCanonical(relPath);
-            break;
+            return _getPathInfoFromCanonical(path);
         }
-        case CanonicalMode::SimplifiedPath:
+        case CanonicalMode::SimplifyPath:
         {
-            pathInfo = _getPathInfoFromCanonical(Path::Simplify(relPath.getUnownedSlice()));
-            break;
+            String simplifiedPath = Path::Simplify(path);
+            // If it still has relative elements can't uniquely identify, so give up
+            if (Path::IsRelative(simplifiedPath))
+            {
+                return nullptr;
+            }
+            return _getPathInfoFromCanonical(simplifiedPath);
         }
+        case CanonicalMode::SimplifyPathAndHash:
         case CanonicalMode::Hash:
         {
             // I can only see if this is the same file as already loaded by loading the file and doing a hash
             ComPtr<ISlangBlob> fileBlob;
-            Result res = m_fileSystem->loadFile(relPath.Buffer(), fileBlob.writeRef());
+            Result res = m_fileSystem->loadFile(path.Buffer(), fileBlob.writeRef());
             if (SLANG_FAILED(res) || fileBlob == nullptr)
             {
                 // Write in result as being null ptr so not tried again
-                m_pathMap.Add(relPath, nullptr);
+                m_pathMap.Add(path, nullptr);
                 return nullptr;
             }
 
             // Calculate the hash on the contents
             const uint64_t hash = GetHashCode64((const char*)fileBlob->getBufferPointer(), fileBlob->getBufferSize());
 
-            String hashString = Path::GetFileName(relPath);
+            String hashString = Path::GetFileName(path);
             hashString = hashString.ToLower();
 
             hashString.append(':');
@@ -233,7 +231,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& relPath)
             // The canonical name is.. combination of name and hash
             hashString.append(hash, 16);
             // We'll use the 'hashString' as the canonical path
-            pathInfo = _getPathInfoFromCanonical(hashString);
+            PathInfo* pathInfo = _getPathInfoFromCanonical(hashString);
 
             // We have the contents, so store it on the PathInfo, along with the result
             if (pathInfo->m_loadFileResult == CompressedResult::Uninitialized)
@@ -243,12 +241,36 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& relPath)
                 pathInfo->m_fileBlob = fileBlob;
             }
 
-            break;
+            return pathInfo;
         }
     }
 
-    // Add the relPath
-    m_pathMap.Add(relPath, pathInfo);
+    return nullptr;
+}
+
+CacheFileSystem::PathInfo* CacheFileSystem::_getPathInfo(const String& path)
+{
+    PathInfo** infoPtr = m_pathMap.TryGetValue(path);
+    if (infoPtr)
+    {
+        return *infoPtr;
+    }
+
+    PathInfo* pathInfo = nullptr;
+    if (m_canonicalMode == CanonicalMode::SimplifyPathAndHash)
+    {
+        // Try to lookup with the simplified path, if it's different
+        const String simplifiedPath = Path::Simplify(path);
+        // Try looking up again if the path is different
+        pathInfo = (simplifiedPath != path) ? _getPathInfo(simplifiedPath) : _createPathInfo(path);
+    }
+    else
+    {
+        pathInfo = _createPathInfo(path);
+    }
+
+    // Add the result to the cache (pathInfo could be nullptr if failed)
+    m_pathMap.Add(path, pathInfo);
     return pathInfo;
 }
 
