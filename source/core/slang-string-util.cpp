@@ -119,4 +119,34 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return ComPtr<ISlangBlob>(new StringBlob(string));
 }
 
+/* static */String StringUtil::calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar)
+{
+    if (fromChar == toChar)
+    {
+        return slice;
+    }
+
+    const UInt numChars = slice.size();
+    const char* srcChars = slice.begin();
+
+    StringBuilder builder;
+    char* dstChars = builder.prepareForAppend(numChars);
+
+    for (UInt i = 0; i < numChars; ++i)
+    {
+        char c = srcChars[i];
+        dstChars[i] = (c == fromChar) ? toChar : c;
+    }
+
+    builder.appendInPlace(dstChars, numChars);
+    return builder;
+}
+
+/* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)
+{
+    return (fromChar == toChar || string.IndexOf(fromChar) == UInt(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
+}
+
+
+
 } // namespace Slang

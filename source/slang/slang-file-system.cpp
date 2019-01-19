@@ -38,7 +38,7 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */DefaultFileSystem DefaultFileSystem::s_singleton; 
+/* static */OSFileSystem OSFileSystem::s_singleton; 
 
 template <typename T>
 static ISlangFileSystemExt* _getInterface(T* ptr, const Guid& guid)
@@ -46,33 +46,43 @@ static ISlangFileSystemExt* _getInterface(T* ptr, const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(ptr) : nullptr;
 }
 
-ISlangUnknown* DefaultFileSystem::getInterface(const Guid& guid)
+ISlangUnknown* OSFileSystem::getInterface(const Guid& guid)
 {
     return _getInterface(this, guid); 
 }
 
-SlangResult DefaultFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
+static String _fixPathDelimiters(const char* pathIn)
+{
+#if SLANG_WINDOWS_FAMILY
+    return pathIn;
+#else
+    // To allow windows style \ delimiters on other platforms, we convert to our standard delimiter
+    String path(pathIn);
+    return StringUtil::calcCharReplaced(pathIn, '\\', Path::PathDelimiter);
+#endif
+}
+
+SlangResult OSFileSystem::getCanoncialPath(const char* pathIn, ISlangBlob** canonicalPathOut)
 {
     String canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::GetCanonical(path, canonicalPath));
+    SLANG_RETURN_ON_FAIL(Path::GetCanonical(_fixPathDelimiters(pathIn), canonicalPath));
     
     *canonicalPathOut = StringUtil::createStringBlob(canonicalPath).detach();
     return SLANG_OK;
 }
 
-SlangResult DefaultFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
+    // Don't need to fix delimiters - because combine path handles both path delimiter types
     return _calcCombinedPath(fromPathType, fromPath, path, pathOut);
 }
 
-SlangResult SLANG_MCALL DefaultFileSystem::getPathType(
-    const char* path,
-    SlangPathType* pathTypeOut)
+SlangResult SLANG_MCALL OSFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
-    return Path::GetPathType(path, pathTypeOut);   
+    return Path::GetPathType(_fixPathDelimiters(pathIn), pathTypeOut);
 }
 
-SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
 {
     // Default implementation that uses the `core` libraries facilities for talking to the OS filesystem.
     //
@@ -80,6 +90,7 @@ SlangResult DefaultFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     // a user could create a build of Slang that doesn't include any OS
     // filesystem calls.
 
+    const String path = _fixPathDelimiters(pathIn);
     if (!File::Exists(path))
     {
         return SLANG_E_NOT_FOUND;

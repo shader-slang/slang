@@ -11,7 +11,7 @@
 namespace Slang
 {
 
-class DefaultFileSystem : public ISlangFileSystemExt
+class OSFileSystem : public ISlangFileSystemExt
 {
 public:
     // ISlangUnknown 
@@ -45,12 +45,12 @@ public:
 
 private:
         /// Make so not constructible
-    DefaultFileSystem() {}
-    virtual ~DefaultFileSystem() {}
+    OSFileSystem() {}
+    virtual ~OSFileSystem() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
 
-    static DefaultFileSystem s_singleton;
+    static OSFileSystem s_singleton;
 };
 
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
@@ -154,7 +154,9 @@ protected:
     PathInfo* _getPathInfo(const String& relPath);
         /// Get path from a canonical path
     PathInfo* _getPathInfoFromCanonical(const String& canonicalPath);
-        
+        /// Given a path works out a canonical path, based on the canonicalMode
+    SlangResult _calcCanonicalPath(const String& path, String& outCanonicalPath);
+
     PathInfo* _createPathInfo(const String& relPath);
     
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 

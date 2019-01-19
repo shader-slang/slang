@@ -316,7 +316,7 @@ CompileRequest::CompileRequest(Session* session)
 
     // Set up the default file system
     SLANG_ASSERT(fileSystem == nullptr);
-    fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
+    fileSystemExt = new CacheFileSystem(OSFileSystem::getSingleton());
 }
 
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
@@ -1251,7 +1251,7 @@ SLANG_API void spSetFileSystem(
     // Set up fileSystemExt appropriately
     if (fileSystem == nullptr)
     {
-        req->fileSystemExt = new Slang::CacheFileSystem(Slang::DefaultFileSystem::getSingleton());
+        req->fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getSingleton());
     }
     else
     {
