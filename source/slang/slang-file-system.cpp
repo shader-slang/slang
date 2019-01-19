@@ -240,15 +240,44 @@ SlangResult CacheFileSystem::_calcCanonicalPath(const String& path, String& outC
     return SLANG_FAIL;
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathInfo(const String& path)
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalPathInfo(const String& path)
 {
-    // First try with the name as it is
-    PathInfo** infoPtr = m_pathMap.TryGetValue(path);
-    if (infoPtr)
+    // Okay we'll need to look up canonically then...
+    ComPtr<ISlangBlob> fileContents;
+    String canonicalPath;
+
+    SlangResult res = _calcCanonicalPath(path, canonicalPath, fileContents);
+    if (SLANG_FAILED(res))
     {
-        return *infoPtr;
+        // Was not able to create a canonical path.. so mark in path map the problem
+        return nullptr;
     }
 
+    // Now try looking up by canonical path -> add if not found
+    PathInfo* pathInfo = nullptr;
+    if (!m_canonicalMap.TryGetValue(canonicalPath, pathInfo))
+    {
+        // Create with found canonicalPath
+        pathInfo = new PathInfo(canonicalPath);
+        m_canonicalMap.Add(canonicalPath, pathInfo);
+    }
+
+    // At this point they must have same canonicalPath
+    SLANG_ASSERT(pathInfo->getCanonicalPath() == canonicalPath);
+
+    // If we have the file contents (because of calcing canonical), and there isn't a read fileblob already
+    // store the data as if read, so doesn't get read again
+    if (fileContents && !pathInfo->m_fileBlob)
+    {
+        pathInfo->m_fileBlob = fileContents;
+        pathInfo->m_loadFileResult = CompressedResult::Ok;
+    }
+
+    return pathInfo;
+}
+
+CacheFileSystem::PathInfo* CacheFileSystem::_createPathInfo(const String& path)
+{
     // If we can simplify try that
     if (_canSimplifyPath(m_canonicalMode))
     {
@@ -262,50 +291,23 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathInfo(const String& p
         }
     }
 
-    // Okay we'll need to look up canonically then...
-    ComPtr<ISlangBlob> fileContents;
-    String canonicalPath;
+    // Look up or create via turning path into 'canonicalPath'
+    return _getOrCreateCanonicalPathInfo(path);
+}
 
-    SlangResult res = _calcCanonicalPath(path, canonicalPath, fileContents);
-
-    if (SLANG_FAILED(res))
-    {
-        // Was not able to create a canonical path.. so mark in path map the problem
-        m_pathMap.Add(path, nullptr);
-        return nullptr;
-    }
-
-    // Now try looking up by canonical path -> add if not found
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathInfo(const String& path)
+{
+    // Lookup in m_pathMap cache
     PathInfo* pathInfo;
+    if (m_pathMap.TryGetValue(path, pathInfo))
     {
-        // First see if we have it.. if not add it
-        infoPtr = m_canonicalMap.TryGetValue(canonicalPath);
-        if (infoPtr)
-        {
-            pathInfo = *infoPtr;
-        }
-        else
-        {
-            // Create with found canonicalPath
-            pathInfo = new PathInfo(canonicalPath);
-            m_canonicalMap.Add(canonicalPath, pathInfo);
-        }
+        // Found so done
+        return pathInfo;
     }
-    
-    // At this point they must have same canonicalPath
-    SLANG_ASSERT(StringUtil::getString(pathInfo->m_canonicalPath) == canonicalPath);
-
-    // Add to the path map
+    // Create a path info (can return nullptr if failed)
+    // We store the result in the m_pathMapCache
+    pathInfo = _createPathInfo(path);
     m_pathMap.Add(path, pathInfo);
-
-    // If we have the file contents (because of calcing canonical), and there isn't a read fileblob already
-    // store the data as if read, so doesn't get read again
-    if (fileContents && !pathInfo->m_fileBlob)
-    {
-        pathInfo->m_fileBlob = fileContents;
-        pathInfo->m_loadFileResult = CompressedResult::Ok;
-    }
-    
     return pathInfo;
 }
 

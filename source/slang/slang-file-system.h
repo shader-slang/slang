@@ -154,7 +154,14 @@ protected:
     PathInfo* _getOrCreatePathInfo(const String& path);
         /// Given a path works out a canonical path, based on the canonicalMode. outFileContents will be set if file had to be read to produce the canonicalPath (ie with Hash)
     SlangResult _calcCanonicalPath(const String& path, String& outCanonicalPath, ComPtr<ISlangBlob>& outFileContents);
-    
+
+        /// Turns the path into a canonical path, and then tries to look up in the canonicalPathMap.
+    PathInfo* _getOrCreateCanonicalPathInfo(const String& path);
+
+
+    PathInfo* _createPathInfo(const String& path);
+
+
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
     It is probably the case we cannot do dynamic_cast on ISlangBlob if we don't know where constructed -> if outside of slang codebase 
