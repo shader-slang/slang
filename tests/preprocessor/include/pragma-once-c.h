@@ -2,4 +2,6 @@
 
 // Used by the `pragma-once.slang` test
 
-#define ONLY_DEFINED_ONCE
+#pragma once
+
+#define ONLY_DEFINED_ONCE_C
