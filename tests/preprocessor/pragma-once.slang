@@ -36,6 +36,9 @@
 
 #include "../preprocessor/./pragma-once-a.h"
 
+#include "include/pragma-once-c.h"
+#include "./include\pragma-once-c.h"
+
 // Now let's use both the function and the
 // macro, to confirm that they are both
 // defined as expected.
