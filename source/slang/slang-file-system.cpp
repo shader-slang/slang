@@ -240,9 +240,9 @@ SlangResult CacheFileSystem::_calcCanonicalPath(const String& path, String& outC
     return SLANG_FAIL;
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalPathInfo(const String& path)
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalCacheInfo(const String& path)
 {
-    // Okay we'll need to look up canonically then...
+    // Use the path to produce canonicalPath information
     ComPtr<ISlangBlob> fileContents;
     String canonicalPath;
 
@@ -253,7 +253,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalPathInfo(const 
         return nullptr;
     }
 
-    // Now try looking up by canonical path -> add if not found
+    // Now try looking up by canonical path. If not found, add a new result
     PathInfo* pathInfo = nullptr;
     if (!m_canonicalMap.TryGetValue(canonicalPath, pathInfo))
     {
@@ -276,37 +276,36 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalPathInfo(const 
     return pathInfo;
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_createPathInfo(const String& path)
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateSimplifiedPathCacheInfo(const String& path)
 {
-    // If we can simplify try that
+    // If we can simplify the path, try looking up in path cache with simplified path (as long as it's different!)
     if (_canSimplifyPath(m_canonicalMode))
     {
-        // Try to lookup with the simplified path, if it's different
         const String simplifiedPath = Path::Simplify(path);
         // Only lookup if the path is different - because otherwise will recurse forever...
         if (simplifiedPath != path)
         {
-            // This is a recursive call, that will mean the original path and the simplified path will be added to cache
-            return _getOrCreatePathInfo(simplifiedPath);
+            // This is a recursive call - and will ensure the simplified path is added to the cache
+            return _getOrCreatePathCacheInfo(simplifiedPath);
         }
     }
 
-    // Look up or create via turning path into 'canonicalPath'
-    return _getOrCreateCanonicalPathInfo(path);
+    return  _getOrCreateCanonicalCacheInfo(path);
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathInfo(const String& path)
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathCacheInfo(const String& path)
 {
-    // Lookup in m_pathMap cache
+    // Lookup in path cache
     PathInfo* pathInfo;
     if (m_pathMap.TryGetValue(path, pathInfo))
     {
         // Found so done
         return pathInfo;
     }
-    // Create a path info (can return nullptr if failed)
-    // We store the result in the m_pathMapCache
-    pathInfo = _createPathInfo(path);
+
+    // Try getting or creating taking into account possible path simplification
+    pathInfo = _getOrCreateSimplifiedPathCacheInfo(path);
+    // Always add the result to the path cache (even if null)
     m_pathMap.Add(path, pathInfo);
     return pathInfo;
 }
@@ -315,7 +314,7 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
 {
     *blobOut = nullptr;
     String path(pathIn);
-    PathInfo* info = _getOrCreatePathInfo(path);
+    PathInfo* info = _getOrCreatePathCacheInfo(path);
     if (!info)
     {
         return SLANG_FAIL;
@@ -336,7 +335,7 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
 
 SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
 {
-    PathInfo* info = _getOrCreatePathInfo(path);
+    PathInfo* info = _getOrCreatePathCacheInfo(path);
     if (!info)
     {
         return SLANG_E_NOT_FOUND;
@@ -363,7 +362,7 @@ SlangResult CacheFileSystem::calcCombinedPath(SlangPathType fromPathType, const 
 SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
     String path(pathIn);
-    PathInfo* info = _getOrCreatePathInfo(path);
+    PathInfo* info = _getOrCreatePathCacheInfo(path);
     if (!info)
     {
         return SLANG_E_NOT_FOUND;

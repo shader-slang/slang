@@ -149,18 +149,16 @@ protected:
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
     };
-
-        /// For a given path gets a PathInfo. Can return nullptr, if it is not possible to create the PathInfo for some reason
-    PathInfo* _getOrCreatePathInfo(const String& path);
         /// Given a path works out a canonical path, based on the canonicalMode. outFileContents will be set if file had to be read to produce the canonicalPath (ie with Hash)
     SlangResult _calcCanonicalPath(const String& path, String& outCanonicalPath, ComPtr<ISlangBlob>& outFileContents);
 
+
+        /// For a given path gets a PathInfo. Can return nullptr, if it is not possible to create the PathInfo for some reason
+    PathInfo* _getOrCreatePathCacheInfo(const String& path);
         /// Turns the path into a canonical path, and then tries to look up in the canonicalPathMap.
-    PathInfo* _getOrCreateCanonicalPathInfo(const String& path);
-
-
-    PathInfo* _createPathInfo(const String& path);
-
+    PathInfo* _getOrCreateCanonicalCacheInfo(const String& path);
+        /// Will simplify the path (if possible) to lookup on the pathCache else will create on canonicalCache
+    PathInfo* _getOrCreateSimplifiedPathCacheInfo(const String& path);
 
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
