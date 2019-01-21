@@ -49,6 +49,9 @@ struct Options
     // generate extra output (notably: command lines we run)
     bool shouldBeVerbose = false;
 
+    // Use verbose paths
+    bool verbosePaths = false;
+
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
 

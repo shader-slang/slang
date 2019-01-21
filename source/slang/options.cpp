@@ -456,6 +456,10 @@ struct OptionsParser
                 {
                     requestImpl->useSerialIRBottleneck = true;
                 }
+                else if (argStr == "-verbose-paths")
+                {
+                    requestImpl->mSink.flags |= DiagnosticSink::Flag::VerbosePath;
+                }
                 else if (argStr == "-verify-debug-serial-ir")
                 {
                     requestImpl->verifyDebugSerialization = true;
