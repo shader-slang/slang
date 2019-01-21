@@ -31,6 +31,18 @@
 #include "./pragma-once-a.h"
 #include "./pragma-once-a.h"
 
+#include ".\pragma-once-a.h"
+#include "./include\../pragma-once-a.h"
+
+#include "../preprocessor/./pragma-once-a.h"
+
+#include "include/pragma-once-c.h"
+#include "./include\pragma-once-c.h"
+
+#ifndef ONLY_DEFINED_ONCE_C
+#undef BAR
+#endif
+
 // Now let's use both the function and the
 // macro, to confirm that they are both
 // defined as expected.

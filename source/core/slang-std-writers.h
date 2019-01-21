@@ -8,9 +8,10 @@ namespace Slang
 {
 
 /* Holds standard writers for the channels */
-class StdWriters
+class StdWriters: public RefObject
 {
 public:
+
     ISlangWriter * getWriter(SlangWriterChannel chan) const { return m_writers[chan]; }
     void setWriter(SlangWriterChannel chan, ISlangWriter* writer) { m_writers[chan] = writer; }
 
@@ -21,9 +22,8 @@ public:
     StdWriters() {}
 
         /// Initialize a default context
-    static StdWriters* initDefault();
-
-    static StdWriters* getDefault();
+    static RefPtr<StdWriters> createDefault();
+    static RefPtr<StdWriters> initDefaultSingleton();
 
     static StdWriters* getSingleton() { return s_singleton; }
     static void setSingleton(StdWriters* context) { s_singleton = context;  }

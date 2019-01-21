@@ -63,6 +63,10 @@ struct StringUtil
         /// Returns an empty string if blob is nullptr 
     static String getString(ISlangBlob* blob);
 
+        /// Given a string or slice, replaces all instances of fromChar with toChar
+    static String calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar);
+    static String calcCharReplaced(const String& string, char fromChar, char toChar);
+    
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 };

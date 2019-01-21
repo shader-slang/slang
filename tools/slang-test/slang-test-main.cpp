@@ -1818,7 +1818,7 @@ void runTestsInDirectory(
 
 SlangResult innerMain(int argc, char** argv)
 {
-    StdWriters::initDefault();
+    auto stdWriters = StdWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
     TestContext context;

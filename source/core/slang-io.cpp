@@ -174,6 +174,21 @@ namespace Slang
         }
     }
 
+    /* static */bool Path::IsRelative(const UnownedStringSlice& path)
+    {
+        List<UnownedStringSlice> split;
+        Split(path, split);
+
+        for (const auto& cur : split)
+        {
+            if (cur == "." || cur == "..")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /* static */String Path::Simplify(const UnownedStringSlice& path)
     {
         List<UnownedStringSlice> split;
@@ -208,7 +223,7 @@ namespace Slang
         {
             split.Add(UnownedStringSlice::fromLiteral("."));
         }
-
+   
         // Reconstruct the string
         StringBuilder builder;
         for (int i = 0; i < int(split.Count()); i++)
@@ -219,6 +234,7 @@ namespace Slang
             }
             builder.Append(split[i]);
         }
+
         return builder;
     }
 

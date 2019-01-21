@@ -6,29 +6,28 @@ namespace Slang
 
 /* static */StdWriters* StdWriters::s_singleton = nullptr;
 
-/* static */StdWriters* StdWriters::getDefault()
+/* static */RefPtr<StdWriters> StdWriters::createDefault()
 {
-    static StdWriters* s_context = nullptr;
+    RefPtr<StdWriters> stdWriters(new StdWriters);
 
-    if (!s_context)
-    {
-        static FileWriter s_stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned | WriterFlag::AutoFlush);
-        static FileWriter s_stdOut(stdout, WriterFlag::IsStatic | WriterFlag::IsUnowned | WriterFlag::AutoFlush);
+    RefPtr<FileWriter> stdError(new FileWriter(stderr, WriterFlag::AutoFlush));
+    RefPtr<FileWriter> stdOut(new FileWriter(stdout, WriterFlag::AutoFlush));
 
-        static StdWriters s_contextVar;
-        s_context = &s_contextVar;
-
-        s_context->setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &s_stdError);
-        s_context->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &s_stdOut);
-    }
-    return s_context;
+    stdWriters->setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdError);
+    stdWriters->setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOut);
+    
+    return stdWriters;
 }
 
-/* static */StdWriters* StdWriters::initDefault()
+/* static */RefPtr<StdWriters> StdWriters::initDefaultSingleton()
 {
-    StdWriters* context = getDefault();
-    setSingleton(context);
-    return context;
+    if (s_singleton)
+    {
+        return s_singleton;
+    }
+    auto defaults = createDefault();
+    setSingleton(defaults);
+    return defaults;
 }
 
 void StdWriters::setRequestWriters(SlangCompileRequest* request)
