@@ -26,7 +26,7 @@ public:
         ISlangBlob**    outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUniqueIdentity(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
             const char* path,
             ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
 
@@ -39,6 +39,12 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
         const char* path,
         SlangPathType* pathTypeOut) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
+        const char* path,
+        ISlangBlob** outCanonicalPath);
+
+    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() {}
 
         /// Get a default instance
     static ISlangFileSystemExt* getSingleton() { return &s_singleton; }
@@ -95,7 +101,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         ISlangBlob**    outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUniqueIdentity(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
         const char* path,
         ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
 
@@ -108,6 +114,12 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
         const char* path,
         SlangPathType* outPathType) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
+        const char* path,
+        ISlangBlob** outCanonicalPath);
+
+    virtual SLANG_NO_THROW void SLANG_MCALL clearCache();
 
         /// Ctor
     CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default);
@@ -130,31 +142,32 @@ protected:
 
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
+            m_getCanonicalPathResult = CompressedResult::Uninitialized;
 
             m_pathType = SLANG_PATH_TYPE_FILE;
         }
-        ~PathInfo()
-        {
-            m_uniqueIdentity->release();
-        }
+        
             /// Get the unique identity path as a string
         const String& getUniqueIdentity() const { SLANG_ASSERT(m_uniqueIdentity); return m_uniqueIdentity->getString(); }
 
-        StringBlob*  m_uniqueIdentity;                         
+        RefPtr<StringBlob> m_uniqueIdentity;
         CompressedResult m_loadFileResult;              
-        CompressedResult m_getPathTypeResult;    
+        CompressedResult m_getPathTypeResult;
+        CompressedResult m_getCanonicalPathResult;
+
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
+        RefPtr<StringBlob> m_canonicalPath;
     };
         /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode. outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
     SlangResult _calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents);
 
         /// For a given path gets a PathInfo. Can return nullptr, if it is not possible to create the PathInfo for some reason
-    PathInfo* _getOrCreatePathCacheInfo(const String& path);
+    PathInfo* _resolvePathCacheInfo(const String& path);
         /// Turns the path into a uniqueIdentity, and then tries to look up in the uniqueIdentityMap.
-    PathInfo* _getOrCreateUniqueIdentityCacheInfo(const String& path);
+    PathInfo* _resolveUniqueIdentityCacheInfo(const String& path);
         /// Will simplify the path (if possible) to lookup on the pathCache else will create on uniqueIdentityMap
-    PathInfo* _getOrCreateSimplifiedPathCacheInfo(const String& path);
+    PathInfo* _resolveSimplifiedPathCacheInfo(const String& path);
 
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
@@ -167,7 +180,7 @@ protected:
     UniqueIdentityMode m_uniqueIdentityMode;            ///< Determines how the 'uniqueIdentity' is produced. Cannot be Default in usage.
 
     ComPtr<ISlangFileSystem> m_fileSystem;              ///< Must always be set
-    ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if not will fall back on the m_fileSystem
+    ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if nullptr will fall back on the m_fileSystem and emulate all the other methods of ISlangFileSystemExt
 };
 
 }

@@ -2005,7 +2005,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     RefPtr<IRModule> irReadModule;
 
     SourceManager workSourceManager;
-    workSourceManager.initialize(sourceManager);
+    workSourceManager.initialize(sourceManager, nullptr);
 
     {
         IRSerialReader reader;

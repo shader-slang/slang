@@ -9,15 +9,12 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-const String PathInfo::getMostUniquePath() const
+const String PathInfo::getMostUniqueIdentity() const
 {
     switch (type)
     {
-        case Type::Normal:      
-        case Type::FoundPath:
-        {
-            return foundPath;
-        }
+        case Type::Normal:      return uniqueIdentity;
+        case Type::FoundPath:   return foundPath;
         default:                return "";
     }
 }
@@ -92,7 +89,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
 {
-    StringSlicePool::Handle pathHandle = m_sourceManager->getStringSlicePool().add(path.getUnownedSlice());
+    StringSlicePool::Handle pathHandle = getSourceManager()->getStringSlicePool().add(path.getUnownedSlice());
     return addLineDirective(directiveLoc, pathHandle, line);
 }
 
@@ -166,7 +163,7 @@ PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
     }
     else
     {
-        return PathInfo::makePath(m_sourceManager->getStringSlicePool().getSlice(pathHandle));
+        return PathInfo::makePath(getSourceManager()->getStringSlicePool().getSlice(pathHandle));
     }
 }
 
@@ -297,7 +294,8 @@ void SourceFile::setContents(const String& content)
     setContents(contentBlob);
 }
 
-SourceFile::SourceFile(const PathInfo& pathInfo, size_t contentSize) :
+SourceFile::SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize) :
+    m_sourceManager(sourceManager),
     m_pathInfo(pathInfo),
     m_contentSize(contentSize)
 {
@@ -305,14 +303,37 @@ SourceFile::SourceFile(const PathInfo& pathInfo, size_t contentSize) :
 
 SourceFile::~SourceFile()
 {
+}
 
+String SourceFile::calcVerbosePath() const
+{
+    ISlangFileSystemExt* fileSystemExt = getSourceManager()->getFileSystemExt();
+
+    if (fileSystemExt)
+    {
+        String canonicalPath;
+        ComPtr<ISlangBlob> canonicalPathBlob;
+        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.Buffer(), canonicalPathBlob.writeRef())))
+        {
+            canonicalPath = StringUtil::getString(canonicalPathBlob);
+        }
+        if (canonicalPath.Length() > 0)
+        {
+            return canonicalPath;
+        }
+    }
+
+    return m_pathInfo.foundPath;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void SourceManager::initialize(
-    SourceManager*  p)
+    SourceManager*  p,
+    ISlangFileSystemExt* fileSystemExt)
 {
+    m_fileSystemExt = fileSystemExt;
+
     m_parent = p;
 
     if( p )
@@ -376,14 +397,14 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 
 SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
-    SourceFile* sourceFile = new SourceFile(pathInfo, contentSize);
+    SourceFile* sourceFile = new SourceFile(this, pathInfo, contentSize);
     m_sourceFiles.Add(sourceFile);
     return sourceFile;
 }
 
 SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
-    SourceFile* sourceFile = new SourceFile(pathInfo, contents.Length());
+    SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.Length());
     m_sourceFiles.Add(sourceFile);
     sourceFile->setContents(contents);
     return sourceFile;
@@ -391,7 +412,7 @@ SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, 
 
 SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
 {
-    SourceFile* sourceFile = new SourceFile(pathInfo, blob->getBufferSize());
+    SourceFile* sourceFile = new SourceFile(this, pathInfo, blob->getBufferSize());
     m_sourceFiles.Add(sourceFile);
     sourceFile->setContents(blob);
     return sourceFile;
@@ -400,7 +421,7 @@ SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, IS
 SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
 {
     SourceRange range = allocateSourceRange(sourceFile->getContentSize());
-    SourceView* sourceView = new SourceView(this, sourceFile, range);
+    SourceView* sourceView = new SourceView(sourceFile, range);
     m_sourceViews.Add(sourceView);
 
     return sourceView;

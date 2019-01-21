@@ -56,8 +56,8 @@ struct PathInfo
         /// True if has a regular found path
     SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath; }
 
-        /// If not the regular path, otherwise the empty string.
-    const String getMostUniquePath() const;
+        /// Returns the 'most unique' identity for the path. If has a 'uniqueIdentity' returns that, else the foundPath, else "".
+    const String getMostUniqueIdentity() const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown", String() }; }
@@ -139,6 +139,9 @@ struct SourceRange
     SourceLoc end;
 };
 
+// Pre-declare
+struct SourceManager;
+
 // A logical or physical storage object for a range of input code
 // that has logically contiguous source locations.
 class SourceFile 
@@ -178,13 +181,20 @@ public:
         /// Set the content as a string
     void setContents(const String& content);
 
+        /// Calculate a display path -> can canonicalize if necessary
+    String calcVerbosePath() const;
+
+        /// Get the source manager this was created on
+    SourceManager* getSourceManager() const { return m_sourceManager; }
+
         /// Ctor
-    SourceFile(const PathInfo& pathInfo, size_t contentSize);
+    SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
         /// Dtor
     ~SourceFile();
 
     protected:
 
+    SourceManager * m_sourceManager;       ///< The source manager this belongs to
     PathInfo m_pathInfo;                  ///< The path The logical file path to report for locations inside this span.
     ComPtr<ISlangBlob> m_contentBlob;     ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
     UnownedStringSlice m_content;         ///< The actual contents of the file.
@@ -210,8 +220,6 @@ struct HumaneSourceLoc
     Int     column = 0;
 };
 
-// Pre-declare
-struct SourceManager;
 
 /* A SourceView maps to a single span of SourceLoc range and is equivalent to a single include or more precisely use of a source file. 
 It is distinct from a SourceFile - because a SourceFile may be included multiple times, with different interpretations (depending 
@@ -257,7 +265,7 @@ class SourceView
         /// Get the source file holds the contents this view 
     SourceFile* getSourceFile() const { return m_sourceFile; }
         /// Get the source manager
-    SourceManager* getSourceManager() const { return m_sourceManager; }
+    SourceManager* getSourceManager() const { return m_sourceFile->getSourceManager(); }
 
         /// Get the associated 'content' (the source text)
     const UnownedStringSlice& getContent() const { return m_sourceFile->getContent(); }
@@ -273,8 +281,7 @@ class SourceView
     PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Ctor
-    SourceView(SourceManager* sourceManager, SourceFile* sourceFile, SourceRange range):
-        m_sourceManager(sourceManager),
+    SourceView(SourceFile* sourceFile, SourceRange range):
         m_range(range),
         m_sourceFile(sourceFile)
     {
@@ -283,7 +290,6 @@ class SourceView
     protected:
     PathInfo _getPathInfo(StringSlicePool::Handle pathHandle) const;
 
-    SourceManager* m_sourceManager;     /// Get the manager this belongs to 
     SourceRange m_range;                ///< The range that this SourceView applies to
     SourceFile* m_sourceFile;           ///< The source file. Can hold the line breaks
     List<Entry> m_entries;              ///< An array entries describing how we should interpret a range, starting from the start location. 
@@ -292,7 +298,7 @@ class SourceView
 struct SourceManager
 {
         // Initialize a source manager, with an optional parent
-    void initialize(SourceManager* parent);
+    void initialize(SourceManager* parent, ISlangFileSystemExt* fileSystemExt);
 
         /// Allocate a range of SourceLoc locations, these can be used to identify a specific location in the source
     SourceRange allocateSourceRange(UInt size);
@@ -325,6 +331,11 @@ struct SourceManager
     SourceFile* findSourceFileRecursively(const String& uniqueIdentity) const;
         /// Find if the source file is defined on this manager.
     SourceFile* findSourceFile(const String& uniqueIdentity) const;
+
+        /// Get the file system associated with this source manager
+    ISlangFileSystemExt* getFileSystemExt() const { return m_fileSystemExt;  }
+        /// Get the file system associated with this source manager
+    void setFileSystemExt(ISlangFileSystemExt* fileSystemExt) { m_fileSystemExt = fileSystemExt;  }
 
         /// Add a source file, uniqueIdentity must be unique for this manager AND any parents
     void addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile);
@@ -375,7 +386,9 @@ struct SourceManager
     MemoryArena m_memoryArena;
 
     // Maps uniqueIdentities to source files
-    Dictionary<String, SourceFile*> m_sourceFileMap;  
+    Dictionary<String, SourceFile*> m_sourceFileMap;
+
+    ComPtr<ISlangFileSystemExt> m_fileSystemExt;
 };
 
 } // namespace Slang
