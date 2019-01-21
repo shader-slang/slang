@@ -117,21 +117,21 @@ struct IncludeHandlerImpl : IncludeHandler
             return SLANG_E_NOT_FOUND;
         }
 
-        // Get the canonical path
-        ComPtr<ISlangBlob> canonicalPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(combinedPath.begin(), canonicalPathBlob.writeRef()));
+        // Get the uniqueIdentity
+        ComPtr<ISlangBlob> uniqueIdentityBlob;
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
 
-        // If the rel path exists -> the canonical path MUST exists too
-        String canonicalPath(StringUtil::getString(canonicalPathBlob));
-        if (canonicalPath.Length() <= 0)
+        // If the rel path exists -> a uniqueIdentity MUST exists too
+        String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
+        if (uniqueIdentity.Length() <= 0)
         {   
-            // Canonical path can't be empty
+            // Unique identity can't be empty
             return SLANG_FAIL;
         }
         
         pathInfoOut.type = PathInfo::Type::Normal;
         pathInfoOut.foundPath = combinedPath;
-        pathInfoOut.canonicalPath = canonicalPath;
+        pathInfoOut.uniqueIdentity = uniqueIdentity;
         return SLANG_OK;     
     }
 
@@ -985,7 +985,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    // We are going to allow canonicalPath to be able to hold strings other than paths (like hashes), therefore we have to load via the found path 
+    // We have to load via the found path - as that is how file was originally loaded 
     if (SLANG_FAILED(includeHandler.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
         this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);

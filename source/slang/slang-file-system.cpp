@@ -62,12 +62,13 @@ static String _fixPathDelimiters(const char* pathIn)
 #endif
 }
 
-SlangResult OSFileSystem::getCanoncialPath(const char* pathIn, ISlangBlob** canonicalPathOut)
+SlangResult OSFileSystem::getUniqueIdentity(const char* pathIn, ISlangBlob** outUniqueIdentity)
 {
+    // By default we use the canonical path to uniquely identify a file
     String canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::GetCanonical(_fixPathDelimiters(pathIn), canonicalPath));
     
-    *canonicalPathOut = StringUtil::createStringBlob(canonicalPath).detach();
+    *outUniqueIdentity = StringUtil::createStringBlob(canonicalPath).detach();
     return SLANG_OK;
 }
 
@@ -138,44 +139,45 @@ ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
     return _getInterface(this, guid);
 }
 
-CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, CanonicalMode canonicalMode) :
+CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode) :
     m_fileSystem(fileSystem),
-    m_canonicalMode(canonicalMode)
+    m_uniqueIdentityMode(uniqueIdentityMode)
 {
     // Try to get the more sophisticated interface
     fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
 
-    switch (canonicalMode)
+    switch (uniqueIdentityMode)
     {
-        case CanonicalMode::Default:
-        case CanonicalMode::FileSystemExt:
+        case UniqueIdentityMode::Default:
+        case UniqueIdentityMode::FileSystemExt:
         {
-            m_canonicalMode = m_fileSystemExt ? CanonicalMode::FileSystemExt : CanonicalMode::SimplifyPathAndHash;
+            // If it's not a complete file system, we will default to SimplifyAndHash style by default
+            m_uniqueIdentityMode = m_fileSystemExt ? UniqueIdentityMode::FileSystemExt : UniqueIdentityMode::SimplifyPathAndHash;
             break;
         }
         default: break;
     }
 
     // It can't be default
-    SLANG_ASSERT(m_canonicalMode != CanonicalMode::Default);
+    SLANG_ASSERT(m_uniqueIdentityMode != UniqueIdentityMode::Default);
 }
 
 CacheFileSystem::~CacheFileSystem()
 {
-    for (const auto& pair : m_canonicalMap)
+    for (const auto& pair : m_uniqueIdentityMap)
     {
         delete pair.Value;
     }
 }
 
 // Determines if we can simplify a path for a given mode
-static bool _canSimplifyPath(CacheFileSystem::CanonicalMode mode)
+static bool _canSimplifyPath(CacheFileSystem::UniqueIdentityMode mode)
 {
-    typedef CacheFileSystem::CanonicalMode CanonicalMode;
+    typedef CacheFileSystem::UniqueIdentityMode UniqueIdentityMode;
     switch (mode)
     {
-        case CanonicalMode::SimplifyPath:
-        case CanonicalMode::SimplifyPathAndHash:
+        case UniqueIdentityMode::SimplifyPath:
+        case UniqueIdentityMode::SimplifyPathAndHash:
         {
             return true;
         }
@@ -186,33 +188,32 @@ static bool _canSimplifyPath(CacheFileSystem::CanonicalMode mode)
     }
 }
 
-SlangResult CacheFileSystem::_calcCanonicalPath(const String& path, String& outCanonicalPath, ComPtr<ISlangBlob>& outFileContents)
+SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents)
 {
-    switch (m_canonicalMode)
+    switch (m_uniqueIdentityMode)
     {
-        case CanonicalMode::FileSystemExt:
+        case UniqueIdentityMode::FileSystemExt:
         {
-            // Try getting the canonical path
-            // Okay request from the underlying file system the canonical path
-            ComPtr<ISlangBlob> canonicalBlob;
-            SLANG_RETURN_ON_FAIL(m_fileSystemExt->getCanoncialPath(path.Buffer(), canonicalBlob.writeRef()));
+            // Try getting the uniqueIdentity by asking underlying file system
+            ComPtr<ISlangBlob> uniqueIdentity;
+            SLANG_RETURN_ON_FAIL(m_fileSystemExt->getUniqueIdentity(path.Buffer(), uniqueIdentity.writeRef()));
             // Get the path as a string
-            outCanonicalPath = StringUtil::getString(canonicalBlob);
+            outUniqueIdentity = StringUtil::getString(uniqueIdentity);
             return SLANG_OK;
         }
-        case CanonicalMode::Path:
+        case UniqueIdentityMode::Path:
         {
-            outCanonicalPath = path;
+            outUniqueIdentity = path;
             return SLANG_OK;
         }
-        case CanonicalMode::SimplifyPath:
+        case UniqueIdentityMode::SimplifyPath:
         {
-            outCanonicalPath = Path::Simplify(path);
+            outUniqueIdentity = Path::Simplify(path);
             // If it still has relative elements can't uniquely identify, so give up
-            return Path::IsRelative(outCanonicalPath) ? SLANG_FAIL : SLANG_OK;
+            return Path::IsRelative(outUniqueIdentity) ? SLANG_FAIL : SLANG_OK;
         }
-        case CanonicalMode::SimplifyPathAndHash:
-        case CanonicalMode::Hash:
+        case UniqueIdentityMode::SimplifyPathAndHash:
+        case UniqueIdentityMode::Hash:
         {
             // I can only see if this is the same file as already loaded by loading the file and doing a hash
             Result res = m_fileSystem->loadFile(path.Buffer(), outFileContents.writeRef());
@@ -229,10 +230,10 @@ SlangResult CacheFileSystem::_calcCanonicalPath(const String& path, String& outC
 
             hashString.append(':');
 
-            // The canonical name is.. combination of name and hash
+            // The uniqueIdentity is a combination of name and hash
             hashString.append(hash, 16);
 
-            outCanonicalPath = hashString;
+            outUniqueIdentity = hashString;
             return SLANG_OK;
         }
     }
@@ -240,32 +241,32 @@ SlangResult CacheFileSystem::_calcCanonicalPath(const String& path, String& outC
     return SLANG_FAIL;
 }
 
-CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalCacheInfo(const String& path)
+CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateUniqueIdentityCacheInfo(const String& path)
 {
-    // Use the path to produce canonicalPath information
+    // Use the path to produce uniqueIdentity information
     ComPtr<ISlangBlob> fileContents;
-    String canonicalPath;
+    String uniqueIdentity;
 
-    SlangResult res = _calcCanonicalPath(path, canonicalPath, fileContents);
+    SlangResult res = _calcUniqueIdentity(path, uniqueIdentity, fileContents);
     if (SLANG_FAILED(res))
     {
-        // Was not able to create a canonical path.. so mark in path map the problem
+        // Was not able to create a uniqueIdentity - return failure as nullptr
         return nullptr;
     }
 
-    // Now try looking up by canonical path. If not found, add a new result
+    // Now try looking up by uniqueIdentity path. If not found, add a new result
     PathInfo* pathInfo = nullptr;
-    if (!m_canonicalMap.TryGetValue(canonicalPath, pathInfo))
+    if (!m_uniqueIdentityMap.TryGetValue(uniqueIdentity, pathInfo))
     {
-        // Create with found canonicalPath
-        pathInfo = new PathInfo(canonicalPath);
-        m_canonicalMap.Add(canonicalPath, pathInfo);
+        // Create with found uniqueIdentity
+        pathInfo = new PathInfo(uniqueIdentity);
+        m_uniqueIdentityMap.Add(uniqueIdentity, pathInfo);
     }
 
-    // At this point they must have same canonicalPath
-    SLANG_ASSERT(pathInfo->getCanonicalPath() == canonicalPath);
+    // At this point they must have same uniqueIdentity
+    SLANG_ASSERT(pathInfo->getUniqueIdentity() == uniqueIdentity);
 
-    // If we have the file contents (because of calcing canonical), and there isn't a read fileblob already
+    // If we have the file contents (because of calcing uniqueIdentity), and there isn't a read fileblob already
     // store the data as if read, so doesn't get read again
     if (fileContents && !pathInfo->m_fileBlob)
     {
@@ -279,7 +280,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateCanonicalCacheInfo(const
 CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateSimplifiedPathCacheInfo(const String& path)
 {
     // If we can simplify the path, try looking up in path cache with simplified path (as long as it's different!)
-    if (_canSimplifyPath(m_canonicalMode))
+    if (_canSimplifyPath(m_uniqueIdentityMode))
     {
         const String simplifiedPath = Path::Simplify(path);
         // Only lookup if the path is different - because otherwise will recurse forever...
@@ -290,7 +291,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreateSimplifiedPathCacheInfo(
         }
     }
 
-    return  _getOrCreateCanonicalCacheInfo(path);
+    return  _getOrCreateUniqueIdentityCacheInfo(path);
 }
 
 CacheFileSystem::PathInfo* CacheFileSystem::_getOrCreatePathCacheInfo(const String& path)
@@ -333,15 +334,15 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
     return toResult(info->m_loadFileResult);
 }
 
-SlangResult CacheFileSystem::getCanoncialPath(const char* path, ISlangBlob** canonicalPathOut)
+SlangResult CacheFileSystem::getUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
     PathInfo* info = _getOrCreatePathCacheInfo(path);
     if (!info)
     {
         return SLANG_E_NOT_FOUND;
     }
-    info->m_canonicalPath->addRef();
-    *canonicalPathOut = info->m_canonicalPath;
+    info->m_uniqueIdentity->addRef();
+    *outUniqueIdentity = info->m_uniqueIdentity;
     return SLANG_OK;
 }
 

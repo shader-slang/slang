@@ -13,8 +13,11 @@ const String PathInfo::getMostUniquePath() const
 {
     switch (type)
     {
-        case Type::Normal:      return canonicalPath;
-        case Type::FoundPath:   return foundPath;
+        case Type::Normal:      
+        case Type::FoundPath:
+        {
+            return foundPath;
+        }
         default:                return "";
     }
 }
@@ -163,7 +166,6 @@ PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
     }
     else
     {
-        // We don't have a full normal path (including 'canonical') so just go with FoundPath
         return PathInfo::makePath(m_sourceManager->getStringSlicePool().getSlice(pathHandle));
     }
 }
@@ -479,18 +481,18 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
     return nullptr;
 }
 
-SourceFile* SourceManager::findSourceFile(const String& canonicalPath) const
+SourceFile* SourceManager::findSourceFile(const String& uniqueIdentity) const
 {
-    SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(canonicalPath);
+    SourceFile*const* filePtr = m_sourceFileMap.TryGetValue(uniqueIdentity);
     return (filePtr) ? *filePtr : nullptr;
 }
 
-SourceFile* SourceManager::findSourceFileRecursively(const String& canonicalPath) const
+SourceFile* SourceManager::findSourceFileRecursively(const String& uniqueIdentity) const
 {
     const SourceManager* manager = this;
     do 
     {
-        SourceFile* sourceFile = manager->findSourceFile(canonicalPath);
+        SourceFile* sourceFile = manager->findSourceFile(uniqueIdentity);
         if (sourceFile)
         {
             return sourceFile;
@@ -500,10 +502,10 @@ SourceFile* SourceManager::findSourceFileRecursively(const String& canonicalPath
     return nullptr;
 }
 
-void SourceManager::addSourceFile(const String& canonicalPath, SourceFile* sourceFile)
+void SourceManager::addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile)
 {
-    SLANG_ASSERT(!findSourceFileRecursively(canonicalPath));
-    m_sourceFileMap.Add(canonicalPath, sourceFile);
+    SLANG_ASSERT(!findSourceFileRecursively(uniqueIdentity));
+    m_sourceFileMap.Add(uniqueIdentity, sourceFile);
 }
 
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)

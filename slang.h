@@ -778,25 +778,25 @@ extern "C"
     struct ISlangFileSystemExt : public ISlangFileSystem
     {
     public:
-        /** Get a canonical path which uniquely identifies an object of the file system.
+        /** Get a uniqueIdentity which uniquely identifies an object of the file system.
            
-        Given a path, returns a 'canonical' path which will return the same path for the same file/directory. 
-        The canonical path is used to compare if two includes are the same file. 
-        The string for the canonical path is held zero terminated in the ISlangBlob of canonicalPathOut. 
+        Given a path, returns a 'uniqueIdentity' path will return the same value for the same file/directory on the file system. 
+        The uniqueIdentity is used to compare if two includes are the same file. 
+        The string for the uniqueIdentity is held zero terminated in the ISlangBlob of outUniqueIdentity.
    
-        Note that a canonical path doesn't *have* to be a 'canonical' path, or a path at all
-        - it can just be a string that uniquely identifies a file. For example another possible mechanism
+        Note that there are many ways a uniqueIdentity may be generated for a file. For example it could be the
+        'canonical path' - assuming it is available and unambitious for a file system. Another possible mechanism
         could be to store the filename combined with the file date time to uniquely identify it.
      
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param path
-        @param canonicalPathOut
-        @returns A `SlangResult` to indicate success or failure getting the canonical path.
+        @param outUniqueIdentity
+        @returns A `SlangResult` to indicate success or failure getting the uniqueIdentity.
         */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUniqueIdentity(
             const char* path,
-            ISlangBlob** canonicalPathOut) = 0;
+            ISlangBlob** outUniqueIdentity) = 0;
 
         /** Calculate a path combining the 'fromPath' with 'path'
 

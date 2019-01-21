@@ -197,10 +197,9 @@ struct Preprocessor
     // The translation unit that is being parsed
     TranslationUnitRequest*                 translationUnit;
 
-    // Any paths that have issued `#pragma once` directives to
+    // The unique identities of any paths that have issued `#pragma once` directives to
     // stop them from being included again.
-    HashSet<String>                         pragmaOncePaths;
-
+    HashSet<String>                         pragmaOnceUniqueIdentities;
 
     TranslationUnitRequest* getTranslationUnit()
     {
@@ -1610,10 +1609,10 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    // We must have a canonical path to be compare
-    if (!filePathInfo.hasCanonicalPath())
+    // We must have a uniqueIdentity to be compare
+    if (!filePathInfo.hasUniqueIdentity())
     {
-        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noCanonicalPath, path);
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::noUniqueIdentity, path);
         return;
     }
 
@@ -1623,7 +1622,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     expectEndOfDirective(context);
 
     // Check whether we've previously included this file and seen a `#pragma once` directive
-    if(context->preprocessor->pragmaOncePaths.Contains(filePathInfo.canonicalPath))
+    if(context->preprocessor->pragmaOnceUniqueIdentities.Contains(filePathInfo.uniqueIdentity))
     {
         return;
     }
@@ -1633,7 +1632,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
 
     // See if this an already loaded source file
-    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.canonicalPath);
+    SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.uniqueIdentity);
     // If not create a new one, and add to the list of known source files
     if (!sourceFile)
     {
@@ -1645,7 +1644,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         }
 
         sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
-        sourceManager->addSourceFile(filePathInfo.canonicalPath, sourceFile);
+        sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
@@ -1873,29 +1872,19 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // We need to identify the path of the file we are preprocessing,
     // so that we can avoid including it again.
     //
-    // Note: for now we are doing a very simplistic check where
-    // we use the raw file path as the key for our duplicate checking.
-    //
-    // TODO: a more refined implementation should probably apply Unicode
-    // normalization and case-folding to the path, and then use that
-    // plus a hash of the file contents to determine whether things
-    // represent the "same" file.
-    //
-    // TODO: even for our simplistic implementation, we need to add
-    // logic to deal with `../` segments in path names to detect
-    // trivial cases of the "same" path.
-    //
+    // We are using the 'uniqueIdentity' as determined by the ISlangFileSystemEx interface to determine file identities.
+    
     auto directiveLoc = GetDirectiveLoc(context);
     auto issuedFromPathInfo = context->preprocessor->translationUnit->compileRequest->getSourceManager()->getPathInfo(directiveLoc, SourceLocType::Actual);
 
-    // Must have a canonical path for a #pragma once to work
-    if (!issuedFromPathInfo.hasCanonicalPath())
+    // Must have uniqueIdentity for a #pragma once to work
+    if (!issuedFromPathInfo.hasUniqueIdentity())
     {
         GetSink(context)->diagnose(subDirectiveToken, Diagnostics::pragmaOnceIgnored);
         return;
     }
 
-    context->preprocessor->pragmaOncePaths.Add(issuedFromPathInfo.canonicalPath);
+    context->preprocessor->pragmaOnceUniqueIdentities.Add(issuedFromPathInfo.uniqueIdentity);
 }
 
 // Information about a specific `#pragma` directive

@@ -44,32 +44,32 @@ struct PathInfo
     enum class Type
     {
         Unknown,                    ///< The path is not known
-        Normal,                     ///< Normal has both path and canonical path
-        FoundPath,                  ///< Just has a found path (canonical path is unknown, or even 'unknowable') 
+        Normal,                     ///< Normal has both path and uniqueIdentity
+        FoundPath,                  ///< Just has a found path (uniqueIdentity is unknown, or even 'unknowable') 
         TokenPaste,                 ///< No paths, just created to do a macro expansion
         TypeParse,                  ///< No path, just created to do a type parse
         CommandLine,                ///< A macro constructed from the command line
     };
 
         /// True if has a canonical path
-    SLANG_FORCE_INLINE bool hasCanonicalPath() const { return type == Type::Normal && canonicalPath.Length() > 0; }
+    SLANG_FORCE_INLINE bool hasUniqueIdentity() const { return type == Type::Normal && uniqueIdentity.Length() > 0; }
         /// True if has a regular found path
     SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath; }
 
-        /// The canonical path is unique, so return that if we have it. If not the regular path, otherwise the empty string.
+        /// If not the regular path, otherwise the empty string.
     const String getMostUniquePath() const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown", String() }; }
     static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste", String()}; }
-    static PathInfo makeNormal(const String& foundPathIn, const String& canonicalPathIn) { SLANG_ASSERT(canonicalPathIn.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, canonicalPathIn }; }
+    static PathInfo makeNormal(const String& foundPathIn, const String& uniqueIdentity) { SLANG_ASSERT(uniqueIdentity.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, uniqueIdentity }; }
     static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
     static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string", String() }; }
     static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line", String() }; }
 
     Type type;                      ///< The type of path
     String foundPath;               ///< The path where the file was found (might contain relative elements) 
-    String canonicalPath;           ///< Canonical version of the found path
+    String uniqueIdentity;          ///< The unique identity of the file on the path found 
 };
 
 class SourceLoc
@@ -292,7 +292,7 @@ class SourceView
 struct SourceManager
 {
         // Initialize a source manager, with an optional parent
-    void initialize(SourceManager*  parent);
+    void initialize(SourceManager* parent);
 
         /// Allocate a range of SourceLoc locations, these can be used to identify a specific location in the source
     SourceRange allocateSourceRange(UInt size);
@@ -322,12 +322,12 @@ struct SourceManager
 
         /// Searches this manager, and then the parent to see if can find a match for path. 
         /// If not found returns nullptr.    
-    SourceFile* findSourceFileRecursively(const String& canonicalPath) const;
+    SourceFile* findSourceFileRecursively(const String& uniqueIdentity) const;
         /// Find if the source file is defined on this manager.
-    SourceFile* findSourceFile(const String& canonicalPath) const;
+    SourceFile* findSourceFile(const String& uniqueIdentity) const;
 
-        /// Add a source file, path must be unique for this manager AND any parents
-    void addSourceFile(const String& canonicalPath, SourceFile* sourceFile);
+        /// Add a source file, uniqueIdentity must be unique for this manager AND any parents
+    void addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile);
 
         /// Get the slice pool
     StringSlicePool& getStringSlicePool() { return m_slicePool; }
@@ -374,7 +374,7 @@ struct SourceManager
     // Can be used for storing the decoded contents of Token. Content for example.
     MemoryArena m_memoryArena;
 
-    // Maps canonical paths to source files
+    // Maps uniqueIdentities to source files
     Dictionary<String, SourceFile*> m_sourceFileMap;  
 };
 

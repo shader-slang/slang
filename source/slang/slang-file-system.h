@@ -26,9 +26,9 @@ public:
         ISlangBlob**    outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUniqueIdentity(
             const char* path,
-            ISlangBlob** canonicalPathOut) SLANG_OVERRIDE;
+            ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
         SlangPathType fromPathType,
@@ -59,16 +59,13 @@ of the interface on the constructor.
 
 NOTE! That this behavior is the same as previously in that.... 
 1) calcRelativePath, just returns the path as processed by the Path:: methods 
-2) getCanonicalPath, just returns the input path as the 'canonical' path. This will be wrong with a file multiply referenced through paths with .. and or . but 
-doing it this way means it works as before and requires no new functions.
-
-You can use a more sophisticated canonical style if you pass true to  useSimplifyForCanonicalPath. This will simplify relative path to create a canonical path.
+2) getUniqueIdentity behavior depends on the UniqueIdentityMode.
 */
 class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 {
     public:
 
-    enum CanonicalMode
+    enum UniqueIdentityMode
     {
         Default,                    ///< If passed, will default to the others depending on what kind of ISlangFileSystem is passed in
         Path,                       ///< Just use the path as is (old style slang behavior)
@@ -98,9 +95,9 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         ISlangBlob**    outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUniqueIdentity(
         const char* path,
-        ISlangBlob** canonicalPathOut) SLANG_OVERRIDE;
+        ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
         SlangPathType fromPathType,
@@ -110,10 +107,10 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
         const char* path,
-        SlangPathType* pathTypeOut) SLANG_OVERRIDE;
+        SlangPathType* outPathType) SLANG_OVERRIDE;
 
         /// Ctor
-    CacheFileSystem(ISlangFileSystem* fileSystem, CanonicalMode canonicalMode = CanonicalMode::Default);
+    CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default);
         /// Dtor
     virtual ~CacheFileSystem();
 
@@ -126,10 +123,10 @@ protected:
 
     struct PathInfo
     {
-        PathInfo(const String& canonicalPath)
+        PathInfo(const String& uniqueIdentity)
         {
-            m_canonicalPath = new StringBlob(canonicalPath);
-            m_canonicalPath->addRef();
+            m_uniqueIdentity = new StringBlob(uniqueIdentity);
+            m_uniqueIdentity->addRef();
 
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
@@ -138,26 +135,25 @@ protected:
         }
         ~PathInfo()
         {
-            m_canonicalPath->release();
+            m_uniqueIdentity->release();
         }
-            /// Get the canonical path as a string
-        const String& getCanonicalPath() const { SLANG_ASSERT(m_canonicalPath); return m_canonicalPath->getString(); }
+            /// Get the unique identity path as a string
+        const String& getUniqueIdentity() const { SLANG_ASSERT(m_uniqueIdentity); return m_uniqueIdentity->getString(); }
 
-        StringBlob*  m_canonicalPath;                         ///< The canonical path
+        StringBlob*  m_uniqueIdentity;                         
         CompressedResult m_loadFileResult;              
         CompressedResult m_getPathTypeResult;    
         SlangPathType m_pathType;
         ComPtr<ISlangBlob> m_fileBlob;
     };
-        /// Given a path works out a canonical path, based on the canonicalMode. outFileContents will be set if file had to be read to produce the canonicalPath (ie with Hash)
-    SlangResult _calcCanonicalPath(const String& path, String& outCanonicalPath, ComPtr<ISlangBlob>& outFileContents);
-
+        /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode. outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
+    SlangResult _calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents);
 
         /// For a given path gets a PathInfo. Can return nullptr, if it is not possible to create the PathInfo for some reason
     PathInfo* _getOrCreatePathCacheInfo(const String& path);
-        /// Turns the path into a canonical path, and then tries to look up in the canonicalPathMap.
-    PathInfo* _getOrCreateCanonicalCacheInfo(const String& path);
-        /// Will simplify the path (if possible) to lookup on the pathCache else will create on canonicalCache
+        /// Turns the path into a uniqueIdentity, and then tries to look up in the uniqueIdentityMap.
+    PathInfo* _getOrCreateUniqueIdentityCacheInfo(const String& path);
+        /// Will simplify the path (if possible) to lookup on the pathCache else will create on uniqueIdentityMap
     PathInfo* _getOrCreateSimplifiedPathCacheInfo(const String& path);
 
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
@@ -165,13 +161,13 @@ protected:
     It is probably the case we cannot do dynamic_cast on ISlangBlob if we don't know where constructed -> if outside of slang codebase 
     doing such a cast can cause an exception. So we *never* want to do dynamic cast from blobs which could be created by external code. */
 
-    Dictionary<String, PathInfo*> m_pathMap;        ///< Maps a path to a canonical path
-    Dictionary<String, PathInfo*> m_canonicalMap;   ///< Maps a canonical path to a files contents. This OWNs the PathInfo.
+    Dictionary<String, PathInfo*> m_pathMap;            ///< Maps a path to a PathInfo (and unique identity)
+    Dictionary<String, PathInfo*> m_uniqueIdentityMap;  ///< Maps a unique identity for a file to its contents. This OWNs the PathInfo.
 
-    CanonicalMode m_canonicalMode;                  ///< Determines how 'canonicalPath' is produced. Cannot be Default in usage.
+    UniqueIdentityMode m_uniqueIdentityMode;            ///< Determines how the 'uniqueIdentity' is produced. Cannot be Default in usage.
 
-    ComPtr<ISlangFileSystem> m_fileSystem;          ///< Must always be set
-    ComPtr<ISlangFileSystemExt> m_fileSystemExt;    ///< Optionally set -> if not will fall back on the m_fileSystem
+    ComPtr<ISlangFileSystem> m_fileSystem;              ///< Must always be set
+    ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if not will fall back on the m_fileSystem
 };
 
 }
