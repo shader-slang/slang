@@ -778,25 +778,25 @@ extern "C"
     struct ISlangFileSystemExt : public ISlangFileSystem
     {
     public:
-        /** Get a canonical path which uniquely identifies an object of the file system.
+        /** Get a uniqueIdentity which uniquely identifies an object of the file system.
            
-        Given a path, returns a 'canonical' path which will return the same path for the same file/directory. 
-        The canonical path is used to compare if two includes are the same file. 
-        The string for the canonical path is held zero terminated in the ISlangBlob of canonicalPathOut. 
+        Given a path, returns a 'uniqueIdentity' path will return the same value for the same file/directory on the file system. 
+        The uniqueIdentity is used to compare if two includes are the same file. 
+        The string for the uniqueIdentity is held zero terminated in the ISlangBlob of outUniqueIdentity.
    
-        Note that a canonical path doesn't *have* to be a 'canonical' path, or a path at all
-        - it can just be a string that uniquely identifies a file. For example another possible mechanism
+        Note that there are many ways a uniqueIdentity may be generated for a file. For example it could be the
+        'canonical path' - assuming it is available and unambitious for a file system. Another possible mechanism
         could be to store the filename combined with the file date time to uniquely identify it.
      
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param path
-        @param canonicalPathOut
-        @returns A `SlangResult` to indicate success or failure getting the canonical path.
+        @param outUniqueIdentity
+        @returns A `SlangResult` to indicate success or failure getting the uniqueIdentity.
         */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanoncialPath(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
             const char* path,
-            ISlangBlob** canonicalPathOut) = 0;
+            ISlangBlob** outUniqueIdentity) = 0;
 
         /** Calculate a path combining the 'fromPath' with 'path'
 
@@ -821,7 +821,27 @@ extern "C"
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
             const char* path, 
-            SlangPathType* pathTypeOut) = 0;  
+            SlangPathType* pathTypeOut) = 0;
+
+        /** Get a canonical path identifies an object of the file system.
+
+        Given a path, returns a 'canonicalPath' the file. This may be a file system 'canonical path' to
+        show where a file was read from. Also though if the filesystem is say a zip file - it might include the path to the zip
+        container as well as the absolute path to the specific file. The main purpose of the method is to be able
+        to display to users unambiguously where a file was read from in diagnostics.
+
+        This method is optional and if not implemented will display 'found paths'. If not implemented return SLANG_E_NOT_IMPLEMENTED. 
+
+        @param path
+        @param outCanonicalPath
+        @returns A `SlangResult`
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
+            const char* path,
+            ISlangBlob** outCanonicalPath) = 0;
+
+        /** Clears any cached information */
+        virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
     };
 
     #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }

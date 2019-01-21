@@ -399,7 +399,7 @@ namespace Slang
         // This is a list of unique modules loaded, in the order they were encountered.
         List<RefPtr<LoadedModule> > loadedModulesList;
 
-        // Map from the path of a module file to its definition
+        // Map from the path (or uniqueIdentity if available) of a module file to its definition
         Dictionary<String, RefPtr<LoadedModule>> mapPathToLoadedModule;
 
         // Map from the logical name of a module to its definition
@@ -508,6 +508,8 @@ namespace Slang
             sourceManager = sm;
             mSink.sourceManager = sm;
         }
+
+        void setFileSystem(ISlangFileSystem* fileSystem);
 
             /// During propagation of an exception for an internal
             /// error, note that this source location was involved
