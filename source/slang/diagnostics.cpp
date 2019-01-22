@@ -240,12 +240,18 @@ static void formatDiagnostic(
      
     if (sourceView && (sink->flags & DiagnosticSink::Flag::VerbosePath))
     {
-        auto actualLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);
-        // Look up the full path
-        SourceFile* sourceFile = sourceView->getSourceFile();
-        actualLoc.pathInfo.foundPath = sourceFile->calcVerbosePath();
+        auto actualHumaneLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);
 
-        formatDiagnostic(actualLoc, diagnostic, sb);
+        // Look up the path verbosely (will get the canonical path if necessary)
+        actualHumaneLoc.pathInfo.foundPath = sourceView->getSourceFile()->calcVerbosePath();
+
+        // Only output if it's actually different
+        if (actualHumaneLoc.pathInfo.foundPath != humaneLoc.pathInfo.foundPath ||
+            actualHumaneLoc.line != humaneLoc.line ||
+            actualHumaneLoc.column != humaneLoc.column)
+        { 
+            formatDiagnostic(actualHumaneLoc, diagnostic, sb);
+        }
     }
 }
 
