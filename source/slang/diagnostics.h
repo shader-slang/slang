@@ -145,7 +145,7 @@ namespace Slang
         {
             enum Enum: uint32_t
             {
-                VerbosePath = 0x1,              ///< Will try and display a 
+                VerbosePath = 0x1,              ///< Will display a more verbose path (if available) - such as a canonical or absolute path
             };
         };
         typedef uint32_t Flags;
