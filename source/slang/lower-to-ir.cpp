@@ -768,17 +768,17 @@ LoweredValInfo emitCallToDeclRef(
 }
 
 IRInst* getFieldKey(
-    IRGenContext*           context,
-    DeclRef<StructField>    field)
+    IRGenContext*       context,
+    DeclRef<VarDecl>    field)
 {
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
 }
 
 LoweredValInfo extractField(
-    IRGenContext*           context,
-    IRType*                 fieldType,
-    LoweredValInfo          base,
-    DeclRef<StructField>    field)
+    IRGenContext*       context,
+    IRType*             fieldType,
+    LoweredValInfo      base,
+    DeclRef<VarDecl>    field)
 {
     IRBuilder* builder = context->irBuilder;
 
@@ -900,7 +900,7 @@ top:
             auto base = materialize(context, boundMemberInfo->base);
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<StructField>() )
+            if( auto fieldDeclRef = declRef.As<VarDecl>() )
             {
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
                 goto top;
@@ -1871,7 +1871,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto loweredBase = lowerRValueExpr(context, expr->BaseExpression);
 
         auto declRef = expr->declRef;
-        if (auto fieldDeclRef = declRef.As<StructField>())
+        if (auto fieldDeclRef = declRef.As<VarDecl>())
         {
             // Okay, easy enough: we have a reference to a field of a struct type...
             return extractField(loweredType, loweredBase, fieldDeclRef);
@@ -2032,7 +2032,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
             {
                 List<IRInst*> args;
-                for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
+                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
                 {
                     if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
@@ -2050,7 +2050,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo getDefaultVal(StructField* decl)
+    LoweredValInfo getDefaultVal(VarDeclBase* decl)
     {
         if(auto initExpr = decl->initExpr)
         {
@@ -2156,7 +2156,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
             {
                 UInt argCounter = 0;
-                for (auto ff : getMembersOfType<StructField>(aggTypeDeclRef))
+                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
                 {
                     if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
@@ -2596,9 +2596,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo extractField(
-        IRType*                 fieldType,
-        LoweredValInfo          base,
-        DeclRef<StructField>    field)
+        IRType*             fieldType,
+        LoweredValInfo      base,
+        DeclRef<VarDecl>    field)
     {
         return Slang::extractField(context, fieldType, base, field);
     }
@@ -3713,7 +3713,7 @@ LoweredValInfo tryGetAddress(
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<StructField>() )
+            if( auto fieldDeclRef = declRef.As<VarDecl>() )
             {
                 auto baseVal = boundMemberInfo->base;
                 auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
@@ -3955,7 +3955,7 @@ top:
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<StructField>() )
+            if( auto fieldDeclRef = declRef.As<VarDecl>() )
             {
                 // materialize the base value and move it into
                 // a mutable temporary if needed
@@ -4321,7 +4321,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    bool isGlobalVarDecl(VarDeclBase* decl)
+    bool isGlobalVarDecl(VarDecl* decl)
     {
         auto parent = decl->ParentDecl;
         if (dynamic_cast<ModuleDecl*>(parent))
@@ -4329,11 +4329,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Variable declared at global scope? -> Global.
             return true;
         }
+        else if(dynamic_cast<AggTypeDeclBase*>(parent))
+        {
+            if(decl->HasModifier<HLSLStaticModifier>())
+            {
+                // A `static` member variable is effectively global.
+                return true;
+            }
+        }
 
         return false;
     }
 
-    LoweredValInfo lowerGlobalShaderParam(VarDeclBase* decl)
+    bool isMemberVarDecl(VarDecl* decl)
+    {
+        auto parent = decl->ParentDecl;
+        if (dynamic_cast<AggTypeDecl*>(parent))
+        {
+            // A variable declared inside of an aggregate type declaration is a member.
+            return true;
+        }
+
+        return false;
+    }
+
+    LoweredValInfo lowerGlobalShaderParam(VarDecl* decl)
     {
         IRType* paramType = lowerType(context, decl->getType());
 
@@ -4361,7 +4381,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
-    LoweredValInfo lowerGlobalVarDecl(VarDeclBase* decl)
+    LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
     {
         if(isGlobalShaderParameter(decl))
         {
@@ -4716,7 +4736,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             lowerType(context, decl->type));
     }
 
-    LoweredValInfo visitVarDeclBase(VarDeclBase* decl)
+    LoweredValInfo visitVarDecl(VarDecl* decl)
     {
         // Detect global (or effectively global) variables
         // and handle them differently.
@@ -4728,6 +4748,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(isFunctionStaticVarDecl(decl))
         {
             return lowerFunctionStaticVarDecl(decl);
+        }
+
+        if(isMemberVarDecl(decl))
+        {
+            return lowerMemberVarDecl(decl);
         }
 
         // A user-defined variable declaration will usually turn into
@@ -4838,7 +4863,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
-        return lowerRValueExpr(subContext, decl->initExpr);
+        return lowerRValueExpr(subContext, decl->tagExpr);
     }
 
     LoweredValInfo visitEnumDecl(EnumDecl* decl)
@@ -4902,7 +4927,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irStruct);
 
-        for (auto fieldDecl : decl->getMembersOfType<StructField>())
+        for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
         {
             if (fieldDecl->HasModifier<HLSLStaticModifier>())
             {
@@ -4946,7 +4971,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct));
     }
 
-    LoweredValInfo visitStructField(StructField* fieldDecl)
+    LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into
         // a "key" that can be used to extract field values

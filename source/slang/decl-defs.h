@@ -33,7 +33,7 @@ ABSTRACT_SYNTAX_CLASS(ContainerDecl, Decl)
     )
 END_SYNTAX_CLASS()
 
-// Base class for all variable-like declarations
+// Base class for all variable declarations
 ABSTRACT_SYNTAX_CLASS(VarDeclBase, Decl)
 
     // type of the variable
@@ -47,9 +47,9 @@ ABSTRACT_SYNTAX_CLASS(VarDeclBase, Decl)
     SYNTAX_FIELD(RefPtr<Expr>, initExpr)
 END_SYNTAX_CLASS()
 
-
-// A field of a `struct` type
-SIMPLE_SYNTAX_CLASS(StructField, VarDeclBase)
+// Ordinary potentially-mutable variables (locals, globals, and member variables)
+SYNTAX_CLASS(VarDecl, VarDeclBase)
+END_SYNTAX_CLASS()
 
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
@@ -76,9 +76,9 @@ ABSTRACT_SYNTAX_CLASS(AggTypeDecl, AggTypeDeclBase)
 RAW(
     // extensions that might apply to this declaration
     ExtensionDecl* candidateExtensions = nullptr;
-    FilteredMemberList<StructField> GetFields()
+    FilteredMemberList<VarDecl> GetFields()
     {
-        return getMembersOfType<StructField>();
+        return getMembersOfType<VarDecl>();
     }
     )
 END_SYNTAX_CLASS()
@@ -98,7 +98,28 @@ RAW(
 )
 END_SYNTAX_CLASS()
 
-SIMPLE_SYNTAX_CLASS(EnumCaseDecl, VarDeclBase)
+// A single case in an enum.
+//
+// E.g., in a declaration like:
+//
+//      enum Color { Red = 0, Green, Blue };
+//
+// The `Red = 0` is the declaration of the `Red`
+// case, with `0` as an explicit expression for its
+// _tag value_.
+//
+SYNTAX_CLASS(EnumCaseDecl, Decl)
+
+    // type of the parent `enum`
+    SYNTAX_FIELD(TypeExp, type)
+
+    RAW(
+    Type* getType() { return type.type.Ptr(); }
+    )
+
+    // Tag value
+    SYNTAX_FIELD(RefPtr<Expr>, tagExpr)
+END_SYNTAX_CLASS()
 
 // An interface which other types can conform to
 SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
@@ -156,6 +177,7 @@ END_SYNTAX_CLASS()
 // A scope for local declarations (e.g., as part of a statement)
 SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
 
+// A function/initializer/subscript parameter (potentially mutable)
 SIMPLE_SYNTAX_CLASS(ParamDecl, VarDeclBase)
 
 // Base class for things that have parameter lists and can thus be applied to arguments ("called")
@@ -204,8 +226,6 @@ SIMPLE_SYNTAX_CLASS(SetterDecl, AccessorDecl)
 SIMPLE_SYNTAX_CLASS(RefAccessorDecl, AccessorDecl)
 
 SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
-
-SIMPLE_SYNTAX_CLASS(Variable, VarDeclBase);
 
 // A "module" of code (essentiately, a single translation unit)
 // that provides a scope for some number of declarations.
