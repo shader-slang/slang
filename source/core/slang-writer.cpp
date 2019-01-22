@@ -28,6 +28,7 @@ SlangResult WriterHelper::print(const char* format, ...)
 
     SlangResult res = SLANG_OK;
 
+    // numChars is the amount of characters needed *not* including terminating 0
     size_t numChars;
     {
         // Create a copy of args, as will be consumed by calcFormattedSize
@@ -39,7 +40,8 @@ SlangResult WriterHelper::print(const char* format, ...)
 
     if (numChars > 0)
     {
-        char* appendBuffer = m_writer->beginAppendBuffer(numChars);
+        // We need to add 1 here, because calcFormatted, *requires* space for terminating 0
+        char* appendBuffer = m_writer->beginAppendBuffer(numChars + 1);
         StringUtil::calcFormatted(format, args, numChars, appendBuffer);
         res = m_writer->endAppendBuffer(appendBuffer, numChars);
     }

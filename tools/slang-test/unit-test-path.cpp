@@ -35,6 +35,26 @@ static void pathUnitTest()
 
         SLANG_CHECK(Path::Simplify("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\") == "a:/../this");
 
+        SLANG_CHECK(Path::Simplify("tests/preprocessor/.\\pragma-once-a.h") == "tests/preprocessor/pragma-once-a.h");
+
+
+        SLANG_CHECK(Path::IsRelative("."));
+        SLANG_CHECK(Path::IsRelative(".."));
+        SLANG_CHECK(Path::IsRelative("blah/.."));
+
+        SLANG_CHECK(Path::IsRelative("blah/.././a"));
+        SLANG_CHECK(Path::IsRelative("a") == false);
+        SLANG_CHECK(Path::IsRelative("blah/a") == false);
+        SLANG_CHECK(Path::IsRelative("a:\\blah/a") == false);
+
+
+        SLANG_CHECK(Path::IsRelative("a:/what/.././../is/./../this/."));
+
+        SLANG_CHECK(Path::IsRelative("a:/what/.././../is/./../this/./"));
+
+        SLANG_CHECK(Path::IsRelative("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
+
+
     }
 }
 

@@ -134,6 +134,10 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->shouldBeVerbose = true;
         }
+        else if (strcmp(arg, "-verbose-paths") == 0)
+        {
+            optionsOut->verbosePaths = true;
+        }
         else if (strcmp(arg, "-generate-hlsl-baselines") == 0)
         {
             optionsOut->generateHLSLBaselines = true;

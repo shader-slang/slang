@@ -133,6 +133,7 @@ For completeness, here are the options that `slangc` currently accepts:
   * 'dxc': Use DirectXShaderCompiler (https://github.com/Microsoft/DirectXShaderCompiler)
   * These are intended for debugging/testing purposes, when you want to be able to see what these existing compilers do with the "same" input and options
 
+* `-verbose-paths`: When displaying diagnostic output aim to display more detailed path information. In practice this is typically the complete 'canonical' path to the source file used.
 
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
 

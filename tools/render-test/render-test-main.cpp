@@ -670,8 +670,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 int main(int argc, char**  argv)
 {
+    using namespace Slang;
     SlangSession* session = spCreateSession(nullptr);
-    SlangResult res = innerMain(Slang::StdWriters::initDefault(), session, argc, argv);
+
+    auto stdWriters = StdWriters::initDefaultSingleton();
+    
+    SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
 
 	return SLANG_FAILED(res) ? 1 : 0;

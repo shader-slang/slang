@@ -473,6 +473,18 @@ namespace Slang
         sink->diagnoseRaw(SLANG_FAILED(res) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
     }
 
+    static String _getDisplayPath(const DiagnosticSink& sink, SourceFile* sourceFile)
+    {
+        if (sink.flags & DiagnosticSink::Flag::VerbosePath)
+        {
+            return sourceFile->calcVerbosePath();
+        }
+        else
+        {
+            return sourceFile->getPathInfo().foundPath;
+        }
+    }
+
     String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest)
     {
         CompileRequest* compileRequest = translationUnitRequest->compileRequest;
@@ -481,6 +493,8 @@ namespace Slang
             return "slang-generated";
         }
 
+        auto& sink = translationUnitRequest->compileRequest->mSink;
+
         const auto& sourceFiles = translationUnitRequest->sourceFiles;
 
         const int numSourceFiles = int(sourceFiles.Count());
@@ -488,16 +502,15 @@ namespace Slang
         switch (numSourceFiles)
         {
             case 0:     return "unknown";
-            case 1:     return sourceFiles[0]->getPathInfo().foundPath;
+            case 1:     return _getDisplayPath(sink, sourceFiles[0]);
             default:
             {
                 StringBuilder builder;
-                builder << sourceFiles[0]->getPathInfo().foundPath;
+                builder << _getDisplayPath(sink, sourceFiles[0]);
                 for (int i = 1; i < numSourceFiles; ++i)
                 {
-                    builder << ";" << sourceFiles[i]->getPathInfo().foundPath;
+                    builder << ";" << _getDisplayPath(sink, sourceFiles[i]);
                 }
-
                 return builder;
             }
         }

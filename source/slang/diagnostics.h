@@ -141,12 +141,23 @@ namespace Slang
         // The source manager to use when mapping source locations to file+line info
         SourceManager*  sourceManager;
 
+        struct Flag 
+        {
+            enum Enum: uint32_t
+            {
+                VerbosePath = 0x1,              ///< Will display a more verbose path (if available) - such as a canonical or absolute path
+            };
+        };
+        typedef uint32_t Flags;
+
         StringBuilder outputBuffer;
 //            List<Diagnostic> diagnostics;
         int errorCount = 0;
 
-        ISlangWriter* writer                        = nullptr;
 
+        ISlangWriter* writer                        = nullptr;
+        Flags flags                                 = 0;
+        
 /*
         void Error(int id, const String & msg, const SourceLoc & pos)
         {
@@ -163,7 +174,7 @@ namespace Slang
 
         void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info)
         {
-            diagnoseImpl(pos, info, 0, NULL);
+            diagnoseImpl(pos, info, 0, nullptr);
         }
 
         void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info, DiagnosticArg const& arg0)

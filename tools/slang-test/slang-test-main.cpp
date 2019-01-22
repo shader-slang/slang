@@ -519,6 +519,15 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     return "";
 }
 
+static void _initSlangCompiler(TestContext* context, OSProcessSpawner& spawnerOut)
+{
+    spawnerOut.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
+
+    if (context->options.verbosePaths)
+    {
+        spawnerOut.pushArgument("-verbose-paths");
+    }
+}
 
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
@@ -528,8 +537,8 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
+    _initSlangCompiler(context, spawner);
 
-    spawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -699,6 +708,8 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
     return SLANG_TARGET_UNKNOWN;
 }
 
+
+
 TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file
@@ -710,11 +721,11 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     OSProcessSpawner actualSpawner;
     OSProcessSpawner expectedSpawner;
 
-    actualSpawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
-    expectedSpawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
-
+    _initSlangCompiler(context, actualSpawner);
+    _initSlangCompiler(context, expectedSpawner);
+    
     actualSpawner.pushArgument(filePath);
-
+    
     const auto& args = input.testOptions->args;
 
     const UInt targetIndex = args.IndexOf("-target");
@@ -821,7 +832,8 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
-    spawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
+    _initSlangCompiler(context, spawner);
+
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -866,8 +878,8 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
 
     OSProcessSpawner spawner;
+    _initSlangCompiler(context, spawner);
 
-    spawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     for( auto arg : input.testOptions->args )
@@ -967,8 +979,8 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
     auto outputStem = input.outputStem;
 
     OSProcessSpawner spawner;
+    _initSlangCompiler(context, spawner);
 
-    spawner.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
     spawner.pushArgument(filePath999);
 
     if( langDefine )
@@ -1818,7 +1830,7 @@ void runTestsInDirectory(
 
 SlangResult innerMain(int argc, char** argv)
 {
-    StdWriters::initDefault();
+    auto stdWriters = StdWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
     TestContext context;

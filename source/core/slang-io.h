@@ -43,6 +43,10 @@ namespace Slang
         static String Simplify(const UnownedStringSlice& path);
         static String Simplify(const String& path) { return Simplify(path.getUnownedSlice()); }
 
+            /// Returns true if a path contains a . or ..
+        static bool IsRelative(const UnownedStringSlice& path);
+        static bool IsRelative(const String& path) { return IsRelative(path.getUnownedSlice()); }
+
         static SlangResult GetPathType(const String & path, SlangPathType* pathTypeOut);
 
         static SlangResult GetCanonical(const String & path, String& canonicalPathOut);

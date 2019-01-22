@@ -149,7 +149,7 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
-DIAGNOSTIC(15302, Error, noCanonicalPath, "`#include` handler didn't generate a canonical path for '$0'")
+DIAGNOSTIC(15302, Error, noUniqueIdentity, "`#include` handler didn't generate a unique identity for file '$0'")
 
 
 // 154xx - macro definition

@@ -58,7 +58,7 @@ Session::Session()
 #include "object-meta-end.h"
 
     // Make sure our source manager is initialized
-    builtinSourceManager.initialize(nullptr);
+    builtinSourceManager.initialize(nullptr, nullptr);
 
     // Initialize representations of some very basic types:
     initializeTypes();
@@ -117,21 +117,21 @@ struct IncludeHandlerImpl : IncludeHandler
             return SLANG_E_NOT_FOUND;
         }
 
-        // Get the canonical path
-        ComPtr<ISlangBlob> canonicalPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getCanoncialPath(combinedPath.begin(), canonicalPathBlob.writeRef()));
+        // Get the uniqueIdentity
+        ComPtr<ISlangBlob> uniqueIdentityBlob;
+        SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
 
-        // If the rel path exists -> the canonical path MUST exists too
-        String canonicalPath(StringUtil::getString(canonicalPathBlob));
-        if (canonicalPath.Length() <= 0)
+        // If the rel path exists -> a uniqueIdentity MUST exists too
+        String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
+        if (uniqueIdentity.Length() <= 0)
         {   
-            // Canonical path can't be empty
+            // Unique identity can't be empty
             return SLANG_FAIL;
         }
         
         pathInfoOut.type = PathInfo::Type::Normal;
         pathInfoOut.foundPath = combinedPath;
-        pathInfoOut.canonicalPath = canonicalPath;
+        pathInfoOut.uniqueIdentity = uniqueIdentity;
         return SLANG_OK;     
     }
 
@@ -306,7 +306,7 @@ CompileRequest::CompileRequest(Session* session)
 
     setSourceManager(&sourceManagerStorage);
 
-    sourceManager->initialize(session->getBuiltinSourceManager());
+    sourceManager->initialize(session->getBuiltinSourceManager(), nullptr);
 
     // Set all the default writers
     for (int i = 0; i < int(WriterChannel::CountOf); ++i)
@@ -314,9 +314,7 @@ CompileRequest::CompileRequest(Session* session)
         setWriter(WriterChannel(i), nullptr);
     }
 
-    // Set up the default file system
-    SLANG_ASSERT(fileSystem == nullptr);
-    fileSystemExt = new CacheFileSystem(DefaultFileSystem::getSingleton());
+    setFileSystem(nullptr);
 }
 
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
@@ -419,7 +417,7 @@ RefPtr<Expr> CompileRequest::parseTypeString(TranslationUnitRequest * translatio
 {
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
-    localSourceManager.initialize(sourceManager);
+    localSourceManager.initialize(sourceManager, nullptr);
         
     Slang::SourceFile* srcFile = localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr);
     
@@ -859,10 +857,10 @@ void CompileRequest::loadParsedModule(
     RefPtr<LoadedModule> loadedModule = new LoadedModule();
 
     // Get a path
-    String mostUniquePath = pathInfo.getMostUniquePath();
-    SLANG_ASSERT(mostUniquePath.Length() > 0);
+    String mostUniqueIdentity = pathInfo.getMostUniqueIdentity();
+    SLANG_ASSERT(mostUniqueIdentity.Length() > 0);
 
-    mapPathToLoadedModule.Add(mostUniquePath, loadedModule);
+    mapPathToLoadedModule.Add(mostUniqueIdentity, loadedModule);
     mapNameToLoadedModules.Add(name, loadedModule);
 
     int errorCountBefore = mSink.GetErrorCount();
@@ -985,7 +983,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
-    // We are going to allow canonicalPath to be able to hold strings other than paths (like hashes), therefore we have to load via the found path 
+    // We have to load via the found path - as that is how file was originally loaded 
     if (SLANG_FAILED(includeHandler.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
         this->mSink.diagnose(loc, Diagnostics::cannotFindFile, fileName);
@@ -994,7 +992,7 @@ RefPtr<ModuleDecl> CompileRequest::findOrImportModule(
     }
 
     // Maybe this was loaded previously at a different relative name?
-    if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniquePath(), loadedModule))
+    if (mapPathToLoadedModule.TryGetValue(filePathInfo.getMostUniqueIdentity(), loadedModule))
         return loadedModule->moduleDecl;
 
     // Try to load it
@@ -1047,6 +1045,34 @@ void CompileRequest::noteInternalErrorLoc(SourceLoc const& loc)
     internalErrorLocsNoted++;
 }
 
+static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+
+void CompileRequest::setFileSystem(ISlangFileSystem* inFileSystem)
+{
+    // Set the fileSystem
+    fileSystem = inFileSystem;
+
+    // Set up fileSystemExt appropriately
+    if (inFileSystem == nullptr)
+    {
+        fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getSingleton());
+    }
+    else
+    {
+        // See if we have the interface 
+        inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
+
+        // If not wrap with WrapFileSytem that keeps the old behavior
+        if (!fileSystemExt)
+        {
+            // Construct a wrapper to emulate the extended interface behavior
+            fileSystemExt = new Slang::CacheFileSystem(fileSystem);
+        }
+    }
+
+    // Set the file system used on the source manager
+    sourceManager->setFileSystemExt(fileSystemExt);
+}
 
 RefPtr<ModuleDecl> findOrImportModule(
     CompileRequest*     request,
@@ -1236,35 +1262,12 @@ SLANG_API void spDestroyCompileRequest(
     delete req;
 }
 
-static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
-
 SLANG_API void spSetFileSystem(
     SlangCompileRequest*    request,
     ISlangFileSystem*       fileSystem)
 {
     if(!request) return;
-    auto req = REQ(request);
-
-    // Set the fileSystem
-    req->fileSystem = fileSystem;
-
-    // Set up fileSystemExt appropriately
-    if (fileSystem == nullptr)
-    {
-        req->fileSystemExt = new Slang::CacheFileSystem(Slang::DefaultFileSystem::getSingleton());
-    }
-    else
-    {
-        // See if we have the interface 
-        fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)req->fileSystemExt.writeRef()); 
-
-        // If not wrap with WrapFileSytem that keeps the old behavior
-        if (!req->fileSystemExt)
-        {
-            // Construct a wrapper to emulate the extended interface behavior
-            req->fileSystemExt = new Slang::CacheFileSystem(fileSystem);
-        }
-    }
+    REQ(request)->setFileSystem(fileSystem);
 }
 
 SLANG_API void spSetCompileFlags(
