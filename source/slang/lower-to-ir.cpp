@@ -4922,7 +4922,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRStructType* irStruct = subBuilder->createStructType();
         addNameHint(context, irStruct, decl);
-
         addLinkageDecoration(context, irStruct, decl);
 
         subBuilder->setInsertInto(irStruct);
@@ -4959,14 +4958,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 fieldType);
         }
 
-        // TODO: we should enumerate the non-field members of the type
-        // as well, and ensure those have been emitted (e.g., any
-        // member functions).
+        // There may be members not handled by the above logic (e.g.,
+        // member functions), but we will not immediately force them
+        // to be emitted here, so as not to risk a circular dependency.
+        //
+        // Instead we will force emission of all children of aggregate
+        // type declarations later, from the top-level emit logic.
 
         irStruct->moveToEnd();
-
         addTargetIntrinsicDecorations(irStruct, decl);
-
 
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct));
     }
@@ -6147,6 +6147,31 @@ static void lowerEntryPointToIR(
     }
 }
 
+    /// Ensure that `decl` and all relevant declarations under it get emitted.
+static void ensureAllDeclsRec(
+    IRGenContext*   context,
+    Decl*           decl)
+{
+    ensureDecl(context, decl);
+
+    // Note: We are checking here for aggregate type declarations, and
+    // not for `ContainerDecl`s in general. This is because many kinds
+    // of container declarations will already take responsibility for emitting
+    // their children directly (e.g., a function declaration is responsible
+    // for emitting its own parameters).
+    //
+    // Aggregate types are the main case where we can emit an outer declaration
+    // and not the stuff nested inside of it.
+    //
+    if(auto containerDecl = dynamic_cast<AggTypeDecl*>(decl))
+    {
+        for (auto memberDecl : containerDecl->Members)
+        {
+            ensureAllDeclsRec(context, memberDecl);
+        }
+    }
+}
+
 IRModule* generateIRForTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
@@ -6192,7 +6217,7 @@ IRModule* generateIRForTranslationUnit(
     // been emitted.
     for (auto decl : translationUnit->SyntaxNode->Members)
     {
-        ensureDecl(context, decl);
+        ensureAllDeclsRec(context, decl);
     }
 
 #if 0
