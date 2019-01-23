@@ -185,7 +185,6 @@
     <ClInclude Include="ir-constexpr.h" />
     <ClInclude Include="ir-dce.h" />
     <ClInclude Include="ir-dominators.h" />
-    <ClInclude Include="ir-existential.h" />
     <ClInclude Include="ir-glsl-legalize.h" />
     <ClInclude Include="ir-inst-defs.h" />
     <ClInclude Include="ir-insts.h" />
@@ -241,7 +240,6 @@
     <ClCompile Include="ir-constexpr.cpp" />
     <ClCompile Include="ir-dce.cpp" />
     <ClCompile Include="ir-dominators.cpp" />
-    <ClCompile Include="ir-existential.cpp" />
     <ClCompile Include="ir-glsl-legalize.cpp" />
     <ClCompile Include="ir-legalize-types.cpp" />
     <ClCompile Include="ir-link.cpp" />

@@ -17,14 +17,25 @@ namespace Slang
 // of witness-table lookup to directly refer to the concrete
 // values for witnesses when witness tables are known.
 //
+// This pass also performs some amount of simplification and
+// specialization for code using existential (interface) types
+// for local variables and function parameters/results.
+//
 // Eventually, this pass will also need to perform specialization
 // of functions to argument values for parameters that must
-// be compile-time constants, and simplification of code using
-// existential (interface) types for function parameters/results.
+// be compile-time constants,
+//
+// All of these passes are inter-related in that applying
+// simplifications/specializations of one category can open
+// up opportunities for transformations in the other categories.
 
 struct SpecializationContext
 {
-    // We know that we can only perform specialization when all
+    // For convenience, we will keep a pointer to the module
+    // we are specializing.
+    IRModule* module;
+
+    // We know that we can only perform generic specialization when all
     // of the arguments to a generic are also fully specialized.
     // The "is fully specialized" condition is something we
     // need to solve for over the program, because the fully-
@@ -74,49 +85,60 @@ struct SpecializationContext
         return true;
     }
 
-    // We will also maintain a work list of instructions that are
-    // not fully specialized, and that we want to consider for
-    // specialization.
+    // We will use a single work list of instruction that need
+    // to be considered for specialization or simplification,
+    // whether generic, existential, etc.
     //
     List<IRInst*> workList;
 
-    // When we consider adding an instruction to our work list
-    // we will try to be careful and only add things that aren't
-    // already fully specialized.
-    //
-    void maybeAddToWorkList(IRInst* inst)
+    void addToWorkList(
+        IRInst* inst)
     {
-        if(isInstFullySpecialized(inst))
-            return;
+        // We will ignore any code that is nested under a generic,
+        // because it doesn't make sense to perform specialization
+        // on such code.
+        //
+        for( auto ii = inst->getParent(); ii; ii = ii->getParent() )
+        {
+            if(as<IRGeneric>(ii))
+                return;
+        }
 
         workList.Add(inst);
     }
 
-    // When we go to populate the work list by recursively
-    // traversing some code, we will be careful to *not*
-    // add generics or their children to the work list,
-    // and will instead consider a generic to be "fully
-    // specialized" already (because uses of that generic
-    // as an *operand* should be seen as fully specialized
-    // references).
+    // When a transformation makes a change to an instruction,
+    // we may need to re-consider transformations for instructions
+    // that use its value. In those cases we will call `addUsersToWorkList`
+    // on the instruction that is being modified or replaced.
     //
-    void populateWorkListRec(
-        IRInst*                     inst)
+    void addUsersToWorkList(
+        IRInst* inst)
     {
-        if(auto genericInst = as<IRGeneric>(inst))
+        for( auto use = inst->firstUse; use; use = use->nextUse )
         {
-            fullySpecializedInsts.Add(genericInst);
-        }
-        else
-        {
-            maybeAddToWorkList(inst);
-
-            for(auto child : inst->getChildren())
-            {
-                populateWorkListRec(child);
-            }
+            auto user = use->getUser();
+            addToWorkList(user);
         }
     }
+
+    // One of the main transformations we will apply is to
+    // consider an instruction as being fully specialized.
+    //
+    void markInstAsFullySpecialized(
+        IRInst* inst)
+    {
+        if(fullySpecializedInsts.Contains(inst))
+            return;
+        fullySpecializedInsts.Add(inst);
+
+        // If we know that an instruction is fully specialized,
+        // then we should start to consider its uses and children
+        // as candidates for being fully specialized too...
+        //
+        addUsersToWorkList(inst);
+    }
+
 
     // Of course, somewhere along the way we expect
     // to run into uses of `specialize(...)` instructions
@@ -278,7 +300,7 @@ struct SpecializationContext
                 // operations nested inside the first generic that refer
                 // to the second.
                 //
-                populateWorkListRec(clonedInst);
+                addToWorkList(clonedInst);
             }
         }
 
@@ -344,6 +366,13 @@ struct SpecializationContext
     void maybeSpecializeGeneric(
         IRSpecialize* specInst)
     {
+        // We will only attempt to specialize when all ofthe
+        // operands to the `speicalize(...)` instruction are
+        // themselves fully specialized.
+        //
+        if(!areAllOperandsFullySpecialized(specInst))
+            return;
+
         // The invariant that the arguments are fully specialized
         // should mean that `a, b, c, ...` are in a form that
         // we can work with, but it does *not* guarantee
@@ -372,6 +401,12 @@ struct SpecializationContext
         //
         auto specializedVal = specializeGeneric(genericVal, specInst);
 
+        // Any uses of this `specialize(...)` instruction will
+        // become uses of `specializeVal`, so we want to re-consider
+        // them for subsequent transformations.
+        //
+        addUsersToWorkList(specInst);
+
         // Then we simply replace any uses of the `specialize(...)`
         // instruction with the specialized value and delete
         // the `specialize(...)` instruction from existence.
@@ -380,29 +415,52 @@ struct SpecializationContext
         specInst->removeAndDeallocate();
     }
 
-    // The basic rule we are following is that once all the operands
-    // to an instruction are fully specialized, we are safe
-    // to specialize the instruction itself, but the work
-    // required to specialize an instruction depends on the
-    // form of the instruction.
+    // Generic specialization depends on identifying when
+    // instructions are fully specialized.
     //
-    void fullySpecializeInst(
-        IRInst*                     inst)
+    void maybeMarkAsFullySpecialized(
+        IRInst* inst)
     {
-        // A precondition of the `fullySpecializeInst` operation
-        // is that the operands to `inst` have all been fully
-        // specialized.
-        //
-        SLANG_ASSERT(areAllOperandsFullySpecialized(inst));
-
         switch(inst->op)
         {
         default:
-            // The default case is that there is nothing to
-            // be done to specialize an instruction; once all
-            // of its operands are specialized it is safe
-            // to consider the instruction itself as fully
-            // specialized.
+            // The default case is that an instruction can
+            // be considered as fully specialized as soon
+            // as all of its operands are.
+            //
+            // TODO: We realistically need a more refined
+            // check here that uses a white-list of instructions
+            // that can represent values suitable for use
+            // as generic arguments.
+            //
+            if(areAllOperandsFullySpecialized(inst))
+            {
+                markInstAsFullySpecialized(inst);
+            }
+            break;
+
+            // Certain instructions cannot ever be considered
+            // fully specialized because they should never
+            // be substituted into a generic as its arguments.
+        case kIROp_Specialize:
+        case kIROp_lookup_interface_method:
+        case kIROp_ExtractExistentialType:
+            break;
+        }
+    }
+
+    // The core of this pass is to look at one instruction
+    // at a time, and try to perform whatever specialization
+    // is appropriate based on its opcode.
+    //
+    void maybeSpecializeInst(
+        IRInst*                     inst)
+    {
+        switch(inst->op)
+        {
+        default:
+            // By default we assume that specialization is
+            // not possible for a given opcode.
             //
             break;
 
@@ -414,7 +472,7 @@ struct SpecializationContext
             break;
 
         case kIROp_lookup_interface_method:
-            // The remaining case we need to consider here
+            // The remaining case we need to consider here for generics
             // is when we have a `lookup_witness_method` instruction
             // that is being applied to a concrete witness table,
             // because we can specialize it to just be a direct
@@ -422,9 +480,37 @@ struct SpecializationContext
             //
             maybeSpecializeWitnessLookup(cast<IRLookupWitnessMethod>(inst));
             break;
+
+        case kIROp_Call:
+            // When writing functions with existential-type parameters,
+            // we need additional support to specialize a callee
+            // function based on the concrete type encapsulated in
+            // an argument of existential type.
+            //
+            maybeSpecializeExistentialsForCall(cast<IRCall>(inst));
+            break;
+
+            // The specialization of functions with existential-type
+            // parameters can create further opportunities for specialization,
+            // but in order to realize these we often need to propagate
+            // through local simplification on values of existential type.
+            //
+        case kIROp_ExtractExistentialType:
+            maybeSpecializeExtractExistentialType(inst);
+            break;
+        case kIROp_ExtractExistentialValue:
+            maybeSpecializeExtractExistentialValue(inst);
+            break;
+        case kIROp_ExtractExistentialWitnessTable:
+            maybeSpecializeExtractExistentialWitnessTable(inst);
+            break;
         }
     }
 
+    // Specializing lookup on witness tables is a general
+    // transformation that helps with both generic and
+    // existential-based code. 
+    //
     void maybeSpecializeWitnessLookup(
         IRLookupWitnessMethod* lookupInst)
     {
@@ -464,6 +550,11 @@ struct SpecializationContext
         // instruciton dynamically, so we can go ahead and
         // replace the original instruction with that value.
         //
+        // We also make sure to add any uses of the lookup
+        // instruction to our work list, because subsequent
+        // simplifications might be possible now.
+        //
+        addUsersToWorkList(lookupInst);
         lookupInst->replaceUsesWith(satisfyingVal);
         lookupInst->removeAndDeallocate();
     }
@@ -491,11 +582,11 @@ struct SpecializationContext
         return nullptr;
     }
 
-    // All of the machinery has been defined above, so
-    // we can now walk through the flow of the overall
-    // specialization pass.
+    // All of the machinery for generic specialization
+    // has been defined above, so we will now walk
+    // through the flow of the overall specialization pass.
     //
-    void processModule(IRModule* module)
+    void processModule()
     {
         // We start by initializing our shared IR building state,
         // since we will re-use that state for any code we
@@ -518,6 +609,626 @@ struct SpecializationContext
         // replacement of the given generic type parameter with
         // the desired concrete value.
         //
+        // TODO: When we start to support global shader parameters
+        // that include existential/interface types, we will need
+        // to support a similar specialization step for them.
+        //
+        specializeGlobalGenericParameters();
+
+        // Now that we've eliminated all cases of global generic parameters,
+        // we should now have the properties that:
+        //
+        // 1. Execution starts in non-generic code, with no unbound
+        //    generic parameters in scope.
+        //
+        // 2. Any case where non-generic code makes use of a generic
+        //    type/function, there will be a `specialize` instruction
+        //    that specifies both the generic and the (concrete) type
+        //    arguments that should be provided to it.
+        //
+        // The basic approach now is to look for opportunities to apply
+        // our specialization rules (e.g., a `specialize` instruction
+        // where all the type arguments are concrete types) and then
+        // processing any additional opportunities created along the way.
+        //
+        // We start out simple by putting the root instruction for the
+        // module onto our work list.
+        //
+        addToWorkList(module->getModuleInst());
+
+        // We will then iterate until our work list goes dry.
+        //
+        while(workList.Count() != 0)
+        {
+            IRInst* inst = workList.Last();
+            workList.RemoveLast();
+
+            // For each instruction we process, we want to perform
+            // a few steps.
+            //
+            // First we will do any checking required to tag an
+            // instruction as being fully specialized.
+            //
+            maybeMarkAsFullySpecialized(inst);
+
+            // Next we will look for all the general-purpose
+            // specialization opportunities (generic specialization,
+            // existential specialization, simplifications, etc.)
+            //
+            maybeSpecializeInst(inst);
+
+            // Finally, we need to make our logic recurse through
+            // the whole IR module, so we want to add the children
+            // of any parent instructions to our work list so that
+            // we process them too.
+            //
+            // Note that we are adding the children of an instruction
+            // in reverse order. This is because the way we are
+            // using the work list treats it like a stack (LIFO) and
+            // we know that fully-specialized-ness will tend to flow
+            // top-down through the program, so that we want to process
+            // the children of an instruction in their original order.
+            //
+            for(auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                // Also note that `addToWorkList` has been written
+                // to avoid adding any instruction that is a descendent
+                // of an IR generic, because we don't actually want
+                // to perform specialization inside of generics.
+                //
+                addToWorkList(child);
+            }
+        }
+
+        // Once the work list has gone dry, we should have the invariant
+        // that there are no `specialize` instructions inside of non-generic
+        // functions that in turn reference a generic type/function, *except*
+        // in the case where that generic is for a builtin type/function, in
+        // which case we wouldn't want to specialize it anyway.
+    }
+
+    // Given a `call` instruction in the IR, we need to detect the case
+    // where the callee has some interface-type parameter(s) and at the
+    // call site it is statically clear what concrete type(s) the arguments
+    // will have.
+    //
+    void maybeSpecializeExistentialsForCall(IRCall* inst)
+    {
+        // We can only specialize a call when the callee function is known.
+        //
+        auto calleeFunc = as<IRFunc>(inst->getCallee());
+        if(!calleeFunc)
+            return;
+
+        // We can only specialize if we have access to a body for the callee.
+        //
+        if(!calleeFunc->isDefinition())
+            return;
+
+        // We shouldn't bother specializing unless the calee has at least
+        // one parameter that has an existential/interface type.
+        //
+        bool shouldSpecialize = false;
+        UInt argCounter = 0;
+        for( auto param : calleeFunc->getParams() )
+        {
+            auto arg = inst->getArg(argCounter++);
+            if( !isExistentialType(param->getDataType()) )
+                continue;
+
+            shouldSpecialize = true;
+
+            // We *cannot* specialize unless the argument value corresponding
+            // to such a parameter is one we can specialize.
+            //
+            if( !canSpecializeExistentialArg(arg))
+                return;
+
+        }
+        // If we never found a parameter wroth specializing, we should bail out.
+        //
+        if(!shouldSpecialize)
+            return;
+
+        // At this point, we believe we *should* and *can* specialize.
+        //
+        // We need a specialized variant of the callee (with the concrete
+        // types substituted in for existential-type parameters), and then
+        // we can replace the call site to call the new function instead.
+        //
+        // Any two call sites where the argument types are the same can
+        // re-use the same callee, so we will  cache and re-use the
+        // specialized functions that we generate (similar to how generic
+        // specialization works). Therefore we will construct a key
+        // for use when caching the specialized functions.
+        // 
+        IRSimpleSpecializationKey key;
+
+        // The specialized callee will always depend on the unspecialized
+        // function from which it is generated, so we add that to our key.
+        //
+        key.vals.Add(calleeFunc);
+
+        // Also, for any parameter that has an existential type, the
+        // specialized function will depend on the concrete type of the
+        // argument.
+        //
+        argCounter = 0;
+        for( auto param : calleeFunc->getParams() )
+        {
+            auto arg = inst->getArg(argCounter++);
+            if( !isExistentialType(param->getDataType()) )
+                continue;
+
+            if( auto makeExistential = as<IRMakeExistential>(arg) )
+            {
+                // Note that we use the *type* stored in the
+                // existential-type argument, but not anything to
+                // do with the particular value (otherwise we'd only
+                // be able to re-use the specialized callee for
+                // call sites that pass in the exact same argument).
+                //
+                auto val = makeExistential->getWrappedValue();
+                auto valType = val->getFullType();
+                key.vals.Add(valType);
+
+                // We are also including the witness table in the key.
+                // This isn't required with our current language model,
+                // since a given type can only conform to a given interface
+                // in one way (so there can be only one witness table).
+                // That means that the `valType` and the existential
+                // type of `param` above should uniquely determine
+                // the witness table we see.
+                //
+                // There are forward-looking cases where supporting
+                // "overlapping conformances" could be required, and
+                // there is low incremental cost to future-proofing
+                // this code, so we go ahead and add the witness
+                // tbale even if it is redundant.
+                //
+                auto witnessTable = makeExistential->getWitnessTable();
+                key.vals.Add(witnessTable);
+            }
+            else
+            {
+                SLANG_UNEXPECTED("missing case for existential argument");
+            }
+        }
+
+        // Once we've constructed our key, we can try to look for an
+        // existing specialization of the callee that we can use.
+        //
+        IRFunc* specializedCallee = nullptr;
+        if( !existentialSpecializedFuncs.TryGetValue(key, specializedCallee) )
+        {
+            // If we didn't find a specialized callee already made, then we
+            // will go ahead and create one, and then register it in our cache.
+            //
+            specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
+            existentialSpecializedFuncs.Add(key, specializedCallee);
+        }
+
+        // At this point we have found or generated a specialized version
+        // of the callee, and we need to emit a call to it.
+        //
+        // We will start by constructing the argument list for the new call.
+        //
+        argCounter = 0;
+        List<IRInst*> newArgs;
+        for( auto param : calleeFunc->getParams() )
+        {
+            auto arg = inst->getArg(argCounter++);
+
+            // How we handle each argument depends on whether the corresponding
+            // parameter has an existential type or not.
+            //
+            if( !isExistentialType(param->getDataType()) )
+            {
+                // If the parameter doesn't have an existential type, then we
+                // don't want to change up the argument we pass at all.
+                //
+                newArgs.Add(arg);
+            }
+            else
+            {
+                // Any place where the original function had a parameter of
+                // existential type, we will now be passing in the concrete
+                // argument value instead of an existential wrapper.
+                //
+                if( auto makeExistential = as<IRMakeExistential>(arg) )
+                {
+                    auto val = makeExistential->getWrappedValue();
+                    newArgs.Add(val);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("missing case for existential argument");
+                }
+            }
+        }
+
+        // Now that we've built up our argument list, it is simple enough
+        // to construct a new `call` instruction.
+        //
+        IRBuilder builderStorage;
+        auto builder = &builderStorage;
+        builder->sharedBuilder = &sharedBuilderStorage;
+
+        builder->setInsertBefore(inst);
+        auto newCall = builder->emitCallInst(
+            inst->getFullType(), specializedCallee, newArgs);
+
+        // We will completely replace the old `call` instruction with the
+        // new one, and will go so far as to transfer any decorations
+        // that were attached to the old call over to the new one.
+        //
+        inst->transferDecorationsTo(newCall);
+        inst->replaceUsesWith(newCall);
+        inst->removeAndDeallocate();
+
+        // Just in case, we will add any instructions that used the
+        // result of this call to our work list for re-consideration.
+        // At this moment this shouldn't open up new opportunities
+        // for specialization, but we can always play it safe.
+        //
+        addUsersToWorkList(newCall);
+    }
+
+    // The above `maybeSpecializeExistentialsForCall` routine needed
+    // a few utilities, which we will now define.
+
+    // First, we want to be able to test whether a type (used by
+    // a parameter) is an existential type so that we should specialize it.
+    //
+    bool isExistentialType(IRType* type)
+    {
+        // An IR-level interface type is always an existential.
+        //
+        if(as<IRInterfaceType>(type))
+            return true;
+
+        // Eventually we will also want to handle arrays over
+        // existential types, but that will require careful
+        // handling in many places.
+
+        return false;
+    }
+
+    // Similarly, we want to be able to test whether an instruction
+    // used as an argument for an existential-type parameter is
+    // suitable for use in specialization.
+    //
+    bool canSpecializeExistentialArg(IRInst* inst)
+    {
+        // A `makeExistential(v, w)` instruction can be used
+        // for specialization, since we have the concrete value `v`
+        // (which implicitly determines the concrete type), and
+        // the witness table `w.
+        //
+        if(as<IRMakeExistential>(inst))
+            return true;
+
+        // If we start to specialize functions that take arrays
+        // of existentials as input, we will need a strategy to
+        // determine arguments suitable for use in specializing
+        // them (these would need to be arrays that nominally
+        // have an existential element type, but somehow have
+        // annotations to indicate that the concrete type
+        // underlying the elements in homogeneous).
+
+        return false;
+    }
+
+    // In order to cache and re-use functions that have had existential-type
+    // parameters specialized, we need storage for the cache.
+    //
+    Dictionary<IRSimpleSpecializationKey, IRFunc*> existentialSpecializedFuncs;
+
+    // The logic for creating a specialized callee function by plugging
+    // in concrete types for existentials is similar to other cases of
+    // specialization in the compiler.
+    //
+    IRFunc* createExistentialSpecializedFunc(
+        IRCall* oldCall,
+        IRFunc* oldFunc)
+    {
+        // We will make use of the infrastructure for cloning
+        // IR code, that is defined in `ir-clone.{h,cpp}`.
+        //
+        // In order to do the cloning work we need an
+        // "environment" that will map old values to
+        // their replacements.
+        //
+        IRCloneEnv cloneEnv;
+
+        // We also need some IR building state, for any
+        // new instructions we will emit.
+        //
+        IRBuilder builderStorage;
+        auto builder = &builderStorage;
+        builder->sharedBuilder = &sharedBuilderStorage;
+
+        // We will start out by determining what the parameters
+        // of the specialized function should be, based on
+        // the parameters of the original, and the concrete
+        // type of selected arguments at the call site.
+        //
+        // Along the way we will build up explicit lists of
+        // the parameters, as well as any new instructions
+        // that need to be added to the body of the function
+        // we generate (as a kind of "prologue"). We build
+        // the lists here because we don't yet have a basic
+        // block, or even a function, to insert them into.
+        //
+        List<IRParam*> newParams;
+        List<IRInst*> newBodyInsts;
+        UInt argCounter = 0;
+        for( auto oldParam : oldFunc->getParams() )
+        {
+            auto arg = oldCall->getArg(argCounter++);
+
+            // Given an old parameter, and the argument value at
+            // the (old) call site, we need to determine what
+            // value should stand in for that parameter in
+            // the specialized callee.
+            //
+            IRInst* replacementVal = nullptr;
+
+            if( !isExistentialType(oldParam->getDataType()) )
+            {
+                // For parameters that don't have an existential type,
+                // there is nothing interesting to do. The new function
+                // will also have a parameter of the exact same type,
+                // and we'll use that instead of the original parameter.
+                //
+                auto newParam = builder->createParam(oldParam->getFullType());
+                newParams.Add(newParam);
+                replacementVal = newParam;
+            }
+            else
+            {
+                // The trickier case is when we have an existential-type
+                // parameter, because we need to extract out the concrete
+                // type that is coming from the call site.
+                //
+                if( auto oldMakeExistential = as<IRMakeExistential>(arg) )
+                {
+                    // In this case, the `arg` is `makeExistential(val, witnessTable)`
+                    // and we know that the specialized call site will just be
+                    // passing in `val`.
+                    //
+                    auto val = oldMakeExistential->getWrappedValue();
+                    auto witnessTable = oldMakeExistential->getWitnessTable();
+
+                    // Our specialized function needs to take a parameter with the
+                    // same type as `val`, to match the call site(s) that will be
+                    // created.
+                    //
+                    auto valType = val->getFullType();
+                    auto newParam = builder->createParam(valType);
+                    newParams.Add(newParam);
+
+                    // Within the body of the function we cannot just use `val`
+                    // directly, because the existing code expects an existential
+                    // value, including its witness table.
+                    //
+                    // Therefore we will create a `makeExtensial(newParam, witnessTable)`
+                    // in the body of the new function and use *that* as the replacement
+                    // value for the original parameter (since it will have the
+                    // correct existential type, and stores the right witness table).
+                    //
+                    auto newMakeExistential = builder->emitMakeExistential(oldParam->getFullType(), newParam, witnessTable);
+                    newBodyInsts.Add(newMakeExistential);
+                    replacementVal = newMakeExistential;
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("missing case for existential argument");
+                }
+            }
+
+            // Whatever replacement value was constructed, we need to
+            // register it as the replacement for the original parameter.
+            //
+            cloneEnv.mapOldValToNew.Add(oldParam, replacementVal);
+        }
+
+        // Next we will create the skeleton of the new
+        // specialized function, including its type.
+        //
+        // In order to construct the type of the new function, we
+        // need to extract the types of all its parameters.
+        //
+        List<IRType*> newParamTypes;
+        for( auto newParam : newParams )
+        {
+            newParamTypes.Add(newParam->getFullType());
+        }
+        IRType* newFuncType = builder->getFuncType(
+            newParamTypes.Count(),
+            newParamTypes.Buffer(),
+            oldFunc->getResultType());
+        IRFunc* newFunc = builder->createFunc();
+        newFunc->setFullType(newFuncType);
+
+        // By construction, our new function type will be
+        // "fully specialized" by the rules used for doing
+        // generic specialization elsewhere in this pass.
+        //
+        fullySpecializedInsts.Add(newFuncType);
+
+        // The above steps have accomplished the "first phase"
+        // of cloning the function (since `IRFunc`s have no
+        // operands).
+        //
+        // We can now use the shared IR cloning infrastructure
+        // to perform the second phase of cloning, which will recursively
+        // clone any nested decorations, blocks, and instructions.
+        //
+        cloneInstDecorationsAndChildren(
+            &cloneEnv,
+            builder->sharedBuilder,
+            oldFunc,
+            newFunc);
+
+        // Now that the main body of existing isntructions have
+        // been cloned into the new function, we can go ahead
+        // and insert all the parameters and body instructions
+        // we built up into the function at the right place.
+        //
+        // We expect the function to always have at least one
+        // block (this was an invariant established before
+        // we decided to specialize).
+        //
+        auto newEntryBlock = newFunc->getFirstBlock();
+        SLANG_ASSERT(newEntryBlock);
+
+        // We expect every valid block to have at least one
+        // "ordinary" instruction (it will at least have
+        // a terminator like a `return`).
+        //
+        auto newFirstOrdinary = newEntryBlock->getFirstOrdinaryInst();
+        SLANG_ASSERT(newFirstOrdinary);
+
+        // All of our parameters will get inserted before
+        // the first ordinary instruction (since the function parameters
+        // should come at the start of the first block).
+        //
+        for( auto newParam : newParams )
+        {
+            newParam->insertBefore(newFirstOrdinary);
+        }
+
+        // All of our new body instructions will *also* be inserted
+        // before the first ordinary instruction (but will come
+        // *after* the parameters by the order of these two loops).
+        //
+        for( auto newBodyInst : newBodyInsts )
+        {
+            newBodyInst->insertBefore(newFirstOrdinary);
+        }
+
+        // After all this work we have a valid `newFunc` that has been
+        // specialized to match the types at the call site.
+        //
+        // There might be further opportunities for simplification and
+        // specialization in the function body now that we've plugged
+        // in some more concrete type information, so we will
+        // add the whole function to our work list for subsequent
+        // consideration.
+        //
+        addToWorkList(newFunc);
+
+        return newFunc;
+    }
+
+    // When we've specialized a function with an interface-type parameter
+    // we will still end up with a `makeExistential` operation in its
+    // body, which could impede subequent specializations.
+    //
+    // For example, if we have the following after specialization:
+    //
+    //      e = makeExistential(v, w1);
+    //      w2 = extractExistentialWitnessTable(e);
+    //      f = lookup_witness_method(w2, k);
+    //      call(f, ...);
+    //
+    // We cannot then specialize the lookup for `f` in this code as written,
+    // but it seems obvious that we could replace `w2` with `w1` and maybe
+    // get further along.
+    //
+    // In order to set up further specialization opportunities we need
+    // to implement a few simplification rules around operations that
+    // extract from an existential, when their operand is a `makeExistential`.
+    //
+    // Let's start with the routine for the case above of extracting
+    // a witness table.
+    //
+    void maybeSpecializeExtractExistentialWitnessTable(IRInst* inst)
+    {
+        // We know `inst` is `extractExistentialWitnessTable(existentialArg)`.
+        //
+        auto existentialArg = inst->getOperand(0);
+
+        if( auto makeExistential = as<IRMakeExistential>(existentialArg) )
+        {
+            // In this case we know `inst` is:
+            //
+            //      extractExistentialWitnessTable(makeExistential(..., witnessTable))
+            //
+            // and we can just simplify that to `witnessTable`.
+            //
+            auto witnessTable = makeExistential->getWitnessTable();
+
+            // Anything that used this instruction is now a candidate for
+            // further simplification or specialization (e.g., one of
+            // the users of this instruction could be a `lookup_witness_method`
+            // that we can now specialize).
+            //
+            addUsersToWorkList(inst);
+
+            inst->replaceUsesWith(witnessTable);
+            inst->removeAndDeallocate();
+        }
+    }
+
+    // The cases for simplifying `extractExistentialValue` is more or less the same
+    // as for witness tables.
+    //
+    void maybeSpecializeExtractExistentialValue(IRInst* inst)
+    {
+        // We know `inst` is `extractExistentialValue(existentialArg)`.
+        //
+        auto existentialArg = inst->getOperand(0);
+        if( auto makeExistential = as<IRMakeExistential>(existentialArg) )
+        {
+            // Now we know `inst` is:
+            //
+            //      extractExistentialValue(makeExistential(val, ...))
+            //
+            // and we can just simplify that to `val`.
+            //
+            auto val = makeExistential->getWrappedValue();
+
+            addUsersToWorkList(inst);
+
+            inst->replaceUsesWith(val);
+            inst->removeAndDeallocate();
+        }
+    }
+
+    // The cases for simplifying `extractExistentialType` is more or less the same
+    // as for witness tables.
+    //
+    void maybeSpecializeExtractExistentialType(IRInst* inst)
+    {
+        // We know `inst` is `extractExistentialValue(existentialArg)`.
+        //
+        auto existentialArg = inst->getOperand(0);
+        if( auto makeExistential = as<IRMakeExistential>(existentialArg) )
+        {
+            // Now we know `inst` is:
+            //
+            //      extractExistentialType(makeExistential(val, ...))
+            //
+            // and we can just simplify that to type type of `val`.
+            //
+            auto val = makeExistential->getWrappedValue();
+            auto valType = val->getFullType();
+
+            addUsersToWorkList(inst);
+
+            inst->replaceUsesWith(valType);
+            inst->removeAndDeallocate();
+        }
+    }
+
+    // The handling of specialization for global generic type
+    // parameters involves searching for all `bind_global_generic_param`
+    // instructions in the input module.
+    //
+    void specializeGlobalGenericParameters()
+    {
         auto moduleInst = module->getModuleInst();
         for(auto inst : moduleInst->getChildren())
         {
@@ -580,106 +1291,15 @@ struct SpecializationContext
                 }
             }
         }
-
-        // Now that we've eliminated all cases of global generic parameters,
-        // we should now have the properties that:
-        //
-        // 1. Execution starts in non-generic code, with no unbound
-        //    generic parameters in scope.
-        //
-        // 2. Any case where non-generic code makes use of a generic
-        //    type/function, there will be a `specialize` instruction
-        //    that specifies both the generic and the (concrete) type
-        //    arguments that should be provided to it.
-        //
-        // Our primary goal is then to find `specialize` instructions that
-        // can be replaced with references to, e.g., a suitably
-        // specialized function, and to resolve any `lookup_interface_method`
-        // instructions to the concrete value fetched from a witness
-        // table.
-        //
-        // We need to be careful of a few things:
-        //
-        // * It would not in general make sense to consider specialize-able
-        //   instructions under an `IRGeneric`, since that could mean "specializing"
-        //   code to parameter values that are still unknown.
-        //
-        // * We *also* need to be careful not to specialize something when one
-        //   or more of its inputs is also a `specialize` or `lookup_interface_method`
-        //   instruction, because then we'd be propagating through non-concrete
-        //   values.
-        //
-        // The approach we use here is to build a work list of instructions
-        // that are candidates for specialization, and then process them one
-        // at a time to see if we can make some forward progress.
-        //
-        // We will start by recursively walking all the instructions to add
-        // the appropriate ones to  our work list:
-        //
-        populateWorkListRec(moduleInst);
-
-        // We want to treat our work list like a queue rather than
-        // a stack, because we populated it in program order,
-        // and fully-specialized-ness will tend to flow top-down.
-        //
-        // To accomplish this we will ping-pong between the
-        // real work list and a copy so that we can iterate over
-        // one list while adding to the other.
-        //
-        List<IRInst*> workListCopy;
-        while(workList.Count() != 0)
-        {
-            workListCopy.Clear();
-            workListCopy.SwapWith(workList);
-
-            for( auto inst : workListCopy )
-            {
-                // We need to check whether it is possible to specialize
-                // the instruction yet. It might not be specializable
-                // because its operands haven't been specialized.
-                //
-                if(!areAllOperandsFullySpecialized(inst))
-                {
-                    // If we can't fully specialize this instruction
-                    // yet, then we need to toss it back onto the
-                    // work list to be considered in the next round.
-                    //
-                    // TODO: We need to carefully vet that this can
-                    // never lead to infinite looping
-                    //
-                    workList.Add(inst);
-                }
-                else
-                {
-                    // If all of the operands to `inst` are
-                    // fully specialized, then we can go
-                    // ahead and do whatever is required
-                    // to "fully specialize" `inst` itself.
-                    //
-                    fullySpecializeInst(inst);
-
-                    // At this point, we want to start
-                    // considering `inst` as fully specialized,
-                    // so let's add it to our set.
-                    //
-                    fullySpecializedInsts.Add(inst);
-                }
-            }
-        }
-
-        // Once the work list has gone dry, we should have the invariant
-        // that there are no `specialize` instructions inside of non-generic
-        // functions that in turn reference a generic type/function, *except*
-        // in the case where that generic is for a builtin type/function, in
-        // which case we wouldn't want to specialize it anyway.
     }
 };
 
-void specializeGenerics(
+void specializeModule(
     IRModule*   module)
 {
     SpecializationContext context;
-    context.processModule(module);
+    context.module = module;
+    context.processModule();
 }
 
 } // namespace Slang
