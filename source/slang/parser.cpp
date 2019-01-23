@@ -1163,16 +1163,13 @@ namespace Slang
         parser->ReadToken(TokenType::OpGreater);
         decl->inner = parseInnerFunc(decl);
         decl->inner->ParentDecl = decl;
+
         // A generic decl hijacks the name of the declaration
         // it wraps, so that lookup can find it.
         if (decl->inner)
         {
             decl->nameAndLoc = decl->inner->nameAndLoc;
             decl->loc = decl->inner->loc;
-        }
-        else
-        {
-            decl = decl;
         }
     }
 
