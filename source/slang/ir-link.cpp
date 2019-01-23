@@ -855,7 +855,15 @@ bool isBetterForTarget(
     if(newLevel != oldLevel)
         return UInt(newLevel) > UInt(oldLevel);
 
-    // All other factors being equal, a definition is
+    // All preceding factors being equal, an `[export]` is better
+    // than an `[import]`.
+    //
+    bool newIsExport = newVal->findDecoration<IRExportDecoration>() != nullptr;
+    bool oldIsExport = oldVal->findDecoration<IRExportDecoration>() != nullptr;
+    if(newIsExport != oldIsExport)
+        return newIsExport;
+
+    // All preceding factors being equal, a definition is
     // better than a declaration.
     auto newIsDef = isDefinition(newVal);
     auto oldIsDef = isDefinition(oldVal);
