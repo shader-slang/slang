@@ -1279,7 +1279,7 @@ namespace Slang
         }
     }
 
-        /// Complete parsing of a function using traditiona (C-like) declarator syntax
+        /// Complete parsing of a function using traditional (C-like) declarator syntax
     static RefPtr<Decl> parseTraditionalFuncDecl(
         Parser*                 parser,
         DeclaratorInfo const&   declaratorInfo)
@@ -1295,7 +1295,7 @@ namespace Slang
             // parsed in a scope that didn't include the function's generic
             // parameters.
             //
-            // We will use a visitor here to try and replace the scope assocaited
+            // We will use a visitor here to try and replace the scope associated
             // with any name expressiosn in the reuslt type.
             //
             // TODO: This should be fixed by not associating scopes with
