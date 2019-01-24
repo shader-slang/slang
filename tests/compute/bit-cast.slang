@@ -9,5 +9,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[dispatchThreadID.x] = asint(float(dispatchThreadID.x) + 1.0f);
+    int numBits = countbits(int(dispatchThreadID.x));
+    
+    outputBuffer[dispatchThreadID.x] = asint(float(dispatchThreadID.x) + numBits + 1.0f);
 }
