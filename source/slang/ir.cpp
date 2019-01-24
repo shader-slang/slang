@@ -3118,6 +3118,22 @@ namespace Slang
         if(as<IRConstant>(inst))
             return true;
 
+        // We are going to have a general rule that
+        // a type should be folded into its use site,
+        // which improves output in most cases, but
+        // we would like to not apply that rule to
+        // "nominal" types like `struct`s.
+        //
+        switch( inst->op )
+        {
+        case kIROp_StructType:
+        case kIROp_InterfaceType:
+            return false;
+
+        default:
+            break;
+        }
+
         if(as<IRType>(inst))
             return true;
 

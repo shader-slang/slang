@@ -82,6 +82,8 @@
     <Expand>
       <Item Name="[op]">op</Item>
       <Item Name="[type]">typeUse.usedValue</Item>
+      <Item Name="[value]" Condition="op == Slang::kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
+      <Item Name="[value]" Condition="op == Slang::kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
       <Synthetic Name="[operands]">
         <DisplayString>{{count = {operandCount}}}</DisplayString>
         <Expand>
@@ -112,15 +114,6 @@
         </Expand>
       </Synthetic>
   </Expand>
-  </Type>
-  <Type Name="Slang::IRDeclRef">
-    <DisplayString>{{IRDeclRef {declRef}}}</DisplayString>
-    <Expand>
-      <Item Name="[op]">op</Item>
-      <Item Name="[type]">type</Item>
-      <Item Name="[declRef]">declRef</Item>
-      <Item Name="[parent]">parent</Item>
-    </Expand>
   </Type>
   <Type Name="Slang::IRUse">
     <DisplayString>{{IRUse {usedValue}}}</DisplayString>

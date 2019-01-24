@@ -1238,6 +1238,23 @@ void legalizeEntryPointParameterForGLSL(
                 }
             }
 
+            // We will still have references to the parameter coming
+            // from the `EmitVertex` calls, so we need to replace it
+            // with something. There isn't anything reasonable to
+            // replace it with that would have the right type, so
+            // we will replace it with an undefined value, knowing
+            // that the emitted code will not actually reference it.
+            //
+            // TODO: This approach to generating geometry shader code
+            // is not ideal, and we should strive to find a better
+            // approach that involes coding the `EmitVertex` operation
+            // directly in the stdlib, similar to how ray-tracing
+            // operations like `TraceRay` are handled.
+            //
+            builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto undefinedVal = builder->emitUndefined(pp->getFullType());
+            pp->replaceUsesWith(undefinedVal);
+
             return;
         }
     }

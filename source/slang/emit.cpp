@@ -3488,7 +3488,23 @@ struct EmitVisitor
             emit(".");
             operandIndex++;
         }
-
+        // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
+        bool glslSignFix = ctx->shared->target == CodeGenTarget::GLSL && name == "sign";
+        if (glslSignFix)
+        {
+            if (auto vectorType = as<IRVectorType>(inst->getDataType()))
+            {
+                emit("ivec");
+                emit(as<IRConstant>(vectorType->getElementCount())->value.intVal);
+                emit("(");
+            }
+            else if (auto scalarType = as<IRBasicType>(inst->getDataType()))
+            {
+                emit("int(");
+            }
+            else
+                glslSignFix = false;
+        }
         emit(name);
         emit("(");
         bool first = true;
@@ -3499,7 +3515,8 @@ struct EmitVisitor
             first = false;
         }
         emit(")");
-
+        if (glslSignFix)
+            emit(")");
         maybeCloseParens(needClose);
     }
 
