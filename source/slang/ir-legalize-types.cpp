@@ -1313,7 +1313,7 @@ static LegalVal legalizeFunc(
         newResultType);
 
     context->builder->setDataType(irFunc, newFuncType);
-
+    context->builder->setInsertInto(irFunc);
     legalizeInstsInParent(context, irFunc);
 
     return LegalVal::simple(irFunc);

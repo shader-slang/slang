@@ -2,7 +2,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 // This is a basic test for Slang compute shader.
 
-RWStructuredBuffer<float> outputBuffer;
+RWStructuredBuffer<uint> outputBuffer;
 
 interface IInterface
 {
@@ -39,5 +39,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Empty obj;
     test(obj);
-    outputBuffer[dispatchThreadID.x] = float(dispatchThreadID.x);
+    outputBuffer[dispatchThreadID.x] = dispatchThreadID.x;
 }
