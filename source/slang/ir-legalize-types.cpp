@@ -952,7 +952,20 @@ static LegalVal legalizeMakeStruct(
     }
 }
 
-
+static LegalVal legalizeConstruct(IRTypeLegalizationContext*    context,
+    LegalType                   type)
+{
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::none:
+        return LegalVal();
+    case LegalType::Flavor::simple:
+        return LegalVal::simple(context->builder->emitConstructorInst(type.getSimple(), 0, nullptr));
+    default:
+        SLANG_UNEXPECTED("unhandled legalization case for construct inst.");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
 
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*    context,
@@ -990,7 +1003,8 @@ static LegalVal legalizeInst(
             type,
             args,
             inst->getOperandCount());
-
+    case kIROp_Construct:
+        return legalizeConstruct(context, type);
     case kIROp_undefined:
         return LegalVal();
     default:
