@@ -129,25 +129,6 @@ static LegalType legalizeType(
     return legalizeType(context->typeLegalizationContext, type);
 }
 
-// Legalize a type, and then expect it to
-// result in a simple type.
-static IRType* legalizeSimpleType(
-    IRTypeLegalizationContext*    context,
-    IRType*                       type)
-{
-    auto legalType = legalizeType(context, type);
-    switch (legalType.flavor)
-    {
-    case LegalType::Flavor::simple:
-        return legalType.getSimple();
-
-    default:
-        // TODO: need to issue a diagnostic here.
-        SLANG_UNEXPECTED("unexpected type case");
-        break;
-    }
-}
-
 // Take a value that is being used as an operand,
 // and turn it into the equivalent legalized value.
 static LegalVal legalizeOperand(
@@ -209,19 +190,45 @@ static LegalVal legalizeCall(
     IRTypeLegalizationContext*    context,
     IRCall* callInst)
 {
-    // TODO: implement legalization of non-simple return types
     auto retType = legalizeType(context, callInst->getFullType());
-    SLANG_ASSERT(retType.flavor == LegalType::Flavor::simple);
+    IRType* retIRType = nullptr;
+    switch (retType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        retIRType = retType.getSimple();
+        break;
+    case LegalType::Flavor::none:
+        retIRType = context->builder->getVoidType();
+        break;
+    default:
+        // TODO: implement legalization of non-simple return types
+        SLANG_UNEXPECTED("unimplemented legalized return type for IRInstCall.");
+    }
 
     List<IRInst*> instArgs;
     for (auto i = 1u; i < callInst->getOperandCount(); i++)
         getArgumentValues(instArgs, legalizeOperand(context, callInst->getOperand(i)));
 
     return LegalVal::simple(context->builder->emitCallInst(
-        callInst->getFullType(),
+        retIRType,
         callInst->getCallee(),
         instArgs.Count(),
         instArgs.Buffer()));
+}
+
+static LegalVal legalizeRetVal(IRTypeLegalizationContext*    context,
+    LegalVal retVal)
+{
+    switch (retVal.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(context->builder->emitReturn(retVal.getSimple()));
+    case LegalVal::Flavor::none:
+        return LegalVal::simple(context->builder->emitReturn());
+    default:
+        // TODO: implement legalization of non-simple return types
+        SLANG_UNEXPECTED("unimplemented legalized return type for IRReturnVal.");
+    }
 }
 
 static LegalVal legalizeLoad(
@@ -343,6 +350,9 @@ static LegalVal legalizeFieldExtract(
 {
     auto builder = context->builder;
 
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
     switch (legalStructOperand.flavor)
     {
     case LegalVal::Flavor::none:
@@ -459,6 +469,8 @@ static LegalVal legalizeFieldAddress(
     IRStructKey*                fieldKey)
 {
     auto builder = context->builder;
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
 
     switch (legalPtrOperand.flavor)
     {
@@ -940,7 +952,20 @@ static LegalVal legalizeMakeStruct(
     }
 }
 
-
+static LegalVal legalizeConstruct(IRTypeLegalizationContext*    context,
+    LegalType                   type)
+{
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::none:
+        return LegalVal();
+    case LegalType::Flavor::simple:
+        return LegalVal::simple(context->builder->emitConstructorInst(type.getSimple(), 0, nullptr));
+    default:
+        SLANG_UNEXPECTED("unhandled legalization case for construct inst.");
+        UNREACHABLE_RETURN(LegalVal());
+    }
+}
 
 static LegalVal legalizeInst(
     IRTypeLegalizationContext*    context,
@@ -970,14 +995,16 @@ static LegalVal legalizeInst(
 
     case kIROp_Call:
         return legalizeCall(context, (IRCall*)inst);
-
+    case kIROp_ReturnVal:
+        return legalizeRetVal(context, args[0]);
     case kIROp_makeStruct:
         return legalizeMakeStruct(
             context,
             type,
             args,
             inst->getOperandCount());
-
+    case kIROp_Construct:
+        return legalizeConstruct(context, type);
     case kIROp_undefined:
         return LegalVal();
     default:
@@ -1186,10 +1213,10 @@ static LegalVal legalizeInst(
     // will, in general, depend on what we are doing.
 
     // We will set up the IR builder so that any new
-    // instructions generated will be placed after
+    // instructions generated will be placed before
     // the location of the original instruction.
     auto builder = context->builder;
-    builder->setInsertBefore(inst->getNextInst());
+    builder->setInsertBefore(inst);
 
     LegalVal legalVal = legalizeInst(
         context,
@@ -1279,7 +1306,19 @@ static LegalVal legalizeFunc(
     // TODO: we should give an error message when the result type of a function
     // can't be legalized (e.g., trying to return a texture, or a structue that
     // contains one).
-    IRType* newResultType = legalizeSimpleType(context, oldFuncType->getResultType());
+    auto legalReturnType = legalizeType(context, oldFuncType->getResultType());
+    IRType* newResultType = nullptr;
+    switch (legalReturnType.flavor)
+    {
+    case LegalType::Flavor::simple:
+        newResultType = legalReturnType.getSimple();
+        break;
+    case LegalType::Flavor::none:
+        newResultType = context->builder->getVoidType();
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown legalized function return type.");
+    }
     List<IRType*> newParamTypes;
     for (UInt pp = 0; pp < oldParamCount; ++pp)
     {
@@ -1295,7 +1334,6 @@ static LegalVal legalizeFunc(
     context->builder->setDataType(irFunc, newFuncType);
 
     legalizeInstsInParent(context, irFunc);
-
     return LegalVal::simple(irFunc);
 }
 
@@ -1360,10 +1398,9 @@ static LegalVal declareSimpleVar(
 
     case kIROp_Var:
         {
+            builder->setInsertBefore(context->insertBeforeLocalVar);
             auto localVar = builder->emitVar(type);
-            localVar->removeFromParent();
-            localVar->insertBefore(context->insertBeforeLocalVar);
-
+            
             irVar = localVar;
             legalVarVal = LegalVal::simple(irVar);
 

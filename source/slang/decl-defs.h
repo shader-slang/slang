@@ -51,6 +51,10 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(VarDecl, VarDeclBase)
 END_SYNTAX_CLASS()
 
+// A variable declaration that is always immutable (whether local, global, or member variable)
+SYNTAX_CLASS(LetDecl, VarDecl)
+END_SYNTAX_CLASS()
+
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
 // declarations:
@@ -165,6 +169,8 @@ SYNTAX_CLASS(TypeDefDecl, SimpleTypeDecl)
     SYNTAX_FIELD(TypeExp, type)
 END_SYNTAX_CLASS()
 
+SIMPLE_SYNTAX_CLASS(TypeAliasDecl, TypeDefDecl)
+
 // An 'assoctype' declaration, it is a container of inheritance clauses
 SYNTAX_CLASS(AssocTypeDecl, AggTypeDecl)
 END_SYNTAX_CLASS()
@@ -179,6 +185,9 @@ SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
 
 // A function/initializer/subscript parameter (potentially mutable)
 SIMPLE_SYNTAX_CLASS(ParamDecl, VarDeclBase)
+
+// A parameter of a function declared in "modern" types (immutable unless explicitly `out` or `inout`)
+SIMPLE_SYNTAX_CLASS(ModernParamDecl, ParamDecl)
 
 // Base class for things that have parameter lists and can thus be applied to arguments ("called")
 ABSTRACT_SYNTAX_CLASS(CallableDecl, ContainerDecl)
