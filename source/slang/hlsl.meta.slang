@@ -402,7 +402,7 @@ __generic<let N : int>
 __target_intrinsic(glsl, "floatBitsToInt")
 vector<int,N> asint(vector<float,N> x);
 
-__target_intrinsic(glsl, "((int)$0)")
+__target_intrinsic(glsl, "int($0)")
 int asint(uint x);
 
 __generic<let N : int>
@@ -420,14 +420,14 @@ __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
-__target_intrinsic(glsl, "floatBitsToUInt")
+__target_intrinsic(glsl, "floatBitsToUint")
 uint asuint(float x);
 
 __generic<let N : int>
-__target_intrinsic(glsl, "floatBitsToUInt")
+__target_intrinsic(glsl, "floatBitsToUint")
 vector<uint,N> asuint(vector<float,N> x);
 
-__target_intrinsic(glsl, "((uint)$0)")
+__target_intrinsic(glsl, "uint($0)")
 uint asuint(int x);
 
 __generic<let N : int>
