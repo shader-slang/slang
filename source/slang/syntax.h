@@ -752,6 +752,9 @@ namespace Slang
         explicit TypeExp(RefPtr<Expr> exp)
             : exp(exp)
         {}
+        explicit TypeExp(RefPtr<Type> type)
+            : type(type)
+        {}
         TypeExp(RefPtr<Expr> exp, RefPtr<Type> type)
             : exp(exp)
             , type(type)

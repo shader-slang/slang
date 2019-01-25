@@ -1163,12 +1163,33 @@ namespace Slang
         parser->ReadToken(TokenType::OpGreater);
         decl->inner = parseInnerFunc(decl);
         decl->inner->ParentDecl = decl;
+
         // A generic decl hijacks the name of the declaration
         // it wraps, so that lookup can find it.
         if (decl->inner)
         {
             decl->nameAndLoc = decl->inner->nameAndLoc;
             decl->loc = decl->inner->loc;
+        }
+    }
+
+    template<typename ParseFunc>
+    static RefPtr<Decl> parseOptGenericDecl(
+        Parser* parser, const ParseFunc& parseInner)
+    {
+        // TODO: may want more advanced disambiguation than this...
+        if (parser->LookAheadToken(TokenType::OpLess))
+        {
+            RefPtr<GenericDecl> genericDecl = new GenericDecl();
+            parser->FillPosition(genericDecl);
+            parser->PushScope(genericDecl);
+            ParseGenericDeclImpl(parser, genericDecl, parseInner);
+            parser->PopScope();
+            return genericDecl;
+        }
+        else
+        {
+            return parseInner(nullptr);
         }
     }
 
@@ -1244,79 +1265,59 @@ namespace Slang
         {}
     };
 
-    static RefPtr<Decl> ParseFuncDeclHeader(
-        Parser*                     parser,
-        DeclaratorInfo const&       declaratorInfo,
-        RefPtr<FuncDecl>  decl,
-        RefPtr<GenericDecl> genDecl)
+        /// Parse an optional body statement for a declaration that can have a body.
+    static RefPtr<Stmt> parseOptBody(Parser* parser)
     {
-        RefPtr<Decl> retDecl = decl;
-
-        parser->FillPosition(decl.Ptr());
-        decl->loc = declaratorInfo.nameAndLoc.loc;
-
-        decl->nameAndLoc = declaratorInfo.nameAndLoc;
-
-        // if return type is a DeclRef type, we need to update its scope to use this function decl's scope
-        // so that LookUp can find the generic type parameters declared after the function name
-        ReplaceScopeVisitor replaceScopeVisitor;
-        replaceScopeVisitor.scope = parser->currentScope;
-        declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
-
-        decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
-        auto parseFuncDeclHeaderInner = [&](GenericDecl *)
-        {
-            parseParameterList(parser, decl);
-            ParseOptSemantics(parser, decl.Ptr());
-            return decl;
-        };
-
-        if (parser->LookAheadToken(TokenType::OpLess))
-        {
-            // parse generic parameters
-            ParseGenericDeclImpl(parser, genDecl.Ptr(), parseFuncDeclHeaderInner);
-            retDecl = genDecl;
-        }
-        else
-            parseFuncDeclHeaderInner(nullptr);
-
-        return retDecl;
-    }
-
-    static RefPtr<Decl> ParseFuncDecl(
-        Parser*                 parser,
-        ContainerDecl*          /*containerDecl*/,
-        DeclaratorInfo const&   declaratorInfo,
-        bool isGeneric)
-    {
-        RefPtr<FuncDecl> decl = new FuncDecl();
-        RefPtr<Decl> retDecl = decl;
-        RefPtr<GenericDecl> genDecl;
-        if (isGeneric)
-        {
-            genDecl = new GenericDecl();
-            parser->FillPosition(genDecl);
-            parser->PushScope(genDecl);
-            retDecl = genDecl;
-        }
-        parser->PushScope(decl.Ptr());
-        ParseFuncDeclHeader(parser, declaratorInfo, decl, genDecl);
-
         if (AdvanceIf(parser, TokenType::Semicolon))
         {
             // empty body
+            return nullptr;
         }
         else
         {
-            decl->Body = parser->parseBlockStatement();
+            return parser->parseBlockStatement();
         }
+    }
 
-        parser->PopScope();
-        if (isGeneric)
+        /// Complete parsing of a function using traditional (C-like) declarator syntax
+    static RefPtr<Decl> parseTraditionalFuncDecl(
+        Parser*                 parser,
+        DeclaratorInfo const&   declaratorInfo)
+    {
+        RefPtr<FuncDecl> decl = new FuncDecl();
+        parser->FillPosition(decl.Ptr());
+        decl->loc = declaratorInfo.nameAndLoc.loc;
+        decl->nameAndLoc = declaratorInfo.nameAndLoc;
+
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
         {
+            // HACK: The return type of the function will already have been
+            // parsed in a scope that didn't include the function's generic
+            // parameters.
+            //
+            // We will use a visitor here to try and replace the scope associated
+            // with any name expressiosn in the reuslt type.
+            //
+            // TODO: This should be fixed by not associating scopes with
+            // such expressions at parse time, and instead pushing down scopes
+            // as part of the state during semantic checking.
+            //
+            ReplaceScopeVisitor replaceScopeVisitor;
+            replaceScopeVisitor.scope = parser->currentScope;
+            declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
+
+            decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
+
+            parser->PushScope(decl);
+
+            parseParameterList(parser, decl);
+            ParseOptSemantics(parser, decl.Ptr());
+            decl->Body = parseOptBody(parser);
+
             parser->PopScope();
-        }
-        return retDecl;
+
+            return decl;
+        });
     }
 
     static RefPtr<VarDeclBase> CreateVarDeclForContext(
@@ -1971,7 +1972,7 @@ namespace Slang
         {
             // Looks like a function, so parse it like one.
             UnwrapDeclarator(initDeclarator, &declaratorInfo);
-            return ParseFuncDecl(parser, containerDecl, declaratorInfo, parser->tokenReader.PeekTokenType() == TokenType::OpLess);
+            return parseTraditionalFuncDecl(parser, declaratorInfo);
         }
 
         // Otherwise we are looking at a variable declaration, which could be one in a sequence...
@@ -2593,14 +2594,8 @@ namespace Slang
 
         parseParameterList(parser, decl);
 
-        if( AdvanceIf(parser, TokenType::Semicolon) )
-        {
-            // empty body
-        }
-        else
-        {
-            decl->Body = parser->parseBlockStatement();
-        }
+        decl->Body = parseOptBody(parser);
+
         return decl;
     }
 
@@ -2675,9 +2670,124 @@ namespace Slang
         return decl;
     }
 
-    static Token expect(Parser* parser, TokenType tokenType)
+    static bool expect(Parser* parser, TokenType tokenType)
     {
-        return parser->ReadToken(tokenType);
+        return parser->ReadToken(tokenType).type == tokenType;
+    }
+
+    static void parseModernVarDeclBaseCommon(
+        Parser*             parser,
+        RefPtr<VarDeclBase> decl)
+    {
+        parser->FillPosition(decl.Ptr());
+        decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            decl->type = parser->ParseTypeExp();
+        }
+
+        if(AdvanceIf(parser, TokenType::OpAssign))
+        {
+            decl->initExpr = parser->ParseInitExpr();
+        }
+    }
+
+    static void parseModernVarDeclCommon(
+        Parser*         parser,
+        RefPtr<VarDecl> decl)
+    {
+        parseModernVarDeclBaseCommon(parser, decl);
+        expect(parser, TokenType::Semicolon);
+    }
+
+    static RefPtr<RefObject> parseLetDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        RefPtr<LetDecl> decl = new LetDecl();
+        parseModernVarDeclCommon(parser, decl);
+        return decl;
+    }
+
+    static RefPtr<RefObject> parseVarDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        RefPtr<VarDecl> decl = new VarDecl();
+        parseModernVarDeclCommon(parser, decl);
+        return decl;
+    }
+
+    static RefPtr<ParamDecl> parseModernParamDecl(
+        Parser* parser)
+    {
+        RefPtr<ParamDecl> decl = new ParamDecl();
+
+        // TODO: "modern" parameters should not accept keyword-based
+        // modifiers and should only accept `[attribute]` syntax for
+        // modifiers to keep the grammar as simple as possible.
+        //
+        // Further, they should accept `out` and `in out`/`inout`
+        // before the type (e.g., `a: inout float4`).
+        //
+        decl->modifiers = ParseModifiers(parser);
+        parseModernVarDeclBaseCommon(parser, decl);
+        return decl;
+    }
+
+    static void parseModernParamList(
+        Parser*                 parser,
+        RefPtr<CallableDecl>    decl)
+    {
+        parser->ReadToken(TokenType::LParent);
+
+        while (!AdvanceIfMatch(parser, TokenType::RParent))
+        {
+            AddMember(decl, parseModernParamDecl(parser));
+            if (AdvanceIf(parser, TokenType::RParent))
+                break;
+            parser->ReadToken(TokenType::Comma);
+        }
+    }
+
+    static RefPtr<RefObject> parseFuncDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        RefPtr<FuncDecl> decl = new FuncDecl();
+
+        parser->FillPosition(decl.Ptr());
+        decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        {
+            parser->PushScope(decl.Ptr());
+            parseModernParamList(parser, decl);
+            if(AdvanceIf(parser, TokenType::RightArrow))
+            {
+                decl->ReturnType = parser->ParseTypeExp();
+            }
+            decl->Body = parseOptBody(parser);
+            parser->PopScope();
+            return decl;
+        });
+    }
+
+    static RefPtr<RefObject> parseTypeAliasDecl(
+        Parser* parser, void* /*userData*/)
+    {
+        RefPtr<TypeAliasDecl> decl = new TypeAliasDecl();
+
+        parser->FillPosition(decl.Ptr());
+        decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
+        {
+            if( expect(parser, TokenType::OpAssign) )
+            {
+                decl->type = parser->ParseTypeExp();
+            }
+            expect(parser, TokenType::Semicolon);
+            return decl;
+        });
     }
 
     // This is a catch-all syntax-construction callback to handle cases where
@@ -3084,36 +3194,20 @@ namespace Slang
     RefPtr<Decl> Parser::ParseStruct()
     {
         RefPtr<StructDecl> rs = new StructDecl();
-        RefPtr<Decl> retDecl = rs;
         FillPosition(rs.Ptr());
         ReadToken("struct");
 
         // TODO: support `struct` declaration without tag
         rs->nameAndLoc = expectIdentifier(this);
 
-        auto parseStructInner = [&](GenericDecl*)
+        return parseOptGenericDecl(this, [&](GenericDecl*)
         {
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, rs.Ptr());
             parseAggTypeDeclBody(this, rs.Ptr());
             return rs;
-        };
-
-        if (LookAheadToken(TokenType::OpLess))
-        {
-            RefPtr<GenericDecl> genDecl = new GenericDecl();
-            FillPosition(genDecl.Ptr());
-            PushScope(genDecl);
-            ParseGenericDeclImpl(this, genDecl.Ptr(), parseStructInner);
-            PopScope();
-            retDecl = genDecl;
-        }
-        else
-        {
-            parseStructInner(nullptr);
-        }
-        return retDecl;
+        });
     }
 
     RefPtr<ClassDecl> Parser::ParseClass()
@@ -3158,7 +3252,8 @@ namespace Slang
 
         decl->nameAndLoc = expectIdentifier(parser);
 
-        auto parseEnumDeclInner = [&](GenericDecl*)
+
+        return parseOptGenericDecl(parser, [&](GenericDecl*)
         {
             parseOptionalInheritanceClause(parser, decl);
             parser->ReadToken(TokenType::LBrace);
@@ -3174,23 +3269,7 @@ namespace Slang
                 parser->ReadToken(TokenType::Comma);
             }
             return decl;
-        };
-
-        if (parser->LookAheadToken(TokenType::OpLess))
-        {
-            RefPtr<GenericDecl> genericDecl = new GenericDecl();
-            parser->FillPosition(genericDecl);
-            parser->PushScope(genericDecl);
-            ParseGenericDeclImpl(parser, genericDecl, parseEnumDeclInner);
-            parser->PopScope();
-            return genericDecl;
-        }
-        else
-        {
-            parseEnumDeclInner(nullptr);
-        }
-
-        return decl;
+        });
     }
 
     static RefPtr<Stmt> ParseSwitchStmt(Parser* parser)
@@ -4717,6 +4796,10 @@ namespace Slang
         DECL(attribute_syntax,parseAttributeSyntaxDecl);
         DECL(__import,        parseImportDecl);
         DECL(import,          parseImportDecl);
+        DECL(let,             parseLetDecl);
+        DECL(var,             parseVarDecl);
+        DECL(func,            parseFuncDecl);
+        DECL(typealias,       parseTypeAliasDecl);
 
     #undef DECL
 
