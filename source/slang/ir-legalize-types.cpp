@@ -350,6 +350,9 @@ static LegalVal legalizeFieldExtract(
 {
     auto builder = context->builder;
 
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
     switch (legalStructOperand.flavor)
     {
     case LegalVal::Flavor::none:
