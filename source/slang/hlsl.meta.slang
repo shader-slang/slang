@@ -368,6 +368,12 @@ bool any(matrix<T,N,M> x);
 double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
+__target_intrinsic(glsl, "intBitsToFloat")
+float asfloat(int x);
+__target_intrinsic(glsl, "uintBitsToFloat")
+float asfloat(uint x);
+
+
 float asfloat( int x);
 float asfloat(uint x);
 __generic<let N : int> vector<float,N> asfloat(vector< int,N> x);
@@ -375,11 +381,7 @@ __generic<let N : int> vector<float,N> asfloat(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);
 
-__target_intrinsic(glsl, "intBitsToFloat")
-float asfloat(int x);
 
-__target_intrinsic(glsl, "uintBitsToFloat")
-float asfloat(uint x);
 
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType> T asin(T x);
@@ -387,6 +389,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);
 
 // Reinterpret bits as an int (HLSL SM 4.0)
+__target_intrinsic(glsl, "floatBitsToInt")
+int asint(float x);
+
 int asint(float x);
 int asint(uint x);
 __generic<let N : int> vector<int,N> asint(vector<float,N> x);
@@ -394,22 +399,20 @@ __generic<let N : int> vector<int,N> asint(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
 
-__target_intrinsic(glsl, "floatBitsToInt")
-int asint(float x);
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
+__target_intrinsic(glsl, "floatBitsToUInt")
+uint asuint(float x);
+
 uint asuint(float x);
 uint asuint(int x);
 __generic<let N : int> vector<uint,N> asuint(vector<float,N> x);
 __generic<let N : int> vector<uint,N> asuint(vector<int,N> x);
 __generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<int,N,M> x);
-
-__target_intrinsic(glsl, "floatBitsToUInt")
-uint asuint(float x);
 
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType> T atan(T x);
