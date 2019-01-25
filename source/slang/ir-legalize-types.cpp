@@ -466,6 +466,8 @@ static LegalVal legalizeFieldAddress(
     IRStructKey*                fieldKey)
 {
     auto builder = context->builder;
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
 
     switch (legalPtrOperand.flavor)
     {
@@ -1313,9 +1315,8 @@ static LegalVal legalizeFunc(
         newResultType);
 
     context->builder->setDataType(irFunc, newFuncType);
-    context->builder->setInsertInto(irFunc);
-    legalizeInstsInParent(context, irFunc);
 
+    legalizeInstsInParent(context, irFunc);
     return LegalVal::simple(irFunc);
 }
 
@@ -1380,10 +1381,9 @@ static LegalVal declareSimpleVar(
 
     case kIROp_Var:
         {
+            builder->setInsertBefore(context->insertBeforeLocalVar);
             auto localVar = builder->emitVar(type);
-            localVar->removeFromParent();
-            localVar->insertBefore(context->insertBeforeLocalVar);
-
+            
             irVar = localVar;
             legalVarVal = LegalVal::simple(irVar);
 
