@@ -329,7 +329,8 @@ namespace Slang
             // Try to preload dxil first, if loading dxc
             if (type == SharedLibraryType::Dxc)
             {
-                getOrLoadSharedLibrary(SharedLibraryType::Dxil, sink);
+                // Pass nullptr as the sink, because if it fails we don't want to report as error
+                getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr);
             }
 
             const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
