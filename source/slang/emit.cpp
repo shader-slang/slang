@@ -6640,36 +6640,6 @@ String emitEntryPoint(
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
 
-
-
-        // For GLSL only, we will need to perform "legalization" of
-        // the entry point and any entry-point parameters.
-        //
-        // TODO: We should consider moving this legalization work
-        // as late as possible, so that it doesn't affect how other
-        // optimization passes need to work.
-        //
-        switch (target)
-        {
-        case CodeGenTarget::GLSL:
-            {
-                legalizeEntryPointForGLSL(
-                    session,
-                    irModule,
-                    irEntryPoint,
-                    &compileRequest->mSink,
-                    &sharedContext.extensionUsageTracker);
-            }
-            break;
-
-        default:
-            break;
-        }
-#if 0
-        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
-#endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
-
         // Desguar any union types, since these will be illegal on
         // various targets.
         //
@@ -6762,6 +6732,34 @@ String emitEntryPoint(
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // For GLSL only, we will need to perform "legalization" of
+        // the entry point and any entry-point parameters.
+        //
+        // TODO: We should consider moving this legalization work
+        // as late as possible, so that it doesn't affect how other
+        // optimization passes need to work.
+        //
+        switch (target)
+        {
+        case CodeGenTarget::GLSL:
+        {
+            legalizeEntryPointForGLSL(
+                session,
+                irModule,
+                irEntryPoint,
+                &compileRequest->mSink,
+                &sharedContext.extensionUsageTracker);
+        }
+        break;
+
+        default:
+            break;
+        }
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
