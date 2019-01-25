@@ -373,7 +373,6 @@ float asfloat(int x);
 __target_intrinsic(glsl, "uintBitsToFloat")
 float asfloat(uint x);
 
-
 float asfloat( int x);
 float asfloat(uint x);
 __generic<let N : int> vector<float,N> asfloat(vector< int,N> x);
@@ -381,16 +380,17 @@ __generic<let N : int> vector<float,N> asfloat(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);
 
-
-
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType> T asin(T x);
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);
 
 // Reinterpret bits as an int (HLSL SM 4.0)
+
 __target_intrinsic(glsl, "floatBitsToInt")
 int asint(float x);
+__target_intrinsic(glsl, "((int)$0)")
+int asint(uint x);
 
 int asint(float x);
 int asint(uint x);
@@ -406,6 +406,8 @@ void asuint(double value, out uint lowbits, out uint highbits);
 // Reinterpret bits as a uint (HLSL SM 4.0)
 __target_intrinsic(glsl, "floatBitsToUInt")
 uint asuint(float x);
+__target_intrinsic(glsl, "((uint)$0)")
+uint asuint(int x);
 
 uint asuint(float x);
 uint asuint(int x);
