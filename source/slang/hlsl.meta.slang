@@ -365,6 +365,11 @@ bool any(matrix<T,N,M> x);
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
+
+__target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
+__glsl_extension(GL_ARB_gpu_shader_fp64)
+double asdouble(uint lowbits, uint highbits);
+
 double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
@@ -417,6 +422,11 @@ __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
+
+__target_intrinsic(glsl, "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }")
+__glsl_extension(GL_ARB_gpu_shader_fp64)
+void asuint(double value, out uint lowbits, out uint highbits);
+
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
