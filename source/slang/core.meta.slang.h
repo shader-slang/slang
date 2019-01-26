@@ -890,15 +890,22 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
-
-                // `SampleCmp()` and `SampleCmpLevelZero`
-                sb << "float SampleCmp(SamplerComparisonState s, ";
-                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                sb << "float compareValue";
-                sb << ");\n";
-
                 int baseCoordCount = kBaseTextureTypes[tt].coordCount;
                 int arrCoordCount = baseCoordCount + isArray;
+				if (arrCoordCount <= 3)
+                {
+					// `SampleCmp()` and `SampleCmpLevelZero`
+					sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
+					sb << "float SampleCmp(SamplerComparisonState s, ";
+					sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+					sb << "float compareValue";
+					sb << ");\n";
+					sb << "__target_intrinsic(glsl, \"texture($p, vec" << arrCoordCount + 1 << "($2, $3))\")";
+					sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
+					sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+					sb << "float compareValue";
+					sb << ");\n";
+				}
                 if (arrCoordCount < 3)
                 {
                     int extCoordCount = arrCoordCount + 1;
@@ -938,10 +945,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << ", vec" << baseCoordCount << "(0.0)";
                     sb << ")$z\")\n";
                 }
-                sb << "float SampleCmpLevelZero(SamplerComparisonState s, ";
-                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-                sb << "float compareValue";
-                sb << ");\n";
+                
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
