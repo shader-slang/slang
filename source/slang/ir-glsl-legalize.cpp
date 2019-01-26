@@ -567,7 +567,11 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     UInt                        bindingIndex,
     GlobalVaryingDeclarator*    declarator)
 {
-    if( as<IRBasicType>(type) )
+    if (as<IRVoidType>(type))
+    {
+        return ScalarizedVal();
+    }
+    else if( as<IRBasicType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
@@ -675,12 +679,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 stage,
                 fieldBindingIndex,
                 declarator);
+            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+            {
+                ScalarizedTupleValImpl::Element element;
+                element.val = fieldVal;
+                element.key = field->getKey();
 
-            ScalarizedTupleValImpl::Element element;
-            element.val = fieldVal;
-            element.key = field->getKey();
-
-            tupleValImpl->elements.Add(element);
+                tupleValImpl->elements.Add(element);
+            }
         }
 
         return ScalarizedVal::tuple(tupleValImpl);

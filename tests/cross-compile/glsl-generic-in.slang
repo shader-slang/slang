@@ -3,10 +3,11 @@ interface IField
 {
 	float get();
 };
-struct GIn<TField>
+struct GIn<TField : IField, TEmptyField>
 {
 	float3 p0;
 	TField field;
+	TEmptyField e;
 };
 struct F : IField
 {
@@ -14,15 +15,19 @@ struct F : IField
 	float2 v1;
 	float get() { return v0.x + v1.x; }
 };
+struct E
+{
+	float get() {return 1.0;}
+};
 
 struct VOut
 {
 	float4 projPos : SV_POSITION;
 };
 
-VOut main(GIn<F> vIn)
+VOut main(GIn<F, E> vIn)
 {
 	VOut vout;
-	vout.projPos = float4(vIn.p0, vIn.field.get());
+	vout.projPos = float4(vIn.p0, vIn.field.get() + vIn.e.get());
 	return vout;
 }

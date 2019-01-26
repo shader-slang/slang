@@ -3572,6 +3572,9 @@ struct EmitVisitor
             UInt argCount = inst->getOperandCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
+                auto operand = inst->getOperand(aa);
+                if (as<IRVoidType>(operand->getDataType()))
+                    continue;
                 if(aa != 1) emit(", ");
                 emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
             }
@@ -6087,6 +6090,8 @@ struct EmitVisitor
         {
             varType = outType->getValueType();
         }
+        if (as<IRVoidType>(varType))
+            return;
 
         // When a global shader parameter represents a "parameter group"
         // (either a constant buffer or a parameter block with non-resource
