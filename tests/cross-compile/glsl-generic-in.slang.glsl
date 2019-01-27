@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE:
 #version 450
 layout(row_major) uniform;
 layout(row_major) buffer;
