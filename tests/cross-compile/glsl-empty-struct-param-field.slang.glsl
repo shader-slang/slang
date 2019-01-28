@@ -3,7 +3,6 @@
 layout(row_major) uniform;
 layout(row_major) buffer;
 
-#line 14 0
 struct P_0
 {
     vec4 param_0;
@@ -17,8 +16,6 @@ layout(std140) uniform _S1
 layout(location = 0)
 out vec4 _S2;
 
-
-#line 14
 void main()
 {
     _S2 = pblock_0._data.param_0;
