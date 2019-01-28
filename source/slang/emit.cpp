@@ -3002,9 +3002,19 @@ struct EmitVisitor
         }
         else
         {
+            // If it returns void -> then we don't need parenthesis
+
+            const auto returnType = inst->getDataType();
+            const bool isVoid = as<IRVoidType>(returnType) != nullptr;
+            
+            // We could determine here is the return type is void... if so no braces?
+
             // General case: we are going to emit some more complex text.
 
-            Emit("(");
+            if (!isVoid)
+            {
+                Emit("(");
+            }
 
             char const* cursor = name.begin();
             char const* end = name.end();
@@ -3364,7 +3374,10 @@ struct EmitVisitor
                 }
             }
 
-            Emit(")");
+            if (!isVoid)
+            {
+                Emit(")");
+            }
         }
     }
 
