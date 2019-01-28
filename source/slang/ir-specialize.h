@@ -5,9 +5,8 @@ namespace Slang
 {
 struct IRModule;
 
-// Find suitable uses of the `specialize` instruction that
-// can be replaced with references to specialized functions.
-void specializeGenerics(
+    /// Specialize generic and interface-based code to use concrete types.
+void specializeModule(
     IRModule*   module);
 
 }
