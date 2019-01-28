@@ -85,7 +85,7 @@ struct SpecializationContext
         return true;
     }
 
-    // We will use a single work list of instruction that need
+    // We will use a single work list of instructions that need
     // to be considered for specialization or simplification,
     // whether generic, existential, etc.
     //
@@ -366,7 +366,7 @@ struct SpecializationContext
     void maybeSpecializeGeneric(
         IRSpecialize* specInst)
     {
-        // We will only attempt to specialize when all ofthe
+        // We will only attempt to specialize when all of the
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
         //
@@ -547,7 +547,7 @@ struct SpecializationContext
 
         // At this point, we know that `satisfyingVal` is what
         // would result from executing this `lookup_witness_method`
-        // instruciton dynamically, so we can go ahead and
+        // instruction dynamically, so we can go ahead and
         // replace the original instruction with that value.
         //
         // We also make sure to add any uses of the lookup
@@ -705,7 +705,7 @@ struct SpecializationContext
         if(!calleeFunc->isDefinition())
             return;
 
-        // We shouldn't bother specializing unless the calee has at least
+        // We shouldn't bother specializing unless the callee has at least
         // one parameter that has an existential/interface type.
         //
         bool shouldSpecialize = false;
@@ -725,7 +725,7 @@ struct SpecializationContext
                 return;
 
         }
-        // If we never found a parameter wroth specializing, we should bail out.
+        // If we never found a parameter worth specializing, we should bail out.
         //
         if(!shouldSpecialize)
             return;
@@ -784,7 +784,7 @@ struct SpecializationContext
                 // "overlapping conformances" could be required, and
                 // there is low incremental cost to future-proofing
                 // this code, so we go ahead and add the witness
-                // tbale even if it is redundant.
+                // table even if it is redundant.
                 //
                 auto witnessTable = makeExistential->getWitnessTable();
                 key.vals.Add(witnessTable);
@@ -1012,7 +1012,7 @@ struct SpecializationContext
                     // directly, because the existing code expects an existential
                     // value, including its witness table.
                     //
-                    // Therefore we will create a `makeExtensial(newParam, witnessTable)`
+                    // Therefore we will create a `makeExistential(newParam, witnessTable)`
                     // in the body of the new function and use *that* as the replacement
                     // value for the original parameter (since it will have the
                     // correct existential type, and stores the right witness table).

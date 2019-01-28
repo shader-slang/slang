@@ -6682,8 +6682,8 @@ String emitEntryPoint(
         // so that the simplifications can be applied.
         //
         // TODO: This pass is *also* likely to be the place where we
-        // perform specialization of functiosn based on parameter
-        // values taht need to be compile-time constants.
+        // perform specialization of functions based on parameter
+        // values that need to be compile-time constants.
         //
         specializeModule(irModule);
 
