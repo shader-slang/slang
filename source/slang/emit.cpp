@@ -3001,9 +3001,19 @@ struct EmitVisitor
         }
         else
         {
+            // If it returns void -> then we don't need parenthesis
+
+            const auto returnType = inst->getDataType();
+            const bool isVoid = as<IRVoidType>(returnType) != nullptr;
+            
+            // We could determine here is the return type is void... if so no braces?
+
             // General case: we are going to emit some more complex text.
 
-            Emit("(");
+            if (!isVoid)
+            {
+                Emit("(");
+            }
 
             char const* cursor = name.begin();
             char const* end = name.end();
@@ -3363,7 +3373,10 @@ struct EmitVisitor
                 }
             }
 
-            Emit(")");
+            if (!isVoid)
+            {
+                Emit(")");
+            }
         }
     }
 
@@ -3571,6 +3584,9 @@ struct EmitVisitor
             UInt argCount = inst->getOperandCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
+                auto operand = inst->getOperand(aa);
+                if (as<IRVoidType>(operand->getDataType()))
+                    continue;
                 if(aa != 1) emit(", ");
                 emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
             }
@@ -6086,6 +6102,8 @@ struct EmitVisitor
         {
             varType = outType->getValueType();
         }
+        if (as<IRVoidType>(varType))
+            return;
 
         // When a global shader parameter represents a "parameter group"
         // (either a constant buffer or a parameter block with non-resource
@@ -6639,36 +6657,6 @@ String emitEntryPoint(
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
 
-
-
-        // For GLSL only, we will need to perform "legalization" of
-        // the entry point and any entry-point parameters.
-        //
-        // TODO: We should consider moving this legalization work
-        // as late as possible, so that it doesn't affect how other
-        // optimization passes need to work.
-        //
-        switch (target)
-        {
-        case CodeGenTarget::GLSL:
-            {
-                legalizeEntryPointForGLSL(
-                    session,
-                    irModule,
-                    irEntryPoint,
-                    &compileRequest->mSink,
-                    &sharedContext.extensionUsageTracker);
-            }
-            break;
-
-        default:
-            break;
-        }
-#if 0
-        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
-#endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
-
         // Desguar any union types, since these will be illegal on
         // various targets.
         //
@@ -6753,6 +6741,34 @@ String emitEntryPoint(
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // For GLSL only, we will need to perform "legalization" of
+        // the entry point and any entry-point parameters.
+        //
+        // TODO: We should consider moving this legalization work
+        // as late as possible, so that it doesn't affect how other
+        // optimization passes need to work.
+        //
+        switch (target)
+        {
+        case CodeGenTarget::GLSL:
+        {
+            legalizeEntryPointForGLSL(
+                session,
+                irModule,
+                irEntryPoint,
+                &compileRequest->mSink,
+                &sharedContext.extensionUsageTracker);
+        }
+        break;
+
+        default:
+            break;
+        }
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 

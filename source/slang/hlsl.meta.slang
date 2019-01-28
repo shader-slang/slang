@@ -365,16 +365,39 @@ bool any(matrix<T,N,M> x);
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
+
+__target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
+__glsl_extension(GL_ARB_gpu_shader5)
+double asdouble(uint lowbits, uint highbits);
+
 double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
-float asfloat( int x);
+
+__target_intrinsic(glsl, "intBitsToFloat")
+float asfloat(int x);
+__target_intrinsic(glsl, "uintBitsToFloat")
 float asfloat(uint x);
-__generic<let N : int> vector<float,N> asfloat(vector< int,N> x);
-__generic<let N : int> vector<float,N> asfloat(vector<uint,N> x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "intBitsToFloat")
+vector<float,N> asfloat(vector< int,N> x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "uintBitsToFloat")
+vector<float,N> asfloat(vector<uint,N> x);
+
+float asfloat( int x);
+__target_intrinsic(glsl, uintBitsToFloat)
+float asfloat(uint x);
+__generic<let N : int>
+__target_intrinsic(glsl, intBitsAsFloat)
+vector<float,N> asfloat(vector< int,N> x);
+__generic<let N : int>
+__target_intrinsic(glsl, uintBitsAsFloat)
+vector<float,N> asfloat(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);
-
 
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType> T asin(T x);
@@ -382,17 +405,56 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);
 
 // Reinterpret bits as an int (HLSL SM 4.0)
+
+__target_intrinsic(glsl, "floatBitsToInt")
 int asint(float x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "floatBitsToInt")
+vector<int,N> asint(vector<float,N> x);
+
+__target_intrinsic(glsl, "int($0)")
 int asint(uint x);
-__generic<let N : int> vector<int,N> asint(vector<float,N> x);
-__generic<let N : int> vector<int,N> asint(vector<uint,N> x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "ivec$N0($0)")
+vector<int,N> asint(vector<uint,N> x);
+
+int asint(float x);
+__target_intrinsic(glsl, "uint($0)")
+int asint(uint x);
+
+__generic<let N : int> 
+__target_intrinsic(glsl, floatBitsToInt)
+vector<int,N> asint(vector<float,N> x);
+__generic<let N : int> 
+vector<int,N> asint(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
+
+__target_intrinsic(glsl, "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }")
+__glsl_extension(GL_ARB_gpu_shader5)
+void asuint(double value, out uint lowbits, out uint highbits);
+
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
+__target_intrinsic(glsl, "floatBitsToUint")
+uint asuint(float x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "floatBitsToUint")
+vector<uint,N> asuint(vector<float,N> x);
+
+__target_intrinsic(glsl, "uint($0)")
+uint asuint(int x);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "uvec$N0($0)")
+vector<uint,N> asuint(vector<int,N> x);
+
 uint asuint(float x);
 uint asuint(int x);
 __generic<let N : int> vector<uint,N> asuint(vector<float,N> x);
