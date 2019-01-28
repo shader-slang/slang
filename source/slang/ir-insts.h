@@ -759,6 +759,9 @@ struct IRBuilder
         return getFuncType(paramTypes.Count(), paramTypes.Buffer(), resultType);
     }
 
+    IRConstantBufferType* getConstantBufferType(
+        IRType* elementType);
+
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
 

@@ -1516,18 +1516,16 @@ void legalizeEntryPointForGLSL(
         // to be at the start of the "ordinary" instructions in the block:
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
-        UInt paramCounter = 0;
         for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
         {
-            UInt paramIndex = paramCounter++;
-
-            // We assume that the entry-point layout includes information
-            // on each parameter, and that these arrays are kept aligned.
-            // Note that this means that any transformations that mess
-            // with function signatures will need to also update layout info...
+            // We assume that the entry-point parameters will all have
+            // layout information attached to them, which is kept up-to-date
+            // by any transformations affecting the parameter list.
             //
-            SLANG_ASSERT(entryPointLayout->fields.Count() > paramIndex);
-            auto paramLayout = entryPointLayout->fields[paramIndex];
+            auto paramLayoutDecoration = pp->findDecoration<IRLayoutDecoration>();
+            SLANG_ASSERT(paramLayoutDecoration);
+            auto paramLayout = dynamic_cast<VarLayout*>(paramLayoutDecoration->getLayout());
+            SLANG_ASSERT(paramLayout);
 
             legalizeEntryPointParameterForGLSL(
                 &context,

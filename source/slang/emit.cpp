@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "ir-dce.h"
+#include "ir-entry-point-uniforms.h"
 #include "ir-glsl-legalize.h"
 #include "ir-insts.h"
 #include "ir-link.h"
@@ -6511,41 +6512,28 @@ EntryPointLayout* findEntryPointLayout(
     return nullptr;
 }
 
-// Given a layout computed for a whole program, find
-// the corresponding layout to use when looking up
-// variables at the global scope.
-//
-// It might be that the global scope was logically
-// mapped to a constant buffer, so that we need
-// to "unwrap" that declaration to get at the
-// actual struct type inside.
-StructTypeLayout* getGlobalStructLayout(
-    ProgramLayout*  programLayout)
+    /// Given a layout computed for a scope, get the layout to use when lookup up variables.
+    ///
+    /// A scope (such as the global scope of a program) groups its
+    /// parameters into a pseudo-`struct` type for layout purposes,
+    /// and in some cases that type will in turn be wrapped in a
+    /// `ConstantBuffer` type to indicate that the parameters needed
+    /// an implicit constant buffer to be allocated.
+    ///
+    /// This function "unwraps" the type layout to find the structure
+    /// type layout that must be stored inside.
+    ///
+StructTypeLayout* getScopeStructLayout(
+    ScopeLayout*  scopeLayout)
 {
-    auto globalScopeLayout = programLayout->globalScopeLayout->typeLayout;
-    if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
+    auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
+    if( auto structTypeLayout = scopeTypeLayout.As<StructTypeLayout>() )
     {
-        return gs.Ptr();
+        return structTypeLayout.Ptr();
     }
-    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterGroupTypeLayout>() )
+    else if( auto constantBufferTypeLayout = scopeTypeLayout.As<ParameterGroupTypeLayout>() )
     {
-        // TODO: the `cbuffer` case really needs to be emitted very
-        // carefully, but that is beyond the scope of what a simple rewriter
-        // can easily do (without semantic analysis, etc.).
-        //
-        // The crux of the problem is that we need to collect all the
-        // global-scope uniforms (but not declarations that don't involve
-        // uniform storage...) and put them in a single `cbuffer` declaration,
-        // so that we can give it an explicit location. The fields in that
-        // declaration might use various type declarations, so we'd really
-        // need to emit all the type declarations first, and that involves
-        // some large scale reorderings.
-        //
-        // For now we will punt and just emit the declarations normally,
-        // and hope that the global-scope block (`$Globals`) gets auto-assigned
-        // the same location that we manually asigned it.
-
-        auto elementTypeLayout = globalConstantBufferLayout->offsetElementTypeLayout;
+        auto elementTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
         auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
 
         // We expect all constant buffers to contain `struct` types for now
@@ -6558,6 +6546,16 @@ StructTypeLayout* getGlobalStructLayout(
         SLANG_UNEXPECTED("uhandled global-scope binding layout");
         return nullptr;
     }
+}
+
+    /// Given a layout computed for a program, get the layout to use when lookup up variables.
+    ///
+    /// This is just an alias of `getScopeStructLayout`.
+    ///
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout)
+{
+    return getScopeStructLayout(programLayout);
 }
 
 void legalizeTypes(
@@ -6656,6 +6654,18 @@ String emitEntryPoint(
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
+
+        // Now that we've linked the IR code, any layout/binding
+        // information has been attached to shader parameters
+        // and entry points. Now we are safe to make transformations
+        // that might move code without worrying about losing
+        // the connection between a parameter and its layout.
+        //
+        // An easy transformation of this kind is to take uniform
+        // parameters of a shader entry point and move them into
+        // the global scope instead.
+        //
+        moveEntryPointUniformParamsToGlobalScope(irModule);
 
         // Desguar any union types, since these will be illegal on
         // various targets.
