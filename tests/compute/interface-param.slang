@@ -1,7 +1,5 @@
 // interface-param.slang
 
-//TEST_DISABLED:
-
 // Test basic use of an interface as an existential type
 // for a value parameter, instead of just as a constraint
 // on a generic type parameter.
@@ -9,8 +7,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-
-//TEST:SIMPLE:-target hlsl -entry computeMain -stage compute -profile sm_5_1 -dump-ir
 
 interface IHelper
 {

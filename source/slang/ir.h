@@ -952,7 +952,15 @@ struct IRStructKey : IRInst
 struct IRStructField : IRInst
 {
     IRStructKey* getKey() { return cast<IRStructKey>(getOperand(0)); }
-    IRType* getFieldType() { return cast<IRType>(getOperand(1)); }
+    IRType* getFieldType()
+    {
+        // Note: We do not use `cast` here because there are
+        // cases of types (which we would like to conveniently
+        // refer to via an `IRType*`) which do not actually
+        // inherit from `IRType` in the hierarchy.
+        //
+        return (IRType*) getOperand(1);
+    }
 
     IR_LEAF_ISA(StructField)
 };
