@@ -1304,3 +1304,15 @@ SLANG_RAW("    ///\n")
 SLANG_RAW("    /// This is equivalent to the LLVM `readnone` function attribute.\n")
 SLANG_RAW("__attributeTarget(FunctionDeclBase)\n")
 SLANG_RAW("attribute_syntax [__readNone] : ReadNoneAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("enum AttributeTargets\n")
+SLANG_RAW("{\n")
+
+    sb << "Struct = " << (int)UserDefinedAttributeTargets::Struct << ", ";
+    sb << "Var = " << (int)UserDefinedAttributeTargets::Var << ", ";
+    sb << "Function = " << (int)UserDefinedAttributeTargets::Function;
+
+SLANG_RAW("\n")
+SLANG_RAW("};\n")
+SLANG_RAW("__attributeTarget(StructDecl)\n")
+SLANG_RAW("attribute_syntax [AttributeUsage(target : AttributeTargets)] : AttributeUsageAttribute;")

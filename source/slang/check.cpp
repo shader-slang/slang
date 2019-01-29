@@ -2389,20 +2389,75 @@ namespace Slang
             // rules to keep us from seeing shadowing variable declarations.
             auto lookupResult = lookUp(getSession(), this, attributeName, scope, LookupMask::Attribute);
 
-            // If we didn't find anything, or the result was overloaded,
+            // If the result was overloaded,
             // then we aren't going to be able to extract a single decl.
-            if(!lookupResult.isValid() || lookupResult.isOverloaded())
+            if(lookupResult.isOverloaded())
                 return nullptr;
 
-            auto decl = lookupResult.item.declRef.getDecl();
-            if( auto attributeDecl = dynamic_cast<AttributeDecl*>(decl) )
+            if (lookupResult.isValid())
             {
-                return attributeDecl;
+                auto decl = lookupResult.item.declRef.getDecl();
+                if (auto attributeDecl = dynamic_cast<AttributeDecl*>(decl))
+                {
+                    return attributeDecl;
+                }
+                else
+                {
+                    return nullptr;
+                }
             }
-            else
+
+            // If we couldn't find a system attribute, try looking up as a user defined attribute
+            // A user defined attribute class is defined as a struct type with a "UserDefinedAttributeAttribute" modifier
+            lookupResult = lookUp(getSession(), this, getSession()->getNameObj(attributeName->text + "Attribute"), scope, LookupMask::type);
+            if (lookupResult.isOverloaded())
             {
+                // see if we have already created an AttributeDecl for this attribute struct
+                for (auto alt : lookupResult.items)
+                {
+                    if (auto adecl = alt.declRef.As<AttributeDecl>())
+                        return adecl.getDecl();
+                }
+            }
+            // If we still cannot find any thing, quit
+            if (!lookupResult.isValid() || lookupResult.isOverloaded())
                 return nullptr;
+            // Now construct an AttributeDecl for this user defined attribute class for future lookup
+            auto userDefAttribAttrib = lookupResult.item.declRef.decl->FindModifier<AttributeUsageAttribute>();
+            if (!userDefAttribAttrib)
+                return nullptr;
+            // create an AttributeDecl for the user defined attribute
+            auto structAttribDef = lookupResult.item.declRef.As<StructDecl>().getDecl();
+            RefPtr<AttributeDecl> attribDecl = new AttributeDecl();
+            attribDecl->nameAndLoc = structAttribDef->nameAndLoc;
+            attribDecl->loc = structAttribDef->loc;
+            attribDecl->nextInContainerWithSameName = structAttribDef->nextInContainerWithSameName;
+            // create a __attributeTarget modifier for the attribute class definition
+            RefPtr<AttributeTargetModifier> targetModifier = new AttributeTargetModifier();
+            targetModifier->syntaxClass = userDefAttribAttrib->targetSyntaxClass;
+            targetModifier->loc = structAttribDef->loc;
+            targetModifier->next = attribDecl->modifiers.first;
+            attribDecl->modifiers.first = targetModifier;
+            structAttribDef->nextInContainerWithSameName = attribDecl.Ptr();
+            // we should create UserDefinedAttribute nodes for all user defined attribute instances
+            attribDecl->syntaxClass = getSession()->findSyntaxClass(getSession()->getNameObj("UserDefinedAttribute"));
+            for (auto member : structAttribDef->Members)
+            {
+                if (auto varMember = member.As<VarDecl>())
+                {
+                    RefPtr<ParamDecl> param = new ParamDecl();
+                    param->nameAndLoc = member->nameAndLoc;
+                    param->type = varMember->type;
+                    param->loc = member->loc;
+                    attribDecl->Members.Add(param);
+                }
             }
+            // add the attribute class definition to the syntax tree, so it can be found
+            structAttribDef->ParentDecl->Members.Add(attribDecl.Ptr());
+            structAttribDef->ParentDecl->memberDictionaryIsValid = false;
+            // do necessary checks on this newly constructed node
+            checkDecl(attribDecl.Ptr());
+            return attribDecl.Ptr();
         }
 
         bool hasIntArgs(Attribute* attr, int numArgs)
@@ -2437,7 +2492,27 @@ namespace Slang
             return true;
         }
 
-        bool validateAttribute(RefPtr<Attribute> attr)
+        bool getAttributeTargetSyntaxClasses(SyntaxClass<RefObject> & cls, uint32_t typeFlags)
+        {
+            if (typeFlags == (int)UserDefinedAttributeTargets::Struct)
+            {
+                cls = getSession()->findSyntaxClass(getSession()->getNameObj("StructDecl"));
+                return true;
+            }
+            if (typeFlags == (int)UserDefinedAttributeTargets::Var)
+            {
+                cls = getSession()->findSyntaxClass(getSession()->getNameObj("VarDecl"));
+                return true;
+            }
+            if (typeFlags == (int)UserDefinedAttributeTargets::Function)
+            {
+                cls = getSession()->findSyntaxClass(getSession()->getNameObj("FuncDecl"));
+                return true;
+            }
+            return false;
+        }
+
+        bool validateAttribute(RefPtr<Attribute> attr, AttributeDecl* attribClassDecl)
         {
                 if(auto numThreadsAttr = attr.As<NumThreadsAttribute>())
                 {
@@ -2529,6 +2604,67 @@ namespace Slang
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
                 }
+                else if (auto attrUsageAttr = attr.As<AttributeUsageAttribute>())
+                {
+                    uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
+                    if (attr->args.Count() == 1)
+                    {
+                        RefPtr<IntVal> outIntVal;
+                        if (auto cInt = checkConstantIntVal(attr->args[0]))
+                        {
+                            targetClassId = (uint32_t)(cInt->value);
+                        }
+                        else
+                        {
+                            getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
+                            return false;
+                        }
+                    }
+                    if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
+                    {
+                        getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
+                        return false;
+                    }
+                }
+                else if (auto userDefAttr = attr.As<UserDefinedAttribute>())
+                {
+                    // check arguments against attribute parameters defined in attribClassDecl
+                    uint32_t paramIndex = 0;
+                    auto params = attribClassDecl->getMembersOfType<ParamDecl>();
+                    for (auto paramDecl : params)
+                    {
+                        if (paramIndex < attr->args.Count())
+                        {
+                            auto & arg = attr->args[paramIndex];
+                            bool typeChecked = false;
+                            if (auto basicType = paramDecl->getType()->AsBasicType())
+                            {
+                                if (basicType->baseType == BaseType::Int)
+                                {
+                                    if (auto cint = checkConstantIntVal(arg))
+                                    {
+                                        attr->intArgVals[(uint32_t)paramIndex] = cint;
+                                    }
+                                    typeChecked = true;
+                                }
+                            }
+                            if (!typeChecked)
+                            {
+                                arg = CheckExpr(arg);
+                                arg = Coerce(paramDecl->getType(), arg);
+                            }
+                        }
+                        paramIndex++;
+                    }
+                    if (params.Count() < attr->args.Count())
+                    {
+                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.Count(), params.Count());
+                    }
+                    else if (params.Count() > attr->args.Count())
+                    {
+                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.Count(), params.Count());
+                    }
+                }
                 else
                 {
                     if(attr->args.Count() == 0)
@@ -2597,11 +2733,9 @@ namespace Slang
                 UInt paramIndex = paramCounter++;
                 if( paramIndex < argCount )
                 {
-                    auto arg = attr->args[paramIndex];
-
                     // TODO: support checking the argument against the declared
                     // type for the parameter.
-
+                    
                 }
                 else
                 {
@@ -2653,7 +2787,7 @@ namespace Slang
             }
 
             // Now apply type-specific validation to the attribute.
-            if(!validateAttribute(attr))
+            if(!validateAttribute(attr, attrDecl))
             {
                 return uncheckedAttr;
             }
@@ -2776,6 +2910,24 @@ namespace Slang
                 {
                     checkGenericDeclHeader(g);
                     registerExtension(extDecl);
+                }
+            }
+            // check user defined attribute classes first
+            for (auto decl : programNode->Members)
+            {
+                if (auto typeMember = decl->As<StructDecl>())
+                {
+                    bool isTypeAttributeClass = false;
+                    for (auto attrib : typeMember->GetModifiersOfType<UncheckedAttribute>())
+                    {
+                        if (attrib->name == getSession()->getNameObj("AttributeUsageAttribute"))
+                        {
+                            isTypeAttributeClass = true;
+                            break;
+                        }
+                    }
+                    if (isTypeAttributeClass)
+                        checkDecl(decl);
                 }
             }
             // check types
@@ -8588,6 +8740,7 @@ namespace Slang
 
         RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* /*expr*/)
         {
+            // StaticMemberExpr means it is already checked
             SLANG_UNEXPECTED("should not occur in unchecked AST");
             UNREACHABLE_RETURN(nullptr);
         }

@@ -315,6 +315,14 @@ END_SYNTAX_CLASS()
 
 // A `[name(arg0, ...)]` style attribute that has been validated.
 SYNTAX_CLASS(Attribute, AttributeBase)
+    FIELD(AttributeArgumentValueDict, intArgVals)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(UserDefinedAttribute, Attribute)
+END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(AttributeUsageAttribute, Attribute)
+    FIELD(SyntaxClass<RefObject>, targetSyntaxClass)
 END_SYNTAX_CLASS()
 
 // An `[unroll]` or `[unroll(count)]` attribute

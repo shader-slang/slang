@@ -66,7 +66,9 @@ struct NamePool
 {
     // Find or create the `Name` that represents the given `text`.
     Name* getName(String const& text);
-
+    // Try find the `Name` that represents the given `text`.
+    // If the name does not exist, return nullptr
+    Name* tryGetName(String const& text);
     // Set the parent name pool to use for lookup
     void setRootNamePool(RootNamePool* rootNamePool)
     {

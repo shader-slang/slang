@@ -3,7 +3,7 @@
 
 #include "compiler.h"
 #include "type-layout.h"
-
+#include "syntax.h"
 #include <assert.h>
 
 // Don't signal errors for stuff we don't implement here,
@@ -18,7 +18,19 @@ using namespace Slang;
 
 
 // Conversion routines to help with strongly-typed reflection API
+static inline Session* convert(SlangSession* session)
+{
+    return (Session*)session;
+}
 
+static inline UserDefinedAttribute* convert(SlangReflectionUserAttribute* attrib)
+{
+    return (UserDefinedAttribute*)attrib;
+}
+static inline SlangReflectionUserAttribute* convert(UserDefinedAttribute* attrib)
+{
+    return (SlangReflectionUserAttribute*)attrib;
+}
 static inline Type* convert(SlangReflectionType* type)
 {
     return (Type*) type;
@@ -84,6 +96,101 @@ static inline SlangReflection* convert(ProgramLayout* program)
 {
     return (SlangReflection*) program;
 }
+
+// user attaribute
+
+unsigned int getUserAttributeCount(Decl* decl)
+{
+    unsigned int count = 0;
+    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    {
+        SLANG_UNUSED(x);
+        count++;
+    }
+    return count;
+}
+
+SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* decl, const char* name)
+{
+    auto nameObj = session->tryGetNameObj(name);
+    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    {
+        if (x->name == nameObj)
+            return (SlangReflectionUserAttribute*)(x);
+    }
+    return nullptr;
+}
+
+SlangReflectionUserAttribute* getUserAttributeByIndex(Decl* decl, unsigned int index)
+{
+    unsigned int id = 0;
+    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    {
+        if (id == index)
+            return convert(x);
+        id++;
+    }
+    return nullptr;
+}
+
+SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return nullptr;
+    return userAttr->getName()->text.Buffer();
+}
+SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return 0;
+    return (unsigned int)userAttr->args.Count();
+}
+SlangReflectionType* spReflectionUserAttribute_GetArgumentType(SlangReflectionUserAttribute* attrib, unsigned int index)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return nullptr;
+    return convert(userAttr->args[index]->type.type.Ptr());
+}
+SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflectionUserAttribute* attrib, unsigned int index, int * rs)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
+    if (index >= userAttr->args.Count()) return SLANG_ERROR_INVALID_PARAMETER;
+    RefPtr<RefObject> val;
+    if (userAttr->intArgVals.TryGetValue(index, val))
+    {
+        *rs = (int)val.As<ConstantIntVal>()->value;
+        return 0;
+    }
+    return SLANG_ERROR_INVALID_PARAMETER;
+}
+SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(SlangReflectionUserAttribute* attrib, unsigned int index, float * rs)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
+    if (index >= userAttr->args.Count()) return SLANG_ERROR_INVALID_PARAMETER;
+    if (auto cexpr = userAttr->args[index].As<FloatingPointLiteralExpr>())
+    {
+        *rs = (float)cexpr->value;
+        return 0;
+    }
+    return SLANG_ERROR_INVALID_PARAMETER;
+}
+SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangReflectionUserAttribute* attrib, unsigned int index, size_t* bufLen)
+{
+    auto userAttr = convert(attrib);
+    if (!userAttr) return nullptr;
+    if (index >= userAttr->args.Count()) return nullptr;
+    if (auto cexpr = userAttr->args[index].As<StringLiteralExpr>())
+    {
+        if (bufLen)
+            *bufLen = cexpr->token.Content.size();
+        return cexpr->token.Content.begin();
+    }
+    return nullptr;
+}
+
+
 
 // type Reflection
 
@@ -350,6 +457,37 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     }
 
     return SLANG_SCALAR_TYPE_NONE;
+}
+
+SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionType* inType)
+{
+    auto type = convert(inType);
+    if (!type) return 0;
+    if (auto declRefType = type->AsDeclRefType())
+    {
+        return getUserAttributeCount(declRefType->declRef.getDecl());
+    }
+    return 0;
+}
+SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangReflectionType* inType, unsigned int index)
+{
+    auto type = convert(inType);
+    if (!type) return 0;
+    if (auto declRefType = type->AsDeclRefType())
+    {
+        return getUserAttributeByIndex(declRefType->declRef.getDecl(), index);
+    }
+    return 0;
+}
+SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName(SlangReflectionType* inType, char const* name)
+{
+    auto type = convert(inType);
+    if (!type) return 0;
+    if (auto declRefType = type->AsDeclRefType())
+    {
+        return findUserAttributeByName(declRefType->getSession(), declRefType->declRef.getDecl(), name);
+    }
+    return 0;
 }
 
 SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionType* inType)
@@ -757,6 +895,24 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
     return (SlangReflectionModifier*) modifier;
 }
 
+SLANG_API unsigned int spReflectionVariable_GetUserAttributeCount(SlangReflectionVariable* inVar)
+{
+    auto varDecl = convert(inVar);
+    if (!varDecl) return 0;
+    return getUserAttributeCount(varDecl);
+}
+SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* inVar, unsigned int index)
+{
+    auto varDecl = convert(inVar);
+    if (!varDecl) return 0;
+    return getUserAttributeByIndex(varDecl, index);
+}
+SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* inVar, SlangSession* session, char const* name)
+{
+    auto varDecl = convert(inVar);
+    if (!varDecl) return 0;
+    return findUserAttributeByName(convert(session), varDecl, name);
+}
 
 // Variable Layout Reflection
 
