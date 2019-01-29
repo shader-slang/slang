@@ -4,13 +4,13 @@
 
 //TEST:REFLECTION:-stage compute -entry main -target hlsl
 
-[AttributeUsage(AttributeTargets.Struct)]
+[__AttributeUsage(_AttributeTargets.Struct)]
 struct MyStructAttribute
 {
     int iParam;
     float fParam;
 };
-[AttributeUsage(AttributeTargets.Var)]
+[__AttributeUsage(_AttributeTargets.Var)]
 struct DefaultValueAttribute
 {
     int iParam;

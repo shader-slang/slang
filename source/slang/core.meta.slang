@@ -1287,11 +1287,11 @@ attribute_syntax [mutating] : MutatingAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
-enum AttributeTargets
+enum _AttributeTargets
 {
     Struct = $( (int) UserDefinedAttributeTargets::Struct),
     Var = $( (int) UserDefinedAttributeTargets::Var),
     Function = $( (int) UserDefinedAttributeTargets::Function),
 };
 __attributeTarget(StructDecl)
-attribute_syntax [AttributeUsage(target : AttributeTargets)] : AttributeUsageAttribute;
+attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
