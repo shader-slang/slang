@@ -1307,12 +1307,18 @@ SLANG_RAW("attribute_syntax [__readNone] : ReadNoneAttribute;\n")
 SLANG_RAW("\n")
 SLANG_RAW("enum AttributeTargets\n")
 SLANG_RAW("{\n")
-
-    sb << "Struct = " << (int)UserDefinedAttributeTargets::Struct << ", ";
-    sb << "Var = " << (int)UserDefinedAttributeTargets::Var << ", ";
-    sb << "Function = " << (int)UserDefinedAttributeTargets::Function;
-
-SLANG_RAW("\n")
+SLANG_RAW("    Struct = ")
+SLANG_SPLICE( (int) UserDefinedAttributeTargets::Struct
+)
+SLANG_RAW(",\n")
+SLANG_RAW("    Var = ")
+SLANG_SPLICE( (int) UserDefinedAttributeTargets::Var
+)
+SLANG_RAW(",\n")
+SLANG_RAW("    Function = ")
+SLANG_SPLICE( (int) UserDefinedAttributeTargets::Function
+)
+SLANG_RAW(",\n")
 SLANG_RAW("};\n")
 SLANG_RAW("__attributeTarget(StructDecl)\n")
 SLANG_RAW("attribute_syntax [AttributeUsage(target : AttributeTargets)] : AttributeUsageAttribute;")

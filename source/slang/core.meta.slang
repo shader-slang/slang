@@ -1289,9 +1289,9 @@ attribute_syntax [__readNone] : ReadNoneAttribute;
 
 enum AttributeTargets
 {
-    Struct = $((int) UserDefinedAttributeTargets::Struct),
-    Var = $((int) UserDefinedAttributeTargets::Var),
-    Function = $((int) UserDefinedAttributeTargets::Function),
+    Struct = $( (int) UserDefinedAttributeTargets::Struct),
+    Var = $( (int) UserDefinedAttributeTargets::Var),
+    Function = $( (int) UserDefinedAttributeTargets::Function),
 };
 __attributeTarget(StructDecl)
 attribute_syntax [AttributeUsage(target : AttributeTargets)] : AttributeUsageAttribute;
