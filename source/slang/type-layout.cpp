@@ -845,11 +845,11 @@ static LayoutSize GetElementCount(RefPtr<IntVal> val)
     if(!val)
         return LayoutSize::infinite();
 
-    if (auto constantVal = val.As<ConstantIntVal>())
+    if (auto constantVal = as<ConstantIntVal>(val))
     {
         return LayoutSize(LayoutSize::RawValue(constantVal->value));
     }
-    else if( auto varRefVal = val.As<GenericParamIntVal>() )
+    else if( auto varRefVal = as<GenericParamIntVal>(val) )
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -1093,7 +1093,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         return oldTypeLayout;
 
     RefPtr<TypeLayout> newTypeLayout;
-    if (auto oldStructTypeLayout = oldTypeLayout.As<StructTypeLayout>())
+    if (auto oldStructTypeLayout = oldTypeLayout.as<StructTypeLayout>())
     {
         RefPtr<StructTypeLayout> newStructTypeLayout = new StructTypeLayout();
         newStructTypeLayout->type = oldStructTypeLayout->type;
@@ -1668,7 +1668,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     // Let's look at the type layout we have, and see if there is anything
     // that we need to do with it.
     //
-    if( auto originalArrayTypeLayout = originalTypeLayout.As<ArrayTypeLayout>() )
+    if( auto originalArrayTypeLayout = originalTypeLayout.as<ArrayTypeLayout>() )
     {
         // The element type is itself an array, so we'll need to adjust
         // *its* element type accordingly.
@@ -1696,7 +1696,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
         return adjustedArrayTypeLayout;
     }
-    else if(auto originalParameterGroupTypeLayout = originalTypeLayout.As<ParameterGroupTypeLayout>() )
+    else if(auto originalParameterGroupTypeLayout = originalTypeLayout.as<ParameterGroupTypeLayout>() )
     {
         auto originalInnerElementTypeLayout = originalParameterGroupTypeLayout->elementVarLayout->typeLayout;
         auto adjustedInnerElementTypeLayout = maybeAdjustLayoutForArrayElementType(
@@ -1715,7 +1715,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
         SLANG_UNIMPLEMENTED_X("array of parameter group");
         UNREACHABLE_RETURN(originalTypeLayout);
     }
-    else if(auto originalStructTypeLayout = originalTypeLayout.As<StructTypeLayout>() )
+    else if(auto originalStructTypeLayout = originalTypeLayout.as<StructTypeLayout>() )
     {
         UInt fieldCount = originalStructTypeLayout->fields.Count();
 
@@ -1782,7 +1782,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                     {
                         // If we are making an unbounded array, then a `struct`
                         // field with resource type will turn into its own space,
-                        // and it will start at regsiter zero in that space.
+                        // and it will start at register zero in that space.
                         //
                         resInfo.index = 0;
                         resInfo.space = spaceOffsetForField.getFiniteValue();

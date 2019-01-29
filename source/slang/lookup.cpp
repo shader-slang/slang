@@ -417,7 +417,7 @@ void DoLocalLookupImpl(
             {
                 checkDecl(request.semantics, inheritanceDeclRef.decl);
 
-                auto baseType = inheritanceDeclRef.getDecl()->base.type.As<DeclRefType>();
+                auto baseType = inheritanceDeclRef.getDecl()->base.type.dynamicCast<DeclRefType>();
                 SLANG_ASSERT(baseType);
                 int diff = 0;
                 auto baseInterfaceDeclRef = baseType->declRef.SubstituteImpl(containerDeclRef.substitutions, &diff);

@@ -1624,39 +1624,39 @@ void addVarDecorations(
     auto builder = context->irBuilder;
     for(RefPtr<Modifier> mod : decl->modifiers)
     {
-        if(mod.As<HLSLNoInterpolationModifier>())
+        if(as<HLSLNoInterpolationModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
         }
-        else if(mod.As<HLSLNoPerspectiveModifier>())
+        else if(as<HLSLNoPerspectiveModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoPerspective);
         }
-        else if(mod.As<HLSLLinearModifier>())
+        else if(as<HLSLLinearModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Linear);
         }
-        else if(mod.As<HLSLSampleModifier>())
+        else if(as<HLSLSampleModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Sample);
         }
-        else if(mod.As<HLSLCentroidModifier>())
+        else if(as<HLSLCentroidModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
-        else if(mod.As<VulkanRayPayloadAttribute>())
+        else if(as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanRayPayloadDecoration>(inst);
         }
-        else if(mod.As<VulkanCallablePayloadAttribute>())
+        else if(as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanCallablePayloadDecoration>(inst);
         }
-        else if(mod.As<VulkanHitAttributesAttribute>())
+        else if(as<VulkanHitAttributesAttribute>(mod))
         {
             builder->addSimpleDecoration<IRVulkanHitAttributesDecoration>(inst);
         }
-        else if(mod.As<GloballyCoherentModifier>())
+        else if(as<GloballyCoherentModifier>(mod))
         {
             builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
@@ -2412,7 +2412,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         // First look to see if the expression references a
         // declaration at all.
-        auto declRefExpr = funcExpr.As<DeclRefExpr>();
+        auto declRefExpr = as<DeclRefExpr>(funcExpr);
         if(!declRefExpr)
             return false;
 
@@ -2430,24 +2430,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else
         {
             // The callee declaration isn't itself a callable (it must have
-            // a funciton type, though).
+            // a function type, though).
             return false;
         }
 
         // Now we can look at the specific kinds of declaration references,
         // and try to tease them apart.
-        if (auto memberFuncExpr = funcExpr.As<MemberExpr>())
+        if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = memberFuncExpr->declRef;
             outInfo->baseExpr = memberFuncExpr->BaseExpression;
             return true;
         }
-        else if (auto staticMemberFuncExpr = funcExpr.As<StaticMemberExpr>())
+        else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = staticMemberFuncExpr->declRef;
             return true;
         }
-        else if (auto varExpr = funcExpr.As<VarExpr>())
+        else if (auto varExpr = as<VarExpr>(funcExpr))
         {
             outInfo->funcDeclRef = varExpr->declRef;
             return true;
@@ -2484,7 +2484,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*> irArgs;
 
         // We will also collect "fixup" actions that need
-        // to be performed after teh call, in order to
+        // to be performed after the call, in order to
         // copy the final values for `out` parameters
         // back to their arguments.
         List<OutArgumentFixup> argFixups;
@@ -2493,7 +2493,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         ResolvedCallInfo resolvedInfo;
         if( tryResolveDeclRefForCall(funcExpr, &resolvedInfo) )
         {
-            // In this case we know exaclty what declaration we
+            // In this case we know exactly what declaration we
             // are going to call, and so we can resolve things
             // appropriately.
             auto funcDeclRef = resolvedInfo.funcDeclRef;
@@ -2525,9 +2525,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         // TODO: In this case we should be emitting code for the callee as
         // an ordinary expression, then emitting the arguments according
-        // to the type information on the callee (e.g., which paameters
+        // to the type information on the callee (e.g., which parameters
         // are `out` or `inout`, and then finally emitting the `call`
-        // instruciton.
+        // instruction.
         //
         // We don't currently have the case of emitting arguments according
         // to function type info (instead of declaration info), and really
@@ -4497,11 +4497,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // in the order they were declared.
         for (auto member : genericDecl->Members)
         {
-            if (auto typeParamDecl = member.As<GenericTypeParamDecl>())
+            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
                 genericArgs.Add(getSimpleVal(context, ensureDecl(context, typeParamDecl)));
             }
-            else if (auto valDecl = member.As<GenericValueParamDecl>())
+            else if (auto valDecl = as<GenericValueParamDecl>(member))
             {
                 genericArgs.Add(getSimpleVal(context, ensureDecl(context, valDecl)));
             }
@@ -4510,7 +4510,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // declaration order.
         for (auto member : genericDecl->Members)
         {
-            if (auto constraintDecl = member.As<GenericTypeConstraintDecl>())
+            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
                 genericArgs.Add(getSimpleVal(context, ensureDecl(context, constraintDecl)));
             }
@@ -4815,7 +4815,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
             // into requirement keys for this interface.
-            if (auto associatedTypeDecl = requirementDecl.As<AssocTypeDecl>())
+            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
@@ -5318,7 +5318,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // in the order they were declared.
         for (auto member : genericDecl->Members)
         {
-            if (auto typeParamDecl = member.As<GenericTypeParamDecl>())
+            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
@@ -5326,7 +5326,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
-            else if (auto valDecl = member.As<GenericValueParamDecl>())
+            else if (auto valDecl = as<GenericValueParamDecl>(member))
             {
                 auto paramType = lowerType(subContext, valDecl->getType());
                 auto param = subBuilder->emitParam(paramType);
@@ -5338,7 +5338,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // declaration order.
         for (auto member : genericDecl->Members)
         {
-            if (auto constraintDecl = member.As<GenericTypeConstraintDecl>())
+            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
@@ -5943,17 +5943,17 @@ IRInst* lowerSubstitutionArg(
 bool canDeclLowerToAGeneric(RefPtr<Decl> decl)
 {
     // A callable decl lowers to an `IRFunc`, and can be generic
-    if(decl.As<CallableDecl>()) return true;
+    if(as<CallableDecl>(decl)) return true;
 
     // An aggregate type decl lowers to an `IRStruct`, and can be generic
-    if(decl.As<AggTypeDecl>()) return true;
+    if(as<AggTypeDecl>(decl)) return true;
 
     // An inheritance decl lowers to an `IRWitnessTable`, and can be generic
-    if(decl.As<InheritanceDecl>()) return true;
+    if(as<InheritanceDecl>(decl)) return true;
 
     // A `typedef` declaration nested under a generic will turn into
     // a generic that returns a type (a simple type-level function).
-    if(decl.As<TypeDefDecl>()) return true;
+    if(as<TypeDefDecl>(decl)) return true;
 
     return false;
 }
@@ -5969,15 +5969,15 @@ LoweredValInfo emitDeclRef(
 
     // Ignore any global generic type substitutions during lowering.
     // Really, we don't even expect these to appear.
-    while(auto globalGenericSubst = subst.As<GlobalGenericParamSubstitution>())
+    while(auto globalGenericSubst = as<GlobalGenericParamSubstitution>(subst))
         subst = globalGenericSubst->outer;
 
     // If the declaration would not get wrapped in a `IRGeneric`,
     // even if it is nested inside of an AST `GenericDecl`, then
-    // we should also ignore any generic substiuttions.
+    // we should also ignore any generic substitutions.
     if(!canDeclLowerToAGeneric(decl))
     {
-        while(auto genericSubst = subst.As<GenericSubstitution>())
+        while(auto genericSubst = as<GenericSubstitution>(subst))
             subst = genericSubst->outer;
     }
 
@@ -5991,7 +5991,7 @@ LoweredValInfo emitDeclRef(
     }
 
     // Otherwise, we look at the kind of substitution, and let it guide us.
-    if(auto genericSubst = subst.As<GenericSubstitution>())
+    if(auto genericSubst = subst.as<GenericSubstitution>())
     {
         // A generic substitution means we will need to output
         // a `specialize` instruction to specialize the generic.
@@ -6040,7 +6040,7 @@ LoweredValInfo emitDeclRef(
 
         return LoweredValInfo::simple(irSpecializedVal);
     }
-    else if(auto thisTypeSubst = subst.As<ThisTypeSubstitution>())
+    else if(auto thisTypeSubst = subst.as<ThisTypeSubstitution>())
     {
         if(decl.Ptr() == thisTypeSubst->interfaceDecl)
         {
@@ -6060,7 +6060,7 @@ LoweredValInfo emitDeclRef(
         // Note: unlike the case for generics above, in the interface-lookup
         // case, we don't end up caring about any further outer substitutions.
         // That is because even if we are naming `ISomething<Foo>.doIt()`,
-        // a method insided a generic interface, we don't actually care
+        // a method inside a generic interface, we don't actually care
         // about the substitution of `Foo` for the parameter `T` of
         // `ISomething<T>`. That is because we really care about the
         // witness table for the concrete type that conforms to `ISomething<Foo>`.
@@ -6115,7 +6115,7 @@ static void lowerEntryPointToIR(
     }
     auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
 
-    // Attach a marker decoraton so that we recognize
+    // Attach a marker decoration so that we recognize
     // this as an entry point.
     auto builder = context->irBuilder;
     builder->addEntryPointDecoration(getSimpleVal(context, loweredEntryPointFunc));
@@ -6126,7 +6126,7 @@ static void lowerEntryPointToIR(
     builder->setInsertInto(builder->getModule()->getModuleInst());
     for (RefPtr<Substitutions> subst = entryPointRequest->globalGenericSubst; subst; subst = subst->outer)
     {
-        auto gSubst = subst.As<GlobalGenericParamSubstitution>();
+        auto gSubst = subst.as<GlobalGenericParamSubstitution>();
         if(!gSubst)
             continue;
 

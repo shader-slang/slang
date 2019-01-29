@@ -953,12 +953,12 @@ namespace Slang
 {
     static unsigned getParameterCount(RefPtr<TypeLayout> typeLayout)
     {
-        if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
+        if(auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
         {
             typeLayout = parameterGroupLayout->offsetElementTypeLayout;
         }
 
-        if(auto structLayout = typeLayout.As<StructTypeLayout>())
+        if(auto structLayout = as<StructTypeLayout>(typeLayout))
         {
             return (unsigned) structLayout->fields.Count();
         }
@@ -968,12 +968,12 @@ namespace Slang
 
     static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
     {
-        if(auto parameterGroupLayout = typeLayout.As<ParameterGroupTypeLayout>())
+        if(auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
         {
             typeLayout = parameterGroupLayout->offsetElementTypeLayout;
         }
 
-        if(auto structLayout = typeLayout.As<StructTypeLayout>())
+        if(auto structLayout = as<StructTypeLayout>(typeLayout))
         {
             return structLayout->fields[index];
         }

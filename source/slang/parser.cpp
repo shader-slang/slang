@@ -619,7 +619,7 @@ namespace Slang
 
             // About to look at shared modifiers? Done.
             RefPtr<Modifier> linkMod = *modifierLink;
-            if(linkMod.As<SharedModifiers>())
+            if(as<SharedModifiers>(linkMod))
             {
                 break;
             }
@@ -821,7 +821,7 @@ namespace Slang
         auto keywordToken = advanceToken(parser);
 
         RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
-        auto syntax = parsedObject.As<T>();
+        auto syntax = dynamicCast<T>(parsedObject);
 
         if (syntax)
         {
@@ -3077,11 +3077,11 @@ namespace Slang
 
         if (decl)
         {
-            if( auto dd = decl.As<Decl>() )
+            if( auto dd = as<Decl>(decl) )
             {
                 CompleteDecl(parser, dd, containerDecl, modifiers);
             }
-            else if(auto declGroup = decl.As<DeclGroup>())
+            else if(auto declGroup = as<DeclGroup>(decl))
             {
                 // We are going to add the same modifiers to *all* of these declarations,
                 // so we want to give later passes a way to detect which modifiers
@@ -3115,11 +3115,11 @@ namespace Slang
         auto declBase = ParseDecl(parser, containerDecl);
         if(!declBase)
             return nullptr;
-        if( auto decl = declBase.As<Decl>() )
+        if( auto decl = as<Decl>(declBase) )
         {
             return decl;
         }
-        else if( auto declGroup = declBase.As<DeclGroup>() )
+        else if( auto declGroup = as<DeclGroup>(declBase) )
         {
             if( declGroup->decls.Count() == 1 )
             {
@@ -3524,7 +3524,7 @@ namespace Slang
                 {
                     body = stmt;
                 }
-                else if (auto seqStmt = body.As<SeqStmt>())
+                else if (auto seqStmt = as<SeqStmt>(body))
                 {
                     seqStmt->stmts.Add(stmt);
                 }

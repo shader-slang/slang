@@ -71,7 +71,7 @@ LegalVal LegalVal::implicitDeref(LegalVal const& val)
 LegalVal LegalVal::getImplicitDeref()
 {
     SLANG_ASSERT(flavor == Flavor::implicitDeref);
-    return obj.As<ImplicitDerefVal>()->val;
+    return as<ImplicitDerefVal>(obj)->val;
 }
 
 

@@ -276,29 +276,29 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<PtrType> Session::getPtrType(
         RefPtr<Type>    valueType)
     {
-        return getPtrType(valueType, "PtrType").As<PtrType>();
+        return getPtrType(valueType, "PtrType").dynamicCast<PtrType>();
     }
 
         // Construct the type `Out<valueType>`
     RefPtr<OutType> Session::getOutType(RefPtr<Type> valueType)
     {
-        return getPtrType(valueType, "OutType").As<OutType>();
+        return getPtrType(valueType, "OutType").dynamicCast<OutType>();
     }
 
     RefPtr<InOutType> Session::getInOutType(RefPtr<Type> valueType)
     {
-        return getPtrType(valueType, "InOutType").As<InOutType>();
+        return getPtrType(valueType, "InOutType").dynamicCast<InOutType>();
     }
 
     RefPtr<RefType> Session::getRefType(RefPtr<Type> valueType)
     {
-        return getPtrType(valueType, "RefType").As<RefType>();
+        return getPtrType(valueType, "RefType").dynamicCast<RefType>();
     }
 
     RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
     {
         auto genericDecl = findMagicDecl(
-            this, ptrTypeName).As<GenericDecl>();
+            this, ptrTypeName).dynamicCast<GenericDecl>();
         return getPtrType(valueType, genericDecl);
     }
 
@@ -350,8 +350,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto elementType = baseType->SubstituteImpl(subst, &diff).As<Type>();
-        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).As<IntVal>();
+        auto elementType = baseType->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).dynamicCast<IntVal>();
         SLANG_ASSERT(arrlen);
         if (diff)
         {
@@ -432,7 +432,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<WitnessTable> RequirementWitness::getWitnessTable()
     {
         SLANG_ASSERT(getFlavor() == Flavor::witnessTable);
-        return m_obj.As<WitnessTable>();
+        return m_obj.dynamicCast<WitnessTable>();
     }
 
 
@@ -500,7 +500,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     // reference to `ISidekick.Hero` with a this-type substitution that references
                     // the `{S:ISidekick}` declaration as a witness.
                     //
-                    // The front-end will expand the generic appliation `followHero<Sidekick<Batman>>`
+                    // The front-end will expand the generic application `followHero<Sidekick<Batman>>`
                     // to `followHero<Sidekick<Batman>, {Sidekick<H>:ISidekick}[H->Batman]>`
                     // (that is, the hidden second parameter will reference the inheritance
                     // clause on `Sidekick<H>`, with a substitution to map `H` to `Batman`.
@@ -541,7 +541,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
             {
-                auto genericSubst = s.As<GenericSubstitution>();
+                auto genericSubst = s.dynamicCast<GenericSubstitution>();
                 if(!genericSubst)
                     continue;
 
@@ -560,11 +560,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         (*ioDiff)++;
                         return genericSubst->args[index];
                     }
-                    else if (auto typeParam = m.As<GenericTypeParamDecl>())
+                    else if (auto typeParam = as<GenericTypeParamDecl>(m))
                     {
                         index++;
                     }
-                    else if (auto valParam = m.As<GenericValueParamDecl>())
+                    else if (auto valParam = as<GenericValueParamDecl>(m))
                     {
                         index++;
                     }
@@ -579,7 +579,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
             {
-                auto genericSubst = s.As<GlobalGenericParamSubstitution>();
+                auto genericSubst = as<GlobalGenericParamSubstitution>(s);
                 if(!genericSubst)
                     continue;
 
@@ -608,7 +608,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         {
             for(auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
             {
-                auto thisSubst = s.As<ThisTypeSubstitution>();
+                auto thisSubst = s.as<ThisTypeSubstitution>();
                 if(!thisSubst)
                     continue;
 
@@ -644,14 +644,14 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     static RefPtr<Type> ExtractGenericArgType(RefPtr<Val> val)
     {
-        auto type = val.As<Type>();
+        auto type = val.dynamicCast<Type>();
         SLANG_RELEASE_ASSERT(type.Ptr());
         return type;
     }
 
     static RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Val> val)
     {
-        auto intVal = val.As<IntVal>();
+        auto intVal = val.as<IntVal>();
         SLANG_RELEASE_ASSERT(intVal.Ptr());
         return intVal;
     }
@@ -690,7 +690,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             dd = parentDecl;
 
-            if(auto genericParentDecl = parentDecl.As<GenericDecl>())
+            if(auto genericParentDecl = parentDecl.as<GenericDecl>())
             {
                 // Don't specialize any parameters of a generic.
                 if(childDecl != genericParentDecl->inner)
@@ -700,7 +700,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 RefPtr<GenericSubstitution> foundSubst;
                 for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
                 {
-                    auto genSubst = s.As<GenericSubstitution>();
+                    auto genSubst = s.as<GenericSubstitution>();
                     if(!genSubst)
                         continue;
 
@@ -753,7 +753,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             GenericSubstitution* subst = nullptr;
             for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
             {
-                if(auto genericSubst = s.As<GenericSubstitution>())
+                if(auto genericSubst = s.as<GenericSubstitution>())
                 {
                     subst = genericSubst;
                     break;
@@ -1072,13 +1072,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
         int diff = 0;
 
         // result type
-        RefPtr<Type> substResultType = resultType->SubstituteImpl(subst, &diff).As<Type>();
+        RefPtr<Type> substResultType = resultType->SubstituteImpl(subst, &diff).dynamicCast<Type>();
 
         // parameter types
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.Add(pp->SubstituteImpl(subst, &diff).As<Type>());
+            substParamTypes.Add(pp->SubstituteImpl(subst, &diff).dynamicCast<Type>());
         }
 
         // early exit for no change...
@@ -1206,7 +1206,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         for(RefPtr<Substitutions> s = subst; s; s = s->outer)
         {
-            if(auto genericSubst = s.As<GenericSubstitution>())
+            if(auto genericSubst = as<GenericSubstitution>(s))
                 return genericSubst;
         }
         return nullptr;
@@ -1228,17 +1228,17 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* MatrixExpressionType::getElementType()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[0].As<Type>().Ptr();
+        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     IntVal* MatrixExpressionType::getRowCount()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[1].As<IntVal>().Ptr();
+        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
     }
 
     IntVal* MatrixExpressionType::getColumnCount()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[2].As<IntVal>().Ptr();
+        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
     }
 
     RefPtr<Type> MatrixExpressionType::getRowType()
@@ -1255,7 +1255,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         RefPtr<IntVal>  elementCount)
     {
         auto vectorGenericDecl = findMagicDecl(
-            this, "Vector").As<GenericDecl>();
+            this, "Vector").as<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
 
         auto substitutions = new GenericSubstitution();
@@ -1275,7 +1275,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* PtrTypeBase::getValueType()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[0].As<Type>().Ptr();
+        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     // GenericParamIntVal
@@ -1304,7 +1304,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // search for a substitution that might apply to us
         for(auto s = subst.substitutions; s; s = s->outer)
         {
-            auto genSubst = s.As<GenericSubstitution>();
+            auto genSubst = s.as<GenericSubstitution>();
             if(!genSubst)
                 continue;
 
@@ -1323,11 +1323,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     (*ioDiff)++;
                     return genSubst->args[index];
                 }
-                else if (auto typeParam = m.As<GenericTypeParamDecl>())
+                else if (auto typeParam = as<GenericTypeParamDecl>(m))
                 {
                     index++;
                 }
-                else if (auto valParam = m.As<GenericValueParamDecl>())
+                else if (auto valParam = as<GenericValueParamDecl>(m))
                 {
                     index++;
                 }
@@ -1337,7 +1337,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
         }
 
-        // Nothing found: don't substittue.
+        // Nothing found: don't substitute.
         return this;
     }
 
@@ -1402,7 +1402,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         int diff = 0;
 
         if(substOuter != outer) diff++;
-        auto substWitness = witness->SubstituteImpl(substSet, &diff).As<SubtypeWitness>();
+        auto substWitness = as<SubtypeWitness>(witness->SubstituteImpl(substSet, &diff));
 
         if (!diff) return this;
 
@@ -1440,7 +1440,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         if(substOuter != outer) diff++;
 
-        auto substActualType = actualType->SubstituteImpl(substSet, &diff).As<Type>();
+        auto substActualType = actualType->SubstituteImpl(substSet, &diff).dynamicCast<Type>();
 
         List<ConstraintArg> substConstraintArgs;
         for(auto constraintArg : constraintArgs)
@@ -1499,7 +1499,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
 
-        return type->Substitute(substitutions).As<Type>();
+        return type->Substitute(substitutions).dynamicCast<Type>();
     }
 
     DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
@@ -1543,7 +1543,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         for(auto s = substs; s; s = s->outer)
         {
-            auto gSubst = s.As<GlobalGenericParamSubstitution>();
+            auto gSubst = s.as<GlobalGenericParamSubstitution>();
             if(!gSubst)
                 continue;
 
@@ -1576,7 +1576,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // a recursive case that skips the rest of the function.
         for(auto specSubst = substsToSpecialize; specSubst; specSubst = specSubst->outer)
         {
-            auto specGlobalGenericSubst = specSubst.As<GlobalGenericParamSubstitution>();
+            auto specGlobalGenericSubst = specSubst.as<GlobalGenericParamSubstitution>();
             if(!specGlobalGenericSubst)
                 continue;
 
@@ -1607,7 +1607,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // the end of the list in all cases, so lets advance
         // until we see them.
         RefPtr<Substitutions> appGlobalGenericSubsts = substsToApply;
-        while(appGlobalGenericSubsts && !appGlobalGenericSubsts.As<GlobalGenericParamSubstitution>())
+        while(appGlobalGenericSubsts && !appGlobalGenericSubsts.as<GlobalGenericParamSubstitution>())
             appGlobalGenericSubsts = appGlobalGenericSubsts->outer;
 
 
@@ -1627,7 +1627,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         RefPtr<Substitutions>* link = &resultSubst;
         for(auto appSubst = appGlobalGenericSubsts; appSubst; appSubst = appSubst->outer)
         {
-            auto appGlobalGenericSubst = appSubst.As<GlobalGenericParamSubstitution>();
+            auto appGlobalGenericSubst = appSubst.as<GlobalGenericParamSubstitution>();
             if(!appSubst)
                 continue;
 
@@ -1661,7 +1661,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
 
     // Construct new substitutions to apply to a declaration,
-    // based on a provided substituion set to be applied
+    // based on a provided substitution set to be applied
     RefPtr<Substitutions> specializeSubstitutions(
         Decl*                   declToSpecialize,
         RefPtr<Substitutions>   substsToSpecialize,
@@ -1688,7 +1688,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             {
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
-                if(auto specGenericSubst = substsToSpecialize.As<GenericSubstitution>())
+                if(auto specGenericSubst = substsToSpecialize.as<GenericSubstitution>())
                 {
                     if(specGenericSubst->genericDecl == ancestorGenericDecl)
                     {
@@ -1722,7 +1722,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 //
                 for(auto s = substsToApply; s; s = s->outer)
                 {
-                    auto appGenericSubst = s.As<GenericSubstitution>();
+                    auto appGenericSubst = s.as<GenericSubstitution>();
                     if(!appGenericSubst)
                         continue;
 
@@ -1758,7 +1758,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
-                if(auto specThisTypeSubst = substsToSpecialize.As<ThisTypeSubstitution>())
+                if(auto specThisTypeSubst = substsToSpecialize.as<ThisTypeSubstitution>())
                 {
                     if(specThisTypeSubst->interfaceDecl == ancestorInterfaceDecl)
                     {
@@ -1787,7 +1787,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 //
                 for(auto s = substsToApply; s; s = s->outer)
                 {
-                    auto appThisTypeSubst = s.As<ThisTypeSubstitution>();
+                    auto appThisTypeSubst = s.as<ThisTypeSubstitution>();
                     if(!appThisTypeSubst)
                         continue;
 
@@ -1865,7 +1865,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         // TODO: The old code here used to try to translate a decl-ref
         // to an associated type in a decl-ref for the concrete type
-        // in a paarticular implementation.
+        // in a particular implementation.
         //
         // I have only kept that logic in `DeclRefType::SubstituteImpl`,
         // but it may turn out it is needed here too.
@@ -1907,7 +1907,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // and there might be a this-type substitution in place.
             // A reference to the parent of the interface declaration
             // should not include that substitution.
-            if(auto thisTypeSubst = substToApply.As<ThisTypeSubstitution>())
+            if(auto thisTypeSubst = substToApply.as<ThisTypeSubstitution>())
             {
                 if(thisTypeSubst->interfaceDecl == interfaceDecl)
                 {
@@ -1921,11 +1921,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         {
             // The parent of this declaration is a generic, which means
             // that the decl-ref to the current declaration might include
-            // substitutiosn that specialize the generic parameters.
+            // substitutions that specialize the generic parameters.
             // A decl-ref to the parent generic should *not* include
             // those substitutions.
             //
-            if(auto genericSubst = substToApply.As<GenericSubstitution>())
+            if(auto genericSubst = substToApply.as<GenericSubstitution>())
             {
                 if(genericSubst->genericDecl == parentGenericDecl)
                 {
@@ -1963,7 +1963,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     IntegerLiteralValue GetIntVal(RefPtr<IntVal> val)
     {
-        if (auto constantVal = val.As<ConstantIntVal>())
+        if (auto constantVal = as<ConstantIntVal>(val))
         {
             return constantVal->value;
         }
@@ -1975,7 +1975,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ConstantIntVal::EqualsVal(Val* val)
     {
-        if (auto intVal = dynamic_cast<ConstantIntVal*>(val))
+        if (auto intVal = dynamicCast<ConstantIntVal>(val))
             return value == intVal->value;
         return false;
     }
@@ -2047,12 +2047,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* HLSLPatchType::getElementType()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[0].As<Type>().Ptr();
+        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     IntVal* HLSLPatchType::getElementCount()
     {
-        return findInnerMostGenericSubstitution(declRef.substitutions)->args[1].As<IntVal>().Ptr();
+        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
     }
 
     // Constructors for types
@@ -2162,8 +2162,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
     RefPtr<Val> TypeEqualityWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
-        rs->sub = sub->SubstituteImpl(subst, ioDiff).As<Type>();
-        rs->sup = sup->SubstituteImpl(subst, ioDiff).As<Type>();
+        rs->sub = sub->SubstituteImpl(subst, ioDiff).dynamicCast<Type>();
+        rs->sup = sup->SubstituteImpl(subst, ioDiff).dynamicCast<Type>();
         return rs;
     }
 
@@ -2194,7 +2194,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         for(RefPtr<Substitutions> s = substs; s; s = s->outer)
         {
-            auto thisTypeSubst = s.As<ThisTypeSubstitution>();
+            auto thisTypeSubst = s.dynamicCast<ThisTypeSubstitution>();
             if(!thisTypeSubst)
                 continue;
 
@@ -2216,7 +2216,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
             {
-                if(auto genericSubst = s.As<GenericSubstitution>())
+                if(auto genericSubst = s.as<GenericSubstitution>())
                 {
                     // the generic decl associated with the substitution list must be
                     // the generic decl that declared this parameter
@@ -2228,7 +2228,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     UInt index = 0;
                     for (auto m : genericDecl->Members)
                     {
-                        if (auto constraintParam = m.As<GenericTypeConstraintDecl>())
+                        if (auto constraintParam = m.dynamicCast<GenericTypeConstraintDecl>())
                         {
                             if (constraintParam.Ptr() == declRef.getDecl())
                             {
@@ -2247,7 +2247,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         return genericSubst->args[index + ordinaryParamCount];
                     }
                 }
-                else if(auto globalGenericSubst = s.As<GlobalGenericParamSubstitution>())
+                else if(auto globalGenericSubst = s.as<GlobalGenericParamSubstitution>())
                 {
                     // check if the substitution is really about this global generic type parameter
                     if (globalGenericSubst->paramDecl != genConstraintDecl->ParentDecl)
@@ -2267,8 +2267,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         // Perform substitution on the constituent elements.
         int diff = 0;
-        auto substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+        auto substSub = sub->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+        auto substSup = sup->SubstituteImpl(subst, &diff).dynamicCast<Type>();
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
         if (!diff)
             return this;
@@ -2362,9 +2362,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         int diff = 0;
 
-        RefPtr<Type> substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
-        RefPtr<Type> substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
-        RefPtr<SubtypeWitness> substSubToMid = subToMid->SubstituteImpl(subst, &diff).As<SubtypeWitness>();
+        RefPtr<Type> substSub = sub->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+        RefPtr<Type> substSup = sup->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+        RefPtr<SubtypeWitness> substSubToMid = subToMid->SubstituteImpl(subst, &diff).dynamicCast<SubtypeWitness>();
         DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(subst, &diff);
 
         // If nothing changed, then we can bail out early.
@@ -2524,8 +2524,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
         int diff = 0;
 
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
-        auto substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+        auto substSub = sub->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+        auto substSup = sup->SubstituteImpl(subst, &diff).dynamicCast<Type>();
 
         if(!diff)
             return this;
@@ -2608,7 +2608,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.Add(caseType->SubstituteImpl(subst, &diff).As<Type>());
+            substCaseTypes.Add(caseType->SubstituteImpl(subst, &diff).dynamicCast<Type>());
         }
         if(!diff)
             return this;
@@ -2674,8 +2674,8 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
 {
     int diff = 0;
 
-    auto substSub = sub->SubstituteImpl(subst, &diff).As<Type>();
-    auto substSup = sup->SubstituteImpl(subst, &diff).As<Type>();
+    auto substSub = sub->SubstituteImpl(subst, &diff).dynamicCast<Type>();
+    auto substSup = sup->SubstituteImpl(subst, &diff).dynamicCast<Type>();
 
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )

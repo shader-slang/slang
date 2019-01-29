@@ -785,12 +785,12 @@ static bool validateSpecializationsMatch(
     for(;;)
     {
         // Skip any global generic substitutions.
-        if(auto leftGlobalGeneric = ll.As<GlobalGenericParamSubstitution>())
+        if(auto leftGlobalGeneric = ll.as<GlobalGenericParamSubstitution>())
         {
             ll = leftGlobalGeneric->outer;
             continue;
         }
-        if(auto rightGlobalGeneric = rr.As<GlobalGenericParamSubstitution>())
+        if(auto rightGlobalGeneric = rr.as<GlobalGenericParamSubstitution>())
         {
             rr = rightGlobalGeneric->outer;
             continue;
@@ -806,9 +806,9 @@ static bool validateSpecializationsMatch(
         ll = ll->outer;
         rr = rr->outer;
 
-        if(auto leftGeneric = leftSubst.As<GenericSubstitution>())
+        if(auto leftGeneric = leftSubst.as<GenericSubstitution>())
         {
-            if(auto rightGeneric = rightSubst.As<GenericSubstitution>())
+            if(auto rightGeneric = as<GenericSubstitution>(rightSubst))
             {
                 if(validateGenericSubstitutionsMatch(context, leftGeneric, rightGeneric, stack))
                 {
@@ -816,9 +816,9 @@ static bool validateSpecializationsMatch(
                 }
             }
         }
-        else if(auto leftThisType = leftSubst.As<ThisTypeSubstitution>())
+        else if(auto leftThisType = leftSubst.as<ThisTypeSubstitution>())
         {
-            if(auto rightThisType = rightSubst.As<ThisTypeSubstitution>())
+            if(auto rightThisType = rightSubst.as<ThisTypeSubstitution>())
             {
                 if(validateThisTypeSubstitutionsMatch(context, leftThisType, rightThisType, stack))
                 {
@@ -1950,12 +1950,12 @@ static void collectGlobalScopeParameters(
     // for generic types in the second pass.
     for (auto decl : program->Members)
     {
-        if (auto genParamDecl = decl.As<GlobalGenericParamDecl>())
+        if (auto genParamDecl = as<GlobalGenericParamDecl>(decl))
             collectGlobalGenericParameter(context, genParamDecl);
     }
     for (auto decl : program->Members)
     {
-        if (auto varDecl = decl.As<VarDeclBase>())
+        if (auto varDecl = as<VarDeclBase>(decl))
             collectGlobalScopeParameter(context, varDecl);
     }
 
@@ -2432,13 +2432,13 @@ static void collectEntryPointParameters(
     context->shared->programLayout->entryPoints.Add(entryPointLayout);
 
     // Note: this isn't really the best place for this logic to sit,
-    // but it is the simplest place where we have a direct correspondance
+    // but it is the simplest place where we have a direct correspondence
     // between a single `EntryPointRequest` and its matching `EntryPointLayout`,
     // so we'll use it.
     //
     for( auto taggedUnionType : entryPoint->taggedUnionTypes )
     {
-        auto substType = taggedUnionType->Substitute(typeSubst).As<Type>();
+        auto substType = taggedUnionType->Substitute(typeSubst).dynamicCast<Type>();
         auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
     }
@@ -2460,7 +2460,7 @@ static void collectEntryPointParameters(
 
     for( auto m : entryPointFuncDecl->Members )
     {
-        auto paramDecl = m.As<VarDeclBase>();
+        auto paramDecl = as<VarDeclBase>(m);
         if(!paramDecl)
             continue;
 
@@ -2486,12 +2486,12 @@ static void collectEntryPointParameters(
         }
 
         RefPtr<VarLayout> paramVarLayout = new VarLayout();
-        paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
+        paramVarLayout->varDecl = makeDeclRef(paramDecl);
 
         auto paramTypeLayout = processEntryPointParameterDecl(
             context,
-            paramDecl.Ptr(),
-            paramDecl->type.type->Substitute(typeSubst).As<Type>(),
+            paramDecl,
+            paramDecl->type.type->Substitute(typeSubst).dynamicCast<Type>(),
             state,
             paramVarLayout);
 
@@ -2525,7 +2525,7 @@ static void collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointParameterDecl(
             context,
             entryPointFuncDecl,
-            resultType->Substitute(typeSubst).As<Type>(),
+            resultType->Substitute(typeSubst).dynamicCast<Type>(),
             state,
             resultLayout);
 
@@ -3008,7 +3008,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         auto &varLayout = globalStructLayout->fields[varId];
         if (varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
         {
-            RefPtr<Type> newType = varLayout->typeLayout->type->Substitute(typeSubst).As<Type>();
+            RefPtr<Type> newType = varLayout->typeLayout->type->Substitute(typeSubst).dynamicCast<Type>();
             RefPtr<TypeLayout> newTypeLayout = CreateTypeLayout(
                 layoutContext.with(constantBufferRules),
                 newType);

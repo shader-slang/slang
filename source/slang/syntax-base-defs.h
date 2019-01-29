@@ -125,7 +125,12 @@ protected:
     Session* session = nullptr;
     )
 END_SYNTAX_CLASS()
-
+RAW(
+    template <typename T>
+    SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->GetCanonicalType()) : nullptr; }
+    template <typename T>
+    SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->GetCanonicalType()) : nullptr; }
+)
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values

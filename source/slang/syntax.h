@@ -618,7 +618,7 @@ namespace Slang
         {
             while (cursor != end)
             {
-                if ((*cursor).As<T>())
+                if (dynamicCast<T>(*cursor))
                     return cursor;
                 cursor++;
             }
@@ -1064,7 +1064,7 @@ namespace Slang
         RefPtr<Val> getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
-            return m_obj.As<Val>();
+            return m_obj.dynamicCast<Val>();
         }
 
         RefPtr<WitnessTable> getWitnessTable();
@@ -1118,7 +1118,7 @@ namespace Slang
     template <typename T>
     SLANG_FORCE_INLINE T* QualType::As()
     {
-        return type ? type->As<T>() : nullptr;
+        return as<T>(type); 
     }
 
     inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
@@ -1170,7 +1170,7 @@ namespace Slang
 
     inline int GetVectorSize(VectorExpressionType* vecType)
     {
-        auto constantVal = vecType->elementCount.As<ConstantIntVal>();
+        auto constantVal = vecType->elementCount.dynamicCast<ConstantIntVal>();
         if (constantVal)
             return (int) constantVal->value;
         // TODO: what to do in this case?

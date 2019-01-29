@@ -5291,10 +5291,10 @@ struct EmitVisitor
         //
 
         auto typeLayout = layout->typeLayout;
-        while(auto arrayTypeLayout = typeLayout.As<ArrayTypeLayout>())
+        while(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
             typeLayout = arrayTypeLayout->elementTypeLayout;
 
-        if (auto matrixTypeLayout = typeLayout.As<MatrixTypeLayout>())
+        if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
         {
             auto target = ctx->shared->target;
 
@@ -5707,7 +5707,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -5797,7 +5797,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout->unwrapArray();
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -6523,11 +6523,11 @@ StructTypeLayout* getGlobalStructLayout(
     ProgramLayout*  programLayout)
 {
     auto globalScopeLayout = programLayout->globalScopeLayout->typeLayout;
-    if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
+    if( auto gs = as<StructTypeLayout>(globalScopeLayout) )
     {
-        return gs.Ptr();
+        return gs;
     }
-    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterGroupTypeLayout>() )
+    else if( auto globalConstantBufferLayout = as<ParameterGroupTypeLayout>(globalScopeLayout) )
     {
         // TODO: the `cbuffer` case really needs to be emitted very
         // carefully, but that is beyond the scope of what a simple rewriter
@@ -6539,19 +6539,19 @@ StructTypeLayout* getGlobalStructLayout(
         // so that we can give it an explicit location. The fields in that
         // declaration might use various type declarations, so we'd really
         // need to emit all the type declarations first, and that involves
-        // some large scale reorderings.
+        // some large scale re orderings.
         //
         // For now we will punt and just emit the declarations normally,
         // and hope that the global-scope block (`$Globals`) gets auto-assigned
-        // the same location that we manually asigned it.
+        // the same location that we manually assigned it.
 
         auto elementTypeLayout = globalConstantBufferLayout->offsetElementTypeLayout;
-        auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
+        auto elementTypeStructLayout = as<StructTypeLayout>(elementTypeLayout);
 
         // We expect all constant buffers to contain `struct` types for now
         SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
-        return elementTypeStructLayout.Ptr();
+        return elementTypeStructLayout;
     }
     else
     {

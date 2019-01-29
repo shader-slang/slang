@@ -183,9 +183,15 @@ namespace Slang
 		}
 
         template<typename U>
-        RefPtr<U> As() const
+        RefPtr<U> dynamicCast() const
         {
-            return RefPtr<U>(dynamicCast<U>(pointer));
+            return RefPtr<U>(Slang::dynamicCast<U>(pointer));
+        }
+
+        template<typename U>
+        RefPtr<U> as() const
+        {
+            return RefPtr<U>(Slang::as<U>(pointer));
         }
 
         ~RefPtr()
