@@ -2498,7 +2498,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ExtractExistentialSubtypeWitness::EqualsVal(Val* val)
     {
-        if( auto extractWitness = val->dynamicCast<ExtractExistentialSubtypeWitness>() )
+        if( auto extractWitness = dynamicCast<ExtractExistentialSubtypeWitness>(val) )
         {
             return declRef.Equals(extractWitness->declRef);
         }
@@ -2628,7 +2628,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
 bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
 {
-    auto taggedUnionWitness = val->dynamicCast<TaggedUnionSubtypeWitness>();
+    auto taggedUnionWitness = dynamicCast<TaggedUnionSubtypeWitness>(val);
     if(!taggedUnionWitness)
         return false;
 

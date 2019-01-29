@@ -4237,11 +4237,11 @@ struct EmitVisitor
         if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
             auto layout = layoutDecoration->getLayout();
-            if(auto varLayout = layout->dynamicCast<VarLayout>())
+            if(auto varLayout = dynamicCast<VarLayout>(layout))
             {
                 emitIRSemantics(ctx, varLayout);
             }
-            else if (auto entryPointLayout = layout->dynamicCast<EntryPointLayout>())
+            else if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layout))
             {
                 if(auto resultLayout = entryPointLayout->resultLayout)
                 {
@@ -5158,7 +5158,7 @@ struct EmitVisitor
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>();
+            return dynamicCast<EntryPointLayout>(layoutDecoration->getLayout());
         }
         return nullptr;
     }
@@ -5167,7 +5167,7 @@ struct EmitVisitor
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>())
+            if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layoutDecoration->getLayout()))
             {
                 return entryPointLayout;
             }
