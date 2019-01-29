@@ -1,0 +1,8 @@
+result code = 1
+standard error = {
+tests/diagnostics/attribute-error.slang(19): error 30019: expected an expression of type 'float', got 'String'
+tests/diagnostics/attribute-error.slang(22): error 31002: attribute 'MyStruct' is not valid here
+tests/diagnostics/attribute-error.slang(24): error 39999: expression does not evaluate to a compile-time constant
+}
+standard output = {
+}

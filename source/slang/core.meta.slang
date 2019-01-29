@@ -1286,3 +1286,12 @@ attribute_syntax [mutating] : MutatingAttribute;
     /// This is equivalent to the LLVM `readnone` function attribute.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
+
+enum _AttributeTargets
+{
+    Struct = $( (int) UserDefinedAttributeTargets::Struct),
+    Var = $( (int) UserDefinedAttributeTargets::Var),
+    Function = $( (int) UserDefinedAttributeTargets::Function),
+};
+__attributeTarget(StructDecl)
+attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;

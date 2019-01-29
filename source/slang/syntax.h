@@ -1084,6 +1084,8 @@ namespace Slang
         RequirementDictionary requirementDictionary;
     };
 
+    typedef Dictionary<unsigned int, RefPtr<RefObject>> AttributeArgumentValueDict;
+
     // Generate class definition for all syntax classes
 #define SYNTAX_FIELD(TYPE, NAME) TYPE NAME;
 #define FIELD(TYPE, NAME) TYPE NAME;
@@ -1343,6 +1345,15 @@ namespace Slang
         RefPtr<Substitutions>   outerSubst);
 
     RefPtr<GenericSubstitution> findInnerMostGenericSubstitution(Substitutions* subst);
+
+    enum class UserDefinedAttributeTargets
+    {
+        None = 0,
+        Struct = 1,
+        Var = 2,
+        Function = 4,
+        All = 7
+    };
 } // namespace Slang
 
 #endif

@@ -1357,6 +1357,7 @@ extern "C"
     typedef struct SlangReflectionVariable          SlangReflectionVariable;
     typedef struct SlangReflectionVariableLayout    SlangReflectionVariableLayout;
     typedef struct SlangReflectionTypeParameter     SlangReflectionTypeParameter;
+    typedef struct SlangReflectionUserAttribute     SlangReflectionUserAttribute;
 
     // get reflection data from a compilation request
     SLANG_API SlangReflection* spGetReflection(
@@ -1492,9 +1493,26 @@ extern "C"
         SLANG_MODIFIER_SHARED,
     };
 
+    // User Attribute
+    SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib);
+    SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib);
+    SLANG_API SlangReflectionType* spReflectionUserAttribute_GetArgumentType(SlangReflectionUserAttribute* attrib, unsigned int index);
+    SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflectionUserAttribute* attrib, unsigned int index, int * rs);
+    SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(SlangReflectionUserAttribute* attrib, unsigned int index, float * rs);
+
+    /** Returns the string-typed value of a user attribute argument
+        The string returned is not null-terminated. The length of the string is returned via `outSize`.
+        If index of out of range, or if the specified argument is not a string, the function will return nullptr.
+    */
+    SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangReflectionUserAttribute* attrib, unsigned int index, size_t * outSize);
+
     // Type Reflection
 
     SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* type);
+    SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionType* type);
+    SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangReflectionType* type, unsigned int index);
+    SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName(SlangReflectionType* type, char const* name);
+
     SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* type);
     SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflectionType* type, unsigned index);
 
@@ -1548,8 +1566,10 @@ extern "C"
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
     SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVariable* var);
-
     SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflectionVariable* var, SlangModifierID modifierID);
+    SLANG_API unsigned int spReflectionVariable_GetUserAttributeCount(SlangReflectionVariable* var);
+    SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* var, unsigned int index);
+    SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * session, char const* name);
 
     // Variable Layout Reflection
 
@@ -1641,6 +1661,34 @@ namespace slang
     struct TypeReflection;
     struct VariableLayoutReflection;
     struct VariableReflection;
+    
+    struct UserAttribute
+    {
+        char const* getName()
+        {
+            return spReflectionUserAttribute_GetName((SlangReflectionUserAttribute*)this);
+        }
+        uint32_t getArgumentCount()
+        {
+            return (uint32_t)spReflectionUserAttribute_GetArgumentCount((SlangReflectionUserAttribute*)this);
+        }
+        TypeReflection* getArgumentType(uint32_t index)
+        {
+            return (TypeReflection*)spReflectionUserAttribute_GetArgumentType((SlangReflectionUserAttribute*)this, index);
+        }
+        SlangResult getArgumentValueInt(uint32_t index, int * value)
+        {
+            return spReflectionUserAttribute_GetArgumentValueInt((SlangReflectionUserAttribute*)this, index, value);
+        }
+        SlangResult getArgumentValueFloat(uint32_t index, float * value)
+        {
+            return spReflectionUserAttribute_GetArgumentValueFloat((SlangReflectionUserAttribute*)this, index, value);
+        }
+        const char* getArgumentValueString(uint32_t index, size_t * outSize)
+        {
+            return spReflectionUserAttribute_GetArgumentValueString((SlangReflectionUserAttribute*)this, index, outSize);
+        }
+    };
 
     struct TypeReflection
     {
@@ -1763,6 +1811,19 @@ namespace slang
         char const* getName()
         {
             return spReflectionType_GetName((SlangReflectionType*) this);
+        }
+
+        unsigned int getUserAttributeCount()
+        {
+            return spReflectionType_GetUserAttributeCount((SlangReflectionType*)this);
+        }
+        UserAttribute* getUserAttributeByIndex(unsigned int index)
+        {
+            return (UserAttribute*)spReflectionType_GetUserAttribute((SlangReflectionType*)this, index);
+        }
+        UserAttribute* findUserAttributeByName(char const* name)
+        {
+            return (UserAttribute*)spReflectionType_FindUserAttributeByName((SlangReflectionType*)this, name);
         }
     };
 
@@ -1943,6 +2004,19 @@ namespace slang
         Modifier* findModifier(Modifier::ID id)
         {
             return (Modifier*) spReflectionVariable_FindModifier((SlangReflectionVariable*) this, (SlangModifierID) id);
+        }
+
+        unsigned int getUserAttributeCount()
+        {
+            return spReflectionVariable_GetUserAttributeCount((SlangReflectionVariable*)this);
+        }
+        UserAttribute* getUserAttributeByIndex(unsigned int index)
+        {
+            return (UserAttribute*)spReflectionVariable_GetUserAttribute((SlangReflectionVariable*)this, index);
+        }
+        UserAttribute* findUserAttributeByName(SlangSession* session, char const* name)
+        {
+            return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, session, name);
         }
     };
 
