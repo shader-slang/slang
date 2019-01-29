@@ -785,17 +785,15 @@ LegalType legalizeTypeImpl(
         auto legalElementType = legalizeType(context,
             uniformBufferType->getElementType());
 
-        switch (legalElementType.flavor)
-        {
-        case LegalType::Flavor::simple:
-            return LegalType::simple(type);
-
-        default:
-            return createLegalUniformBufferType(
+        // Note that even when legalElementType.flavor == Simple
+        // we still need to create a new uniform buffer type
+        // from `legalElementType` instead of `type`
+        // because the `legalElementType` may still differ from `type`
+        // if `type` contains empty structs.
+        return createLegalUniformBufferType(
                 context,
                 uniformBufferType,
                 legalElementType);
-        }
 
     }
     else if (isResourceType(type))
@@ -898,27 +896,14 @@ LegalType legalizeTypeImpl(
             context,
             arrayType->getElementType());
 
-        switch (legalElementType.flavor)
-        {
-        case LegalType::Flavor::simple:
-            // Element type didn't need to be legalized, so
-            // we can just use this type as-is.
-            return LegalType::simple(type);
+        ArrayLegalTypeWrapper wrapper;
+        wrapper.arrayType = arrayType;
 
-        default:
-            {
-                ArrayLegalTypeWrapper wrapper;
-                wrapper.arrayType = arrayType;
-
-                return wrapLegalType(
-                    context,
-                    legalElementType,
-                    &wrapper,
-                    &wrapper);
-            }
-            break;
-        }
-
+        return wrapLegalType(
+            context,
+            legalElementType,
+            &wrapper,
+            &wrapper);
     }
 
     return LegalType::simple(type);
