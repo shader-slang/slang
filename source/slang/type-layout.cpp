@@ -2493,7 +2493,7 @@ RefPtr<TypeLayout> TypeLayout::unwrapArray()
 
 RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl()
 {
-    auto declRefType = type->AsDeclRefType();
+    auto declRefType = as<DeclRefType>(type);
     SLANG_ASSERT(declRefType);
     auto rsDeclRef = declRefType->declRef.As<GlobalGenericParamDecl>();
     return rsDeclRef.getDecl();

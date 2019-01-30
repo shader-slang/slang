@@ -130,11 +130,6 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return false;
     }
 
-    NamedExpressionType* Type::AsNamedType()
-    {
-        return dynamic_cast<NamedExpressionType*>(this);
-    }
-
     RefPtr<Val> Type::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
@@ -174,9 +169,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         return IsTexture() || IsSampler();
     }
+
     bool Type::IsStruct()
     {
-        auto declRefType = AsDeclRefType();
+        auto declRefType = as<DeclRefType>(this);
         if (!declRefType) return false;
         auto structDeclRef = declRefType->declRef.As<StructDecl>();
         if (!structDeclRef) return false;
@@ -341,7 +337,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ArrayExpressionType::EqualsImpl(Type * type)
     {
-        auto arrType = type->AsArrayType();
+        auto arrType = as<ArrayExpressionType>(type);
         if (!arrType)
             return false;
         return (areValsEqual(ArrayLength, arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
@@ -401,7 +397,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool DeclRefType::EqualsImpl(Type * type)
     {
-        if (auto declRefType = type->AsDeclRefType())
+        if (auto declRefType = as<DeclRefType>(type))
         {
             return declRef.Equals(declRefType->declRef);
         }
@@ -1197,7 +1193,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     BasicExpressionType* VectorExpressionType::GetScalarType()
     {
-        return elementType->AsBasicType();
+        return as<BasicExpressionType>(elementType);
     }
 
     //
@@ -1223,7 +1219,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     BasicExpressionType* MatrixExpressionType::GetScalarType()
     {
-        return getElementType()->AsBasicType();
+        return as<BasicExpressionType>(getElementType()); 
     }
 
     Type* MatrixExpressionType::getElementType()

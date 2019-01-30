@@ -397,7 +397,7 @@ void DoLocalLookupImpl(
         RefPtr<DeclRefType> targetDeclRefType;
         if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
         {
-            targetDeclRefType = extDeclRef.getDecl()->targetType->AsDeclRefType();
+            targetDeclRefType = as<DeclRefType>(extDeclRef.getDecl()->targetType);
             SLANG_ASSERT(targetDeclRefType);
             int diff = 0;
             targetDeclRef = targetDeclRefType->declRef.As<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
@@ -489,7 +489,7 @@ void DoLookupImpl(
             {
                 if (extDeclRef.getDecl()->targetType)
                 {
-                    if (auto targetDeclRef = extDeclRef.getDecl()->targetType->AsDeclRefType())
+                    if (auto targetDeclRef = as<DeclRefType>(extDeclRef.getDecl()->targetType))
                     {
                         if (auto aggDeclRef = targetDeclRef->declRef.As<AggTypeDecl>())
                         {

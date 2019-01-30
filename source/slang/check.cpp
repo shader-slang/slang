@@ -119,29 +119,31 @@ namespace Slang
         bool fromType(Type* typeIn)
         {
             aggVal = 0;
-            if (auto basicType = typeIn->AsBasicType())
+            if (auto basicType = as<BasicExpressionType>(typeIn))
             {
                 data.type = (unsigned char)basicType->baseType;
                 data.dim1 = data.dim2 = 0;
             }
-            else if (auto vectorType = typeIn->AsVectorType())
+            else if (auto vectorType = as<VectorExpressionType>(typeIn))
             {
                 if (auto elemCount = vectorType->elementCount.dynamicCast<ConstantIntVal>())
                 {
                     data.dim1 = elemCount->value - 1;
-                    data.type = (unsigned char)vectorType->elementType->AsBasicType()->baseType;
+                    auto elementBasicType = as<BasicExpressionType>(vectorType->elementType);
+                    data.type = (unsigned char)elementBasicType->baseType;
                     data.dim2 = 0;
                 }
                 else
                     return false;
             }
-            else if (auto matrixType = typeIn->AsMatrixType())
+            else if (auto matrixType = as<MatrixExpressionType>(typeIn))
             {
                 if (auto elemCount1 = dynamic_cast<ConstantIntVal*>(matrixType->getRowCount()))
                 {
                     if (auto elemCount2 = dynamic_cast<ConstantIntVal*>(matrixType->getColumnCount()))
                     {
-                        data.type = (unsigned char)matrixType->getElementType()->AsBasicType()->baseType;
+                        auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType());
+                        data.type = (unsigned char)elemBasicType->baseType;
                         data.dim1 = elemCount1->value - 1;
                         data.dim2 = elemCount2->value - 1;
                     }
@@ -2212,7 +2214,7 @@ namespace Slang
         {
             if (auto sharedTypeExpr = typeExp.exp.dynamicCast<SharedTypeExpr>())
             {
-                if (auto declRefType = sharedTypeExpr->base->AsDeclRefType())
+                if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
                 {
                     declRefType->declRef.substitutions = createDefaultSubstitutions(getSession(), declRefType->declRef.getDecl());
                     if (auto typetype = typeExp.exp->type.type.dynamicCast<TypeType>())
@@ -4609,7 +4611,7 @@ namespace Slang
         void maybeInferArraySizeForVariable(VarDeclBase* varDecl)
         {
             // Not an array?
-            auto arrayType = varDecl->type->AsArrayType();
+            auto arrayType = as<ArrayExpressionType>(varDecl->type);
             if (!arrayType) return;
 
             // Explicit element count given?
@@ -4640,7 +4642,7 @@ namespace Slang
 
         void validateArraySizeForVariable(VarDeclBase* varDecl)
         {
-            auto arrayType = varDecl->type->AsArrayType();
+            auto arrayType = as<ArrayExpressionType>(varDecl->type);
             if (!arrayType) return;
 
             auto elementCount = arrayType->ArrayLength;
@@ -8626,14 +8628,14 @@ namespace Slang
             // members via extension, for vector or scalar types.
             //
             // TODO: Matrix swizzles probably need to be handled at some point.
-            if (auto baseVecType = baseType->AsVectorType())
+            if (auto baseVecType = baseType.As<VectorExpressionType>())
             {
                 return CheckSwizzleExpr(
                     expr,
                     baseVecType->elementType,
                     baseVecType->elementCount);
             }
-            else if(auto baseScalarType = baseType->AsBasicType())
+            else if(auto baseScalarType = baseType.As<BasicExpressionType>())
             {
                 // Treat scalar like a 1-element vector when swizzling
                 return CheckSwizzleExpr(

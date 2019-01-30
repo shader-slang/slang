@@ -1164,8 +1164,10 @@ namespace Slang
 
     //
 
-    inline BaseType GetVectorBaseType(VectorExpressionType* vecType) {
-        return vecType->elementType->AsBasicType()->baseType;
+    inline BaseType GetVectorBaseType(VectorExpressionType* vecType)
+    {
+        auto basicExprType = as<BasicExpressionType>(vecType->elementType);
+        return basicExprType->baseType;
     }
 
     inline int GetVectorSize(VectorExpressionType* vecType)
