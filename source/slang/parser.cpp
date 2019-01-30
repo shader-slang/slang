@@ -2992,7 +2992,14 @@ namespace Slang
     {
         // Add any modifiers we parsed before the declaration to the list
         // of modifiers on the declaration itself.
-        AddModifiers(decl.Ptr(), modifiers.first);
+        //
+        // We need to be careful, because if `decl` is a generic declaration,
+        // then we really want the modifiers to apply to the inner declaration.
+        //
+        RefPtr<Decl> declToModify = decl;
+        if(auto genericDecl = decl.As<GenericDecl>())
+            declToModify = genericDecl->inner;
+        AddModifiers(declToModify.Ptr(), modifiers.first);
 
         // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
