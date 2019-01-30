@@ -8321,12 +8321,8 @@ namespace Slang
             }
         }
 
-        RefPtr<Expr> visitGenericAppExpr(GenericAppExpr * genericAppExpr)
+        RefPtr<Expr> visitGenericAppExpr(GenericAppExpr* genericAppExpr)
         {
-            // We are applying a generic to arguments, but there might be multiple generic
-            // declarations with the same name, so this becomes a specialized case of
-            // overload resolution.
-
             // Start by checking the base expression and arguments.
             auto& baseExpr = genericAppExpr->FunctionExpr;
             baseExpr = CheckTerm(baseExpr);
@@ -8335,6 +8331,19 @@ namespace Slang
             {
                 arg = CheckTerm(arg);
             }
+
+            return checkGenericAppWithCheckedArgs(genericAppExpr);
+        }
+
+            /// Check a generic application where the operands have already been checked.
+        RefPtr<Expr> checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr)
+        {
+            // We are applying a generic to arguments, but there might be multiple generic
+            // declarations with the same name, so this becomes a specialized case of
+            // overload resolution.
+
+            auto& baseExpr = genericAppExpr->FunctionExpr;
+            auto& args = genericAppExpr->Arguments;
 
             // If there was an error in the base expression,  or in any of
             // the arguments, then just bail.
@@ -9223,7 +9232,7 @@ namespace Slang
         //
         if( entryPoint->getStage() == Stage::Unknown )
         {
-            sink->diagnose(entryPoint->decl, Diagnostics::entryPointHasNoStage, entryPoint->name);
+            sink->diagnose(entryPoint->getFuncDecl(), Diagnostics::entryPointHasNoStage, entryPoint->name);
         }
 
         if (entryPoint->getStage() == Stage::Hull)
@@ -9231,7 +9240,7 @@ namespace Slang
             auto translationUnit = entryPoint->getTranslationUnit();
             auto translationUnitSyntax = translationUnit->SyntaxNode;
 
-            auto attr = entryPoint->decl->FindModifier<PatchConstantFuncAttribute>();
+            auto attr = entryPoint->getFuncDecl()->FindModifier<PatchConstantFuncAttribute>();
 
             if (attr)
             {
@@ -9273,6 +9282,11 @@ namespace Slang
     {
         // The first step in validating the entry point is to find
         // the (unique) function declaration that matches its name.
+        //
+        // TODO: We will eventually need to update this logic
+        // to work by parsing the provided `entryPoint->name` string
+        // as an expression, so that we can handle more complex
+        // names like `foo<int>` or `SomeType.vs`.
 
         auto translationUnit = entryPoint->getTranslationUnit();
         auto sink = &entryPoint->compileRequest->mSink;
@@ -9300,11 +9314,20 @@ namespace Slang
         // We'll walk the linked list of declarations with the same name,
         // to see what we find. Along the way we'll keep track of the
         // first function declaration we find, if any:
+        //
         FuncDecl* entryPointFuncDecl = nullptr;
         for(auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
         {
+            // We want to support the case where the declaration is
+            // a generic function, so we will automatically
+            // unwrap any outer `GenericDecl` we find here.
+            //
+            auto decl = ee;
+            if(auto genericDecl = as<GenericDecl>(decl))
+                decl = genericDecl->inner;
+
             // Is this declaration a function?
-            if (auto funcDecl = as<FuncDecl>(ee))
+            if (auto funcDecl = as<FuncDecl>(decl))
             {
                 // Skip non-primary declarations, so that
                 // we don't give an error when an entry
@@ -9376,33 +9399,64 @@ namespace Slang
         // Phew, we have at least found a suitable decl.
         // Let's record that in the entry-point request so
         // that we don't have to re-do this effort again later.
-        entryPoint->decl = entryPointFuncDecl;
+        //
+        // Note: we may replace the decl-ref we store at this point
+        // later in this function, when we (potentially) specialize
+        // a generic entry point to generic arguments provided
+        // via the API.
+        //
+        entryPoint->funcDeclRef = makeDeclRef(entryPointFuncDecl);
 
-        // Lookup generic parameter types in global scope
+        // If the user specified generic arguments for the entry point,
+        // then we will want to parse those arguments as expressions
+        // in a scope that includes the tanslation unit that holds
+        // the entry point, as well as any other modules that got
+        // transitively loaded via `import`.
+        //
+        // TODO: This would be better handled by giving the user
+        // more explicit ways to parse/build types at the API level,
+        // rather than keeping things string-based this far along.
+        //
+        // TODO: Building a list of `scopesToTry` here shouldn't
+        // be required, since the `Scope` type itself has the ability
+        // for form chains for lookup purposes (e.g., the way that
+        // `import` is handled by modifying a scope).
+        //
         List<RefPtr<Scope>> scopesToTry;
         scopesToTry.Add(entryPoint->getTranslationUnit()->SyntaxNode->scope);
         for (auto & module : entryPoint->compileRequest->loadedModulesList)
             scopesToTry.Add(module->moduleDecl->scope);
 
-        List<RefPtr<Type>> globalGenericArgs;
+        // We are going to do some semantic checking, so we need to
+        // set up a `SemanticsVistitor` that we can use.
+        //
+        SemanticsVisitor semantics(
+            &entryPoint->compileRequest->mSink,
+            entryPoint->compileRequest,
+            entryPoint->getTranslationUnit());
+
+        // We will be looping over the generic argument strings
+        // that the user provided via the API (or command line),
+        // and parsing+checking each into an `Expr`.
+        //
+        // This loop will *not* handle coercing the arguments
+        // to be types.
+        //
+        List<RefPtr<Expr>> genericArgs;
         for (auto name : entryPoint->genericArgStrings)
         {
-            // parse type name
-            RefPtr<Type> type;
+            RefPtr<Expr> argExpr;
             for (auto & s : scopesToTry)
             {
-                RefPtr<Expr> typeExpr = entryPoint->compileRequest->parseTypeString(entryPoint->getTranslationUnit(),
-                    name, s);
-                type = checkProperType(translationUnit, TypeExp(typeExpr));
-                if (type)
+                argExpr = entryPoint->compileRequest->parseTypeString(
+                    entryPoint->getTranslationUnit(),
+                    name,
+                    s);
+                argExpr = semantics.CheckTerm(argExpr);
+                if( argExpr )
                 {
                     break;
                 }
-            }
-            if (!type)
-            {
-                sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, name);
-                return;
             }
 
             // The following is a bit of a hack.
@@ -9419,165 +9473,257 @@ namespace Slang
             // as a (top-level) argument for a generic type parameter, so that we
             // can check for them here and cache them on the entry point request.
             //
-            if( auto taggedUnionType = as<TaggedUnionType>(type) )
+            if( auto typeType = as<TypeType>(argExpr->type) )
             {
-                entryPoint->taggedUnionTypes.Add(taggedUnionType);
+                auto type = typeType->type;
+                if( auto taggedUnionType = as<TaggedUnionType>(type) )
+                {
+                    entryPoint->taggedUnionTypes.Add(taggedUnionType);
+                }
             }
 
-            globalGenericArgs.Add(type);
+            genericArgs.Add(argExpr);
         }
 
-        // validate global type arguments only when we are generating code
-        if ((entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+        // There are two cases we care about here, and we are going to treat them
+        // as mutually exclusive for simplicity.
+        //
+        // The first case is when the entry point function is itself generic,
+        // in which case we will assume that `genericArgs` lines up one-to-one
+        // with the explicit generic parameters of the entry point.
+        //
+        if( auto genericDecl = as<GenericDecl>(entryPointFuncDecl->ParentDecl) )
         {
-            // check that user-provided type arguments conforms to the generic type
-            // parameter declaration of this translation unit
+            // We will construct a suitable `GenericAppExpr` to represent
+            // the user-specified `genericDecl` being applied to the
+            // supplied `genericArgs`, and then use the existing
+            // semantic checking logic that would apply to an explicit
+            // generic application like `F<A,B,C>` if it were
+            // encountered in the source code.
 
-            // collect global generic parameters from all imported modules
-            List<RefPtr<GlobalGenericParamDecl>> globalGenericParams;
-            // add current translation unit first
-            {
-                auto globalGenParams = translationUnit->SyntaxNode->getMembersOfType<GlobalGenericParamDecl>();
-                for (auto p : globalGenParams)
-                    globalGenericParams.Add(p);
-            }
-            // add imported modules
-            for (auto loadedModule : entryPoint->compileRequest->loadedModulesList)
-            {
-                auto moduleDecl = loadedModule->moduleDecl;
-                auto globalGenParams = moduleDecl->getMembersOfType<GlobalGenericParamDecl>();
-                for (auto p : globalGenParams)
-                    globalGenericParams.Add(p);
-            }
+            auto session = entryPoint->compileRequest->mSession;
+            auto genericDeclRef = makeDeclRef(genericDecl);
 
-            if (globalGenericParams.Count() != globalGenericArgs.Count())
-            {
-                sink->diagnose(entryPoint->decl, Diagnostics::mismatchEntryPointTypeArgument,
-                    globalGenericParams.Count(),
-                    globalGenericArgs.Count());
-                return;
-            }
+            // The first pieces is a `VarExpr` that refers to `genericDecl`.
+            //
+            // TODO: This would not be needed if we instead parsed
+            // the supplied entry-point name into an expression
+            // earlier in this function.
+            //
+            RefPtr<VarExpr> genericExpr = new VarExpr();
+            genericExpr->declRef = genericDeclRef;
+            genericExpr->type.type = getTypeForDeclRef(session, genericDeclRef);
 
-            // We have an appropriate number of arguments for the global generic parameters,
-            // and now we need to check that the arguments conform to the declared constraints.
+            // Next we construct the actual `GenericAppExpr`
             //
-            // Along the way, we will build up an appropriate set of substitutions to represent
-            // the generic arguments and their conformances.
-            //
-            RefPtr<Substitutions> globalGenericSubsts;
-            auto globalGenericSubstLink = &globalGenericSubsts;
-            //
-            // TODO: There is a serious flaw to this checking logic if we ever have cases where
-            // the constraints on one `type_param` can depend on another `type_param`, e.g.:
-            //
-            //      type_param A;
-            //      type_param B : ISidekick<A>;
-            //
-            // In that case, if a user tries to set `B` to `Robin` and `Robin` conforms to
-            // `ISidekick<Batman>`, then the compiler needs to know whether `A` is being
-            // set to `Batman` to know whether the setting for `B` is valid. In this limit
-            // the constraints can be mutually recursive (so `A : IMentor<B>`).
-            //
-            // The only way to check things correctly is to validate each conformance under
-            // a set of assumptions (substitutions) that includes all the type substitutions,
-            // and possibly also all the other constraints *except* the one to be validated.
-            //
-            // We will punt on this for now, and just check each constraint in isolation.
-            //
-            UInt argCounter = 0;
-            for(auto& globalGenericParam : globalGenericParams)
-            {
-                // Get the argument that matches this parameter.
-                UInt argIndex = argCounter++;
-                SLANG_ASSERT(argIndex < globalGenericArgs.Count());
-                auto globalGenericArg = globalGenericArgs[argIndex];
+            RefPtr<GenericAppExpr> genericAppExpr = new GenericAppExpr();
+            genericAppExpr->FunctionExpr = genericExpr;
+            genericAppExpr->Arguments = genericArgs;
 
-                // As a quick sanity check, see if the argument that is being supplied for a parameter
-                // is just the parameter itself, because this should always be an error:
+            // We use the semantics visitor to perform the
+            // actual checking logic (this might report
+            // errors)
+            //
+            auto checkedExpr = semantics.checkGenericAppWithCheckedArgs(genericAppExpr);
+
+            // Now we need to extract an appropriate decl-ref for the entry
+            // point from the `checkedExpr`.
+            //
+            if( auto declRefExpr = checkedExpr.as<DeclRefExpr>() )
+            {
+                // TODO: We should eventually check for the case
+                // where we have a `MemberExpr` or another case of
+                // `DeclRefExpr` that cannot be summarized as just
+                // its decl-ref.
                 //
-                if( auto argDeclRefType = as<DeclRefType>(globalGenericArg) )
-                {
-                    auto argDeclRef = argDeclRefType->declRef;
-                    if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
-                    {
-                        if(argGenericParamDeclRef.getDecl() == globalGenericParam)
-                        {
-                            // We are trying to specialize a generic parameter using itself.
-                            sink->diagnose(globalGenericParam,
-                                Diagnostics::cannotSpecializeGlobalGenericToItself,
-                                globalGenericParam->getName());
-                            sink->diagnose(entryPointFuncDecl,
-                                Diagnostics::noteWhenCompilingEntryPoint,
-                                entryPointFuncDecl->getName());
-                            continue;
-                        }
-                        else
-                        {
-                            // We are trying to specialize a generic parameter using a *different*
-                            // global generic type parameter.
-                            sink->diagnose(globalGenericParam,
-                                Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
-                                globalGenericParam->getName(),
-                                argGenericParamDeclRef.GetName());
-                            sink->diagnose(entryPointFuncDecl,
-                                Diagnostics::noteWhenCompilingEntryPoint,
-                                entryPointFuncDecl->getName());
-                            continue;
-                        }
-                    }
-                }
+                // The basic `VarExpr` and `StaticMemberExpr` cases
+                // should be allow-able.
 
-
-                // Create a substitution for this parameter/argument.
-                RefPtr<GlobalGenericParamSubstitution> subst = new GlobalGenericParamSubstitution();
-                subst->paramDecl = globalGenericParam;
-                subst->actualType = globalGenericArg;
-
-                // Walk through the declared constraints for the parameter,
-                // and check that the argument actually satisfies them.
-                for(auto constraint : globalGenericParam->getMembersOfType<GenericTypeConstraintDecl>())
-                {
-                    // Get the type that the constraint is enforcing conformance to
-                    auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
-
-                    // Use our semantic-checking logic to search for a witness to the required conformance
-                    SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
-                    auto witness = visitor.tryGetSubtypeWitness(globalGenericArg, interfaceType);
-                    if (!witness)
-                    {
-                        // If no witness was found, then we will be unable to satisfy
-                        // the conformances required.
-                        sink->diagnose(globalGenericParam,
-                            Diagnostics::typeArgumentDoesNotConformToInterface,
-                            globalGenericParam->nameAndLoc.name,
-                            globalGenericArg,
-                            interfaceType);
-                    }
-
-                    // Attach the concrete witness for this conformance to the
-                    // substutiton
-                    GlobalGenericParamSubstitution::ConstraintArg constraintArg;
-                    constraintArg.decl = constraint;
-                    constraintArg.val = witness;
-                    subst->constraintArgs.Add(constraintArg);
-                }
-
-                // Add the substitution for this parameter to the global substitution
-                // set that we are building.
-
-                *globalGenericSubstLink = subst;
-                globalGenericSubstLink = &subst->outer;
+                entryPoint->funcDeclRef = declRefExpr->declRef.as<FuncDecl>();
             }
-
-            entryPoint->globalGenericSubst = globalGenericSubsts;
+            else if( semantics.IsErrorExpr(checkedExpr) )
+            {
+                // Any semantic error that occured should have been
+                // reported already.
+            }
+            else
+            {
+                // The result of specializing a reference to a generic
+                // function should always be a `DeclRefExpr`
+                //
+                SLANG_UNEXPECTED("reference to generic decl wasn't a `DeclRefExpr`");
+            }
         }
+        else
+        {
+            // The other case is when the entry point function is *not* itself
+            // generic, so we assume that any generic arguments must have been intended
+            // to match up with global generic parameters instead.
+            //
+            // We will only validate global generic type arguments when we are going
+            // to generate code, since in a no-codegen pass we will typically *not*
+            // have arguments to associate with the parameters.
+            //
+            if ((entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+            {
+                // check that user-provioded type arguments conforms to the generic type
+                // parameter declaration of this translation unit
+
+                // collect global generic parameters from all imported modules
+                List<RefPtr<GlobalGenericParamDecl>> globalGenericParams;
+                // add current translation unit first
+                {
+                    auto globalGenParams = translationUnit->SyntaxNode->getMembersOfType<GlobalGenericParamDecl>();
+                    for (auto p : globalGenParams)
+                        globalGenericParams.Add(p);
+                }
+                // add imported modules
+                for (auto loadedModule : entryPoint->compileRequest->loadedModulesList)
+                {
+                    auto moduleDecl = loadedModule->moduleDecl;
+                    auto globalGenParams = moduleDecl->getMembersOfType<GlobalGenericParamDecl>();
+                    for (auto p : globalGenParams)
+                        globalGenericParams.Add(p);
+                }
+
+                if (globalGenericParams.Count() != genericArgs.Count())
+                {
+                    sink->diagnose(entryPoint->getFuncDecl(), Diagnostics::mismatchEntryPointTypeArgument,
+                        globalGenericParams.Count(),
+                        genericArguments.Count());
+                    return;
+                }
+
+                // We have an appropriate number of arguments for the global generic parameters,
+                // and now we need to check that the arguments conform to the declared constraints.
+                //
+                // Along the way, we will build up an appropriate set of substitutions to represent
+                // the generic arguments and their conformances.
+                //
+                RefPtr<Substitutions> globalGenericSubsts;
+                auto globalGenericSubstLink = &globalGenericSubsts;
+                //
+                // TODO: There is a serious flaw to this checking logic if we ever have cases where
+                // the constraints on one `type_param` can depend on another `type_param`, e.g.:
+                //
+                //      type_param A;
+                //      type_param B : ISidekick<A>;
+                //
+                // In that case, if a user tries to set `B` to `Robin` and `Robin` conforms to
+                // `ISidekick<Batman>`, then the compiler needs to know whether `A` is being
+                // set to `Batman` to know whether the setting for `B` is valid. In this limit
+                // the constraints can be mutually recursive (so `A : IMentor<B>`).
+                //
+                // The only way to check things correctly is to validate each conformance under
+                // a set of assumptions (substitutions) that includes all the type substitutions,
+                // and possibly also all the other constraints *except* the one to be validated.
+                //
+                // We will punt on this for now, and just check each constraint in isolation.
+                //
+                UInt argCounter = 0;
+                for(auto& globalGenericParam : globalGenericParams)
+                {
+                    // Get the argument that matches this parameter.
+                    UInt argIndex = argCounter++;
+                    SLANG_ASSERT(argIndex < genericArguments.Count());
+                    auto globalGenericArg = checkProperType(translationUnit, TypeExp(genericArguments[argIndex]));
+                    if (!globalGenericArg)
+                    {
+                        sink->diagnose(firstDeclWithName, Diagnostics::entryPointTypeSymbolNotAType, entryPoint->genericArgStrings[argIndex]);
+                        return;
+                    }
+
+                    // As a quick sanity check, see if the argument that is being supplied for a parameter
+                    // is just the parameter itself, because this should always be an error:
+                    //
+                    if( auto argDeclRefType = globalGenericArg.as<DeclRefType>() )
+                    {
+                        auto argDeclRef = argDeclRefType->declRef;
+                        if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
+                        {
+                            if(argGenericParamDeclRef.getDecl() == globalGenericParam)
+                            {
+                                // We are trying to specialize a generic parameter using itself.
+                                sink->diagnose(globalGenericParam,
+                                    Diagnostics::cannotSpecializeGlobalGenericToItself,
+                                    globalGenericParam->getName());
+                                sink->diagnose(entryPointFuncDecl,
+                                    Diagnostics::noteWhenCompilingEntryPoint,
+                                    entryPointFuncDecl->getName());
+                                continue;
+                            }
+                            else
+                            {
+                                // We are trying to specialize a generic parameter using a *different*
+                                // global generic type parameter.
+                                sink->diagnose(globalGenericParam,
+                                    Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
+                                    globalGenericParam->getName(),
+                                    argGenericParamDeclRef.GetName());
+                                sink->diagnose(entryPointFuncDecl,
+                                    Diagnostics::noteWhenCompilingEntryPoint,
+                                    entryPointFuncDecl->getName());
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Create a substitution for this parameter/argument.
+                    RefPtr<GlobalGenericParamSubstitution> subst = new GlobalGenericParamSubstitution();
+                    subst->paramDecl = globalGenericParam;
+                    subst->actualType = globalGenericArg;
+
+                    // Walk through the declared constraints for the parameter,
+                    // and check that the argument actually satisfies them.
+                    for(auto constraint : globalGenericParam->getMembersOfType<GenericTypeConstraintDecl>())
+                    {
+                        // Get the type that the constraint is enforcing conformance to
+                        auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
+
+                        // Use our semantic-checking logic to search for a witness to the required conformance
+                        SemanticsVisitor visitor(sink, entryPoint->compileRequest, translationUnit);
+                        auto witness = visitor.tryGetSubtypeWitness(globalGenericArg, interfaceType);
+                        if (!witness)
+                        {
+                            // If no witness was found, then we will be unable to satisfy
+                            // the conformances required.
+                            sink->diagnose(globalGenericParam,
+                                Diagnostics::typeArgumentDoesNotConformToInterface,
+                                globalGenericParam->nameAndLoc.name,
+                                globalGenericArg,
+                                interfaceType);
+                        }
+
+                        // Attach the concrete witness for this conformance to the
+                        // substutiton
+                        GlobalGenericParamSubstitution::ConstraintArg constraintArg;
+                        constraintArg.decl = constraint;
+                        constraintArg.val = witness;
+                        subst->constraintArgs.Add(constraintArg);
+                    }
+
+                    // Add the substitution for this parameter to the global substitution
+                    // set that we are building.
+
+                    *globalGenericSubstLink = subst;
+                    globalGenericSubstLink = &subst->outer;
+                }
+
+                entryPoint->globalGenericSubst = globalGenericSubsts;
+            }
+        }
+
+        // If any errors occured while we were checking the generic arguments
+        // of the entry point, then we should bail out rather than try to
+        // perform the next step of validation.
+        //
         if (sink->errorCount != 0)
             return;
 
         // Now that we've *found* the entry point, it is time to validate
         // that it actually meets the constraints for the chosen stage/profile.
         //
-        // TODO: This validation should be performed "under" any global generic
+        // TODO: This validation should (probably?) be performed "under" any global generic
         // parameter substitution we might have created, so that we can validate
         // based on knowledge of actual types.
         //
@@ -9674,7 +9820,7 @@ namespace Slang
                     RefPtr<EntryPointRequest> entryPointReq = new EntryPointRequest();
                     entryPointReq->compileRequest = compileRequest;
                     entryPointReq->translationUnitIndex = int(tt);
-                    entryPointReq->decl = funcDecl;
+                    entryPointReq->funcDeclRef = makeDeclRef(funcDecl);
                     entryPointReq->name = funcDecl->getName();
                     entryPointReq->profile = profile;
 
