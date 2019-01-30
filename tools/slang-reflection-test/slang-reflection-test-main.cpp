@@ -55,7 +55,7 @@ static void dedent(PrettyWriter& writer)
     writer.indent--;
 }
 
-static void write(PrettyWriter& writer, char const* text)
+static void write(PrettyWriter& writer, char const* text, size_t length = 0)
 {
     // TODO: can do this more efficiently...
     char const* cursor = text;
@@ -63,7 +63,7 @@ static void write(PrettyWriter& writer, char const* text)
     {
         char c = *cursor++;
         if (!c) break;
-
+        if (length && cursor - text == length) break;
         if (c == '\n')
         {
             writer.startOfLine = true;
@@ -81,6 +81,18 @@ static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
     Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
+}
+
+static void write(PrettyWriter& writer, int val)
+{
+    adjust(writer);
+    Slang::StdWriters::getOut().print("%d", val);
+}
+
+static void write(PrettyWriter& writer, float val)
+{
+    adjust(writer);
+    Slang::StdWriters::getOut().print("%f", val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -261,6 +273,76 @@ static void emitReflectionModifierInfoJSON(
     }
 }
 
+static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* userAttribute)
+{
+    write(writer, "{\n");
+    indent(writer);
+    write(writer, "\"name\": \"");
+    write(writer, userAttribute->getName());
+    write(writer, "\",\n");
+    write(writer, "\"arguments\": [\n");
+    indent(writer);
+    for (unsigned int i = 0; i < userAttribute->getArgumentCount(); i++)
+    {
+        int intVal;
+        float floatVal;
+        size_t bufSize = 0;
+        if (i > 0)
+            write(writer, ",\n");
+        if (SLANG_SUCCEEDED(userAttribute->getArgumentValueInt(i, &intVal)))
+        {
+            write(writer, intVal);
+        }
+        else if (SLANG_SUCCEEDED(userAttribute->getArgumentValueFloat(i, &floatVal)))
+        {
+            write(writer, floatVal);
+        }
+        else if (auto str = userAttribute->getArgumentValueString(i, &bufSize))
+        {
+            write(writer, str, bufSize);
+        }
+        else
+            write(writer, "\"invalid value\"");
+    }
+    dedent(writer);
+    write(writer, "\n]\n");
+    dedent(writer);
+    write(writer, "}\n");
+}
+
+static void emitUserAttributes(PrettyWriter& writer, slang::TypeReflection* type)
+{
+    auto attribCount = type->getUserAttributeCount();
+    if (attribCount)
+    {
+        write(writer, ",\n\"userAttribs\": [");
+        for (unsigned int i = 0; i < attribCount; i++)
+        {
+            if (i > 0)
+                write(writer, ",\n");
+            auto attrib = type->getUserAttributeByIndex(i);
+            emitUserAttributeJSON(writer, attrib);
+        }
+        write(writer, "]");
+    }
+}
+static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* var)
+{
+    auto attribCount = var->getUserAttributeCount();
+    if (attribCount)
+    {
+        write(writer, ",\n\"userAttribs\": [");
+        for (unsigned int i = 0; i < attribCount; i++)
+        {
+            if (i > 0)
+                write(writer, ",\n");
+            auto attrib = var->getUserAttributeByIndex(i);
+            emitUserAttributeJSON(writer, attrib);
+        }
+        write(writer, "]");
+    }
+}
+
 static void emitReflectionVarLayoutJSON(
     PrettyWriter&                       writer,
     slang::VariableLayoutReflection*    var)
@@ -278,6 +360,7 @@ static void emitReflectionVarLayoutJSON(
 
     emitReflectionVarBindingInfoJSON(writer, var);
 
+    emitUserAttributes(writer, var->getVariable());
     dedent(writer);
     write(writer, "\n}");
 }
@@ -367,6 +450,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         write(writer, "\"");
     }
 }
+
 
 static void emitReflectionTypeInfoJSON(
     PrettyWriter&           writer,
@@ -467,10 +551,10 @@ static void emitReflectionTypeInfoJSON(
         write(writer, "\"kind\": \"matrix\"");
         write(writer, ",\n");
         write(writer, "\"rowCount\": ");
-        write(writer, type->getRowCount());
+        write(writer, (SlangUInt)type->getRowCount());
         write(writer, ",\n");
         write(writer, "\"columnCount\": ");
-        write(writer, type->getColumnCount());
+        write(writer, (SlangUInt)type->getColumnCount());
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
@@ -523,7 +607,9 @@ static void emitReflectionTypeInfoJSON(
         assert(!"unhandled case");
         break;
     }
+    emitUserAttributes(writer, type);
 }
+
 
 static void emitReflectionTypeLayoutInfoJSON(
     PrettyWriter&                   writer,
@@ -580,6 +666,8 @@ static void emitReflectionTypeLayoutInfoJSON(
             }
             dedent(writer);
             write(writer, "\n]");
+            emitUserAttributes(writer, structTypeLayout->getType());
+            
         }
         break;
 

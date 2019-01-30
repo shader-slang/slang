@@ -587,6 +587,7 @@ namespace Slang
         RootNamePool* getRootNamePool() { return &rootNamePool; }
         NamePool* getNamePool() { return &namePool; }
         Name* getNameObj(String name) { return namePool.getName(name); }
+        Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }
         //
 
         // Generated code for stdlib, etc.

@@ -26,4 +26,12 @@ Name* NamePool::getName(String const& text)
     return name;
 }
 
+Name* NamePool::tryGetName(String const& text)
+{
+    RefPtr<Name> name;
+    if (rootPool->names.TryGetValue(text, name))
+        return name;
+    return nullptr;
+}
+
 } // namespace Slang
