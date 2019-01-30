@@ -1884,6 +1884,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return decl->nameAndLoc.name;
     }
 
+    SourceLoc DeclRefBase::getLoc() const
+    {
+        return decl->loc;
+    }
+
     DeclRefBase DeclRefBase::GetParent() const
     {
         // Want access to the free function (the 'as' method by default gets priority)
