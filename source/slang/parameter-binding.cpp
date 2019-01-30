@@ -1790,7 +1790,7 @@ static void collectGlobalScopeParameters(
     // First enumerate parameters at global scope
     // We collect two things here:
     // 1. A shader parameter, which is always a variable
-    // 2. A global entry-point generic parameter type (`__generic_param`),
+    // 2. A global entry-point generic parameter type (`type_param`),
     //    which is a GlobalGenericParamDecl
     // We collect global generic type parameters in the first pass,
     // So we can fill in the correct index into ordinary type layouts 

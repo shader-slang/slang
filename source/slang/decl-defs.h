@@ -175,7 +175,7 @@ SIMPLE_SYNTAX_CLASS(TypeAliasDecl, TypeDefDecl)
 SYNTAX_CLASS(AssocTypeDecl, AggTypeDecl)
 END_SYNTAX_CLASS()
 
-// A '__generic_param' declaration, which defines a generic
+// A 'type_param' declaration, which defines a generic
 // entry-point parameter. Is a container of GenericTypeConstraintDecl
 SYNTAX_CLASS(GlobalGenericParamDecl, AggTypeDecl)
 END_SYNTAX_CLASS()
