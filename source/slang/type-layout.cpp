@@ -905,19 +905,19 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     RefPtr<ParameterGroupType>  type,
     LayoutRulesImpl*            rules)
 {
-    if( type->As<ConstantBufferType>() )
+    if( as<ConstantBufferType>(type) )
     {
         return rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
     }
-    else if( type->As<TextureBufferType>() )
+    else if( as<TextureBufferType>(type) )
     {
         return rules->GetObjectLayout(ShaderParameterKind::TextureUniformBuffer);
     }
-    else if( type->As<GLSLShaderStorageBufferType>() )
+    else if( as<GLSLShaderStorageBufferType>(type) )
     {
         return rules->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer);
     }
-    else if (type->As<ParameterBlockType>())
+    else if (as<ParameterBlockType>(type))
     {
         // Note: we default to consuming zero register spces here, because
         // a parameter block might not contain anything (or all it contains
@@ -935,11 +935,11 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     // TODO: the vertex-input and fragment-output cases should
     // only actually apply when we are at the appropriate stage in
     // the pipeline...
-    else if( type->As<GLSLInputParameterGroupType>() )
+    else if( as<GLSLInputParameterGroupType>(type) )
     {
         return SimpleLayoutInfo(LayoutResourceKind::VertexInput, 0);
     }
-    else if( type->As<GLSLOutputParameterGroupType>() )
+    else if( as<GLSLOutputParameterGroupType>(type) )
     {
         return SimpleLayoutInfo(LayoutResourceKind::FragmentOutput, 0);
     }
@@ -1212,15 +1212,14 @@ createParameterGroupTypeLayout(
     // in HLSL or not.
 
     // Check if we are working with a parameter block...
-    auto parameterBlockType = parameterGroupType ? parameterGroupType->As<ParameterBlockType>() : nullptr;
-
-
+    auto parameterBlockType = as<ParameterBlockType>(parameterGroupType);
+    
     // Check if we have a parameter block *and* it should be
     // allocated into its own register space(s)
     bool ownRegisterSpace = false;
     if (parameterBlockType)
     {
-        // Should we allocate this block its own regsiter space?
+        // Should we allocate this block its own register space?
         if( shouldAllocateRegisterSpaceForParameterBlock(context) )
         {
             ownRegisterSpace = true;
@@ -1419,27 +1418,27 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            rules)
 {
-    if( parameterGroupType->As<ConstantBufferType>() )
+    if( as<ConstantBufferType>(parameterGroupType) )
     {
         return rules->getLayoutRulesFamily()->getConstantBufferRules();
     }
-    else if( parameterGroupType->As<TextureBufferType>() )
+    else if( as<TextureBufferType>(parameterGroupType) )
     {
         return rules->getLayoutRulesFamily()->getTextureBufferRules();
     }
-    else if( parameterGroupType->As<GLSLInputParameterGroupType>() )
+    else if( as<GLSLInputParameterGroupType>(parameterGroupType) )
     {
         return rules->getLayoutRulesFamily()->getVaryingInputRules();
     }
-    else if( parameterGroupType->As<GLSLOutputParameterGroupType>() )
+    else if( as<GLSLOutputParameterGroupType>(parameterGroupType) )
     {
         return rules->getLayoutRulesFamily()->getVaryingOutputRules();
     }
-    else if( parameterGroupType->As<GLSLShaderStorageBufferType>() )
+    else if( as<GLSLShaderStorageBufferType>(parameterGroupType) )
     {
         return rules->getLayoutRulesFamily()->getShaderStorageBufferRules();
     }
-    else if (parameterGroupType->As<ParameterBlockType>())
+    else if (as<ParameterBlockType>(parameterGroupType))
     {
         return rules->getLayoutRulesFamily()->getParameterBlockRules();
     }
@@ -1831,7 +1830,7 @@ SimpleLayoutInfo GetLayoutImpl(
 {
     auto rules = context.rules;
 
-    if (auto parameterGroupType = type->As<ParameterGroupType>())
+    if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
         // If the user is just interested in uniform layout info,
         // then this is easy: a `ConstantBuffer<T>` is really no
@@ -1860,7 +1859,7 @@ SimpleLayoutInfo GetLayoutImpl(
 
         return info;
     }
-    else if (auto samplerStateType = type->As<SamplerStateType>())
+    else if (auto samplerStateType = as<SamplerStateType>(type))
     {
         return GetSimpleLayoutImpl(
             rules->GetObjectLayout(ShaderParameterKind::SamplerState),
@@ -1868,7 +1867,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if (auto textureType = type->As<TextureType>())
+    else if (auto textureType = as<TextureType>(type))
     {
         // TODO: the logic here should really be defined by the rules,
         // and not at this top level...
@@ -1890,7 +1889,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if (auto imageType = type->As<GLSLImageType>())
+    else if (auto imageType = as<GLSLImageType>(type))
     {
         // TODO: the logic here should really be defined by the rules,
         // and not at this top level...
@@ -1912,7 +1911,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if (auto textureSamplerType = type->As<TextureSamplerType>())
+    else if (auto textureSamplerType = as<TextureSamplerType>(type))
     {
         // TODO: the logic here should really be defined by the rules,
         // and not at this top level...
@@ -1937,7 +1936,7 @@ SimpleLayoutInfo GetLayoutImpl(
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                                \
-    else if(auto type_##TYPE = type->As<TYPE>()) do {                   \
+    else if(auto type_##TYPE = as<TYPE>(type)) do {                   \
         auto info = rules->GetObjectLayout(ShaderParameterKind::KIND);  \
         if (outTypeLayout)                                              \
         {                                                               \
@@ -1961,7 +1960,7 @@ SimpleLayoutInfo GetLayoutImpl(
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                        \
-    else if(type->As<TYPE>()) do {                              \
+    else if(as<TYPE>(type)) do {                              \
         return GetSimpleLayoutImpl(                             \
             rules->GetObjectLayout(ShaderParameterKind::KIND),  \
             type, rules, outTypeLayout);                        \
@@ -1981,7 +1980,7 @@ SimpleLayoutInfo GetLayoutImpl(
     //
     // TODO(tfoley): Need to recognize any UAV types here
     //
-    else if(auto basicType = type->As<BasicExpressionType>())
+    else if(auto basicType = as<BasicExpressionType>(type))
     {
         return GetSimpleLayoutImpl(
             rules->GetScalarLayout(basicType->baseType),
@@ -1989,7 +1988,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if(auto vecType = type->As<VectorExpressionType>())
+    else if(auto vecType = as<VectorExpressionType>(type))
     {
         return GetSimpleLayoutImpl(
             rules->GetVectorLayout(
@@ -1999,7 +1998,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if(auto matType = type->As<MatrixExpressionType>())
+    else if(auto matType = as<MatrixExpressionType>(type))
     {
         // The `GetMatrixLayout` implementation in the layout rules
         // currently defaults to assuming column-major layout,
@@ -2040,7 +2039,7 @@ SimpleLayoutInfo GetLayoutImpl(
 
         return info;
     }
-    else if (auto arrayType = type->As<ArrayExpressionType>())
+    else if (auto arrayType = as<ArrayExpressionType>(type))
     {
         RefPtr<TypeLayout> elementTypeLayout;
         auto elementInfo = GetLayoutImpl(
@@ -2192,7 +2191,7 @@ SimpleLayoutInfo GetLayoutImpl(
         }
         return arrayUniformInfo;
     }
-    else if (auto declRefType = type->As<DeclRefType>())
+    else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
 
@@ -2336,7 +2335,7 @@ SimpleLayoutInfo GetLayoutImpl(
             return info;
         }
     }
-    else if (auto errorType = type->As<ErrorType>())
+    else if (auto errorType = as<ErrorType>(type))
     {
         // An error type means that we encountered something we don't understand.
         //
@@ -2349,7 +2348,7 @@ SimpleLayoutInfo GetLayoutImpl(
             rules,
             outTypeLayout);
     }
-    else if( auto taggedUnionType = type->As<TaggedUnionType>() )
+    else if( auto taggedUnionType = as<TaggedUnionType>(type) )
     {
         // A tagged union type needs to be laid out as the maximum
         // size of any constituent type.

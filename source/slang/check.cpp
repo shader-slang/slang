@@ -459,7 +459,7 @@ namespace Slang
         RefPtr<Type> ExtractTypeFromTypeRepr(const RefPtr<Expr>& typeRepr)
         {
             if (!typeRepr) return nullptr;
-            if (auto typeType = typeRepr->type->As<TypeType>())
+            if (auto typeType = typeRepr->type.As<TypeType>())
             {
                 return typeType->type;
             }
@@ -495,10 +495,10 @@ namespace Slang
 
         RefPtr<DeclRefType> getExprDeclRefType(Expr * expr)
         {
-            if (auto typetype = expr->type->As<TypeType>())
+            if (auto typetype = expr->type.As<TypeType>())
                 return typetype->type.dynamicCast<DeclRefType>();
             else
-                return expr->type->As<DeclRefType>();
+                return expr->type.As<DeclRefType>();
         }
 
         /// Is `decl` usable as a static member?
@@ -570,7 +570,7 @@ namespace Slang
         {
             auto exprType = expr->type.type;
 
-            if(auto declRefType = exprType->As<DeclRefType>())
+            if(auto declRefType = as<DeclRefType>(exprType))
             {
                 if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
                 {
@@ -666,7 +666,7 @@ namespace Slang
                 // form (e.g., for a member function, return a value usable
                 // for referencing it as a free function).
                 //
-                if (baseExpr->type->As<TypeType>())
+                if (baseExpr->type.As<TypeType>())
                 {
                     auto expr = new StaticMemberExpr();
                     expr->loc = loc;
@@ -737,7 +737,7 @@ namespace Slang
             RefPtr<Expr>    base,
             SourceLoc       loc)
         {
-            auto ptrLikeType = base->type->As<PointerLikeType>();
+            auto ptrLikeType = base->type.As<PointerLikeType>();
             SLANG_ASSERT(ptrLikeType);
 
             auto derefExpr = new DerefExpr();
@@ -890,11 +890,11 @@ namespace Slang
                 expr = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
             }
 
-            if (auto typeType = expr->type.type->As<TypeType>())
+            if (auto typeType = as<TypeType>(expr->type.type))
             {
                 return expr;
             }
-            else if (auto errorType = expr->type.type->As<ErrorType>())
+            else if (auto errorType = as<ErrorType>(expr->type.type))
             {
                 return expr;
             }
@@ -906,7 +906,7 @@ namespace Slang
         RefPtr<Type> ExpectAType(RefPtr<Expr> expr)
         {
             auto typeRepr = ExpectATypeRepr(expr);
-            if (auto typeType = typeRepr->type->As<TypeType>())
+            if (auto typeType = typeRepr->type.As<TypeType>())
             {
                 return typeType->type;
             }
@@ -931,11 +931,11 @@ namespace Slang
                 exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
             }
 
-            if (auto typeType = exp->type->As<TypeType>())
+            if (auto typeType = exp->type.As<TypeType>())
             {
                 return typeType->type;
             }
-            else if (auto errorType = exp->type->As<ErrorType>())
+            else if (auto errorType = exp->type.As<ErrorType>())
             {
                 return exp->type.type;
             }
@@ -945,7 +945,7 @@ namespace Slang
             }
         }
 
-        // Construct a type reprsenting the instantiation of
+        // Construct a type representing the instantiation of
         // the given generic declaration for the given arguments.
         // The arguments should already be checked against
         // the declaration.
@@ -1045,7 +1045,7 @@ namespace Slang
             //
             if (auto varDecl = decl.dynamicCast<VarDecl>())
             {
-                if (auto parenScope = varDecl->ParentDecl->As<ScopeDecl>())
+                if (auto parenScope = as<ScopeDecl>(varDecl->ParentDecl))
                 {
                     // TODO: This diagnostic should be emitted on the line that is referencing
                     // the declaration. That requires `EnsureDecl` to take the requesting
@@ -1126,7 +1126,7 @@ namespace Slang
                 return false;
             }
 
-            if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+            if (auto genericDeclRefType = as<GenericDeclRefType>(type))
             {
                 // We are using a reference to a generic declaration as a concrete
                 // type. This means we should substitute in any default parameter values
@@ -1229,7 +1229,7 @@ namespace Slang
         {
             TypeExp result = CoerceToProperType(typeExp);
             Type* type = result.type.Ptr();
-            if (auto basicType = type->As<BasicExpressionType>())
+            if (auto basicType = as<BasicExpressionType>(type))
             {
                 // TODO: `void` shouldn't be a basic type, to make this easier to avoid
                 if (basicType->baseType == BaseType::Void)
@@ -1328,29 +1328,29 @@ namespace Slang
         bool isEffectivelyScalarForInitializerLists(
             RefPtr<Type>    type)
         {
-            if(type->As<ArrayExpressionType>()) return false;
-            if(type->As<VectorExpressionType>()) return false;
-            if(type->As<MatrixExpressionType>()) return false;
+            if(as<ArrayExpressionType>(type)) return false;
+            if(as<VectorExpressionType>(type)) return false;
+            if(as<MatrixExpressionType>(type)) return false;
 
-            if(type->As<BasicExpressionType>())
-            {
-                return true;
-            }
-
-            if(type->As<ResourceType>())
-            {
-                return true;
-            }
-            if(type->As<UntypedBufferResourceType>())
-            {
-                return true;
-            }
-            if(type->As<SamplerStateType>())
+            if(as<BasicExpressionType>(type))
             {
                 return true;
             }
 
-            if(auto declRefType = type->As<DeclRefType>())
+            if(as<ResourceType>(type))
+            {
+                return true;
+            }
+            if(as<UntypedBufferResourceType>(type))
+            {
+                return true;
+            }
+            if(as<SamplerStateType>(type))
+            {
+                return true;
+            }
+
+            if(auto declRefType = as<DeclRefType>(type))
             {
                 if(declRefType->declRef.As<StructDecl>())
                     return false;
@@ -1463,7 +1463,7 @@ namespace Slang
             auto toType = inToType;
             UInt argCount = fromInitializerListExpr->args.Count();
 
-            // In the case where we need to build a reuslt expression,
+            // In the case where we need to build a result expression,
             // we will collect the new arguments here
             List<RefPtr<Expr>> coercedArgs;
 
@@ -1494,7 +1494,7 @@ namespace Slang
                     // synthesizing default values.
                 }
             }
-            else if (auto toVecType = toType->As<VectorExpressionType>())
+            else if (auto toVecType = as<VectorExpressionType>(toType))
             {
                 auto toElementCount = toVecType->elementCount;
                 auto toElementType = toVecType->elementType;
@@ -1535,7 +1535,7 @@ namespace Slang
                     }
                 }
             }
-            else if(auto toArrayType = toType->As<ArrayExpressionType>())
+            else if(auto toArrayType = as<ArrayExpressionType>(toType))
             {
                 // TODO(tfoley): If we can compute the size of the array statically,
                 // then we want to check that there aren't too many initializers present
@@ -1618,7 +1618,7 @@ namespace Slang
                         new ConstantIntVal(elementCount));
                 }
             }
-            else if(auto toMatrixType = toType->As<MatrixExpressionType>())
+            else if(auto toMatrixType = as<MatrixExpressionType>(toType))
             {
                 // In the general case, the initializer list might comprise
                 // both vectors and scalars.
@@ -1673,7 +1673,7 @@ namespace Slang
                     }
                 }
             }
-            else if(auto toDeclRefType = toType->As<DeclRefType>())
+            else if(auto toDeclRefType = as<DeclRefType>(toType))
             {
                 auto toTypeDeclRef = toDeclRefType->declRef;
                 if(auto toStructDeclRef = toTypeDeclRef.As<StructDecl>())
@@ -1770,7 +1770,7 @@ namespace Slang
             }
 
             // If either type is an error, then let things pass.
-            if (toType->As<ErrorType>() || fromType->As<ErrorType>())
+            if (as<ErrorType>(toType) || as<ErrorType>(fromType))
             {
                 if (outToExpr)
                     *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
@@ -1795,7 +1795,7 @@ namespace Slang
             }
 
             //
-            if (auto toDeclRefType = toType->As<DeclRefType>())
+            if (auto toDeclRefType = as<DeclRefType>(toType))
             {
                 auto toTypeDeclRef = toDeclRefType->declRef;
                 if (auto interfaceDeclRef = toTypeDeclRef.As<InterfaceDecl>())
@@ -1832,12 +1832,12 @@ namespace Slang
                         auto sub = GetSub(constraintDeclRef);
                         auto sup = GetSup(constraintDeclRef);
 
-                        auto subDeclRef = sub->As<DeclRefType>();
+                        auto subDeclRef = as<DeclRefType>(sub);
                         if (!subDeclRef)
                             continue;
                         if (subDeclRef->declRef != genParamDeclRef)
                             continue;
-                        auto supDeclRefType = sup->As<DeclRefType>();
+                        auto supDeclRefType = as<DeclRefType>(sup);
                         if (supDeclRefType)
                         {
                             auto toInterfaceDeclRef = supDeclRefType->declRef.As<InterfaceDecl>();
@@ -1858,7 +1858,7 @@ namespace Slang
             }
 
             // Are we converting from a parameter group type to its element type?
-            if(auto fromParameterGroupType = fromType->As<ParameterGroupType>())
+            if(auto fromParameterGroupType = as<ParameterGroupType>(fromType))
             {
                 auto fromElementType = fromParameterGroupType->getElementType();
 
@@ -2138,7 +2138,7 @@ namespace Slang
         void CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl)
         {
             // A variable that didn't have an explicit type written must
-            // have its type inferred from the initial-value expresison.
+            // have its type inferred from the initial-value expression.
             //
             if(!varDecl->type.exp)
             {
@@ -2302,7 +2302,7 @@ namespace Slang
             // For now we only allow inheritance from interfaces, so
             // we will validate that the type expression names an interface
 
-            if(auto declRefType = base.type->As<DeclRefType>())
+            if(auto declRefType = as<DeclRefType>(base.type))
             {
                 if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
                 {
@@ -2445,7 +2445,7 @@ namespace Slang
             attribDecl->syntaxClass = getSession()->findSyntaxClass(getSession()->getNameObj("UserDefinedAttribute"));
             for (auto member : structAttribDef->Members)
             {
-                if (auto varMember = member.As<VarDecl>())
+                if (auto varMember = as<VarDecl>(member))
                 {
                     RefPtr<ParamDecl> param = new ParamDecl();
                     param->nameAndLoc = member->nameAndLoc;
@@ -2470,7 +2470,7 @@ namespace Slang
             }
             for (int i = 0; i < numArgs; ++i)
             {
-                if (!attr->args[i]->As<IntegerLiteralExpr>())
+                if (!as<IntegerLiteralExpr>(attr->args[i]))
                 {
                     return false;
                 }
@@ -2486,7 +2486,7 @@ namespace Slang
             }
             for (int i = 0; i < numArgs; ++i)
             {
-                if (!attr->args[i]->As<StringLiteralExpr>())
+                if (!as<StringLiteralExpr>(attr->args[i]))
                 {
                     return false;
                 }
@@ -2606,7 +2606,7 @@ namespace Slang
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
                 }
-                else if (auto attrUsageAttr = attr.As<AttributeUsageAttribute>())
+                else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
                 {
                     uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
                     if (attr->args.Count() == 1)
@@ -2628,7 +2628,7 @@ namespace Slang
                         return false;
                     }
                 }
-                else if (auto userDefAttr = attr.As<UserDefinedAttribute>())
+                else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
                 {
                     // check arguments against attribute parameters defined in attribClassDecl
                     uint32_t paramIndex = 0;
@@ -2639,7 +2639,7 @@ namespace Slang
                         {
                             auto & arg = attr->args[paramIndex];
                             bool typeChecked = false;
-                            if (auto basicType = paramDecl->getType()->AsBasicType())
+                            if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
                             {
                                 if (basicType->baseType == BaseType::Int)
                                 {
@@ -3487,7 +3487,7 @@ namespace Slang
             InheritanceDecl*            inheritanceDecl,
             Type*                       baseType)
         {
-            if (auto baseDeclRefType = baseType->As<DeclRefType>())
+            if (auto baseDeclRefType = as<DeclRefType>(baseType))
             {
                 auto baseTypeDeclRef = baseDeclRefType->declRef;
                 if (auto baseInterfaceDeclRef = baseTypeDeclRef.As<InterfaceDecl>())
@@ -3556,7 +3556,7 @@ namespace Slang
 
         void checkExtensionConformance(ExtensionDecl* decl)
         {
-            if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
+            if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
             {
                 if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
                 {
@@ -3616,7 +3616,7 @@ namespace Slang
             //
             // TODO: We should also add a pass that takes
             // all the stated inheritance relationships,
-            // expands them to include implicitic inheritance,
+            // expands them to include implicit inheritance,
             // and then linearizes them. This would allow
             // later passes that need to know everything
             // a type inherits from to proceed linearly
@@ -3657,9 +3657,9 @@ namespace Slang
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc)
         {
-            if(auto basicType = type->As<BasicExpressionType>())
+            if(auto basicType = as<BasicExpressionType>(type))
             {
-                // Allow the built-in intteger types.
+                // Allow the built-in integer types.
                 if(isIntegerBaseType(basicType->baseType))
                     return;
 
@@ -3696,12 +3696,12 @@ namespace Slang
                     // Look at the type being inherited from.
                     auto superType = inheritanceDecl->base.type;
 
-                    if(auto errorType = superType->As<ErrorType>())
+                    if(auto errorType = as<ErrorType>(superType))
                     {
                         // Ignore any erroneous inheritance clauses.
                         continue;
                     }
-                    else if(auto declRefType = superType->As<DeclRefType>())
+                    else if(auto declRefType = as<DeclRefType>(superType))
                     {
                         if(auto interfaceDeclRef = declRefType->declRef.As<InterfaceDecl>())
                         {
@@ -3742,7 +3742,7 @@ namespace Slang
                     // type is suitable. (e.g., if we are going
                     // to allow raw values for case tags to be
                     // derived automatically, then the tag
-                    // type needs to be some kind of interer type...)
+                    // type needs to be some kind of integer type...)
                     //
                     // For now we will just be harsh and require it
                     // to be one of a few builtin types.
@@ -4775,7 +4775,7 @@ namespace Slang
             if(!initExpr) return;
 
             // Is the type of the initializer an array type?
-            if(auto arrayInitType = initExpr->type->As<ArrayExpressionType>())
+            if(auto arrayInitType = initExpr->type.As<ArrayExpressionType>())
             {
                 elementCount = arrayInitType->ArrayLength;
             }
@@ -4906,7 +4906,7 @@ namespace Slang
                 // operation right now.
                 //
                 // TODO: we should really allow constant-folding for anything
-                // that can be lowerd to our bytecode...
+                // that can be lowered to our bytecode...
                 return nullptr;
             }
 
@@ -5123,7 +5123,7 @@ namespace Slang
         RefPtr<IntVal> TryCheckIntegerConstantExpression(Expr* exp)
         {
             // Check if type is acceptable for an integer constant expression
-            if(auto basicType = exp->type.type->As<BasicExpressionType>())
+            if(auto basicType = as<BasicExpressionType>(exp->type.type))
             {
                 if(!isIntegerBaseType(basicType->baseType))
                     return nullptr;
@@ -5207,9 +5207,9 @@ namespace Slang
 
             auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-            return DeclRefType::Create(
+            return as<VectorExpressionType>(DeclRefType::Create(
                 session,
-                declRef)->As<VectorExpressionType>();
+                declRef));
         }
 
         RefPtr<Expr> visitIndexExpr(IndexExpr* subscriptExpr)
@@ -5234,7 +5234,7 @@ namespace Slang
             // Otherwise, we need to look at the type of the base expression,
             // to figure out how subscripting should work.
             auto baseType = baseExpr->type.Ptr();
-            if (auto baseTypeType = baseType->As<TypeType>())
+            if (auto baseTypeType = as<TypeType>(baseType))
             {
                 // We are trying to "index" into a type, so we have an expression like `float[2]`
                 // which should be interpreted as resolving to an array type.
@@ -5254,19 +5254,19 @@ namespace Slang
                 subscriptExpr->type = QualType(getTypeType(arrayType));
                 return subscriptExpr;
             }
-            else if (auto baseArrayType = baseType->As<ArrayExpressionType>())
+            else if (auto baseArrayType = as<ArrayExpressionType>(baseType))
             {
                 return CheckSimpleSubscriptExpr(
                     subscriptExpr,
                     baseArrayType->baseType);
             }
-            else if (auto vecType = baseType->As<VectorExpressionType>())
+            else if (auto vecType = as<VectorExpressionType>(baseType))
             {
                 return CheckSimpleSubscriptExpr(
                     subscriptExpr,
                     vecType->elementType);
             }
-            else if (auto matType = baseType->As<MatrixExpressionType>())
+            else if (auto matType = as<MatrixExpressionType>(baseType))
             {
                 // TODO(tfoley): We shouldn't go and recompute
                 // row types over and over like this... :(
@@ -5402,7 +5402,7 @@ namespace Slang
 
             if (!type.IsLeftValue)
             {
-                if (type->As<ErrorType>())
+                if (type.As<ErrorType>())
                 {
                     // Don't report an l-value issue on an erroneous expression
                 }
@@ -5433,7 +5433,7 @@ namespace Slang
 
             // TODO: need to check that the target type names a declaration...
 
-            if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
+            if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
             {
                 // Attach our extension to that type as a candidate...
                 if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDecl>())
@@ -5451,7 +5451,7 @@ namespace Slang
         {
             if (decl->IsChecked(getCheckedState())) return;
 
-            if (!decl->targetType->As<DeclRefType>())
+            if (!as<DeclRefType>(decl->targetType))
             {
                 getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
             }
@@ -5575,7 +5575,7 @@ namespace Slang
         {
             if (checkingPhase == CheckingPhase::Header)
             {
-                // An acessor must appear nested inside a subscript declaration (today),
+                // An accessor must appear nested inside a subscript declaration (today),
                 // or a property declaration (when we add them). It will derive
                 // its return type from the outer declaration, so we handle both
                 // of these checks at the same place.
@@ -5608,8 +5608,8 @@ namespace Slang
             bool satisfied = false; // Has this constraint been met?
         };
 
-        // A collection of constraints that will need to be satisified (solved)
-        // in order for checking to suceed.
+        // A collection of constraints that will need to be satisfied (solved)
+        // in order for checking to succeed.
         struct ConstraintSystem
         {
             // A source location to use in reporting any issues
@@ -5712,7 +5712,7 @@ namespace Slang
             RefPtr<SubtypeWitness>* link = &witness;
 
             // As long as there is more than one breadcrumb, we
-            // need to be creating transitie witnesses.
+            // need to be creating transitive witnesses.
             while(bb->prev)
             {
                 // On the first iteration when processing the list
@@ -5814,7 +5814,7 @@ namespace Slang
             TypeWitnessBreadcrumb*  inBreadcrumbs)
         {
             // for now look up a conformance member...
-            if(auto declRefType = type->As<DeclRefType>())
+            if(auto declRefType = as<DeclRefType>(type))
             {
                 auto declRef = declRefType->declRef;
 
@@ -5844,9 +5844,9 @@ namespace Slang
                         // that is being inherited from. This is dangerous because
                         // it might lead to infinite loops.
                         //
-                        // TODO: A better appraoch would be to create a linearized list
-                        // of all the interfaces that a given type direclty or indirectly
-                        // inheirts, and store it with the type, so that we don't have
+                        // TODO: A better approach would be to create a linearized list
+                        // of all the interfaces that a given type directly or indirectly
+                        // inherits, and store it with the type, so that we don't have
                         // to recurse in places like this (and can maybe catch infinite
                         // loops better). This would also help avoid checking multiply-inherited
                         // conformances multiple times.
@@ -5897,7 +5897,7 @@ namespace Slang
                         auto sub = GetSub(constraintDeclRef);
                         auto sup = GetSup(constraintDeclRef);
 
-                        auto subDeclRef = sub->As<DeclRefType>();
+                        auto subDeclRef = as<DeclRefType>(sub);
                         if(!subDeclRef)
                             continue;
                         if(subDeclRef->declRef != genericTypeParamDeclRef)
@@ -5920,7 +5920,7 @@ namespace Slang
                     }
                 }
             }
-            else if(auto taggedUnionType = type->As<TaggedUnionType>())
+            else if(auto taggedUnionType = as<TaggedUnionType>(type))
             {
                 // A tagged union type conforms to an interface if all of
                 // the constituent types in the tagged union conform.
@@ -6094,7 +6094,7 @@ namespace Slang
                         {
                             // Our candidate can convert to the current "best" type, so
                             // it is logically a more specific type that satisfies our
-                            // constraints, thereforce we should keep it.
+                            // constraints, therefore we should keep it.
                             //
                             bestType = candidateType;
                         }
@@ -6129,9 +6129,9 @@ namespace Slang
                 return left;
 
             // We can join two basic types by picking the "better" of the two
-            if (auto leftBasic = left->As<BasicExpressionType>())
+            if (auto leftBasic = as<BasicExpressionType>(left))
             {
-                if (auto rightBasic = right->As<BasicExpressionType>())
+                if (auto rightBasic = as<BasicExpressionType>(right))
                 {
                     auto leftFlavor = leftBasic->baseType;
                     auto rightFlavor = rightBasic->baseType;
@@ -6151,7 +6151,7 @@ namespace Slang
                 }
 
                 // We can also join a vector and a scalar
-                if(auto rightVector = right->As<VectorExpressionType>())
+                if(auto rightVector = as<VectorExpressionType>(right))
                 {
                     return TryJoinVectorAndScalarType(rightVector, leftBasic);
                 }
@@ -6159,9 +6159,9 @@ namespace Slang
 
             // We can join two vector types by joining their element types
             // (and also their sizes...)
-            if( auto leftVector = left->As<VectorExpressionType>())
+            if( auto leftVector = as<VectorExpressionType>(left))
             {
-                if(auto rightVector = right->As<VectorExpressionType>())
+                if(auto rightVector = as<VectorExpressionType>(right))
                 {
                     // Check if the vector sizes match
                     if(!leftVector->elementCount->EqualsVal(rightVector->elementCount.Ptr()))
@@ -6180,14 +6180,14 @@ namespace Slang
                 }
 
                 // We can also join a vector and a scalar
-                if(auto rightBasic = right->As<BasicExpressionType>())
+                if(auto rightBasic = as<BasicExpressionType>(right))
                 {
                     return TryJoinVectorAndScalarType(leftVector, rightBasic);
                 }
             }
 
             // HACK: trying to work trait types in here...
-            if(auto leftDeclRefType = left->As<DeclRefType>())
+            if(auto leftDeclRefType = as<DeclRefType>(left))
             {
                 if( auto leftInterfaceRef = leftDeclRefType->declRef.As<InterfaceDecl>() )
                 {
@@ -6195,7 +6195,7 @@ namespace Slang
                     return TryJoinTypeWithInterface(right, leftInterfaceRef);
                 }
             }
-            if(auto rightDeclRefType = right->As<DeclRefType>())
+            if(auto rightDeclRefType = as<DeclRefType>(right))
             {
                 if( auto rightInterfaceRef = rightDeclRefType->declRef.As<InterfaceDecl>() )
                 {
@@ -6739,7 +6739,7 @@ namespace Slang
                 return createTypeEqualityWitness(sub);
             }
 
-            if(auto supDeclRefType = sup->As<DeclRefType>())
+            if(auto supDeclRefType = as<DeclRefType>(sup))
             {
                 auto supDeclRef = supDeclRefType->declRef;
                 if(auto supInterfaceDeclRef = supDeclRef.As<InterfaceDecl>())
@@ -7384,25 +7384,25 @@ namespace Slang
             RefPtr<Type>  fst,
             RefPtr<Type>  snd)
         {
-            if (auto fstDeclRefType = fst->As<DeclRefType>())
+            if (auto fstDeclRefType = as<DeclRefType>(fst))
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
                 if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
 
-                if (auto sndDeclRefType = snd->As<DeclRefType>())
+                if (auto sndDeclRefType = as<DeclRefType>(snd))
                 {
                     auto sndDeclRef = sndDeclRefType->declRef;
 
                     if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
                         return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
-                    // can't be unified if they refer to differnt declarations.
+                    // can't be unified if they refer to different declarations.
                     if (fstDeclRef.getDecl() != sndDeclRef.getDecl()) return false;
 
                     // next we need to unify the substitutions applied
-                    // to each decalration reference.
+                    // to each declaration reference.
                     if (!tryUnifySubstitutions(
                         constraints,
                         fstDeclRef.substitutions.substitutions,
@@ -7427,17 +7427,17 @@ namespace Slang
 
             // An error type can unify with anything, just so we avoid cascading errors.
 
-            if (auto fstErrorType = fst->As<ErrorType>())
+            if (auto fstErrorType = as<ErrorType>(fst))
                 return true;
 
-            if (auto sndErrorType = snd->As<ErrorType>())
+            if (auto sndErrorType = as<ErrorType>(snd))
                 return true;
 
             // A generic parameter type can unify with anything.
             // TODO: there actually needs to be some kind of "occurs check" sort
             // of thing here...
 
-            if (auto fstDeclRefType = fst->As<DeclRefType>())
+            if (auto fstDeclRefType = as<DeclRefType>(fst))
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
@@ -7448,7 +7448,7 @@ namespace Slang
                 }
             }
 
-            if (auto sndDeclRefType = snd->As<DeclRefType>())
+            if (auto sndDeclRefType = as<DeclRefType>(snd))
             {
                 auto sndDeclRef = sndDeclRefType->declRef;
 
@@ -7468,9 +7468,9 @@ namespace Slang
             // in a completely ad hoc fashion, but eventually we'd
             // want to do it more formally.
 
-            if(auto fstVectorType = fst->As<VectorExpressionType>())
+            if(auto fstVectorType = as<VectorExpressionType>(fst))
             {
-                if(auto sndScalarType = snd->As<BasicExpressionType>())
+                if(auto sndScalarType = as<BasicExpressionType>(snd))
                 {
                     return TryUnifyTypes(
                         constraints,
@@ -7479,9 +7479,9 @@ namespace Slang
                 }
             }
 
-            if(auto fstScalarType = fst->As<BasicExpressionType>())
+            if(auto fstScalarType = as<BasicExpressionType>(fst))
             {
-                if(auto sndVectorType = snd->As<VectorExpressionType>())
+                if(auto sndVectorType = as<VectorExpressionType>(snd))
                 {
                     return TryUnifyTypes(
                         constraints,
@@ -7503,7 +7503,7 @@ namespace Slang
             DeclRef<ExtensionDecl> extDeclRef = makeDeclRef(extDecl);
 
             // If the extension is a generic extension, then we
-            // need to infer type argumenst that will give
+            // need to infer type arguments that will give
             // us a target type that matches `type`.
             //
             if (auto extGenericDecl = GetOuterGeneric(extDecl))
@@ -7521,7 +7521,7 @@ namespace Slang
                     return DeclRef<ExtensionDecl>();
                 }
 
-                // Consruct a reference to the extension with our constraint variables
+                // Construct a reference to the extension with our constraint variables
                 // set as they were found by solving the constraint system.
                 extDeclRef = DeclRef<Decl>(extDecl, constraintSubst).As<ExtensionDecl>();
             }
@@ -7533,14 +7533,14 @@ namespace Slang
             // an interface, and the `type` we are trying to match up has a this-type
             // substitution for that interface, then we want to attach a matching
             // substitution to the extension decl-ref.
-            if(auto targetDeclRefType = targetType->As<DeclRefType>())
+            if(auto targetDeclRefType = as<DeclRefType>(targetType))
             {
                 if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.As<InterfaceDecl>())
                 {
                     // Okay, the target type is an interface.
                     //
                     // Is the type we want to apply to also an interface?
-                    if(auto appDeclRefType = type->As<DeclRefType>())
+                    if(auto appDeclRefType = as<DeclRefType>(type))
                     {
                         if(auto appInterfaceDeclRef = appDeclRefType->declRef.As<InterfaceDecl>())
                         {
@@ -7797,7 +7797,7 @@ namespace Slang
                 // generic parameter in question, and `Foo` is whatever we are
                 // constraining it to.
                 auto subType = GetSub(constraintDeclRef);
-                auto subDeclRefType = subType->As<DeclRefType>();
+                auto subDeclRefType = as<DeclRefType>(subType);
                 if(!subDeclRefType)
                     continue;
                 if(!subDeclRefType->declRef.Equals(typeDeclRef))
@@ -7819,7 +7819,7 @@ namespace Slang
             OverloadResolveContext&	context,
             RefPtr<Type>            resultType)
         {
-            if (auto declRefType = type->As<DeclRefType>())
+            if (auto declRefType = as<DeclRefType>(type))
             {
                 auto declRef = declRefType->declRef;
                 if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
@@ -8448,13 +8448,13 @@ namespace Slang
             if (auto invoke = dynamic_cast<InvokeExpr*>(rs.Ptr()))
             {
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
-                if(auto funcType = invoke->FunctionExpr->type->As<FuncType>())
+                if(auto funcType = invoke->FunctionExpr->type.As<FuncType>())
                 {
                     UInt paramCount = funcType->getParamCount();
                     for (UInt pp = 0; pp < paramCount; ++pp)
                     {
                         auto paramType = funcType->getParamType(pp);
-                        if (paramType->As<OutTypeBase>() || paramType->As<RefType>())
+                        if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
                         {
                             // `out`, `inout`, and `ref` parameters currently require
                             // an *exact* match on the type of the argument.
@@ -8612,7 +8612,7 @@ namespace Slang
             for (;;)
             {
                 auto baseType = expr->type;
-                if (auto pointerLikeType = baseType->As<PointerLikeType>())
+                if (auto pointerLikeType = baseType.As<PointerLikeType>())
                 {
                     auto elementType = QualType(pointerLikeType->elementType);
                     elementType.IsLeftValue = baseType.IsLeftValue;
@@ -8796,7 +8796,7 @@ namespace Slang
                     baseScalarType,
                     1);
             }
-            else if(auto typeType = baseType->As<TypeType>())
+            else if(auto typeType = baseType.As<TypeType>())
             {
                 // We are looking up a member inside a type.
                 // We want to be careful here because we should only find members
@@ -8806,7 +8806,7 @@ namespace Slang
                 // We need to fix that.
                 auto type = typeType->type;
 
-                if (type->As<ErrorType>())
+                if (as<ErrorType>(type))
                 {
                     return CreateErrorExpr(expr);
                 }
@@ -8835,9 +8835,9 @@ namespace Slang
                 // The biggest challenge there is that we'd need to arrange
                 // to generate "dispatcher" functions that could be used
                 // to implement that function, in the case where we are
-                // making a static reference to some kind of polymoprhic declaration.
+                // making a static reference to some kind of polymorphic declaration.
                 //
-                // (Also, static refernces to fields/properties would get even
+                // (Also, static references to fields/properties would get even
                 // harder, because you'd have to know whether a getter/setter/ref-er
                 // is needed).
                 //
@@ -8912,7 +8912,7 @@ namespace Slang
                     expr->BaseExpression,
                     expr->loc);
             }
-            else if (baseType->As<ErrorType>())
+            else if (baseType.As<ErrorType>())
             {
                 return CreateErrorExpr(expr);
             }
@@ -9413,7 +9413,7 @@ namespace Slang
             // as a (top-level) argument for a generic type parameter, so that we
             // can check for them here and cache them on the entry point request.
             //
-            if( auto taggedUnionType = type->As<TaggedUnionType>() )
+            if( auto taggedUnionType = as<TaggedUnionType>(type) )
             {
                 entryPoint->taggedUnionTypes.Add(taggedUnionType);
             }
@@ -9424,7 +9424,7 @@ namespace Slang
         // validate global type arguments only when we are generating code
         if ((entryPoint->compileRequest->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
         {
-            // check that user-provioded type arguments conforms to the generic type
+            // check that user-provided type arguments conforms to the generic type
             // parameter declaration of this translation unit
 
             // collect global generic parameters from all imported modules
@@ -9489,7 +9489,7 @@ namespace Slang
                 // As a quick sanity check, see if the argument that is being supplied for a parameter
                 // is just the parameter itself, because this should always be an error:
                 //
-                if( auto argDeclRefType = globalGenericArg->As<DeclRefType>() )
+                if( auto argDeclRefType = as<DeclRefType>(globalGenericArg) )
                 {
                     auto argDeclRef = argDeclRefType->declRef;
                     if(auto argGenericParamDeclRef = argDeclRef.As<GlobalGenericParamDecl>())

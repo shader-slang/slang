@@ -159,7 +159,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
     RefPtr<RefObject> val;
     if (userAttr->intArgVals.TryGetValue(index, val))
     {
-        *rs = (int)val.As<ConstantIntVal>()->value;
+        *rs = (int)as<ConstantIntVal>(val)->value;
         return 0;
     }
     return SLANG_ERROR_INVALID_PARAMETER;
@@ -169,7 +169,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(SlangRefle
     auto userAttr = convert(attrib);
     if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
     if (index >= userAttr->args.Count()) return SLANG_ERROR_INVALID_PARAMETER;
-    if (auto cexpr = userAttr->args[index].As<FloatingPointLiteralExpr>())
+    if (auto cexpr = as<FloatingPointLiteralExpr>(userAttr->args[index]))
     {
         *rs = (float)cexpr->value;
         return 0;
@@ -181,7 +181,7 @@ SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangRefl
     auto userAttr = convert(attrib);
     if (!userAttr) return nullptr;
     if (index >= userAttr->args.Count()) return nullptr;
-    if (auto cexpr = userAttr->args[index].As<StringLiteralExpr>())
+    if (auto cexpr = as<StringLiteralExpr>(userAttr->args[index]))
     {
         if (bufLen)
             *bufLen = cexpr->token.Content.size();
@@ -202,49 +202,49 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     // TODO(tfoley: Don't emit the same type more than once...
 
-    if (auto basicType = type->As<BasicExpressionType>())
+    if (auto basicType = as<BasicExpressionType>(type))
     {
         return SLANG_TYPE_KIND_SCALAR;
     }
-    else if (auto vectorType = type->As<VectorExpressionType>())
+    else if (auto vectorType = as<VectorExpressionType>(type))
     {
         return SLANG_TYPE_KIND_VECTOR;
     }
-    else if (auto matrixType = type->As<MatrixExpressionType>())
+    else if (auto matrixType = as<MatrixExpressionType>(type))
     {
         return SLANG_TYPE_KIND_MATRIX;
     }
-    else if (auto parameterBlockType = type->As<ParameterBlockType>())
+    else if (auto parameterBlockType = as<ParameterBlockType>(type))
     {
         return SLANG_TYPE_KIND_PARAMETER_BLOCK;
     }
-    else if (auto constantBufferType = type->As<ConstantBufferType>())
+    else if (auto constantBufferType = as<ConstantBufferType>(type))
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;
     }
-    else if( auto streamOutputType = type->As<HLSLStreamOutputType>() )
+    else if( auto streamOutputType = as<HLSLStreamOutputType>(type) )
     {
         return SLANG_TYPE_KIND_OUTPUT_STREAM;
     }
-    else if (type->As<TextureBufferType>())
+    else if (as<TextureBufferType>(type))
     {
         return SLANG_TYPE_KIND_TEXTURE_BUFFER;
     }
-    else if (type->As<GLSLShaderStorageBufferType>())
+    else if (as<GLSLShaderStorageBufferType>(type))
     {
         return SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER;
     }
-    else if (auto samplerStateType = type->As<SamplerStateType>())
+    else if (auto samplerStateType = as<SamplerStateType>(type))
     {
         return SLANG_TYPE_KIND_SAMPLER_STATE;
     }
-    else if (auto textureType = type->As<TextureTypeBase>())
+    else if (auto textureType = as<TextureTypeBase>(type))
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
-    else if(type->As<TYPE>()) do {          \
+    else if(as<TYPE>(type)) do {          \
         return SLANG_TYPE_KIND_RESOURCE;    \
     } while(0)
 
@@ -259,11 +259,11 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     CASE(UntypedBufferResourceType);
 #undef CASE
 
-    else if (auto arrayType = type->As<ArrayExpressionType>())
+    else if (auto arrayType = as<ArrayExpressionType>(type))
     {
         return SLANG_TYPE_KIND_ARRAY;
     }
-    else if( auto declRefType = type->As<DeclRefType>() )
+    else if( auto declRefType = as<DeclRefType>(type) )
     {
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.As<StructDecl>() )
@@ -279,7 +279,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_INTERFACE;
         }
     }
-    else if (auto errorType = type->As<ErrorType>())
+    else if (auto errorType = as<ErrorType>(type))
     {
         // This means we saw a type we didn't understand in the user's code
         return SLANG_TYPE_KIND_NONE;
@@ -296,7 +296,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
 
     // TODO: maybe filter based on kind
 
-    if(auto declRefType = type->As<DeclRefType>())
+    if(auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.As<StructDecl>())
@@ -315,7 +315,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
 
     // TODO: maybe filter based on kind
 
-    if(auto declRefType = type->As<DeclRefType>())
+    if(auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.As<StructDecl>())
@@ -333,11 +333,11 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto arrayType = type->As<ArrayExpressionType>())
+    if(auto arrayType = as<ArrayExpressionType>(type))
     {
         return arrayType->ArrayLength ? (size_t) GetIntVal(arrayType->ArrayLength) : 0;
     }
-    else if( auto vectorType = type->As<VectorExpressionType>())
+    else if( auto vectorType = as<VectorExpressionType>(type))
     {
         return (size_t) GetIntVal(vectorType->elementCount);
     }
@@ -350,19 +350,19 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     auto type = convert(inType);
     if(!type) return nullptr;
 
-    if(auto arrayType = type->As<ArrayExpressionType>())
+    if(auto arrayType = as<ArrayExpressionType>(type))
     {
         return (SlangReflectionType*) arrayType->baseType.Ptr();
     }
-    else if( auto constantBufferType = type->As<ConstantBufferType>())
+    else if( auto constantBufferType = as<ConstantBufferType>(type))
     {
         return convert(constantBufferType->elementType.Ptr());
     }
-    else if( auto vectorType = type->As<VectorExpressionType>())
+    else if( auto vectorType = as<VectorExpressionType>(type))
     {
         return convert(vectorType->elementType.Ptr());
     }
-    else if( auto matrixType = type->As<MatrixExpressionType>())
+    else if( auto matrixType = as<MatrixExpressionType>(type))
     {
         return convert(matrixType->getElementType());
     }
@@ -375,15 +375,15 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = type->As<MatrixExpressionType>())
+    if(auto matrixType = as<MatrixExpressionType>(type))
     {
         return (unsigned int) GetIntVal(matrixType->getRowCount());
     }
-    else if(auto vectorType = type->As<VectorExpressionType>())
+    else if(auto vectorType = as<VectorExpressionType>(type))
     {
         return 1;
     }
-    else if( auto basicType = type->As<BasicExpressionType>() )
+    else if( auto basicType = as<BasicExpressionType>(type) )
     {
         return 1;
     }
@@ -396,15 +396,15 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = type->As<MatrixExpressionType>())
+    if(auto matrixType = as<MatrixExpressionType>(type))
     {
         return (unsigned int) GetIntVal(matrixType->getColumnCount());
     }
-    else if(auto vectorType = type->As<VectorExpressionType>())
+    else if(auto vectorType = as<VectorExpressionType>(type))
     {
         return (unsigned int) GetIntVal(vectorType->elementCount);
     }
-    else if( auto basicType = type->As<BasicExpressionType>() )
+    else if( auto basicType = as<BasicExpressionType>(type) )
     {
         return 1;
     }
@@ -417,16 +417,16 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     auto type = convert(inType);
     if(!type) return 0;
 
-    if(auto matrixType = type->As<MatrixExpressionType>())
+    if(auto matrixType = as<MatrixExpressionType>(type))
     {
         type = matrixType->getElementType();
     }
-    else if(auto vectorType = type->As<VectorExpressionType>())
+    else if(auto vectorType = as<VectorExpressionType>(type))
     {
         type = vectorType->elementType.Ptr();
     }
 
-    if(auto basicType = type->As<BasicExpressionType>())
+    if(auto basicType = as<BasicExpressionType>(type))
     {
         switch (basicType->baseType)
         {
@@ -463,7 +463,7 @@ SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionTyp
 {
     auto type = convert(inType);
     if (!type) return 0;
-    if (auto declRefType = type->AsDeclRefType())
+    if (auto declRefType = as<DeclRefType>(type))
     {
         return getUserAttributeCount(declRefType->declRef.getDecl());
     }
@@ -473,7 +473,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangR
 {
     auto type = convert(inType);
     if (!type) return 0;
-    if (auto declRefType = type->AsDeclRefType())
+    if (auto declRefType = as<DeclRefType>(type))
     {
         return getUserAttributeByIndex(declRefType->declRef.getDecl(), index);
     }
@@ -483,7 +483,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
 {
     auto type = convert(inType);
     if (!type) return 0;
-    if (auto declRefType = type->AsDeclRefType())
+    if (auto declRefType = as<DeclRefType>(type))
     {
         return findUserAttributeByName(declRefType->getSession(), declRefType->declRef.getDecl(), name);
     }
@@ -495,19 +495,19 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
     auto type = convert(inType);
     if(!type) return 0;
 
-    while(auto arrayType = type->As<ArrayExpressionType>())
+    while(auto arrayType = as<ArrayExpressionType>(type))
     {
         type = arrayType->baseType.Ptr();
     }
 
-    if(auto textureType = type->As<TextureTypeBase>())
+    if(auto textureType = as<TextureTypeBase>(type))
     {
         return textureType->getShape();
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS)   \
-    else if(type->As<TYPE>()) do {  \
+    else if(as<TYPE>(type)) do {  \
         return SHAPE;               \
     } while(0)
 
@@ -530,19 +530,19 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     auto type = convert(inType);
     if(!type) return 0;
 
-    while(auto arrayType = type->As<ArrayExpressionType>())
+    while(auto arrayType = as<ArrayExpressionType>(type))
     {
         type = arrayType->baseType.Ptr();
     }
 
-    if(auto textureType = type->As<TextureTypeBase>())
+    if(auto textureType = as<TextureTypeBase>(type))
     {
         return textureType->getAccess();
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS)   \
-    else if(type->As<TYPE>()) do {  \
+    else if(as<TYPE>(type)) do {  \
         return ACCESS;              \
     } while(0)
 
@@ -567,7 +567,7 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
 {
     auto type = convert(inType);
 
-    if( auto declRefType = type->As<DeclRefType>() )
+    if( auto declRefType = as<DeclRefType>(type) )
     {
         auto declRef = declRefType->declRef;
 
@@ -613,20 +613,20 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
     auto type = convert(inType);
     if(!type) return nullptr;
 
-    while(auto arrayType = type->As<ArrayExpressionType>())
+    while(auto arrayType = as<ArrayExpressionType>(type))
     {
         type = arrayType->baseType.Ptr();
     }
 
-    if (auto textureType = type->As<TextureTypeBase>())
+    if (auto textureType = as<TextureTypeBase>(type))
     {
         return convert(textureType->elementType.Ptr());
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS)                                                       \
-    else if(type->As<TYPE>()) do {                                                      \
-        return convert(type->As<TYPE>()->elementType.Ptr());                            \
+    else if(as<TYPE>(type)) do {                                                      \
+        return convert(as<TYPE>(type)->elementType.Ptr());                            \
     } while(0)
 
     // TODO: structured buffer needs to expose type layout!
@@ -695,7 +695,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayo
     {
         switch (category)
         {
-        // We store the stride explictly for the uniform case
+        // We store the stride explicitly for the uniform case
         case SLANG_PARAMETER_CATEGORY_UNIFORM:
             return arrayTypeLayout->uniformStride;
 
@@ -950,7 +950,7 @@ namespace Slang
             // Is the category they were asking about one that makes sense for the type
             // of this variable?
             Type* type = typeLayout->getType();
-            while (auto arrayType = type->As<ArrayExpressionType>())
+            while (auto arrayType = as<ArrayExpressionType>(type))
                 type = arrayType->baseType;
             switch (spReflectionType_GetKind(convert(type)))
             {

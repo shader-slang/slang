@@ -4862,17 +4862,17 @@ struct EmitVisitor
                     }
                 }
 
-                if(auto outputStreamType = pp->type->As<HLSLStreamOutputType>())
+                if(auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
                 {
-                    if(outputStreamType->As<HLSLTriangleStreamType>())
+                    if(as<HLSLTriangleStreamType>(outputStreamType))
                     {
                         emit("layout(triangle_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLLineStreamType>())
+                    else if(as<HLSLLineStreamType>(outputStreamType))
                     {
                         emit("layout(line_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLPointStreamType>())
+                    else if(as<HLSLPointStreamType>(outputStreamType))
                     {
                         emit("layout(points) out;\n");
                     }

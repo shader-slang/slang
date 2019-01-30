@@ -94,12 +94,6 @@ public:
     bool Equals(Type * type);
     bool Equals(RefPtr<Type> type);
 
-    template<typename T>
-    T* As()
-    {
-        return dynamic_cast<T*>(GetCanonicalType());
-    }
-
     bool IsTextureOrSampler();
     bool IsTexture() { return as<TextureType>(this) != nullptr; }
     bool IsSampler() { return as<SamplerStateType>(this) != nullptr; }

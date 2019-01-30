@@ -851,9 +851,9 @@ static bool validateTypesMatch(
     // are ever recursive types. We'd need a more refined system to
     // cache the matches we've already found.
 
-    if( auto leftDeclRefType = left->As<DeclRefType>() )
+    if( auto leftDeclRefType = as<DeclRefType>(left) )
     {
-        if( auto rightDeclRefType = right->As<DeclRefType>() )
+        if( auto rightDeclRefType = as<DeclRefType>(right) )
         {
             // Are they references to matching decl refs?
             auto leftDeclRef = leftDeclRefType->declRef;
@@ -931,9 +931,9 @@ static bool validateTypesMatch(
 
     // If we are looking at `T[N]` and `U[M]` we want to check that
     // `T` is structurally equivalent to `U` and `N` is the same as `M`.
-    else if( auto leftArrayType = left->As<ArrayExpressionType>() )
+    else if( auto leftArrayType = as<ArrayExpressionType>(left) )
     {
-        if( auto rightArrayType = right->As<ArrayExpressionType>() )
+        if( auto rightArrayType = as<ArrayExpressionType>(right) )
         {
             if(!validateTypesMatch(context, leftArrayType->baseType, rightArrayType->baseType, stack) )
                 return false;
@@ -1029,7 +1029,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterGroupType>())
+    if( varDecl->HasModifier<InModifier>() || as<GLSLInputParameterGroupType>(type))
     {
         // Special case to handle "arrayed" shader inputs, as used
         // for Geometry and Hull input
@@ -1041,8 +1041,8 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
             // Tessellation `patch` variables should stay as written
             if( !varDecl->HasModifier<GLSLPatchModifier>() )
             {
-                // Unwrap array type, if prsent
-                if( auto arrayType = type->As<ArrayExpressionType>() )
+                // Unwrap array type, if present
+                if( auto arrayType = as<ArrayExpressionType>(type) )
                 {
                     type = arrayType->baseType.Ptr();
                 }
@@ -1067,7 +1067,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterGroupType>())
+    if( varDecl->HasModifier<OutModifier>() || as<GLSLOutputParameterGroupType>(type))
     {
         // Special case to handle "arrayed" shader outputs, as used
         // for Hull Shader output
@@ -1080,8 +1080,8 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
             // Tessellation `patch` variables should stay as written
             if( !varDecl->HasModifier<GLSLPatchModifier>() )
             {
-                // Unwrap array type, if prsent
-                if( auto arrayType = type->As<ArrayExpressionType>() )
+                // Unwrap array type, if present
+                if( auto arrayType = as<ArrayExpressionType>(type) )
                 {
                     type = arrayType->baseType.Ptr();
                 }
@@ -1118,7 +1118,7 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if( varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>() )
+    if( varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
@@ -1128,14 +1128,14 @@ getTypeLayoutForGlobalShaderParameter_GLSL(
     // TODO(tfoley): We have multiple variations of
     // the `uniform` modifier right now, and that
     // needs to get fixed...
-    if( varDecl->HasModifier<HLSLUniformModifier>() || type->As<ConstantBufferType>() )
+    if( varDecl->HasModifier<HLSLUniformModifier>() || as<ConstantBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getConstantBufferRules()),
             type);
     }
 
-    if( varDecl->HasModifier<GLSLBufferModifier>() || type->As<GLSLShaderStorageBufferType>() )
+    if( varDecl->HasModifier<GLSLBufferModifier>() || as<GLSLShaderStorageBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getShaderStorageBufferRules()),
@@ -1184,7 +1184,7 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
     auto rules = layoutContext.getRulesFamily();
     auto type = varDecl->getType();
 
-    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && type->As<ConstantBufferType>() )
+    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && as<ConstantBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
@@ -1193,7 +1193,7 @@ getTypeLayoutForGlobalShaderParameter_HLSL(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if (varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>())
+    if (varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type))
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
@@ -2175,7 +2175,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
     // The default handling of varying parameters should not apply
     // to geometry shader output streams; they have their own special rules.
-    if( auto gsStreamType = type->As<HLSLStreamOutputType>() )
+    if( auto gsStreamType = as<HLSLStreamOutputType>(type) )
     {
         //
 
@@ -2294,21 +2294,21 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     }
 
     // Scalar and vector types are treated as outputs directly
-    if(auto basicType = type->As<BasicExpressionType>())
+    if(auto basicType = as<BasicExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, basicType, state, varLayout);
     }
-    else if(auto vectorType = type->As<VectorExpressionType>())
+    else if(auto vectorType = as<VectorExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, vectorType, state, varLayout);
     }
     // A matrix is processed as if it was an array of rows
-    else if( auto matrixType = type->As<MatrixExpressionType>() )
+    else if( auto matrixType = as<MatrixExpressionType>(type) )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
         return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
     }
-    else if( auto arrayType = type->As<ArrayExpressionType>() )
+    else if( auto arrayType = as<ArrayExpressionType>(type) )
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
@@ -2337,12 +2337,12 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if (auto textureType = type->As<TextureType>()) { return nullptr;  }
-    else if(auto samplerStateType = type->As<SamplerStateType>()) { return nullptr;  }
-    else if(auto constantBufferType = type->As<ConstantBufferType>()) { return nullptr;  }
+    else if (auto textureType = as<TextureType>(type)) { return nullptr;  }
+    else if(auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
+    else if(auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
-    else if( auto declRefType = type->As<DeclRefType>() )
+    else if( auto declRefType = as<DeclRefType>(type) )
     {
         auto declRef = declRefType->declRef;
 
@@ -2400,7 +2400,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
         }
     }
     // If we ran into an error in checking the user's code, then skip this parameter
-    else if( auto errorType = type->As<ErrorType>() )
+    else if( auto errorType = as<ErrorType>(type) )
     {
         return nullptr;
     }

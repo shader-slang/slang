@@ -1152,7 +1152,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // We will assume here that the super-type is an interface, and it
         // will be left to the front-end to ensure this property.
         //
-        auto supDeclRefType = val->sup->As<DeclRefType>();
+        auto supDeclRefType = as<DeclRefType>(val->sup);
         if(!supDeclRefType)
         {
             SLANG_UNEXPECTED("super-type not a decl-ref type when generating tagged union witness table");
@@ -1315,10 +1315,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     caseArgs.Add(caseThisArg);
 
                     // The remaining arguments to the call will just be forwarded from
-                    // the parameters of the wrapper functon.
+                    // the parameters of the wrapper function.
                     //
                     // TODO: This would need to change if/when we started allowing `This` type
-                    // or assocaited-type parameters to be used at call sites where a tagged
+                    // or associated-type parameters to be used at call sites where a tagged
                     // union is used.
                     //
                     for( auto param : irParams )
@@ -1977,11 +1977,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo getDefaultVal(Type* type)
     {
         auto irType = lowerType(context, type);
-        if (auto basicType = type->As<BasicExpressionType>())
+        if (auto basicType = as<BasicExpressionType>(type))
         {
             return getSimpleDefaultVal(irType);
         }
-        else if (auto vectorType = type->As<VectorExpressionType>())
+        else if (auto vectorType = as<VectorExpressionType>(type))
         {
             UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
 
@@ -1995,7 +1995,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
         }
-        else if (auto matrixType = type->As<MatrixExpressionType>())
+        else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
 
@@ -2011,7 +2011,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
         }
-        else if (auto arrayType = type->As<ArrayExpressionType>())
+        else if (auto arrayType = as<ArrayExpressionType>(type))
         {
             UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
@@ -2026,7 +2026,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
         }
-        else if (auto declRefType = type->As<DeclRefType>())
+        else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->declRef;
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
@@ -2082,7 +2082,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         // Now for each argument in the initializer list,
         // fill in the appropriate field of the result
-        if (auto arrayType = type->As<ArrayExpressionType>())
+        if (auto arrayType = type.As<ArrayExpressionType>())
         {
             UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
@@ -2104,7 +2104,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
         }
-        else if (auto vectorType = type->As<VectorExpressionType>())
+        else if (auto vectorType = type.As<VectorExpressionType>())
         {
             UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
 
@@ -2126,7 +2126,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
         }
-        else if (auto matrixType = type->As<MatrixExpressionType>())
+        else if (auto matrixType = type.As<MatrixExpressionType>())
         {
             UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
 
@@ -2150,7 +2150,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
         }
-        else if (auto declRefType = type->As<DeclRefType>())
+        else if (auto declRefType = type.As<DeclRefType>())
         {
             DeclRef<Decl> declRef = declRefType->declRef;
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
@@ -2181,7 +2181,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
 
         // If none of the above cases matched, then we had better
-        // have zero arguments in the initailizer list, in which
+        // have zero arguments in the initializer list, in which
         // case we are just looking for default initialization.
         //
         SLANG_UNEXPECTED("unhandled case for initializer list codegen");
@@ -2261,7 +2261,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
                 // TODO: The approach we are taking here to default arguments
                 // is simplistic, and has consequences for the front-end as
-                // well as binary serializatiojn of modules.
+                // well as binary serialization of modules.
                 //
                 // We could consider some more refined approaches where, e.g.,
                 // functions with default arguments generate multiple IR-level
@@ -2632,7 +2632,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // Because our representation of lowered "values"
         // can encompass l-values explicitly, we can
         // lower assignment easily. We just lower the left-
-        // and right-hand sides, and then peform an assignment
+        // and right-hand sides, and then perform an assignment
         // based on the resulting values.
         //
         auto leftVal = lowerLValueExpr(context, expr->left);
@@ -2693,7 +2693,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         {
             auto baseSwizzleInfo = loweredBase.getSwizzledLValueInfo();
 
-            // Our new swizzle witll use the same base expression (e.g.,
+            // Our new swizzle will use the same base expression (e.g.,
             // `foo[i]` in our example above), but will need to remap
             // the swizzle indices it uses.
             //
@@ -2740,7 +2740,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVisitor>
 {
     // A swizzle in an r-value context can save time by just
-    // emitting the swizzle instuctions directly.
+    // emitting the swizzle instructions directly.
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
@@ -4189,7 +4189,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // interface requires, and not what it provides.
         //
         auto parentDecl = inheritanceDecl->ParentDecl;
-        if (auto parentInterfaceDecl = parentDecl->As<InterfaceDecl>())
+        if (auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
         }
@@ -4198,10 +4198,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // declaration is being used to add a conformance to
         // an existing `interface`:
         //
-        if(auto parentExtensionDecl = parentDecl->As<ExtensionDecl>())
+        if(auto parentExtensionDecl = as<ExtensionDecl>(parentDecl))
         {
             auto targetType = parentExtensionDecl->targetType;
-            if(auto targetDeclRefType = targetType->As<DeclRefType>())
+            if(auto targetDeclRefType = as<DeclRefType>(targetType))
             {
                 if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.As<InterfaceDecl>())
                 {
@@ -4278,7 +4278,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitDeclGroup(DeclGroup* declGroup)
     {
-        // To lowere a group of declarations, we just
+        // To lower a group of declarations, we just
         // lower each one individually.
         //
         for (auto decl : declGroup->decls)

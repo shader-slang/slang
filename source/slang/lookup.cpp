@@ -184,7 +184,7 @@ void DoMemberLookupImpl(
 
     // If the type was pointer-like, then dereference it
     // automatically here.
-    if (auto pointerLikeType = baseType->As<PointerLikeType>())
+    if (auto pointerLikeType = as<PointerLikeType>(baseType))
     {
         // Need to leave a breadcrumb to indicate that we
         // did an implicit dereference here
@@ -200,7 +200,7 @@ void DoMemberLookupImpl(
 
     // Default case: no dereference needed
 
-    if (auto baseDeclRefType = baseType->As<DeclRefType>())
+    if (auto baseDeclRefType = as<DeclRefType>(baseType))
     {
         if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDecl>())
         {
@@ -246,7 +246,7 @@ DeclRef<Decl> maybeSpecializeInterfaceDeclRef(
         //
         // Note: this is to ensure that we can specialize the subtype witness
         // later (e.g., by replacing a subtype witness that represents a generic
-        // constraint paraqmeter with the concrete generic arguments that
+        // constraint parameter with the concrete generic arguments that
         // are used at a particular call site to the generic).
         RefPtr<DeclaredSubtypeWitness> subtypeWitness = new DeclaredSubtypeWitness();
         subtypeWitness->declRef = constraintDeclRef;
@@ -272,7 +272,7 @@ RefPtr<Type> maybeSpecializeInterfaceDeclRef(
     RefPtr<Type>                superType,          // The type we are going to perform lookup in
     DeclRef<TypeConstraintDecl> constraintDeclRef)  // The type constraint that told us our type is a subtype
 {
-    if (auto superDeclRefType = superType->As<DeclRefType>())
+    if (auto superDeclRefType = as<DeclRefType>(superType))
     {
         if (auto superInterfaceDeclRef = superDeclRefType->declRef.As<InterfaceDecl>())
         {
@@ -388,7 +388,7 @@ void DoLocalLookupImpl(
         //
         // This code should be converted to do a type-based lookup
         // through declared bases for *any* aggregate type declaration.
-        // I think that logic is present in the type-bsed lookup path, but
+        // I think that logic is present in the type-based lookup path, but
         // it would be needed here for when doing lookup from inside an
         // aggregate declaration.
 
@@ -447,7 +447,7 @@ void DoLookupImpl(
     for (;scope != endScope; scope = scope->parent)
     {
         // Note that we consider all "peer" scopes together,
-        // so that a hit in one of them does not proclude
+        // so that a hit in one of them does not preclude
         // also finding a hit in another
         for(auto link = scope; link; link = link->nextSibling)
         {
@@ -611,7 +611,7 @@ void lookUpThroughConstraint(
         constraintDeclRef);
 
     // We need to track the indirection we took in lookup,
-    // so that we can construct an approrpiate AST on the other
+    // so that we can construct an appropriate AST on the other
     // side that includes the "upcase" from sub-type to super-type.
     //
     BreadcrumbInfo breadcrumb;
@@ -624,7 +624,7 @@ void lookUpThroughConstraint(
     //
     // TODO: The even simpler thing we need to worry about here is that if
     // there is ever a "diamond" relationship in the inheritance hierarchy,
-    // we might end up seeing the same interface via diffrent "paths" and
+    // we might end up seeing the same interface via different "paths" and
     // we wouldn't want that to lead to overload-resolution failure.
     //
     lookUpMemberImpl(session, semantics, name, superType, ioResult, &breadcrumb, mask);
@@ -639,7 +639,7 @@ void lookUpMemberImpl(
     BreadcrumbInfo*     inBreadcrumbs,
     LookupMask          mask)
 {
-    if (auto declRefType = type->As<DeclRefType>())
+    if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
         if (declRef.As<AssocTypeDecl>() || declRef.As<GlobalGenericParamDecl>())
@@ -677,7 +677,7 @@ void lookUpMemberImpl(
                 // generic parameter in question, and `Foo` is whatever we are
                 // constraining it to.
                 auto subType = GetSub(constraintDeclRef);
-                auto subDeclRefType = subType->As<DeclRefType>();
+                auto subDeclRefType = as<DeclRefType>(subType);
                 if(!subDeclRefType)
                     continue;
                 if(!subDeclRefType->declRef.Equals(genericTypeParamDeclRef))

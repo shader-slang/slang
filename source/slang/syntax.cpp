@@ -310,7 +310,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto rsType = DeclRefType::Create(
             this,
             declRef);
-        return rsType->As<PtrTypeBase>();
+        return as<PtrTypeBase>( rsType);
     }
 
     RefPtr<ArrayExpressionType> Session::getArrayType(
@@ -963,7 +963,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ErrorType::EqualsImpl(Type* type)
     {
-        if (auto errorType = type->As<ErrorType>())
+        if (auto errorType = as<ErrorType>(type))
             return true;
         return false;
     }
@@ -1037,7 +1037,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool FuncType::EqualsImpl(Type * type)
     {
-        if (auto funcType = type->As<FuncType>())
+        if (auto funcType = as<FuncType>(type))
         {
             auto paramCount = getParamCount();
             auto otherParamCount = funcType->getParamCount();
@@ -1134,7 +1134,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool TypeType::EqualsImpl(Type * t)
     {
-        if (auto typeType = t->As<TypeType>())
+        if (auto typeType = as<TypeType>(t))
         {
             return t->Equals(typeType->type);
         }
@@ -1163,7 +1163,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool GenericDeclRefType::EqualsImpl(Type * type)
     {
-        if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+        if (auto genericDeclRefType = as<GenericDeclRefType>(type))
         {
             return declRef.Equals(genericDeclRefType->declRef);
         }
@@ -1261,9 +1261,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-        return DeclRefType::Create(
+        return as<VectorExpressionType>(DeclRefType::Create(
             this,
-            declRef)->As<VectorExpressionType>();
+            declRef));
     }
 
 
@@ -2461,7 +2461,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ExtractExistentialType::EqualsImpl(Type* type)
     {
-        if( auto extractExistential = type->As<ExtractExistentialType>() )
+        if( auto extractExistential = as<ExtractExistentialType>(type) )
         {
             return declRef.Equals(extractExistential->declRef);
         }
@@ -2559,7 +2559,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool TaggedUnionType::EqualsImpl(Type* type)
     {
-        auto taggedUnion = type->As<TaggedUnionType>();
+        auto taggedUnion = as<TaggedUnionType>(type);
         if(!taggedUnion)
             return false;
 
