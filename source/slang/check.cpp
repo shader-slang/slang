@@ -7401,7 +7401,7 @@ namespace Slang
                                         // The type we want to apply to has a this-type substitution,
                                         // and (by construction) the target type currently does not.
                                         //
-                                        SLANG_ASSERT(!targetInterfaceDeclRef.substitutions.substitutions.As<ThisTypeSubstitution>());
+                                        SLANG_ASSERT(!targetInterfaceDeclRef.substitutions.substitutions.as<ThisTypeSubstitution>());
 
                                         // We will create a new substitution to apply to the target type.
                                         RefPtr<ThisTypeSubstitution> newTargetSubst = new ThisTypeSubstitution();

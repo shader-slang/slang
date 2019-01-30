@@ -1402,8 +1402,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
         int diff = 0;
 
         if(substOuter != outer) diff++;
-        auto substWitness = as<SubtypeWitness>(witness->SubstituteImpl(substSet, &diff));
 
+        // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
+        auto substWitness = witness->SubstituteImpl(substSet, &diff).as<SubtypeWitness>();
+        
         if (!diff) return this;
 
         (*ioDiff)++;
