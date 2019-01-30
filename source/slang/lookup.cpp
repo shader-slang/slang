@@ -202,7 +202,7 @@ void DoMemberLookupImpl(
 
     if (auto baseDeclRefType = as<DeclRefType>(baseType))
     {
-        if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDecl>())
+        if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.as<AggTypeDecl>())
         {
             DoLocalLookupImpl(
                 session,
@@ -239,7 +239,7 @@ DeclRef<Decl> maybeSpecializeInterfaceDeclRef(
     DeclRef<Decl>               superTypeDeclRef,   // The decl-ref we are going to perform lookup in
     DeclRef<TypeConstraintDecl> constraintDeclRef)  // The type constraint that told us our type is a subtype
 {
-    if (auto superInterfaceDeclRef = superTypeDeclRef.As<InterfaceDecl>())
+    if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
     {
         // Create a subtype witness value to note the subtype relationship
         // that makes this specialization valid.
@@ -274,7 +274,7 @@ RefPtr<Type> maybeSpecializeInterfaceDeclRef(
 {
     if (auto superDeclRefType = as<DeclRefType>(superType))
     {
-        if (auto superInterfaceDeclRef = superDeclRefType->declRef.As<InterfaceDecl>())
+        if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
         {
             auto specializedInterfaceDeclRef = maybeSpecializeInterfaceDeclRef(
                 subType,
@@ -356,7 +356,7 @@ void DoLocalLookupImpl(
     }
 
     // Consider lookup via extension
-    if( auto aggTypeDeclRef = containerDeclRef.As<AggTypeDecl>() )
+    if( auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>() )
     {
         RefPtr<Type> type = DeclRefType::Create(
             session,
@@ -395,16 +395,16 @@ void DoLocalLookupImpl(
         // if we are looking at an extension, find the target decl that we are extending
         DeclRef<Decl> targetDeclRef = containerDeclRef;
         RefPtr<DeclRefType> targetDeclRefType;
-        if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
+        if (auto extDeclRef = containerDeclRef.as<ExtensionDecl>())
         {
             targetDeclRefType = as<DeclRefType>(extDeclRef.getDecl()->targetType);
             SLANG_ASSERT(targetDeclRefType);
             int diff = 0;
-            targetDeclRef = targetDeclRefType->declRef.As<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
+            targetDeclRef = targetDeclRefType->declRef.as<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
         }
 
         // if we are looking inside an interface decl, try find in the interfaces it inherits from
-        bool isInterface = targetDeclRef.As<InterfaceDecl>() ? true : false;
+        bool isInterface = targetDeclRef.as<InterfaceDecl>() ? true : false;
         if (isInterface)
         {
             if(!targetDeclRefType)
@@ -428,7 +428,7 @@ void DoLocalLookupImpl(
                     baseInterfaceDeclRef,
                     inheritanceDeclRef);
 
-                DoLocalLookupImpl(session, name, baseInterfaceDeclRef.As<ContainerDecl>(), request, result, inBreadcrumbs);
+                DoLocalLookupImpl(session, name, baseInterfaceDeclRef.as<ContainerDecl>(), request, result, inBreadcrumbs);
             }
         }
     }
@@ -457,7 +457,7 @@ void DoLookupImpl(
                 continue;
 
             DeclRef<ContainerDecl> containerDeclRef =
-                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(session, containerDecl)).As<ContainerDecl>();
+                DeclRef<Decl>(containerDecl, createDefaultSubstitutions(session, containerDecl)).as<ContainerDecl>();
             
             BreadcrumbInfo breadcrumb;
             BreadcrumbInfo* breadcrumbs = nullptr;
@@ -470,7 +470,7 @@ void DoLookupImpl(
             // just `AggTypeDecl`, because we want to catch `extension`
             // declarations as well.
             //
-            if (auto aggTypeDeclRef = containerDeclRef.As<AggTypeDeclBase>())
+            if (auto aggTypeDeclRef = containerDeclRef.as<AggTypeDeclBase>())
             {
                 breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
                 breadcrumb.thisParameterMode = thisParameterMode;
@@ -485,13 +485,13 @@ void DoLookupImpl(
             
             // if we are currently in an extension decl, perform local lookup
             // in the target decl we are extending
-            if (auto extDeclRef = containerDeclRef.As<ExtensionDecl>())
+            if (auto extDeclRef = containerDeclRef.as<ExtensionDecl>())
             {
                 if (extDeclRef.getDecl()->targetType)
                 {
                     if (auto targetDeclRef = as<DeclRefType>(extDeclRef.getDecl()->targetType))
                     {
-                        if (auto aggDeclRef = targetDeclRef->declRef.As<AggTypeDecl>())
+                        if (auto aggDeclRef = targetDeclRef->declRef.as<AggTypeDecl>())
                         {
                             containerDeclRef = extDeclRef.Substitute(aggDeclRef);
                         }
@@ -502,7 +502,7 @@ void DoLookupImpl(
                 session,
                 name, containerDeclRef, request, result, breadcrumbs);
 
-            if( auto funcDeclRef = containerDeclRef.As<FunctionDeclBase>() )
+            if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
             {
                 if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
                 {
@@ -642,9 +642,9 @@ void lookUpMemberImpl(
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
-        if (declRef.As<AssocTypeDecl>() || declRef.As<GlobalGenericParamDecl>())
+        if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
         {
-            for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.As<ContainerDecl>()))
+            for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
             {
                 lookUpThroughConstraint(
                     session,
@@ -657,16 +657,16 @@ void lookUpMemberImpl(
                     mask);
             }
         }
-        else if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+        else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
         {
             LookupRequest request;
             request.semantics = semantics;
 
             DoLocalLookupImpl(session, name, aggTypeDeclRef, request, ioResult, inBreadcrumbs);
         }
-        else if (auto genericTypeParamDeclRef = declRef.As<GenericTypeParamDecl>())
+        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
         {
-            auto genericDeclRef = genericTypeParamDeclRef.GetParent().As<GenericDecl>();
+            auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
             assert(genericDeclRef);
 
             for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))

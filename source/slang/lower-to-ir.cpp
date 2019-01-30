@@ -610,7 +610,7 @@ LoweredValInfo emitCallToDeclRef(
     auto builder = context->irBuilder;
 
 
-    if (auto subscriptDeclRef = funcDeclRef.As<SubscriptDecl>())
+    if (auto subscriptDeclRef = funcDeclRef.as<SubscriptDecl>())
     {
         // A reference to a subscript declaration is a special case,
         // because it is not possible to call a subscript directly;
@@ -627,7 +627,7 @@ LoweredValInfo emitCallToDeclRef(
             // We want to track whether this subscript has any accessors other than
             // `get` (assuming that everything except `get` can be used for setting...).
 
-            if (auto foundGetterDeclRef = accessorDeclRef.As<GetterDecl>())
+            if (auto foundGetterDeclRef = accessorDeclRef.as<GetterDecl>())
             {
                 // We found a getter.
                 getterDeclRef = foundGetterDeclRef;
@@ -731,7 +731,7 @@ LoweredValInfo emitCallToDeclRef(
     }
     // TODO: handle target intrinsic modifier too...
 
-    if( auto ctorDeclRef = funcDeclRef.As<ConstructorDecl>() )
+    if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
         // HACK: we know all constructors are builtins for now,
         // so we need to emit them as a call to the corresponding
@@ -900,7 +900,7 @@ top:
             auto base = materialize(context, boundMemberInfo->base);
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<VarDecl>() )
+            if( auto fieldDeclRef = declRef.as<VarDecl>() )
             {
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
                 goto top;
@@ -1158,7 +1158,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             SLANG_UNEXPECTED("super-type not a decl-ref type when generating tagged union witness table");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
-        auto supInterfaceDeclRef = supDeclRefType->declRef.As<InterfaceDecl>();
+        auto supInterfaceDeclRef = supDeclRefType->declRef.as<InterfaceDecl>();
         if( !supInterfaceDeclRef )
         {
             SLANG_UNEXPECTED("super-type not an interface type when generating tagged union witness table");
@@ -1197,7 +1197,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
 
 
-            if(auto callableDeclRef = reqDeclRef.As<CallableDecl>())
+            if(auto callableDeclRef = reqDeclRef.as<CallableDecl>())
             {
                 // We have something callable, so we need to synthesize
                 // a function to satisfy it.
@@ -1871,12 +1871,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         auto loweredBase = lowerRValueExpr(context, expr->BaseExpression);
 
         auto declRef = expr->declRef;
-        if (auto fieldDeclRef = declRef.As<VarDecl>())
+        if (auto fieldDeclRef = declRef.as<VarDecl>())
         {
             // Okay, easy enough: we have a reference to a field of a struct type...
             return extractField(loweredType, loweredBase, fieldDeclRef);
         }
-        else if (auto callableDeclRef = declRef.As<CallableDecl>())
+        else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
             RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
             boundMemberInfo->type = nullptr;
@@ -1884,7 +1884,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->declRef = callableDeclRef;
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
-        else if(auto constraintDeclRef = declRef.As<TypeConstraintDecl>())
+        else if(auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
         {
             // The code is making use of a "witness" that a value of
             // some generic type conforms to an interface.
@@ -2029,7 +2029,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->declRef;
-            if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+            if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
                 for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
@@ -2153,7 +2153,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->declRef;
-            if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())
+            if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 UInt argCounter = 0;
                 for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
@@ -2364,7 +2364,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        if (auto callableDeclRef = funcDeclRef.As<CallableDecl>())
+        if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
         {
             addDirectCallArgs(expr, callableDeclRef, ioArgs, ioFixups);
         }
@@ -3713,7 +3713,7 @@ LoweredValInfo tryGetAddress(
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<VarDecl>() )
+            if( auto fieldDeclRef = declRef.as<VarDecl>() )
             {
                 auto baseVal = boundMemberInfo->base;
                 auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
@@ -3955,7 +3955,7 @@ top:
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.As<VarDecl>() )
+            if( auto fieldDeclRef = declRef.as<VarDecl>() )
             {
                 // materialize the base value and move it into
                 // a mutable temporary if needed
@@ -4203,7 +4203,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto targetType = parentExtensionDecl->targetType;
             if(auto targetDeclRefType = as<DeclRefType>(targetType))
             {
-                if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.As<InterfaceDecl>())
+                if(auto targetInterfaceDeclRef = targetDeclRefType->declRef.as<InterfaceDecl>())
                 {
                     return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
                 }
@@ -5018,7 +5018,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     DeclRef<D> createDefaultSpecializedDeclRef(D* decl)
     {
         DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(decl);
-        return declRef.As<D>();
+        return declRef.as<D>();
     }
 
 

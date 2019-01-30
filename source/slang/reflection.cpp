@@ -266,15 +266,15 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     else if( auto declRefType = as<DeclRefType>(type) )
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructDecl>() )
+        if( auto structDeclRef = declRef.as<StructDecl>() )
         {
             return SLANG_TYPE_KIND_STRUCT;
         }
-        else if (auto genericParamType = declRef.As<GlobalGenericParamDecl>())
+        else if (auto genericParamType = declRef.as<GlobalGenericParamDecl>())
         {
             return SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER;
         }
-        else if (auto interfaceType = declRef.As<InterfaceDecl>())
+        else if (auto interfaceType = declRef.as<InterfaceDecl>())
         {
             return SLANG_TYPE_KIND_INTERFACE;
         }
@@ -299,7 +299,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
     if(auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructDecl>())
+        if( auto structDeclRef = declRef.as<StructDecl>())
         {
             return GetFields(structDeclRef).Count();
         }
@@ -318,7 +318,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
     if(auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->declRef;
-        if( auto structDeclRef = declRef.As<StructDecl>())
+        if( auto structDeclRef = declRef.as<StructDecl>())
         {
             auto fieldDeclRef = GetFields(structDeclRef).ToArray()[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();

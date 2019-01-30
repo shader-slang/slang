@@ -2195,7 +2195,7 @@ SimpleLayoutInfo GetLayoutImpl(
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructDecl>())
+        if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> typeLayout;
             if (outTypeLayout)
@@ -2315,7 +2315,7 @@ SimpleLayoutInfo GetLayoutImpl(
 
             return info;
         }
-        else if (auto globalGenParam = declRef.As<GlobalGenericParamDecl>())
+        else if (auto globalGenParam = declRef.as<GlobalGenericParamDecl>())
         {
             SimpleLayoutInfo info;
             info.alignment = 0;
@@ -2494,7 +2494,7 @@ RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl
 {
     auto declRefType = as<DeclRefType>(type);
     SLANG_ASSERT(declRefType);
-    auto rsDeclRef = declRefType->declRef.As<GlobalGenericParamDecl>();
+    auto rsDeclRef = declRefType->declRef.as<GlobalGenericParamDecl>();
     return rsDeclRef.getDecl();
 }
 

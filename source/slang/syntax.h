@@ -1,5 +1,5 @@
-#ifndef RASTER_RENDERER_SYNTAX_H
-#define RASTER_RENDERER_SYNTAX_H
+#ifndef SLANG_SYNTAX_H
+#define SLANG_SYNTAX_H
 
 #include "../core/basic.h"
 #include "ir.h"
@@ -430,7 +430,7 @@ namespace Slang
         Decl* decl = nullptr;
         Decl* getDecl() const { return decl; }
 
-        // Optionally, a chain of substititions to perform
+        // Optionally, a chain of substitutions to perform
         SubstitutionSet substitutions;
 
         DeclRefBase()
@@ -450,7 +450,7 @@ namespace Slang
             , substitutions(subst)
         {}
 
-        // Apply substitutions to a type or ddeclaration
+        // Apply substitutions to a type or declaration
         RefPtr<Type> Substitute(RefPtr<Type> type) const;
 
         DeclRefBase Substitute(DeclRefBase declRef) const;
@@ -504,10 +504,10 @@ namespace Slang
 
         // "dynamic cast" to a more specific declaration reference type
         template<typename U>
-        DeclRef<U> As() const
+        DeclRef<U> as() const
         {
             DeclRef<U> result;
-            result.decl = dynamic_cast<U*>(decl);
+            result.decl = Slang::as<U>(decl);
             result.substitutions = substitutions;
             return result;
         }
@@ -726,7 +726,7 @@ namespace Slang
             while (ptr != end)
             {
                 DeclRef<Decl> declRef(ptr->Ptr(), substitutions);
-                if (declRef.As<T>())
+                if (declRef.as<T>())
                     return ptr;
                 ptr++;
             }
@@ -1198,7 +1198,7 @@ namespace Slang
         List<DeclRef<T>> rs;
         for (auto d : getMembersOfType<T>(declRef))
             rs.Add(d);
-        if (auto aggDeclRef = declRef.As<AggTypeDecl>())
+        if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {

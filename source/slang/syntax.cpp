@@ -174,7 +174,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         auto declRefType = as<DeclRefType>(this);
         if (!declRefType) return false;
-        auto structDeclRef = declRefType->declRef.As<StructDecl>();
+        auto structDeclRef = declRefType->declRef.as<StructDecl>();
         if (!structDeclRef) return false;
         return true;
     }
@@ -460,7 +460,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         if(auto declaredSubtypeWitness = dynamic_cast<DeclaredSubtypeWitness*>(subtypeWitness))
         {
-            if(auto inheritanceDeclRef = declaredSubtypeWitness->declRef.As<InheritanceDecl>())
+            if(auto inheritanceDeclRef = declaredSubtypeWitness->declRef.as<InheritanceDecl>())
             {
                 // A conformance that was declared as part of an inheritance clause
                 // will have built up a dictionary of the satisfying declarations
@@ -2081,7 +2081,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         Session*                    session,
         DeclRef<TypeDefDecl> const& declRef)
     {
-        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(session, declRef).As<TypeDefDecl>();
+        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(session, declRef).as<TypeDefDecl>();
 
         auto namedType = new NamedExpressionType(specializedDeclRef);
         namedType->setSession(session);
@@ -2207,7 +2207,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Val> DeclaredSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
     {
-        if (auto genConstraintDeclRef = declRef.As<GenericTypeConstraintDecl>())
+        if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
         {
             auto genConstraintDecl = genConstraintDeclRef.getDecl();
 

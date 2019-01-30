@@ -879,9 +879,9 @@ static bool validateTypesMatch(
                 }
 
                 // Check that any declared fields match too.
-                if( auto leftStructDeclRef = leftDeclRef.As<AggTypeDecl>() )
+                if( auto leftStructDeclRef = leftDeclRef.as<AggTypeDecl>() )
                 {
-                    if( auto rightStructDeclRef = rightDeclRef.As<AggTypeDecl>() )
+                    if( auto rightStructDeclRef = rightDeclRef.as<AggTypeDecl>() )
                     {
                         List<DeclRef<VarDecl>> leftFields;
                         List<DeclRef<VarDecl>> rightFields;
@@ -1354,7 +1354,7 @@ static void collectGlobalScopeParameter(
     // Now create a variable layout that we can use
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->typeLayout = typeLayout;
-    varLayout->varDecl = DeclRef<Decl>(varDecl.Ptr(), nullptr).As<VarDeclBase>();
+    varLayout->varDecl = DeclRef<Decl>(varDecl.Ptr(), nullptr).as<VarDeclBase>();
 
     // This declaration may represent the same logical parameter
     // as a declaration that came from a different translation unit.
@@ -2346,7 +2346,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructDecl>())
+        if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
             structLayout->type = type;
@@ -2384,7 +2384,7 @@ static RefPtr<TypeLayout> processEntryPointParameter(
 
             return structLayout;
         }
-        else if (auto globalGenericParam = declRef.As<GlobalGenericParamDecl>())
+        else if (auto globalGenericParam = declRef.as<GlobalGenericParamDecl>())
         {
             auto genParamTypeLayout = new GenericParamTypeLayout();
             // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
