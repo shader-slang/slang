@@ -600,7 +600,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // the outer interface, then try to replace the type with the
         // actual value of the associated type for the given implementation.
         //
-        if(auto substAssocTypeDecl = substDeclRef.decl->As<AssocTypeDecl>())
+        if(auto substAssocTypeDecl = as<AssocTypeDecl>(substDeclRef.decl))
         {
             for(auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
             {
@@ -608,7 +608,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 if(!thisSubst)
                     continue;
 
-                if(auto interfaceDecl = substAssocTypeDecl->ParentDecl->As<InterfaceDecl>())
+                if(auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
                 {
                     if(thisSubst->interfaceDecl == interfaceDecl)
                     {
@@ -1527,7 +1527,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         Decl* dd = decl;
         while(dd)
         {
-            if(auto interfaceDecl = dd->As<InterfaceDecl>())
+            if(auto interfaceDecl = as<InterfaceDecl>(dd))
                 return interfaceDecl;
 
             dd = dd->ParentDecl;
@@ -1682,7 +1682,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // corresponding to that decl.
         for(Decl* ancestorDecl = declToSpecialize; ancestorDecl; ancestorDecl = ancestorDecl->ParentDecl)
         {
-            if(auto ancestorGenericDecl = ancestorDecl->As<GenericDecl>())
+            if(auto ancestorGenericDecl = as<GenericDecl>(ancestorDecl))
             {
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
@@ -1748,7 +1748,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     return firstSubst;
                 }
             }
-            else if(auto ancestorInterfaceDecl = ancestorDecl->As<InterfaceDecl>())
+            else if(auto ancestorInterfaceDecl = as<InterfaceDecl>(ancestorDecl))
             {
                 // The task is basically the same as for the generic case:
                 // We want to see if there is any existing substitution that
@@ -1816,7 +1816,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // in either substitution.
         //
         // As an invariant, there should *not* be any generic or this-type
-        // substitutiosn in `substToSpecialize`, because otherwise they
+        // substitutions in `substToSpecialize`, because otherwise they
         // would be specializations that don't actually apply to the given
         // declaration.
         //
@@ -2283,11 +2283,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // so we'll need to change this location in the code if we ever clean
         // up the hierarchy.
         //
-        if (auto substTypeConstraintDecl = substDeclRef.decl->As<GenericTypeConstraintDecl>())
+        if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.decl))
         {
-            if (auto substAssocTypeDecl = substTypeConstraintDecl->ParentDecl->As<AssocTypeDecl>())
+            if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->ParentDecl))
             {
-                if (auto interfaceDecl = substAssocTypeDecl->ParentDecl->As<InterfaceDecl>())
+                if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
                 {
                     // At this point we have a constraint decl for an associated type,
                     // and we nee to see if we are dealing with a concrete substitution

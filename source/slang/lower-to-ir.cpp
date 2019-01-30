@@ -4071,13 +4071,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
-        if(auto assocTypeDecl = decl->ParentDecl->As<AssocTypeDecl>())
+        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->ParentDecl))
         {
             // TODO: might need extra steps if we ever allow
             // generic associated types.
 
 
-            if(auto interfaceDecl = assocTypeDecl->ParentDecl->As<InterfaceDecl>())
+            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->ParentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -4085,7 +4085,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if(auto globalGenericParamDecl = decl->ParentDecl->As<GlobalGenericParamDecl>())
+        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->ParentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -5798,14 +5798,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         // TODO: Should this just always visit/lower the inner decl?
 
-        if (auto innerFuncDecl = genDecl->inner->As<FunctionDeclBase>())
+        if (auto innerFuncDecl = as<FunctionDeclBase>(genDecl->inner))
             return lowerFuncDecl(innerFuncDecl);
-        else if (auto innerStructDecl = genDecl->inner->As<StructDecl>())
+        else if (auto innerStructDecl = as<StructDecl>(genDecl->inner))
         {
             visitAggTypeDecl(innerStructDecl);
             return LoweredValInfo();
         }
-        else if( auto extensionDecl = genDecl->inner->As<ExtensionDecl>() )
+        else if( auto extensionDecl = as<ExtensionDecl>(genDecl->inner) )
         {
             return visitExtensionDecl(extensionDecl);
         }
@@ -5818,7 +5818,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // A function declaration may have multiple, target-specific
         // overloads, and we need to emit an IR version of each of these.
 
-        // The front end will form a linked list of declaratiosn with
+        // The front end will form a linked list of declarations with
         // the same signature, whenever there is any kind of redeclaration.
         // We will look to see if that linked list has been formed.
         auto primaryDecl = decl->primaryDecl;

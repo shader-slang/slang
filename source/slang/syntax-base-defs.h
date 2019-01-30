@@ -16,17 +16,6 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase)
     // The primary source location associated with this AST node
     FIELD(SourceLoc, loc)
-
-    RAW(
-    // Allow dynamic casting with a convenient syntax
-    template<typename T>
-    T* As()
-    {
-        SLANG_ASSERT(this);
-        return dynamic_cast<T*>(this);
-    }
-    )
-
 END_SYNTAX_CLASS()
 
 // Base class for compile-time values (most often a type).

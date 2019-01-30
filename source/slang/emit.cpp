@@ -4603,7 +4603,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto stringLitExpr = expr->As<StringLiteralExpr>();
+        auto stringLitExpr = as<StringLiteralExpr>(expr);
         if (!stringLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
@@ -4630,7 +4630,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto intLitExpr = expr->As<IntegerLiteralExpr>();
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
         if (!intLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
@@ -4840,23 +4840,23 @@ struct EmitVisitor
             {
                 if(auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
-                    if(inputPrimitiveTypeModifier->As<HLSLTriangleModifier>())
+                    if(as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineModifier>())
+                    else if(as<HLSLLineModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineAdjModifier>())
+                    else if(as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines_adjacency) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLPointModifier>())
+                    else if(as<HLSLPointModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(points) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLTriangleAdjModifier>())
+                    else if(as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles_adjacency) in;\n");
                     }

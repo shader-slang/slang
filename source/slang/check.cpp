@@ -19,7 +19,7 @@ namespace Slang
     {
         // Things at the global scope are always "members" of their module.
         //
-        if(parentDecl->As<ModuleDecl>())
+        if(as<ModuleDecl>(parentDecl))
             return false;
 
         // Anything explicitly marked `static` and not at module scope
@@ -55,7 +55,7 @@ namespace Slang
         // explicit representation of up-cast operations in the
         // AST.
         //
-        if(decl->As<TypeConstraintDecl>())
+        if(as<TypeConstraintDecl>(decl))
             return false;
 
         return false;
@@ -74,7 +74,7 @@ namespace Slang
         // function for it.
 
         auto parentDecl = decl->ParentDecl;
-        if(auto genericDecl = parentDecl->As<GenericDecl>())
+        if(auto genericDecl = as<GenericDecl>(parentDecl))
             parentDecl = genericDecl->ParentDecl;
 
         return isEffectivelyStatic(decl, parentDecl);
@@ -243,16 +243,16 @@ namespace Slang
             // attached to an overloaded definition (filtered for
             // definitions that could conceivably apply to us).
             //
-            // TODO: This should really be pased on the operator name
+            // TODO: This should really be parsed on the operator name
             // plus fixity, rather than the intrinsic opcode...
             //
             // We will need to reject postfix definitions for prefix
             // operators, and vice versa, to ensure things work.
             //
-            auto prefixExpr = opExpr->As<PrefixExpr>();
-            auto postfixExpr = opExpr->As<PostfixExpr>();
+            auto prefixExpr = as<PrefixExpr>(opExpr);
+            auto postfixExpr = as<PostfixExpr>(opExpr);
 
-            if (auto overloadedBase = opExpr->FunctionExpr->As<OverloadedExpr>())
+            if (auto overloadedBase = as<OverloadedExpr>(opExpr->FunctionExpr))
             {
                 for(auto item : overloadedBase->lookupResult2 )
                 {
@@ -260,7 +260,7 @@ namespace Slang
                     // see if it gives us a key to work with.
                     //
                     Decl* funcDecl = overloadedBase->lookupResult2.item.declRef.decl;
-                    if (auto genDecl = funcDecl->As<GenericDecl>())
+                    if (auto genDecl = as<GenericDecl>(funcDecl))
                         funcDecl = genDecl->inner.Ptr();
 
                     // Reject definitions that have the wrong fixity.
@@ -508,16 +508,16 @@ namespace Slang
             if(decl->HasModifier<HLSLStaticModifier>())
                 return true;
 
-            if(decl->As<ConstructorDecl>())
+            if(as<ConstructorDecl>(decl))
                 return true;
 
-            if(decl->As<EnumCaseDecl>())
+            if(as<EnumCaseDecl>(decl))
                 return true;
 
-            if(decl->As<AggTypeDeclBase>())
+            if(as<AggTypeDeclBase>(decl))
                 return true;
 
-            if(decl->As<SimpleTypeDecl>())
+            if(as<SimpleTypeDecl>(decl))
                 return true;
 
             return false;
@@ -576,7 +576,7 @@ namespace Slang
                 {
                     // Is there an this-type substitution being applied, so that
                     // we are referencing the interface type through a concrete
-                    // type (e.g., a type parameter constrainted to this interface)?
+                    // type (e.g., a type parameter constrained to this interface)?
                     //
                     // Because of the way that substitutions need to mirror the nesting
                     // hierarchy of declarations, any this-type substitution pertaining
@@ -649,7 +649,7 @@ namespace Slang
             //
             auto type = GetTypeForDeclRef(declRef);
 
-            // Construct an appropriate expression based on teh structured of
+            // Construct an appropriate expression based on the structured of
             // the declaration reference.
             //
             if (baseExpr)
@@ -2908,7 +2908,7 @@ namespace Slang
                 registerExtension(s);
             for (auto & g : programNode->getMembersOfType<GenericDecl>())
             {
-                if (auto extDecl = g->inner->As<ExtensionDecl>())
+                if (auto extDecl = as<ExtensionDecl>(g->inner))
                 {
                     checkGenericDeclHeader(g);
                     registerExtension(extDecl);
@@ -2917,7 +2917,7 @@ namespace Slang
             // check user defined attribute classes first
             for (auto decl : programNode->Members)
             {
-                if (auto typeMember = decl->As<StructDecl>())
+                if (auto typeMember = as<StructDecl>(decl))
                 {
                     bool isTypeAttributeClass = false;
                     for (auto attrib : typeMember->GetModifiersOfType<UncheckedAttribute>())
@@ -2988,9 +2988,9 @@ namespace Slang
                         checkExtensionConformance(s);
                     for (auto & g : programNode->getMembersOfType<GenericDecl>())
                     {
-                        if (auto innerAggDecl = g->inner->As<AggTypeDecl>())
+                        if (auto innerAggDecl = as<AggTypeDecl>(g->inner))
                             checkAggTypeConformance(innerAggDecl);
-                        else if (auto innerExtDecl = g->inner->As<ExtensionDecl>())
+                        else if (auto innerExtDecl = as<ExtensionDecl>(g->inner))
                             checkExtensionConformance(innerExtDecl);
                     }
                 }
@@ -3776,7 +3776,7 @@ namespace Slang
                     Decl* tagAssociatedTypeDecl = nullptr;
                     if(auto enumTypeTypeDeclRefType = enumTypeType.dynamicCast<DeclRefType>())
                     {
-                        if(auto enumTypeTypeInterfaceDecl = enumTypeTypeDeclRefType->declRef.getDecl()->As<InterfaceDecl>())
+                        if(auto enumTypeTypeInterfaceDecl = as<InterfaceDecl>(enumTypeTypeDeclRefType->declRef.getDecl()))
                         {
                             for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
                             {
@@ -3886,11 +3886,11 @@ namespace Slang
                 for(auto memberDecl : decl->Members)
                 {
                     // Already checked inheritance declarations above.
-                    if(auto inheritanceDecl = memberDecl->As<InheritanceDecl>())
+                    if(auto inheritanceDecl = as<InheritanceDecl>(memberDecl))
                         continue;
 
                     // Already checked enum case declarations above.
-                    if(auto caseDecl = memberDecl->As<EnumCaseDecl>())
+                    if(auto caseDecl = as<EnumCaseDecl>(memberDecl))
                         continue;
 
                     // TODO: Right now we don't support other kinds of
@@ -3913,7 +3913,7 @@ namespace Slang
                 // An enum case had better appear inside an enum!
                 //
                 // TODO: Do we need/want to support generic cases some day?
-                auto parentEnumDecl = decl->ParentDecl->As<EnumDecl>();
+                auto parentEnumDecl = as<EnumDecl>(decl->ParentDecl);
                 SLANG_ASSERT(parentEnumDecl);
 
                 // The tag type should have already been set by
@@ -3965,7 +3965,7 @@ namespace Slang
             {
                 decl->SetCheckState(DeclCheckState::CheckedHeader);
                 // global generic param only allowed in global scope
-                auto program = decl->ParentDecl->As<ModuleDecl>();
+                auto program = as<ModuleDecl>(decl->ParentDecl);
                 if (!program)
                     getSink()->diagnose(decl, Slang::Diagnostics::globalGenParamInGlobalScopeOnly);
                 // Now check all of the member declarations.
@@ -3985,7 +3985,7 @@ namespace Slang
                 decl->SetCheckState(DeclCheckState::CheckedHeader);
 
                 // assoctype only allowed in an interface
-                auto interfaceDecl = decl->ParentDecl->As<InterfaceDecl>();
+                auto interfaceDecl = as<InterfaceDecl>(decl->ParentDecl);
                 if (!interfaceDecl)
                     getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
 
@@ -8104,7 +8104,7 @@ namespace Slang
             bool shouldAddToCache = false;
             OperatorOverloadCacheKey key;
             TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
-            if (auto opExpr = expr->As<OperatorExpr>())
+            if (auto opExpr = as<OperatorExpr>(expr))
             {
                 if (key.fromOperatorExpr(opExpr))
                 {
@@ -9037,14 +9037,14 @@ namespace Slang
             {
                 auto containerDecl = scope->containerDecl;
 
-                if( auto funcDeclBase = containerDecl->As<FunctionDeclBase>() )
+                if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
                 {
                     if( funcDeclBase->HasModifier<MutatingAttribute>() )
                     {
                         expr->type.IsLeftValue = true;
                     }
                 }
-                else if (auto aggTypeDecl = containerDecl->As<AggTypeDecl>())
+                else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
                 {
                     checkDecl(aggTypeDecl);
 
@@ -9056,7 +9056,7 @@ namespace Slang
                         makeDeclRef(aggTypeDecl));
                     return expr;
                 }
-                else if (auto extensionDecl = containerDecl->As<ExtensionDecl>())
+                else if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
                 {
                     checkDecl(extensionDecl);
 
@@ -9236,7 +9236,7 @@ namespace Slang
                 }
 
                 Expr* expr = attr->args[0];
-                StringLiteralExpr* stringLit = expr->As<StringLiteralExpr>();
+                StringLiteralExpr* stringLit = as<StringLiteralExpr>(expr);
 
                 if (!stringLit)
                 {
@@ -9637,12 +9637,12 @@ namespace Slang
                 for( auto globalDecl : translationUnit->SyntaxNode->Members )
                 {
                     auto maybeFuncDecl = globalDecl;
-                    if( auto genericDecl = maybeFuncDecl->As<GenericDecl>() )
+                    if( auto genericDecl = as<GenericDecl>(maybeFuncDecl) )
                     {
                         maybeFuncDecl = genericDecl->inner;
                     }
 
-                    auto funcDecl = maybeFuncDecl->As<FuncDecl>();
+                    auto funcDecl = as<FuncDecl>(maybeFuncDecl);
                     if(!funcDecl)
                         continue;
 
