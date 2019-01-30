@@ -1114,13 +1114,6 @@ namespace Slang
 
 #include "object-meta-end.h"
 
-
-    template <typename T>
-    SLANG_FORCE_INLINE T* QualType::As()
-    {
-        return as<T>(type); 
-    }
-
     inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->sub.Ptr());
