@@ -2082,7 +2082,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
         // Now for each argument in the initializer list,
         // fill in the appropriate field of the result
-        if (auto arrayType = type.As<ArrayExpressionType>())
+        if (auto arrayType = as<ArrayExpressionType>(type))
         {
             UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
 
@@ -2104,7 +2104,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
         }
-        else if (auto vectorType = type.As<VectorExpressionType>())
+        else if (auto vectorType = as<VectorExpressionType>(type))
         {
             UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
 
@@ -2126,7 +2126,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
         }
-        else if (auto matrixType = type.As<MatrixExpressionType>())
+        else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
 
@@ -2150,7 +2150,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
         }
-        else if (auto declRefType = type.As<DeclRefType>())
+        else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->declRef;
             if (auto aggTypeDeclRef = declRef.As<AggTypeDecl>())

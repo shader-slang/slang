@@ -459,7 +459,7 @@ namespace Slang
         RefPtr<Type> ExtractTypeFromTypeRepr(const RefPtr<Expr>& typeRepr)
         {
             if (!typeRepr) return nullptr;
-            if (auto typeType = typeRepr->type.As<TypeType>())
+            if (auto typeType = as<TypeType>(typeRepr->type))
             {
                 return typeType->type;
             }
@@ -495,10 +495,10 @@ namespace Slang
 
         RefPtr<DeclRefType> getExprDeclRefType(Expr * expr)
         {
-            if (auto typetype = expr->type.As<TypeType>())
+            if (auto typetype = as<TypeType>(expr->type))
                 return typetype->type.dynamicCast<DeclRefType>();
             else
-                return expr->type.As<DeclRefType>();
+                return as<DeclRefType>(expr->type);
         }
 
         /// Is `decl` usable as a static member?
@@ -666,7 +666,7 @@ namespace Slang
                 // form (e.g., for a member function, return a value usable
                 // for referencing it as a free function).
                 //
-                if (baseExpr->type.As<TypeType>())
+                if (as<TypeType>(baseExpr->type))
                 {
                     auto expr = new StaticMemberExpr();
                     expr->loc = loc;
@@ -737,7 +737,7 @@ namespace Slang
             RefPtr<Expr>    base,
             SourceLoc       loc)
         {
-            auto ptrLikeType = base->type.As<PointerLikeType>();
+            auto ptrLikeType = as<PointerLikeType>(base->type);
             SLANG_ASSERT(ptrLikeType);
 
             auto derefExpr = new DerefExpr();
@@ -906,7 +906,7 @@ namespace Slang
         RefPtr<Type> ExpectAType(RefPtr<Expr> expr)
         {
             auto typeRepr = ExpectATypeRepr(expr);
-            if (auto typeType = typeRepr->type.As<TypeType>())
+            if (auto typeType = as<TypeType>(typeRepr->type))
             {
                 return typeType->type;
             }
@@ -931,11 +931,11 @@ namespace Slang
                 exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
             }
 
-            if (auto typeType = exp->type.As<TypeType>())
+            if (auto typeType = as<TypeType>(exp->type))
             {
                 return typeType->type;
             }
-            else if (auto errorType = exp->type.As<ErrorType>())
+            else if (auto errorType = as<ErrorType>(exp->type))
             {
                 return exp->type.type;
             }
@@ -1265,7 +1265,7 @@ namespace Slang
         {
             // TODO: we may want other cases here...
 
-            if (auto errorType = expr->type.As<ErrorType>())
+            if (auto errorType = as<ErrorType>(expr->type))
                 return true;
 
             return false;
@@ -4775,7 +4775,7 @@ namespace Slang
             if(!initExpr) return;
 
             // Is the type of the initializer an array type?
-            if(auto arrayInitType = initExpr->type.As<ArrayExpressionType>())
+            if(auto arrayInitType = as<ArrayExpressionType>(initExpr->type))
             {
                 elementCount = arrayInitType->ArrayLength;
             }
@@ -5402,7 +5402,7 @@ namespace Slang
 
             if (!type.IsLeftValue)
             {
-                if (type.As<ErrorType>())
+                if (as<ErrorType>(type))
                 {
                     // Don't report an l-value issue on an erroneous expression
                 }
@@ -7913,7 +7913,7 @@ namespace Slang
                 // for anything applicable.
                 AddDeclRefOverloadCandidates(LookupResultItem(declRefExpr->declRef), context);
             }
-            else if (auto funcType = funcExprType.As<FuncType>())
+            else if (auto funcType = as<FuncType>(funcExprType))
             {
                 // TODO(tfoley): deprecate this path...
                 AddFuncOverloadCandidate(funcType, context);
@@ -7934,7 +7934,7 @@ namespace Slang
                     AddOverloadCandidates(item, context);
                 }
             }
-            else if (auto typeType = funcExprType.As<TypeType>())
+            else if (auto typeType = as<TypeType>(funcExprType))
             {
                 // If none of the above cases matched, but we are
                 // looking at a type, then I suppose we have
@@ -8448,7 +8448,7 @@ namespace Slang
             if (auto invoke = dynamic_cast<InvokeExpr*>(rs.Ptr()))
             {
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
-                if(auto funcType = invoke->FunctionExpr->type.As<FuncType>())
+                if(auto funcType = as<FuncType>(invoke->FunctionExpr->type))
                 {
                     UInt paramCount = funcType->getParamCount();
                     for (UInt pp = 0; pp < paramCount; ++pp)
@@ -8612,7 +8612,7 @@ namespace Slang
             for (;;)
             {
                 auto baseType = expr->type;
-                if (auto pointerLikeType = baseType.As<PointerLikeType>())
+                if (auto pointerLikeType = as<PointerLikeType>(baseType))
                 {
                     auto elementType = QualType(pointerLikeType->elementType);
                     elementType.IsLeftValue = baseType.IsLeftValue;
@@ -8781,14 +8781,14 @@ namespace Slang
             // members via extension, for vector or scalar types.
             //
             // TODO: Matrix swizzles probably need to be handled at some point.
-            if (auto baseVecType = baseType.As<VectorExpressionType>())
+            if (auto baseVecType = as<VectorExpressionType>(baseType))
             {
                 return CheckSwizzleExpr(
                     expr,
                     baseVecType->elementType,
                     baseVecType->elementCount);
             }
-            else if(auto baseScalarType = baseType.As<BasicExpressionType>())
+            else if(auto baseScalarType = as<BasicExpressionType>(baseType))
             {
                 // Treat scalar like a 1-element vector when swizzling
                 return CheckSwizzleExpr(
@@ -8796,7 +8796,7 @@ namespace Slang
                     baseScalarType,
                     1);
             }
-            else if(auto typeType = baseType.As<TypeType>())
+            else if(auto typeType = as<TypeType>(baseType))
             {
                 // We are looking up a member inside a type.
                 // We want to be careful here because we should only find members
@@ -8912,7 +8912,7 @@ namespace Slang
                     expr->BaseExpression,
                     expr->loc);
             }
-            else if (baseType.As<ErrorType>())
+            else if (as<ErrorType>(baseType))
             {
                 return CreateErrorExpr(expr);
             }

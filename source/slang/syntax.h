@@ -291,10 +291,7 @@ namespace Slang
     struct QualType
     {
         RefPtr<Type>	type;
-        bool					IsLeftValue;
-
-        template <typename T>
-        T* As();
+        bool	        IsLeftValue;
 
         QualType()
             : IsLeftValue(false)
@@ -307,6 +304,7 @@ namespace Slang
 
         Type* Ptr() { return type.Ptr(); }
 
+        operator Type*() { return type; }
         operator RefPtr<Type>() { return type; }
         RefPtr<Type> operator->() { return type; }
     };
