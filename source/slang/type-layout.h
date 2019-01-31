@@ -575,6 +575,18 @@ public:
     LayoutSize tagOffset;
 };
 
+    /// Layout for a scoped entity like a program, module, or entry point
+class ScopeLayout : public Layout
+{
+public:
+    // The layout for the parameters of this entity.
+    //
+    RefPtr<VarLayout> parametersLayout;
+};
+
+StructTypeLayout* getScopeStructLayout(
+    ScopeLayout*  programLayout);
+
 // Layout information for a single shader entry point
 // within a program
 //
@@ -584,7 +596,7 @@ public:
 //
 // TODO: where to store layout info for the return
 // type of the function?
-class EntryPointLayout : public StructTypeLayout
+class EntryPointLayout : public ScopeLayout
 {
 public:
     // The corresponding function declaration
@@ -617,9 +629,10 @@ public:
 };
 
 // Layout information for the global scope of a program
-class ProgramLayout : public Layout
+class ProgramLayout : public ScopeLayout
 {
 public:
+    /*
     // We store a layout for the declarations at the global
     // scope. Note that this will *either* be a single
     // `StructTypeLayout` with the fields stored directly,
@@ -634,6 +647,7 @@ public:
     // to store them).
     //
     RefPtr<VarLayout> globalScopeLayout;
+    */
 
     // We catalog the requested entry points here,
     // and any entry-point-specific parameter data
@@ -645,6 +659,9 @@ public:
 
     TargetRequest* targetRequest = nullptr;
 };
+
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout);
 
 struct LayoutRulesFamilyImpl;
 

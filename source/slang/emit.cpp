@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "ir-dce.h"
+#include "ir-entry-point-uniforms.h"
 #include "ir-glsl-legalize.h"
 #include "ir-insts.h"
 #include "ir-link.h"
@@ -4237,11 +4238,11 @@ struct EmitVisitor
         if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
             auto layout = layoutDecoration->getLayout();
-            if(auto varLayout = layout->dynamicCast<VarLayout>())
+            if(auto varLayout = dynamicCast<VarLayout>(layout))
             {
                 emitIRSemantics(ctx, varLayout);
             }
-            else if (auto entryPointLayout = layout->dynamicCast<EntryPointLayout>())
+            else if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layout))
             {
                 if(auto resultLayout = entryPointLayout->resultLayout)
                 {
@@ -4603,7 +4604,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto stringLitExpr = expr->As<StringLiteralExpr>();
+        auto stringLitExpr = as<StringLiteralExpr>(expr);
         if (!stringLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
@@ -4630,7 +4631,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto intLitExpr = expr->As<IntegerLiteralExpr>();
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
         if (!intLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
@@ -4840,39 +4841,39 @@ struct EmitVisitor
             {
                 if(auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
-                    if(inputPrimitiveTypeModifier->As<HLSLTriangleModifier>())
+                    if(as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineModifier>())
+                    else if(as<HLSLLineModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineAdjModifier>())
+                    else if(as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines_adjacency) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLPointModifier>())
+                    else if(as<HLSLPointModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(points) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLTriangleAdjModifier>())
+                    else if(as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles_adjacency) in;\n");
                     }
                 }
 
-                if(auto outputStreamType = pp->type->As<HLSLStreamOutputType>())
+                if(auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
                 {
-                    if(outputStreamType->As<HLSLTriangleStreamType>())
+                    if(as<HLSLTriangleStreamType>(outputStreamType))
                     {
                         emit("layout(triangle_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLLineStreamType>())
+                    else if(as<HLSLLineStreamType>(outputStreamType))
                     {
                         emit("layout(line_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLPointStreamType>())
+                    else if(as<HLSLPointStreamType>(outputStreamType))
                     {
                         emit("layout(points) out;\n");
                     }
@@ -5158,7 +5159,7 @@ struct EmitVisitor
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>();
+            return dynamicCast<EntryPointLayout>(layoutDecoration->getLayout());
         }
         return nullptr;
     }
@@ -5167,7 +5168,7 @@ struct EmitVisitor
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>())
+            if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layoutDecoration->getLayout()))
             {
                 return entryPointLayout;
             }
@@ -5291,10 +5292,10 @@ struct EmitVisitor
         //
 
         auto typeLayout = layout->typeLayout;
-        while(auto arrayTypeLayout = typeLayout.As<ArrayTypeLayout>())
+        while(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
             typeLayout = arrayTypeLayout->elementTypeLayout;
 
-        if (auto matrixTypeLayout = typeLayout.As<MatrixTypeLayout>())
+        if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
         {
             auto target = ctx->shared->target;
 
@@ -5707,7 +5708,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -5797,7 +5798,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout->unwrapArray();
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -6511,53 +6512,50 @@ EntryPointLayout* findEntryPointLayout(
     return nullptr;
 }
 
-// Given a layout computed for a whole program, find
-// the corresponding layout to use when looking up
-// variables at the global scope.
-//
-// It might be that the global scope was logically
-// mapped to a constant buffer, so that we need
-// to "unwrap" that declaration to get at the
-// actual struct type inside.
-StructTypeLayout* getGlobalStructLayout(
-    ProgramLayout*  programLayout)
+    /// Given a layout computed for a scope, get the layout to use when lookup up variables.
+    ///
+    /// A scope (such as the global scope of a program) groups its
+    /// parameters into a pseudo-`struct` type for layout purposes,
+    /// and in some cases that type will in turn be wrapped in a
+    /// `ConstantBuffer` type to indicate that the parameters needed
+    /// an implicit constant buffer to be allocated.
+    ///
+    /// This function "unwraps" the type layout to find the structure
+    /// type layout that must be stored inside.
+    ///
+StructTypeLayout* getScopeStructLayout(
+    ScopeLayout*  scopeLayout)
 {
-    auto globalScopeLayout = programLayout->globalScopeLayout->typeLayout;
-    if( auto gs = globalScopeLayout.As<StructTypeLayout>() )
+    auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
+    if( auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout) )
     {
-        return gs.Ptr();
+        return structTypeLayout;
     }
-    else if( auto globalConstantBufferLayout = globalScopeLayout.As<ParameterGroupTypeLayout>() )
+    else if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
     {
-        // TODO: the `cbuffer` case really needs to be emitted very
-        // carefully, but that is beyond the scope of what a simple rewriter
-        // can easily do (without semantic analysis, etc.).
-        //
-        // The crux of the problem is that we need to collect all the
-        // global-scope uniforms (but not declarations that don't involve
-        // uniform storage...) and put them in a single `cbuffer` declaration,
-        // so that we can give it an explicit location. The fields in that
-        // declaration might use various type declarations, so we'd really
-        // need to emit all the type declarations first, and that involves
-        // some large scale reorderings.
-        //
-        // For now we will punt and just emit the declarations normally,
-        // and hope that the global-scope block (`$Globals`) gets auto-assigned
-        // the same location that we manually asigned it.
-
-        auto elementTypeLayout = globalConstantBufferLayout->offsetElementTypeLayout;
-        auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
+        auto elementTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
+        auto elementTypeStructLayout = as<StructTypeLayout>(elementTypeLayout);
 
         // We expect all constant buffers to contain `struct` types for now
         SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
-        return elementTypeStructLayout.Ptr();
+        return elementTypeStructLayout;
     }
     else
     {
         SLANG_UNEXPECTED("uhandled global-scope binding layout");
         return nullptr;
     }
+}
+
+    /// Given a layout computed for a program, get the layout to use when lookup up variables.
+    ///
+    /// This is just an alias of `getScopeStructLayout`.
+    ///
+StructTypeLayout* getGlobalStructLayout(
+    ProgramLayout*  programLayout)
+{
+    return getScopeStructLayout(programLayout);
 }
 
 void legalizeTypes(
@@ -6656,6 +6654,18 @@ String emitEntryPoint(
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
+
+        // Now that we've linked the IR code, any layout/binding
+        // information has been attached to shader parameters
+        // and entry points. Now we are safe to make transformations
+        // that might move code without worrying about losing
+        // the connection between a parameter and its layout.
+        //
+        // An easy transformation of this kind is to take uniform
+        // parameters of a shader entry point and move them into
+        // the global scope instead.
+        //
+        moveEntryPointUniformParamsToGlobalScope(irModule);
 
         // Desguar any union types, since these will be illegal on
         // various targets.

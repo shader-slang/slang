@@ -1,5 +1,5 @@
-#ifndef RASTER_RENDERER_SYNTAX_H
-#define RASTER_RENDERER_SYNTAX_H
+#ifndef SLANG_SYNTAX_H
+#define SLANG_SYNTAX_H
 
 #include "../core/basic.h"
 #include "ir.h"
@@ -291,10 +291,7 @@ namespace Slang
     struct QualType
     {
         RefPtr<Type>	type;
-        bool					IsLeftValue;
-
-        template <typename T>
-        T* As();
+        bool	        IsLeftValue;
 
         QualType()
             : IsLeftValue(false)
@@ -307,6 +304,7 @@ namespace Slang
 
         Type* Ptr() { return type.Ptr(); }
 
+        operator Type*() { return type; }
         operator RefPtr<Type>() { return type; }
         RefPtr<Type> operator->() { return type; }
     };
@@ -432,7 +430,7 @@ namespace Slang
         Decl* decl = nullptr;
         Decl* getDecl() const { return decl; }
 
-        // Optionally, a chain of substititions to perform
+        // Optionally, a chain of substitutions to perform
         SubstitutionSet substitutions;
 
         DeclRefBase()
@@ -452,7 +450,7 @@ namespace Slang
             , substitutions(subst)
         {}
 
-        // Apply substitutions to a type or ddeclaration
+        // Apply substitutions to a type or declaration
         RefPtr<Type> Substitute(RefPtr<Type> type) const;
 
         DeclRefBase Substitute(DeclRefBase declRef) const;
@@ -506,10 +504,10 @@ namespace Slang
 
         // "dynamic cast" to a more specific declaration reference type
         template<typename U>
-        DeclRef<U> As() const
+        DeclRef<U> as() const
         {
             DeclRef<U> result;
-            result.decl = dynamic_cast<U*>(decl);
+            result.decl = Slang::as<U>(decl);
             result.substitutions = substitutions;
             return result;
         }
@@ -618,7 +616,7 @@ namespace Slang
         {
             while (cursor != end)
             {
-                if ((*cursor).As<T>())
+                if (dynamicCast<T>(*cursor))
                     return cursor;
                 cursor++;
             }
@@ -728,7 +726,7 @@ namespace Slang
             while (ptr != end)
             {
                 DeclRef<Decl> declRef(ptr->Ptr(), substitutions);
-                if (declRef.As<T>())
+                if (declRef.as<T>())
                     return ptr;
                 ptr++;
             }
@@ -1064,7 +1062,7 @@ namespace Slang
         RefPtr<Val> getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
-            return m_obj.As<Val>();
+            return m_obj.dynamicCast<Val>();
         }
 
         RefPtr<WitnessTable> getWitnessTable();
@@ -1116,13 +1114,6 @@ namespace Slang
 
 #include "object-meta-end.h"
 
-
-    template <typename T>
-    SLANG_FORCE_INLINE T* QualType::As()
-    {
-        return type ? type->As<T>() : nullptr;
-    }
-
     inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
         return declRef.Substitute(declRef.getDecl()->sub.Ptr());
@@ -1166,13 +1157,15 @@ namespace Slang
 
     //
 
-    inline BaseType GetVectorBaseType(VectorExpressionType* vecType) {
-        return vecType->elementType->AsBasicType()->baseType;
+    inline BaseType GetVectorBaseType(VectorExpressionType* vecType)
+    {
+        auto basicExprType = as<BasicExpressionType>(vecType->elementType);
+        return basicExprType->baseType;
     }
 
     inline int GetVectorSize(VectorExpressionType* vecType)
     {
-        auto constantVal = vecType->elementCount.As<ConstantIntVal>();
+        auto constantVal = vecType->elementCount.dynamicCast<ConstantIntVal>();
         if (constantVal)
             return (int) constantVal->value;
         // TODO: what to do in this case?
@@ -1205,7 +1198,7 @@ namespace Slang
         List<DeclRef<T>> rs;
         for (auto d : getMembersOfType<T>(declRef))
             rs.Add(d);
-        if (auto aggDeclRef = declRef.As<AggTypeDecl>())
+        if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {

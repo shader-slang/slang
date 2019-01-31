@@ -16,17 +16,6 @@ END_SYNTAX_CLASS()
 ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase)
     // The primary source location associated with this AST node
     FIELD(SourceLoc, loc)
-
-    RAW(
-    // Allow dynamic casting with a convenient syntax
-    template<typename T>
-    T* As()
-    {
-        SLANG_ASSERT(this);
-        return dynamic_cast<T*>(this);
-    }
-    )
-
 END_SYNTAX_CLASS()
 
 // Base class for compile-time values (most often a type).
@@ -60,6 +49,15 @@ ABSTRACT_SYNTAX_CLASS(Val, NodeBase)
     )
 END_SYNTAX_CLASS()
 
+RAW(
+    class Type;
+
+    template <typename T>
+    SLANG_FORCE_INLINE T* as(Type* obj);
+    template <typename T>
+    SLANG_FORCE_INLINE const T* as(const Type* obj);
+    )
+
 // A type, representing a classifier for some term in the AST.
 //
 // Types can include "sugar" in that they may refer to a
@@ -68,7 +66,7 @@ END_SYNTAX_CLASS()
 //
 // In order to operation on types, though, we often want
 // to look past any sugar, and operate on an underlying
-// "canonical" type. The reprsentation caches a pointer to
+// "canonical" type. The representation caches a pointer to
 // a canonical type on every type, so we can easily
 // operate on the raw representation when needed.
 ABSTRACT_SYNTAX_CLASS(Type, Val)
@@ -85,31 +83,12 @@ public:
     bool Equals(Type * type);
     bool Equals(RefPtr<Type> type);
 
-    bool IsVectorType() { return As<VectorExpressionType>() != nullptr; }
-    bool IsArray() { return As<ArrayExpressionType>() != nullptr; }
-
-    template<typename T>
-    T* As()
-    {
-        return dynamic_cast<T*>(GetCanonicalType());
-    }
-
-    // Convenience/legacy wrappers for `As<>`
-    ArithmeticExpressionType * AsArithmeticType() { return As<ArithmeticExpressionType>(); }
-    BasicExpressionType * AsBasicType() { return As<BasicExpressionType>(); }
-    VectorExpressionType * AsVectorType() { return As<VectorExpressionType>(); }
-    MatrixExpressionType * AsMatrixType() { return As<MatrixExpressionType>(); }
-    ArrayExpressionType * AsArrayType() { return As<ArrayExpressionType>(); }
-
-    DeclRefType* AsDeclRefType() { return As<DeclRefType>(); }
-
-    NamedExpressionType* AsNamedType();
-
     bool IsTextureOrSampler();
-    bool IsTexture() { return As<TextureType>() != nullptr; }
-    bool IsSampler() { return As<SamplerStateType>() != nullptr; }
+    bool IsTexture() { return as<TextureType>(this) != nullptr; }
+    bool IsSampler() { return as<SamplerStateType>(this) != nullptr; }
     bool IsStruct();
-    bool IsClass();
+    //bool IsClass();
+
     Type* GetCanonicalType();
 
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
@@ -125,7 +104,12 @@ protected:
     Session* session = nullptr;
     )
 END_SYNTAX_CLASS()
-
+RAW(
+    template <typename T>
+    SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->GetCanonicalType()) : nullptr; }
+    template <typename T>
+    SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->GetCanonicalType()) : nullptr; }
+)
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values

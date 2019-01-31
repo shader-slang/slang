@@ -21,7 +21,7 @@ namespace Slang
         void add(Modifier* modifier)
         {
             // Doesn't handle SharedModifiers
-            SLANG_ASSERT(modifier->As<SharedModifiers>() == nullptr);
+            SLANG_ASSERT(as<SharedModifiers>(modifier) == nullptr);
 
             // Splice at end
             *m_next = modifier;
@@ -33,7 +33,7 @@ namespace Slang
             Modifier* cur = m_result;
             while (cur)
             {
-                T* castCur = cur->As<T>();
+                T* castCur = as<T>(cur);
                 if (castCur)
                 {
                     return castCur;
@@ -619,7 +619,7 @@ namespace Slang
 
             // About to look at shared modifiers? Done.
             RefPtr<Modifier> linkMod = *modifierLink;
-            if(linkMod.As<SharedModifiers>())
+            if(as<SharedModifiers>(linkMod))
             {
                 break;
             }
@@ -821,7 +821,7 @@ namespace Slang
         auto keywordToken = advanceToken(parser);
 
         RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
-        auto syntax = parsedObject.As<T>();
+        auto syntax = dynamicCast<T>(parsedObject);
 
         if (syntax)
         {
@@ -1701,7 +1701,7 @@ namespace Slang
         RefPtr<Expr>    base)
     {
         Name * baseName = nullptr;
-        if (auto varExpr = base->As<VarExpr>())
+        if (auto varExpr = as<VarExpr>(base))
             baseName = varExpr->name;
         // if base is a known generics, parse as generics
         if (baseName && isGenericName(parser, baseName))
@@ -1800,14 +1800,14 @@ namespace Slang
         //
         // TODO: We should really make these keywords be registered like any other
         // syntax category, rather than be special-cased here. The main issue here
-        // is that we need to allow them to be used as type specififers, as in:
+        // is that we need to allow them to be used as type specifiers, as in:
         //
         //      struct Foo { int x } foo;
         //
         // The ideal answer would be to register certain keywords as being able
-        // to parse a type specififer, and look for those keywords here.
+        // to parse a type specifier, and look for those keywords here.
         // We should ideally add special case logic that bails out of declarator
-        // parsing iff we have one of these kinds of type specififers and the
+        // parsing iff we have one of these kinds of type specifiers and the
         // closing `}` is at the end of its line, as a bit of a special case
         // to allow the common idiom.
         //
@@ -2997,7 +2997,7 @@ namespace Slang
         // then we really want the modifiers to apply to the inner declaration.
         //
         RefPtr<Decl> declToModify = decl;
-        if(auto genericDecl = decl.As<GenericDecl>())
+        if(auto genericDecl = decl.as<GenericDecl>())
             declToModify = genericDecl->inner;
         AddModifiers(declToModify.Ptr(), modifiers.first);
 
@@ -3024,7 +3024,7 @@ namespace Slang
                 // A declaration that starts with an identifier might be:
                 //
                 // - A keyword-based declaration (e.g., `cbuffer ...`)
-                // - The begining of a type in a declarator-based declaration (e.g., `int ...`)
+                // - The beginning of a type in a declarator-based declaration (e.g., `int ...`)
                 // - A GLSL block declaration (e.g., `uniform Foo { ... }`)
 
                 // Let's deal with the GLSL block case first. This is something like:
@@ -3084,11 +3084,11 @@ namespace Slang
 
         if (decl)
         {
-            if( auto dd = decl.As<Decl>() )
+            if( auto dd = as<Decl>(decl) )
             {
                 CompleteDecl(parser, dd, containerDecl, modifiers);
             }
-            else if(auto declGroup = decl.As<DeclGroup>())
+            else if(auto declGroup = as<DeclGroup>(decl))
             {
                 // We are going to add the same modifiers to *all* of these declarations,
                 // so we want to give later passes a way to detect which modifiers
@@ -3122,11 +3122,11 @@ namespace Slang
         auto declBase = ParseDecl(parser, containerDecl);
         if(!declBase)
             return nullptr;
-        if( auto decl = declBase.As<Decl>() )
+        if( auto decl = as<Decl>(declBase) )
         {
             return decl;
         }
-        else if( auto declGroup = declBase.As<DeclGroup>() )
+        else if( auto declGroup = as<DeclGroup>(declBase) )
         {
             if( declGroup->decls.Count() == 1 )
             {
@@ -3496,7 +3496,7 @@ namespace Slang
             statement = ParseExpressionStatement();
         }
 
-        if (statement && !statement->As<DeclStmt>())
+        if (statement && !as<DeclStmt>(statement))
         {
             // Install any modifiers onto the statement.
             // Note: this path is bypassed in the case of a
@@ -3531,7 +3531,7 @@ namespace Slang
                 {
                     body = stmt;
                 }
-                else if (auto seqStmt = body.As<SeqStmt>())
+                else if (auto seqStmt = as<SeqStmt>(body))
                 {
                     seqStmt->stmts.Add(stmt);
                 }

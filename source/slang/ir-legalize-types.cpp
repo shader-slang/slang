@@ -71,7 +71,7 @@ LegalVal LegalVal::implicitDeref(LegalVal const& val)
 LegalVal LegalVal::getImplicitDeref()
 {
     SLANG_ASSERT(flavor == Flavor::implicitDeref);
-    return obj.As<ImplicitDerefVal>()->val;
+    return as<ImplicitDerefVal>(obj)->val;
 }
 
 
@@ -1017,7 +1017,7 @@ static LegalVal legalizeInst(
 RefPtr<VarLayout> findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return layoutDecoration->getLayout()->dynamicCast<VarLayout>();
+        return dynamicCast<VarLayout>(layoutDecoration->getLayout());
     return nullptr;
 }
 

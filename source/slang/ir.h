@@ -407,13 +407,33 @@ struct IRInst
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 };
 
-// `dynamic_cast` equivalent
 template<typename T>
-T* as(IRInst* inst, T* /* */ = nullptr)
+T* dynamicCast(IRInst* inst)
 {
     if (inst && T::isaImpl(inst->op))
-        return (T*) inst;
+        return static_cast<T*>(inst);
     return nullptr;
+}
+
+template<typename T>
+const T* dynamicCast(const IRInst* inst)
+{
+    if (inst && T::isaImpl(inst->op))
+        return static_cast<const T*>(inst);
+    return nullptr;
+}
+
+// `dynamic_cast` equivalent (we just use dynamicCast)
+template<typename T>
+T* as(IRInst* inst)
+{
+    return dynamicCast<T>(inst);
+}
+
+template<typename T>
+const T* as(const IRInst* inst)
+{
+    return dynamicCast<T>(inst);
 }
 
 // `static_cast` equivalent, with debug validation

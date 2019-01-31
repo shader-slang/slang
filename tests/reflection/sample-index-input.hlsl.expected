@@ -29,7 +29,6 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "stage": "fragment",
                                 "binding": {"kind": "varyingInput", "index": 0},
                                 "semanticName": "COLOR"
                             },
