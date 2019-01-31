@@ -165,20 +165,6 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return et->canonicalType;
     }
 
-    bool Type::IsTextureOrSampler()
-    {
-        return IsTexture() || IsSampler();
-    }
-
-    bool Type::IsStruct()
-    {
-        auto declRefType = as<DeclRefType>(this);
-        if (!declRefType) return false;
-        auto structDeclRef = declRefType->declRef.as<StructDecl>();
-        if (!structDeclRef) return false;
-        return true;
-    }
-
     void Session::initializeTypes()
     {
         errorType = new ErrorType();

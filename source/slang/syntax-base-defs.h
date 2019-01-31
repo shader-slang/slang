@@ -80,14 +80,8 @@ public:
     Session* getSession() { return this->session; }
     void setSession(Session* s) { this->session = s; }
 
-    bool Equals(Type * type);
+    bool Equals(Type* type);
     bool Equals(RefPtr<Type> type);
-
-    bool IsTextureOrSampler();
-    bool IsTexture() { return as<TextureType>(this) != nullptr; }
-    bool IsSampler() { return as<SamplerStateType>(this) != nullptr; }
-    bool IsStruct();
-    //bool IsClass();
 
     Type* GetCanonicalType();
 
@@ -95,7 +89,7 @@ public:
 
     virtual bool EqualsVal(Val* val) override;
 protected:
-    virtual bool EqualsImpl(Type * type) = 0;
+    virtual bool EqualsImpl(Type* type) = 0;
 
     virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
