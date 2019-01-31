@@ -5790,7 +5790,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // body appear before the function itself in the list
         // of global values.
         irFunc->moveToEnd();
-
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irFunc));
     }
 
@@ -5799,15 +5798,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: Should this just always visit/lower the inner decl?
 
         if (auto innerFuncDecl = as<FunctionDeclBase>(genDecl->inner))
-            return lowerFuncDecl(innerFuncDecl);
+            return ensureDecl(context, innerFuncDecl);
         else if (auto innerStructDecl = as<StructDecl>(genDecl->inner))
         {
-            visitAggTypeDecl(innerStructDecl);
+            ensureDecl(context, innerStructDecl);
             return LoweredValInfo();
         }
         else if( auto extensionDecl = as<ExtensionDecl>(genDecl->inner) )
         {
-            return visitExtensionDecl(extensionDecl);
+            return ensureDecl(context, extensionDecl);
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -5891,7 +5890,6 @@ LoweredValInfo ensureDecl(
 
         env = env->outer;
     }
-
 
     IRBuilder subIRBuilder;
     subIRBuilder.sharedBuilder = context->irBuilder->sharedBuilder;

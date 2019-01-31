@@ -2992,7 +2992,14 @@ namespace Slang
     {
         // Add any modifiers we parsed before the declaration to the list
         // of modifiers on the declaration itself.
-        AddModifiers(decl.Ptr(), modifiers.first);
+        //
+        // We need to be careful, because if `decl` is a generic declaration,
+        // then we really want the modifiers to apply to the inner declaration.
+        //
+        RefPtr<Decl> declToModify = decl;
+        if(auto genericDecl = decl.as<GenericDecl>())
+            declToModify = genericDecl->inner;
+        AddModifiers(declToModify.Ptr(), modifiers.first);
 
         // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
@@ -3017,7 +3024,7 @@ namespace Slang
                 // A declaration that starts with an identifier might be:
                 //
                 // - A keyword-based declaration (e.g., `cbuffer ...`)
-                // - The begining of a type in a declarator-based declaration (e.g., `int ...`)
+                // - The beginning of a type in a declarator-based declaration (e.g., `int ...`)
                 // - A GLSL block declaration (e.g., `uniform Foo { ... }`)
 
                 // Let's deal with the GLSL block case first. This is something like:
