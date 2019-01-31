@@ -1710,6 +1710,15 @@ namespace Slang
             (IRInst* const*) paramTypes);
     }
 
+    IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType)
+    {
+        IRInst* operands[] = { elementType };
+        return (IRConstantBufferType*) getType(
+            kIROp_ConstantBufferType,
+            1,
+            operands);
+    }
+
     IRConstExprRate* IRBuilder::getConstExprRate()
     {
         return (IRConstExprRate*)getType(kIROp_ConstExprRate);

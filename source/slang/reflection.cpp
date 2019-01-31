@@ -1155,7 +1155,7 @@ SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
     auto entryPointLayout = convert(inEntryPoint);
     if(!entryPointLayout) return 0;
 
-    return getParameterCount(entryPointLayout);
+    return getParameterCount(entryPointLayout->parametersLayout->typeLayout);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getParameterByIndex(
@@ -1165,7 +1165,7 @@ SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getParameterByIn
     auto entryPointLayout = convert(inEntryPoint);
     if(!entryPointLayout) return 0;
 
-    return convert(getParameterByIndex(entryPointLayout, index));
+    return convert(getParameterByIndex(entryPointLayout->parametersLayout->typeLayout, index));
 }
 
 SLANG_API SlangStage spReflectionEntryPoint_getStage(SlangReflectionEntryPoint* inEntryPoint)
@@ -1276,12 +1276,6 @@ SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(Sl
 
 // Shader Reflection
 
-namespace Slang
-{
-    StructTypeLayout* getGlobalStructLayout(
-        ProgramLayout*  programLayout);
-}
-
 SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* inProgram)
 {
     auto program = convert(inProgram);
@@ -1365,7 +1359,7 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
 {
     auto program = convert(inProgram);
     if (!program) return 0;
-    auto cb = program->globalScopeLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
+    auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
     if (!cb) return 0;
     return cb->index;
 }
