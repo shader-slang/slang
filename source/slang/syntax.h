@@ -537,7 +537,7 @@ namespace Slang
             return DeclRefBase::Substitute(expr);
         }
 
-        // Apply substitutions to a type or ddeclaration
+        // Apply substitutions to a type or declaration
         template<typename U>
         DeclRef<U> Substitute(DeclRef<U> declRef) const
         {
@@ -723,12 +723,12 @@ namespace Slang
 
         RefPtr<Decl>* Adjust(RefPtr<Decl>* ptr, RefPtr<Decl>* end) const
         {
-            while (ptr != end)
+            for (; ptr != end; ptr++)
             {
-                DeclRef<Decl> declRef(ptr->Ptr(), substitutions);
-                if (declRef.as<T>())
+                if (as<T>(*ptr))
+                {
                     return ptr;
-                ptr++;
+                }
             }
             return end;
         }
