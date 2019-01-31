@@ -821,7 +821,7 @@ namespace Slang
         auto keywordToken = advanceToken(parser);
 
         RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
-        auto syntax = dynamicCast<T>(parsedObject);
+        auto syntax = as<T>(parsedObject);
 
         if (syntax)
         {

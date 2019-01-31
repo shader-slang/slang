@@ -7205,18 +7205,18 @@ namespace Slang
             RefPtr<Val>			snd)
         {
             // if both values are types, then unify types
-            if (auto fstType = dynamicCast<Type>(fst))
+            if (auto fstType = as<Type>(fst))
             {
-                if (auto sndType = dynamicCast<Type>(snd))
+                if (auto sndType = as<Type>(snd))
                 {
                     return TryUnifyTypes(constraints, fstType, sndType);
                 }
             }
 
             // if both values are constant integers, then compare them
-            if (auto fstIntVal = dynamicCast<ConstantIntVal>(fst))
+            if (auto fstIntVal = as<ConstantIntVal>(fst))
             {
-                if (auto sndIntVal = dynamicCast<ConstantIntVal>(snd))
+                if (auto sndIntVal = as<ConstantIntVal>(snd))
                 {
                     return fstIntVal->value == sndIntVal->value;
                 }

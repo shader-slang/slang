@@ -293,8 +293,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
     {
-        auto genericDecl = findMagicDecl(
-            this, ptrTypeName).dynamicCast<GenericDecl>();
+        auto genericDecl = findMagicDecl(this, ptrTypeName).dynamicCast<GenericDecl>();
         return getPtrType(valueType, genericDecl);
     }
 
@@ -1224,17 +1223,17 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* MatrixExpressionType::getElementType()
     {
-        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     IntVal* MatrixExpressionType::getRowCount()
     {
-        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
     }
 
     IntVal* MatrixExpressionType::getColumnCount()
     {
-        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
     }
 
     RefPtr<Type> MatrixExpressionType::getRowType()
@@ -1271,7 +1270,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* PtrTypeBase::getValueType()
     {
-        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     // GenericParamIntVal
@@ -1973,7 +1972,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ConstantIntVal::EqualsVal(Val* val)
     {
-        if (auto intVal = dynamicCast<ConstantIntVal>(val))
+        if (auto intVal = as<ConstantIntVal>(val))
             return value == intVal->value;
         return false;
     }
@@ -2045,12 +2044,12 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* HLSLPatchType::getElementType()
     {
-        return dynamicCast<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
+        return as<Type>(findInnerMostGenericSubstitution(declRef.substitutions)->args[0]);
     }
 
     IntVal* HLSLPatchType::getElementCount()
     {
-        return dynamicCast<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
+        return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[1]);
     }
 
     // Constructors for types
@@ -2496,7 +2495,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ExtractExistentialSubtypeWitness::EqualsVal(Val* val)
     {
-        if( auto extractWitness = dynamicCast<ExtractExistentialSubtypeWitness>(val) )
+        if( auto extractWitness = as<ExtractExistentialSubtypeWitness>(val) )
         {
             return declRef.Equals(extractWitness->declRef);
         }
@@ -2626,7 +2625,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
 bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
 {
-    auto taggedUnionWitness = dynamicCast<TaggedUnionSubtypeWitness>(val);
+    auto taggedUnionWitness = as<TaggedUnionSubtypeWitness>(val);
     if(!taggedUnionWitness)
         return false;
 
