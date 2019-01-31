@@ -8,9 +8,6 @@
 namespace Slang
 {
 
-StructTypeLayout* getGlobalStructLayout(
-    ProgramLayout*  programLayout);
-
 // Needed for lookup up entry-point layouts.
 //
 // TODO: maybe arrange so that codegen is driven from the layout layer
@@ -721,14 +718,15 @@ IRFunc* specializeIRForEntryPoint(
     // than having to look it up on the original entry-point layout.
     if( auto firstBlock = clonedFunc->getFirstBlock() )
     {
-        UInt paramLayoutCount = entryPointLayout->fields.Count();
+        auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+        UInt paramLayoutCount = paramsStructLayout->fields.Count();
         UInt paramCounter = 0;
         for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
         {
             UInt paramIndex = paramCounter++;
             if( paramIndex < paramLayoutCount )
             {
-                auto paramLayout = entryPointLayout->fields[paramIndex];
+                auto paramLayout = paramsStructLayout->fields[paramIndex];
                 context->builder->addLayoutDecoration(
                     pp,
                     paramLayout);
@@ -1227,7 +1225,7 @@ IRSpecializationState* createIRSpecializationState(
     // Next, we want to optimize lookup for layout infromation
     // associated with global declarations, so that we can
     // look things up based on the IR values (using mangled names)
-    auto globalStructLayout = getGlobalStructLayout(newProgramLayout);
+    auto globalStructLayout = getScopeStructLayout(newProgramLayout);
     for (auto globalVarLayout : globalStructLayout->fields)
     {
         auto mangledName = getMangledName(globalVarLayout->varDecl);
@@ -1235,6 +1233,10 @@ IRSpecializationState* createIRSpecializationState(
     }
 
     // for now, clone all unreferenced witness tables
+    //
+    // TODO: This step should *not* be needed with the current IR
+    // specialization approach, so we should consider removing it.
+    //
     for (auto sym :context->getSymbols())
     {
         if (sym.Value->irGlobalValue->op == kIROp_WitnessTable)
