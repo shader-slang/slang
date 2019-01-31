@@ -1062,7 +1062,7 @@ namespace Slang
         RefPtr<Val> getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
-            return m_obj.dynamicCast<Val>();
+            return m_obj.as<Val>();
         }
 
         RefPtr<WitnessTable> getWitnessTable();
@@ -1165,7 +1165,7 @@ namespace Slang
 
     inline int GetVectorSize(VectorExpressionType* vecType)
     {
-        auto constantVal = vecType->elementCount.dynamicCast<ConstantIntVal>();
+        auto constantVal = vecType->elementCount.as<ConstantIntVal>();
         if (constantVal)
             return (int) constantVal->value;
         // TODO: what to do in this case?

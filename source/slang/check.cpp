@@ -126,7 +126,7 @@ namespace Slang
             }
             else if (auto vectorType = as<VectorExpressionType>(typeIn))
             {
-                if (auto elemCount = vectorType->elementCount.dynamicCast<ConstantIntVal>())
+                if (auto elemCount = vectorType->elementCount.as<ConstantIntVal>())
                 {
                     data.dim1 = elemCount->value - 1;
                     auto elementBasicType = as<BasicExpressionType>(vectorType->elementType);
@@ -583,7 +583,7 @@ namespace Slang
                     // to the chosen interface decl must be the first substitution on
                     // the list (which is a linked list from the "inside" out).
                     //
-                    auto thisTypeSubst = interfaceDeclRef.substitutions.substitutions.dynamicCast<ThisTypeSubstitution>();
+                    auto thisTypeSubst = interfaceDeclRef.substitutions.substitutions.as<ThisTypeSubstitution>();
                     if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.decl)
                     {
                         // This isn't really an existential type, because somebody
@@ -885,7 +885,7 @@ namespace Slang
 
         RefPtr<Expr> ExpectATypeRepr(RefPtr<Expr> expr)
         {
-            if (auto overloadedExpr = expr.dynamicCast<OverloadedExpr>())
+            if (auto overloadedExpr = expr.as<OverloadedExpr>())
             {
                 expr = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
             }
@@ -925,7 +925,7 @@ namespace Slang
 
         RefPtr<Val> ExtractGenericArgVal(RefPtr<Expr> exp)
         {
-            if (auto overloadedExpr = exp.dynamicCast<OverloadedExpr>())
+            if (auto overloadedExpr = exp.as<OverloadedExpr>())
             {
                 // assume that if it is overloaded, we want a type
                 exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
@@ -1043,7 +1043,7 @@ namespace Slang
             // this is a quick fix that at least alerts the user to how we are
             // interpreting their code.
             //
-            if (auto varDecl = decl.dynamicCast<VarDecl>())
+            if (auto varDecl = decl.as<VarDecl>())
             {
                 if (auto parenScope = as<ScopeDecl>(varDecl->ParentDecl))
                 {
@@ -1076,7 +1076,7 @@ namespace Slang
         void EnusreAllDeclsRec(RefPtr<Decl> decl)
         {
             checkDecl(decl);
-            if (auto containerDecl = decl.dynamicCast<ContainerDecl>())
+            if (auto containerDecl = decl.as<ContainerDecl>())
             {
                 for (auto m : containerDecl->Members)
                 {
@@ -1111,7 +1111,7 @@ namespace Slang
             Type* type = typeExp.type.Ptr();
             if(!type && typeExp.exp)
             {
-                if(auto typeType = typeExp.exp->type.type.dynamicCast<TypeType>())
+                if(auto typeType = as<TypeType>(typeExp.exp->type))
                 {
                     type = typeType->type;
                 }
@@ -1141,7 +1141,7 @@ namespace Slang
                 List<RefPtr<Expr>> args;
                 for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
                 {
-                    if (auto typeParam = member.dynamicCast<GenericTypeParamDecl>())
+                    if (auto typeParam = member.as<GenericTypeParamDecl>())
                     {
                         if (!typeParam->initType.exp)
                         {
@@ -1157,7 +1157,7 @@ namespace Slang
                         if (outProperType)
                             args.Add(typeParam->initType.exp);
                     }
-                    else if (auto valParam = member.dynamicCast<GenericValueParamDecl>())
+                    else if (auto valParam = member.as<GenericValueParamDecl>())
                     {
                         if (!valParam->initExpr)
                         {
@@ -1274,11 +1274,11 @@ namespace Slang
         // Capture the "base" expression in case this is a member reference
         RefPtr<Expr> GetBaseExpr(RefPtr<Expr> expr)
         {
-            if (auto memberExpr = expr.dynamicCast<MemberExpr>())
+            if (auto memberExpr = expr.as<MemberExpr>())
             {
                 return memberExpr->BaseExpression;
             }
-            else if(auto overloadedExpr = expr.dynamicCast<OverloadedExpr>())
+            else if(auto overloadedExpr = expr.as<OverloadedExpr>())
             {
                 return overloadedExpr->base;
             }
@@ -1293,17 +1293,17 @@ namespace Slang
         {
             if(left == right) return true;
 
-            if(auto leftConst = left.dynamicCast<ConstantIntVal>())
+            if(auto leftConst = left.as<ConstantIntVal>())
             {
-                if(auto rightConst = right.dynamicCast<ConstantIntVal>())
+                if(auto rightConst = right.as<ConstantIntVal>())
                 {
                     return leftConst->value == rightConst->value;
                 }
             }
 
-            if(auto leftVar = left.dynamicCast<GenericParamIntVal>())
+            if(auto leftVar = left.as<GenericParamIntVal>())
             {
-                if(auto rightVar = right.dynamicCast<GenericParamIntVal>())
+                if(auto rightVar = right.as<GenericParamIntVal>())
                 {
                     return leftVar->declRef.Equals(rightVar->declRef);
                 }
@@ -1366,7 +1366,7 @@ namespace Slang
         {
             // A nested initializer list should always be used directly.
             //
-            if(fromExpr.dynamicCast<InitializerListExpr>())
+            if(as<InitializerListExpr>(fromExpr))
             {
                 return true;
             }
@@ -1500,7 +1500,7 @@ namespace Slang
                 auto toElementType = toVecType->elementType;
 
                 UInt elementCount = 0;
-                if (auto constElementCount = toElementCount.dynamicCast<ConstantIntVal>())
+                if (auto constElementCount = toElementCount.as<ConstantIntVal>())
                 {
                     elementCount = (UInt) constElementCount->value;
                 }
@@ -1548,7 +1548,7 @@ namespace Slang
                     // of elements being initialized matches what was declared.
                     //
                     UInt elementCount = 0;
-                    if (auto constElementCount = toElementCount.dynamicCast<ConstantIntVal>())
+                    if (auto constElementCount = as<ConstantIntVal>(toElementCount))
                     {
                         elementCount = (UInt) constElementCount->value;
                     }
@@ -1780,7 +1780,7 @@ namespace Slang
             }
 
             // Coercion from an initializer list is allowed for many types
-            if( auto fromInitializerListExpr = fromExpr.dynamicCast<InitializerListExpr>())
+            if( auto fromInitializerListExpr = as<InitializerListExpr>(fromExpr))
             {
                 if(!tryCoerceInitializerList(toType, outToExpr, fromInitializerListExpr))
                     return false;
@@ -2210,14 +2210,15 @@ namespace Slang
         }
 
         // Fill in default substitutions for the 'subtype' part of a type constraint decl
-        void CheckConstraintSubType(TypeExp & typeExp)
+        void CheckConstraintSubType(TypeExp& typeExp)
         {
-            if (auto sharedTypeExpr = typeExp.exp.dynamicCast<SharedTypeExpr>())
+            if (auto sharedTypeExpr = as<SharedTypeExpr>(typeExp.exp))
             {
                 if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
                 {
                     declRefType->declRef.substitutions = createDefaultSubstitutions(getSession(), declRefType->declRef.getDecl());
-                    if (auto typetype = typeExp.exp->type.type.dynamicCast<TypeType>())
+
+                    if (auto typetype = as<TypeType>(typeExp.exp->type))
                         typetype->type = declRefType;
                 }
             }
@@ -2707,8 +2708,7 @@ namespace Slang
                 return uncheckedAttr;
             }
 
-            RefPtr<RefObject> attrObj = attrDecl->syntaxClass.createInstance();
-            auto attr = attrObj.dynamicCast<Attribute>();
+            RefPtr<Attribute> attr = as<Attribute>(attrDecl->syntaxClass.createInstance());
             if(!attr)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute class did not yield an attribute object");
@@ -2802,7 +2802,7 @@ namespace Slang
             RefPtr<Modifier>        m,
             ModifiableSyntaxNode*   syntaxNode)
         {
-            if(auto hlslUncheckedAttribute = m.dynamicCast<UncheckedAttribute>())
+            if(auto hlslUncheckedAttribute = as<UncheckedAttribute>(m))
             {
                 // We have an HLSL `[name(arg,...)]` attribute, and we'd like
                 // to check that it is provides all the expected arguments
@@ -3036,17 +3036,17 @@ namespace Slang
             {
                 auto genMbr = genDecl.getDecl()->Members[i];
                 auto requiredGenMbr = genDecl.getDecl()->Members[i];
-                if (auto genTypeMbr = genMbr.dynamicCast<GenericTypeParamDecl>())
+                if (auto genTypeMbr = as<GenericTypeParamDecl>(genMbr))
                 {
-                    if (auto requiredGenTypeMbr = requiredGenMbr.dynamicCast<GenericTypeParamDecl>())
+                    if (auto requiredGenTypeMbr = as<GenericTypeParamDecl>(requiredGenMbr))
                     {
                     }
                     else
                         return false;
                 }
-                else if (auto genValMbr = genMbr.dynamicCast<GenericValueParamDecl>())
+                else if (auto genValMbr = as<GenericValueParamDecl>(genMbr))
                 {
-                    if (auto requiredGenValMbr = requiredGenMbr.dynamicCast<GenericValueParamDecl>())
+                    if (auto requiredGenValMbr = as<GenericValueParamDecl>(requiredGenMbr))
                     {
                         if (!genValMbr->type->Equals(requiredGenValMbr->type))
                             return false;
@@ -3054,9 +3054,9 @@ namespace Slang
                     else
                         return false;
                 }
-                else if (auto genTypeConstraintMbr = genMbr.dynamicCast<GenericTypeConstraintDecl>())
+                else if (auto genTypeConstraintMbr = as<GenericTypeConstraintDecl>(genMbr))
                 {
-                    if (auto requiredTypeConstraintMbr = requiredGenMbr.dynamicCast<GenericTypeConstraintDecl>())
+                    if (auto requiredTypeConstraintMbr = as<GenericTypeConstraintDecl>(requiredGenMbr))
                     {
                         if (!genTypeConstraintMbr->sup->Equals(requiredTypeConstraintMbr->sup))
                         {
@@ -3844,7 +3844,7 @@ namespace Slang
                         RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
                         if(explicitTagVal)
                         {
-                            if(auto constIntVal = explicitTagVal.dynamicCast<ConstantIntVal>())
+                            if(auto constIntVal = explicitTagVal.as<ConstantIntVal>())
                             {
                                 defaultTag = constIntVal->value;
                             }
@@ -4895,7 +4895,7 @@ namespace Slang
             //
             // For right now we will look for calls to intrinsic functions, and then inspect
             // their names (this is bad and slow).
-            auto funcDeclRefExpr = invokeExpr->FunctionExpr.dynamicCast<DeclRefExpr>();
+            auto funcDeclRefExpr = invokeExpr->FunctionExpr.as<DeclRefExpr>();
             if (!funcDeclRefExpr) return nullptr;
 
             auto funcDeclRef = funcDeclRefExpr->declRef;
@@ -5197,7 +5197,7 @@ namespace Slang
         {
             auto session = getSession();
             auto vectorGenericDecl = findMagicDecl(
-                session, "Vector").dynamicCast<GenericDecl>();
+                session, "Vector").as<GenericDecl>();
             auto vectorTypeDecl = vectorGenericDecl->inner;
 
             auto substitutions = new GenericSubstitution();
@@ -6258,7 +6258,7 @@ namespace Slang
                         if (c.decl != typeParam.getDecl())
                             continue;
 
-                        auto cType = c.val.dynamicCast<Type>();
+                        auto cType = c.val.as<Type>();
                         SLANG_RELEASE_ASSERT(cType.Ptr());
 
                         if (!type)
@@ -6297,7 +6297,7 @@ namespace Slang
                         if (c.decl != valParam.getDecl())
                             continue;
 
-                        auto cVal = c.val.dynamicCast<IntVal>();
+                        auto cVal = c.val.as<IntVal>();
                         SLANG_RELEASE_ASSERT(cVal.Ptr());
 
                         if (!val)
@@ -6777,7 +6777,7 @@ namespace Slang
             // We should have the existing arguments to the generic
             // handy, so that we can construct a substitution list.
 
-            RefPtr<GenericSubstitution> subst = candidate.subst.dynamicCast<GenericSubstitution>();
+            RefPtr<GenericSubstitution> subst = candidate.subst.as<GenericSubstitution>();
             SLANG_ASSERT(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
@@ -6847,7 +6847,7 @@ namespace Slang
             RefPtr<Expr>            originalExpr,
             RefPtr<GenericSubstitution>   subst)
         {
-            auto baseDeclRefExpr = baseExpr.dynamicCast<DeclRefExpr>();
+            auto baseDeclRefExpr = baseExpr.as<DeclRefExpr>();
             if (!baseDeclRefExpr)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");

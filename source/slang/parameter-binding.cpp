@@ -2494,7 +2494,7 @@ static void collectEntryPointParameters(
     //
     for( auto taggedUnionType : entryPoint->taggedUnionTypes )
     {
-        auto substType = taggedUnionType->Substitute(typeSubst).dynamicCast<Type>();
+        auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
         auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
     }
@@ -2610,7 +2610,7 @@ static void collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointVaryingParameterDecl(
             context,
             entryPointFuncDecl,
-            resultType->Substitute(typeSubst).dynamicCast<Type>(),
+            resultType->Substitute(typeSubst).as<Type>(),
             state,
             resultLayout);
 
