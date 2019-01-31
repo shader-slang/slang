@@ -113,14 +113,19 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     //
 
+    Type::~Type()
+    {
+        // If the canonicalType !=nullptr AND it is not set to this (ie the canonicalType is another object)
+        // then it needs to be released because it's owned by this object.
+        if (canonicalType && canonicalType != this)
+        {
+            canonicalType->releaseReference();
+        }
+    }
+
     bool Type::Equals(Type * type)
     {
         return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
-    }
-
-    bool Type::Equals(RefPtr<Type> type)
-    {
-        return Equals(type.Ptr());
     }
 
     bool Type::EqualsVal(Val* val)
@@ -145,21 +150,21 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return canSubst;
     }
 
-
     Type* Type::GetCanonicalType()
     {
-        SLANG_ASSERT(this);
-
         Type* et = const_cast<Type*>(this);
         if (!et->canonicalType)
         {
             // TODO(tfoley): worry about thread safety here?
             auto canType = et->CreateCanonicalType();
             et->canonicalType = canType;
-            if (dynamic_cast<Type*>(et->canonicalType) != this)
-                et->canonicalTypeRefPtr = canType;
-            else
-                canType.detach();
+
+            // TODO(js): That this detachs when canType == this is a little surprising. It would seem
+            // as if this would create a circular reference on the object, but in practice there are
+            // no leaks so appears correct.
+            // That the dtor only releases if != this, also makes it surprising.
+            canType.detach();
+            
             SLANG_ASSERT(et->canonicalType);
         }
         return et->canonicalType;

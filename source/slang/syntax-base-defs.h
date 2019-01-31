@@ -81,20 +81,21 @@ public:
     void setSession(Session* s) { this->session = s; }
 
     bool Equals(Type* type);
-    bool Equals(RefPtr<Type> type);
-
+    
     Type* GetCanonicalType();
 
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     virtual bool EqualsVal(Val* val) override;
+
+    ~Type();
+
 protected:
     virtual bool EqualsImpl(Type* type) = 0;
 
     virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
-    RefPtr<Type> canonicalTypeRefPtr;
-
+    
     Session* session = nullptr;
     )
 END_SYNTAX_CLASS()
