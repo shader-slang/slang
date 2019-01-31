@@ -912,6 +912,9 @@ RefPtr<ModuleDecl> CompileRequest::loadModule(
     if( errorCountAfter != errorCountBefore )
     {
         mSink.diagnose(srcLoc, Diagnostics::errorInImportedModule);
+    }
+    if (errorCountAfter)
+    {
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
