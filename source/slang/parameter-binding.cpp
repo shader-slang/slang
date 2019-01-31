@@ -785,12 +785,12 @@ static bool validateSpecializationsMatch(
     for(;;)
     {
         // Skip any global generic substitutions.
-        if(auto leftGlobalGeneric = ll.As<GlobalGenericParamSubstitution>())
+        if(auto leftGlobalGeneric = ll.as<GlobalGenericParamSubstitution>())
         {
             ll = leftGlobalGeneric->outer;
             continue;
         }
-        if(auto rightGlobalGeneric = rr.As<GlobalGenericParamSubstitution>())
+        if(auto rightGlobalGeneric = rr.as<GlobalGenericParamSubstitution>())
         {
             rr = rightGlobalGeneric->outer;
             continue;
@@ -806,9 +806,9 @@ static bool validateSpecializationsMatch(
         ll = ll->outer;
         rr = rr->outer;
 
-        if(auto leftGeneric = leftSubst.As<GenericSubstitution>())
+        if(auto leftGeneric = leftSubst.as<GenericSubstitution>())
         {
-            if(auto rightGeneric = rightSubst.As<GenericSubstitution>())
+            if(auto rightGeneric = as<GenericSubstitution>(rightSubst))
             {
                 if(validateGenericSubstitutionsMatch(context, leftGeneric, rightGeneric, stack))
                 {
@@ -816,9 +816,9 @@ static bool validateSpecializationsMatch(
                 }
             }
         }
-        else if(auto leftThisType = leftSubst.As<ThisTypeSubstitution>())
+        else if(auto leftThisType = leftSubst.as<ThisTypeSubstitution>())
         {
-            if(auto rightThisType = rightSubst.As<ThisTypeSubstitution>())
+            if(auto rightThisType = rightSubst.as<ThisTypeSubstitution>())
             {
                 if(validateThisTypeSubstitutionsMatch(context, leftThisType, rightThisType, stack))
                 {
@@ -851,9 +851,9 @@ static bool validateTypesMatch(
     // are ever recursive types. We'd need a more refined system to
     // cache the matches we've already found.
 
-    if( auto leftDeclRefType = left->As<DeclRefType>() )
+    if( auto leftDeclRefType = as<DeclRefType>(left) )
     {
-        if( auto rightDeclRefType = right->As<DeclRefType>() )
+        if( auto rightDeclRefType = as<DeclRefType>(right) )
         {
             // Are they references to matching decl refs?
             auto leftDeclRef = leftDeclRefType->declRef;
@@ -879,9 +879,9 @@ static bool validateTypesMatch(
                 }
 
                 // Check that any declared fields match too.
-                if( auto leftStructDeclRef = leftDeclRef.As<AggTypeDecl>() )
+                if( auto leftStructDeclRef = leftDeclRef.as<AggTypeDecl>() )
                 {
-                    if( auto rightStructDeclRef = rightDeclRef.As<AggTypeDecl>() )
+                    if( auto rightStructDeclRef = rightDeclRef.as<AggTypeDecl>() )
                     {
                         List<DeclRef<VarDecl>> leftFields;
                         List<DeclRef<VarDecl>> rightFields;
@@ -931,9 +931,9 @@ static bool validateTypesMatch(
 
     // If we are looking at `T[N]` and `U[M]` we want to check that
     // `T` is structurally equivalent to `U` and `N` is the same as `M`.
-    else if( auto leftArrayType = left->As<ArrayExpressionType>() )
+    else if( auto leftArrayType = as<ArrayExpressionType>(left) )
     {
-        if( auto rightArrayType = right->As<ArrayExpressionType>() )
+        if( auto rightArrayType = as<ArrayExpressionType>(right) )
         {
             if(!validateTypesMatch(context, leftArrayType->baseType, rightArrayType->baseType, stack) )
                 return false;
@@ -1029,7 +1029,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<InModifier>() || type->As<GLSLInputParameterGroupType>())
+    if( varDecl->HasModifier<InModifier>() || as<GLSLInputParameterGroupType>(type))
     {
         // Special case to handle "arrayed" shader inputs, as used
         // for Geometry and Hull input
@@ -1041,8 +1041,8 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
             // Tessellation `patch` variables should stay as written
             if( !varDecl->HasModifier<GLSLPatchModifier>() )
             {
-                // Unwrap array type, if prsent
-                if( auto arrayType = type->As<ArrayExpressionType>() )
+                // Unwrap array type, if present
+                if( auto arrayType = as<ArrayExpressionType>(type) )
                 {
                     type = arrayType->baseType.Ptr();
                 }
@@ -1067,7 +1067,7 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
         return nullptr;
 
     auto type = varDecl->getType();
-    if( varDecl->HasModifier<OutModifier>() || type->As<GLSLOutputParameterGroupType>())
+    if( varDecl->HasModifier<OutModifier>() || as<GLSLOutputParameterGroupType>(type))
     {
         // Special case to handle "arrayed" shader outputs, as used
         // for Hull Shader output
@@ -1080,8 +1080,8 @@ RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
             // Tessellation `patch` variables should stay as written
             if( !varDecl->HasModifier<GLSLPatchModifier>() )
             {
-                // Unwrap array type, if prsent
-                if( auto arrayType = type->As<ArrayExpressionType>() )
+                // Unwrap array type, if present
+                if( auto arrayType = as<ArrayExpressionType>(type) )
                 {
                     type = arrayType->baseType.Ptr();
                 }
@@ -1109,7 +1109,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
 
-    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && type->As<ConstantBufferType>() )
+    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && as<ConstantBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
@@ -1118,7 +1118,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if (varDecl->HasModifier<PushConstantAttribute>() && type->As<ConstantBufferType>())
+    if (varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type))
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
@@ -1209,7 +1209,7 @@ static void collectGlobalScopeParameter(
     // Now create a variable layout that we can use
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->typeLayout = typeLayout;
-    varLayout->varDecl = DeclRef<Decl>(varDecl.Ptr(), nullptr).As<VarDeclBase>();
+    varLayout->varDecl = DeclRef<Decl>(varDecl.Ptr(), nullptr).as<VarDeclBase>();
 
     // This declaration may represent the same logical parameter
     // as a declaration that came from a different translation unit.
@@ -1797,12 +1797,12 @@ static void collectGlobalScopeParameters(
     // for generic types in the second pass.
     for (auto decl : program->Members)
     {
-        if (auto genParamDecl = decl.As<GlobalGenericParamDecl>())
+        if (auto genParamDecl = as<GlobalGenericParamDecl>(decl))
             collectGlobalGenericParameter(context, genParamDecl);
     }
     for (auto decl : program->Members)
     {
-        if (auto varDecl = decl.As<VarDeclBase>())
+        if (auto varDecl = as<VarDeclBase>(decl))
             collectGlobalScopeParameter(context, varDecl);
     }
 
@@ -2017,7 +2017,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 {
     // The default handling of varying parameters should not apply
     // to geometry shader output streams; they have their own special rules.
-    if( auto gsStreamType = type->As<HLSLStreamOutputType>() )
+    if( auto gsStreamType = as<HLSLStreamOutputType>(type) )
     {
         //
 
@@ -2136,21 +2136,21 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
 
     // Scalar and vector types are treated as outputs directly
-    if(auto basicType = type->As<BasicExpressionType>())
+    if(auto basicType = as<BasicExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, basicType, state, varLayout);
     }
-    else if(auto vectorType = type->As<VectorExpressionType>())
+    else if(auto vectorType = as<VectorExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, vectorType, state, varLayout);
     }
     // A matrix is processed as if it was an array of rows
-    else if( auto matrixType = type->As<MatrixExpressionType>() )
+    else if( auto matrixType = as<MatrixExpressionType>(type) )
     {
         auto rowCount = GetIntVal(matrixType->getRowCount());
         return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
     }
-    else if( auto arrayType = type->As<ArrayExpressionType>() )
+    else if( auto arrayType = as<ArrayExpressionType>(type) )
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
@@ -2179,16 +2179,16 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if (auto textureType = type->As<TextureType>()) { return nullptr;  }
-    else if(auto samplerStateType = type->As<SamplerStateType>()) { return nullptr;  }
-    else if(auto constantBufferType = type->As<ConstantBufferType>()) { return nullptr;  }
+    else if (auto textureType = as<TextureType>(type)) { return nullptr;  }
+    else if(auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
+    else if(auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
-    else if( auto declRefType = type->As<DeclRefType>() )
+    else if( auto declRefType = as<DeclRefType>(type) )
     {
         auto declRef = declRefType->declRef;
 
-        if (auto structDeclRef = declRef.As<StructDecl>())
+        if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
             structLayout->type = type;
@@ -2226,7 +2226,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             return structLayout;
         }
-        else if (auto globalGenericParam = declRef.As<GlobalGenericParamDecl>())
+        else if (auto globalGenericParam = declRef.as<GlobalGenericParamDecl>())
         {
             auto genParamTypeLayout = new GenericParamTypeLayout();
             // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
@@ -2242,7 +2242,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         }
     }
     // If we ran into an error in checking the user's code, then skip this parameter
-    else if( auto errorType = type->As<ErrorType>() )
+    else if( auto errorType = as<ErrorType>(type) )
     {
         return nullptr;
     }
@@ -2488,13 +2488,13 @@ static void collectEntryPointParameters(
     context->entryPointLayout = entryPointLayout;
 
     // Note: this isn't really the best place for this logic to sit,
-    // but it is the simplest place where we have a direct correspondance
+    // but it is the simplest place where we have a direct correspondence
     // between a single `EntryPointRequest` and its matching `EntryPointLayout`,
     // so we'll use it.
     //
     for( auto taggedUnionType : entryPoint->taggedUnionTypes )
     {
-        auto substType = taggedUnionType->Substitute(typeSubst).As<Type>();
+        auto substType = taggedUnionType->Substitute(typeSubst).dynamicCast<Type>();
         auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
     }
@@ -2610,7 +2610,7 @@ static void collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointVaryingParameterDecl(
             context,
             entryPointFuncDecl,
-            resultType->Substitute(typeSubst).As<Type>(),
+            resultType->Substitute(typeSubst).dynamicCast<Type>(),
             state,
             resultLayout);
 

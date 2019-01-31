@@ -4238,11 +4238,11 @@ struct EmitVisitor
         if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
         {
             auto layout = layoutDecoration->getLayout();
-            if(auto varLayout = layout->dynamicCast<VarLayout>())
+            if(auto varLayout = dynamicCast<VarLayout>(layout))
             {
                 emitIRSemantics(ctx, varLayout);
             }
-            else if (auto entryPointLayout = layout->dynamicCast<EntryPointLayout>())
+            else if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layout))
             {
                 if(auto resultLayout = entryPointLayout->resultLayout)
                 {
@@ -4604,7 +4604,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto stringLitExpr = expr->As<StringLiteralExpr>();
+        auto stringLitExpr = as<StringLiteralExpr>(expr);
         if (!stringLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
@@ -4631,7 +4631,7 @@ struct EmitVisitor
 
         Expr* expr = attrib->args[0];
 
-        auto intLitExpr = expr->As<IntegerLiteralExpr>();
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
         if (!intLitExpr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
@@ -4841,39 +4841,39 @@ struct EmitVisitor
             {
                 if(auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
-                    if(inputPrimitiveTypeModifier->As<HLSLTriangleModifier>())
+                    if(as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineModifier>())
+                    else if(as<HLSLLineModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLLineAdjModifier>())
+                    else if(as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(lines_adjacency) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLPointModifier>())
+                    else if(as<HLSLPointModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(points) in;\n");
                     }
-                    else if(inputPrimitiveTypeModifier->As<HLSLTriangleAdjModifier>())
+                    else if(as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
                     {
                         emit("layout(triangles_adjacency) in;\n");
                     }
                 }
 
-                if(auto outputStreamType = pp->type->As<HLSLStreamOutputType>())
+                if(auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
                 {
-                    if(outputStreamType->As<HLSLTriangleStreamType>())
+                    if(as<HLSLTriangleStreamType>(outputStreamType))
                     {
                         emit("layout(triangle_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLLineStreamType>())
+                    else if(as<HLSLLineStreamType>(outputStreamType))
                     {
                         emit("layout(line_strip) out;\n");
                     }
-                    else if(outputStreamType->As<HLSLPointStreamType>())
+                    else if(as<HLSLPointStreamType>(outputStreamType))
                     {
                         emit("layout(points) out;\n");
                     }
@@ -5159,7 +5159,7 @@ struct EmitVisitor
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
         {
-            return layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>();
+            return dynamicCast<EntryPointLayout>(layoutDecoration->getLayout());
         }
         return nullptr;
     }
@@ -5168,7 +5168,7 @@ struct EmitVisitor
     {
         if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
         {
-            if (auto entryPointLayout = layoutDecoration->getLayout()->dynamicCast<EntryPointLayout>())
+            if (auto entryPointLayout = dynamicCast<EntryPointLayout>(layoutDecoration->getLayout()))
             {
                 return entryPointLayout;
             }
@@ -5292,10 +5292,10 @@ struct EmitVisitor
         //
 
         auto typeLayout = layout->typeLayout;
-        while(auto arrayTypeLayout = typeLayout.As<ArrayTypeLayout>())
+        while(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
             typeLayout = arrayTypeLayout->elementTypeLayout;
 
-        if (auto matrixTypeLayout = typeLayout.As<MatrixTypeLayout>())
+        if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
         {
             auto target = ctx->shared->target;
 
@@ -5708,7 +5708,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout;
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -5798,7 +5798,7 @@ struct EmitVisitor
         EmitVarChain elementChain = blockChain;
 
         auto typeLayout = varLayout->typeLayout->unwrapArray();
-        if( auto parameterGroupTypeLayout = typeLayout.As<ParameterGroupTypeLayout>() )
+        if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
         {
             containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
             elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
@@ -6527,19 +6527,19 @@ StructTypeLayout* getScopeStructLayout(
     ScopeLayout*  scopeLayout)
 {
     auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
-    if( auto structTypeLayout = scopeTypeLayout.As<StructTypeLayout>() )
+    if( auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout) )
     {
         return structTypeLayout.Ptr();
     }
-    else if( auto constantBufferTypeLayout = scopeTypeLayout.As<ParameterGroupTypeLayout>() )
+    else if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
     {
         auto elementTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
-        auto elementTypeStructLayout = elementTypeLayout.As<StructTypeLayout>();
+        auto elementTypeStructLayout = as<StructTypeLayout>(elementTypeLayout);
 
         // We expect all constant buffers to contain `struct` types for now
         SLANG_RELEASE_ASSERT(elementTypeStructLayout);
 
-        return elementTypeStructLayout.Ptr();
+        return elementTypeStructLayout;
     }
     else
     {

@@ -744,7 +744,7 @@ ScalarizedVal extractField(
 
     case ScalarizedVal::Flavor::tuple:
         {
-            auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+            auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
             return tupleVal->elements[fieldIndex].val;
         }
 
@@ -821,7 +821,7 @@ void assign(
                 // We are assigning from a tuple to a destination
                 // that is not a tuple. We will perform assignment
                 // element-by-element.
-                auto rightTupleVal = right.impl.As<ScalarizedTupleValImpl>();
+                auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
                 UInt elementCount = rightTupleVal->elements.Count();
 
                 for( UInt ee = 0; ee < elementCount; ++ee )
@@ -847,7 +847,7 @@ void assign(
         {
             // We have a tuple, so we are going to need to try and assign
             // to each of its constituent fields.
-            auto leftTupleVal = left.impl.As<ScalarizedTupleValImpl>();
+            auto leftTupleVal = as<ScalarizedTupleValImpl>(left.impl);
             UInt elementCount = leftTupleVal->elements.Count();
 
             for( UInt ee = 0; ee < elementCount; ++ee )
@@ -869,7 +869,7 @@ void assign(
             //
             // In this case we are converting to the actual type of the GLSL variable,
             // from the "pretend" type that it had in the IR before.
-            auto typeAdapter = left.impl.As<ScalarizedTypeAdapterValImpl>();
+            auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(left.impl);
             auto adaptedRight = adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
             assign(builder, typeAdapter->val, adaptedRight);
         }
@@ -905,7 +905,7 @@ ScalarizedVal getSubscriptVal(
 
     case ScalarizedVal::Flavor::tuple:
         {
-            auto inputTuple = val.impl.As<ScalarizedTupleValImpl>();
+            auto inputTuple = val.impl.as<ScalarizedTupleValImpl>();
 
             RefPtr<ScalarizedTupleValImpl> resultTuple = new ScalarizedTupleValImpl();
             resultTuple->type = elementType;
@@ -967,7 +967,7 @@ IRInst* materializeTupleValue(
     IRBuilder*      builder,
     ScalarizedVal   val)
 {
-    auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+    auto tupleVal = val.impl.as<ScalarizedTupleValImpl>();
     SLANG_ASSERT(tupleVal);
 
     UInt elementCount = tupleVal->elements.Count();
@@ -1044,7 +1044,7 @@ IRInst* materializeValue(
 
     case ScalarizedVal::Flavor::tuple:
         {
-            auto tupleVal = val.impl.As<ScalarizedTupleValImpl>();
+            //auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
             return materializeTupleValue(builder, val);
         }
         break;
@@ -1055,7 +1055,7 @@ IRInst* materializeValue(
             // doesn't match the type it pretends to have. To make this
             // work we need to adapt the type from its actual type over
             // to its pretend type.
-            auto typeAdapter = val.impl.As<ScalarizedTypeAdapterValImpl>();
+            auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
             auto adapted = adaptType(builder, typeAdapter->val, typeAdapter->pretendType, typeAdapter->actualType);
             return materializeValue(builder, adapted);
         }

@@ -63,29 +63,30 @@ namespace Slang
         {
             return referenceCount;
         }
-
-        // Use instead of dynamic_cast as it allows for replacement without using Rtti in the future
-        template<typename T>
-        SLANG_FORCE_INLINE const T* dynamicCast() const
-        {
-            return dynamic_cast<const T*>(this);
-        }
-        template<typename T>
-        SLANG_FORCE_INLINE T* dynamicCast()
-        {
-            return dynamic_cast<T*>(this);
-        }
     };
 
-    inline void addReference(RefObject* obj)
+    SLANG_FORCE_INLINE void addReference(RefObject* obj)
     {
         if(obj) obj->addReference();
     }
 
-    inline void releaseReference(RefObject* obj)
+    SLANG_FORCE_INLINE void releaseReference(RefObject* obj)
     {
         if(obj) obj->releaseReference();
     }
+
+    // For straight dynamic cast.
+    // Use instead of dynamic_cast as it allows for replacement without using Rtti in the future
+    template <typename T>
+    SLANG_FORCE_INLINE T* dynamicCast(RefObject* obj) { return dynamic_cast<T*>(obj); }
+    template <typename T>
+    SLANG_FORCE_INLINE const T* dynamicCast(const RefObject* obj) { return dynamic_cast<const T*>(obj); }
+
+    // Like a dynamicCast, but allows a type to implement a specific implementation that is suitable for it
+    template <typename T>
+    SLANG_FORCE_INLINE T* as(RefObject* obj) { return dynamicCast<T>(obj); }
+    template <typename T>
+    SLANG_FORCE_INLINE const T* as(const RefObject* obj) { return dynamicCast<T>(obj); }
 
     // "Smart" pointer to a reference-counted object
     template<typename T>
@@ -182,9 +183,15 @@ namespace Slang
 		}
 
         template<typename U>
-        RefPtr<U> As() const
+        RefPtr<U> dynamicCast() const
         {
-            return RefPtr<U>(pointer->template dynamicCast<U>());
+            return RefPtr<U>(Slang::dynamicCast<U>(pointer));
+        }
+
+        template<typename U>
+        RefPtr<U> as() const
+        {
+            return RefPtr<U>(Slang::as<U>(pointer));
         }
 
         ~RefPtr()
