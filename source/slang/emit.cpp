@@ -6529,7 +6529,7 @@ StructTypeLayout* getScopeStructLayout(
     auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
     if( auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout) )
     {
-        return structTypeLayout.Ptr();
+        return structTypeLayout;
     }
     else if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
     {

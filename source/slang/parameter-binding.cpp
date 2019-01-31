@@ -2259,7 +2259,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = paramDecl->type.type->Substitute(typeSubst).As<Type>();
+    auto paramType = paramDecl->type.type->Substitute(typeSubst).as<Type>();
 
     if( paramDecl->HasModifier<HLSLUniformModifier>() )
     {
@@ -2297,7 +2297,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         return processEntryPointVaryingParameterDecl(
             context,
             paramDecl.Ptr(),
-            paramDecl->type.type->Substitute(typeSubst).As<Type>(),
+            paramDecl->type.type->Substitute(typeSubst).as<Type>(),
             state,
             paramVarLayout);
     }
@@ -3114,7 +3114,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
         // substutition with the global generic arguments.
         //
         RefPtr<Type> oldType = oldVarLayout->getTypeLayout()->getType();
-        RefPtr<Type> newType = oldType->Substitute(typeSubst).As<Type>();
+        RefPtr<Type> newType = oldType->Substitute(typeSubst).as<Type>();
 
         RefPtr<TypeLayout> newTypeLayout = getTypeLayoutForGlobalShaderParameter(
             &context,
