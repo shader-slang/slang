@@ -126,7 +126,7 @@ namespace Slang
             }
             else if (auto vectorType = as<VectorExpressionType>(typeIn))
             {
-                if (auto elemCount = vectorType->elementCount.as<ConstantIntVal>())
+                if (auto elemCount = as<ConstantIntVal>(vectorType->elementCount))
                 {
                     data.dim1 = elemCount->value - 1;
                     auto elementBasicType = as<BasicExpressionType>(vectorType->elementType);
@@ -885,16 +885,16 @@ namespace Slang
 
         RefPtr<Expr> ExpectATypeRepr(RefPtr<Expr> expr)
         {
-            if (auto overloadedExpr = expr.as<OverloadedExpr>())
+            if (auto overloadedExpr = as<OverloadedExpr>(expr))
             {
                 expr = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
             }
 
-            if (auto typeType = as<TypeType>(expr->type.type))
+            if (auto typeType = as<TypeType>(expr->type))
             {
                 return expr;
             }
-            else if (auto errorType = as<ErrorType>(expr->type.type))
+            else if (auto errorType = as<ErrorType>(expr->type))
             {
                 return expr;
             }
@@ -925,7 +925,7 @@ namespace Slang
 
         RefPtr<Val> ExtractGenericArgVal(RefPtr<Expr> exp)
         {
-            if (auto overloadedExpr = exp.as<OverloadedExpr>())
+            if (auto overloadedExpr = as<OverloadedExpr>(exp))
             {
                 // assume that if it is overloaded, we want a type
                 exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
@@ -1043,7 +1043,7 @@ namespace Slang
             // this is a quick fix that at least alerts the user to how we are
             // interpreting their code.
             //
-            if (auto varDecl = decl.as<VarDecl>())
+            if (auto varDecl = as<VarDecl>(decl))
             {
                 if (auto parenScope = as<ScopeDecl>(varDecl->ParentDecl))
                 {
@@ -1076,7 +1076,7 @@ namespace Slang
         void EnusreAllDeclsRec(RefPtr<Decl> decl)
         {
             checkDecl(decl);
-            if (auto containerDecl = decl.as<ContainerDecl>())
+            if (auto containerDecl = as<ContainerDecl>(decl))
             {
                 for (auto m : containerDecl->Members)
                 {
@@ -1141,7 +1141,7 @@ namespace Slang
                 List<RefPtr<Expr>> args;
                 for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
                 {
-                    if (auto typeParam = member.as<GenericTypeParamDecl>())
+                    if (auto typeParam = as<GenericTypeParamDecl>(member))
                     {
                         if (!typeParam->initType.exp)
                         {
@@ -1157,7 +1157,7 @@ namespace Slang
                         if (outProperType)
                             args.Add(typeParam->initType.exp);
                     }
-                    else if (auto valParam = member.as<GenericValueParamDecl>())
+                    else if (auto valParam = as<GenericValueParamDecl>(member))
                     {
                         if (!valParam->initExpr)
                         {
@@ -1274,11 +1274,11 @@ namespace Slang
         // Capture the "base" expression in case this is a member reference
         RefPtr<Expr> GetBaseExpr(RefPtr<Expr> expr)
         {
-            if (auto memberExpr = expr.as<MemberExpr>())
+            if (auto memberExpr = as<MemberExpr>(expr))
             {
                 return memberExpr->BaseExpression;
             }
-            else if(auto overloadedExpr = expr.as<OverloadedExpr>())
+            else if(auto overloadedExpr = as<OverloadedExpr>(expr))
             {
                 return overloadedExpr->base;
             }
@@ -1293,17 +1293,17 @@ namespace Slang
         {
             if(left == right) return true;
 
-            if(auto leftConst = left.as<ConstantIntVal>())
+            if(auto leftConst = as<ConstantIntVal>(left))
             {
-                if(auto rightConst = right.as<ConstantIntVal>())
+                if(auto rightConst = as<ConstantIntVal>(right))
                 {
                     return leftConst->value == rightConst->value;
                 }
             }
 
-            if(auto leftVar = left.as<GenericParamIntVal>())
+            if(auto leftVar = as<GenericParamIntVal>(left))
             {
-                if(auto rightVar = right.as<GenericParamIntVal>())
+                if(auto rightVar = as<GenericParamIntVal>(right))
                 {
                     return leftVar->declRef.Equals(rightVar->declRef);
                 }
@@ -1352,7 +1352,7 @@ namespace Slang
 
             if(auto declRefType = as<DeclRefType>(type))
             {
-                if(declRefType->declRef.as<StructDecl>())
+                if(as<StructDecl>(declRefType->declRef))
                     return false;
             }
 
@@ -1500,7 +1500,7 @@ namespace Slang
                 auto toElementType = toVecType->elementType;
 
                 UInt elementCount = 0;
-                if (auto constElementCount = toElementCount.as<ConstantIntVal>())
+                if (auto constElementCount = as<ConstantIntVal>(toElementCount))
                 {
                     elementCount = (UInt) constElementCount->value;
                 }
@@ -3844,7 +3844,7 @@ namespace Slang
                         RefPtr<IntVal> explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
                         if(explicitTagVal)
                         {
-                            if(auto constIntVal = explicitTagVal.as<ConstantIntVal>())
+                            if(auto constIntVal = as<ConstantIntVal>(explicitTagVal))
                             {
                                 defaultTag = constIntVal->value;
                             }
@@ -6297,8 +6297,8 @@ namespace Slang
                         if (c.decl != valParam.getDecl())
                             continue;
 
-                        auto cVal = c.val.as<IntVal>();
-                        SLANG_RELEASE_ASSERT(cVal.Ptr());
+                        auto cVal = as<IntVal>(c.val);
+                        SLANG_RELEASE_ASSERT(cVal);
 
                         if (!val)
                         {
@@ -6306,7 +6306,7 @@ namespace Slang
                         }
                         else
                         {
-                            if(!val->EqualsVal(cVal.Ptr()))
+                            if(!val->EqualsVal(cVal))
                             {
                                 // failure!
                                 return SubstitutionSet();

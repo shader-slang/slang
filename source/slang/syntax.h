@@ -1165,7 +1165,7 @@ namespace Slang
 
     inline int GetVectorSize(VectorExpressionType* vecType)
     {
-        auto constantVal = vecType->elementCount.as<ConstantIntVal>();
+        auto constantVal = as<ConstantIntVal>(vecType->elementCount);
         if (constantVal)
             return (int) constantVal->value;
         // TODO: what to do in this case?
