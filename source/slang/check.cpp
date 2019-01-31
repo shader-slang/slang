@@ -6606,6 +6606,10 @@ namespace Slang
             {
                 if (auto typeParamRef = memberRef.As<GenericTypeParamDecl>())
                 {
+                    if (aa >= context.argCount)
+                    {
+                        return false;
+                    }
                     auto arg = context.getArg(aa++);
 
                     TypeExp typeExp;
