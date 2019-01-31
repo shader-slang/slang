@@ -19,3 +19,5 @@ The [Intermediate Representation (IR)](ir.md) document describes the design of S
 The [Existential Types](existential-types.md) document goes into some detail about what "existential types" are in the context of the Slang language, and explains how we may go about supporting them.
 
 The [Capabilities](capabilities.md) document explains the proposed model for how Slang will support general notions of profile- or capability-based overloading/dispatch.
+
+The [Casting](casting.md) document explains how casting works in the slang C++ compiler code base.
