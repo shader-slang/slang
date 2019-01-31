@@ -213,14 +213,14 @@ namespace Slang
         DeclRef<Decl>       declRef)
     {
         auto parentDeclRef = declRef.GetParent();
-        auto parentGenericDeclRef = parentDeclRef.As<GenericDecl>();
+        auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
             // In certain cases we want to skip emitting the parent
             if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() != declRef.getDecl()))
             {
             }
-            else if(parentDeclRef.As<FunctionDeclBase>())
+            else if(parentDeclRef.as<FunctionDeclBase>())
             {
             }
             else
@@ -232,7 +232,7 @@ namespace Slang
         // A generic declaration is kind of a pseudo-declaration
         // as far as the user is concerned; so we don't want
         // to emit its name.
-        if(auto genericDeclRef = declRef.As<GenericDecl>())
+        if(auto genericDeclRef = declRef.as<GenericDecl>())
         {
             return;
         }
@@ -240,7 +240,7 @@ namespace Slang
         // Inheritance declarations don't have meaningful names,
         // and so we should emit them based on the type
         // that is doing the inheriting.
-        if(auto inheritanceDeclRef = declRef.As<InheritanceDecl>())
+        if(auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
         {
             emit(context, "I");
             emitType(context, GetSup(inheritanceDeclRef));
@@ -250,7 +250,7 @@ namespace Slang
         // Similarly, an extension doesn't have a name worth
         // emitting, and we should base things on its target
         // type instead.
-        if(auto extensionDeclRef = declRef.As<ExtensionDecl>())
+        if(auto extensionDeclRef = declRef.as<ExtensionDecl>())
         {
             // TODO: as a special case, an "unconditional" extension
             // that is in the same module as the type it extends should
@@ -264,9 +264,9 @@ namespace Slang
 
         // Special case: accessors need some way to distinguish themselves
         // so that a getter/setter/ref-er don't all compile to the same name.
-        if(declRef.As<GetterDecl>())        emitRaw(context, "Ag");
-        if(declRef.As<SetterDecl>())        emitRaw(context, "As");
-        if(declRef.As<RefAccessorDecl>())   emitRaw(context, "Ar");
+        if(declRef.as<GetterDecl>())        emitRaw(context, "Ag");
+        if(declRef.as<SetterDecl>())        emitRaw(context, "As");
+        if(declRef.as<RefAccessorDecl>())   emitRaw(context, "Ar");
 
         // Are we the "inner" declaration beneath a generic decl?
         if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() == declRef.getDecl()))
@@ -294,15 +294,15 @@ namespace Slang
                 UInt genericParameterCount = 0;
                 for( auto mm : getMembers(parentGenericDeclRef) )
                 {
-                    if(mm.As<GenericTypeParamDecl>())
+                    if(mm.as<GenericTypeParamDecl>())
                     {
                         genericParameterCount++;
                     }
-                    else if(mm.As<GenericValueParamDecl>())
+                    else if(mm.as<GenericValueParamDecl>())
                     {
                         genericParameterCount++;
                     }
-                    else if(mm.As<GenericTypeConstraintDecl>())
+                    else if(mm.as<GenericTypeConstraintDecl>())
                     {
                         genericParameterCount++;
                     }
@@ -314,16 +314,16 @@ namespace Slang
                 emit(context, genericParameterCount);
                 for( auto mm : getMembers(parentGenericDeclRef) )
                 {
-                    if(auto genericTypeParamDecl = mm.As<GenericTypeParamDecl>())
+                    if(auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
                         emitRaw(context, "T");
                     }
-                    else if(auto genericValueParamDecl = mm.As<GenericValueParamDecl>())
+                    else if(auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {
                         emitRaw(context, "v");
                         emitType(context, GetType(genericValueParamDecl));
                     }
-                    else if(mm.As<GenericTypeConstraintDecl>())
+                    else if(mm.as<GenericTypeConstraintDecl>())
                     {
                         emitRaw(context, "C");
                         // TODO: actually emit info about the constraint
@@ -342,7 +342,7 @@ namespace Slang
         // We'll also go ahead and emit the result type as well,
         // just for completeness.
         //
-        if( auto callableDeclRef = declRef.As<CallableDecl>())
+        if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
             auto parameters = GetParameters(callableDeclRef);
             UInt parameterCount = parameters.Count();
@@ -358,7 +358,7 @@ namespace Slang
 
             // Don't print result type for an initializer/constructor,
             // since it is implicit in the qualified name.
-            if (!callableDeclRef.As<ConstructorDecl>())
+            if (!callableDeclRef.as<ConstructorDecl>())
             {
                 emitType(context, GetResultType(callableDeclRef));
             }
