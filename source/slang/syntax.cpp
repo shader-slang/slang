@@ -1881,6 +1881,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     DeclRefBase DeclRefBase::GetParent() const
     {
+        // Want access to the free function (the 'as' method by default gets priority)
+        // Can access as method with this->as because it removes any ambiguity.
+        using Slang::as;
+
         auto parentDecl = decl->ParentDecl;
         if (!parentDecl)
             return DeclRefBase();

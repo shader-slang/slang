@@ -420,6 +420,10 @@ namespace Slang
         bool Equals(SubstitutionSet substSet) const;
         int GetHashCode() const;
     };
+
+    template<typename T>
+    struct DeclRef;
+
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
     struct DeclRefBase
@@ -461,6 +465,13 @@ namespace Slang
         // Apply substitutions to this declaration reference
         DeclRefBase SubstituteImpl(SubstitutionSet subst, int* ioDiff);
 
+        // Returns true if 'as' will return a valid cast
+        template <typename T>
+        bool canAs() const { return Slang::as<T>(decl) != nullptr; }
+
+        // "dynamic cast" to a more specific declaration reference type
+        template<typename T>
+        DeclRef<T> as() const;
 
         // Check if this is an equivalent declaration reference to another
         bool Equals(DeclRefBase const& declRef) const;
@@ -500,16 +511,6 @@ namespace Slang
             typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
             : DeclRefBase(other.decl, other.substitutions)
         {
-        }
-
-        // "dynamic cast" to a more specific declaration reference type
-        template<typename U>
-        DeclRef<U> as() const
-        {
-            DeclRef<U> result;
-            result.decl = Slang::as<U>(decl);
-            result.substitutions = substitutions;
-            return result;
         }
 
         T* getDecl() const
@@ -556,7 +557,15 @@ namespace Slang
         }
     };
 
-    
+    template<typename T>
+    DeclRef<T> DeclRefBase::as() const
+    {
+        DeclRef<T> result;
+        result.decl = Slang::as<T>(decl);
+        result.substitutions = substitutions;
+        return result;
+    }
+
     template<typename T>
     inline DeclRef<T> makeDeclRef(T* decl)
     {

@@ -404,7 +404,7 @@ void DoLocalLookupImpl(
         }
 
         // if we are looking inside an interface decl, try find in the interfaces it inherits from
-        bool isInterface = targetDeclRef.as<InterfaceDecl>() ? true : false;
+        bool isInterface = targetDeclRef.canAs<InterfaceDecl>(); 
         if (isInterface)
         {
             if(!targetDeclRefType)
