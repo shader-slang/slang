@@ -7,7 +7,7 @@ C++'s built in mechanisms for casting (principally dynamic_cast) is problematic 
 
 * There are types which we want to 'dynamic_cast' that do not have, and we do not want to have a Vtbl (for example Slang::IRInst). 
 * There are types which a 'dynamic_cast' doesn't do quite what we want (for example casting on Type* derived types typically wants to work on their canonical type)
-* We may want to replace use of dynamic_cast in the future for speed/space or other reasons in the future
+* We may want to replace use of dynamic_cast in the future for speed/space or other reasons
 * It is common in the code base when using a 'smart pointer' type to cast it, but still return a smart pointer 
 
 To deal with these issues we need casting within Slang to follow it's own methodology. In summary it is as follows...
