@@ -194,8 +194,8 @@ namespace Slang
             return RefPtr<U>(Slang::as<U>(pointer));
         }
 
-        template <typename T>
-        bool is() const { return Slang::as<T>(pointer) != nullptr; }
+        template <typename U>
+        bool is() const { return Slang::as<U>(pointer) != nullptr; }
 
         ~RefPtr()
         {
