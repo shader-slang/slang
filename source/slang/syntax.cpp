@@ -249,16 +249,23 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* Session::getStringType()
     {
-        auto stringTypeDecl = findMagicDecl(this, "StringType");
-        return DeclRefType::Create(this, makeDeclRef<Decl>(stringTypeDecl));
+        if (stringType == nullptr)
+        {
+            auto stringTypeDecl = findMagicDecl(this, "StringType");
+            stringType = DeclRefType::Create(this, makeDeclRef<Decl>(stringTypeDecl));
+        }
+        return stringType;
     }
 
     Type* Session::getEnumTypeType()
     {
-        auto enumTypeTypeDecl = findMagicDecl(this, "EnumTypeType");
-        return DeclRefType::Create(this, makeDeclRef<Decl>(enumTypeTypeDecl));
+        if (enumTypeType == nullptr)
+        {
+            auto enumTypeTypeDecl = findMagicDecl(this, "EnumTypeType");
+            enumTypeType = DeclRefType::Create(this, makeDeclRef<Decl>(enumTypeTypeDecl));
+        }
+        return enumTypeType;
     }
-
 
     RefPtr<PtrType> Session::getPtrType(
         RefPtr<Type>    valueType)
@@ -721,7 +728,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    DeclRefType* DeclRefType::Create(
+    RefPtr<DeclRefType> DeclRefType::Create(
         Session*        session,
         DeclRef<Decl>   declRef)
     {
@@ -876,13 +883,13 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     SLANG_UNEXPECTED("unhandled type");
                 }
 
-                auto type = classInfo.createInstance();
+                RefPtr<RefObject> type = classInfo.createInstance();
                 if (!type)
                 {
                     SLANG_UNEXPECTED("constructor failure");
                 }
 
-                auto declRefType = dynamic_cast<DeclRefType*>(type);
+                auto declRefType = dynamicCast<DeclRefType>(type);
                 if (!declRefType)
                 {
                     SLANG_UNEXPECTED("expected a declaration reference type");
@@ -1251,9 +1258,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-        return as<VectorExpressionType>(DeclRefType::Create(
+        return DeclRefType::Create(
             this,
-            declRef));
+            declRef).as<VectorExpressionType>();
     }
 
 

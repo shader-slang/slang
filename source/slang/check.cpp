@@ -5209,9 +5209,9 @@ namespace Slang
 
             auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-            return as<VectorExpressionType>(DeclRefType::Create(
+            return DeclRefType::Create(
                 session,
-                declRef));
+                declRef).as<VectorExpressionType>();
         }
 
         RefPtr<Expr> visitIndexExpr(IndexExpr* subscriptExpr)

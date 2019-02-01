@@ -608,6 +608,9 @@ namespace Slang
         RefPtr<Type> constExprRate;
         RefPtr<Type> irBasicBlockType;
 
+        RefPtr<Type> stringType;
+        RefPtr<Type> enumTypeType;
+
         ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
         ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
         SlangFuncPtr sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)];
