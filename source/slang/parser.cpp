@@ -2997,7 +2997,7 @@ namespace Slang
         // then we really want the modifiers to apply to the inner declaration.
         //
         RefPtr<Decl> declToModify = decl;
-        if(auto genericDecl = decl.as<GenericDecl>())
+        if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
         AddModifiers(declToModify.Ptr(), modifiers.first);
 

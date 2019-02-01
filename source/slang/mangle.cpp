@@ -264,9 +264,12 @@ namespace Slang
 
         // Special case: accessors need some way to distinguish themselves
         // so that a getter/setter/ref-er don't all compile to the same name.
-        if(declRef.as<GetterDecl>())        emitRaw(context, "Ag");
-        if(declRef.as<SetterDecl>())        emitRaw(context, "As");
-        if(declRef.as<RefAccessorDecl>())   emitRaw(context, "Ar");
+        {
+            auto decl = declRef.getDecl();
+            if(as<GetterDecl>(decl))        emitRaw(context, "Ag");
+            if(as<SetterDecl>(decl))        emitRaw(context, "As");
+            if(as<RefAccessorDecl>(decl))   emitRaw(context, "Ar");
+        }
 
         // Are we the "inner" declaration beneath a generic decl?
         if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() == declRef.getDecl()))
@@ -294,15 +297,15 @@ namespace Slang
                 UInt genericParameterCount = 0;
                 for( auto mm : getMembers(parentGenericDeclRef) )
                 {
-                    if(mm.as<GenericTypeParamDecl>())
+                    if(as<GenericTypeParamDecl>(mm))
                     {
                         genericParameterCount++;
                     }
-                    else if(mm.as<GenericValueParamDecl>())
+                    else if(as<GenericValueParamDecl>(mm))
                     {
                         genericParameterCount++;
                     }
-                    else if(mm.as<GenericTypeConstraintDecl>())
+                    else if(as<GenericTypeConstraintDecl>(mm))
                     {
                         genericParameterCount++;
                     }

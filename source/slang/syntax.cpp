@@ -1676,7 +1676,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             {
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
-                if(auto specGenericSubst = substsToSpecialize.as<GenericSubstitution>())
+                if(auto specGenericSubst = as<GenericSubstitution>(substsToSpecialize))
                 {
                     if(specGenericSubst->genericDecl == ancestorGenericDecl)
                     {
@@ -1710,7 +1710,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 //
                 for(auto s = substsToApply; s; s = s->outer)
                 {
-                    auto appGenericSubst = s.as<GenericSubstitution>();
+                    auto appGenericSubst = as<GenericSubstitution>(s);
                     if(!appGenericSubst)
                         continue;
 
@@ -1746,7 +1746,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
                 // The declaration is nested inside a generic.
                 // Does it already have a specialization for that generic?
-                if(auto specThisTypeSubst = substsToSpecialize.as<ThisTypeSubstitution>())
+                if(auto specThisTypeSubst = as<ThisTypeSubstitution>(substsToSpecialize))
                 {
                     if(specThisTypeSubst->interfaceDecl == ancestorInterfaceDecl)
                     {
@@ -1895,7 +1895,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // and there might be a this-type substitution in place.
             // A reference to the parent of the interface declaration
             // should not include that substitution.
-            if(auto thisTypeSubst = substToApply.as<ThisTypeSubstitution>())
+            if(auto thisTypeSubst = as<ThisTypeSubstitution>(substToApply))
             {
                 if(thisTypeSubst->interfaceDecl == interfaceDecl)
                 {
@@ -1913,7 +1913,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // A decl-ref to the parent generic should *not* include
             // those substitutions.
             //
-            if(auto genericSubst = substToApply.as<GenericSubstitution>())
+            if(auto genericSubst = as<GenericSubstitution>(substToApply))
             {
                 if(genericSubst->genericDecl == parentGenericDecl)
                 {
@@ -2182,7 +2182,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         for(RefPtr<Substitutions> s = substs; s; s = s->outer)
         {
-            auto thisTypeSubst = s.as<ThisTypeSubstitution>();
+            auto thisTypeSubst = as<ThisTypeSubstitution>(s);
             if(!thisTypeSubst)
                 continue;
 
@@ -2204,7 +2204,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
             {
-                if(auto genericSubst = s.as<GenericSubstitution>())
+                if(auto genericSubst = as<GenericSubstitution>(s))
                 {
                     // the generic decl associated with the substitution list must be
                     // the generic decl that declared this parameter
@@ -2216,9 +2216,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     UInt index = 0;
                     for (auto m : genericDecl->Members)
                     {
-                        if (auto constraintParam = m.as<GenericTypeConstraintDecl>())
+                        if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
                         {
-                            if (constraintParam.Ptr() == declRef.getDecl())
+                            if (constraintParam == declRef.getDecl())
                             {
                                 found = true;
                                 break;

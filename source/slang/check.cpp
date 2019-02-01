@@ -6258,8 +6258,8 @@ namespace Slang
                         if (c.decl != typeParam.getDecl())
                             continue;
 
-                        auto cType = c.val.as<Type>();
-                        SLANG_RELEASE_ASSERT(cType.Ptr());
+                        auto cType = as<Type>(c.val);
+                        SLANG_RELEASE_ASSERT(cType);
 
                         if (!type)
                         {
@@ -6851,7 +6851,7 @@ namespace Slang
             RefPtr<Expr>            originalExpr,
             RefPtr<GenericSubstitution>   subst)
         {
-            auto baseDeclRefExpr = baseExpr.as<DeclRefExpr>();
+            auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
             if (!baseDeclRefExpr)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), baseExpr, "expected a reference to a generic declaration");
@@ -6928,7 +6928,7 @@ namespace Slang
                 {
                 case OverloadCandidate::Flavor::Func:
                     {
-                        RefPtr<AppExprBase> callExpr = context.originalExpr.as<InvokeExpr>();
+                        RefPtr<AppExprBase> callExpr = as<InvokeExpr>(context.originalExpr);
                         if(!callExpr)
                         {
                             callExpr = new InvokeExpr();
@@ -7735,7 +7735,7 @@ namespace Slang
             //
             for (auto genericDeclRef : getMembersOfType<GenericDecl>(aggTypeDeclRef))
             {
-                if (auto ctorDecl = genericDeclRef.getDecl()->inner.as<ConstructorDecl>())
+                if (auto ctorDecl = as<ConstructorDecl>(genericDeclRef.getDecl()->inner))
                 {
                     DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
                     if (!innerRef)
@@ -9742,16 +9742,16 @@ namespace Slang
                 isLValue = false;
 
             // Variables declared with `let` are always immutable.
-            if(varDeclRef.as<LetDecl>())
+            if(as<LetDecl>(varDeclRef.getDecl()))
                 isLValue = false;
 
             // Generic value parameters are always immutable
-            if(varDeclRef.as<GenericValueParamDecl>())
+            if(as<GenericValueParamDecl>(varDeclRef.getDecl()))
                 isLValue = false;
 
             // Function parameters declared in the "modern" style
             // are immutable unless they have an `out` or `inout` modifier.
-            if( varDeclRef.as<ModernParamDecl>() )
+            if(as<ModernParamDecl>(varDeclRef.getDecl()) )
             {
                 // Note: the `inout` modifier AST class inherits from
                 // the class for the `out` modifier so that we can
