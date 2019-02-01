@@ -6603,11 +6603,15 @@ namespace Slang
             candidate.subst = genSubst;
             auto& checkedArgs = genSubst->args;
 
-            int aa = 0;
+            uint32_t aa = 0;
             for (auto memberRef : getMembers(genericDeclRef))
             {
                 if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
                 {
+                    if (aa >= context.argCount)
+                    {
+                        return false;
+                    }
                     auto arg = context.getArg(aa++);
 
                     TypeExp typeExp;
