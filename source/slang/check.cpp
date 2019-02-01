@@ -2708,7 +2708,9 @@ namespace Slang
                 return uncheckedAttr;
             }
 
-            RefPtr<Attribute> attr = as<Attribute>(attrDecl->syntaxClass.createInstance());
+            // Manage scope
+            RefPtr<RefObject> attrInstance = attrDecl->syntaxClass.createInstance();
+            auto attr = attrInstance.as<Attribute>();
             if(!attr)
             {
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute class did not yield an attribute object");

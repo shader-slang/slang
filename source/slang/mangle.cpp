@@ -265,9 +265,9 @@ namespace Slang
         // Special case: accessors need some way to distinguish themselves
         // so that a getter/setter/ref-er don't all compile to the same name.
         {
-            if (declRef.canAs<GetterDecl>())        emitRaw(context, "Ag");
-            if (declRef.canAs<SetterDecl>())        emitRaw(context, "As");
-            if (declRef.canAs<RefAccessorDecl>())   emitRaw(context, "Ar");
+            if (declRef.is<GetterDecl>())        emitRaw(context, "Ag");
+            if (declRef.is<SetterDecl>())        emitRaw(context, "As");
+            if (declRef.is<RefAccessorDecl>())   emitRaw(context, "Ar");
         }
 
         // Are we the "inner" declaration beneath a generic decl?
@@ -360,7 +360,7 @@ namespace Slang
 
             // Don't print result type for an initializer/constructor,
             // since it is implicit in the qualified name.
-            if (!callableDeclRef.canAs<ConstructorDecl>())
+            if (!callableDeclRef.is<ConstructorDecl>())
             {
                 emitType(context, GetResultType(callableDeclRef));
             }

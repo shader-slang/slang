@@ -467,7 +467,7 @@ namespace Slang
 
         // Returns true if 'as' will return a valid cast
         template <typename T>
-        bool canAs() const { return Slang::as<T>(decl) != nullptr; }
+        bool is() const { return Slang::as<T>(decl) != nullptr; }
 
         // "dynamic cast" to a more specific declaration reference type
         template<typename T>

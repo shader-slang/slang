@@ -18,6 +18,8 @@ To deal with these issues we need casting within Slang to follow it's own method
 * If you want to *literally* do a dynamic cast use 'dynamicCast' free function. 
     * This guarantees the returned pointer points to the same object (like normal dynamic_cast)
 * If you want to return a smart pointer from a cast from a smart pointer use the .as or .dynamicCast *methods*
+* If you want to determine if an 'as' cast is possible on a smart pointer use the .is method
+    * Doing so will produce more efficient code because a new smart pointer does not need to be constructed
 
 These functions will also work with types that do not have Vtbl - like IRInst derived types. 
 

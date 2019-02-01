@@ -266,15 +266,15 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     else if( auto declRefType = as<DeclRefType>(type) )
     {
         const auto& declRef = declRefType->declRef;
-        if(declRef.canAs<StructDecl>() )
+        if(declRef.is<StructDecl>() )
         {
             return SLANG_TYPE_KIND_STRUCT;
         }
-        else if (declRef.canAs<GlobalGenericParamDecl>())
+        else if (declRef.is<GlobalGenericParamDecl>())
         {
             return SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER;
         }
-        else if (declRef.canAs<InterfaceDecl>())
+        else if (declRef.is<InterfaceDecl>())
         {
             return SLANG_TYPE_KIND_INTERFACE;
         }

@@ -162,7 +162,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // an explicit IR constant buffer for that wrapper, 
         //
         auto entryPointParamsLayout = entryPointLayout->parametersLayout;
-        bool needConstantBuffer = as<ParameterGroupTypeLayout>(entryPointParamsLayout->typeLayout) != nullptr;
+        bool needConstantBuffer = entryPointParamsLayout->typeLayout.is<ParameterGroupTypeLayout>(); 
 
         // We will set up an IR builder so that we are ready to generate code.
         //
