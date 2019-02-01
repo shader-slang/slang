@@ -69,7 +69,7 @@ If we then want to query the type of this field, we can first look up the type s
 Cell::T [Cell::T => int]
 ```
 
-Of course, we can then simplify the reference by applying the substutions, to get:
+Of course, we can then simplify the reference by applying the substitutions, to get:
 
 ```
 int
@@ -89,7 +89,7 @@ Each ancestor of a declaration can introduce an expected substitution along the 
 
 * A surrounding `interface` declaration usually requires a `ThisTypeSubstitution` that identifies the specific type on which an interface member has been looked up.
 
-All of the expected substitutions should be in place in the gerneral case, even when we might not have additional information. E.g., within a generic declaration like this:
+All of the expected substitutions should be in place in the general case, even when we might not have additional information. E.g., within a generic declaration like this:
 
 ```hlsl
 struct Cell<T>
