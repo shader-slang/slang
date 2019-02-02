@@ -420,6 +420,10 @@ namespace Slang
         bool Equals(SubstitutionSet substSet) const;
         int GetHashCode() const;
     };
+
+    template<typename T>
+    struct DeclRef;
+
     // A reference to a declaration, which may include
     // substitutions for generic parameters.
     struct DeclRefBase
@@ -461,6 +465,13 @@ namespace Slang
         // Apply substitutions to this declaration reference
         DeclRefBase SubstituteImpl(SubstitutionSet subst, int* ioDiff);
 
+        // Returns true if 'as' will return a valid cast
+        template <typename T>
+        bool is() const { return Slang::as<T>(decl) != nullptr; }
+
+        // "dynamic cast" to a more specific declaration reference type
+        template<typename T>
+        DeclRef<T> as() const;
 
         // Check if this is an equivalent declaration reference to another
         bool Equals(DeclRefBase const& declRef) const;
@@ -502,16 +513,6 @@ namespace Slang
         {
         }
 
-        // "dynamic cast" to a more specific declaration reference type
-        template<typename U>
-        DeclRef<U> as() const
-        {
-            DeclRef<U> result;
-            result.decl = Slang::as<U>(decl);
-            result.substitutions = substitutions;
-            return result;
-        }
-
         T* getDecl() const
         {
             return (T*)decl;
@@ -537,7 +538,7 @@ namespace Slang
             return DeclRefBase::Substitute(expr);
         }
 
-        // Apply substitutions to a type or ddeclaration
+        // Apply substitutions to a type or declaration
         template<typename U>
         DeclRef<U> Substitute(DeclRef<U> declRef) const
         {
@@ -556,7 +557,15 @@ namespace Slang
         }
     };
 
-    
+    template<typename T>
+    DeclRef<T> DeclRefBase::as() const
+    {
+        DeclRef<T> result;
+        result.decl = Slang::as<T>(decl);
+        result.substitutions = substitutions;
+        return result;
+    }
+
     template<typename T>
     inline DeclRef<T> makeDeclRef(T* decl)
     {
@@ -723,12 +732,12 @@ namespace Slang
 
         RefPtr<Decl>* Adjust(RefPtr<Decl>* ptr, RefPtr<Decl>* end) const
         {
-            while (ptr != end)
+            for (; ptr != end; ptr++)
             {
-                DeclRef<Decl> declRef(ptr->Ptr(), substitutions);
-                if (declRef.as<T>())
+                if (as<T>(*ptr))
+                {
                     return ptr;
-                ptr++;
+                }
             }
             return end;
         }
@@ -1062,7 +1071,7 @@ namespace Slang
         RefPtr<Val> getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
-            return m_obj.dynamicCast<Val>();
+            return m_obj.as<Val>();
         }
 
         RefPtr<WitnessTable> getWitnessTable();
@@ -1165,7 +1174,7 @@ namespace Slang
 
     inline int GetVectorSize(VectorExpressionType* vecType)
     {
-        auto constantVal = vecType->elementCount.dynamicCast<ConstantIntVal>();
+        auto constantVal = as<ConstantIntVal>(vecType->elementCount);
         if (constantVal)
             return (int) constantVal->value;
         // TODO: what to do in this case?

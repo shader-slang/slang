@@ -785,12 +785,12 @@ static bool validateSpecializationsMatch(
     for(;;)
     {
         // Skip any global generic substitutions.
-        if(auto leftGlobalGeneric = ll.as<GlobalGenericParamSubstitution>())
+        if(auto leftGlobalGeneric = as<GlobalGenericParamSubstitution>(ll))
         {
             ll = leftGlobalGeneric->outer;
             continue;
         }
-        if(auto rightGlobalGeneric = rr.as<GlobalGenericParamSubstitution>())
+        if(auto rightGlobalGeneric = as<GlobalGenericParamSubstitution>(rr))
         {
             rr = rightGlobalGeneric->outer;
             continue;
@@ -806,7 +806,7 @@ static bool validateSpecializationsMatch(
         ll = ll->outer;
         rr = rr->outer;
 
-        if(auto leftGeneric = leftSubst.as<GenericSubstitution>())
+        if(auto leftGeneric = as<GenericSubstitution>(leftSubst))
         {
             if(auto rightGeneric = as<GenericSubstitution>(rightSubst))
             {
@@ -816,9 +816,9 @@ static bool validateSpecializationsMatch(
                 }
             }
         }
-        else if(auto leftThisType = leftSubst.as<ThisTypeSubstitution>())
+        else if(auto leftThisType = as<ThisTypeSubstitution>(leftSubst))
         {
-            if(auto rightThisType = rightSubst.as<ThisTypeSubstitution>())
+            if(auto rightThisType = as<ThisTypeSubstitution>(rightSubst))
             {
                 if(validateThisTypeSubstitutionsMatch(context, leftThisType, rightThisType, stack))
                 {
@@ -2494,7 +2494,7 @@ static void collectEntryPointParameters(
     //
     for( auto taggedUnionType : entryPoint->taggedUnionTypes )
     {
-        auto substType = taggedUnionType->Substitute(typeSubst).dynamicCast<Type>();
+        auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
         auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
     }
@@ -2610,7 +2610,7 @@ static void collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointVaryingParameterDecl(
             context,
             entryPointFuncDecl,
-            resultType->Substitute(typeSubst).dynamicCast<Type>(),
+            resultType->Substitute(typeSubst).as<Type>(),
             state,
             resultLayout);
 

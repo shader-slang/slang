@@ -50,7 +50,7 @@ RAW(
     virtual String ToString() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
-    static DeclRefType* Create(
+    static RefPtr<DeclRefType> Create(
         Session*        session,
         DeclRef<Decl>   declRef);
 

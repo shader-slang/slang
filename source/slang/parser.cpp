@@ -821,7 +821,7 @@ namespace Slang
         auto keywordToken = advanceToken(parser);
 
         RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
-        auto syntax = dynamicCast<T>(parsedObject);
+        auto syntax = as<T>(parsedObject);
 
         if (syntax)
         {
@@ -2997,7 +2997,7 @@ namespace Slang
         // then we really want the modifiers to apply to the inner declaration.
         //
         RefPtr<Decl> declToModify = decl;
-        if(auto genericDecl = decl.as<GenericDecl>())
+        if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
         AddModifiers(declToModify.Ptr(), modifiers.first);
 

@@ -194,6 +194,9 @@ namespace Slang
             return RefPtr<U>(Slang::as<U>(pointer));
         }
 
+        template <typename U>
+        bool is() const { return Slang::as<U>(pointer) != nullptr; }
+
         ~RefPtr()
         {
             releaseReference((Slang::RefObject*) pointer);

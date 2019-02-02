@@ -90,7 +90,7 @@ struct LegalType
     RefPtr<ImplicitDerefType> getImplicitDeref() const
     {
         SLANG_ASSERT(flavor == Flavor::implicitDeref);
-        return obj.dynamicCast<ImplicitDerefType>();
+        return obj.as<ImplicitDerefType>();
     }
 
     static LegalType tuple(
@@ -99,7 +99,7 @@ struct LegalType
     RefPtr<TuplePseudoType> getTuple() const
     {
         SLANG_ASSERT(flavor == Flavor::tuple);
-        return obj.dynamicCast<TuplePseudoType>();
+        return obj.as<TuplePseudoType>();
     }
 
     static LegalType pair(
@@ -113,7 +113,7 @@ struct LegalType
     RefPtr<PairPseudoType> getPair() const
     {
         SLANG_ASSERT(flavor == Flavor::pair);
-        return obj.dynamicCast<PairPseudoType>();
+        return obj.as<PairPseudoType>();
     }
 };
 
