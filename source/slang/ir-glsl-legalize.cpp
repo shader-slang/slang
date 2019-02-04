@@ -596,7 +596,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         auto elementType = arrayType->getElementType();
         auto elementCount = arrayType->getElementCount();
-        auto arrayLayout = dynamicCast<ArrayTypeLayout>(typeLayout);
+        auto arrayLayout = as<ArrayTypeLayout>(typeLayout);
         SLANG_ASSERT(arrayLayout);
         auto elementTypeLayout = arrayLayout->elementTypeLayout;
 
@@ -619,7 +619,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
     {
         auto elementType = streamType->getElementType();
-        auto streamLayout = dynamicCast<StreamOutputTypeLayout>(typeLayout);
+        auto streamLayout = as<StreamOutputTypeLayout>(typeLayout);
         SLANG_ASSERT(streamLayout);
         auto elementTypeLayout = streamLayout->elementTypeLayout;
 
@@ -639,7 +639,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         // We need to recurse down into the individual fields,
         // and generate a variable for each of them.
 
-        auto structTypeLayout = dynamicCast<StructTypeLayout>(typeLayout);
+        auto structTypeLayout = as<StructTypeLayout>(typeLayout);
         SLANG_ASSERT(structTypeLayout);
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
@@ -1398,7 +1398,7 @@ void legalizeEntryPointForGLSL(
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
 
-    auto entryPointLayout = dynamicCast<EntryPointLayout>(layoutDecoration->getLayout());
+    auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getLayout());
     SLANG_ASSERT(entryPointLayout);
 
     GLSLLegalizationContext context;
@@ -1524,7 +1524,7 @@ void legalizeEntryPointForGLSL(
             //
             auto paramLayoutDecoration = pp->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(paramLayoutDecoration);
-            auto paramLayout = dynamicCast<VarLayout>(paramLayoutDecoration->getLayout());
+            auto paramLayout = as<VarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
             legalizeEntryPointParameterForGLSL(

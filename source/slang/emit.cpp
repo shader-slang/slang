@@ -5004,7 +5004,7 @@ struct EmitVisitor
                 if (auto layoutDecor = pp->findDecoration<IRLayoutDecoration>())
                 {
                     Layout* layout = layoutDecor->getLayout();
-                    VarLayout* varLayout = dynamicCast<VarLayout>(layout);
+                    VarLayout* varLayout = as<VarLayout>(layout);
 
                     if (varLayout)
                     {
@@ -5012,15 +5012,15 @@ struct EmitVisitor
 
                         if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                         {
-                            if (dynamicCast<HLSLTriangleModifier>(primTypeModifier))
+                            if (as<HLSLTriangleModifier>(primTypeModifier))
                                 emit("triangle ");
-                            else if (dynamicCast<HLSLPointModifier>(primTypeModifier))
+                            else if (as<HLSLPointModifier>(primTypeModifier))
                                 emit("point ");
-                            else if (dynamicCast<HLSLLineModifier>(primTypeModifier))
+                            else if (as<HLSLLineModifier>(primTypeModifier))
                                 emit("line ");
-                            else if (dynamicCast<HLSLLineAdjModifier>(primTypeModifier))
+                            else if (as<HLSLLineAdjModifier>(primTypeModifier))
                                 emit("lineadj ");
-                            else if (dynamicCast<HLSLTriangleAdjModifier>(primTypeModifier))
+                            else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
                                 emit("triangleadj ");
                         }
                     }
