@@ -780,8 +780,15 @@ extern "C"
     public:
         /** Get a uniqueIdentity which uniquely identifies an object of the file system.
            
-        Given a path, returns a 'uniqueIdentity' path will return the same value for the same file/directory on the file system. 
-        The uniqueIdentity is used to compare if two includes are the same file. 
+        Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same file on the file system.
+
+        The uniqueIdentity is used to compare if files are the same - which allows slang to cache source contents internally. It is also used
+        for #pragma once functionality.
+
+        A *requirement* is for any implementation is that two paths can only return the same uniqueIdentity if the
+        contents of the two files are *identical*. If an implementation breaks this constraint it can produce incorrect compilation.
+        If an implementation cannot *strictly* identify *the same* files, this will only have an effect on #pragma once behavior.
+
         The string for the uniqueIdentity is held zero terminated in the ISlangBlob of outUniqueIdentity.
    
         Note that there are many ways a uniqueIdentity may be generated for a file. For example it could be the
