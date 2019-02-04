@@ -734,7 +734,7 @@ namespace Slang
         {
             for (; ptr != end; ptr++)
             {
-                if (as<T>(*ptr))
+                if (ptr->is<T>())
                 {
                     return ptr;
                 }

@@ -296,15 +296,15 @@ namespace Slang
                 UInt genericParameterCount = 0;
                 for( auto mm : getMembers(parentGenericDeclRef) )
                 {
-                    if(as<GenericTypeParamDecl>(mm))
+                    if(mm.is<GenericTypeParamDecl>())
                     {
                         genericParameterCount++;
                     }
-                    else if(as<GenericValueParamDecl>(mm))
+                    else if(mm.is<GenericValueParamDecl>())
                     {
                         genericParameterCount++;
                     }
-                    else if(as<GenericTypeConstraintDecl>(mm))
+                    else if(mm.is<GenericTypeConstraintDecl>())
                     {
                         genericParameterCount++;
                     }

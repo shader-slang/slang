@@ -6783,7 +6783,7 @@ namespace Slang
             // We should have the existing arguments to the generic
             // handy, so that we can construct a substitution list.
 
-            RefPtr<GenericSubstitution> subst = candidate.subst.as<GenericSubstitution>();
+            auto subst = candidate.subst.as<GenericSubstitution>();
             SLANG_ASSERT(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
@@ -9744,16 +9744,16 @@ namespace Slang
                 isLValue = false;
 
             // Variables declared with `let` are always immutable.
-            if(as<LetDecl>(varDeclRef.getDecl()))
+            if(varDeclRef.is<LetDecl>())
                 isLValue = false;
 
             // Generic value parameters are always immutable
-            if(as<GenericValueParamDecl>(varDeclRef.getDecl()))
+            if(varDeclRef.is<GenericValueParamDecl>())
                 isLValue = false;
 
             // Function parameters declared in the "modern" style
             // are immutable unless they have an `out` or `inout` modifier.
-            if(as<ModernParamDecl>(varDeclRef.getDecl()) )
+            if(varDeclRef.is<ModernParamDecl>())
             {
                 // Note: the `inout` modifier AST class inherits from
                 // the class for the `out` modifier so that we can
