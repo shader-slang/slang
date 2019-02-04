@@ -625,7 +625,7 @@ namespace Slang
         {
             while (cursor != end)
             {
-                if (dynamicCast<T>(*cursor))
+                if (as<T>(*cursor))
                     return cursor;
                 cursor++;
             }
@@ -1322,7 +1322,7 @@ namespace Slang
         for (;;)
         {
             if (!m) return m;
-            if (dynamicCast<T>(m))
+            if (as<T>(m))
             {
                 return m;
             }

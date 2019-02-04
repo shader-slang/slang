@@ -453,7 +453,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         SubtypeWitness* subtypeWitness,
         Decl*           requirementKey)
     {
-        if(auto declaredSubtypeWitness = dynamicCast<DeclaredSubtypeWitness>(subtypeWitness))
+        if(auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
         {
             if(auto inheritanceDeclRef = declaredSubtypeWitness->declRef.as<InheritanceDecl>())
             {
@@ -527,7 +527,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         // the case we especially care about is when this type references a declaration
         // of a generic parameter, since that is what we might be substituting...
-        if (auto genericTypeParamDecl = dynamicCast<GenericTypeParamDecl>(declRef.getDecl()))
+        if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(declRef.getDecl()))
         {
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
@@ -565,7 +565,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 }
             }
         }
-        else if (auto globalGenParam = dynamicCast<GlobalGenericParamDecl>(declRef.getDecl()))
+        else if (auto globalGenParam = as<GlobalGenericParamDecl>(declRef.getDecl()))
         {
             // search for a substitution that might apply to us
             for(auto s = subst.substitutions; s; s = s->outer)
@@ -1273,7 +1273,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool GenericParamIntVal::EqualsVal(Val* val)
     {
-        if (auto genericParamVal = dynamicCast<GenericParamIntVal>(val))
+        if (auto genericParamVal = as<GenericParamIntVal>(val))
         {
             return declRef.Equals(genericParamVal->declRef);
         }
@@ -1363,7 +1363,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // both must be NULL, or non-NULL
         if (!this || !subst)
             return !this && !subst;
-        auto genericSubst = dynamicCast<GenericSubstitution>(subst);
+        auto genericSubst = as<GenericSubstitution>(subst);
         if (!genericSubst)
             return false;
         if (genericDecl != genericSubst->genericDecl)
@@ -1413,7 +1413,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (!subst)
             return false;
 
-        if (auto thisTypeSubst = dynamicCast<ThisTypeSubstitution>(subst))
+        if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
         {
             return witness->EqualsVal(thisTypeSubst->witness);
         }
@@ -1462,7 +1462,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         if (!subst)
             return false;
-        if (auto genSubst = dynamicCast<GlobalGenericParamSubstitution>(subst))
+        if (auto genSubst = as<GlobalGenericParamSubstitution>(subst))
         {
             if (paramDecl != genSubst->paramDecl)
                 return false;
@@ -1898,7 +1898,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         // to the parent declaration as were applied to the child.
         RefPtr<Substitutions> substToApply = substitutions.substitutions;
 
-        if(auto interfaceDecl = dynamicCast<InterfaceDecl>(decl))
+        if(auto interfaceDecl = as<InterfaceDecl>(decl))
         {
             // The declaration being referenced is an `interface` declaration,
             // and there might be a this-type substitution in place.
@@ -1914,7 +1914,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
         }
 
-        if (auto parentGenericDecl = dynamicCast<GenericDecl>(parentDecl))
+        if (auto parentGenericDecl = as<GenericDecl>(parentDecl))
         {
             // The parent of this declaration is a generic, which means
             // that the decl-ref to the current declaration might include
@@ -2150,7 +2150,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool TypeEqualityWitness::EqualsVal(Val* val)
     {
-        auto otherWitness = dynamicCast<TypeEqualityWitness>(val);
+        auto otherWitness = as<TypeEqualityWitness>(val);
         if (!otherWitness)
             return false;
         return sub->Equals(otherWitness->sub);
@@ -2176,7 +2176,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool DeclaredSubtypeWitness::EqualsVal(Val* val)
     {
-        auto otherWitness = dynamicCast<DeclaredSubtypeWitness>(val);
+        auto otherWitness = as<DeclaredSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 
@@ -2345,7 +2345,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool TransitiveSubtypeWitness::EqualsVal(Val* val)
     {
-        auto otherWitness = dynamicCast<TransitiveSubtypeWitness>(val);
+        auto otherWitness = as<TransitiveSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 

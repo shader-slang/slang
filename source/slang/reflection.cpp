@@ -678,7 +678,7 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return nullptr;
 
-    if(auto structTypeLayout = dynamicCast<StructTypeLayout>(typeLayout))
+    if(auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
         return (SlangReflectionVariableLayout*) structTypeLayout->fields[index].Ptr();
     }
@@ -691,7 +691,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayo
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return 0;
 
-    if( auto arrayTypeLayout = dynamicCast<ArrayTypeLayout>(typeLayout))
+    if( auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         switch (category)
         {
@@ -726,15 +726,15 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return nullptr;
 
-    if( auto arrayTypeLayout = dynamicCast<ArrayTypeLayout>(typeLayout))
+    if( auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         return (SlangReflectionTypeLayout*) arrayTypeLayout->elementTypeLayout.Ptr();
     }
-    else if( auto constantBufferTypeLayout = dynamicCast<ParameterGroupTypeLayout>(typeLayout))
+    else if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         return convert(constantBufferTypeLayout->offsetElementTypeLayout.Ptr());
     }
-    else if( auto structuredBufferTypeLayout = dynamicCast<StructuredBufferTypeLayout>(typeLayout))
+    else if( auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         return convert(structuredBufferTypeLayout->elementTypeLayout.Ptr());
     }
@@ -747,7 +747,7 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetElementVarLay
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return nullptr;
 
-    if( auto constantBufferTypeLayout = dynamicCast<ParameterGroupTypeLayout>(typeLayout))
+    if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         return convert(constantBufferTypeLayout->elementVarLayout.Ptr());
     }
@@ -779,7 +779,7 @@ static SlangParameterCategory getParameterCategory(
 
 static TypeLayout* maybeGetContainerLayout(TypeLayout* typeLayout)
 {
-    if (auto parameterGroupTypeLayout = dynamicCast<ParameterGroupTypeLayout>(typeLayout))
+    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         auto containerTypeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
         if (containerTypeLayout->resourceInfos.Count() != 0)
@@ -826,7 +826,7 @@ SLANG_API SlangMatrixLayoutMode spReflectionTypeLayout_GetMatrixLayoutMode(Slang
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
-    if( auto matrixLayout = dynamicCast<MatrixTypeLayout>(typeLayout) )
+    if( auto matrixLayout = as<MatrixTypeLayout>(typeLayout) )
     {
         return matrixLayout->mode;
     }
@@ -842,7 +842,7 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return -1;
 
-    if(auto genericParamTypeLayout = dynamicCast<GenericParamTypeLayout>(typeLayout))
+    if(auto genericParamTypeLayout = as<GenericParamTypeLayout>(typeLayout))
     {
         return genericParamTypeLayout->paramIndex;
     }
@@ -1204,19 +1204,19 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     else
     {
         // Fall back to the GLSL case, which requires a search over global-scope declarations
-        // to look for anything with the `local_size_*` qualifier
-        auto module = dynamicCast<ModuleDecl>(entryPointFunc->ParentDecl);
+        // to look for as with the `local_size_*` qualifier
+        auto module = as<ModuleDecl>(entryPointFunc->ParentDecl);
         if (module)
         {
             for (auto dd : module->Members)
             {
                 for (auto mod : dd->GetModifiersOfType<GLSLLocalSizeLayoutModifier>())
                 {
-                    if (auto xMod = dynamicCast<GLSLLocalSizeXLayoutModifier>(mod))
+                    if (auto xMod = as<GLSLLocalSizeXLayoutModifier>(mod))
                         sizeAlongAxis[0] = (SlangUInt) getIntegerLiteralValue(xMod->valToken);
-                    else if (auto yMod = dynamicCast<GLSLLocalSizeYLayoutModifier>(mod))
+                    else if (auto yMod = as<GLSLLocalSizeYLayoutModifier>(mod))
                         sizeAlongAxis[1] = (SlangUInt) getIntegerLiteralValue(yMod->valToken);
-                    else if (auto zMod = dynamicCast<GLSLLocalSizeZLayoutModifier>(mod))
+                    else if (auto zMod = as<GLSLLocalSizeZLayoutModifier>(mod))
                         sizeAlongAxis[2] = (SlangUInt) getIntegerLiteralValue(zMod->valToken);
                 }
             }

@@ -45,7 +45,7 @@ void buildMemberDictionary(ContainerDecl* decl)
     decl->transparentMembers.Clear();
 
     // are we a generic?
-    GenericDecl* genericDecl = dynamicCast<GenericDecl>(decl);
+    GenericDecl* genericDecl = as<GenericDecl>(decl);
 
     for (auto m : decl->Members)
     {
@@ -84,21 +84,21 @@ void buildMemberDictionary(ContainerDecl* decl)
 bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
 {
     // type declarations
-    if(auto aggTypeDecl = dynamicCast<AggTypeDecl>(decl))
+    if(auto aggTypeDecl = as<AggTypeDecl>(decl))
     {
         return int(mask) & int(LookupMask::type);
     }
-    else if(auto simpleTypeDecl = dynamicCast<SimpleTypeDecl>(decl))
+    else if(auto simpleTypeDecl = as<SimpleTypeDecl>(decl))
     {
         return int(mask) & int(LookupMask::type);
     }
     // function declarations
-    else if(auto funcDecl = dynamicCast<FunctionDeclBase>(decl))
+    else if(auto funcDecl = as<FunctionDeclBase>(decl))
     {
         return (int(mask) & int(LookupMask::Function)) != 0;
     }
     // attribute declaration
-    else if( auto attrDecl = dynamicCast<AttributeDecl>(decl) )
+    else if( auto attrDecl = as<AttributeDecl>(decl) )
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }

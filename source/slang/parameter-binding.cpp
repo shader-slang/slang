@@ -523,7 +523,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
 
 
     UInt space = 0;
-    if( auto registerSemantic = dynamicCast<HLSLRegisterSemantic>(semantic) )
+    if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
     {
         auto const& spaceName = registerSemantic->spaceName.Content;
         if(spaceName.size() != 0)

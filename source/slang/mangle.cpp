@@ -65,7 +65,7 @@ namespace Slang
         ManglingContext*    context,
         Val*                val)
     {
-        if( auto constVal = dynamicCast<ConstantIntVal>(val) )
+        if( auto constVal = as<ConstantIntVal>(val) )
         {
             auto cVal = constVal->value;
             if(cVal >= 0 && cVal <= 9 )
@@ -386,18 +386,18 @@ namespace Slang
         //
         // Functions will get no prefix, since we assume
         // they are a common case:
-        if(dynamicCast<FuncDecl>(decl))
+        if(as<FuncDecl>(decl))
         {}
         // Types will get a `T` prefix:
-        else if(dynamicCast<AggTypeDecl>(decl))
+        else if(as<AggTypeDecl>(decl))
             emitRaw(context, "T");
-        else if(dynamicCast<TypeDefDecl>(decl))
+        else if(as<TypeDefDecl>(decl))
             emitRaw(context, "T");
         // Variables will get a `V` prefix:
         //
         // TODO: probably need to pull constant-buffer
         // declarations out of this...
-        else if(dynamicCast<VarDeclBase>(decl))
+        else if(as<VarDeclBase>(decl))
             emitRaw(context, "V");
         else
         {

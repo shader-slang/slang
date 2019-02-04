@@ -389,7 +389,7 @@ ModuleDecl* findModuleDecl(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->ParentDecl)
     {
-        if (auto moduleDecl = dynamicCast<ModuleDecl>(dd))
+        if (auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl;
     }
     return nullptr;
@@ -1704,7 +1704,7 @@ static String getNameForNameHint(
         return String();
 
 
-    if(auto varDecl = dynamicCast<VarDeclBase>(decl))
+    if(auto varDecl = as<VarDeclBase>(decl))
     {
         // For an ordinary local variable, global variable,
         // parameter, or field, we will just use the name
@@ -1722,7 +1722,7 @@ static String getNameForNameHint(
     auto parentDecl = decl->ParentDecl;
 
     // Skip past a generic parent, if we are a declaration nested in a generic.
-    if(auto genericParentDecl = dynamicCast<GenericDecl>(parentDecl))
+    if(auto genericParentDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericParentDecl->ParentDecl;
 
     auto parentName = getNameForNameHint(context, parentDecl);
@@ -2423,7 +2423,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // In such a case we should be careful to not statically
         // resolve things.
         //
-        if(auto callableDecl = dynamicCast<CallableDecl>(declRefExpr->declRef.getDecl()))
+        if(auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
         {
             // Okay, the declaration is directly callable, so we can continue.
         }
@@ -3387,13 +3387,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Unwrap any surrounding `{ ... }` so we can look
         // at the statement inside.
-        while(auto blockStmt = dynamicCast<BlockStmt>(stmt))
+        while(auto blockStmt = as<BlockStmt>(stmt))
         {
             stmt = blockStmt->body;
             continue;
         }
 
-        if(auto seqStmt = dynamicCast<SeqStmt>(stmt))
+        if(auto seqStmt = as<SeqStmt>(stmt))
         {
             // Walk through teh children and process each.
             for(auto childStmt : seqStmt->stmts)
@@ -3401,7 +3401,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 lowerSwitchCases(childStmt, info);
             }
         }
-        else if(auto caseStmt = dynamicCast<CaseStmt>(stmt))
+        else if(auto caseStmt = as<CaseStmt>(stmt))
         {
             // A full `case` statement has a value we need
             // to test against. It is expected to be a
@@ -3429,7 +3429,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             info->cases.Add(caseVal);
             info->cases.Add(label);
         }
-        else if(auto defaultStmt = dynamicCast<DefaultStmt>(stmt))
+        else if(auto defaultStmt = as<DefaultStmt>(stmt))
         {
             auto label = getLabelForCase(info);
 
@@ -3438,7 +3438,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             info->defaultLabel = label;
         }
-        else if(auto emptyStmt = dynamicCast<EmptyStmt>(stmt))
+        else if(auto emptyStmt = as<EmptyStmt>(stmt))
         {
             // Special-case empty statements so they don't
             // mess up our "trivial fall-through" optimization.
@@ -4217,7 +4217,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // then we need to identify the type being extended.
         //
         RefPtr<Type> subType;
-        if (auto extParentDecl = dynamicCast<ExtensionDecl>(parentDecl))
+        if (auto extParentDecl = as<ExtensionDecl>(parentDecl))
         {
             subType = extParentDecl->targetType.type;
         }
@@ -4324,12 +4324,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     bool isGlobalVarDecl(VarDecl* decl)
     {
         auto parent = decl->ParentDecl;
-        if (dynamicCast<ModuleDecl>(parent))
+        if (as<ModuleDecl>(parent))
         {
             // Variable declared at global scope? -> Global.
             return true;
         }
-        else if(dynamicCast<AggTypeDeclBase>(parent))
+        else if(as<AggTypeDeclBase>(parent))
         {
             if(decl->HasModifier<HLSLStaticModifier>())
             {
@@ -4344,7 +4344,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     bool isMemberVarDecl(VarDecl* decl)
     {
         auto parent = decl->ParentDecl;
-        if (dynamicCast<AggTypeDecl>(parent))
+        if (as<AggTypeDecl>(parent))
         {
             // A variable declared inside of an aggregate type declaration is a member.
             return true;
@@ -4466,7 +4466,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // set correctly, so we can't just scan up and look
         // for a function in the parent chain...
         auto parent = decl->ParentDecl;
-        if( dynamicCast<ScopeDecl>(parent) )
+        if( as<ScopeDecl>(parent) )
         {
             return true;
         }
@@ -4538,7 +4538,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
         {
-            if(auto genericAncestor = dynamicCast<GenericDecl>(pp))
+            if(auto genericAncestor = as<GenericDecl>(pp))
             {
                 return defaultSpecializeOuterGeneric(parentVal, type, genericAncestor);
             }
@@ -5235,11 +5235,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     direction = kParameterDirection_InOut;
                 }
 
-                if( auto aggTypeDecl = dynamicCast<AggTypeDecl>(parentDecl) )
+                if( auto aggTypeDecl = as<AggTypeDecl>(parentDecl) )
                 {
                     addThisParameter(direction, aggTypeDecl, ioParameterLists);
                 }
-                else if( auto extensionDecl = dynamicCast<ExtensionDecl>(parentDecl) )
+                else if( auto extensionDecl = as<ExtensionDecl>(parentDecl) )
                 {
                     addThisParameter(direction, extensionDecl->targetType, ioParameterLists);
                 }
@@ -5249,7 +5249,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Once we've added any parameters based on parent declarations,
         // we can see if this declaration itself introduces parameters.
         //
-        if( auto callableDecl = dynamicCast<CallableDecl>(decl) )
+        if( auto callableDecl = as<CallableDecl>(decl) )
         {
             // Don't collect parameters from the outer scope if
             // we are in a `static` context.
@@ -5360,7 +5360,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
         {
-            if(auto genericAncestor = dynamicCast<GenericDecl>(pp))
+            if(auto genericAncestor = as<GenericDecl>(pp))
             {
                 return emitOuterGeneric(subContext, genericAncestor, leafDecl);
             }
@@ -5467,13 +5467,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // We compute a declaration to use for looking up the return type here:
         CallableDecl* declForReturnType = decl;
-        if (auto accessorDecl = dynamicCast<AccessorDecl>(decl))
+        if (auto accessorDecl = as<AccessorDecl>(decl))
         {
             // We are some kind of accessor, so the parent declaration should
             // know the correct return type to expose.
             //
             auto parentDecl = accessorDecl->ParentDecl;
-            if (auto subscriptDecl = dynamicCast<SubscriptDecl>(parentDecl))
+            if (auto subscriptDecl = as<SubscriptDecl>(parentDecl))
             {
                 declForReturnType = subscriptDecl;
             }
@@ -5529,7 +5529,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto irResultType = lowerType(subContext, declForReturnType->ReturnType);
 
-        if (auto setterDecl = dynamicCast<SetterDecl>(decl))
+        if (auto setterDecl = as<SetterDecl>(decl))
         {
             // We are lowering a "setter" accessor inside a subscript
             // declaration, which means we don't want to *return* the
@@ -5544,7 +5544,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irResultType = subBuilder->getVoidType();
         }
 
-        if( auto refAccessorDecl = dynamicCast<RefAccessorDecl>(decl) )
+        if( auto refAccessorDecl = as<RefAccessorDecl>(decl) )
         {
             // A `ref` accessor needs to return a *pointer* to the value
             // being accessed, rather than a simple value.
@@ -5678,7 +5678,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
             }
 
-            if (auto setterDecl = dynamicCast<SetterDecl>(decl))
+            if (auto setterDecl = as<SetterDecl>(decl))
             {
                 // Add the IR parameter for the new value
                 IRType* irParamType = irResultType;
@@ -5836,12 +5836,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: Need to be careful about how this is approached,
         // to avoid emitting a bunch of extra definitions in the IR.
 
-        auto primaryFuncDecl = dynamicCast<FunctionDeclBase>(primaryDecl);
+        auto primaryFuncDecl = as<FunctionDeclBase>(primaryDecl);
         SLANG_ASSERT(primaryFuncDecl);
         LoweredValInfo result = lowerFuncDecl(primaryFuncDecl);
         for (auto dd = primaryDecl->nextDecl; dd; dd = dd->nextDecl)
         {
-            auto funcDecl = dynamicCast<FunctionDeclBase>(dd);
+            auto funcDecl = as<FunctionDeclBase>(dd);
             SLANG_ASSERT(funcDecl);
             lowerFuncDecl(funcDecl);
         }
@@ -5919,7 +5919,7 @@ IRInst* lowerSubstitutionArg(
     {
         return lowerType(context, type);
     }
-    else if (auto declaredSubtypeWitness = dynamicCast<DeclaredSubtypeWitness>(val))
+    else if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(val))
     {
         // We need to look up the IR-level representation of the witness (which will be a witness table).
         auto irWitnessTable = getSimpleVal(
@@ -6161,7 +6161,7 @@ static void ensureAllDeclsRec(
     // Aggregate types are the main case where we can emit an outer declaration
     // and not the stuff nested inside of it.
     //
-    if(auto containerDecl = dynamicCast<AggTypeDecl>(decl))
+    if(auto containerDecl = as<AggTypeDecl>(decl))
     {
         for (auto memberDecl : containerDecl->Members)
         {

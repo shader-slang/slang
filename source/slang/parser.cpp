@@ -795,7 +795,7 @@ namespace Slang
             return nullptr;
 
         auto decl = lookupResult.item.declRef.getDecl();
-        if( auto syntaxDecl = dynamicCast<SyntaxDecl>(decl) )
+        if( auto syntaxDecl = as<SyntaxDecl>(decl) )
         {
             return syntaxDecl;
         }
@@ -1323,7 +1323,7 @@ namespace Slang
     static RefPtr<VarDeclBase> CreateVarDeclForContext(
         ContainerDecl*  containerDecl )
     {
-        if (dynamicCast<CallableDecl>(containerDecl))
+        if (as<CallableDecl>(containerDecl))
         {
             // Function parameters always use their dedicated syntax class.
             //
@@ -3313,11 +3313,11 @@ namespace Slang
             return false;
 
         auto decl = lookupResult.item.declRef.getDecl();
-        if( auto typeDecl = dynamicCast<AggTypeDecl>(decl) )
+        if( auto typeDecl = as<AggTypeDecl>(decl) )
         {
             return true;
         }
-        else if( auto typeVarDecl = dynamicCast<SimpleTypeDecl>(decl) )
+        else if( auto typeVarDecl = as<SimpleTypeDecl>(decl) )
         {
             return true;
         }
