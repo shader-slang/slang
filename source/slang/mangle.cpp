@@ -65,7 +65,7 @@ namespace Slang
         ManglingContext*    context,
         Val*                val)
     {
-        if( auto constVal = dynamic_cast<ConstantIntVal*>(val) )
+        if( auto constVal = dynamicCast<ConstantIntVal>(val) )
         {
             auto cVal = constVal->value;
             if(cVal >= 0 && cVal <= 9 )
@@ -112,17 +112,17 @@ namespace Slang
     {
         // TODO: actually implement this bit...
 
-        if( auto basicType = dynamic_cast<BasicExpressionType*>(type) )
+        if( auto basicType = dynamicCast<BasicExpressionType>(type) )
         {
             emitBaseType(context, basicType->baseType);
         }
-        else if( auto vecType = dynamic_cast<VectorExpressionType*>(type) )
+        else if( auto vecType = dynamicCast<VectorExpressionType>(type) )
         {
             emitRaw(context, "v");
             emitSimpleIntVal(context, vecType->elementCount);
             emitType(context, vecType->elementType);
         }
-        else if( auto matType = dynamic_cast<MatrixExpressionType*>(type) )
+        else if( auto matType = dynamicCast<MatrixExpressionType>(type) )
         {
             emitRaw(context, "m");
             emitSimpleIntVal(context, matType->getRowCount());
@@ -130,21 +130,21 @@ namespace Slang
             emitSimpleIntVal(context, matType->getColumnCount());
             emitType(context, matType->getElementType());
         }
-        else if( auto namedType = dynamic_cast<NamedExpressionType*>(type) )
+        else if( auto namedType = dynamicCast<NamedExpressionType>(type) )
         {
             emitType(context, GetType(namedType->declRef));
         }
-        else if( auto declRefType = dynamic_cast<DeclRefType*>(type) )
+        else if( auto declRefType = dynamicCast<DeclRefType>(type) )
         {
             emitQualifiedName(context, declRefType->declRef);
         }
-        else if (auto arrType = dynamic_cast<ArrayExpressionType*>(type))
+        else if (auto arrType = dynamicCast<ArrayExpressionType>(type))
         {
             emitRaw(context, "a");
             emitSimpleIntVal(context, arrType->ArrayLength);
             emitType(context, arrType->baseType);
         }
-        else if( auto taggedUnionType = dynamic_cast<TaggedUnionType*>(type) )
+        else if( auto taggedUnionType = dynamicCast<TaggedUnionType>(type) )
         {
             emitRaw(context, "u");
             for( auto caseType : taggedUnionType->caseTypes )
@@ -163,11 +163,11 @@ namespace Slang
         ManglingContext*    context,
         Val*                val)
     {
-        if( auto type = dynamic_cast<Type*>(val) )
+        if( auto type = dynamicCast<Type>(val) )
         {
             emitType(context, type);
         }
-        else if( auto witness = dynamic_cast<Witness*>(val) )
+        else if( auto witness = dynamicCast<Witness>(val) )
         {
             // We don't emit witnesses as part of a mangled
             // name, because the way that the front-end
@@ -182,7 +182,7 @@ namespace Slang
             // to mangle in the constraints even when
             // the whole thing is specialized...
         }
-        else if( auto genericParamIntVal = dynamic_cast<GenericParamIntVal*>(val) )
+        else if( auto genericParamIntVal = dynamicCast<GenericParamIntVal>(val) )
         {
             // TODO: we shouldn't be including the names of generic parameters
             // anywhere in mangled names, since changing parameter names
@@ -195,7 +195,7 @@ namespace Slang
             emitRaw(context, "K");
             emitName(context, genericParamIntVal->declRef.GetName());
         }
-        else if( auto constantIntVal = dynamic_cast<ConstantIntVal*>(val) )
+        else if( auto constantIntVal = dynamicCast<ConstantIntVal>(val) )
         {
             // TODO: need to figure out what prefix/suffix is needed
             // to allow demangling later.
@@ -386,18 +386,18 @@ namespace Slang
         //
         // Functions will get no prefix, since we assume
         // they are a common case:
-        if(dynamic_cast<FuncDecl*>(decl))
+        if(dynamicCast<FuncDecl>(decl))
         {}
         // Types will get a `T` prefix:
-        else if(dynamic_cast<AggTypeDecl*>(decl))
+        else if(dynamicCast<AggTypeDecl>(decl))
             emitRaw(context, "T");
-        else if(dynamic_cast<TypeDefDecl*>(decl))
+        else if(dynamicCast<TypeDefDecl>(decl))
             emitRaw(context, "T");
         // Variables will get a `V` prefix:
         //
         // TODO: probably need to pull constant-buffer
         // declarations out of this...
-        else if(dynamic_cast<VarDeclBase*>(decl))
+        else if(dynamicCast<VarDeclBase>(decl))
             emitRaw(context, "V");
         else
         {

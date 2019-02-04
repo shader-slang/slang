@@ -2483,7 +2483,7 @@ RefPtr<TypeLayout> TypeLayout::unwrapArray()
 {
     TypeLayout* typeLayout = this;
 
-    while(auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
+    while(auto arrayTypeLayout = dynamicCast<ArrayTypeLayout>(typeLayout))
         typeLayout = arrayTypeLayout->elementTypeLayout;
 
     return typeLayout;

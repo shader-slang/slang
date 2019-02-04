@@ -131,7 +131,7 @@ Name* StringRepresentationCache::getName(Handle handle)
     Entry& entry = m_entries[int(handle)];
     if (entry.m_object)
     {
-        Name* name = dynamic_cast<Name*>(entry.m_object);
+        Name* name = dynamicCast<Name>(entry.m_object);
         if (name)
         {
             return name;
@@ -171,7 +171,7 @@ StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle 
     Entry& entry = m_entries[int(handle)];
     if (entry.m_object)
     {
-        Name* name = dynamic_cast<Name*>(entry.m_object);
+        Name* name = dynamicCast<Name>(entry.m_object);
         if (name)
         {
             return name->text.getStringRepresentation();
