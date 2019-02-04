@@ -194,7 +194,7 @@ public:
 
     protected:
 
-    SourceManager * m_sourceManager;       ///< The source manager this belongs to
+    SourceManager* m_sourceManager;       ///< The source manager this belongs to
     PathInfo m_pathInfo;                  ///< The path The logical file path to report for locations inside this span.
     ComPtr<ISlangBlob> m_contentBlob;     ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
     UnownedStringSlice m_content;         ///< The actual contents of the file.
