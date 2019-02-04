@@ -150,16 +150,30 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
         pathHandle = entry.m_pathHandle;
     }
 
-    humaneLoc.pathInfo = _getPathInfo(pathHandle);
+    humaneLoc.pathInfo = _getPathInfoFromHandle(pathHandle);
     return humaneLoc;
 }
 
-PathInfo SourceView::_getPathInfo(StringSlicePool::Handle pathHandle) const
+PathInfo SourceView::_getPathInfo() const
+{
+    if (m_viewPath.Length())
+    {
+        PathInfo pathInfo(m_sourceFile->getPathInfo());
+        pathInfo.foundPath = m_viewPath;
+        return pathInfo;
+    }
+    else
+    {
+        return m_sourceFile->getPathInfo();
+    }
+}
+
+PathInfo SourceView::_getPathInfoFromHandle(StringSlicePool::Handle pathHandle) const
 {
     // If there is no override path, then just the source files path
     if (pathHandle == StringSlicePool::Handle(0))
     {
-        return m_sourceFile->getPathInfo();
+        return _getPathInfo();
     }
     else
     {
@@ -171,11 +185,11 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 {
     if (type == SourceLocType::Actual)
     {
-        return m_sourceFile->getPathInfo();
+        return _getPathInfo();
     }
 
     const int entryIndex = findEntryIndex(loc);
-    return _getPathInfo((entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0));
+    return _getPathInfoFromHandle((entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -418,10 +432,21 @@ SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, IS
     return sourceFile;
 }
 
-SourceView* SourceManager::createSourceView(SourceFile* sourceFile)
+SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo)
 {
     SourceRange range = allocateSourceRange(sourceFile->getContentSize());
-    SourceView* sourceView = new SourceView(sourceFile, range);
+
+    SourceView* sourceView = nullptr;
+    if (pathInfo &&
+        (pathInfo->foundPath.Length() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
+    {
+        sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath);
+    }
+    else
+    {
+        sourceView = new SourceView(sourceFile, range, nullptr);
+    }
+
     m_sourceViews.Add(sourceView);
 
     return sourceView;

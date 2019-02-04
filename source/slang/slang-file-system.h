@@ -40,9 +40,13 @@ public:
         const char* path,
         SlangPathType* pathTypeOut) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
+        const char* path,
+        ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
         const char* path,
-        ISlangBlob** outCanonicalPath);
+        ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() {}
 
@@ -70,6 +74,13 @@ NOTE! That this behavior is the same as previously in that....
 class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 {
     public:
+
+    enum class PathStyle
+    {
+        Default,                    ///< Pass to say use the default 
+        Unknown,                    ///< It's an unknown type of path
+        Simplifiable,               ///< It can be simplified by Path::Simplify
+    };
 
     enum UniqueIdentityMode
     {
@@ -115,6 +126,10 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         const char* path,
         SlangPathType* outPathType) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
+        const char* path,
+        ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
         const char* path,
         ISlangBlob** outCanonicalPath);
@@ -122,7 +137,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache();
 
         /// Ctor
-    CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default);
+    CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
         /// Dtor
     virtual ~CacheFileSystem();
 
@@ -178,6 +193,7 @@ protected:
     Dictionary<String, PathInfo*> m_uniqueIdentityMap;  ///< Maps a unique identity for a file to its contents. This OWNs the PathInfo.
 
     UniqueIdentityMode m_uniqueIdentityMode;            ///< Determines how the 'uniqueIdentity' is produced. Cannot be Default in usage.
+    PathStyle m_pathStyle;                              ///< Style of paths
 
     ComPtr<ISlangFileSystem> m_fileSystem;              ///< Must always be set
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if nullptr will fall back on the m_fileSystem and emulate all the other methods of ISlangFileSystemExt

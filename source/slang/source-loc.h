@@ -194,7 +194,7 @@ public:
 
     protected:
 
-    SourceManager * m_sourceManager;       ///< The source manager this belongs to
+    SourceManager* m_sourceManager;       ///< The source manager this belongs to
     PathInfo m_pathInfo;                  ///< The path The logical file path to report for locations inside this span.
     ComPtr<ISlangBlob> m_contentBlob;     ///< A blob that owns the storage for the file contents. If nullptr, there is no contents
     UnownedStringSlice m_content;         ///< The actual contents of the file.
@@ -281,14 +281,24 @@ class SourceView
     PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Ctor
-    SourceView(SourceFile* sourceFile, SourceRange range):
+    SourceView(SourceFile* sourceFile, SourceRange range, const String* viewPath):
         m_range(range),
         m_sourceFile(sourceFile)
     {
+        if (viewPath)
+        {
+            m_viewPath = *viewPath;
+        }
     }
 
     protected:
-    PathInfo _getPathInfo(StringSlicePool::Handle pathHandle) const;
+        /// Get the pathInfo from a string handle. If it's 0, it will return the _getPathInfo
+    PathInfo _getPathInfoFromHandle(StringSlicePool::Handle pathHandle) const;
+        /// Gets the pathInfo for this view. It may be different from the m_sourceFile's if the path has been
+        /// overridden by m_viewPath
+    PathInfo _getPathInfo() const;
+
+    String m_viewPath;                      ///< Path to this view. If empty the path is the path to the SourceView
 
     SourceRange m_range;                ///< The range that this SourceView applies to
     SourceFile* m_sourceFile;           ///< The source file. Can hold the line breaks
@@ -315,7 +325,9 @@ struct SourceManager
     PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
         /// Create a new source view from a file
-    SourceView* createSourceView(SourceFile* sourceFile);
+        /// @param sourceFile is the source file that contains the source
+        /// @param pathInfo is path used to read the file from
+    SourceView* createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo);
 
         /// Find a view by a source file location. 
         /// If not found in this manager will look in the parent SourceManager

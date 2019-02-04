@@ -176,6 +176,17 @@ struct IncludeHandlerImpl : IncludeHandler
         return SLANG_OK;
     }
 
+    virtual String simplifyPath(const String& path) override
+    {
+        ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
+        ComPtr<ISlangBlob> simplifiedPath;
+        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.Buffer(), simplifiedPath.writeRef())))
+        {
+            return path;
+        }
+        return StringUtil::getString(simplifiedPath);
+    }
+
 };
 
 //
