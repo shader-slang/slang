@@ -176,7 +176,7 @@ struct IncludeHandlerImpl : IncludeHandler
         return SLANG_OK;
     }
 
-    virtual String simplifyPath(const String& path)
+    virtual String simplifyPath(const String& path) override
     {
         ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
         ComPtr<ISlangBlob> simplifiedPath;
