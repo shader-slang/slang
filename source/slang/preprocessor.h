@@ -22,6 +22,8 @@ struct IncludeHandler
 
     virtual SlangResult readFile(const String& path, 
         ISlangBlob** blobOut) = 0;        
+
+    virtual String simplifyPath(const String& path) = 0;
 };
 
 // Take a string of source code and preprocess it into a list of tokens.

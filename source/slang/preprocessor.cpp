@@ -1627,6 +1627,9 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
+    // Simplify the path
+    filePathInfo.foundPath = includeHandler->simplifyPath(filePathInfo.foundPath);
+
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
     auto sourceManager = context->preprocessor->getCompileRequest()->getSourceManager();
@@ -1643,6 +1646,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
             return;
         }
 
+        
         sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
     }

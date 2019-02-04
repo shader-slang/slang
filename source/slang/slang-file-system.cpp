@@ -76,6 +76,13 @@ SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCan
     return SLANG_OK;
 }
 
+SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
+{
+    String simplifiedPath = Path::Simplify(_fixPathDelimiters(pathIn));
+    *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
+    return SLANG_OK;
+}
+
 SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     // Don't need to fix delimiters - because combine path handles both path delimiter types
@@ -143,9 +150,10 @@ ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
     return _getInterface(this, guid);
 }
 
-CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode) :
+CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode, PathStyle pathStyle) :
     m_fileSystem(fileSystem),
-    m_uniqueIdentityMode(uniqueIdentityMode)
+    m_uniqueIdentityMode(uniqueIdentityMode),
+    m_pathStyle(pathStyle)
 {
     // Try to get the more sophisticated interface
     fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
@@ -160,6 +168,17 @@ CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMod
             break;
         }
         default: break;
+    }
+
+    if (m_fileSystemExt)
+    {
+        // We just defer to the m_fileSystem, so we mark as unknown 
+        m_pathStyle = PathStyle::Unknown;
+    }
+    else if (m_pathStyle == PathStyle::Default)
+    {
+        // We'll assume it's simplify-able 
+        m_pathStyle = PathStyle::Simplifiable;
     }
 
     // It can't be default
@@ -286,7 +305,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolveUniqueIdentityCacheInfo(cons
     // At this point they must have same uniqueIdentity
     SLANG_ASSERT(pathInfo->getUniqueIdentity() == uniqueIdentity);
 
-    // If we have the file contents (because of calcing uniqueIdentity), and there isn't a read fileblob already
+    // If we have the file contents (because of calc-ing uniqueIdentity), and there isn't a read file blob already
     // store the data as if read, so doesn't get read again
     if (fileContents && !pathInfo->m_fileBlob)
     {
@@ -412,6 +431,29 @@ SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* path
 
     *pathTypeOut = info->m_pathType;
     return toResult(info->m_getPathTypeResult);
+}
+
+SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+{
+    // If we have a ISlangFileSystemExt we can just pass on the request to it
+    if (m_fileSystemExt)
+    {
+        return m_fileSystemExt->getSimplifiedPath(path, outSimplifiedPath);
+    }
+    else
+    {
+        // Use the path style to see what we can do with it
+        switch (m_pathStyle)
+        {
+            case PathStyle::Simplifiable:
+            {
+                String simplifiedPath = Path::Simplify(_fixPathDelimiters(path));
+                *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
+                return SLANG_OK;
+            }
+            default: return SLANG_E_NOT_IMPLEMENTED;
+        }
+    }
 }
 
 SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)

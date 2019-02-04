@@ -823,18 +823,32 @@ extern "C"
             const char* path, 
             SlangPathType* pathTypeOut) = 0;
 
+        /** Get a simplified path. 
+        Given a path, returns a simplified version of that path - typically removing '..' and/or '.'. A simplified
+        path must point to the same object as the original. 
+       
+        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
+
+        @param path
+        @param outSimplifiedPath
+        @returns SLANG_OK if successfully simplified the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
+            const char* path,
+            ISlangBlob** outSimplifiedPath) = 0;
+
         /** Get a canonical path identifies an object of the file system.
 
-        Given a path, returns a 'canonicalPath' the file. This may be a file system 'canonical path' to
-        show where a file was read from. Also though if the filesystem is say a zip file - it might include the path to the zip
+        Given a path, returns a 'canonicalPath' to the file. This may be a file system 'canonical path' to
+        show where a file was read from. If the file system is say a zip file - it might include the path to the zip
         container as well as the absolute path to the specific file. The main purpose of the method is to be able
-        to display to users unambiguously where a file was read from in diagnostics.
+        to display to uses unambiguously where a file was read from.
 
-        This method is optional and if not implemented will display 'found paths'. If not implemented return SLANG_E_NOT_IMPLEMENTED. 
+        This method is optional, if not implemented return SLANG_E_NOT_IMPLEMENTED.
 
         @param path
         @param outCanonicalPath
-        @returns A `SlangResult`
+        @returns SLANG_OK if successfully canonicalized the path (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
             const char* path,
