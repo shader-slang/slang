@@ -842,7 +842,7 @@ top:
         PathInfo pathInfo = PathInfo::makeTokenPaste();
        
         SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
-        SourceView* sourceView = sourceManager->createSourceView(sourceFile);
+        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr);
 
         Lexer lexer;
         lexer.initialize(sourceView, GetSink(preprocessor), getNamePool(preprocessor), sourceManager->getMemoryArena());
@@ -1648,7 +1648,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
-    SourceView* sourceView = sourceManager->createSourceView(sourceFile);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo);
 
     PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceView);
     inputStream->parent = context->preprocessor->inputStream;
@@ -2259,8 +2259,8 @@ static void DefineMacro(
     SourceFile* keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
     SourceFile* valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
 
-    SourceView* keyView = sourceManager->createSourceView(keyFile);
-    SourceView* valueView = sourceManager->createSourceView(valueFile);
+    SourceView* keyView = sourceManager->createSourceView(keyFile, nullptr);
+    SourceView* valueView = sourceManager->createSourceView(valueFile, nullptr);
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
@@ -2319,7 +2319,7 @@ TokenList preprocessSource(
 
     SourceManager* sourceManager = translationUnit->compileRequest->getSourceManager();
 
-    SourceView* sourceView = sourceManager->createSourceView(file);
+    SourceView* sourceView = sourceManager->createSourceView(file, nullptr);
 
     // create an initial input stream based on the provided buffer
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceView);

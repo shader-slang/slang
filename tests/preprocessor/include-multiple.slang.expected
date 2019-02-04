@@ -1,9 +1,9 @@
 result code = -1
 standard error = {
-tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
+tests/preprocessor/../preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
 tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
-tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
-tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
+tests/preprocessor/./include-a.slang.h(3): error 30201: function 'bar' already has a body
+tests/preprocessor/../preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
 }
 standard output = {
 }
