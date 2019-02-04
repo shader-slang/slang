@@ -366,7 +366,7 @@ struct DesugarUnionTypesContext
             // there to be complete type layout information for the
             // types involved.
             //
-            auto structTypeLayout = dynamic_cast<StructTypeLayout*>(payloadTypeLayout);
+            auto structTypeLayout = as<StructTypeLayout>(payloadTypeLayout);
             SLANG_ASSERT(structTypeLayout);
 
             // We are going to emit code to extract each of the fields
@@ -665,14 +665,14 @@ struct DesugarUnionTypesContext
         info->replacementInst = structType;
 
         // We require/expect the earlier code generation steps to have
-        // assocaited a layout with every tagged union that appears in
+        // associated a layout with every tagged union that appears in
         // the code.
         //
         auto layoutDecoration = type->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(layoutDecoration);
         auto layout = layoutDecoration->getLayout();
         SLANG_ASSERT(layout);
-        auto taggedUnionTypeLayout = dynamic_cast<TaggedUnionTypeLayout*>(layout);
+        auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(layout);
         SLANG_ASSERT(taggedUnionTypeLayout);
 
         info->taggedUnionTypeLayout = taggedUnionTypeLayout;

@@ -523,7 +523,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
 
 
     UInt space = 0;
-    if( auto registerSemantic = dynamic_cast<HLSLRegisterSemantic*>(semantic) )
+    if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
     {
         auto const& spaceName = registerSemantic->spaceName.Content;
         if(spaceName.size() != 0)
@@ -698,25 +698,25 @@ static bool validateValuesMatch(
     Val*                        right,
     StructuralTypeMatchStack*   stack)
 {
-    if( auto leftType = dynamic_cast<Type*>(left) )
+    if( auto leftType = dynamicCast<Type>(left) )
     {
-        if( auto rightType = dynamic_cast<Type*>(right) )
+        if( auto rightType = dynamicCast<Type>(right) )
         {
             return validateTypesMatch(context, leftType, rightType, stack);
         }
     }
 
-    if( auto leftInt = dynamic_cast<IntVal*>(left) )
+    if( auto leftInt = dynamicCast<IntVal>(left) )
     {
-        if( auto rightInt = dynamic_cast<IntVal*>(right) )
+        if( auto rightInt = dynamicCast<IntVal>(right) )
         {
             return validateIntValuesMatch(context, leftInt, rightInt, stack);
         }
     }
 
-    if( auto leftWitness = dynamic_cast<SubtypeWitness*>(left) )
+    if( auto leftWitness = dynamicCast<SubtypeWitness>(left) )
     {
-        if( auto rightWitness = dynamic_cast<SubtypeWitness*>(right) )
+        if( auto rightWitness = dynamicCast<SubtypeWitness>(right) )
         {
             return true;
         }

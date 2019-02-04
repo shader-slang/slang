@@ -226,7 +226,7 @@ namespace Slang
             for (;;)
             {
                 if (!m) return m;
-                if (dynamic_cast<T*>(m)) return m;
+                if (dynamicCast<T>(m)) return m;
                 m = m->next.Ptr();
             }
         }
@@ -625,7 +625,7 @@ namespace Slang
         {
             while (cursor != end)
             {
-                if (dynamicCast<T>(*cursor))
+                if (as<T>(*cursor))
                     return cursor;
                 cursor++;
             }
@@ -734,7 +734,7 @@ namespace Slang
         {
             for (; ptr != end; ptr++)
             {
-                if (as<T>(*ptr))
+                if (ptr->is<T>())
                 {
                     return ptr;
                 }
@@ -1322,7 +1322,10 @@ namespace Slang
         for (;;)
         {
             if (!m) return m;
-            if (dynamic_cast<T*>(m)) return m;
+            if (as<T>(m))
+            {
+                return m;
+            }
             m = m->next.Ptr();
         }        
     }

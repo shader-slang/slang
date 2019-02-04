@@ -35,9 +35,9 @@ namespace Slang
         // so (Java is an exception here, perhaps due to some
         // influence from the Scandanavian OOP tradition of Beta/gbeta).
         //
-        if(dynamic_cast<AggTypeDecl*>(decl))
+        if(as<AggTypeDecl>(decl))
             return true;
-        if(dynamic_cast<SimpleTypeDecl*>(decl))
+        if(as<SimpleTypeDecl>(decl))
             return true;
 
         // Things nested inside functions may have dependencies
@@ -45,7 +45,7 @@ namespace Slang
         // be dealt with via "capture" so they are also effectively
         // `static`
         //
-        if(dynamic_cast<FunctionDeclBase*>(parentDecl))
+        if(as<FunctionDeclBase>(parentDecl))
             return true;
 
         // Type constraint declarations are used in member-reference
@@ -85,7 +85,7 @@ namespace Slang
     {
         // A global shader parameter must be declared at global (module) scope.
         //
-        if(!dynamic_cast<ModuleDecl*>(decl->ParentDecl)) return false;
+        if(!as<ModuleDecl>(decl->ParentDecl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
@@ -138,9 +138,9 @@ namespace Slang
             }
             else if (auto matrixType = as<MatrixExpressionType>(typeIn))
             {
-                if (auto elemCount1 = dynamic_cast<ConstantIntVal*>(matrixType->getRowCount()))
+                if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
                 {
-                    if (auto elemCount2 = dynamic_cast<ConstantIntVal*>(matrixType->getColumnCount()))
+                    if (auto elemCount2 = as<ConstantIntVal>(matrixType->getColumnCount()))
                     {
                         auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType());
                         data.type = (unsigned char)elemBasicType->baseType;
@@ -1638,7 +1638,7 @@ namespace Slang
                     toMatrixType->getElementType(),
                     toMatrixType->getColumnCount());
 
-                if (auto constRowCount = dynamic_cast<ConstantIntVal*>(toMatrixType->getRowCount()))
+                if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
                 {
                     rowCount = (UInt) constRowCount->value;
                 }
@@ -2400,7 +2400,7 @@ namespace Slang
             if (lookupResult.isValid())
             {
                 auto decl = lookupResult.item.declRef.getDecl();
-                if (auto attributeDecl = dynamic_cast<AttributeDecl*>(decl))
+                if (auto attributeDecl = as<AttributeDecl>(decl))
                 {
                     return attributeDecl;
                 }
@@ -3577,12 +3577,12 @@ namespace Slang
             // confirm that the type actually provides whatever
             // those clauses require.
 
-            if (auto interfaceDecl = dynamic_cast<InterfaceDecl*>(decl))
+            if (auto interfaceDecl = as<InterfaceDecl>(decl))
             {
                 // Don't check that an interface conforms to the
                 // things it inherits from.
             }
-            else if (auto assocTypeDecl = dynamic_cast<AssocTypeDecl*>(decl))
+            else if (auto assocTypeDecl = as<AssocTypeDecl>(decl))
             {
                 // Don't check that an associated type decl conforms to the
                 // things it inherits from.
@@ -4083,11 +4083,11 @@ namespace Slang
                 Decl* fstParam = fstParams[pp];
                 Decl* sndParam = sndParams[pp];
 
-                if (auto fstTypeParam = dynamic_cast<GenericTypeParamDecl*>(fstParam))
+                if (auto fstTypeParam = as<GenericTypeParamDecl>(fstParam))
                 {
-                    if (auto sndTypeParam = dynamic_cast<GenericTypeParamDecl*>(sndParam))
+                    if (auto sndTypeParam = as<GenericTypeParamDecl>(sndParam))
                     {
-                        // TODO: is there any validation that needs to be peformed here?
+                        // TODO: is there any validation that needs to be performed here?
                     }
                     else
                     {
@@ -4095,9 +4095,9 @@ namespace Slang
                         return false;
                     }
                 }
-                else if (auto fstValueParam = dynamic_cast<GenericValueParamDecl*>(fstParam))
+                else if (auto fstValueParam = as<GenericValueParamDecl>(fstParam))
                 {
-                    if (auto sndValueParam = dynamic_cast<GenericValueParamDecl*>(sndParam))
+                    if (auto sndValueParam = as<GenericValueParamDecl>(sndParam))
                     {
                         // Need to check that the parameters have the same type.
                         //
@@ -4234,7 +4234,7 @@ namespace Slang
             // If this is a generic function (that is, its parent
             // declaration is a generic), then we need to look
             // for sibling declarations of the parent.
-            auto genericDecl = dynamic_cast<GenericDecl*>(parentDecl);
+            auto genericDecl = as<GenericDecl>(parentDecl);
             if (genericDecl)
             {
                 parentDecl = genericDecl->ParentDecl;
@@ -4257,20 +4257,20 @@ namespace Slang
                 auto prevDecl = pp;
 
                 // Look through generics to the declaration underneath
-                auto prevGenericDecl = dynamic_cast<GenericDecl*>(prevDecl);
+                auto prevGenericDecl = as<GenericDecl>(prevDecl);
                 if (prevGenericDecl)
                     prevDecl = prevGenericDecl->inner.Ptr();
 
                 // We only care about previously-declared functions
                 // Note(tfoley): although we should really error out if the
                 // name is already in use for something else, like a variable...
-                auto prevFuncDecl = dynamic_cast<FuncDecl*>(prevDecl);
+                auto prevFuncDecl = as<FuncDecl>(prevDecl);
                 if (!prevFuncDecl)
                     continue;
 
                 // If one declaration is a prefix/postfix operator, and the
                 // other is not a matching operator, then don't consider these
-                // to be redeclarations.
+                // to be re-declarations.
                 //
                 // Note(tfoley): Any attempt to call such an operator using
                 // ordinary function-call syntax (if we decided to allow it)
@@ -4548,7 +4548,7 @@ namespace Slang
             for (UInt ii = outerStmtCount; ii > 0; --ii)
             {
                 auto outerStmt = outerStmts[ii-1];
-                auto found = dynamic_cast<T*>(outerStmt);
+                auto found = as<T>(outerStmt);
                 if (found)
                     return found;
             }
@@ -5013,19 +5013,19 @@ namespace Slang
             Expr* expr)
         {
             // Unwrap any "identity" expressions
-            while (auto parenExpr = dynamic_cast<ParenExpr*>(expr))
+            while (auto parenExpr = as<ParenExpr>(expr))
             {
                 expr = parenExpr->base;
             }
 
             // TODO(tfoley): more serious constant folding here
-            if (auto intLitExpr = dynamic_cast<IntegerLiteralExpr*>(expr))
+            if (auto intLitExpr = as<IntegerLiteralExpr>(expr))
             {
                 return GetIntVal(intLitExpr);
             }
 
             // it is possible that we are referring to a generic value param
-            if (auto declRefExpr = dynamic_cast<DeclRefExpr*>(expr))
+            if (auto declRefExpr = as<DeclRefExpr>(expr))
             {
                 auto declRef = declRefExpr->declRef;
 
@@ -5104,13 +5104,13 @@ namespace Slang
                 }
             }
 
-            if(auto castExpr = dynamic_cast<TypeCastExpr*>(expr))
+            if(auto castExpr = as<TypeCastExpr>(expr))
             {
                 auto val = TryConstantFoldExpr(castExpr->Arguments[0].Ptr());
                 if(val)
                     return val;
             }
-            else if (auto invokeExpr = dynamic_cast<InvokeExpr*>(expr))
+            else if (auto invokeExpr = as<InvokeExpr>(expr))
             {
                 auto val = TryConstantFoldExpr(invokeExpr);
                 if (val)
@@ -5476,14 +5476,14 @@ namespace Slang
             // the grandparent.
             //
             auto parent = decl->ParentDecl;
-            auto genericParent = dynamic_cast<GenericDecl*>(parent);
+            auto genericParent = as<GenericDecl>(parent);
             if (genericParent)
             {
                 parent = genericParent->ParentDecl;
             }
 
             // Now look at the type of the parent (or grandparent).
-            if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(parent))
+            if (auto aggTypeDecl = as<AggTypeDecl>(parent))
             {
                 // We are nested in an aggregate type declaration,
                 // so the result type of the initializer will just
@@ -5492,7 +5492,7 @@ namespace Slang
                     getSession(),
                     makeDeclRef(aggTypeDecl));
             }
-            else if (auto extDecl = dynamic_cast<ExtensionDecl*>(parent))
+            else if (auto extDecl = as<ExtensionDecl>(parent))
             {
                 // We are nested inside an extension, so the result
                 // type needs to be the type being extended.
@@ -5582,7 +5582,7 @@ namespace Slang
                 // its return type from the outer declaration, so we handle both
                 // of these checks at the same place.
                 auto parent = decl->ParentDecl;
-                if (auto parentSubscript = dynamic_cast<SubscriptDecl*>(parent))
+                if (auto parentSubscript = as<SubscriptDecl>(parent))
                 {
                     decl->ReturnType = parentSubscript->ReturnType;
                 }
@@ -6783,7 +6783,7 @@ namespace Slang
             // We should have the existing arguments to the generic
             // handy, so that we can construct a substitution list.
 
-            RefPtr<GenericSubstitution> subst = candidate.subst.as<GenericSubstitution>();
+            auto subst = candidate.subst.as<GenericSubstitution>();
             SLANG_ASSERT(subst);
 
             subst->genericDecl = genericDeclRef.getDecl();
@@ -7200,7 +7200,7 @@ namespace Slang
         {
             auto parentDecl = decl->ParentDecl;
             if (!parentDecl) return nullptr;
-            auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl);
+            auto parentGeneric = as<GenericDecl>(parentDecl);
             return parentGeneric;
         }
 
@@ -7394,14 +7394,14 @@ namespace Slang
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
+                if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
 
                 if (auto sndDeclRefType = as<DeclRefType>(snd))
                 {
                     auto sndDeclRef = sndDeclRefType->declRef;
 
-                    if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
+                    if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
                         return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                     // can't be unified if they refer to different declarations.
@@ -7447,7 +7447,7 @@ namespace Slang
             {
                 auto fstDeclRef = fstDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.getDecl()))
+                if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
                 {
                     if(typeParamDecl->ParentDecl == constraints.genericDecl )
                         return TryUnifyTypeParam(constraints, typeParamDecl, snd);
@@ -7458,7 +7458,7 @@ namespace Slang
             {
                 auto sndDeclRef = sndDeclRefType->declRef;
 
-                if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.getDecl()))
+                if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
                 {
                     if(typeParamDecl->ParentDecl == constraints.genericDecl )
                         return TryUnifyTypeParam(constraints, typeParamDecl, fst);
@@ -8236,7 +8236,7 @@ namespace Slang
 
 #if 0
                         // Debugging: ensure that we don't consider multiple declarations of the same operation
-                        if (auto decl = dynamic_cast<CallableDecl*>(candidate.item.declRef.decl))
+                        if (auto decl = as<CallableDecl>(candidate.item.declRef.decl))
                         {
                             char buffer[1024];
                             sprintf_s(buffer, sizeof(buffer), "[this:%p, primary:%p, next:%p]",
@@ -8451,7 +8451,7 @@ namespace Slang
         RefPtr<Expr> CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
         {
             auto rs = ResolveInvoke(expr);
-            if (auto invoke = dynamic_cast<InvokeExpr*>(rs.Ptr()))
+            if (auto invoke = as<InvokeExpr>(rs.Ptr()))
             {
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
                 if(auto funcType = as<FuncType>(invoke->FunctionExpr->type))
@@ -9145,7 +9145,7 @@ namespace Slang
         for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
         {
             // Is this declaration a function?
-            if (auto funcDecl = dynamic_cast<FuncDecl*>(ee))
+            if (auto funcDecl = as<FuncDecl>(ee))
             {
                 // Skip non-primary declarations, so that
                 // we don't give an error when an entry
@@ -9171,7 +9171,7 @@ namespace Slang
                     // List all of the declarations that the user *might* mean
                     for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
                     {
-                        if (auto candidate = dynamic_cast<FuncDecl*>(ff))
+                        if (auto candidate = as<FuncDecl>(ff))
                         {
                             sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
                         }
@@ -9304,7 +9304,7 @@ namespace Slang
         for(auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
         {
             // Is this declaration a function?
-            if (auto funcDecl = dynamic_cast<FuncDecl*>(ee))
+            if (auto funcDecl = as<FuncDecl>(ee))
             {
                 // Skip non-primary declarations, so that
                 // we don't give an error when an entry
@@ -9330,7 +9330,7 @@ namespace Slang
                     // List all of the declarations that the user *might* mean
                     for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
                     {
-                        if (auto candidate = dynamic_cast<FuncDecl*>(ff))
+                        if (auto candidate = as<FuncDecl>(ff))
                         {
                             sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
                         }
@@ -9744,16 +9744,16 @@ namespace Slang
                 isLValue = false;
 
             // Variables declared with `let` are always immutable.
-            if(as<LetDecl>(varDeclRef.getDecl()))
+            if(varDeclRef.is<LetDecl>())
                 isLValue = false;
 
             // Generic value parameters are always immutable
-            if(as<GenericValueParamDecl>(varDeclRef.getDecl()))
+            if(varDeclRef.is<GenericValueParamDecl>())
                 isLValue = false;
 
             // Function parameters declared in the "modern" style
             // are immutable unless they have an `out` or `inout` modifier.
-            if(as<ModernParamDecl>(varDeclRef.getDecl()) )
+            if(varDeclRef.is<ModernParamDecl>())
             {
                 // Note: the `inout` modifier AST class inherits from
                 // the class for the `out` modifier so that we can
@@ -9885,7 +9885,7 @@ namespace Slang
         SubstitutionSet outerSubstSet)
     {
         auto dd = decl->ParentDecl;
-        if( auto genericDecl = dynamic_cast<GenericDecl*>(dd) )
+        if( auto genericDecl = as<GenericDecl>(dd) )
         {
             // We don't want to specialize references to anything
             // other than the "inner" declaration itself.

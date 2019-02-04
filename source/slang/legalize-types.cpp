@@ -109,7 +109,7 @@ ModuleDecl* findModuleForDecl(
 {
     for (auto dd = decl; dd; dd = dd->ParentDecl)
     {
-        if (auto moduleDecl = dynamic_cast<ModuleDecl*>(dd))
+        if (auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl;
     }
     return nullptr;
@@ -945,7 +945,7 @@ RefPtr<TypeLayout> getDerefTypeLayout(
     if (!typeLayout)
         return nullptr;
 
-    if (auto parameterGroupTypeLayout = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         return parameterGroupTypeLayout->offsetElementTypeLayout;
     }
@@ -962,13 +962,13 @@ RefPtr<VarLayout> getFieldLayout(
 
     for(;;)
     {
-        if(auto arrayTypeLayout = dynamic_cast<ArrayTypeLayout*>(typeLayout))
+        if(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
         {
             typeLayout = arrayTypeLayout->elementTypeLayout;
         }
-        else if(auto parameterGroupTypeLayotu = dynamic_cast<ParameterGroupTypeLayout*>(typeLayout))
+        else if(auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
         {
-            typeLayout = parameterGroupTypeLayotu->offsetElementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
         }
         else
         {
@@ -977,7 +977,7 @@ RefPtr<VarLayout> getFieldLayout(
     }
 
 
-    if (auto structTypeLayout = dynamic_cast<StructTypeLayout*>(typeLayout))
+    if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
         for(auto ff : structTypeLayout->fields)
         {
