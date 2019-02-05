@@ -356,9 +356,12 @@ DIAGNOSTIC(38024, Error, invalidDispatchThreadIDType, "parameter with SV_Dispatc
 
 DIAGNOSTIC(-1, Note, noteWhenCompilingEntryPoint, "when compiling entry point '$0'")
 
-DIAGNOSTIC(38020, Error, mismatchGlobalGenericArguments, "expected $0 global generic arguments ($1 provided)")
-DIAGNOSTIC(38021, Error, globalTypeArgumentDoesNotConformToInterface, "type argument `$1` for global generic parameter `$0` does not conform to interface `$2`.")
+DIAGNOSTIC(38025, Error, mismatchGlobalGenericArguments, "expected $0 global generic arguments ($1 provided)")
+DIAGNOSTIC(38026, Error, globalTypeArgumentDoesNotConformToInterface, "type argument `$1` for global generic parameter `$0` does not conform to interface `$2`.")
 
+DIAGNOSTIC(38027, Error, mismatchExistentialSlotArgCount, "expected $0 existential slot arguments ($1 provided)")
+DIAGNOSTIC(38028, Error, existentialSlotArgNotAType, "existential slot argument $0 was not a type")
+DIAGNOSTIC(38029, Error, existentialSlotArgDoesNotConform, "existential slot argument $0 does not conform to the required interface '$1'")
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(39999, Fatal, errorInImportedModule, "error in imported module, compilation ceased.")

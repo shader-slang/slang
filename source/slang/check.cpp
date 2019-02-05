@@ -557,6 +557,117 @@ namespace Slang
             return isDeclUsableAsStaticMember(decl);
         }
 
+            /// Move `expr` into a temporary variable and execute `func` on that variable.
+            ///
+            /// Returns an expression that wraps both the creation and initialization of
+            /// the temporary, and the computation created by `func`.
+            ///
+        template<typename F>
+        RefPtr<Expr> moveTemp(RefPtr<Expr> const& expr, F const& func)
+        {
+            RefPtr<VarDecl> varDecl = new VarDecl();
+            varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
+            varDecl->checkState = DeclCheckState::Checked;
+            varDecl->nameAndLoc.loc = expr->loc;
+            varDecl->initExpr = expr;
+            varDecl->type.type = expr->type.type;
+
+            auto varDeclRef = makeDeclRef(varDecl.Ptr());
+
+            RefPtr<LetExpr> letExpr = new LetExpr();
+            letExpr->decl = varDecl;
+
+            auto body = func(varDeclRef);
+
+            letExpr->body = body;
+            letExpr->type = body->type;
+
+            return letExpr;
+        }
+
+            /// Execute `func` on a variable with the value of `expr`.
+            ///
+            /// If `expr` is just a reference to an immutable (e.g., `let`) variable
+            /// then this might use the existing variable. Otherwise it will create
+            /// a new variable to hold `expr`, using `moveTemp()`.
+            ///
+        template<typename F>
+        RefPtr<Expr> maybeMoveTemp(RefPtr<Expr> const& expr, F const& func)
+        {
+            if(auto varExpr = as<VarExpr>(expr))
+            {
+                auto declRef = varExpr->declRef;
+                if(auto varDeclRef = declRef.as<LetDecl>())
+                    return func(varDeclRef);
+            }
+
+            return moveTemp(expr, func);
+        }
+
+            /// Return an expression that represents "opening" the existential `expr`.
+            ///
+            /// The type of `expr` must be an interface type, matching `interfaceDeclRef`.
+            ///
+            /// If we scope down the PL theory to just the case that Slang cares about,
+            /// a value of an existential type like `IMover` is a tuple of:
+            ///
+            ///  * a concrete type `X`
+            ///  * a witness `w` of the fact that `X` implements `IMover`
+            ///  * a value `v` of type `X`
+            ///
+            /// "Opening" an existential value is the process of decomposing a single
+            /// value `e : IMover` into the pieces `X`, `w`, and `v`.
+            ///
+            /// Rather than return all those pieces individually, this operation
+            /// returns an expression that logically corresponds to `v`: an expression
+            /// of type `X`, where the type carries the knowledge that `X` implements `IMover`.
+            ///
+        RefPtr<Expr> openExistential(
+            RefPtr<Expr>            expr,
+            DeclRef<InterfaceDecl>  interfaceDeclRef)
+        {
+            // If `expr` refers to an immutable binding,
+            // then we can use it directly. If it refers
+            // to an arbitrary expression or a mutable
+            // binding, we will move its value into an
+            // immutable temporary so that we can use
+            // it directly.
+            //
+            auto interfaceDecl = interfaceDeclRef.getDecl();
+            return maybeMoveTemp(expr, [&](DeclRef<VarDeclBase> varDeclRef)
+            {
+                RefPtr<ExtractExistentialType> openedType = new ExtractExistentialType();
+                openedType->declRef = varDeclRef;
+
+                RefPtr<ExtractExistentialSubtypeWitness> openedWitness = new ExtractExistentialSubtypeWitness();
+                openedWitness->sub = openedType;
+                openedWitness->sup = expr->type.type;
+                openedWitness->declRef = varDeclRef;
+
+                RefPtr<ThisTypeSubstitution> openedThisType = new ThisTypeSubstitution();
+                openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
+                openedThisType->interfaceDecl = interfaceDecl;
+                openedThisType->witness = openedWitness;
+
+                DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
+                auto substDeclRefType = DeclRefType::Create(getSession(), substDeclRef);
+
+                RefPtr<ExtractExistentialValueExpr> openedValue = new ExtractExistentialValueExpr();
+                openedValue->declRef = varDeclRef;
+                openedValue->type = QualType(substDeclRefType);
+
+                return openedValue;
+            });
+        }
+
+            /// If `expr` has existential type, then open it.
+            ///
+            /// Returns an expression that opens `expr` if it had existential type.
+            /// Otherwise returns `expr` itself.
+            ///
+            /// See `openExistential` for a discussion of what "opening" an
+            /// existential-type value means.
+            ///
         RefPtr<Expr> maybeOpenExistential(RefPtr<Expr> expr)
         {
             auto exprType = expr->type.type;
@@ -584,45 +695,7 @@ namespace Slang
                     {
                         // Okay, here is the case that matters.
                         //
-
-                        auto interfaceDecl = interfaceDeclRef.getDecl();
-
-                        RefPtr<VarDecl> varDecl = new VarDecl();
-                        varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
-                        varDecl->checkState = DeclCheckState::Checked;
-                        varDecl->nameAndLoc.loc = expr->loc;
-                        varDecl->initExpr = expr;
-                        varDecl->type.type = expr->type.type;
-
-                        auto varDeclRef = makeDeclRef(varDecl.Ptr());
-
-                        RefPtr<LetExpr> letExpr = new LetExpr();
-                        letExpr->decl = varDecl;
-
-                        RefPtr<ExtractExistentialType> openedType = new ExtractExistentialType();
-                        openedType->declRef = varDeclRef;
-
-                        RefPtr<ExtractExistentialSubtypeWitness> openedWitness = new ExtractExistentialSubtypeWitness();
-                        openedWitness->sub = openedType;
-                        openedWitness->sup = expr->type.type;
-                        openedWitness->declRef = varDeclRef;
-
-                        RefPtr<ThisTypeSubstitution> openedThisType = new ThisTypeSubstitution();
-                        openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
-                        openedThisType->interfaceDecl = interfaceDecl;
-                        openedThisType->witness = openedWitness;
-
-                        DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
-                        auto substDeclRefType = DeclRefType::Create(getSession(), substDeclRef);
-
-                        RefPtr<ExtractExistentialValueExpr> openedValue = new ExtractExistentialValueExpr();
-                        openedValue->declRef = varDeclRef;
-                        openedValue->type = QualType(substDeclRefType);
-
-                        letExpr->body = openedValue;
-                        letExpr->type = openedValue->type;
-
-                        return letExpr;
+                        return openExistential(expr, interfaceDeclRef);
                     }
                 }
             }
@@ -9232,13 +9305,78 @@ namespace Slang
         }
     }
 
+        /// Recursively walk `paramDeclRef` and add any required existential slots to `ioSlots`.
+    static void _collectExistentialParamsRec(
+        ExistentialSlots&       ioSlots,
+        DeclRef<VarDeclBase>    paramDeclRef)
+    {
+        auto type = GetType(paramDeclRef);
+
+        // Whether or not something is an array does not affect
+        // the number of existential slots it introduces.
+        //
+        while( auto arrayType = as<ArrayExpressionType>(type) )
+        {
+            type = arrayType->baseType;
+        }
+
+        if( auto declRefType = as<DeclRefType>(type) )
+        {
+            auto typeDeclRef = declRefType->declRef;
+            if( auto interfaceDeclRef = typeDeclRef.as<InterfaceDecl>() )
+            {
+                // Each leaf parameter of interface type adds one slot.
+                //
+                ioSlots.types.Add(type);
+            }
+            else if( auto structDeclRef = typeDeclRef.as<StructDecl>() )
+            {
+                // A structure type should recursively introduce
+                // existential slots for its fields.
+                //
+                for( auto fieldDeclRef : GetFields(structDeclRef) )
+                {
+                    if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+                        continue;
+
+                    _collectExistentialParamsRec(ioSlots, fieldDeclRef);
+                }
+            }
+        }
+
+        // TODO: We eventually need to handle cases like constant
+        // buffers and parameter blocks that may have existential
+        // element types.
+    }
+
+        /// Enumerate the existential-type parameters of an `EntryPoint`.
+        ///
+        /// Any parameters found will be added to the list of existential slots on `this`.
+        ///
+    void EntryPoint::_collectExistentialParams()
+    {
+        // Note: we defensively test whether there is a function decl-ref
+        // because this routine gets called from the constructor, and
+        // a "dummy" entry point will have a null pointer for the function.
+        //
+        if( auto funcDeclRef = getFuncDeclRef() )
+        {
+            for( auto paramDeclRef : GetParameters(funcDeclRef) )
+            {
+                _collectExistentialParamsRec(m_existentialSlots, paramDeclRef);
+            }
+        }
+    }
+
     // Validate that an entry point function conforms to any additional
     // constraints based on the stage (and profile?) it specifies.
     void validateEntryPoint(
-        FuncDecl*       entryPointFuncDecl,
-        Stage           stage,
+        EntryPoint*     entryPoint,
         DiagnosticSink* sink)
     {
+        auto entryPointFuncDecl = entryPoint->getFuncDecl();
+        auto stage = entryPoint->getStage();
+
         // TODO: We currently do minimal checking here, but this is the
         // right place to perform the following validation checks:
         //
@@ -9494,19 +9632,41 @@ namespace Slang
         }
 
 
-        // Now that we've *found* the entry point, it is time to validate
-        // that it actually meets the constraints for the chosen stage/profile.
-        //
-        validateEntryPoint(
-            entryPointFuncDecl,
-            entryPointProfile.GetStage(),
-            sink);
-
         RefPtr<EntryPoint> entryPoint = EntryPoint::create(
             makeDeclRef(entryPointFuncDecl),
             entryPointProfile);
 
+        // Now that we've *found* the entry point, it is time to validate
+        // that it actually meets the constraints for the chosen stage/profile.
+        //
+        validateEntryPoint(entryPoint, sink);
+
         return entryPoint;
+    }
+
+        /// Enumerate the existential-type parameters of a `Program`.
+        ///
+        /// Any parameters found will be added to the list of existential slots on `this`.
+        ///
+    void Program::_collectExistentialParams()
+    {
+        // We need to inspect all of the global shader parameters
+        // referenced by the compile request, and for each we
+        // need to determine what existential types parameters it implies.
+        //
+        for( auto module : getModuleDependencies() )
+        {
+            auto moduleDecl = module->getModuleDecl();
+            for( auto globalVar : moduleDecl->getMembersOfType<VarDecl>() )
+            {
+                if(!isGlobalShaderParameter(globalVar))
+                    continue;
+
+                _collectExistentialParamsRec(
+                    m_globalExistentialSlots,
+                    makeDeclRef(globalVar.Ptr()));
+            }
+        }
     }
 
         /// Create a `Program` to represent the compiled code.
@@ -9623,32 +9783,99 @@ namespace Slang
                     Profile profile;
                     profile.setStage(entryPointAttr->stage);
 
-                    validateEntryPoint(funcDecl, entryPointAttr->stage, sink);
-
                     RefPtr<EntryPoint> entryPoint = EntryPoint::create(
                         makeDeclRef(funcDecl),
                         profile);
+
+                    validateEntryPoint(entryPoint, sink);
+
                     program->addEntryPoint(entryPoint);
                     translationUnit->entryPoints.Add(entryPoint);
                 }
             }
         }
 
+        program->_collectExistentialParams();
+
         return program;
     }
 
-            /// Create a specialization an existing entry point based on generic arguments.
-    DeclRef<FuncDecl> specializeEntryPoint(
+    static void _specializeExistentialSlots(
         Linkage*                    linkage,
-        FuncDecl*                   entryPointFuncDecl,
-        List<RefPtr<Expr>> const&   genericArgs,
+        ExistentialSlots&           ioSlots,
+        List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
+        UInt slotCount = ioSlots.types.Count();
+        UInt argCount = args.Count();
+
+        if( slotCount != argCount )
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::mismatchExistentialSlotArgCount, slotCount, argCount);
+            return;
+        }
+
+        SemanticsVisitor visitor(linkage, sink);
+
+        for( UInt ii = 0; ii < slotCount; ++ii )
+        {
+            auto slotType = ioSlots.types[ii];
+            auto argExpr = args[ii];
+
+            auto argType = checkProperType(linkage, TypeExp(argExpr), sink);
+            if(!argType)
+            {
+                // TODO: Each slot should track a source location and/or a `VarDeclBase`
+                // that names the parameter that the slot corresponds to.
+
+                sink->diagnose(SourceLoc(), Diagnostics::existentialSlotArgNotAType, ii);
+                return;
+            }
+
+
+            auto witness = visitor.tryGetSubtypeWitness(argType, slotType);
+            if (!witness)
+            {
+                // If no witness was found, then we will be unable to satisfy
+                // the conformances required.
+                sink->diagnose(SourceLoc(), Diagnostics::existentialSlotArgDoesNotConform, ii, slotType);
+                return;
+            }
+
+            ExistentialSlots::Arg arg;
+            arg.type = argType;
+            arg.witness = witness;
+            ioSlots.args.Add(arg);
+        }
+    }
+
+    void EntryPoint::_specializeExistentialSlots(
+        List<RefPtr<Expr>> const&   args,
+        DiagnosticSink*             sink)
+    {
+        Slang::_specializeExistentialSlots(getLinkage(), m_existentialSlots, args, sink);
+    }
+
+            /// Create a specialization an existing entry point based on generic arguments.
+    RefPtr<EntryPoint> createSpecializedEntryPoint(
+        EntryPoint*                 unspecializedEntryPoint,
+        List<RefPtr<Expr>> const&   genericArgs,
+        List<RefPtr<Expr>> const&   existentialArgs,
+        DiagnosticSink*             sink)
+    {
+        auto linkage = unspecializedEntryPoint->getLinkage();
+
+        // TODO: Need to be careful in case entry point already has a decl-ref,
+        // pertaining to outer specializations (e.g., when entry point was
+        // nested in a generic type.
+        //
+        auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
+
         SemanticsVisitor semantics(
             linkage,
             sink);
 
-        DeclRef<FuncDecl> entryPointFuncDeclRef = makeDeclRef(entryPointFuncDecl);
+        DeclRef<FuncDecl> entryPointFuncDeclRef = makeDeclRef(entryPointFuncDecl.Ptr());
         if( auto genericDecl = as<GenericDecl>(entryPointFuncDecl->ParentDecl) )
         {
             // We will construct a suitable `GenericAppExpr` to represent
@@ -9702,7 +9929,7 @@ namespace Slang
             {
                 // Any semantic error that occured should have been
                 // reported already.
-                return DeclRef<FuncDecl>();
+                return nullptr;
             }
             else
             {
@@ -9714,7 +9941,14 @@ namespace Slang
             }
         }
 
-        return entryPointFuncDeclRef;
+        RefPtr<EntryPoint> specializedEntryPoint = EntryPoint::create(
+            entryPointFuncDeclRef,
+            unspecializedEntryPoint->getProfile());
+
+        // Next we need to validate the existential arguments.
+        specializedEntryPoint->_specializeExistentialSlots(existentialArgs, sink);
+
+        return specializedEntryPoint;
     }
 
         /// Parse an array of strings as generic arguments.
@@ -9771,11 +10005,20 @@ namespace Slang
         }
     }
 
+    void Program::_specializeExistentialSlots(
+        List<RefPtr<Expr>> const&   args,
+        DiagnosticSink*             sink)
+    {
+        Slang::_specializeExistentialSlots(getLinkage(), m_globalExistentialSlots, args, sink);
+    }
+
+
         /// Specialize a program to global generic arguments
     RefPtr<Program> createSpecializedProgram(
         Linkage*                    linkage,
         Program*                    unspecializedProgram,
         List<RefPtr<Expr>> const&   globalGenericArgs,
+        List<RefPtr<Expr>> const&   globalExistentialArgs,
         DiagnosticSink*             sink)
     {
         // The given `unspecializedProgram` should be one that
@@ -9827,6 +10070,8 @@ namespace Slang
         // We have an appropriate number of arguments for the global generic parameters,
         // and now we need to check that the arguments conform to the declared constraints.
         //
+        SemanticsVisitor visitor(linkage, sink);
+
         // Along the way, we will build up an appropriate set of substitutions to represent
         // the generic arguments and their conformances.
         //
@@ -9905,7 +10150,6 @@ namespace Slang
                 auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
 
                 // Use our semantic-checking logic to search for a witness to the required conformance
-                SemanticsVisitor visitor(linkage, sink);
                 auto witness = visitor.tryGetSubtypeWitness(globalGenericArg, interfaceType);
                 if (!witness)
                 {
@@ -9937,6 +10181,10 @@ namespace Slang
 
         specializedProgram->setGlobalGenericSubsitution(globalGenericSubsts);
 
+        // Now deal with the existential arguments
+        specializedProgram->_collectExistentialParams();
+        specializedProgram->_specializeExistentialSlots(globalExistentialArgs, sink);
+
         return specializedProgram;
     }
 
@@ -9949,12 +10197,11 @@ namespace Slang
         /// Returns a specialized entry point if everything worked as expected.
         /// Returns null and diagnoses errors if anything goes wrong.
         ///
-    RefPtr<EntryPoint> specializeEntryPoint(
+    RefPtr<EntryPoint> createSpecializedEntryPoint(
         EndToEndCompileRequest*                         endToEndReq,
         EntryPoint*                                     unspecializedEntryPoint,
         EndToEndCompileRequest::EntryPointInfo const&   entryPointInfo)
     {
-        auto linkage = endToEndReq->getLinkage();
         auto sink = endToEndReq->getSink();
         auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
 
@@ -9967,18 +10214,20 @@ namespace Slang
             entryPointInfo.genericArgStrings,
             genericArgs);
 
+        List<RefPtr<Expr>> existentialArgs;
+        parseGenericArgStrings(
+            endToEndReq,
+            entryPointInfo.existentialArgStrings,
+            existentialArgs);
+
         // Next we specialize the entry point function given the parsed
         // generic argument expressions.
         //
-        auto entryPointFuncDeclRef = specializeEntryPoint(
-            linkage,
-            entryPointFuncDecl,
+        auto entryPoint = createSpecializedEntryPoint(
+            unspecializedEntryPoint,
             genericArgs,
+            existentialArgs,
             sink);
-
-        RefPtr<EntryPoint> entryPoint = EntryPoint::create(
-            entryPointFuncDeclRef,
-            unspecializedEntryPoint->getProfile());
 
         return entryPoint;
     }
@@ -10005,6 +10254,13 @@ namespace Slang
             endToEndReq->globalGenericArgStrings,
             globalGenericArgs);
 
+        // Also handle global existential type arguments.
+        List<RefPtr<Expr>> globalExistentialArgs;
+        parseGenericArgStrings(
+            endToEndReq,
+            endToEndReq->globalExistentialSlotArgStrings,
+            globalExistentialArgs);
+
         // Now we create the initial specialized program by
         // applying the global generic arguments (if any) to the
         // unspecialized program.
@@ -10013,6 +10269,7 @@ namespace Slang
             endToEndReq->getLinkage(),
             unspecializedProgram,
             globalGenericArgs,
+            globalExistentialArgs,
             endToEndReq->getSink());
 
         // If anything went wrong with the global generic
@@ -10045,7 +10302,7 @@ namespace Slang
             auto unspecializedEntryPoint = unspecializedProgram->getEntryPoint(ii);
             auto& entryPointInfo = endToEndReq->entryPoints[ii];
 
-            auto specializedEntryPoint = specializeEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
+            auto specializedEntryPoint = createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
             specializedProgram->addEntryPoint(specializedEntryPoint);
         }
 

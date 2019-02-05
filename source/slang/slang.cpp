@@ -2081,6 +2081,45 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     return SLANG_OK;
 }
 
+SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
+    SlangCompileRequest*    request,
+    int                     slotIndex,
+    char const*             typeName)
+{
+    if(!request)        return SLANG_FAIL;
+    if(slotIndex < 0)   return SLANG_FAIL;
+    if(!typeName)       return SLANG_FAIL;
+
+    auto req = convert(request);
+    auto& typeArgStrings = req->globalExistentialSlotArgStrings;
+    if(Slang::UInt(slotIndex) >= typeArgStrings.Count())
+        typeArgStrings.SetSize(slotIndex+1);
+    typeArgStrings[slotIndex] = Slang::String(typeName);
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spSetTypeNameForEntryPointExistentialSlot(
+    SlangCompileRequest*    request,
+    int                     entryPointIndex,
+    int                     slotIndex,
+    char const*             typeName)
+{
+    if(!request)            return SLANG_FAIL;
+    if(entryPointIndex < 0) return SLANG_FAIL;
+    if(slotIndex < 0)       return SLANG_FAIL;
+    if(!typeName)           return SLANG_FAIL;
+
+    auto req = convert(request);
+    if(Slang::UInt(entryPointIndex) >= req->entryPoints.Count())
+        return SLANG_FAIL;
+
+    auto& entryPointInfo = req->entryPoints[entryPointIndex];
+    auto& typeArgStrings = entryPointInfo.existentialArgStrings;
+    if(Slang::UInt(slotIndex) >= typeArgStrings.Count())
+        typeArgStrings.SetSize(slotIndex+1);
+    typeArgStrings[slotIndex] = Slang::String(typeName);
+    return SLANG_OK;
+}
 
 // Compile in a context that already has its translation units specified
 SLANG_API SlangResult spCompile(

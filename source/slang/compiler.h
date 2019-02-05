@@ -17,7 +17,6 @@ namespace Slang
 {
     struct PathInfo;
     struct IncludeHandler;
-    class CompileRequest;
     class ProgramLayout;
     class PtrType;
     class TargetProgram;
@@ -116,6 +115,26 @@ namespace Slang
         List<uint8_t> outputBinary;
 
         ComPtr<ISlangBlob> blob;
+    };
+
+        /// Collects information about placeholder "slots" for interface/existential types.
+    struct ExistentialSlots
+    {
+            /// The existential/interface type associated with each slot.
+        List<RefPtr<Type>> types;
+
+            /// Source code for concrete type to plug in for each slot.
+//        List<String> argStrings;
+
+            /// A concrete type argument plus a witness table for its conformance to the desired interface
+        struct Arg
+        {
+            RefPtr<Type>    type;
+            RefPtr<Val>     witness;
+        };
+
+            /// Concrete type arguments to plug into each slot
+        List<Arg> args;
     };
 
         /// A request for the front-end to find and validate an entry-point function
@@ -264,11 +283,21 @@ namespace Slang
             Name*       name,
             Profile     profile);
 
+        UInt getExistentialSlotCount() { return m_existentialSlots.types.Count(); }
+        Type* getExistentialSlotType(UInt index) { return m_existentialSlots.types[index]; }
+        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_existentialSlots.args[index]; }
+
+        void _specializeExistentialSlots(
+            List<RefPtr<Expr>> const&   args,
+            DiagnosticSink*             sink);
+
     private:
         EntryPoint(
             Name*               name,
             Profile             profile,
             DeclRef<FuncDecl>   funcDeclRef);
+
+        void _collectExistentialParams();
 
         // The name of the entry point function (e.g., `main`)
         //
@@ -277,6 +306,9 @@ namespace Slang
         // The declaration of the entry-point function itself.
         //
         DeclRef<FuncDecl> m_funcDeclRef;
+
+            /// The existential/interface slots associated with the entry point parameter scope.
+        ExistentialSlots m_existentialSlots;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target stage, and also
@@ -527,8 +559,6 @@ namespace Slang
 
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
-
-
 
         // Source manager to help track files loaded
         SourceManager m_defaultSourceManager;
@@ -886,7 +916,17 @@ namespace Slang
             ///
         RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
 
+        UInt getExistentialSlotCount() { return m_globalExistentialSlots.types.Count(); }
+        Type* getExistentialSlotType(UInt index) { return m_globalExistentialSlots.types[index]; }
+        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+
+        void _collectExistentialParams();
+        void _specializeExistentialSlots(
+            List<RefPtr<Expr>> const&   args,
+            DiagnosticSink*             sink);
+
     private:
+
         // The linakge this program is associated with.
         //
         // Note that a `Program` keeps its associated linkage alive,
@@ -905,6 +945,9 @@ namespace Slang
 
         // Specializations for global generic parameters (if any)
         RefPtr<Substitutions> m_globalGenericSubst;
+
+        // The existential/interface slots associated with the global scope.
+        ExistentialSlots m_globalExistentialSlots;
 
         // Generated IR for this program.
         RefPtr<IRModule> m_irModule;
@@ -1044,6 +1087,8 @@ namespace Slang
             /// Source code for the generic arguments to use for the global generic parameters of the program.
         List<String> globalGenericArgStrings;
 
+            /// Types to use to fill global existential "slots"
+        List<String> globalExistentialSlotArgStrings;
 
         bool shouldSkipCodegen = false;
 
@@ -1061,6 +1106,9 @@ namespace Slang
         public:
             /// Source code for the generic arguments to use for the generic parameters of the entry point.
             List<String> genericArgStrings;
+
+            /// Source code for the type arguments to plug into the existential type "slots" of the entry point
+            List<String> existentialArgStrings;
         };
         List<EntryPointInfo> entryPoints;
 

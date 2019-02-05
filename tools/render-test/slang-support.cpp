@@ -94,7 +94,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     RefPtr<ShaderProgram> shaderProgram;
 
     Slang::List<const char*> rawGlobalTypeNames;
-    for (auto typeName : request.globalTypeArguments)
+    for (auto typeName : request.globalGenericTypeArguments)
         rawGlobalTypeNames.Add(typeName.Buffer());
     spSetGlobalGenericArgs(
         slangRequest,
@@ -102,8 +102,24 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
         rawGlobalTypeNames.Buffer());
 
     Slang::List<const char*> rawEntryPointTypeNames;
-    for (auto typeName : request.entryPointTypeArguments)
+    for (auto typeName : request.entryPointGenericTypeArguments)
         rawEntryPointTypeNames.Add(typeName.Buffer());
+
+    UInt globalExistentialTypeCount = request.globalExistentialTypeArguments.Count();
+    for( UInt ii = 0; ii < globalExistentialTypeCount; ++ii )
+    {
+        spSetTypeNameForGlobalExistentialSlot(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
+    }
+
+    UInt entryPointExistentialTypeCount = request.entryPointExistentialTypeArguments.Count();
+    auto setEntryPointExistentialTypeArgs = [&](int entryPoint)
+    {
+        for( UInt ii = 0; ii < entryPointExistentialTypeCount; ++ii )
+        {
+            spSetTypeNameForEntryPointExistentialSlot(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
+        }
+    };
+
     if (request.computeShader.name)
     {
         int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
@@ -111,6 +127,8 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
             SLANG_STAGE_COMPUTE,
             (int)rawEntryPointTypeNames.Count(),
             rawEntryPointTypeNames.Buffer());
+
+        setEntryPointExistentialTypeArgs(computeEntryPoint);
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
         const SlangResult res = spCompile(slangRequest);
@@ -140,6 +158,9 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     {
         int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
         int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
+
+        setEntryPointExistentialTypeArgs(vertexEntryPoint);
+        setEntryPointExistentialTypeArgs(fragmentEntryPoint);
 
         const SlangResult res = spCompile(slangRequest);
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))

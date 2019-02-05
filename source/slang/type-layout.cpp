@@ -2357,6 +2357,28 @@ SimpleLayoutInfo GetLayoutImpl(
                 rules,
                 outTypeLayout);
         }
+        else if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
+        {
+            // When laying out a type that includes interface-type fields,
+            // we cannot know how much space the concrete type that
+            // gets stored into the field consumes.
+            //
+            // If we were doing layout for a typical CPU target, then
+            // we could just say that each interface-type field consumes
+            // some fixed number of pointers (e.g., a data pointer plus a witness
+            // table pointer).
+            //
+            // We will borrow the intuition from that and invent a new
+            // resource kind for "existential slots" which conceptually
+            // represents the indirections needed to reference the
+            // data to be referenced by this field.
+            //
+            return GetSimpleLayoutImpl(
+                SimpleLayoutInfo(LayoutResourceKind::ExistentialSlot, 1),
+                type,
+                rules,
+                outTypeLayout);
+        }
     }
     else if (auto errorType = as<ErrorType>(type))
     {

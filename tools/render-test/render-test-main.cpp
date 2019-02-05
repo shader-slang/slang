@@ -387,8 +387,10 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 		compileRequest.computeShader.source = sourceInfo;
 		compileRequest.computeShader.name = computeEntryPointName;
 	}
-	compileRequest.globalTypeArguments = m_shaderInputLayout.globalTypeArguments;
-	compileRequest.entryPointTypeArguments = m_shaderInputLayout.entryPointTypeArguments;
+	compileRequest.globalGenericTypeArguments = m_shaderInputLayout.globalGenericTypeArguments;
+	compileRequest.entryPointGenericTypeArguments = m_shaderInputLayout.entryPointGenericTypeArguments;
+	compileRequest.globalExistentialTypeArguments = m_shaderInputLayout.globalExistentialTypeArguments;
+	compileRequest.entryPointExistentialTypeArguments = m_shaderInputLayout.entryPointExistentialTypeArguments;
 	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
 
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
