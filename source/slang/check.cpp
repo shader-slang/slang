@@ -9625,7 +9625,7 @@ namespace Slang
                 {
                     // Get the argument that matches this parameter.
                     UInt argIndex = argCounter++;
-                    SLANG_ASSERT(argIndex < genericArguments.Count());
+                    SLANG_ASSERT(argIndex < genericArgs.Count());
                     auto globalGenericArg = checkProperType(translationUnit, TypeExp(genericArgs[argIndex]));
                     if (!globalGenericArg)
                     {
