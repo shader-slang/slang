@@ -2310,6 +2310,11 @@ namespace Slang
                     return;
                 }
             }
+            else if(base.type.is<ErrorType>())
+            {
+                // If an error was already produced, don't emit a cascading error.
+                return;
+            }
 
             // If type expression didn't name an interface, we'll emit an error here
             // TODO: deal with the case of an error in the type expression (don't cascade)
