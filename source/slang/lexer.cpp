@@ -12,7 +12,7 @@
 
 namespace Slang
 {
-    static Token GetEndOfFileToken()
+    Token TokenReader::GetEndOfFileToken()
     {
         return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
     }
@@ -41,31 +41,19 @@ namespace Slang
     {}
 
 
-    Token TokenReader::PeekToken() const
+    Token& TokenReader::PeekToken()
     {
-        if (!mCursor)
-            return GetEndOfFileToken();
-
-        Token token = *mCursor;
-        if (mCursor == mEnd)
-            token.type = TokenType::EndOfFile;
-        return token;
+        return nextToken;
     }
 
     TokenType TokenReader::PeekTokenType() const
     {
-        if (mCursor == mEnd)
-            return TokenType::EndOfFile;
-        SLANG_ASSERT(mCursor);
-        return mCursor->type;
+        return nextToken.type;
     }
 
     SourceLoc TokenReader::PeekLoc() const
     {
-        if (!mCursor)
-            return SourceLoc();
-        SLANG_ASSERT(mCursor);
-        return mCursor->loc;
+        return nextToken.loc;
     }
 
     Token TokenReader::AdvanceToken()
@@ -73,11 +61,14 @@ namespace Slang
         if (!mCursor)
             return GetEndOfFileToken();
 
-        Token token = *mCursor;
-        if (mCursor == mEnd)
-            token.type = TokenType::EndOfFile;
-        else
+        Token token = nextToken;
+        if (mCursor < mEnd)
+        {
             mCursor++;
+            nextToken = *mCursor;
+        }
+        else
+            nextToken.type = TokenType::EndOfFile;
         return token;
     }
 
