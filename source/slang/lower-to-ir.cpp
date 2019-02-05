@@ -585,7 +585,7 @@ LoweredValInfo emitPostfixIncDecOp(
     builder->emitStore(argPtr, innerOp);
 
     // For a postfix operator like `i++` we return
-    // the value that we read befor the increment/decrement
+    // the value that we read before the increment/decrement
     // gets applied. In casual terms we "read
     // the variable, then increment it."
     //
