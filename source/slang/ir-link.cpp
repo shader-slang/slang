@@ -743,6 +743,11 @@ IRFunc* specializeIRForEntryPoint(
         return nullptr;
     }
 
+    if( !clonedFunc->findDecorationImpl(kIROp_EntryPointDecoration) )
+    {
+        context->builder->addEntryPointDecoration(clonedFunc);
+    }
+
     // We need to attach the layout information for
     // the entry point to this declaration, so that
     // we can use it to inform downstream code emit.

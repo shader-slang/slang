@@ -6117,14 +6117,7 @@ static void lowerEntryPointToIR(
     // Attach a marker decoration so that we recognize
     // this as an entry point.
     //
-    // Note: We use `getResolvedInstForDecoration` here in
-    // case `loweredEntryPointFunc` refers to a `specialize`
-    // instruction that specialized a generic entry point
-    // (in which case we want to decorate the `IRFunc`
-    // that the generic returns).
-    //
-    builder->addEntryPointDecoration(
-        getResolvedInstForDecorations(loweredEntryPointFunc));
+    builder->addEntryPointDecoration(loweredEntryPointFunc);
 
     //
     if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
