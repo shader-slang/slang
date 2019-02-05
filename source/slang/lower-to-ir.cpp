@@ -534,7 +534,7 @@ IRInst* getOneValOfType(
     UNREACHABLE_RETURN(nullptr);
 }
 
-LoweredValInfo emitPreOp(
+LoweredValInfo emitPrefixIncDecOp(
     IRGenContext*   context,
     IRType*         type,
     IROp            op,
@@ -555,10 +555,15 @@ LoweredValInfo emitPreOp(
 
     builder->emitStore(argPtr, innerOp);
 
-    return LoweredValInfo::simple(preVal);
+    // For a prefix operator like `++i` we return
+    // the value after the increment/decrement has
+    // been applied. In casual terms we "increment
+    // the varaible, then return its value."
+    //
+    return LoweredValInfo::simple(innerOp);
 }
 
-LoweredValInfo emitPostOp(
+LoweredValInfo emitPostfixIncDecOp(
     IRGenContext*   context,
     IRType*         type,
     IROp            op,
@@ -579,7 +584,12 @@ LoweredValInfo emitPostOp(
 
     builder->emitStore(argPtr, innerOp);
 
-    return LoweredValInfo::ptr(argPtr);
+    // For a postfix operator like `i++` we return
+    // the value that we read before the increment/decrement
+    // gets applied. In casual terms we "read
+    // the variable, then increment it."
+    //
+    return LoweredValInfo::simple(preVal);
 }
 
 LoweredValInfo lowerRValueExpr(
@@ -707,13 +717,13 @@ LoweredValInfo emitCallToDeclRef(
 #undef CASE
 
 #define CASE(COMPOUND, OP)  \
-            case COMPOUND: return emitPreOp(context, type, OP, argCount, args)
+            case COMPOUND: return emitPrefixIncDecOp(context, type, OP, argCount, args)
             CASE(kIRPseudoOp_PreInc, kIROp_Add);
             CASE(kIRPseudoOp_PreDec, kIROp_Sub);
 #undef CASE
 
 #define CASE(COMPOUND, OP)  \
-            case COMPOUND: return emitPostOp(context, type, OP, argCount, args)
+            case COMPOUND: return emitPostfixIncDecOp(context, type, OP, argCount, args)
             CASE(kIRPseudoOp_PostInc, kIROp_Add);
             CASE(kIRPseudoOp_PostDec, kIROp_Sub);
 #undef CASE
