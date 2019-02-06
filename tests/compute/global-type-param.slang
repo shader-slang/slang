@@ -26,10 +26,8 @@ struct Impl : IBase
     }
 };
 
-__generic_param TImpl : IBase;
-
 [numthreads(1, 1, 1)]
-void computeMain(
+void computeMain<TImpl:IBase>(
     uniform TImpl impl,
     uint3 dispatchThreadID : SV_DispatchThreadID)
 {

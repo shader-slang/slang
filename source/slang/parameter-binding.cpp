@@ -1790,7 +1790,7 @@ static void collectGlobalScopeParameters(
     // First enumerate parameters at global scope
     // We collect two things here:
     // 1. A shader parameter, which is always a variable
-    // 2. A global entry-point generic parameter type (`__generic_param`),
+    // 2. A global entry-point generic parameter type (`type_param`),
     //    which is a GlobalGenericParamDecl
     // We collect global generic type parameters in the first pass,
     // So we can fill in the correct index into ordinary type layouts 
@@ -2255,13 +2255,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     ParameterBindingContext*        context,
     SubstitutionSet                 typeSubst,
-    RefPtr<ParamDecl>               paramDecl,
+    DeclRef<ParamDecl>              paramDeclRef,
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = paramDecl->type.type->Substitute(typeSubst).as<Type>();
+    auto paramType = GetType(paramDeclRef)->Substitute(typeSubst).as<Type>();
 
-    if( paramDecl->HasModifier<HLSLUniformModifier>() )
+    if( paramDeclRef.getDecl()->HasModifier<HLSLUniformModifier>() )
     {
         // An entry-point parameter that is explicitly marked `uniform` represents
         // a uniform shader parameter passed via the implicitly-defined
@@ -2283,21 +2283,24 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         state.directionMask = 0;
 
         // If it appears to be an input, process it as such.
-        if( paramDecl->HasModifier<InModifier>() || paramDecl->HasModifier<InOutModifier>() || !paramDecl->HasModifier<OutModifier>() )
+        if( paramDeclRef.getDecl()->HasModifier<InModifier>()
+            || paramDeclRef.getDecl()->HasModifier<InOutModifier>()
+            || !paramDeclRef.getDecl()->HasModifier<OutModifier>() )
         {
             state.directionMask |= kEntryPointParameterDirection_Input;
         }
 
         // If it appears to be an output, process it as such.
-        if(paramDecl->HasModifier<OutModifier>() || paramDecl->HasModifier<InOutModifier>())
+        if(paramDeclRef.getDecl()->HasModifier<OutModifier>()
+            || paramDeclRef.getDecl()->HasModifier<InOutModifier>())
         {
             state.directionMask |= kEntryPointParameterDirection_Output;
         }
 
         return processEntryPointVaryingParameterDecl(
             context,
-            paramDecl.Ptr(),
-            paramDecl->type.type->Substitute(typeSubst).as<Type>(),
+            paramDeclRef.getDecl(),
+            paramType,
             state,
             paramVarLayout);
     }
@@ -2460,22 +2463,14 @@ static void collectEntryPointParameters(
     EntryPointRequest*              entryPoint,
     SubstitutionSet                 typeSubst)
 {
-    FuncDecl* entryPointFuncDecl = entryPoint->decl;
-    if (!entryPointFuncDecl)
-    {
-        // Something must have failed earlier, so that
-        // we didn't find a declaration to match this
-        // entry point request.
-        //
-        return;
-    }
+    DeclRef<FuncDecl> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
 
     // We will take responsibility for creating and filling in
     // the `EntryPointLayout` object here.
     //
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
     entryPointLayout->profile = entryPoint->profile;
-    entryPointLayout->entryPoint = entryPointFuncDecl;
+    entryPointLayout->entryPoint = entryPointFuncDeclRef.getDecl();
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -2522,12 +2517,12 @@ static void collectEntryPointParameters(
     scopeBuilder.beginLayout(context);
     auto paramsStructLayout = scopeBuilder.m_structLayout;
 
-    for( auto paramDecl : entryPointFuncDecl->getMembersOfType<ParamDecl>() )
+    for( auto paramDeclRef : getMembersOfType<ParamDecl>(entryPointFuncDeclRef) )
     {
         // Any error messages we emit during the process should
         // refer to the location of this parameter.
         //
-        state.loc = paramDecl->loc;
+        state.loc = paramDeclRef.getLoc();
 
         // We are going to construct the variable layout for this
         // parameter *before* computing the type layout, because
@@ -2536,13 +2531,13 @@ static void collectEntryPointParameters(
         // back onto the `VarLayout`.
         //
         RefPtr<VarLayout> paramVarLayout = new VarLayout();
-        paramVarLayout->varDecl = makeDeclRef(paramDecl.Ptr());
+        paramVarLayout->varDecl = paramDeclRef;
         paramVarLayout->stage = state.stage;
 
         auto paramTypeLayout = computeEntryPointParameterTypeLayout(
             context,
             typeSubst,
-            paramDecl,
+            paramDeclRef,
             paramVarLayout,
             state);
         paramVarLayout->typeLayout = paramTypeLayout;
@@ -2598,10 +2593,10 @@ static void collectEntryPointParameters(
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
     //
-    auto resultType = entryPointFuncDecl->ReturnType.type;
+    auto resultType = GetResultType(entryPointFuncDeclRef)->Substitute(typeSubst).as<Type>();
     if( !resultType->Equals(resultType->getSession()->getVoidType()) )
     {
-        state.loc = entryPointFuncDecl->loc;
+        state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;
 
         RefPtr<VarLayout> resultLayout = new VarLayout();
@@ -2609,7 +2604,7 @@ static void collectEntryPointParameters(
 
         auto resultTypeLayout = processEntryPointVaryingParameterDecl(
             context,
-            entryPointFuncDecl,
+            entryPointFuncDeclRef.getDecl(),
             resultType->Substitute(typeSubst).as<Type>(),
             state,
             resultLayout);

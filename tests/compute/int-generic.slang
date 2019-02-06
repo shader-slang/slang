@@ -29,14 +29,12 @@ struct Material<let A:int, let B: int> : IMaterial
     TBRDF getBRDF() { TBRDF a; a.c = 0; return a; }
 };
 
-type_param TMaterial : IMaterial;
-
-TMaterial material;
-
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain<M : IMaterial>(
+    uniform M material,
+    uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    TMaterial.TBRDF brdf = material.getBRDF();
+    M.TBRDF brdf = material.getBRDF();
 	int outVal = brdf.compute();
 	outputBuffer[dispatchThreadID.x] = outVal;
 }

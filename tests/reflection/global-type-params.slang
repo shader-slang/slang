@@ -7,8 +7,8 @@
 interface IBase
 {};
 
-__generic_param TParam : IBase;
-__generic_param TParam2 : IBase;
+type_param TParam : IBase;
+type_param TParam2 : IBase;
 
 struct S
 {

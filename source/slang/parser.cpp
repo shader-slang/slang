@@ -4781,8 +4781,7 @@ namespace Slang
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
         DECL(typedef,         ParseTypeDef);
         DECL(associatedtype,  parseAssocType);
-        DECL(__generic_param, parseGlobalGenericParamDecl);
-        DECL(type_param,      parseGlobalGenericParamDecl);
+        DECL(type_param,    parseGlobalGenericParamDecl);
         DECL(cbuffer,         parseHLSLCBufferDecl);
         DECL(tbuffer,         parseHLSLTBufferDecl);
         DECL(__generic,       ParseGenericDecl);

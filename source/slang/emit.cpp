@@ -6623,26 +6623,25 @@ String emitEntryPoint(
 
     EmitVisitor visitor(&context);
 
-    // We are going to create a fresh IR module that we will use to
-    // clone any code needed by the user's entry point.
-    IRSpecializationState* irSpecializationState = createIRSpecializationState(
-        entryPoint,
-        programLayout,
-        target,
-        targetRequest);
     {
-        IRModule* irModule = getIRModule(irSpecializationState);
         auto compileRequest = translationUnit->compileRequest;
         auto session = compileRequest->mSession;
 
-        TypeLegalizationContext typeLegalizationContext;
-        initialize(&typeLegalizationContext,
-            session,
-            irModule);
-
-        auto irEntryPoint = specializeIRForEntryPoint(
-            irSpecializationState,
-            entryPoint);
+        // We start out by performing "linking" at the level of the IR.
+        // This step will create a fresh IR module to be used for
+        // code generation, and will copy in any IR definitions that
+        // the desired entry point requires. Along the way it will
+        // resolve references to imported/exported symbols across
+        // modules, and also select between the definitions of
+        // any "profile-overloaded" symbols.
+        //
+        auto linkedIR = linkIR(
+            entryPoint,
+            programLayout,
+            target,
+            targetRequest);
+        auto irModule = linkedIR.module;
+        auto irEntryPoint = linkedIR.entryPoint;
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "CLONED");
@@ -6708,9 +6707,22 @@ String emitEntryPoint(
         // we need to ensure that the code only uses types
         // that are legal on the chosen target.
         //
-        legalizeTypes(
-            &typeLegalizationContext,
-            irModule);
+        {
+            // TODO: The presence of `TypeLegalizationContext`
+            // in the public API of the `legalizeTypes` function
+            // is a throwback to when there was AST-level
+            // type legalization and all the complications it
+            // created. The pass should be refactored to not
+            // expose these details.
+            //
+            TypeLegalizationContext typeLegalizationContext;
+            initialize(&typeLegalizationContext,
+                session,
+                irModule);
+            legalizeTypes(
+                &typeLegalizationContext,
+                irModule);
+        }
 
         //  Debugging output of legalization
 #if 0
@@ -6810,7 +6822,6 @@ String emitEntryPoint(
         // GlobalGenericParamSubstitution implementation may reference ir objects
         targetRequest->compileRequest->compiledModules.Add(irModule);
     }
-    destroyIRSpecializationState(irSpecializationState);
 
     // Deal with cases where a particular stage requires certain GLSL versions
     // and/or extensions.

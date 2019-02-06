@@ -6113,25 +6113,31 @@ static void lowerEntryPointToIR(
     EntryPointRequest*  entryPointRequest)
 {
     // First, lower the entry point like an ordinary function
-    auto entryPointFuncDecl = entryPointRequest->decl;
-    if (!entryPointFuncDecl)
-    {
-        // Something must have gone wrong earlier, if we
-        // weren't able to associate a declaration with
-        // the entry point request.
-        return;
-    }
-    auto loweredEntryPointFunc = ensureDecl(context, entryPointFuncDecl);
+
+    auto session = context->getSession();
+    auto entryPointFuncDeclRef = entryPointRequest->getFuncDeclRef();
+    auto entryPointFuncType = lowerType(context, getFuncType(session, entryPointFuncDeclRef));
+
+    auto builder = context->irBuilder;
+    builder->setInsertInto(builder->getModule()->getModuleInst());
+
+    auto loweredEntryPointFunc = getSimpleVal(context,
+        emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
     // Attach a marker decoration so that we recognize
     // this as an entry point.
-    auto builder = context->irBuilder;
-    builder->addEntryPointDecoration(getSimpleVal(context, loweredEntryPointFunc));
+    //
+    builder->addEntryPointDecoration(loweredEntryPointFunc);
+
+    //
+    if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
+    {
+        builder->addExportDecoration(loweredEntryPointFunc, getMangledName(entryPointFuncDeclRef).getUnownedSlice());
+    }
 
     // Now lower all the arguments supplied for global generic
     // type parameters.
     //
-    builder->setInsertInto(builder->getModule()->getModuleInst());
     for (RefPtr<Substitutions> subst = entryPointRequest->globalGenericSubst; subst; subst = subst->outer)
     {
         auto gSubst = subst.as<GlobalGenericParamSubstitution>();

@@ -29,6 +29,14 @@ namespace Slang
 // simplifications/specializations of one category can open
 // up opportunities for transformations in the other categories.
 
+struct SpecializationContext;
+
+IRInst* specializeGenericImpl(
+    IRGeneric*              genericVal,
+    IRSpecialize*           specializeInst,
+    IRModule*               module,
+    SpecializationContext*  context);
+
 struct SpecializationContext
 {
     // For convenience, we will keep a pointer to the module
@@ -203,112 +211,26 @@ struct SpecializationContext
 
         // If no existing specialization is found, we need
         // to create the specialization instead.
+        // This mostly amounts to evaluating the generic as
+        // if it were a function being called.
         //
-        // Effectively this amounts to "calling" the generic
-        // on its concrete argument values and computing the
-        // result it returns.
+        // We will use a free function to do the actual work
+        // of evaluating the generic, so that the logic
+        // can be re-used in other cases that need to
+        // do one-off specialization.
         //
-        // For now, all of our generics consist of a single
-        // basic block, so we can "call" them just by
-        // cloning the instructions in their single block
-        // into the global scope, using an environment for
-        // cloning that maps the generic parameters to
-        // the concrete arguments that were provided
-        // by the `specialize(...)` instruction.
+        IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
+
+
+        // The value that was returned from evaluating
+        // the generic is the specialized value, and we
+        // need to remember it in our dictionary of
+        // specializations so that we don't instantiate
+        // this generic again for the same arguments.
         //
-        IRCloneEnv      env;
+        genericSpecializations.Add(key, specializedVal);
 
-        // We will walk through the parameters of the generic and
-        // register the corresponding argument of the `specialize`
-        // instruction to be used as the "cloned" value for each
-        // parameter.
-        //
-        // Suppose we are looking at `specialize(g, a, b, c)` and `g` has
-        // three generic parameters: `T`, `U`, and `V`. Then we will
-        // be initializing our environment to map `T -> a`, `U -> b`,
-        // and `V -> c`.
-        //
-        UInt argCounter = 0;
-        for( auto param : genericVal->getParams() )
-        {
-            UInt argIndex = argCounter++;
-            SLANG_ASSERT(argIndex < specializeInst->getArgCount());
-
-            IRInst* arg = specializeInst->getArg(argIndex);
-
-            env.mapOldValToNew.Add(param, arg);
-        }
-
-        // We will set up an IR builder for insertion
-        // into the global scope, at the same location
-        // as the original generic.
-        //
-        IRBuilder builderStorage;
-        IRBuilder* builder = &builderStorage;
-        builder->sharedBuilder = &sharedBuilderStorage;
-        builder->setInsertBefore(genericVal);
-
-        // Now we will run through the body of the generic and
-        // clone each of its instructions into the global scope,
-        // until we reach a `return` instruction.
-        //
-        for( auto bb : genericVal->getBlocks() )
-        {
-            // We expect a generic to only ever contain a single block.
-            //
-            SLANG_ASSERT(bb == genericVal->getFirstBlock());
-
-            // We will iterate over the non-parameter ("ordinary")
-            // instructions only, because parameters were dealt
-            // with explictly at an earlier point.
-            //
-            for( auto ii : bb->getOrdinaryInsts() )
-            {
-                // The last block of the generic is expected to end with
-                // a `return` instruction for the specialized value that
-                // comes out of the abstraction.
-                //
-                // We thus use that cloned value as the result of the
-                // specialization step.
-                //
-                if( auto returnValInst = as<IRReturnVal>(ii) )
-                {
-                    auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
-
-                    // The value that was returned from evaluating
-                    // the generic is the specialized value, and we
-                    // need to remember it in our dictionary of
-                    // specializations so that we don't instantiate
-                    // this generic again for the same arguments.
-                    //
-                    genericSpecializations.Add(key, specializedVal);
-
-                    return specializedVal;
-                }
-
-                // For any instruction other than a `return`, we will
-                // simply clone it completely into the global scope.
-                //
-                IRInst* clonedInst = cloneInst(&env, builder, ii);
-
-                // Any new instructions we create during cloning were
-                // not present when we initially built our work list,
-                // so we need to make sure to consider them now.
-                //
-                // This is important for the cases where one generic
-                // invokes another, because there will be `specialize`
-                // operations nested inside the first generic that refer
-                // to the second.
-                //
-                addToWorkList(clonedInst);
-            }
-        }
-
-        // If we reach this point, something went wrong, because we
-        // never encountered a `return` inside the body of the generic.
-        //
-        SLANG_UNEXPECTED("no return from generic");
-        UNREACHABLE_RETURN(nullptr);
+        return specializedVal;
     }
 
     // The logic for generating a specialization of an IR generic
@@ -1301,5 +1223,132 @@ void specializeModule(
     context.module = module;
     context.processModule();
 }
+
+
+IRInst* specializeGenericImpl(
+    IRGeneric*              genericVal,
+    IRSpecialize*           specializeInst,
+    IRModule*               module,
+    SpecializationContext*  context)
+{
+    // Effectively, specializing a generic amounts to "calling" the generic
+    // on its concrete argument values and computing the
+    // result it returns.
+    //
+    // For now, all of our generics consist of a single
+    // basic block, so we can "call" them just by
+    // cloning the instructions in their single block
+    // into the global scope, using an environment for
+    // cloning that maps the generic parameters to
+    // the concrete arguments that were provided
+    // by the `specialize(...)` instruction.
+    //
+    IRCloneEnv      env;
+
+    // We will walk through the parameters of the generic and
+    // register the corresponding argument of the `specialize`
+    // instruction to be used as the "cloned" value for each
+    // parameter.
+    //
+    // Suppose we are looking at `specialize(g, a, b, c)` and `g` has
+    // three generic parameters: `T`, `U`, and `V`. Then we will
+    // be initializing our environment to map `T -> a`, `U -> b`,
+    // and `V -> c`.
+    //
+    UInt argCounter = 0;
+    for( auto param : genericVal->getParams() )
+    {
+        UInt argIndex = argCounter++;
+        SLANG_ASSERT(argIndex < specializeInst->getArgCount());
+
+        IRInst* arg = specializeInst->getArg(argIndex);
+
+        env.mapOldValToNew.Add(param, arg);
+    }
+
+    // We will set up an IR builder for insertion
+    // into the global scope, at the same location
+    // as the original generic.
+    //
+    SharedIRBuilder sharedBuilderStorage;
+    sharedBuilderStorage.module = module;
+    sharedBuilderStorage.session = module->getSession();
+
+    IRBuilder builderStorage;
+    IRBuilder* builder = &builderStorage;
+    builder->sharedBuilder = &sharedBuilderStorage;
+    builder->setInsertBefore(genericVal);
+
+    // Now we will run through the body of the generic and
+    // clone each of its instructions into the global scope,
+    // until we reach a `return` instruction.
+    //
+    for( auto bb : genericVal->getBlocks() )
+    {
+        // We expect a generic to only ever contain a single block.
+        //
+        SLANG_ASSERT(bb == genericVal->getFirstBlock());
+
+        // We will iterate over the non-parameter ("ordinary")
+        // instructions only, because parameters were dealt
+        // with explictly at an earlier point.
+        //
+        for( auto ii : bb->getOrdinaryInsts() )
+        {
+            // The last block of the generic is expected to end with
+            // a `return` instruction for the specialized value that
+            // comes out of the abstraction.
+            //
+            // We thus use that cloned value as the result of the
+            // specialization step.
+            //
+            if( auto returnValInst = as<IRReturnVal>(ii) )
+            {
+                auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
+                return specializedVal;
+            }
+
+            // For any instruction other than a `return`, we will
+            // simply clone it completely into the global scope.
+            //
+            IRInst* clonedInst = cloneInst(&env, builder, ii);
+
+            // Any new instructions we create during cloning were
+            // not present when we initially built our work list,
+            // so we need to make sure to consider them now.
+            //
+            // This is important for the cases where one generic
+            // invokes another, because there will be `specialize`
+            // operations nested inside the first generic that refer
+            // to the second.
+            //
+            if( context )
+            {
+                context->addToWorkList(clonedInst);
+            }
+        }
+    }
+
+    // If we reach this point, something went wrong, because we
+    // never encountered a `return` inside the body of the generic.
+    //
+    SLANG_UNEXPECTED("no return from generic");
+    UNREACHABLE_RETURN(nullptr);
+}
+
+IRInst* specializeGeneric(
+    IRSpecialize*   specializeInst)
+{
+    auto baseGeneric = as<IRGeneric>(specializeInst->getBase());
+    SLANG_ASSERT(baseGeneric);
+    if(!baseGeneric) return specializeInst;
+
+    auto module = specializeInst->getModule();
+    SLANG_ASSERT(module);
+    if(!module) return specializeInst;
+
+    return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);
+}
+
 
 } // namespace Slang

@@ -8,7 +8,7 @@ interface IVertInterpolant
 	float4 getColor();
 }
 
-__generic_param TVertInterpolant : IVertInterpolant; 
+type_param TVertInterpolant : IVertInterpolant; 
 
 struct VertImpl : IVertInterpolant
 {

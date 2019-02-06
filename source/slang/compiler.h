@@ -152,7 +152,11 @@ namespace Slang
         // This will be filled in as part of semantic analysis;
         // it should not be assumed to be available in cases
         // where any errors were diagnosed.
-        RefPtr<FuncDecl> decl;
+        //
+        DeclRef<FuncDecl> funcDeclRef;
+
+        DeclRef<FuncDecl> getFuncDeclRef();
+        RefPtr<FuncDecl> getFuncDecl();
 
         RefPtr<Substitutions> globalGenericSubst;
 

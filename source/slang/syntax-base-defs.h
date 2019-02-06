@@ -178,7 +178,7 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions)
-    // the __generic_param decl to be substituted
+    // the type_param decl to be substituted
     DECL_FIELD(GlobalGenericParamDecl*, paramDecl)
 
     // the actual type to substitute in
