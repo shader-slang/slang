@@ -138,7 +138,6 @@ namespace Slang
         }
 
         RefPtr<ModuleDecl> Parse();
-
         Token ReadToken();
         Token ReadToken(TokenType type);
         Token ReadToken(const char * string);
@@ -1667,11 +1666,15 @@ namespace Slang
         }
         parser->genericDepth--;
 
-        // TODO: probably want to suppot `>>` and `>=` here as well,
-        // and split up those tokens as needed.
-        //
-        parser->ReadToken(TokenType::OpGreater);
-
+        if (parser->tokenReader.PeekToken().type == TokenType::OpRsh)
+        {
+            parser->tokenReader.PeekToken().type = TokenType::OpGreater;
+            parser->tokenReader.PeekToken().loc.setRaw(parser->tokenReader.PeekToken().loc.getRaw() + 1);
+        }
+        else if (parser->LookAheadToken(TokenType::OpGreater))
+            parser->ReadToken(TokenType::OpGreater);
+        else
+            parser->sink->diagnose(parser->tokenReader.PeekToken(), Diagnostics::tokenTypeExpected, "'>'");
         return genericApp;
     }
 
@@ -3444,7 +3447,7 @@ namespace Slang
             //
             // We'll solve this with backtracking for now.
 
-            Token* startPos = tokenReader.mCursor;
+            TokenReader::ParsingCursor startPos = tokenReader.getCursor();
 
             // Try to parse a type (knowing that the type grammar is
             // a subset of the expression grammar, and so this should
@@ -3466,13 +3469,13 @@ namespace Slang
                 // Reset the cursor and try to parse a declaration now.
                 // Note: the declaration will consume any modifiers
                 // that had been in place on the statement.
-                tokenReader.mCursor = startPos;
+                tokenReader.setCursor(startPos);
                 statement = parseVarDeclrStatement(modifiers);
                 return statement;
             }
 
             // Fallback: reset and parse an expression
-            tokenReader.mCursor = startPos;
+            tokenReader.setCursor(startPos);
             statement = ParseExpressionStatement();
         }
         else if (LookAheadToken(TokenType::Semicolon))
