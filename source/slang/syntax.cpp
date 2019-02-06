@@ -1427,7 +1427,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     RefPtr<Substitutions> GlobalGenericParamSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
-        // if we find a GlobalGenericParamSubstitution in subst that references the same __generic_param decl
+        // if we find a GlobalGenericParamSubstitution in subst that references the same type_param decl
         // return a copy of that GlobalGenericParamSubstitution
         int diff = 0;
 
@@ -1882,6 +1882,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
     Name* DeclRefBase::GetName() const
     {
         return decl->nameAndLoc.name;
+    }
+
+    SourceLoc DeclRefBase::getLoc() const
+    {
+        return decl->loc;
     }
 
     DeclRefBase DeclRefBase::GetParent() const

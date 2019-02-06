@@ -127,6 +127,17 @@ namespace Slang
         return compileRequest->translationUnits[translationUnitIndex].Ptr();
     }
 
+    DeclRef<FuncDecl> EntryPointRequest::getFuncDeclRef()
+    {
+        return funcDeclRef;
+    }
+
+    RefPtr<FuncDecl> EntryPointRequest::getFuncDecl()
+    {
+        return getFuncDeclRef().getDecl();
+    }
+
+
     //
 
     Profile Profile::LookUp(char const* name)

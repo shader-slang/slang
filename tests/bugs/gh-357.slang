@@ -25,11 +25,9 @@ struct AssocImpl : IAssoc
     typedef BaseImpl TBase;
 };
 
-__generic_param T : IAssoc;
-
-
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain<T:IAssoc>(
+    uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     T.TBase base;

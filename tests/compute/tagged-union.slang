@@ -44,11 +44,13 @@ struct B : IFrobnicator
     }
 }
 
+[numthreads(4, 1, 1)]
+void computeMain
 // Now we will define the generic type parameter for our shader,
 // which will be constraints to be a type that implements our
 // `IFrobnicator` interface.
 //
-type_param T : IFrobnicator;
+    <T : IFrobnicator>
 //
 // For the actual test runner, we will instruct it to plug in
 // a tagged-union type over the two concrete implemetnations.
@@ -57,7 +59,7 @@ type_param T : IFrobnicator;
 // our intention when it is informed via the API.
 //
 //TEST_INPUT: type __TaggedUnion(A,B)
-
+    (
 // Next we need to pass in the actual parameter data for our
 // chosen `IFrobnicator` implementation. The decalration of
 // the constant buffer follows the conventional approach for
@@ -68,7 +70,7 @@ type_param T : IFrobnicator;
 // the `render-test` tool doesn't yet support code that
 // uses multiple descriptor tables/sets.
 //
-ConstantBuffer<T> gFrobnicator;
+    uniform ConstantBuffer<T> gFrobnicator,
 
 // Where things get interesting is when we go to provide the
 // data that will be used by the parameter block.
@@ -92,17 +94,15 @@ ConstantBuffer<T> gFrobnicator;
 //
 //TEST_INPUT: cbuffer(data=[16 9 1 0 0], stride=4):dxbinding(0),glbinding(0)
 
-int test(int val)
-{
-    return gFrobnicator.frobnicate(val);
-}
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(1),out
-RWStructuredBuffer<int> gOutputBuffer;
-
-[numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+    uniform RWStructuredBuffer<int> gOutputBuffer,
+    uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    gOutputBuffer[tid] = test(tid);
+
+    int val = tid;
+    val = gFrobnicator.frobnicate(val);
+
+    gOutputBuffer[tid] = val;
 }
