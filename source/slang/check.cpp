@@ -2883,6 +2883,45 @@ namespace Slang
             syntaxNode->modifiers.first = resultModifiers;
         }
 
+            /// Perform checking of interface conformaces for this decl and all its children
+        void checkInterfaceConformancesRec(Decl* decl)
+        {
+            // Any user-defined type may have declared interface conformances,
+            // which we should check.
+            //
+            if( auto aggTypeDecl = as<AggTypeDecl>(decl) )
+            {
+                checkAggTypeConformance(aggTypeDecl);
+            }
+            // Conformances can also come via `extension` declarations, and
+            // we should check them against the type(s) being extended.
+            //
+            else if(auto extensionDecl = as<ExtensionDecl>(decl))
+            {
+                checkExtensionConformance(extensionDecl);
+            }
+
+            // We need to handle the recursive cases here, the first
+            // of which is a generic decl, where we want to recurivsely
+            // check the inner declaration.
+            //
+            if(auto genericDecl = as<GenericDecl>(decl))
+            {
+                checkInterfaceConformancesRec(genericDecl->inner);
+            }
+            // For any other kind of container declaration, we will
+            // recurse into all of its member declarations, so that
+            // we can handle, e.g., nested `struct` types.
+            //
+            else if(auto containerDecl = as<ContainerDecl>(decl))
+            {
+                for(auto member : containerDecl->Members)
+                {
+                    checkInterfaceConformancesRec(member);
+                }
+            }
+        }
+
         void visitModuleDecl(ModuleDecl* programNode)
         {
             // Try to register all the builtin decls
@@ -2988,18 +3027,7 @@ namespace Slang
 
                 if (pass == 0)
                 {
-                    // now we can check all interface conformances
-                    for (auto & s : programNode->getMembersOfType<AggTypeDecl>())
-                        checkAggTypeConformance(s);
-                    for (auto & s : programNode->getMembersOfType<ExtensionDecl>())
-                        checkExtensionConformance(s);
-                    for (auto & g : programNode->getMembersOfType<GenericDecl>())
-                    {
-                        if (auto innerAggDecl = as<AggTypeDecl>(g->inner))
-                            checkAggTypeConformance(innerAggDecl);
-                        else if (auto innerExtDecl = as<ExtensionDecl>(g->inner))
-                            checkExtensionConformance(innerExtDecl);
-                    }
+                    checkInterfaceConformancesRec(programNode);
                 }
             }
         }
