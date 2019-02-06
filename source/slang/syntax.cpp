@@ -330,7 +330,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
 
 
-    bool ArrayExpressionType::EqualsImpl(Type * type)
+    bool ArrayExpressionType::EqualsImpl(Type* type)
     {
         auto arrType = as<ArrayExpressionType>(type);
         if (!arrType)
@@ -1361,8 +1361,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
     bool GenericSubstitution::Equals(Substitutions* subst)
     {
         // both must be NULL, or non-NULL
-        if (!this || !subst)
-            return !this && !subst;
+        if (subst == nullptr)
+            return false;
+        if (this == subst)
+            return true;
+
         auto genericSubst = as<GenericSubstitution>(subst);
         if (!genericSubst)
             return false;
@@ -1409,9 +1412,10 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     bool ThisTypeSubstitution::Equals(Substitutions* subst)
     {
-        SLANG_ASSERT(this);
         if (!subst)
             return false;
+        if (subst == this)
+            return true;
 
         if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
         {
@@ -1462,6 +1466,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
     {
         if (!subst)
             return false;
+        if (subst == this)
+            return true;
+
         if (auto genSubst = as<GlobalGenericParamSubstitution>(subst))
         {
             if (paramDecl != genSubst->paramDecl)
@@ -2437,11 +2444,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return name->text;
     }
 
-    bool SubstitutionSet::Equals(SubstitutionSet substSet) const
+    bool SubstitutionSet::Equals(const SubstitutionSet& substSet) const
     {
-        if(!substitutions || !substSet.substitutions)
-            return substitutions == substSet.substitutions;
-
+        if (substitutions == substSet.substitutions)
+        {
+            return true;
+        }
+        if (substitutions == nullptr || substSet.substitutions == nullptr)
+        {
+            return false;
+        }
         return substitutions->Equals(substSet.substitutions);
     }
 
