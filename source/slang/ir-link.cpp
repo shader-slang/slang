@@ -659,13 +659,29 @@ void cloneFunctionCommon(
     }
 }
 
+// We will forward-declare the subroutine for eagerly specializing
+// an IR-level generic to argument values, because `specializeIRForEntryPoint`
+// needs to perform this operation even though it is logically part of
+// the later generic specialization pass.
+//
+IRInst* specializeGeneric(
+    IRSpecialize*   specializeInst);
+
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext*  context,
     EntryPointRequest*  entryPointRequest,
     EntryPointLayout*   entryPointLayout)
 {
-    // Look up the IR symbol by name
-    auto mangledName = getMangledName(entryPointRequest->decl);
+    // We start by looking up the IR symbol that
+    // matches the mangled name given to the
+    // function we want to emit.
+    //
+    // Note: the function decl-ref may refer to
+    // a specialization of a generic function,
+    // so that the mangled name of the decl-ref is
+    // not the same as the mangled name of the decl.
+    //
+    auto mangledName = getMangledName(entryPointRequest->getFuncDeclRef());
     RefPtr<IRSpecSymbol> sym;
     if (!context->getSymbols().TryGetValue(mangledName, sym))
     {
@@ -674,40 +690,68 @@ IRFunc* specializeIRForEntryPoint(
     }
 
     // TODO: deal with the case where we might
-    // have multiple versions...
+    // have multiple (profile-overloaded) versions...
+    //
+    auto originalVal = sym->irGlobalValue;
 
-    auto globalValue = sym->irGlobalValue;
-    if (globalValue->op != kIROp_Func)
+    // We will start by cloning the entry point reference
+    // like any other global value.
+    //
+    auto clonedVal = cloneGlobalValue(context, originalVal);
+
+    // In the case where the user is requesting a specialization
+    // of a generic entry point, we have a bit of a problem.
+    //
+    // This function is expected to return an `IRFunc` and
+    // subsequent passes expect to find, e.g., layout information
+    // attached to the parameters of such a func.
+    //
+    // In the generic case, the `clonedValue` won't be an
+    // `IRFunc`, but instead an `IRSpecialize`.
+    //
+    if(auto clonedSpec = as<IRSpecialize>(clonedVal))
     {
-        SLANG_UNEXPECTED("expected an IR function");
+        // The Right Thing to do here is to perform some
+        // amount of generic specialization, at least
+        // until we get back an `IRFunc`.
+        //
+        // The dangerous thing is that the generic specialization
+        // pass can, in principle, change the signature of
+        // functions, so that attaching parameter layout
+        // information *after* specialization might not work.
+        //
+        // The compromise we make here is to directly
+        // invoke the logic for specializing a generic.
+        //
+        // In theory this isn't valid, because there is no
+        // way we can register the specialized function we
+        // create so that it would be re-used by other instantiations
+        // with the same arguments (because we cannot be
+        // sure the generic arguments are themselves fully specialized)
+        //
+        // In practice this isn't really a problem, because
+        // we don't want to share the definition between
+        // an entry point and an ordinary function anyway.
+        //
+        clonedVal = specializeGeneric(clonedSpec);
+    }
+
+    auto clonedFunc = as<IRFunc>(clonedVal);
+    if(!clonedFunc)
+    {
+        SLANG_UNEXPECTED("expected entry point to be a function");
         return nullptr;
     }
-    auto originalFunc = (IRFunc*)globalValue;
 
-    // Create a clone for the IR function
-    auto clonedFunc = context->builder->createFunc();
-
-    // Note: we do *not* register this cloned declaration
-    // as the cloned value for the original symbol.
-    // This is kind of a kludge, but it ensures that
-    // in the unlikely case that the function is both
-    // used as an entry point and a callable function
-    // (yes, this would imply recursion...) we actually
-    // have two copies, which lets us arbitrarily
-    // transform the entry point to meet target requirements.
-    //
-    // TODO: The above statement is kind of bunk, though,
-    // because both versions of the function would have
-    // the same mangled name... :(
-
-    // We need to clone all the properties of the original
-    // function, including any blocks, their parameters,
-    // and their instructions.
-    cloneFunctionCommon(context, clonedFunc, originalFunc);
+    if( !clonedFunc->findDecorationImpl(kIROp_EntryPointDecoration) )
+    {
+        context->builder->addEntryPointDecoration(clonedFunc);
+    }
 
     // We need to attach the layout information for
     // the entry point to this declaration, so that
     // we can use it to inform downstream code emit.
+    //
     context->builder->addLayoutDecoration(
         clonedFunc,
         entryPointLayout);
@@ -1166,13 +1210,14 @@ struct IRSpecializationState
     }
 };
 
-IRSpecializationState* createIRSpecializationState(
+LinkedIR linkIR(
     EntryPointRequest*  entryPointRequest,
     ProgramLayout*      programLayout,
     CodeGenTarget       target,
     TargetRequest*      targetReq)
 {
-    IRSpecializationState* state = new IRSpecializationState();
+    IRSpecializationState stateStorage;
+    auto state = &stateStorage;
 
     state->programLayout = programLayout;
     state->target = target;
@@ -1232,6 +1277,8 @@ IRSpecializationState* createIRSpecializationState(
         context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
     }
 
+    context->builder->setInsertInto(context->getModule()->getModuleInst());
+
     // for now, clone all unreferenced witness tables
     //
     // TODO: This step should *not* be needed with the current IR
@@ -1242,38 +1289,8 @@ IRSpecializationState* createIRSpecializationState(
         if (sym.Value->irGlobalValue->op == kIROp_WitnessTable)
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
     }
-    return state;
-}
-
-void destroyIRSpecializationState(IRSpecializationState* state)
-{
-    delete state;
-}
-
-IRModule* getIRModule(IRSpecializationState* state)
-{
-    return state->irModule;
-}
-
-IRFunc* specializeIRForEntryPoint(
-    IRSpecializationState*  state,
-    EntryPointRequest*  entryPointRequest)
-{
-    auto translationUnit = entryPointRequest->getTranslationUnit();
-    auto originalIRModule = translationUnit->irModule;
-    if (!originalIRModule)
-    {
-        // We should already have emitted IR for the original
-        // translation unit, and it we don't have it, then
-        // we are now in trouble.
-        return nullptr;
-    }
-
-    auto context = state->getContext();
-    auto newProgramLayout = state->newProgramLayout;
 
     auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPointRequest);
-
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
@@ -1317,13 +1334,19 @@ IRFunc* specializeIRForEntryPoint(
         context->builder->addLayoutDecoration(clonedType, taggedUnionTypeLayout);
     }
 
-
-
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
     // these should get run whether or not the entry point
     // references them.
-    return irEntryPoint;
+
+    // Now that we've cloned the entry point and everything
+    // it refers to, we can package up the data we return
+    // to the caller.
+    //
+    LinkedIR linkedIR;
+    linkedIR.module = state->irModule;
+    linkedIR.entryPoint = irEntryPoint;
+    return linkedIR;
 }
 
 

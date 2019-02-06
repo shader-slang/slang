@@ -26,10 +26,6 @@ struct Impl : IBase
     }
 };
 
-__generic_param TImpl : IBase;
-
-ParameterBlock<TImpl> impl;
-
 cbuffer C
 {
     float base0; // = 0.5    
@@ -39,7 +35,10 @@ Texture2D tex1;  // = 0.0
 SamplerState sampler;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain<
+    TImpl : IBase>(
+    uniform ParameterBlock<TImpl> impl,
+    uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
     float b0 = tex1.SampleLevel(sampler, float2(0.0), 0.0).x + base0; // = 0.5
