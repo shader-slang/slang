@@ -304,6 +304,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if(semanticName == "sv_dispatchthreadid")
     {
         name = "gl_GlobalInvocationID";
+
+        auto builder = context->getBuilder();
+        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_domainlocation")
     {
@@ -514,7 +517,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     //
     // Our IR global shader parameters are read-only, just
     // like our IR function parameters, and need a wrapper
-    // `Out<...>` type to represent otuputs.
+    // `Out<...>` type to represent outputs.
     //
     bool isOutput = kind == LayoutResourceKind::VaryingOutput;
     IRType* paramType = isOutput ? builder->getOutType(type) : type;

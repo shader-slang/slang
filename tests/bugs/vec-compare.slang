@@ -7,7 +7,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4,4,1)]
-void computeMain(uint3 pixelIndex : SV_DispatchThreadID)
+void computeMain(uint2 pixelIndex : SV_DispatchThreadID)
 {
     
     // We will test floats, uints, and int vectors
