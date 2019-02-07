@@ -585,10 +585,15 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
 
 SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * reflection, char const * name)
 {
-    auto context = convert(reflection);
-    auto compileRequest = context->targetRequest->compileRequest;
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
 
-    RefPtr<Type> result = compileRequest->getTypeFromString(name);
+    // TODO: We should extend this API to support getting error messages
+    // when type lookup fails.
+    //
+    Slang::DiagnosticSink sink;
+
+    RefPtr<Type> result = program->getTypeFromString(name, &sink);
     return (SlangReflectionType*)result.Ptr();
 }
 
@@ -599,12 +604,13 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
 {
     auto context = convert(reflection);
     auto type = convert(inType);
-    auto layoutContext = getInitialLayoutContextForTarget(context->targetRequest);
+    auto targetReq = context->getTargetReq();
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq, context);
     RefPtr<TypeLayout> result;
-    if (context->targetRequest->typeLayouts.TryGetValue(type, result))
+    if (targetReq->getTypeLayouts().TryGetValue(type, result))
         return (SlangReflectionTypeLayout*)result.Ptr();
     result = CreateTypeLayout(layoutContext, type);
-    context->targetRequest->typeLayouts[type] = result;
+    targetReq->getTypeLayouts()[type] = result;
     return (SlangReflectionTypeLayout*)result.Ptr();
 }
 

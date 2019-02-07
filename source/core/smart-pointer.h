@@ -157,10 +157,14 @@ namespace Slang
             releaseReference(old);
         }
 
-		int GetHashCode()
-		{
-			return (int)(long long)(void*)pointer;
-		}
+        int GetHashCode()
+        {
+            // Note: We need a `RefPtr<T>` to hash the same as a `T*`,
+            // so that a `T*` can be used as a key in a dictionary with
+            // `RefPtr<T>` keys, and vice versa.
+            //
+            return Slang::GetHashCode(pointer);
+        }
 
         bool operator==(const T * ptr) const
         {

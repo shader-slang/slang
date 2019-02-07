@@ -18,7 +18,7 @@ struct ResourceParameterSpecializationContext
     // the parameters that were passed to the top-level
     // `specializeResourceParameters` function.
     //
-    CompileRequest* compileRequest;
+    BackEndCompileRequest* compileRequest;
     TargetRequest*  targetRequest;
     IRModule*       module;
 
@@ -850,7 +850,7 @@ struct ResourceParameterSpecializationContext
 // and then defer to it for the real work.
 //
 void specializeResourceParameters(
-    CompileRequest* compileRequest,
+    BackEndCompileRequest* compileRequest,
     TargetRequest*  targetRequest,
     IRModule*       module)
 {

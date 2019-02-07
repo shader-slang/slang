@@ -309,9 +309,6 @@ struct ParameterInfo : RefObject
 
     ParameterBindingInfo    bindingInfo[kLayoutResourceKindCount];
 
-    // The next parameter that has the same name...
-    ParameterInfo* nextOfSameName;
-
     // The translation unit this parameter is specific to, if any
     TranslationUnitRequest* translationUnit = nullptr;
 
@@ -335,8 +332,22 @@ struct EntryPointParameterBindingContext
 // across all translation units
 struct SharedParameterBindingContext
 {
-    // The base compile request
-    CompileRequest* compileRequest;
+    SharedParameterBindingContext(
+        LayoutRulesFamilyImpl*  defaultLayoutRules,
+        ProgramLayout*          programLayout,
+        TargetRequest*          targetReq,
+        DiagnosticSink*         sink)
+        : defaultLayoutRules(defaultLayoutRules)
+        , programLayout(programLayout)
+        , targetRequest(targetReq)
+        , m_sink(sink)
+    {
+    }
+
+    DiagnosticSink* m_sink = nullptr;
+
+    // The program that we are laying out
+//    Program* program = nullptr;
 
     // The target request that is triggering layout
     //
@@ -365,20 +376,18 @@ struct SharedParameterBindingContext
     UInt defaultSpace = 0;
 
     TargetRequest* getTargetRequest() { return targetRequest; }
+    DiagnosticSink* getSink() { return m_sink; }
 };
 
 static DiagnosticSink* getSink(SharedParameterBindingContext* shared)
 {
-    return &shared->compileRequest->mSink;
+    return shared->getSink();
 }
 
 // State that might be specific to a single translation unit
 // or event to an entry point.
 struct ParameterBindingContext
 {
-    // The translation unit we are processing right now
-    TranslationUnitRequest* translationUnit;
-
     // All the shared state needs to be available
     SharedParameterBindingContext* shared;
 
@@ -394,9 +403,6 @@ struct ParameterBindingContext
 
     // The entry point that is being processed right now.
     EntryPointLayout*   entryPointLayout = nullptr;
-
-    // The source language we are trying to use
-    SourceLanguage sourceLanguage;
 
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
     LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
@@ -1216,6 +1222,10 @@ static void collectGlobalScopeParameter(
     // as a declaration that came from a different translation unit.
     // If that is the case, we want to re-use the same `VarLayout`
     // across both parameters.
+    //
+    // TODO: This logic currently detects *any* global-scope parameters
+    // with matching names, but it should eventually be narrowly
+    // scoped so that it only applies to parameters from unnamed modules.
     //
     // First we look for an existing entry matching the name
     // of this parameter:
@@ -2477,7 +2487,7 @@ static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
     ///
 static void collectEntryPointParameters(
     ParameterBindingContext*        context,
-    EntryPointRequest*              entryPoint,
+    EntryPoint*                     entryPoint,
     SubstitutionSet                 typeSubst)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
@@ -2486,7 +2496,7 @@ static void collectEntryPointParameters(
     // the `EntryPointLayout` object here.
     //
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
-    entryPointLayout->profile = entryPoint->profile;
+    entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->entryPoint = entryPointFuncDeclRef.getDecl();
 
     // The entry point layout must be added to the output
@@ -2501,10 +2511,10 @@ static void collectEntryPointParameters(
 
     // Note: this isn't really the best place for this logic to sit,
     // but it is the simplest place where we have a direct correspondence
-    // between a single `EntryPointRequest` and its matching `EntryPointLayout`,
+    // between a single `EntryPoint` and its matching `EntryPointLayout`,
     // so we'll use it.
     //
-    for( auto taggedUnionType : entryPoint->taggedUnionTypes )
+    for( auto taggedUnionType : entryPoint->getTaggedUnionTypes() )
     {
         SLANG_ASSERT(taggedUnionType);
         auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
@@ -2645,59 +2655,9 @@ static void collectEntryPointParameters(
     }
 }
 
-// When doing parameter binding for global-scope stuff in GLSL,
-// we may need to know what stage we are compiling for, so that
-// we can handle special cases appropriately (e.g., "arrayed"
-// inputs and outputs).
-static Stage
-inferStageForTranslationUnit(
-    TranslationUnitRequest* translationUnit)
-{
-    // In the specific case where we are compiling GLSL input,
-    // and have only a single entry point, use the stage
-    // of the entry point.
-    //
-    // TODO: now that we've dropped official GLSL support,
-    // we probably should drop this as well.
-    //
-    if( translationUnit->sourceLanguage == SourceLanguage::GLSL )
-    {
-        if( translationUnit->entryPoints.Count() == 1 )
-        {
-            return translationUnit->entryPoints[0]->getStage();
-        }
-    }
-
-    return Stage::Unknown;
-}
-
-static void collectModuleParameters(
-    ParameterBindingContext*    inContext,
-    ModuleDecl*          module)
-{
-    // Each loaded module provides a separate (logical) namespace for
-    // parameters, so that two parameters with the same name, in
-    // distinct modules, should yield different bindings.
-    //
-    ParameterBindingContext contextData = *inContext;
-    auto context = &contextData;
-
-    context->translationUnit = nullptr;
-
-    context->stage = Stage::Unknown;
-
-    // All imported modules are implicitly Slang code
-    context->sourceLanguage = SourceLanguage::Slang;
-
-    // A loaded module cannot define entry points that
-    // we'll expose (for now), so we just need to
-    // consider global-scope parameters.
-    collectGlobalScopeParameters(context, module);
-}
-
 static void collectParameters(
     ParameterBindingContext*        inContext,
-    CompileRequest*                 request)
+    Program*                        program)
 {
     // All of the parameters in translation units directly
     // referenced in the compile request are part of one
@@ -2707,29 +2667,21 @@ static void collectParameters(
     ParameterBindingContext contextData = *inContext;
     auto context = &contextData;
 
-    for( auto& translationUnit : request->translationUnits )
+    for(RefPtr<Module> module : program->getModuleDependencies())
     {
-        context->translationUnit = translationUnit;
-        context->stage = inferStageForTranslationUnit(translationUnit.Ptr());
-        context->sourceLanguage = translationUnit->sourceLanguage;
+        context->stage = Stage::Unknown;
 
         // First look at global-scope parameters
-        collectGlobalScopeParameters(context, translationUnit->SyntaxNode.Ptr());
-
-        // Next consider parameters for entry points
-        for( auto& entryPoint : translationUnit->entryPoints )
-        {
-            context->stage = entryPoint->getStage();
-            collectEntryPointParameters(context, entryPoint.Ptr(), SubstitutionSet());
-        }
-        context->entryPointLayout = nullptr;
+        collectGlobalScopeParameters(context, module->getModuleDecl());
     }
 
-    // Now collect parameters from loaded modules
-    for (auto& loadedModule : request->loadedModulesList)
+    // Next consider parameters for entry points
+    for(auto entryPoint : program->getEntryPoints())
     {
-        collectModuleParameters(context, loadedModule->moduleDecl.Ptr());
+        context->stage = entryPoint->getStage();
+        collectEntryPointParameters(context, entryPoint, SubstitutionSet());
     }
+    context->entryPointLayout = nullptr;
 }
 
     /// Emit a diagnostic about a uniform parameter at global scope.
@@ -2770,41 +2722,40 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
     return numUsed;
 }
 
-void generateParameterBindings(
-    TargetRequest*     targetReq)
+RefPtr<ProgramLayout> generateParameterBindings(
+    TargetProgram*  targetProgram,
+    DiagnosticSink* sink)
 {
-    CompileRequest* compileReq = targetReq->compileRequest;
+    auto program = targetProgram->getProgram();
+    auto targetReq = targetProgram->getTargetReq();
+
+    RefPtr<ProgramLayout> programLayout = new ProgramLayout();
+    programLayout->targetProgram = targetProgram;
 
     // Try to find rules based on the selected code-generation target
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq);
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
     if (!layoutContext.rules)
-        return;
-
-    RefPtr<ProgramLayout> programLayout = new ProgramLayout();
-    programLayout->targetRequest = targetReq;
-
-    targetReq->layout = programLayout;
+        return nullptr;
 
     // Create a context to hold shared state during the process
     // of generating parameter bindings
-    SharedParameterBindingContext sharedContext;
-    sharedContext.compileRequest = compileReq;
-    sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
-    sharedContext.programLayout = programLayout;
-    sharedContext.targetRequest = targetReq;
+    SharedParameterBindingContext sharedContext(
+        layoutContext.getRulesFamily(),
+        programLayout,
+        targetReq,
+        sink);
 
     // Create a sub-context to collect parameters that get
     // declared into the global scope
     ParameterBindingContext context;
     context.shared = &sharedContext;
-    context.translationUnit = nullptr;
     context.layoutContext = layoutContext;
 
     // Walk through AST to discover all the parameters
-    collectParameters(&context, compileReq);
+    collectParameters(&context, program);
 
     // Now walk through the parameters to generate initial binding information
     for( auto& parameter : sharedContext.parameters )
@@ -2978,17 +2929,35 @@ void generateParameterBindings(
         const int numShaderRecordRegs = _calcTotalNumUsedRegistersForLayoutResourceKind(&context, LayoutResourceKind::ShaderRecord);
         if (numShaderRecordRegs > 1)
         {
-           compileReq->mSink.diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
-           return;
+           sink->diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
         }
     }
 
+    return programLayout;
+}
+
+ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
+{
+    if( !m_layout )
+    {
+        m_layout = generateParameterBindings(this, sink);
+    }
+    return m_layout;
+}
+
+void generateParameterBindings(
+    Program*        program,
+    TargetRequest*  targetReq,
+    DiagnosticSink* sink)
+{
+    program->getTargetProgram(targetReq)->getOrCreateLayout(sink);
 }
 
 RefPtr<ProgramLayout> specializeProgramLayout(
     TargetRequest*  targetReq,
     ProgramLayout*  oldProgramLayout, 
-    SubstitutionSet typeSubst)
+    SubstitutionSet typeSubst,
+    DiagnosticSink* sink)
 {
     // The goal of the layout specialization step is to take an existing `ProgramLayout`,
     // and add a layout to any parameter(s) that could not be laid out previously, because
@@ -3006,7 +2975,7 @@ RefPtr<ProgramLayout> specializeProgramLayout(
 
     RefPtr<ProgramLayout> newProgramLayout;
     newProgramLayout = new ProgramLayout();
-    newProgramLayout->targetRequest = targetReq;
+    newProgramLayout->targetProgram = oldProgramLayout->targetProgram;
     newProgramLayout->globalGenericParams = oldProgramLayout->globalGenericParams;
 
     // The basic idea will be to iterate over the parameters in the old layout,
@@ -3020,18 +2989,17 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     // We will use the same kind of context type as the original parameter binding
     // step did, so we initialize its state here:
 
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq);
+    auto layoutContext = getInitialLayoutContextForTarget(targetReq, newProgramLayout);
     SLANG_ASSERT(layoutContext.rules);
 
-    SharedParameterBindingContext sharedContext;
-    sharedContext.compileRequest = targetReq->compileRequest;
-    sharedContext.defaultLayoutRules = layoutContext.getRulesFamily();
-    sharedContext.programLayout = newProgramLayout;
-    sharedContext.targetRequest = targetReq;
+    SharedParameterBindingContext sharedContext(
+        layoutContext.getRulesFamily(),
+        newProgramLayout,
+        targetReq,
+        sink);
 
     ParameterBindingContext context;
     context.shared = &sharedContext;
-    context.translationUnit = nullptr;
     context.layoutContext = layoutContext;
 
     // We will also need state for laying out any global-scope parameters
@@ -3119,12 +3087,9 @@ RefPtr<ProgramLayout> specializeProgramLayout(
     // parameter, the layout of its parameter list strictly follows
     // the declaration order.
     //
-    for (auto & translationUnit : targetReq->compileRequest->translationUnits)
+    for( auto entryPoint : oldProgramLayout->getProgram()->getEntryPoints() )
     {
-        for (auto & entryPoint : translationUnit->entryPoints)
-        {
-            collectEntryPointParameters(&context, entryPoint, typeSubst);
-        }
+        collectEntryPointParameters(&context, entryPoint, typeSubst);
         context.entryPointLayout = nullptr;
     }
 

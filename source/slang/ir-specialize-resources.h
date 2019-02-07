@@ -3,7 +3,7 @@
 
 namespace Slang
 {
-    class CompileRequest;
+    class BackEndCompileRequest;
     class TargetRequest;
     struct IRModule;
 
@@ -18,7 +18,7 @@ namespace Slang
         /// global shader parameters directly).
         ///
     void specializeResourceParameters(
-        CompileRequest* compileRequest,
+        BackEndCompileRequest* compileRequest,
         TargetRequest*  targetRequest,
         IRModule*       module);
 }

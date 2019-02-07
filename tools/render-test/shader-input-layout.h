@@ -73,6 +73,7 @@ class ShaderInputLayout
 public:
     Slang::List<ShaderInputLayoutEntry> entries;
     Slang::List<Slang::String> globalTypeArguments;
+    Slang::List<Slang::String> entryPointTypeArguments;
     int numRenderTargets = 1;
     void Parse(const char * source);
 };

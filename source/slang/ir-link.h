@@ -19,8 +19,9 @@ namespace Slang
     // used.
     //
     LinkedIR linkIR(
-        EntryPointRequest*  entryPointRequest,
-        ProgramLayout*      programLayout,
-        CodeGenTarget       target,
-        TargetRequest*      targetReq);
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
+        ProgramLayout*          programLayout,
+        CodeGenTarget           target,
+        TargetRequest*          targetReq);
 }

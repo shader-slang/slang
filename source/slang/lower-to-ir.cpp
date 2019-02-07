@@ -300,8 +300,18 @@ struct IRGenEnv
 
 struct SharedIRGenContext
 {
-    CompileRequest* compileRequest;
-    ModuleDecl*     mainModuleDecl;
+    SharedIRGenContext(
+        Session*        session,
+        DiagnosticSink* sink,
+        ModuleDecl*     mainModuleDecl = nullptr)
+        : m_session(session)
+        , m_sink(sink)
+        , m_mainModuleDecl(mainModuleDecl)
+    {}
+
+    Session*        m_session = nullptr;
+    DiagnosticSink* m_sink = nullptr;
+    ModuleDecl*     m_mainModuleDecl = nullptr;
 
     // The "global" environment for mapping declarations to their IR values.
     IRGenEnv globalEnv;
@@ -356,17 +366,17 @@ struct IRGenContext
 
     Session* getSession()
     {
-        return shared->compileRequest->mSession;
-    }
-
-    CompileRequest* getCompileRequest()
-    {
-        return shared->compileRequest;
+        return shared->m_session;
     }
 
     DiagnosticSink* getSink()
     {
-        return &getCompileRequest()->mSink;
+        return shared->m_sink;
+    }
+
+    ModuleDecl* getMainModuleDecl()
+    {
+        return shared->m_mainModuleDecl;
     }
 };
 
@@ -422,7 +432,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     if (isFromStdLib(decl))
         return false;
 
-    if (moduleDecl != context->shared->mainModuleDecl)
+    if (moduleDecl != context->getMainModuleDecl())
         return true;
 
     return false;
@@ -1735,15 +1745,30 @@ static String getNameForNameHint(
     if(auto genericParentDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericParentDecl->ParentDecl;
 
+    // A `ModuleDecl` can have a name too, but in the common case
+    // we don't want to generate name hints that include the module
+    // name, simply because they would lead to every global symbol
+    // getting a much longer name.
+    //
+    // TODO: We should probably include the module name for symbols
+    // being `import`ed, and not for symbols being compiled directly
+    // (those coming from a module that had no name given to it).
+    //
+    // For now we skip past a `ModuleDecl` parent.
+    //
+    if(auto moduleParentDecl = as<ModuleDecl>(parentDecl))
+        parentDecl = moduleParentDecl->ParentDecl;
+
+    if(!parentDecl)
+    {
+        return leafName->text;
+    }
+
     auto parentName = getNameForNameHint(context, parentDecl);
     if(parentName.Length() == 0)
     {
         return leafName->text;
     }
-
-    // TODO: at some point we will start giving `ModuleDecl`s names,
-    // and in that case we need to think carefully about whether to
-    // include their names here or not.
 
     // We will now construct a new `Name` to use as the hint,
     // combining the name of the parent and the leaf declaration.
@@ -3603,7 +3628,7 @@ void lowerStmt(
     catch(AbortCompilationException&) { throw; }
     catch(...)
     {
-        context->getCompileRequest()->noteInternalErrorLoc(stmt->loc);
+        context->getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
     }
 }
@@ -5877,7 +5902,7 @@ LoweredValInfo lowerDecl(
     catch(AbortCompilationException&) { throw; }
     catch(...)
     {
-        context->getCompileRequest()->noteInternalErrorLoc(decl->loc);
+        context->getSink()->noteInternalErrorLoc(decl->loc);
         throw;
     }
 }
@@ -6108,14 +6133,47 @@ LoweredValInfo emitDeclRef(
         type);
 }
 
-static void lowerEntryPointToIR(
-    IRGenContext*       context,
-    EntryPointRequest*  entryPointRequest)
+static void lowerFrontEndEntryPointToIR(
+    IRGenContext*   context,
+    EntryPoint*     entryPoint)
+{
+    // TODO: We should emit an entry point as a dedicated IR function
+    // (distinct from the IR function used if it were called normally),
+    // with a mangled name based on the original function name plus
+    // the stage for which it is being compiled as an entry point (so
+    // that entry points for distinct stages always have distinct names).
+    //
+    // For now we just have an (implicit) constraint that a given
+    // function should only be used as an entry point for one stage,
+    // and any such function should *not* be used as an ordinary funciton.
+
+    auto entryPointFuncDecl = entryPoint->getFuncDecl();
+
+    auto builder = context->irBuilder;
+    builder->setInsertInto(builder->getModule()->getModuleInst());
+
+    auto loweredEntryPointFunc = getSimpleVal(context,
+        ensureDecl(context, entryPointFuncDecl));
+
+    // Attach a marker decoration so that we recognize
+    // this as an entry point.
+    //
+    IRInst* instToDecorate = loweredEntryPointFunc;
+    if(auto irGeneric = as<IRGeneric>(instToDecorate))
+    {
+        instToDecorate = findGenericReturnVal(irGeneric);
+    }
+    builder->addEntryPointDecoration(instToDecorate);
+}
+
+static void lowerProgramEntryPointToIR(
+    IRGenContext*   context,
+    EntryPoint*     entryPoint)
 {
     // First, lower the entry point like an ordinary function
 
     auto session = context->getSession();
-    auto entryPointFuncDeclRef = entryPointRequest->getFuncDeclRef();
+    auto entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
     auto entryPointFuncType = lowerType(context, getFuncType(session, entryPointFuncDeclRef));
 
     auto builder = context->irBuilder;
@@ -6124,40 +6182,10 @@ static void lowerEntryPointToIR(
     auto loweredEntryPointFunc = getSimpleVal(context,
         emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
-    // Attach a marker decoration so that we recognize
-    // this as an entry point.
-    //
-    builder->addEntryPointDecoration(loweredEntryPointFunc);
-
     //
     if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
         builder->addExportDecoration(loweredEntryPointFunc, getMangledName(entryPointFuncDeclRef).getUnownedSlice());
-    }
-
-    // Now lower all the arguments supplied for global generic
-    // type parameters.
-    //
-    for (RefPtr<Substitutions> subst = entryPointRequest->globalGenericSubst; subst; subst = subst->outer)
-    {
-        auto gSubst = subst.as<GlobalGenericParamSubstitution>();
-        if(!gSubst)
-            continue;
-
-        IRInst* typeParam = getSimpleVal(context, ensureDecl(context, gSubst->paramDecl));
-        IRType* typeVal = lowerType(context, gSubst->actualType);
-
-        // bind `typeParam` to `typeVal`
-        builder->emitBindGlobalGenericParam(typeParam, typeVal);
-
-        for (auto& constraintArg : gSubst->constraintArgs)
-        {
-            IRInst* constraintParam = getSimpleVal(context, ensureDecl(context, constraintArg.decl));
-            IRInst* constraintVal = lowerSimpleVal(context, constraintArg.val);
-
-            // bind `constraintParam` to `constraintVal`
-            builder->emitBindGlobalGenericParam(constraintParam, constraintVal);
-        }
     }
 }
 
@@ -6191,11 +6219,11 @@ IRModule* generateIRForTranslationUnit(
 {
     auto compileRequest = translationUnit->compileRequest;
 
-    SharedIRGenContext sharedContextStorage;
+    SharedIRGenContext sharedContextStorage(
+        translationUnit->getSession(),
+        translationUnit->compileRequest->getSink(),
+        translationUnit->getModuleDecl());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
-
-    sharedContext->compileRequest = compileRequest;
-    sharedContext->mainModuleDecl = translationUnit->SyntaxNode;
 
     IRGenContext contextStorage(sharedContext);
     IRGenContext* context = &contextStorage;
@@ -6203,7 +6231,7 @@ IRModule* generateIRForTranslationUnit(
     SharedIRBuilder sharedBuilderStorage;
     SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
     sharedBuilder->module = nullptr;
-    sharedBuilder->session = compileRequest->mSession;
+    sharedBuilder->session = compileRequest->getSession();
 
     IRBuilder builderStorage;
     IRBuilder* builder = &builderStorage;
@@ -6224,12 +6252,13 @@ IRModule* generateIRForTranslationUnit(
     // in case they require special handling.
     for (auto entryPoint : translationUnit->entryPoints)
     {
-        lowerEntryPointToIR(context, entryPoint);
+        lowerFrontEndEntryPointToIR(context, entryPoint);
     }
+
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->SyntaxNode->Members)
+    for (auto decl : translationUnit->getModuleDecl()->Members)
     {
         ensureAllDeclsRec(context, decl);
     }
@@ -6271,12 +6300,12 @@ IRModule* generateIRForTranslationUnit(
 
     // Propagate `constexpr`-ness through the dataflow graph (and the
     // call graph) based on constraints imposed by different instructions.
-    propagateConstExpr(module, &compileRequest->mSink);
+    propagateConstExpr(module, compileRequest->getSink());
 
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
 
-    checkForMissingReturns(module, &compileRequest->mSink);
+    checkForMissingReturns(module, compileRequest->getSink());
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
@@ -6293,28 +6322,82 @@ IRModule* generateIRForTranslationUnit(
     // then we can dump the initial IR for the module here.
     if(compileRequest->shouldDumpIR)
     {
-        ISlangWriter* writer = translationUnit->compileRequest->getWriter(WriterChannel::StdError);
-
-        dumpIR(module, writer);
+        DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(module, &writer);
     }
 
     return module;
 }
 
-#if 0
-String emitSlangIRAssemblyForEntryPoint(
-    EntryPointRequest*  entryPoint)
+RefPtr<IRModule> generateIRForProgram(
+    Session*        session,
+    Program*        program,
+    DiagnosticSink* sink)
 {
-    auto compileRequest = entryPoint->compileRequest;
-    auto irModule = lowerEntryPointToIR(
-        entryPoint,
-        compileRequest->layout.Ptr(),
-        // TODO: we need to pick the target more carefully here
-        CodeGenTarget::HLSL);
+//    auto compileRequest = translationUnit->compileRequest;
 
-    return getSlangIRAssembly(irModule);
+    SharedIRGenContext sharedContextStorage(
+        session,
+        sink);
+    SharedIRGenContext* sharedContext = &sharedContextStorage;
+
+    IRGenContext contextStorage(sharedContext);
+    IRGenContext* context = &contextStorage;
+
+    SharedIRBuilder sharedBuilderStorage;
+    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->module = nullptr;
+    sharedBuilder->session = session;
+
+    IRBuilder builderStorage;
+    IRBuilder* builder = &builderStorage;
+    builder->sharedBuilder = sharedBuilder;
+
+    RefPtr<IRModule> module = builder->createModule();
+    sharedBuilder->module = module;
+
+    context->irBuilder = builder;
+
+    // We need to emit symbols for all of the entry
+    // points in the program; this is especially
+    // important in the case where a generic entry
+    // point is being specialized.
+    //
+    for(auto entryPoint : program->getEntryPoints())
+    {
+        lowerProgramEntryPointToIR(context, entryPoint);
+    }
+
+
+    // Now lower all the arguments supplied for global generic
+    // type parameters.
+    //
+    for (RefPtr<Substitutions> subst = program->getGlobalGenericSubstitution(); subst; subst = subst->outer)
+    {
+        auto gSubst = subst.as<GlobalGenericParamSubstitution>();
+        if(!gSubst)
+            continue;
+
+        IRInst* typeParam = getSimpleVal(context, ensureDecl(context, gSubst->paramDecl));
+        IRType* typeVal = lowerType(context, gSubst->actualType);
+
+        // bind `typeParam` to `typeVal`
+        builder->emitBindGlobalGenericParam(typeParam, typeVal);
+
+        for (auto& constraintArg : gSubst->constraintArgs)
+        {
+            IRInst* constraintParam = getSimpleVal(context, ensureDecl(context, constraintArg.decl));
+            IRInst* constraintVal = lowerSimpleVal(context, constraintArg.val);
+
+            // bind `constraintParam` to `constraintVal`
+            builder->emitBindGlobalGenericParam(constraintParam, constraintVal);
+        }
+    }
+
+    // TODO: Should we apply any of the validation or
+    // mandatory optimization passes here?
+
+    return module;
 }
-#endif
-
 
 } // namespace Slang

@@ -195,13 +195,13 @@ namespace Slang
     }
 
     void validateIRModuleIfEnabled(
-        CompileRequest* compileRequest,
-        IRModule*       module)
+        CompileRequestBase*  compileRequest,
+        IRModule*               module)
     {
         if (!compileRequest->shouldValidateIR)
             return;
 
-        auto sink = &compileRequest->mSink;
+        auto sink = compileRequest->getSink();
         validateIRModule(module, sink);
     }
 }

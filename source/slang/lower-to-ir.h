@@ -14,7 +14,7 @@
 namespace Slang
 {
     class CompileRequest;
-    class EntryPointRequest;
+    class EntryPoint;
     class ProgramLayout;
     class TranslationUnitRequest;
 
@@ -22,5 +22,10 @@ namespace Slang
 
     IRModule* generateIRForTranslationUnit(
         TranslationUnitRequest* translationUnit);
+
+    RefPtr<IRModule> generateIRForProgram(
+        Session*        session,
+        Program*        program,
+        DiagnosticSink* sink);
 }
 #endif

@@ -8,7 +8,7 @@
 
 namespace Slang
 {
-    class EntryPointRequest;
+    class EntryPoint;
     class ProgramLayout;
     class TranslationUnitRequest;
 
@@ -20,13 +20,13 @@ namespace Slang
     // Emit code for a single entry point, based on
     // the input translation unit.
     String emitEntryPoint(
-        EntryPointRequest*  entryPoint,
-        ProgramLayout*      programLayout,
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
 
         // The target language to generate code in (e.g., HLSL/GLSL)
-        CodeGenTarget       target,
+        CodeGenTarget           target,
 
         // The full target request
-        TargetRequest*      targetRequest);
+        TargetRequest*          targetRequest);
 }
 #endif
