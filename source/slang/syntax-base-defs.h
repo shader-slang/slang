@@ -32,7 +32,7 @@ ABSTRACT_SYNTAX_CLASS(Val, NodeBase)
     // substitutions to this one
     RefPtr<Val> Substitute(SubstitutionSet subst);
 
-    // Lower-level interface for substition. Like the basic
+    // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller

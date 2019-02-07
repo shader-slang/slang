@@ -2259,7 +2259,10 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = GetType(paramDeclRef)->Substitute(typeSubst).as<Type>();
+    auto paramDeclRefType = GetType(paramDeclRef);
+    SLANG_ASSERT(paramDeclRefType);
+
+    auto paramType = paramDeclRefType->Substitute(typeSubst).as<Type>();
 
     if( paramDeclRef.getDecl()->HasModifier<HLSLUniformModifier>() )
     {
@@ -2489,6 +2492,7 @@ static void collectEntryPointParameters(
     //
     for( auto taggedUnionType : entryPoint->taggedUnionTypes )
     {
+        SLANG_ASSERT(taggedUnionType);
         auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
         auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
@@ -2594,6 +2598,8 @@ static void collectEntryPointParameters(
     // types and apply this logic unconditionally.
     //
     auto resultType = GetResultType(entryPointFuncDeclRef)->Substitute(typeSubst).as<Type>();
+    SLANG_ASSERT(resultType);
+
     if( !resultType->Equals(resultType->getSession()->getVoidType()) )
     {
         state.loc = entryPointFuncDeclRef.getLoc();
@@ -3106,9 +3112,10 @@ RefPtr<ProgramLayout> specializeProgramLayout(
 
         // In the case where things are generic-dependent, we need to re-do
         // the type layout process on the type that results from doing
-        // substutition with the global generic arguments.
+        // substitution with the global generic arguments.
         //
         RefPtr<Type> oldType = oldVarLayout->getTypeLayout()->getType();
+        SLANG_ASSERT(oldType);
         RefPtr<Type> newType = oldType->Substitute(typeSubst).as<Type>();
 
         RefPtr<TypeLayout> newTypeLayout = getTypeLayoutForGlobalShaderParameter(
