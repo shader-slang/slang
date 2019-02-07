@@ -3599,6 +3599,9 @@ struct EmitVisitor
 
     static const char* getGLSLVectorCompareFunctionName(IROp op)
     {
+        // Glsl vector comparisons use functions...
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/equal.xhtml
+
         switch (op)
         {
         case kIROp_Eql:     return "equal";
