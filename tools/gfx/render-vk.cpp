@@ -2505,7 +2505,7 @@ void VKRenderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* lay
 
 Result VKRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram)
 {
-    ShaderProgramImpl* impl = new ShaderProgramImpl(desc.pipelineType);
+    RefPtr<ShaderProgramImpl> impl = new ShaderProgramImpl(desc.pipelineType);
     if( desc.pipelineType == PipelineType::Compute)
     {
         auto computeKernel = desc.findKernel(StageType::Compute);
@@ -2519,7 +2519,7 @@ Result VKRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
         impl->m_vertex = compileEntryPoint(*vertexKernel, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0]);
         impl->m_fragment = compileEntryPoint(*fragmentKernel, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1]);
     }
-    *outProgram = impl;
+    *outProgram = impl.detach();
     return SLANG_OK;
 }
 
