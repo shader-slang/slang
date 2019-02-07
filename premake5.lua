@@ -115,13 +115,13 @@ workspace "slang"
         architecture "ARM"
 
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-fno-delete-null-pointer-checks", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option"} 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option"} 
     	
 	filter { "toolset:gcc*"}
-		buildoptions { "-Wno-nonnull-compare", "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
+		buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
 		
     filter { "toolset:clang" }
-         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-undefined-bool-conversion"}
+         buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function"}
 		
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
