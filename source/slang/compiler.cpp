@@ -1153,7 +1153,7 @@ SlangResult dissassembleDXILUsingDXC(
         // It is possible that we are dynamically discovering entry
         // points (using `[shader(...)]` attributes), so that the
         // number of entry points on the compile request does not
-        // match the number of entries in teh `entryPointOutputPaths`
+        // match the number of entries in the `entryPointOutputPaths`
         // array.
         //
         String outputPath;
