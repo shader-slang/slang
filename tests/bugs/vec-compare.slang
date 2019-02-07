@@ -9,6 +9,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4,4,1)]
 void computeMain(uint3 pixelIndex : SV_DispatchThreadID)
 {
+    
     // We will test floats, uints, and int vectors
     // We need all comparisons < > <= >= == !=
     
@@ -59,6 +60,21 @@ void computeMain(uint3 pixelIndex : SV_DispatchThreadID)
         bits |= any(v != test)   ? 0x20 : 0;
         floatBits = bits;
     }
+       
+    int coerceBits;
+    {
+        float2 v = { float(x), float(y) };
+        int2 test = { 1, 2 };
+        
+        int bits = 0;
+        bits |= any(v <  test)   ? 0x01 : 0;
+        bits |= any(v <= test)   ? 0x02 : 0;
+        bits |= any(v == test)   ? 0x04 : 0; 
+        bits |= any(v >  test)   ? 0x08 : 0;
+        bits |= any(v >= test)   ? 0x10 : 0;
+        bits |= any(v != test)   ? 0x20 : 0;
+        coerceBits = bits;
+    }
     
-    outputBuffer[pixelIndex.x + pixelIndex.y * 4] = (floatBits << 16) | (intBits << 8) | (uintBits);
+    outputBuffer[pixelIndex.x + pixelIndex.y * 4] = (coerceBits << 24) | (floatBits << 16) | (intBits << 8) | (uintBits);
 }
