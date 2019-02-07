@@ -9233,7 +9233,7 @@ namespace Slang
         // Can accept a single int/unit
         {
             auto basicType = as<BasicExpressionType>(type);
-            if (!basicType)
+            if (basicType)
             {
                 return (basicType->baseType == BaseType::Int || basicType->baseType == BaseType::UInt);
             }
