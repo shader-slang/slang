@@ -2965,7 +2965,7 @@ void generateParameterBindings(
         const int numShaderRecordRegs = _calcTotalNumUsedRegistersForParameterCategory(&context, SLANG_PARAMETER_CATEGORY_SHADER_RECORD);
         if (numShaderRecordRegs > 1)
         {
-           compileReq->mSink.diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers);
+           compileReq->mSink.diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
            return;
         }
     }
