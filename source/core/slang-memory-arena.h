@@ -133,6 +133,11 @@ public:
         /// Total memory allocated in bytes
     size_t calcTotalMemoryAllocated() const;
 
+        /// Get thue current allocation cursor (memory address where subsequent allocations will be placed if space within the current block)
+    void* getCursor() const { return m_current; }
+        /// Rewind (and effectively deallocate) all allocations *after* the cursor
+    void rewindToCursor(const void* cursor);
+
         /// Default Ctor
     MemoryArena();
         /// Construct with block size and alignment. Block alignment must be a power of 2.
@@ -159,8 +164,9 @@ protected:
 
     void _resetCurrentBlock();
     void _addCurrentBlock(Block* block);
+    void _setCurrentBlock(Block* block);
 
-    static Block* _joinBlocks(Block* pre, Block* post);
+    void _deallocateBlock(Block* block);
 
         /// Create a new block with regular block alignment 
     Block* _newNormalBlock();
@@ -171,11 +177,20 @@ protected:
     void* _allocateAlignedFromNewBlockAndZero(size_t sizeInBytes, size_t alignment);
 
         /// Find block that contains data/size that is _NOT_ current (ie not first block in m_usedBlocks)
-    const Block* _findNonCurrent(const void* data, size_t sizeInBytes) const;
-    const Block* _findInBlocks(const Block* block, const void* data, size_t sizeInBytes) const;
+    Block* _findNonCurrent(const void* data, size_t sizeInBytes) const;
+    Block* _findNonCurrent(const void* data) const;
+
+        /// Find a block that contains data starting from block. Returns null ptr if not found
+    Block* _findInBlocks(Block* block, const void* data) const;
+    Block* _findInBlocks(Block* block, const void* data, size_t sizeInBytes) const;
 
     size_t _calcBlocksUsedMemory(const Block* block) const;
     size_t _calcBlocksAllocatedMemory(const Block* block) const;
+        /// Returns true if block can be classed as normal (right size and same or better alignment)
+    bool _isNormalBlock(Block* block);
+
+        /// Handles the rewinding of the cursor for the more complicated cases
+    void _rewindToCursor(const void* cursor);
 
     uint8_t* m_start;               ///< The start of the current block (pointed to by m_usedBlocks)
     uint8_t* m_end;                 ///< The end of the current block
@@ -186,9 +201,8 @@ protected:
     size_t m_blockAlignment;        ///< The alignment applied to used blocks
 
     Block* m_availableBlocks;       ///< Standard sized blocks that are available
-    Block* m_usedBlocks;            ///< List of all normal sized used blocks. The first one is the 'current block'
-    Block* m_usedOddBlocks;         ///< Used 'odd' blocks - blocks can actually be smaller than normal blocks, but are typically larger. 
-
+    Block* m_usedBlocks;            ///< Singly linked list of used blocks. The first one is the 'current block' and m_next is the previously allocated blocks. nullptr terminated.
+    
     FreeList m_blockFreeList;       ///< Holds all of the blocks for fast allocation/free
 
     private:
@@ -376,6 +390,20 @@ inline void MemoryArena::adjustToBlockAlignment()
         m_current = ptr;
     }
     assert(size_t(m_current) & alignMask);
+}
+// --------------------------------------------------------------------------
+SLANG_FORCE_INLINE void MemoryArena::rewindToCursor(const void* cursor)
+{
+    // Is it in the current block?
+    {
+        const uint8_t* cur = (const uint8_t*)cursor;
+        if (cur >= m_start && cur <= m_current)
+        {
+            m_current = const_cast<uint8_t*>(cur);
+            return;
+        }
+    }
+    _rewindToCursor(cursor);
 }
 
 } // namespace Slang
