@@ -1458,13 +1458,23 @@ namespace Slang
             operandCount += listOperandCounts[ii];
         }
 
+        // A more aggressive Impl could create the instruction once, and only free the memory
+        // allocated to construct if it was found that the instruction already exists.
+        // Here we just avoid using malloc and use the memoryArena as a cheap way to allocate some
+        // temporary memory.
+        auto& memoryArena = builder->getModule()->memoryArena;
+        void* cursor = memoryArena.getCursor();
+
         // We are going to create a dummy instruction on the stack,
         // which will be used as a key for lookup, so see if we
         // already have an equivalent instruction available to use.
 
         size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
-        IRInst* keyInst = (IRInst*) malloc(keySize);
-        memset(keyInst, 0, keySize);
+        IRInst* keyInst = (IRInst*) memoryArena.allocateAndZero(keySize);
+        //memset(keyInst, 0, keySize);
+
+        void* endCursor = memoryArena.getCursor();
+        SLANG_UNUSED(endCursor);
 
         new(keyInst) IRInst();
         keyInst->op = op;
@@ -1488,7 +1498,8 @@ namespace Slang
         IRInst* foundInst = nullptr;
         bool found = builder->sharedBuilder->globalValueNumberingMap.TryGetValue(key, foundInst);
 
-        free((void*)keyInst);
+        SLANG_ASSERT(endCursor == memoryArena.getCursor());
+        memoryArena.rewindToCursor(cursor);
 
         if (found)
         {
