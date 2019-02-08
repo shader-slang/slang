@@ -417,7 +417,7 @@ namespace Slang
             : substitutions(subst)
         {
         }
-        bool Equals(SubstitutionSet substSet) const;
+        bool Equals(const SubstitutionSet& substSet) const;
         int GetHashCode() const;
     };
 
