@@ -25,11 +25,15 @@
 #define g_c_t   _S9
 #define g_c_i   _S10
 #define g_c_j   _S11
-#define tmp_f_a_ii	_S12
-#define tmp_f_a_jj	_S13
-#define tmp_f_b 	_S14
-#define tmp_g_b 	_S15
-#define tmp_g_c 	_S16
+
+#define tid         _S12
+
+#define tmp_f_a_ii	_S13
+#define tmp_f_a_jj	_S14
+
+#define tmp_f_b 	_S15
+#define tmp_g_b 	_S16
+#define tmp_g_c 	_S17
 
 layout(std430, binding = 0) buffer a_block {
     int _data[];
@@ -67,9 +71,11 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 void main()
 {
-    uint ii = gl_GlobalInvocationID.x;
-    uint jj = gl_GlobalInvocationID.y;
-    uint kk = gl_GlobalInvocationID.z;
+    uvec3 tid = uvec3(gl_GlobalInvocationID);
+
+    uint ii = tid.x;
+    uint jj = tid.y;
+    uint kk = tid.z;
 
     int tmp_f_a_ii = f_a(ii);
 
