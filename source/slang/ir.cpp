@@ -1471,9 +1471,9 @@ namespace Slang
 
         size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
         IRInst* keyInst = (IRInst*) memoryArena.allocateAndZero(keySize);
-        //memset(keyInst, 0, keySize);
-
+        
         void* endCursor = memoryArena.getCursor();
+        // Mark as 'unused' cos it is unused on release builds. 
         SLANG_UNUSED(endCursor);
 
         new(keyInst) IRInst();
