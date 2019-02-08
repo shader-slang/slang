@@ -101,7 +101,7 @@ struct SharedEmitContext
     HumaneSourceLoc nextSourceLocation;
     bool needToUpdateSourceLocation;
 
-    // For GLSL output, we can't emit traidtional `#line` directives
+    // For GLSL output, we can't emit traditional `#line` directives
     // with a file path in them, so we maintain a map that associates
     // each path with a unique integer, and then we output those
     // instead.
@@ -508,7 +508,7 @@ struct EmitVisitor
     {
         // There are a few different requirements here that we need to deal with:
         //
-        // 1) We need to print somethign that is valid syntax in the target language
+        // 1) We need to print something that is valid syntax in the target language
         //    (this means that hex floats are off the table for now)
         //
         // 2) We need our printing to be independent of the current global locale in C,
@@ -1608,7 +1608,7 @@ struct EmitVisitor
         return space;
     }
 
-    // Emit a single `regsiter` semantic, as appropriate for a given resource-type-specific layout info
+    // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
     void emitHLSLRegisterSemantic(
         LayoutResourceKind  kind,
         EmitVarChain*       chain,
@@ -1779,7 +1779,7 @@ struct EmitVisitor
                 // Explicit offsets require a GLSL extension (which
                 // is not universally supported, it seems) or a new
                 // enough GLSL version (which we don't want to
-                // universall require), so for right now we
+                // universally require), so for right now we
                 // won't actually output explicit offsets for uniform
                 // shader parameters.
                 //
@@ -3597,6 +3597,51 @@ struct EmitVisitor
         }
     }
 
+    static const char* getGLSLVectorCompareFunctionName(IROp op)
+    {
+        // Glsl vector comparisons use functions...
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/equal.xhtml
+
+        switch (op)
+        {
+        case kIROp_Eql:     return "equal";
+        case kIROp_Neq:     return "notEqual";
+        case kIROp_Greater: return "greaterThan";
+        case kIROp_Less:    return "lessThan";
+        case kIROp_Geq:     return "greaterThanEqual";
+        case kIROp_Leq:     return "lessThanEqual";
+        default:    return nullptr;
+        }
+    }
+
+    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& inOutOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    {
+        *needCloseOut = maybeEmitParens(inOutOuterPrec, opPrec);
+
+        if (getTarget(ctx) == CodeGenTarget::GLSL
+            && as<IRVectorType>(inst->getOperand(0)->getDataType())
+            && as<IRVectorType>(inst->getOperand(1)->getDataType()))
+        {
+            const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
+            SLANG_ASSERT(funcName);
+
+            emit(funcName);
+            emit("(");
+            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
+            emit(",");
+            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+            emit(")");
+        }
+        else
+        {
+            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
+            emit(" ");
+            emit(opPrec.op);
+            emit(" ");
+            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+        }
+    }
+
     void emitIRInstExpr(
         EmitContext*    ctx,
         IRInst*         inst,
@@ -3703,6 +3748,12 @@ struct EmitVisitor
             }
             break;
 
+
+#define CASE_COMPARE(OPCODE, PREC, OP)                                                          \
+        case OPCODE:                                                                            \
+            emitComparison(ctx, inst,  mode, outerPrec, kEOp_##PREC, &needClose);               \
+            break
+
 #define CASE(OPCODE, PREC, OP)                                                                  \
         case OPCODE:                                                                            \
             needClose = maybeEmitParens(outerPrec, kEOp_##PREC);                                \
@@ -3721,12 +3772,12 @@ struct EmitVisitor
 
         // TODO: Need to pull out component-wise
         // comparison cases for matrices/vectors
-        CASE(kIROp_Eql, Eql, ==);
-        CASE(kIROp_Neq, Neq, !=);
-        CASE(kIROp_Greater, Greater, >);
-        CASE(kIROp_Less, Less, <);
-        CASE(kIROp_Geq, Geq, >=);
-        CASE(kIROp_Leq, Leq, <=);
+        CASE_COMPARE(kIROp_Eql, Eql, ==);
+        CASE_COMPARE(kIROp_Neq, Neq, !=);
+        CASE_COMPARE(kIROp_Greater, Greater, >);
+        CASE_COMPARE(kIROp_Less, Less, <);
+        CASE_COMPARE(kIROp_Geq, Geq, >=);
+        CASE_COMPARE(kIROp_Leq, Leq, <=);
 
         CASE(kIROp_BitAnd, BitAnd, &);
         CASE(kIROp_BitXor, BitXor, ^);
