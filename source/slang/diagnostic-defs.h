@@ -387,6 +387,8 @@ DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does no
 
 DIAGNOSTIC(39016, Error, globalUniformsNotSupported, "'$0' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.")
 
+DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "Can have at most one 'shader record' attributed constant buffer.")
+
 //
 // 4xxxx - IL code generation.
 //
