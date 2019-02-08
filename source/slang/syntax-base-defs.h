@@ -32,7 +32,7 @@ ABSTRACT_SYNTAX_CLASS(Val, NodeBase)
     // substitutions to this one
     RefPtr<Val> Substitute(SubstitutionSet subst);
 
-    // Lower-level interface for substition. Like the basic
+    // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
@@ -118,14 +118,13 @@ ABSTRACT_SYNTAX_CLASS(Substitutions, RefObject)
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) = 0;
-    virtual bool operator == (const Substitutions & subst) = 0;
     virtual int GetHashCode() const = 0;
     )
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(GenericSubstitution, Substitutions)
     // The generic declaration that defines the
-    // parametesr we are binding to arguments
+    // parameters we are binding to arguments
     DECL_FIELD(GenericDecl*, genericDecl)
 
     // The actual values of the arguments
@@ -137,10 +136,7 @@ SYNTAX_CLASS(GenericSubstitution, Substitutions)
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
-    virtual bool operator == (const Substitutions & subst) override
-    {
-        return Equals(const_cast<Substitutions*>(&subst));
-    }
+
     virtual int GetHashCode() const override
     {
         int rs = 0;
@@ -169,10 +165,7 @@ SYNTAX_CLASS(ThisTypeSubstitution, Substitutions)
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
-    virtual bool operator == (const Substitutions & subst) override
-    {
-        return Equals(const_cast<Substitutions*>(&subst));
-    }
+
     virtual int GetHashCode() const override;
     )
 END_SYNTAX_CLASS()
@@ -201,10 +194,7 @@ RAW(
 
     // Check if these are equivalent substitutiosn to another set
     virtual bool Equals(Substitutions* subst) override;
-    virtual bool operator == (const Substitutions & subst) override
-    {
-        return Equals(const_cast<Substitutions*>(&subst));
-    }
+
     virtual int GetHashCode() const override
     {
         int rs = actualType->GetHashCode();
@@ -242,7 +232,7 @@ ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNode)
     )
 END_SYNTAX_CLASS()
 
-// A syntax node which can have modifiers appled
+// A syntax node which can have modifiers applied
 ABSTRACT_SYNTAX_CLASS(ModifiableSyntaxNode, SyntaxNode)
 
     SYNTAX_FIELD(Modifiers, modifiers)

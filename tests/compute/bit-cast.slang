@@ -31,12 +31,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
     
     {
-        int4 i4 = int4(id, id + 1, id + 2, id + 3);
+        // Make i4 holds id as floats so we know they are valid float values and not denormals
+        int4 i4 = int4(asint(float(id)), asint(float(id + 1)), asint(float(id + 2)), asint(float(id + 3))); 
         float4 f4 = asfloat(i4);
         uint3 u3 = asuint(f4.xyz);
         float2 f2 = asfloat(u3.xy);
-        int i1 = asint(id);
+        uint u1 = asuint(f2.x);
         
-        outputBuffer[id + 8] = i1;
+        float f1 = asfloat(u1);
+        int i1 = asint(f1);
+        
+        float f1_ = asfloat(i1);
+        int i1_ = asint(f1_);
+        
+        outputBuffer[id + 8] = (int)asfloat(i1_); 
     }
 }
