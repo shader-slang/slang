@@ -1533,7 +1533,7 @@ namespace Slang
             maybeSetSourceLoc(builder, inst);
 
             IRUse*const operands = inst->getOperands();
-            for (int i = 0; i < operandCount; ++i)
+            for (UInt i = 0; i < operandCount; ++i)
             {
                 IRUse& operand = operands[i];
                 auto value = operand.usedValue;
