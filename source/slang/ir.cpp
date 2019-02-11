@@ -1458,54 +1458,91 @@ namespace Slang
             operandCount += listOperandCounts[ii];
         }
 
+        // A more aggressive Impl could create the instruction once, and only free the memory
+        // allocated to construct if it was found that the instruction already exists.
+        // Here we just avoid using malloc and use the memoryArena as a cheap way to allocate some
+        // temporary memory.
+        auto& memoryArena = builder->getModule()->memoryArena;
+        void* cursor = memoryArena.getCursor();
+
         // We are going to create a dummy instruction on the stack,
         // which will be used as a key for lookup, so see if we
         // already have an equivalent instruction available to use.
 
         size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
-        IRInst* keyInst = (IRInst*) malloc(keySize);
-        memset(keyInst, 0, keySize);
+        IRInst* inst = (IRInst*) memoryArena.allocateAndZero(keySize);
+        
+        void* endCursor = memoryArena.getCursor();
+        // Mark as 'unused' cos it is unused on release builds. 
+        SLANG_UNUSED(endCursor);
 
-        new(keyInst) IRInst();
-        keyInst->op = op;
-        keyInst->typeUse.usedValue = type;
-        keyInst->operandCount = (uint32_t) operandCount;
+        new(inst) IRInst();
+        inst->op = op;
+        inst->typeUse.usedValue = type;
+        inst->operandCount = (uint32_t) operandCount;
 
-        IRUse* operand = keyInst->getOperands();
-        for (UInt ii = 0; ii < operandListCount; ++ii)
+        // Don't link up as we may free (if we already have this)
         {
-            UInt listOperandCount = listOperandCounts[ii];
-            for (UInt jj = 0; jj < listOperandCount; ++jj)
+            IRUse* operand = inst->getOperands();
+            for (UInt ii = 0; ii < operandListCount; ++ii)
             {
-                operand->usedValue = listOperands[ii][jj];
-                operand++;
+                UInt listOperandCount = listOperandCounts[ii];
+                for (UInt jj = 0; jj < listOperandCount; ++jj)
+                {
+                    operand->usedValue = listOperands[ii][jj];
+                    operand++;
+                }
             }
         }
 
         IRInstKey key;
-        key.inst = keyInst;
+        key.inst = inst;
 
+        // Ideally we would add if not found, else return if was found instead of testing & then adding.
         IRInst* foundInst = nullptr;
         bool found = builder->sharedBuilder->globalValueNumberingMap.TryGetValue(key, foundInst);
 
-        free((void*)keyInst);
-
+        SLANG_ASSERT(endCursor == memoryArena.getCursor());
+        
         if (found)
         {
+            memoryArena.rewindToCursor(cursor);
             return foundInst;
         }
 
-        // If no instruction was found, then we need to emit it.
+        // Make the lookup instruction into proper instruction. Equivalent to
+        // IRInst* inst = createInstImpl<IRInst>(
+        //    builder,
+        //    op,
+        //    type,
+        //    0,
+        //    nullptr,
+        //    operandListCount,
+        //    listOperandCounts,
+        //    listOperands);
 
-        IRInst* inst = createInstImpl<IRInst>(
-            builder,
-            op,
-            type,
-            0,
-            nullptr,
-            operandListCount,
-            listOperandCounts,
-            listOperands);
+        {
+            
+            // Okay now need to link up
+            if (type)
+            {
+                inst->typeUse.usedValue = nullptr;
+                inst->typeUse.init(inst, type);
+            }
+
+            maybeSetSourceLoc(builder, inst);
+
+            IRUse*const operands = inst->getOperands();
+            for (UInt i = 0; i < operandCount; ++i)
+            {
+                IRUse& operand = operands[i];
+                auto value = operand.usedValue;
+
+                operand.usedValue = nullptr;
+                operand.init(inst, value);
+            }
+        }
+
         addHoistableInst(builder, inst);
 
         key.inst = inst;
