@@ -1458,17 +1458,12 @@ namespace Slang
             operandCount += listOperandCounts[ii];
         }
 
-        // A more aggressive Impl could create the instruction once, and only free the memory
-        // allocated to construct if it was found that the instruction already exists.
-        // Here we just avoid using malloc and use the memoryArena as a cheap way to allocate some
-        // temporary memory.
         auto& memoryArena = builder->getModule()->memoryArena;
         void* cursor = memoryArena.getCursor();
 
-        // We are going to create a dummy instruction on the stack,
-        // which will be used as a key for lookup, so see if we
+        // We are going to create a 'dummy' instruction on the memoryArena
+        // which can be used as a key for lookup, so see if we
         // already have an equivalent instruction available to use.
-
         size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
         IRInst* inst = (IRInst*) memoryArena.allocateAndZero(keySize);
         
@@ -1481,7 +1476,7 @@ namespace Slang
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t) operandCount;
 
-        // Don't link up as we may free (if we already have this)
+        // Don't link up as we may free (if we already have this key)
         {
             IRUse* operand = inst->getOperands();
             for (UInt ii = 0; ii < operandListCount; ++ii)
@@ -1510,19 +1505,9 @@ namespace Slang
             return foundInst;
         }
 
-        // Make the lookup instruction into proper instruction. Equivalent to
-        // IRInst* inst = createInstImpl<IRInst>(
-        //    builder,
-        //    op,
-        //    type,
-        //    0,
-        //    nullptr,
-        //    operandListCount,
-        //    listOperandCounts,
-        //    listOperands);
-
+        // Make the lookup instruction into 'proper' instruction. Equivalent to
+        // IRInst* inst = createInstImpl<IRInst>(builder, op, type, 0, nullptr, operandListCount, listOperandCounts, listOperands);
         {
-            
             // Okay now need to link up
             if (type)
             {
