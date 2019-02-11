@@ -10,7 +10,7 @@ MemoryArena::MemoryArena()
     m_blockAllocSize = 0;
 
     // Set up as empty
-    m_usedOddBlocks = nullptr;
+    m_usedBlocks = nullptr;
     m_availableBlocks = nullptr;
 
     _resetCurrentBlock();
@@ -56,8 +56,7 @@ void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
     m_blockAlignment = alignment;
 
     m_availableBlocks = nullptr;
-    m_usedOddBlocks = nullptr;
-
+    
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
 
     _resetCurrentBlock();
@@ -82,6 +81,16 @@ void MemoryArena::_addCurrentBlock(Block* block)
     // Add to linked list of used block, making it the top used block
     block->m_next = m_usedBlocks;
     m_usedBlocks = block;
+}
+
+void MemoryArena::_setCurrentBlock(Block* block)
+{
+    // Set up for allocation from
+    m_end = block->m_end;
+    m_start = block->m_start;
+    m_current = m_start;
+
+    assert(m_usedBlocks == block);
 }
 
 void MemoryArena::_deallocateBlocksPayload(Block* start)
@@ -109,65 +118,87 @@ void MemoryArena::_deallocateBlocks(Block* start)
     }
 }
 
-/* static */MemoryArena::Block* MemoryArena::_joinBlocks(Block* pre, Block* post)
+bool MemoryArena::_isNormalBlock(Block* block)
 {
-    if (pre && post)
+    size_t blockSize = size_t(block->m_end - block->m_start);
+    return (blockSize == m_blockAllocSize) && ((size_t(block->m_start) & (m_blockAlignment - 1)) == 0);
+}
+
+void MemoryArena::_deallocateBlock(Block* block)
+{
+    // If it's a normal block then make it available
+    if (_isNormalBlock(block))
     {
-        // If both are actual lists, concat post at end of pre
-        Block* cur = pre;
-        while (cur->m_next)
-        {
-            cur = cur->m_next;
-        }
-        // Attach post to end of pre
-        cur->m_next = post;
+        block->m_next = m_availableBlocks;
+        m_availableBlocks = block;
     }
-    return pre ? pre : post;
+    else
+    {
+        // Must be oversized so free it
+        ::free(block->m_alloc);
+        // Free it in the block list
+        m_blockFreeList.deallocate(block);
+    }
 }
 
 void MemoryArena::deallocateAll()
 {
-    // Free all oversized
-    _deallocateBlocks(m_usedOddBlocks);
-    m_usedOddBlocks = nullptr;
-    // We want to put used blocks onto the start of the available list
-    m_availableBlocks = _joinBlocks(m_usedBlocks, m_availableBlocks);
+    // we need to rewind through m_usedBlocks -> seeing it the are normal sized or not
 
+    Block* block = m_usedBlocks;
+    while (block)
+    {
+        Block* next = block->m_next;
+        _deallocateBlock(block);
+        block = next;
+    }
+    
     // Reset current block
     _resetCurrentBlock();
 }
 
 void MemoryArena::reset()
 {
-    _deallocateBlocksPayload(m_usedOddBlocks);
     _deallocateBlocksPayload(m_usedBlocks);
     _deallocateBlocksPayload(m_availableBlocks);
 
     m_blockFreeList.reset();
 
-    m_usedOddBlocks = nullptr;
     m_availableBlocks = nullptr;
 
     _resetCurrentBlock();
 }
 
-const MemoryArena::Block* MemoryArena::_findNonCurrent(const void* data, size_t size) const
+MemoryArena::Block* MemoryArena::_findNonCurrent(const void* data, size_t size) const
 {
-    // It must either be m_usedOversizedBlocks or after m_usedBlocks (because m_usedBlocks is m_current)
-    const Block* block = _findInBlocks(m_usedOddBlocks, data, size);
-    if (block) 
-    {
-        return block;
-    }
     return m_usedBlocks ? _findInBlocks(m_usedBlocks->m_next, data, size) : nullptr;
 }
 
-const MemoryArena::Block* MemoryArena::_findInBlocks(const Block* block, const void* data, size_t size) const
+MemoryArena::Block* MemoryArena::_findNonCurrent(const void* data) const
+{
+    return m_usedBlocks ? _findInBlocks(m_usedBlocks->m_next, data) : nullptr;
+}
+
+MemoryArena::Block* MemoryArena::_findInBlocks(Block* block, const void* data, size_t size) const
 {
     const uint8_t* ptr = (const uint8_t*)data;
     while (block)
     {
         if (ptr >= block->m_start && ptr + size <= block->m_end)
+        {
+            return block;
+        }
+        block = block->m_next;
+    }
+    return nullptr;
+}
+
+MemoryArena::Block* MemoryArena::_findInBlocks(Block* block, const void* data) const
+{
+    const uint8_t* ptr = (const uint8_t*)data;
+    while (block)
+    {
+        if (ptr >= block->m_start && ptr <= block->m_end)
         {
             return block;
         }
@@ -249,32 +280,30 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
 
     const size_t currentRemainSize = size_t(m_end - m_current);
 
+    Block* block;
+
+    // There are two scenario
     // a) Allocate a new normal block and make current
-    // b) Allocate a new normal block (leave current)
-    // c) Allocate a new 'oversized' block (leave current)
+    // b) Allocate a new 'oversized' block and make current
     // 
-    // We only bother with a and c here, as b is only really usable if size is close to m_blockAllocSize
+    // That by always allocating a new block if oversized, we lose more efficiency in terms of storage (the previous block
+    // may not have been used much). BUT doing so makes it easy to rewind - as the blocks are always in order of allocation.
+    // An improvement might be to have some abstraction that sits on top that can do this tracking (or have the blocks
+    // themselves record if they alias over a previously used block - but we don't bother with this here.
 
     // If there is > 1/3 of block remaining, or the block required is too big to fit use an 'oversized' block
     if ((currentRemainSize * 3 > m_blockPayloadSize) || (allocSize > m_blockAllocSize))
     {
-        // We don't change current because there is enough remaining
-        Block* block = _newBlock(allocSize, alignment);
-        if (!block)
-        {
-            return nullptr;
-        }
-        // Add to odd used blocks list
-        block->m_next = m_usedOddBlocks;
-        m_usedOddBlocks = block;
-        // NOTE! We are keeping the previous m_current current, so any remaining space can still be used
-        // Return the address
-        return block->m_start;
+        // This is an oversized block so just allocate the whole thing
+        block = _newBlock(allocSize, alignment);
     }
-
-    // Must be allocatable within a normal block
-    assert(allocSize <= m_blockAllocSize);
-    Block* block = _newNormalBlock();
+    else
+    {
+        // Must be allocatable within a normal block
+        assert(allocSize <= m_blockAllocSize);
+        block = _newNormalBlock();
+    }
+    // If not allocated we are done
     if (!block)
     {
         return nullptr;
@@ -313,17 +342,57 @@ size_t MemoryArena::_calcBlocksAllocatedMemory(const Block* block) const
     return total;
 }
 
+void MemoryArena::_rewindToCursor(const void* cursorIn)
+{
+    // If it's nullptr, then there are no allocation so free all
+    if (cursorIn == nullptr)
+    {
+        deallocateAll();
+        return;
+    }
+   
+    // Find the block that contains the allocation
+    Block* cursorBlock = _findNonCurrent(cursorIn);
+    assert(cursorBlock);
+    if (!cursorBlock)
+    {
+        // If not found it means this address is NOT part any of the active used heap!
+        // Probably an invalid cursor 
+        return;
+    }
+
+    // Deallocate all of the blocks up to the cursor block
+    {
+        Block* block = m_usedBlocks;
+        while (block != cursorBlock)
+        {
+            Block* next = block->m_next;
+            _deallocateBlock(block);
+            block = next;
+        }
+    }
+
+    // The cursor block is now the current block
+    m_usedBlocks = cursorBlock; 
+    _setCurrentBlock(cursorBlock);
+
+    const uint8_t* cursor = (const uint8_t*)cursorIn;
+    // Must be in the range of the currently set block
+    assert(cursor >= m_start && cursor <= m_end);
+
+    // Set the current position where the cursor is
+    m_current = const_cast<uint8_t*>(cursor);
+}
+
 size_t MemoryArena::calcTotalMemoryUsed() const
 {
-    return _calcBlocksUsedMemory(m_usedOddBlocks)
-        + (m_usedBlocks ? _calcBlocksUsedMemory(m_usedBlocks->m_next) : 0) +
+    return (m_usedBlocks ? _calcBlocksUsedMemory(m_usedBlocks->m_next) : 0) +
         size_t(m_current - m_start);
 }
 
 size_t MemoryArena::calcTotalMemoryAllocated() const
 {
-    return _calcBlocksAllocatedMemory(m_usedOddBlocks) + 
-        _calcBlocksAllocatedMemory(m_usedBlocks) +
+    return _calcBlocksAllocatedMemory(m_usedBlocks) +
         _calcBlocksAllocatedMemory(m_availableBlocks);
 }
 

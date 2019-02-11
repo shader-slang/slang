@@ -169,6 +169,21 @@ static void memoryArenaUnitTest()
                         arena.reset();
                         blocks.Clear();
                     }
+                    else if (var == 3)
+                    {
+                        arena.rewindToCursor(nullptr);
+                        blocks.Clear();
+                    }
+                    else if (var == 4)
+                    {
+                        // Rewind to a random position
+                        int rewindIndex = randGen.nextInt32UpTo(int32_t(blocks.Count()));
+                        // rewind to this block
+                        arena.rewindToCursor(blocks[rewindIndex].m_data);
+                        // All the blocks (includign this one) and now deallocated
+                        blocks.SetSize(rewindIndex);
+
+                    }
                     else
                     {
                         size_t usedMemory = arena.calcTotalMemoryUsed();
@@ -247,6 +262,12 @@ static void memoryArenaUnitTest()
                 }
             }
         }
+    }
+    {
+        // Do lots of allocations and test out rewind
+        
+
+
     }
 }
 
