@@ -4612,8 +4612,6 @@ namespace Slang
         return modifier;
     }
 
-
-
     static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
@@ -4653,47 +4651,35 @@ namespace Slang
             }
             else
             {
-                if (nameText == "push_constant")
+                RefPtr<Modifier> modifier;
+
+#define CASE(key, type) if (nameText == #key) { modifier = new type; } else
+                CASE(push_constant, PushConstantAttribute) 
+                CASE(shaderRecordNV, ShaderRecordAttribute)
+                CASE(constant_id,   GLSLConstantIDLayoutModifier) 
+                CASE(location, GLSLLocationLayoutModifier) 
+                CASE(local_size_x, GLSLLocalSizeXLayoutModifier) 
+                CASE(local_size_y, GLSLLocalSizeYLayoutModifier) 
+                CASE(local_size_z, GLSLLocalSizeZLayoutModifier)
                 {
-                    RefPtr<PushConstantAttribute> modifier(new PushConstantAttribute);
-
-                    modifier->name = nameAndLoc.name;
-                    modifier->loc = nameAndLoc.loc;
-
-                    listBuilder.add(modifier);
+                    modifier = new GLSLUnparsedLayoutModifier();
                 }
-                else
+                SLANG_ASSERT(modifier);
+#undef CASE
+
+                modifier->name = nameAndLoc.name;
+                modifier->loc = nameAndLoc.loc;
+
+                // Special handling for GLSLLayoutModifier
+                if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
                 {
-                    RefPtr<GLSLLayoutModifier> modifier;
-
-                    // TODO: better handling of this choice (e.g., lookup in scope)
-                    if(0) {}
-                #define CASE(KEYWORD, CLASS) \
-                    else if(nameText == #KEYWORD) modifier = new CLASS()
-
-                    CASE(constant_id,   GLSLConstantIDLayoutModifier);
-                    CASE(location,      GLSLLocationLayoutModifier);
-                    CASE(local_size_x,  GLSLLocalSizeXLayoutModifier);
-                    CASE(local_size_y,  GLSLLocalSizeYLayoutModifier);
-                    CASE(local_size_z,  GLSLLocalSizeZLayoutModifier);
-                    CASE(shaderRecordNV,  ShaderRecordNVLayoutModifier);
-
-                #undef CASE
-                    else
+                    if (AdvanceIf(parser, TokenType::OpAssign))
                     {
-                        modifier = new GLSLUnparsedLayoutModifier();
+                        glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
                     }
-
-                    modifier->name = nameAndLoc.name;
-                    modifier->loc = nameAndLoc.loc;
-
-                    if(AdvanceIf(parser, TokenType::OpAssign))
-                    {
-                        modifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
-                    }
-
-                    listBuilder.add(modifier);
                 }
+
+                listBuilder.add(modifier);
             }
 
             if (AdvanceIf(parser, TokenType::RParent))

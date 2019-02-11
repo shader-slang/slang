@@ -1195,6 +1195,12 @@ attribute_syntax [vk_binding(binding: int, set: int = 0)]			: GLSLBindingAttribu
 __attributeTarget(DeclBase)
 attribute_syntax [gl_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
 
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_shader_record]			                        : ShaderRecordAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
+
 __attributeTarget(DeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
 __attributeTarget(DeclBase)
