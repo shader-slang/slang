@@ -172,7 +172,7 @@ namespace Slang
 		}
 		void Rehash()
 		{
-			if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
+			if (bucketSizeMinusOne == -1 || _count >= int(MaxLoadFactor * bucketSizeMinusOne))
 			{
 				int newSize = (bucketSizeMinusOne + 1) * 2;
 				if (newSize == 0)
@@ -331,6 +331,25 @@ namespace Slang
 			marks.Clear();
 		}
 
+        TValue* TryGetOrAdd(const TKey& key, const TValue& value)
+        {
+            Rehash();
+            auto pos = FindPosition(kvPair.Key);
+            if (pos.ObjectPosition != -1)
+            {
+                return &hashMap[pos.ObjectPosition].Value;
+            }
+            else if (pos.InsertionPosition != -1)
+            {
+                KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(value));
+                _count++;
+                _Insert(_Move(kvPair), pos.InsertionPosition);
+                return nullptr;
+            }
+            else
+                throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+        }
+
 		template<typename T>
 		bool ContainsKey(const T & key) const
 		{
@@ -364,6 +383,7 @@ namespace Slang
 			}
 			return nullptr;
 		}
+
 		class ItemProxy
 		{
 		private:
@@ -431,7 +451,7 @@ namespace Slang
 		{
 			bucketSizeMinusOne = -1;
 			_count = 0;
-			hashMap = 0;
+			hashMap = nullptr;
 		}
 		template<typename Arg, typename... Args>
 		Dictionary(Arg arg, Args... args)
@@ -439,12 +459,12 @@ namespace Slang
 			Init(arg, args...);
 		}
 		Dictionary(const Dictionary<TKey, TValue> & other)
-			: bucketSizeMinusOne(-1), _count(0), hashMap(0)
+			: bucketSizeMinusOne(-1), _count(0), hashMap(nullptr)
 		{
 			*this = other;
 		}
 		Dictionary(Dictionary<TKey, TValue> && other)
-			: bucketSizeMinusOne(-1), _count(0), hashMap(0)
+			: bucketSizeMinusOne(-1), _count(0), hashMap(nullptr)
 		{
 			*this = (_Move(other));
 		}
