@@ -1490,25 +1490,24 @@ namespace Slang
             }
         }
 
-        IRInstKey key;
-        key.inst = inst;
-
-        // Ideally we would add if not found, else return if was found instead of testing & then adding.
-        IRInst* foundInst = nullptr;
-        bool found = builder->sharedBuilder->globalValueNumberingMap.TryGetValue(key, foundInst);
-
-        SLANG_ASSERT(endCursor == memoryArena.getCursor());
-        
-        if (found)
+        // Find or add the key/inst
         {
-            memoryArena.rewindToCursor(cursor);
-            return foundInst;
+            IRInstKey key{ inst };
+
+            // Ideally we would add if not found, else return if was found instead of testing & then adding.
+            IRInst** found = builder->sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
+            SLANG_ASSERT(endCursor == memoryArena.getCursor());
+            // If it's found, just return, and throw away the instruction
+            if (found)
+            {
+                memoryArena.rewindToCursor(cursor);
+                return *found;
+            }
         }
 
-        // Make the lookup instruction into 'proper' instruction. Equivalent to
+        // Make the lookup 'inst' instruction into 'proper' instruction. Equivalent to
         // IRInst* inst = createInstImpl<IRInst>(builder, op, type, 0, nullptr, operandListCount, listOperandCounts, listOperands);
         {
-            // Okay now need to link up
             if (type)
             {
                 inst->typeUse.usedValue = nullptr;
@@ -1529,9 +1528,6 @@ namespace Slang
         }
 
         addHoistableInst(builder, inst);
-
-        key.inst = inst;
-        builder->sharedBuilder->globalValueNumberingMap.Add(key, inst);
 
         return inst;
     }
