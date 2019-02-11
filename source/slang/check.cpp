@@ -2607,6 +2607,11 @@ namespace Slang
                     // Has no args
                     SLANG_ASSERT(attr->args.Count() == 0);
                 }
+                else if (as<ShaderRecordAttribute>(attr))
+                {
+                    // Has no args
+                    SLANG_ASSERT(attr->args.Count() == 0);
+                }
                 else if (as<EarlyDepthStencilAttribute>(attr))
                 {
                     // Has no args
@@ -3993,7 +3998,7 @@ namespace Slang
             decl->SetCheckState(getCheckedState());
         }
 
-        void visitGlobalGenericParamDecl(GlobalGenericParamDecl * decl)
+        void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
         {
             if (decl->IsChecked(getCheckedState())) return;
             if (checkingPhase == CheckingPhase::Header)
@@ -4040,7 +4045,7 @@ namespace Slang
             checkModifiers(stmt);
         }
 
-        void visitFuncDecl(FuncDecl *functionNode)
+        void visitFuncDecl(FuncDecl* functionNode)
         {
             if (functionNode->IsChecked(getCheckedState()))
                 return;
