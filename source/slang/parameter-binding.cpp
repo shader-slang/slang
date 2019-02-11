@@ -1109,12 +1109,13 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
 
-    if( varDecl->HasModifier<ShaderRecordNVLayoutModifier>() && as<ConstantBufferType>(type) )
+    if( varDecl->HasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type) )
     {
         return CreateTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
             type);
     }
+
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
@@ -2741,6 +2742,21 @@ void diagnoseGlobalUniform(
     getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformsNotSupported, varDecl->getName());
 }
 
+static int _calcTotalNumUsedRegistersForParameterCategory(ParameterBindingContext* bindingContext, SlangParameterCategory paramCategory)
+{
+    int numUsed = 0;
+    for (auto& pair : bindingContext->shared->globalSpaceUsedRangeSets)
+    {
+        UsedRangeSet* rangeSet = pair.Value;
+        const auto& usedRanges = rangeSet->usedResourceRanges[paramCategory];
+        for (const auto& usedRange : usedRanges.ranges)
+        {
+            numUsed += int(usedRange.end - usedRange.begin);
+        }
+    }
+    return numUsed;
+}
+
 void generateParameterBindings(
     TargetRequest*     targetReq)
 {
@@ -2890,7 +2906,7 @@ void generateParameterBindings(
     // in the global scope we will process the parameters
     // of each entry point in order.
     //
-    // Note: the effect of the current implemetnation is to
+    // Note: the effect of the current implementation is to
     // allocate non-overlapping registers/bindings between all
     // the entry points in the compile request (e.g., if you
     // have a vertex and fragment shader being compiled together,
@@ -2944,6 +2960,16 @@ void generateParameterBindings(
         cbInfo->index = globalConstantBufferBinding.index;
     }
     programLayout->parametersLayout = globalScopeVarLayout;
+
+    {
+        const int numShaderRecordRegs = _calcTotalNumUsedRegistersForParameterCategory(&context, SLANG_PARAMETER_CATEGORY_SHADER_RECORD);
+        if (numShaderRecordRegs > 1)
+        {
+           compileReq->mSink.diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
+           return;
+        }
+    }
+
 }
 
 RefPtr<ProgramLayout> specializeProgramLayout(
