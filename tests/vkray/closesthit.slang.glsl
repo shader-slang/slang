@@ -26,7 +26,7 @@ buffer tmp_shaderrecord
     SLANG_ParameterGroup_ShaderRecord_0 _data;
 } ShaderRecord_0;
 
-layout(std430, binding = 0) buffer tmp_colors
+layout(std430, binding = 0) readonly buffer tmp_colors
 {
     vec4 _data[];
 } colors_0;

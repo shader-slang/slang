@@ -4598,7 +4598,7 @@ struct EmitVisitor
         }
     }
 
-    /// Emit high-level language statements from a structrured region tree.
+    /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(
         EmitContext*    ctx,
         RegionTree*     regionTree)
@@ -5005,12 +5005,12 @@ struct EmitVisitor
         //
         // TODO: it would be better to do these transformations earlier,
         // so that we can, e.g., dump the final IR code *before* emission
-        // starts, but that gets a bit compilcated because we also want
-        // to have the region tree avalable without having to recompute it.
+        // starts, but that gets a bit complicated because we also want
+        // to have the region tree available without having to recompute it.
         //
         // For now we are just going to do things the expedient way, but
         // eventually we should allow an IR module to have side-band
-        // storage for dervied structured like the region tree (and logic
+        // storage for derived structures like the region tree (and logic
         // for invalidating them when a transformation would break them).
         //
         fixValueScoping(regionTree);
@@ -5094,7 +5094,7 @@ struct EmitVisitor
             indent();
 
             // HACK: forward-declare all the local variables needed for the
-            // prameters of non-entry blocks.
+            // parameters of non-entry blocks.
             emitPhiVarDecls(ctx, func);
 
             // Need to emit the operations in the blocks of the function
@@ -5242,7 +5242,7 @@ struct EmitVisitor
     }
 
     // Check whether a given value names a target intrinsic,
-    // and return the IR function representing the instrinsic
+    // and return the IR function representing the intrinsic
     // if it does.
     IRFunc* asTargetIntrinsic(
         EmitContext*    ctxt,
@@ -5278,7 +5278,7 @@ struct EmitVisitor
 
             // We do not emit the declaration for
             // functions that appear to be intrinsics/builtins
-            // in the target langugae.
+            // in the target language.
             if (isTargetIntrinsic(ctx, func))
                 return;
 
@@ -5470,12 +5470,12 @@ struct EmitVisitor
         // add the `flat` modifier for GLSL.
         if(!anyModifiers && isGLSL)
         {
-            // Only emit a deault `flat` for fragment
+            // Only emit a default `flat` for fragment
             // stage varying inputs.
             //
             // TODO: double-check that this works for
             // signature matching even if the producing
-            // stage didnt' use `flat`.
+            // stage didn't use `flat`.
             //
             // If this ends up being a problem we can instead
             // output everything with `flat` except for
@@ -5995,7 +5995,14 @@ struct EmitVisitor
             }
         }
         
-        emit(") buffer ");
+        emit(") ");
+
+        if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+        {
+            emit("readonly ");
+        }
+
+        emit("buffer ");
     
         // Generate a dummy name for the block
         emit("_S");
@@ -6021,7 +6028,7 @@ struct EmitVisitor
     void emitIRByteAddressBuffer_GLSL(
         EmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
-        IRByteAddressBufferTypeBase*    /* byteAddressBufferType */)
+        IRByteAddressBufferTypeBase*    byteAddressBufferType)
     {
         // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
         // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -6052,7 +6059,14 @@ struct EmitVisitor
             }
         }
 
-        emit(") buffer ");
+        emit(") ");
+
+        if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
+        {
+            emit("readonly ");
+        }
+
+        emit("buffer ");
 
         // Generate a dummy name for the block
         emit("_S");
