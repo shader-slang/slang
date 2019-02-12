@@ -1492,7 +1492,7 @@ namespace Slang
 
         // Find or add the key/inst
         {
-            IRInstKey key{ inst };
+            IRInstKey key = { inst };
 
             // Ideally we would add if not found, else return if was found instead of testing & then adding.
             IRInst** found = builder->sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
