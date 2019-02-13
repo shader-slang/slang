@@ -5857,21 +5857,32 @@ struct EmitVisitor
             typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
         }
 
+        /*
+        With resources backed by 'buffer' on glsl, we want to output 'readonly' if that is a good match
+        for the underlying type. If uniform it's implicit it's readonly
+
+        Here this only happens with isShaderRecord which is a 'constant buffer' (ie implicitly readonly)
+        or IRGLSLShaderStorageBufferType which is read write.
+        */
+
         emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
         emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
         bool isShaderRecord = emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
         if( isShaderRecord )
         {
-            emit("buffer ");
+            // ShaderRecord is an attribute on a constant buffer, so assume readonly is appropriate 
+            emit("readonly buffer ");
         }
         else if(as<IRGLSLShaderStorageBufferType>(type))
         {
+            // Is writable 
             emit("layout(std430) buffer ");
         }
         // TODO: what to do with HLSL `tbuffer` style buffers?
         else
         {
+            // uniform is implicitly read only
             emit("layout(std140) uniform ");
         }
 
@@ -5997,6 +6008,19 @@ struct EmitVisitor
         
         emit(") ");
 
+        /*
+        If the output type is a buffer, and we can determine it is only readonly we can prefix before
+        buffer with 'readonly'
+
+        The actual structuredBufferType could be
+
+        HLSLStructuredBufferType                        - This is unambiguously read only
+        HLSLRWStructuredBufferType                      - Read write
+        HLSLRasterizerOrderedStructuredBufferType       - Allows read/write access
+        HLSLAppendStructuredBufferType                  - Write
+        HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
+        */
+
         if (as<IRHLSLStructuredBufferType>(structuredBufferType))
         {
             emit("readonly ");
@@ -6060,6 +6084,15 @@ struct EmitVisitor
         }
 
         emit(") ");
+
+        /*
+        If the output type is a buffer, and we can determine it is only readonly we can prefix before
+        buffer with 'readonly'
+
+        HLSLByteAddressBufferType                   - This is unambiguously read only
+        HLSLRWByteAddressBufferType                 - Read write
+        HLSLRasterizerOrderedByteAddressBufferType  - Allows read/write access
+        */
 
         if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
         {
