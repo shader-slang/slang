@@ -1,6 +1,6 @@
 result code = 0
 standard error = {
-tests/diagnostics/undefined-in-preprocessor-conditional.slang(8): warning 15205: undefined idenfier 'BART' in preprocessor expression will evaluate to zero
+tests/diagnostics/undefined-in-preprocessor-conditional.slang(8): warning 15205: undefined identifier 'BART' in preprocessor expression will evaluate to zero
 }
 standard output = {
 }
