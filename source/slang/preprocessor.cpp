@@ -1408,12 +1408,10 @@ static void HandleIfDirective(PreprocessorDirectiveContext* context)
     // If we are skipping, we can just consume the expression, and assume true
     if (IsSkipping(context->preprocessor))
     {
-        // Consume everything until the end of the directive
-        while (AdvanceToken(context).type != TokenType::EndOfDirective)
-        {
-        }
-
-        // Begin a preprocessor block, enabled based on the expression.
+        // Consume everything until the end of the line 
+        SkipToEndOfLine(context);
+        // Begin a preprocessor block, assume true based on the expression
+        // (contents will all be ignored because skipping).
         beginConditional(context, inputStream, true);
     }
     else
