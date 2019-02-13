@@ -2,6 +2,7 @@
 #define FUNDAMENTAL_LIB_SMART_POINTER_H
 
 #include "common.h"
+#include "hash.h"
 #include "type-traits.h"
 
 #include <assert.h>
