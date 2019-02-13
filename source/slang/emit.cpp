@@ -5871,7 +5871,8 @@ struct EmitVisitor
 
         if( isShaderRecord )
         {
-            // ShaderRecord is an attribute on a constant buffer, so assume readonly is appropriate 
+            // TODO: A shader record in vk can be potentially read write. Currently slang does't support write access
+            // so for now we will assume readonly
             emit("readonly buffer ");
         }
         else if(as<IRGLSLShaderStorageBufferType>(type))
