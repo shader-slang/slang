@@ -2016,6 +2016,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
+    // Make sure to associate a stage with every
+    // varying parameter (including sub-fields of
+    // `struct`-type parameters), since downstream
+    // code generation will need to look at the
+    // stage (possibly on individual leaf fields) to
+    // decide when to emit things like the `flat`
+    // interpolation modifier.
+    //
+    if( varLayout )
+    {
+        varLayout->stage = state.stage;
+    }
+
     // The default handling of varying parameters should not apply
     // to geometry shader output streams; they have their own special rules.
     if( auto gsStreamType = as<HLSLStreamOutputType>(type) )
