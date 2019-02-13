@@ -4598,7 +4598,7 @@ struct EmitVisitor
         }
     }
 
-    /// Emit high-level language statements from a structrured region tree.
+    /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(
         EmitContext*    ctx,
         RegionTree*     regionTree)
@@ -5005,12 +5005,12 @@ struct EmitVisitor
         //
         // TODO: it would be better to do these transformations earlier,
         // so that we can, e.g., dump the final IR code *before* emission
-        // starts, but that gets a bit compilcated because we also want
-        // to have the region tree avalable without having to recompute it.
+        // starts, but that gets a bit complicated because we also want
+        // to have the region tree available without having to recompute it.
         //
         // For now we are just going to do things the expedient way, but
         // eventually we should allow an IR module to have side-band
-        // storage for dervied structured like the region tree (and logic
+        // storage for derived structures like the region tree (and logic
         // for invalidating them when a transformation would break them).
         //
         fixValueScoping(regionTree);
@@ -5094,7 +5094,7 @@ struct EmitVisitor
             indent();
 
             // HACK: forward-declare all the local variables needed for the
-            // prameters of non-entry blocks.
+            // parameters of non-entry blocks.
             emitPhiVarDecls(ctx, func);
 
             // Need to emit the operations in the blocks of the function
@@ -5242,7 +5242,7 @@ struct EmitVisitor
     }
 
     // Check whether a given value names a target intrinsic,
-    // and return the IR function representing the instrinsic
+    // and return the IR function representing the intrinsic
     // if it does.
     IRFunc* asTargetIntrinsic(
         EmitContext*    ctxt,
@@ -5278,7 +5278,7 @@ struct EmitVisitor
 
             // We do not emit the declaration for
             // functions that appear to be intrinsics/builtins
-            // in the target langugae.
+            // in the target language.
             if (isTargetIntrinsic(ctx, func))
                 return;
 
@@ -5470,12 +5470,12 @@ struct EmitVisitor
         // add the `flat` modifier for GLSL.
         if(!anyModifiers && isGLSL)
         {
-            // Only emit a deault `flat` for fragment
+            // Only emit a default `flat` for fragment
             // stage varying inputs.
             //
             // TODO: double-check that this works for
             // signature matching even if the producing
-            // stage didnt' use `flat`.
+            // stage didn't use `flat`.
             //
             // If this ends up being a problem we can instead
             // output everything with `flat` except for
@@ -5857,21 +5857,33 @@ struct EmitVisitor
             typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
         }
 
+        /*
+        With resources backed by 'buffer' on glsl, we want to output 'readonly' if that is a good match
+        for the underlying type. If uniform it's implicit it's readonly
+
+        Here this only happens with isShaderRecord which is a 'constant buffer' (ie implicitly readonly)
+        or IRGLSLShaderStorageBufferType which is read write.
+        */
+
         emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
         emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
         bool isShaderRecord = emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
         if( isShaderRecord )
         {
-            emit("buffer ");
+            // TODO: A shader record in vk can be potentially read write. Currently slang does't support write access
+            // so for now we will assume readonly
+            emit("readonly buffer ");
         }
         else if(as<IRGLSLShaderStorageBufferType>(type))
         {
+            // Is writable 
             emit("layout(std430) buffer ");
         }
         // TODO: what to do with HLSL `tbuffer` style buffers?
         else
         {
+            // uniform is implicitly read only
             emit("layout(std140) uniform ");
         }
 
@@ -5995,7 +6007,27 @@ struct EmitVisitor
             }
         }
         
-        emit(") buffer ");
+        emit(") ");
+
+        /*
+        If the output type is a buffer, and we can determine it is only readonly we can prefix before
+        buffer with 'readonly'
+
+        The actual structuredBufferType could be
+
+        HLSLStructuredBufferType                        - This is unambiguously read only
+        HLSLRWStructuredBufferType                      - Read write
+        HLSLRasterizerOrderedStructuredBufferType       - Allows read/write access
+        HLSLAppendStructuredBufferType                  - Write
+        HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
+        */
+
+        if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+        {
+            emit("readonly ");
+        }
+
+        emit("buffer ");
     
         // Generate a dummy name for the block
         emit("_S");
@@ -6021,7 +6053,7 @@ struct EmitVisitor
     void emitIRByteAddressBuffer_GLSL(
         EmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
-        IRByteAddressBufferTypeBase*    /* byteAddressBufferType */)
+        IRByteAddressBufferTypeBase*    byteAddressBufferType)
     {
         // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
         // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -6052,7 +6084,23 @@ struct EmitVisitor
             }
         }
 
-        emit(") buffer ");
+        emit(") ");
+
+        /*
+        If the output type is a buffer, and we can determine it is only readonly we can prefix before
+        buffer with 'readonly'
+
+        HLSLByteAddressBufferType                   - This is unambiguously read only
+        HLSLRWByteAddressBufferType                 - Read write
+        HLSLRasterizerOrderedByteAddressBufferType  - Allows read/write access
+        */
+
+        if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
+        {
+            emit("readonly ");
+        }
+
+        emit("buffer ");
 
         // Generate a dummy name for the block
         emit("_S");

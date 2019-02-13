@@ -1458,17 +1458,12 @@ namespace Slang
             operandCount += listOperandCounts[ii];
         }
 
-        // A more aggressive Impl could create the instruction once, and only free the memory
-        // allocated to construct if it was found that the instruction already exists.
-        // Here we just avoid using malloc and use the memoryArena as a cheap way to allocate some
-        // temporary memory.
         auto& memoryArena = builder->getModule()->memoryArena;
         void* cursor = memoryArena.getCursor();
 
-        // We are going to create a dummy instruction on the stack,
-        // which will be used as a key for lookup, so see if we
+        // We are going to create a 'dummy' instruction on the memoryArena
+        // which can be used as a key for lookup, so see if we
         // already have an equivalent instruction available to use.
-
         size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
         IRInst* inst = (IRInst*) memoryArena.allocateAndZero(keySize);
         
@@ -1481,7 +1476,7 @@ namespace Slang
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t) operandCount;
 
-        // Don't link up as we may free (if we already have this)
+        // Don't link up as we may free (if we already have this key)
         {
             IRUse* operand = inst->getOperands();
             for (UInt ii = 0; ii < operandListCount; ++ii)
@@ -1495,35 +1490,24 @@ namespace Slang
             }
         }
 
-        IRInstKey key;
-        key.inst = inst;
-
-        // Ideally we would add if not found, else return if was found instead of testing & then adding.
-        IRInst* foundInst = nullptr;
-        bool found = builder->sharedBuilder->globalValueNumberingMap.TryGetValue(key, foundInst);
-
-        SLANG_ASSERT(endCursor == memoryArena.getCursor());
-        
-        if (found)
+        // Find or add the key/inst
         {
-            memoryArena.rewindToCursor(cursor);
-            return foundInst;
+            IRInstKey key = { inst };
+
+            // Ideally we would add if not found, else return if was found instead of testing & then adding.
+            IRInst** found = builder->sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
+            SLANG_ASSERT(endCursor == memoryArena.getCursor());
+            // If it's found, just return, and throw away the instruction
+            if (found)
+            {
+                memoryArena.rewindToCursor(cursor);
+                return *found;
+            }
         }
 
-        // Make the lookup instruction into proper instruction. Equivalent to
-        // IRInst* inst = createInstImpl<IRInst>(
-        //    builder,
-        //    op,
-        //    type,
-        //    0,
-        //    nullptr,
-        //    operandListCount,
-        //    listOperandCounts,
-        //    listOperands);
-
+        // Make the lookup 'inst' instruction into 'proper' instruction. Equivalent to
+        // IRInst* inst = createInstImpl<IRInst>(builder, op, type, 0, nullptr, operandListCount, listOperandCounts, listOperands);
         {
-            
-            // Okay now need to link up
             if (type)
             {
                 inst->typeUse.usedValue = nullptr;
@@ -1544,9 +1528,6 @@ namespace Slang
         }
 
         addHoistableInst(builder, inst);
-
-        key.inst = inst;
-        builder->sharedBuilder->globalValueNumberingMap.Add(key, inst);
 
         return inst;
     }

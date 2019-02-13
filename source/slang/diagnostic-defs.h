@@ -141,7 +141,7 @@ DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in p
 DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression");
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression");
 DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression");
-DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined idenfier '$0' in preprocessor expression will evaluate to zero")
+DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined identifier '$0' in preprocessor expression will evaluate to zero")
 
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
@@ -387,7 +387,7 @@ DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does no
 
 DIAGNOSTIC(39016, Error, globalUniformsNotSupported, "'$0' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.")
 
-DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "Can have at most one 'shader record' attributed constant buffer found $0.")
+DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 
 //
 // 4xxxx - IL code generation.

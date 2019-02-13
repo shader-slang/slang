@@ -39,7 +39,7 @@ void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
 
-    // Must be at least sizeof(void*) in size, as that is the minimum the backing allocator will be
+    // Ensure it's alignment is at least kMinAlignment 
     alignment = (alignment < kMinAlignment) ? kMinAlignment : alignment;
 
     m_blockPayloadSize = blockPayloadSize;
@@ -120,7 +120,8 @@ void MemoryArena::_deallocateBlocks(Block* start)
 
 bool MemoryArena::_isNormalBlock(Block* block)
 {
-    size_t blockSize = size_t(block->m_end - block->m_start);
+    // The size of the block in total is from m_alloc to the m_end (ie the size that is passed into _newBlock)
+    const size_t blockSize = size_t(block->m_end - block->m_alloc);
     return (blockSize == m_blockAllocSize) && ((size_t(block->m_start) & (m_blockAlignment - 1)) == 0);
 }
 
@@ -134,7 +135,7 @@ void MemoryArena::_deallocateBlock(Block* block)
     }
     else
     {
-        // Must be oversized so free it
+        // Must be odd sized so free it
         ::free(block->m_alloc);
         // Free it in the block list
         m_blockFreeList.deallocate(block);
@@ -144,7 +145,6 @@ void MemoryArena::_deallocateBlock(Block* block)
 void MemoryArena::deallocateAll()
 {
     // we need to rewind through m_usedBlocks -> seeing it the are normal sized or not
-
     Block* block = m_usedBlocks;
     while (block)
     {
@@ -278,23 +278,20 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     // The size of the block must be at least large enough to take into account alignment
     size_t allocSize = (alignment <= kMinAlignment) ? size : (size + alignment);
 
-    const size_t currentRemainSize = size_t(m_end - m_current);
-
     Block* block;
 
-    // There are two scenario
+    // There are two scenarios
     // a) Allocate a new normal block and make current
-    // b) Allocate a new 'oversized' block and make current
+    // b) Allocate a new 'odd-sized' block and make current
     // 
-    // That by always allocating a new block if oversized, we lose more efficiency in terms of storage (the previous block
+    // That by always allocating a new block if odd-sized, we lose more efficiency in terms of storage (the previous block
     // may not have been used much). BUT doing so makes it easy to rewind - as the blocks are always in order of allocation.
+    //
     // An improvement might be to have some abstraction that sits on top that can do this tracking (or have the blocks
     // themselves record if they alias over a previously used block - but we don't bother with this here.
-
-    // If there is > 1/3 of block remaining, or the block required is too big to fit use an 'oversized' block
-    if ((currentRemainSize * 3 > m_blockPayloadSize) || (allocSize > m_blockAllocSize))
+    if (allocSize > m_blockAllocSize)
     {
-        // This is an oversized block so just allocate the whole thing
+        // This is an odd-sized block so just allocate the whole thing
         block = _newBlock(allocSize, alignment);
     }
     else
@@ -303,16 +300,22 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
         assert(allocSize <= m_blockAllocSize);
         block = _newNormalBlock();
     }
+
     // If not allocated we are done
     if (!block)
     {
         return nullptr;
     }
-    // It's a new regular block...
+
+    // Make the current block 
     _addCurrentBlock(block);
 
+    // Allocated memory is just the start of this block
+    uint8_t* memory = m_current;
+    // It must already be aligned
+    assert((size_t(m_current) & alignMask) == 0);
+
     // Do the aligned allocation (which must fit) by aligning the pointer
-    uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
     // It must fit if the previous code is correct...
     assert(memory + size <= m_end);
     // Move the current pointer

@@ -2016,6 +2016,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
+    // Make sure to associate a stage with every
+    // varying parameter (including sub-fields of
+    // `struct`-type parameters), since downstream
+    // code generation will need to look at the
+    // stage (possibly on individual leaf fields) to
+    // decide when to emit things like the `flat`
+    // interpolation modifier.
+    //
+    if( varLayout )
+    {
+        varLayout->stage = state.stage;
+    }
+
     // The default handling of varying parameters should not apply
     // to geometry shader output streams; they have their own special rules.
     if( auto gsStreamType = as<HLSLStreamOutputType>(type) )
@@ -2742,13 +2755,13 @@ void diagnoseGlobalUniform(
     getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformsNotSupported, varDecl->getName());
 }
 
-static int _calcTotalNumUsedRegistersForParameterCategory(ParameterBindingContext* bindingContext, SlangParameterCategory paramCategory)
+static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingContext* bindingContext, LayoutResourceKind kind)
 {
     int numUsed = 0;
     for (auto& pair : bindingContext->shared->globalSpaceUsedRangeSets)
     {
         UsedRangeSet* rangeSet = pair.Value;
-        const auto& usedRanges = rangeSet->usedResourceRanges[paramCategory];
+        const auto& usedRanges = rangeSet->usedResourceRanges[kind];
         for (const auto& usedRange : usedRanges.ranges)
         {
             numUsed += int(usedRange.end - usedRange.begin);
@@ -2962,7 +2975,7 @@ void generateParameterBindings(
     programLayout->parametersLayout = globalScopeVarLayout;
 
     {
-        const int numShaderRecordRegs = _calcTotalNumUsedRegistersForParameterCategory(&context, SLANG_PARAMETER_CATEGORY_SHADER_RECORD);
+        const int numShaderRecordRegs = _calcTotalNumUsedRegistersForLayoutResourceKind(&context, LayoutResourceKind::ShaderRecord);
         if (numShaderRecordRegs > 1)
         {
            compileReq->mSink.diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
