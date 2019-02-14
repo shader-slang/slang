@@ -25,7 +25,7 @@ layout(std140) uniform _S2
 
 
 layout(std430, binding = 2)
-buffer _S3 {
+readonly buffer _S3 {
     S_0 _data[];
 } sb1_0[4];
 
@@ -35,7 +35,7 @@ buffer _S4 {
 } sb2_0[5];
 
 layout(std430, binding = 4)
-buffer _S5
+readonly buffer _S5
 {
     uint _data[];
 } bb_0[6];

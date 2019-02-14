@@ -52,6 +52,7 @@ struct StructuredBuffer
         out uint numStructs,
         out uint stride);
 
+    __target_intrinsic(glsl, "$0._data[$1]") 
     T Load(int location);
     T Load(int location, out uint status);
 

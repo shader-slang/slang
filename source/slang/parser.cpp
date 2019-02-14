@@ -4328,7 +4328,7 @@ namespace Slang
         //     __intrinsic_op(<identifier>)
         //
         // Finally, we can leave off the specification, so that the
-        // op name will be derived fromthe function name:
+        // op name will be derived from the function name:
         //
         //     __intrinsic_op
         //
