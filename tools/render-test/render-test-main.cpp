@@ -332,7 +332,8 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
         }
     }
 
-    return SLANG_OK;
+    // If success must have a pipeline state
+    return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
@@ -388,12 +389,8 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	}
 	compileRequest.entryPointTypeArguments = m_shaderInputLayout.globalTypeArguments;
 	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
-	if (!m_shaderProgram)
-	{
-		return SLANG_FAIL;
-	}
 
-	return SLANG_OK;
+    return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
 void RenderTestApp::renderFrame()
