@@ -113,7 +113,7 @@ struct LoweredValInfo
         // A simple IR value
         Simple,
 
-        // An l-value reprsented as an IR
+        // An l-value represented as an IR
         // pointer to the value
         Ptr,
 

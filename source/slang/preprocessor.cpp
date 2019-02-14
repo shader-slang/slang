@@ -402,7 +402,7 @@ static Token AdvanceRawToken(Preprocessor* preprocessor, LexerFlags lexerFlags =
 // current token state.
 static Token PeekRawToken(Preprocessor* preprocessor)
 {
-    // We need to find the strema that `advanceRawToken` would read from.
+    // We need to find the stream that `advanceRawToken` would read from.
     PreprocessorInputStream* inputStream = preprocessor->inputStream;
     for (;;)
     {
@@ -954,7 +954,7 @@ static PreprocessorMacro* LookupMacro(PreprocessorDirectiveContext* context, Nam
     return LookupMacro(context->preprocessor, name);
 }
 
-// Determine if we have read everthing on the directive's line.
+// Determine if we have read everything on the directive's line.
 static bool IsEndOfLine(PreprocessorDirectiveContext* context)
 {
     return PeekRawToken(context->preprocessor).type == TokenType::EndOfDirective;
@@ -1239,7 +1239,7 @@ static int GetInfixOpPrecedence(Token const& opToken)
         return -1;
 
     // otherwise we look at the token type to figure
-    // out what precednece it should be parse with
+    // out what precedence it should be parse with
     switch (opToken.type)
     {
     default:
@@ -1348,7 +1348,7 @@ static PreprocessorExpressionValue ParseAndEvaluateInfixExpressionWithPrecedence
         Token opToken = PeekToken(context);
         int opPrecedence = GetInfixOpPrecedence(opToken);
 
-        // If it isn't an operator of high enough precendece, we are done.
+        // If it isn't an operator of high enough precedence, we are done.
         if(opPrecedence < precedence)
             break;
 
@@ -1400,16 +1400,28 @@ static PreprocessorExpressionValue ParseAndEvaluateExpression(PreprocessorDirect
 // Handle a `#if` directive
 static void HandleIfDirective(PreprocessorDirectiveContext* context)
 {
-    // Record current inpu stream in case preprocessor expression
+    // Record current input stream in case preprocessor expression
     // changes the input stream to a macro expansion while we
     // are parsing.
     auto inputStream = context->preprocessor->inputStream;
 
-    // Parse a preprocessor expression.
-    PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
+    // If we are skipping, we can just consume the expression, and assume true
+    if (IsSkipping(context->preprocessor))
+    {
+        // Consume everything until the end of the line 
+        SkipToEndOfLine(context);
+        // Begin a preprocessor block, assume true based on the expression
+        // (contents will all be ignored because skipping).
+        beginConditional(context, inputStream, true);
+    }
+    else
+    {
+        // Parse a preprocessor expression.
+        PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
-    // Begin a preprocessor block, enabled based on the expression.
-    beginConditional(context, inputStream, value != 0);
+        // Begin a preprocessor block, enabled based on the expression.
+        beginConditional(context, inputStream, value != 0);
+    }
 }
 
 // Handle a `#ifdef` directive

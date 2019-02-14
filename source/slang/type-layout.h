@@ -229,7 +229,7 @@ struct UniformArrayLayoutInfo : UniformLayoutInfo
 typedef slang::ParameterCategory LayoutResourceKind;
 
 // Layout information for a value that only consumes
-// a single reosurce kind.
+// a single resource kind.
 struct SimpleLayoutInfo
 {
     // What kind of resource should we consume?
@@ -301,7 +301,7 @@ class Layout : public RefObject
 {
 };
 
-// A reified reprsentation of a particular laid-out type
+// A reified representation of a particular laid-out type
 class TypeLayout : public Layout
 {
 public:
@@ -367,7 +367,7 @@ public:
 
         /// "Unwrap" any layers of array-ness from this type layout.
         ///
-        /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the elemnt type layout.
+        /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the element type layout.
         /// Otherwise, returns this type layout.
         ///
     RefPtr<TypeLayout> unwrapArray();
@@ -401,7 +401,7 @@ public:
     String  systemValueSemantic;
     int     systemValueSemanticIndex;
 
-    // General cse semantic name and index
+    // General case semantic name and index
     // TODO: this and the system-value field are redundant
     // TODO: the `VarLayout` type is getting bloated; we need to not store this
     // information unless actually required.
@@ -568,7 +568,7 @@ public:
 
         /// The byte offset for the tag field.
         ///
-        /// The tag field will always be allocted as
+        /// The tag field will always be allocated as
         /// a `uint`, so we don't store a separate layout
         /// for it.
         ///
@@ -590,7 +590,7 @@ StructTypeLayout* getScopeStructLayout(
 // Layout information for a single shader entry point
 // within a program
 //
-// Treated as a subclass of `StructTypeLayout` becase
+// Treated as a subclass of `StructTypeLayout` because
 // it needs to include computed layout information
 // for the parameters of the entry point.
 //
@@ -843,7 +843,7 @@ struct TypeLayoutContext
 TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest* targetReq);
 
-// Get the "simple" layout for a type accordinging to a given set of layout
+// Get the "simple" layout for a type according to a given set of layout
 // rules. Note that a "simple" layout can only consume one `LayoutResourceKind`,
 // and so this operation may not correctly capture the full resource usage
 // of a type.

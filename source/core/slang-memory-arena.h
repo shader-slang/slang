@@ -45,16 +45,16 @@ class MemoryArena
 public:
     typedef MemoryArena ThisType;
 
-        /** The minimum alignment of the backing memory allocator.
+        /** The minimum alignment of the backing memory allocator. 
         NOTE! That this should not be greater than the alignment of the underlying allocator, and should never be less than sizeof(void*).
         */
     static const size_t kMinAlignment = sizeof(void*);  
         /** Determines if an allocation is consistent with an allocation from this arena.
 
         The test cannot say definitively if this was such an allocation, because the exact details
-        of each allocation is not kept.
+        of each allocation are not kept.
         @param alloc The start of the allocation
-        @param sizeInBytes The size of the allocation
+        @param sizeInBytes The size of the allocation in bytes
         @return true if allocation could have been from this Arena */
     bool isValid(const void* alloc, size_t sizeInBytes) const;
 
@@ -64,9 +64,7 @@ public:
 
         /** Allocate some memory of at least size bytes without having any specific alignment.
 
-         Can be used for slightly faster *aligned* allocations if caveats in class description are met. The
-         Unaligned, means the method will not enforce alignment - but a client call to allocateUnaligned can control
-         subsequent allocations alignments via it's size.
+         Can be used for slightly faster *aligned* allocations if caveats in class description are met. Alignment is kMinAlignment or better.
 
          @param size The size of the allocation requested (in bytes and must be > 0).
          @return The allocation. Can be nullptr if backing allocator was not able to request required memory */
@@ -84,11 +82,14 @@ public:
     void* allocateAligned(size_t sizeInBytes, size_t alignment);
 
         /** Allocate some aligned memory of at least size bytes 
-        @param size Size of allocation wanted (must be > 0).
+        @param sizeInBytes Size of allocation wanted (must be > 0).
         @return The allocation (or nullptr if unable to allocate).  */
     void* allocateUnaligned(size_t sizeInBytes);
 
         /** Allocates a null terminated string.
+
+        NOTE, it is not possible to rewind to a zero length string allocation (because such a strings memory is not held on the arena)
+
         @param str A null-terminated string
         @return A copy of the string held on the arena */
     const char* allocateString(const char* str);
@@ -99,11 +100,11 @@ public:
          @return A copy of the string held on the arena. */
     const char* allocateString(const char* chars, size_t numChars);
 
-        /// Allocate an element of the specified type. Note: Constructor for type is not executed.
+        /// Allocate space for the specified type, with appropriate alignment. Note: Constructor for type is *NOT* executed.
     template <typename T>
     T* allocate();
 
-        /// Allocate an array of a specified type. NOTE Constructor of T is NOT executed.
+        /// Allocate an array of a specified type. NOTE Constructor of T is *NOT* executed.
     template <typename T>
     T* allocateArray(size_t numElems);
 
@@ -116,7 +117,7 @@ public:
     T* allocateAndZeroArray(size_t numElems);
 
         /** Deallocates all allocated memory. That backing memory will generally not be released so
-         subsequent allocation will be fast, and from the same memory. Note though that 'oversize' blocks
+         subsequent allocation will be fast, and from the same memory. Note though that 'odd' blocks
          will be deallocated. */
     void deallocateAll();
 
@@ -133,7 +134,8 @@ public:
         /// Total memory allocated in bytes
     size_t calcTotalMemoryAllocated() const;
 
-        /// Get thue current allocation cursor (memory address where subsequent allocations will be placed if space within the current block)
+        /// Get the current allocation cursor (memory address where subsequent allocations will be placed if space within the current block)
+        /// The address of an allocated block can be used as a cursor to rewind to, such that it and all subsequent allocations will be deallocated
     void* getCursor() const { return m_current; }
         /// Rewind (and effectively deallocate) all allocations *after* the cursor
     void rewindToCursor(const void* cursor);
@@ -259,10 +261,10 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 {
-    // Implement without calling ::allocate, because in most common case we don't need to test for null.
     assert(sizeInBytes > 0);
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
+    // Implement without calling ::allocate, because in most common case we don't need to test for null.
     uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
     uint8_t* end = mem + sizeInBytes;
     if ( end <= m_end)
@@ -331,7 +333,8 @@ inline const char* MemoryArena::allocateString(const char* chars, size_t numChar
 template <typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocate()
 {
-    return reinterpret_cast<T*>(allocateAligned(sizeof(T), SLANG_ALIGN_OF(T)));
+    void* mem = (SLANG_ALIGN_OF(T) <= kMinAlignment) ? allocate(sizeof(T)) : allocateAligned(sizeof(T), SLANG_ALIGN_OF(T));
+    return reinterpret_cast<T*>(mem);
 }
 
 // --------------------------------------------------------------------------
