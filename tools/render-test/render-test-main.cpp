@@ -332,7 +332,8 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
         }
     }
 
-    return SLANG_OK;
+    // If success must have a pipeline state
+    return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
