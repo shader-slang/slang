@@ -20,6 +20,8 @@ namespace Slang
     class CompileRequest;
     class ProgramLayout;
     class PtrType;
+    class TargetProgram;
+    class TargetRequest;
     class TypeLayout;
 
     enum class CompilerMode
@@ -88,8 +90,12 @@ namespace Slang
         kMatrixLayoutMode_ColumnMajor   = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
-
-    class CompileRequest;
+    class Linkage;
+    class Module;
+    class Program;
+    class FrontEndCompileRequest;
+    class BackEndCompileRequest;
+    class EndToEndCompileRequest;
     class TranslationUnitRequest;
 
     // Result of compiling an entry point.
@@ -112,18 +118,165 @@ namespace Slang
         ComPtr<ISlangBlob> blob;
     };
 
-    // Describes an entry point that we've been requested to compile
-    class EntryPointRequest : public RefObject
+        /// A request for the front-end to find and validate an entry-point function
+    struct FrontEndEntryPointRequest : RefObject
     {
     public:
+            /// Create a request for an entry point.
+        FrontEndEntryPointRequest(
+            FrontEndCompileRequest* compileRequest,
+            int                     translationUnitIndex,
+            Name*                   name,
+            Profile                 profile);
+
+            /// Get the parent front-end compile request.
+        FrontEndCompileRequest* getCompileRequest() { return m_compileRequest; }
+
+            /// Get the translation unit that contains the entry point.
+        TranslationUnitRequest* getTranslationUnit();
+
+            /// Get the name of the entry point to find.
+        Name* getName() { return m_name; }
+
+            /// Get the stage that the entry point is to be compiled for
+        Stage getStage() { return m_profile.GetStage(); }
+
+            /// Get the profile that the entry point is to be compiled for
+        Profile getProfile() { return m_profile; }
+
+    private:
         // The parent compile request
-        CompileRequest* compileRequest = nullptr;
+        FrontEndCompileRequest* m_compileRequest;
+
+        // The index of the translation unit that will hold the entry point
+        int                     m_translationUnitIndex;
+
+        // The name of the entry point function to look for
+        Name*                   m_name;
+
+        // The profile to compile for (including stage)
+        Profile                 m_profile;
+    };
+
+        /// Tracks an ordered list of modules that something depends on.
+    struct ModuleDependencyList
+    {
+    public:
+            /// Get the list of modules that are depended on.
+        List<RefPtr<Module>> const& getModuleList() { return m_moduleList; }
+
+            /// Add a module and everything it depends on to the list.
+        void addDependency(Module* module);
+
+            /// Add a module to the list, but not the modules it depends on.
+        void addLeafDependency(Module* module);
+
+    private:
+        void _addDependency(Module* module);
+
+        List<RefPtr<Module>>    m_moduleList;
+        HashSet<Module*>        m_moduleSet;
+    };
+
+        /// Tracks an unordered list of filesystem paths that something depends on
+    struct FilePathDependencyList
+    {
+    public:
+            /// Get the list of paths that are depended on.
+        List<String> const& getFilePathList() { return m_filePathList; }
+
+            /// Add a path to the list, if it is not already present
+        void addDependency(String const& path);
+
+            /// Add all of the paths that `module` depends on to the list
+        void addDependency(Module* module);
+
+    private:
+
+        // TODO: We are using a `HashSet` here to deduplicate
+        // the paths so that we don't return the same path
+        // multiple times from `getFilePathList`, but because
+        // order isn't important, we could potentially do better
+        // in terms of memory (at some cost in performance) by
+        // just sorting the `m_filePathList` every once in
+        // a while and then deduplicating.
+
+        List<String>    m_filePathList;
+        HashSet<String> m_filePathSet;
+    };
+
+        /// Describes an entry point for the purposes of layout and code generation.
+        ///
+        /// This class also tracks any generic arguments to the entry point,
+        /// in the case that it is a specialization of a generic entry point.
+        ///
+        /// There is also a provision for creating a "dummy" entry point for
+        /// the purposes of pass-through compilation modes. Only the
+        /// `getName()` and `getProfile()` methods should be expected to
+        /// return useful data on pass-through entry points.
+        ///
+    class EntryPoint : public RefObject
+    {
+    public:
+            /// Create an entry point that refers to the given function.
+        static RefPtr<EntryPoint> create(
+            DeclRef<FuncDecl>   funcDeclRef,
+            Profile             profile);
+
+            /// Get the function decl-ref, including any generic arguments.
+        DeclRef<FuncDecl> getFuncDeclRef() { return m_funcDeclRef; }
+
+            /// Get the function declaration (without generic arguments).
+        RefPtr<FuncDecl> getFuncDecl() { return m_funcDeclRef.getDecl(); }
+
+            /// Get the name of the entry point
+        Name* getName() { return m_name; }
+
+            /// Get the profile associated with the entry point
+            ///
+            /// Note: only the stage part of the profile is expected
+            /// to contain useful data, but certain legacy code paths
+            /// allow for "shader model" information to come via this path.
+            ///
+        Profile getProfile() { return m_profile; }
+
+            /// Get the stage that the entry point is for.
+        Stage getStage() { return m_profile.GetStage(); }
+
+            /// Get the module that contains the entry point.
+        Module* getModule();
+
+            /// Get the linkage that contains the module for this entry pooint.
+        Linkage* getLinkage();
+
+            /// Get a list of modules that this entry point depends on.
+            ///
+            /// This will include the module that defines the entry point (see `getModule()`),
+            /// but may also include modules that are required by its generic type arguments.
+            ///
+        List<RefPtr<Module>> getModuleDependencies() { return m_dependencyList.getModuleList(); }
+
+            /// Get a list of tagged-union types referenced by the entry point's generic parameters.
+        List<RefPtr<TaggedUnionType>> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
+
+            /// Create a dummy `EntryPoint` that is only usable for pass-through compilation.
+        static RefPtr<EntryPoint> createDummyForPassThrough(
+            Name*       name,
+            Profile     profile);
+
+    private:
+        EntryPoint(
+            Name*               name,
+            Profile             profile,
+            DeclRef<FuncDecl>   funcDeclRef);
 
         // The name of the entry point function (e.g., `main`)
-        Name* name;
+        //
+        Name* m_name = nullptr;
 
-            /// Source code for the generic arguments to use for the generic parameters of the entry point.
-        List<String> genericArgStrings;
+        // The declaration of the entry-point function itself.
+        //
+        DeclRef<FuncDecl> m_funcDeclRef;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target stage, and also
@@ -135,33 +288,13 @@ namespace Slang
         // from the target, while the stage part is all that is
         // intrinsic to the entry point.
         //
-        Profile profile;
+        Profile m_profile;
 
-        // Get the stage that the entry point is being compiled for.
-        Stage getStage() { return profile.GetStage(); }
+        // Any tagged union types that were referenced by the generic arguments of the entry point.
+        List<RefPtr<TaggedUnionType>> m_taggedUnionTypes;
 
-        // The index of the translation unit (within the parent
-        // compile request) that the entry point function is
-        // supposed to be defined in.
-        int translationUnitIndex;
-
-        // The translation unit that this entry point came from
-        TranslationUnitRequest* getTranslationUnit();
-
-        // The declaration of the entry-point function itself.
-        // This will be filled in as part of semantic analysis;
-        // it should not be assumed to be available in cases
-        // where any errors were diagnosed.
-        //
-        DeclRef<FuncDecl> funcDeclRef;
-
-        DeclRef<FuncDecl> getFuncDeclRef();
-        RefPtr<FuncDecl> getFuncDecl();
-
-        RefPtr<Substitutions> globalGenericSubst;
-
-            /// Any tagged union types that were referenced by the generic arguments of the entry point.
-        List<RefPtr<TaggedUnionType>> taggedUnionTypes;
+        // Modules the entry point depends on.
+        ModuleDependencyList m_dependencyList;
     };
 
     enum class PassThroughMode : SlangPassThrough
@@ -174,13 +307,78 @@ namespace Slang
 
     class SourceFile;
 
-    // A single translation unit requested to be compiled.
-    //
+        /// A module of code that has been compiled through the front-end
+        ///
+        /// A module comprises all the code from one translation unit (which
+        /// may span multiple Slang source files), and provides access
+        /// to both the AST and IR representations of that code.
+        ///
+    class Module : public RefObject
+    {
+    public:
+            /// Create a module (initially empty).
+        Module(Linkage* linkage);
+
+            /// Get the parent linkage of this module.
+        Linkage* getLinkage() { return m_linkage; }
+
+            /// Get the AST for the module (if it has been parsed)
+        ModuleDecl* getModuleDecl() { return m_moduleDecl; }
+
+            /// The the IR for the module (if it has been generated)
+        IRModule* getIRModule() { return m_irModule; }
+
+            /// Get the list of other modules this module depends on
+        List<RefPtr<Module>> const& getModuleDependencyList() { return m_moduleDependencyList.getModuleList(); }
+
+            /// Get the list of filesystem paths this module depends on
+        List<String> const& getFilePathDependencyList() { return m_filePathDependencyList.getFilePathList(); }
+
+            /// Register a module that this module depends on
+        void addModuleDependency(Module* module);
+
+            /// Register a filesystem path that this module depends on
+        void addFilePathDependency(String const& path);
+
+            /// Set the AST for this module.
+            ///
+            /// This should only be called once, during creation of the module.
+            ///
+        void setModuleDecl(ModuleDecl* moduleDecl) { m_moduleDecl = moduleDecl; }
+
+            /// Set the IR for this module.
+            ///
+            /// This should only be called once, during creation of the module.
+            ///
+        void setIRModule(IRModule* irModule) { m_irModule = irModule; }
+
+    private:
+        // The parent linkage
+        Linkage* m_linkage = nullptr;
+
+        // The AST for the module
+        RefPtr<ModuleDecl>  m_moduleDecl;
+
+        // The IR for the module
+        RefPtr<IRModule> m_irModule = nullptr;
+
+        // List of modules this module depends on
+        ModuleDependencyList m_moduleDependencyList;
+
+        // List of filesystem paths this module depends on
+        FilePathDependencyList m_filePathDependencyList;
+    };
+    typedef Module LoadedModule;
+
+        /// A request for the front-end to compile a translation unit.
     class TranslationUnitRequest : public RefObject
     {
     public:
+        TranslationUnitRequest(
+            FrontEndCompileRequest* compileRequest);
+
         // The parent compile request
-        CompileRequest* compileRequest = nullptr;
+        FrontEndCompileRequest* compileRequest = nullptr;
 
         // The language in which the source file(s)
         // are assumed to be written
@@ -189,26 +387,30 @@ namespace Slang
         // The source file(s) that will be compiled to form this translation unit
         //
         // Usually, for HLSL or GLSL there will be only one file.
-        List<SourceFile*> sourceFiles;
+        List<SourceFile*> m_sourceFiles;
+
+        List<SourceFile*> const& getSourceFiles() { return m_sourceFiles; }
+        void addSourceFile(SourceFile* sourceFile);
 
         // The entry points associated with this translation unit
-        List<RefPtr<EntryPointRequest> > entryPoints;
+        List<RefPtr<EntryPoint>> entryPoints;
 
         // Preprocessor definitions to use for this translation unit only
-        // (whereas the ones on `CompileOptions` will be shared)
+        // (whereas the ones on `compileRequest` will be shared)
         Dictionary<String, String> preprocessorDefinitions;
 
-        // Compile flags for this translation unit
-        SlangCompileFlags compileFlags = 0;
+            /// The name that will be used for the module this translation unit produces.
+        Name* moduleName = nullptr;
 
-        // The parsed syntax for the translation unit
-        RefPtr<ModuleDecl>   SyntaxNode;
+            /// Result of compiling this translation unit (a module)
+        RefPtr<Module> module;
 
-        // The IR-level code for this translation unit.
-        // This will only be valid/non-null after semantic
-        // checking and IR generation are complete, so it
-        // is not safe to use this field without testing for NULL.
-        RefPtr<IRModule> irModule;
+        Module* getModule() { return module; }
+        RefPtr<ModuleDecl> getModuleDecl() { return module->getModuleDecl(); }
+
+        Session* getSession();
+        NamePool* getNamePool();
+        SourceManager* getSourceManager();
     };
 
     enum class FloatingPointMode : SlangFloatingPointMode
@@ -232,33 +434,28 @@ namespace Slang
         Binary = SLANG_WRITER_MODE_BINARY,
     };
 
-    // A request to generate output in some target format
+        /// A request to generate output in some target format.
     class TargetRequest : public RefObject
     {
     public:
-        CompileRequest*     compileRequest;
+        Linkage*            linkage;
         CodeGenTarget       target;
         SlangTargetFlags    targetFlags = 0;
         Slang::Profile      targetProfile = Slang::Profile();
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
 
-        // Requested output paths for each entry point.
-        // An empty string indices no output desired for
-        // the given entry point.
-        List<String> entryPointOutputPaths;
+        Linkage* getLinkage() { return linkage; }
+        CodeGenTarget getTarget() { return target; }
+        Profile getTargetProfile() { return targetProfile; }
+        FloatingPointMode getFloatingPointMode() { return floatingPointMode; }
 
-        // The resulting reflection layout information
-        RefPtr<ProgramLayout> layout;
-
-        // Generated compile results for each entry point
-        // in the parent compile request (indexing matches
-        // the order they are given in the compile request)
-        List<CompileResult> entryPointResults;
+        Session* getSession();
+        MatrixLayoutMode getDefaultMatrixLayoutMode();
 
         // TypeLayouts created on the fly by reflection API
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
 
-        MatrixLayoutMode getDefaultMatrixLayoutMode();
+        Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
     };
 
         /// Are we generating code for a D3D API?
@@ -280,7 +477,8 @@ namespace Slang
     // - If the entry point and target disagree on the profile family, always use the
     //   profile family and version from the target.
     //
-    Profile getEffectiveProfile(EntryPointRequest* entryPoint, TargetRequest* target);
+    Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target);
+
 
     // A directory to be searched when looking for files (e.g., `#include`)
     struct SearchDirectory
@@ -294,109 +492,52 @@ namespace Slang
         String  path;
     };
 
-    // Represents a module that has been loaded through the front-end
-    // (up through IR generation).
-    //
-    class LoadedModule : public RefObject
+        /// A list of directories to search for files (e.g., `#include`)
+    struct SearchDirectoryList
     {
-    public:
-        // The AST for the module
-        RefPtr<ModuleDecl>  moduleDecl;
+        // A parent list that should also be searched
+        SearchDirectoryList*    parent = nullptr;
 
-        // The IR for the module
-        RefPtr<IRModule> irModule = nullptr;
+        // Directories to be searched
+        List<SearchDirectory>   searchDirectories;
     };
-
-    class Session;
-
 
     /// Create a blob that will retain (a copy of) raw data.
     ///
     ComPtr<ISlangBlob> createRawBlob(void const* data, size_t size);
 
-    class CompileRequest : public RefObject
+        /// A context for loading and re-using code modules.
+    class Linkage : public RefObject
     {
     public:
-        // Pointer to parent session
-        Session* mSession;
+            /// Create an initially-empty linkage
+        Linkage(Session* session);
+
+            /// Get the parent session for this linkage
+        Session* getSession() { return m_session; }
 
         // Information on the targets we are being asked to
         // generate code for.
         List<RefPtr<TargetRequest>> targets;
 
-        // What container format are we being asked to generate?
-        ContainerFormat containerFormat = ContainerFormat::None;
-
-        // Path to output container to
-        String containerOutputPath;
-
         // Directories to search for `#include` files or `import`ed modules
-        List<SearchDirectory> searchDirectories;
+        SearchDirectoryList searchDirectories;
+
+        SearchDirectoryList const& getSearchDirectories() { return searchDirectories; }
 
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
 
-        // Translation units we are being asked to compile
-        List<RefPtr<TranslationUnitRequest> > translationUnits;
 
-        // Entry points we've been asked to compile (each
-        // associated with a translation unit).
-        List<RefPtr<EntryPointRequest> > entryPoints;
-
-        // Types constructed by reflection API
-        Dictionary<String, RefPtr<Type>> types;
-
-        /// The layout to use for matrices by default (row/column major)
-        MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
-        MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
-
-        // Should we just pass the input to another compiler?
-        PassThroughMode passThrough = PassThroughMode::None;
-
-        // Compile flags to be shared by all translation units
-        SlangCompileFlags compileFlags = 0;
-
-        // Should we dump intermediate results along the way, for debugging?
-        bool shouldDumpIntermediates = false;
-
-        bool shouldDumpIR = false;
-        bool shouldValidateIR = false;
-        bool shouldSkipCodegen = false;
-
-        // If true then generateIR will serialize out IR, and serialize back in again. Making 
-        // serialization a bottleneck or firewall between the front end and the backend
-        bool useSerialIRBottleneck = false; 
-
-        // If true will serialize and de-serialize with debug information
-        bool verifyDebugSerialization = false;
-
-        // How should `#line` directives be emitted (if at all)?
-        LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
-
-        // Are we being driven by the command-line `slangc`, and should act accordingly?
-        bool isCommandLineCompile = false;
 
         // Source manager to help track files loaded
-        SourceManager sourceManagerStorage;
-        SourceManager* sourceManager;
+        SourceManager m_defaultSourceManager;
+        SourceManager* m_sourceManager = nullptr;
 
         // Name pool for looking up names
         NamePool namePool;
 
         NamePool* getNamePool() { return &namePool; }
-
-        // Output stuff
-        DiagnosticSink mSink;
-        String mDiagnosticOutput;
-
-        /// A blob holding the diagnostic output
-        ComPtr<ISlangBlob> diagnosticOutputBlob;
-
-        // Files that compilation depended on
-        List<String> mDependencyFilePaths;
-
-        // Generated bytecode representation of all the code
-        List<uint8_t> generatedBytecode;
 
         // Modules that have been dynamically loaded via `import`
         //
@@ -424,11 +565,7 @@ namespace Slang
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
-        // For output
-        ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF];
-
-        void setWriter(WriterChannel chan, ISlangWriter* writer);
-        ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
+        ISlangFileSystemExt* getFileSystemExt() { return fileSystemExt; }
 
         /// Load a file into memory using the configured file system.
         ///
@@ -438,11 +575,177 @@ namespace Slang
         ///
         SlangResult loadFile(String const& path, ISlangBlob** outBlob);
 
-        CompileRequest(Session* session);
 
-        RefPtr<Expr> parseTypeString(TranslationUnitRequest * translationUnit, String typeStr, RefPtr<Scope> scope);
+        RefPtr<Expr> parseTypeString(String typeStr, RefPtr<Scope> scope);
 
-        Type* getTypeFromString(String typeStr);
+            /// Add a mew target amd return its index.
+        UInt addTarget(
+            CodeGenTarget   target);
+
+        RefPtr<Module> loadModule(
+            Name*               name,
+            const PathInfo&     filePathInfo,
+            ISlangBlob*         fileContentsBlob,
+            SourceLoc const&    loc,
+            DiagnosticSink*     sink);
+
+        void loadParsedModule(
+            RefPtr<TranslationUnitRequest>  translationUnit,
+            Name*                           name,
+            PathInfo const&                 pathInfo);
+
+            /// Load a module of the given name.
+        Module* loadModule(String const& name);
+
+        RefPtr<Module> findOrImportModule(
+            Name*               name,
+            SourceLoc const&    loc,
+            DiagnosticSink*     sink);
+
+        SourceManager* getSourceManager()
+        {
+            return m_sourceManager;
+        }
+
+            /// Override the source manager for the linakge.
+            ///
+            /// This is only used to install a temporary override when
+            /// parsing stuff from strings (where we don't want to retain
+            /// full source files for the parsed result).
+            ///
+            /// TODO: We should remove the need for this hack.
+            ///
+        void setSourceManager(SourceManager* sourceManager)
+        {
+            m_sourceManager = sourceManager;
+        }
+
+        void setFileSystem(ISlangFileSystem* fileSystem);
+
+        /// The layout to use for matrices by default (row/column major)
+        MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
+        MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
+
+    private:
+        Session* m_session = nullptr;
+
+            /// Tracks state of modules currently being loaded.
+            ///
+            /// This information is used to diagnose cases where
+            /// a user tries to recursively import the same module
+            /// (possibly along a transitive chain of `import`s).
+            ///
+        struct ModuleBeingImportedRAII
+        {
+        public:
+            ModuleBeingImportedRAII(
+                Linkage*    linkage,
+                Module*     module)
+                : linkage(linkage)
+                , module(module)
+            {
+                next = linkage->m_modulesBeingImported;
+                linkage->m_modulesBeingImported = this;
+            }
+
+            ~ModuleBeingImportedRAII()
+            {
+                linkage->m_modulesBeingImported = next;
+            }
+
+            Linkage* linkage;
+            Module* module;
+            ModuleBeingImportedRAII* next;
+        };
+
+        // Any modules currently being imported will be listed here
+        ModuleBeingImportedRAII* m_modulesBeingImported;
+
+            /// Is the given module in the middle of being imported?
+        bool isBeingImported(Module* module);
+    };
+
+        /// Shared functionality between front- and back-end compile requests.
+        ///
+        /// This is the base class for both `FrontEndCompileRequest` and
+        /// `BackEndCompileRequest`, and allows a small number of parts of
+        /// the compiler to be easily invocable from either front-end or
+        /// back-end work.
+        ///
+    class CompileRequestBase : public RefObject
+    {
+        // TODO: We really shouldn't need this type in the long run.
+        // The few places that rely on it should be refactored to just
+        // depend on the unerlying information (a linkage and a diagnostic
+        // sink) directly.
+        //
+        // The flags to control dumping and validation of IR should be
+        // moved to some kind of shared settings/options `struct` that
+        // both front-end and back-end requests can store.
+
+    public:
+        Session* getSession();
+        Linkage* getLinkage() { return m_linkage; }
+        DiagnosticSink* getSink() { return m_sink; }
+        SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
+        NamePool* getNamePool() { return getLinkage()->getNamePool(); }
+        ISlangFileSystemExt* getFileSystemExt() { return getLinkage()->getFileSystemExt(); }
+        SlangResult loadFile(String const& path, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outBlob); }
+
+        bool shouldDumpIR = false;
+        bool shouldValidateIR = false;
+
+    protected:
+        CompileRequestBase(
+            Linkage*        linkage,
+            DiagnosticSink* sink);
+
+    private:
+        Linkage* m_linkage = nullptr;
+        DiagnosticSink* m_sink = nullptr;
+    };
+
+        /// A request to compile source code to an AST + IR.
+    class FrontEndCompileRequest : public CompileRequestBase
+    {
+    public:
+        FrontEndCompileRequest(
+            Linkage*        linkage,
+            DiagnosticSink* sink);
+
+        int addEntryPoint(
+            int                     translationUnitIndex,
+            String const&           name,
+            Profile                 entryPointProfile);
+
+        // Translation units we are being asked to compile
+        List<RefPtr<TranslationUnitRequest> > translationUnits;
+
+        RefPtr<TranslationUnitRequest> getTranslationUnit(UInt index) { return translationUnits[index]; }
+
+        // Compile flags to be shared by all translation units
+        SlangCompileFlags compileFlags = 0;
+
+        // If true then generateIR will serialize out IR, and serialize back in again. Making 
+        // serialization a bottleneck or firewall between the front end and the backend
+        bool useSerialIRBottleneck = false; 
+
+        // If true will serialize and de-serialize with debug information
+        bool verifyDebugSerialization = false;
+
+        List<RefPtr<FrontEndEntryPointRequest>> m_entryPointReqs;
+
+        List<RefPtr<FrontEndEntryPointRequest>> const& getEntryPointReqs() { return m_entryPointReqs; }
+        UInt getEntryPointReqCount() { return m_entryPointReqs.Count(); }
+        FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
+
+        // Directories to search for `#include` files or `import`ed modules
+        SearchDirectoryList searchDirectories;
+
+        SearchDirectoryList const& getSearchDirectories() { return searchDirectories; }
+
+        // Definitions to provide during preprocessing
+        Dictionary<String, String> preprocessorDefinitions;
 
         void parseTranslationUnit(
             TranslationUnitRequest* translationUnit);
@@ -454,9 +757,24 @@ namespace Slang
         void generateIR();
 
         SlangResult executeActionsInner();
-        SlangResult executeActions();
 
-        int addTranslationUnit(SourceLanguage language, String const& name);
+            /// Add a translation unit to be compiled.
+            ///
+            /// @param language The source language that the translation unit will use (e.g., `SourceLanguage::Slang`
+            /// @param moduleName The name that will be used for the module compile from the translation unit.
+            /// @return The zero-based index of the translation unit in this compile request.
+        int addTranslationUnit(SourceLanguage language, Name* moduleName);
+
+            /// Add a translation unit to be compiled.
+            ///
+            /// @param language The source language that the translation unit will use (e.g., `SourceLanguage::Slang`
+            /// @return The zero-based index of the translation unit in this compile request.
+            ///
+            /// The module name for the translation unit will be automatically generated.
+            /// If all translation units in a compile request use automatically generated
+            /// module names, then they are guaranteed not to conflict with one another.
+            ///
+        int addTranslationUnit(SourceLanguage language);
 
         void addTranslationUnitSourceFile(
             int             translationUnitIndex,
@@ -476,63 +794,337 @@ namespace Slang
             int             translationUnitIndex,
             String const&   path);
 
+        Program* getProgram() { return m_program; }
+
+    private:
+        RefPtr<Program> m_program;
+    };
+
+        /// A collection of code modules and entry points that are intended to be used together.
+        ///
+        /// A `Program` establishes that certain pieces of code are intended
+        /// to be used togehter so that, e.g., layout can make sure to allocate
+        /// space for the global shader parameters in all referenced modules.
+        ///
+    class Program : public RefObject
+    {
+    public:
+            /// Create a new program, initially empty.
+            ///
+            /// All code loaded into the program must come
+            /// from the given `linkage`.
+        Program(
+            Linkage* linkage);
+
+            /// Get the linkage that this program uses.
+        Linkage* getLinkage() { return m_linkage; }
+
+            /// Get the number of entry points added to the program
+        UInt getEntryPointCount() { return m_entryPoints.Count(); }
+
+            /// Get the entry point at the given `index`.
+        RefPtr<EntryPoint> getEntryPoint(UInt index) { return m_entryPoints[index]; }
+
+            /// Get the full ist of entry points on the program.
+        List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
+
+            /// Get the substitution (if any) that represents how global generics are specialized.
+        RefPtr<Substitutions> getGlobalGenericSubstitution() { return m_globalGenericSubst; }
+
+            /// Get the full list of modules this program depends on
+        List<RefPtr<Module>> getModuleDependencies() { return m_moduleDependencyList.getModuleList(); }
+
+            /// Get the full list of filesystem paths this program depends on
+        List<String> getFilePathDependencies() { return m_filePathDependencyList.getFilePathList(); }
+
+            /// Get the target-specific version of this program for the given `target`.
+            ///
+            /// The `target` must be a target on the `Linkage` that was used to create this program.
+        TargetProgram* getTargetProgram(TargetRequest* target);
+            
+            /// Add a module (and everything it depends on) to the list of references
+        void addReferencedModule(Module* module);
+
+            /// Add a module (but not the things it depends on) to the list of references
+            ///
+            /// This is a compatiblity hack for legacy compiler behavior.
+        void addReferencedLeafModule(Module* module);
+
+
+            /// Add an entry point to the program
+            ///
+            /// This also adds everything the entry point depends on to the list of references.
+            ///
+        void addEntryPoint(EntryPoint* entryPoint);
+
+            /// Set the global generic argument substitution to use.
+        void setGlobalGenericSubsitution(RefPtr<Substitutions> subst)
+        {
+            m_globalGenericSubst = subst;
+        }
+
+            /// Parse a type from a string, in the context of this program.
+            ///
+            /// Any names in the string will be resolved using the modules
+            /// referenced by the program.
+            ///
+            /// On an error, returns null and reports diagnostic messages
+            /// to the provided `sink`.
+            ///
+        Type* getTypeFromString(String typeStr, DiagnosticSink* sink);
+
+            /// Get the IR module that represents this program and its entry points.
+            ///
+            /// The IR module for a program tries to be minimal, and in the
+            /// common case will only include symbols with `[import]` declarations
+            /// for the entry point(s) of the program, and any types they
+            /// depend on.
+            ///
+            /// This IR module is intended to be linked against the IR modules
+            /// for all of the dependencies (see `getModuleDependencies()`) to
+            /// provide complete code.
+            ///
+        RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
+
+    private:
+        // The linakge this program is associated with.
+        //
+        // Note that a `Program` keeps its associated linkage alive,
+        // and not vice versa.
+        //
+        RefPtr<Linkage> m_linkage;
+
+        // Tracking data for the list of modules dependend on
+        ModuleDependencyList m_moduleDependencyList;
+
+        // Tracking data for the list of filesystem paths dependend on
+        FilePathDependencyList m_filePathDependencyList;
+
+        // Entry points that are part of the program.
+        List<RefPtr<EntryPoint> > m_entryPoints;
+
+        // Specializations for global generic parameters (if any)
+        RefPtr<Substitutions> m_globalGenericSubst;
+
+        // Generated IR for this program.
+        RefPtr<IRModule> m_irModule;
+
+        // Cache of target-specific programs for each target.
+        Dictionary<TargetRequest*, RefPtr<TargetProgram>> m_targetPrograms;
+
+        // Any types looked up dynamically using `getTypeFromString`
+        Dictionary<String, RefPtr<Type>> m_types;
+    };
+
+        /// A `Program` specialized for a particular `TargetRequest`
+    class TargetProgram : public RefObject
+    {
+    public:
+        TargetProgram(
+            Program*        program,
+            TargetRequest*  targetReq);
+
+            /// Get the underlying program
+        Program* getProgram() { return m_program; }
+
+            /// Get the underlying target
+        TargetRequest* getTargetReq() { return m_targetReq; }
+
+            /// Get the layout for the program on the target.
+            ///
+            /// If this is the first time the layout has been
+            /// requested, report any errors that arise during
+            /// layout to the given `sink`.
+            ///
+        ProgramLayout* getOrCreateLayout(DiagnosticSink* sink);
+
+            /// Get the layout for the program on the taarget.
+            ///
+            /// This routine assumes that `getOrCreateLayout`
+            /// has already been called previously.
+            ///
+        ProgramLayout* getExistingLayout()
+        {
+            SLANG_ASSERT(m_layout);
+            return m_layout;
+        }
+
+            /// Get the compiled code for an entry point on the target.
+            ///
+            /// This routine assumes code generation has already been
+            /// performed and called `setEntryPointResult`.
+            ///
+        CompileResult& getExistingEntryPointResult(Int entryPointIndex)
+        {
+            return m_entryPointResults[entryPointIndex];
+        }
+
+        // TODO: Need a lazy `getOrCreateEntryPointResult`
+
+            /// Set the compiled code for an entry point.
+            ///
+            /// Should only be called by code generation.
+        void setEntryPointResult(Int entryPointIndex, CompileResult const& result)
+        {
+            m_entryPointResults[entryPointIndex] = result;
+        }
+
+    private:
+        // The program being compiled or laid out
+        Program* m_program;
+
+        // The target that code/layout will be generated for
+        TargetRequest* m_targetReq;
+
+        // The computed layout, if it has been generated yet
+        RefPtr<ProgramLayout> m_layout;
+
+        // Generated compile results for each entry point
+        // in the parent `Program` (indexing matches
+        // the order they are given in the `Program`)
+        List<CompileResult> m_entryPointResults;
+    };
+
+        /// A request to generate code for a program
+    class BackEndCompileRequest : public CompileRequestBase
+    {
+    public:
+        BackEndCompileRequest(
+            Linkage*        linkage,
+            DiagnosticSink* sink,
+            Program*        program = nullptr);
+
+        // Should we dump intermediate results along the way, for debugging?
+        bool shouldDumpIntermediates = false;
+
+        // How should `#line` directives be emitted (if at all)?
+        LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
+
+        LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
+
+        Program* getProgram() { return m_program; }
+        void setProgram(Program* program) { m_program = program; }
+
+    private:
+        RefPtr<Program> m_program;
+    };
+
+        /// A compile request that spans the front and back ends of the compiler
+        ///
+        /// This is what the command-line `slangc` uses, as well as the legacy
+        /// C API. It ties together the functionality of `Linkage`,
+        /// `FrontEndCompileRequest`, and `BackEndCompileRequest`, plus a small
+        /// number of additional features that primarily make sense for
+        /// command-line usage.
+        ///
+    class EndToEndCompileRequest : public RefObject
+    {
+    public:
+        EndToEndCompileRequest(
+            Session* session);
+
+        // What container format are we being asked to generate?
+        //
+        // Note: This field is unused except by the options-parsing
+        // logic; it exists to support wriiting out binary modules
+        // once that feature is ready.
+        //
+        ContainerFormat containerFormat = ContainerFormat::None;
+
+        // Path to output container to
+        //
+        // Note: This field exists to support wriiting out binary modules
+        // once that feature is ready.
+        //
+        String containerOutputPath;
+
+        // Should we just pass the input to another compiler?
+        PassThroughMode passThrough = PassThroughMode::None;
+
+            /// Source code for the generic arguments to use for the global generic parameters of the program.
+        List<String> globalGenericArgStrings;
+
+
+        bool shouldSkipCodegen = false;
+
+        // Are we being driven by the command-line `slangc`, and should act accordingly?
+        bool isCommandLineCompile = false;
+
+        String mDiagnosticOutput;
+
+            /// A blob holding the diagnostic output
+        ComPtr<ISlangBlob> diagnosticOutputBlob;
+
+            /// Per-entry-point information not tracked by other compile requests
+        class EntryPointInfo : public RefObject
+        {
+        public:
+            /// Source code for the generic arguments to use for the generic parameters of the entry point.
+            List<String> genericArgStrings;
+        };
+        List<EntryPointInfo> entryPoints;
+
+            /// Per-target information only needed for command-line compiles
+        class TargetInfo : public RefObject
+        {
+        public:
+            // Requested output paths for each entry point.
+            // An empty string indices no output desired for
+            // the given entry point.
+            Dictionary<Int, String> entryPointOutputPaths;
+        };
+        Dictionary<TargetRequest*, RefPtr<TargetInfo>> targetInfos;
+
+        Linkage* getLinkage() { return m_linkage; }
+
         int addEntryPoint(
             int                     translationUnitIndex,
             String const&           name,
             Profile                 profile,
             List<String> const &    genericTypeNames);
 
-        UInt addTarget(
-            CodeGenTarget   target);
+        void setWriter(WriterChannel chan, ISlangWriter* writer);
+        ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
 
-        RefPtr<ModuleDecl> loadModule(
-            Name*               name,
-            const PathInfo&     filePathInfo,
-            ISlangBlob*         fileContentsBlob,
-            SourceLoc const& loc);
+        SlangResult executeActionsInner();
+        SlangResult executeActions();
 
-        void loadParsedModule(
-            RefPtr<TranslationUnitRequest> const&   translationUnit,
-            Name*                                   name,
-            PathInfo const&                         pathInfo);
+        Session* getSession() { return m_session; }
+        DiagnosticSink* getSink() { return &m_sink; }
+        NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
-        RefPtr<ModuleDecl> findOrImportModule(
-            Name*               name,
-            SourceLoc const&    loc);
+        FrontEndCompileRequest* getFrontEndReq() { return m_frontEndReq; }
+        BackEndCompileRequest* getBackEndReq() { return m_backEndReq; }
+        Program* getUnspecializedProgram() { return getFrontEndReq()->getProgram(); }
+        Program* getSpecializedProgram() { return m_specializedProgram; }
 
-        Decl* lookupGlobalDecl(Name* name);
+    private:
+        Session*                        m_session = nullptr;
+        RefPtr<Linkage>                 m_linkage;
+        DiagnosticSink                  m_sink;
+        RefPtr<FrontEndCompileRequest>  m_frontEndReq;
+        RefPtr<Program>                 m_unspecializedProgram;
+        RefPtr<Program>                 m_specializedProgram;
+        RefPtr<BackEndCompileRequest>   m_backEndReq;
 
-        SourceManager* getSourceManager()
-        {
-            return sourceManager;
-        }
-
-        void setSourceManager(SourceManager* sm)
-        {
-            sourceManager = sm;
-            mSink.sourceManager = sm;
-        }
-
-        void setFileSystem(ISlangFileSystem* fileSystem);
-
-            /// During propagation of an exception for an internal
-            /// error, note that this source location was involved
-        void noteInternalErrorLoc(SourceLoc const& loc);
-
-        int internalErrorLocsNoted = 0;
+        // For output
+        ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF];
     };
 
     void generateOutput(
-        CompileRequest* compileRequest);
+        BackEndCompileRequest* compileRequest);
+
+    void generateOutput(
+        EndToEndCompileRequest* compileRequest);
 
     // Helper to dump intermediate output when debugging
     void maybeDumpIntermediate(
-        CompileRequest* compileRequest,
+        BackEndCompileRequest* compileRequest,
         void const*     data,
         size_t          size,
         CodeGenTarget   target);
     void maybeDumpIntermediate(
-        CompileRequest* compileRequest,
+        BackEndCompileRequest* compileRequest,
         char const*     text,
         CodeGenTarget   target);
 
@@ -548,12 +1140,14 @@ namespace Slang
     @param sink The diagnostic sink to report to */
     void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink);
 
-    /* Given a translationUnitRequest determines a filename that is most suitable to identify the input.
-    If the translation is a pass through will attempt to get the source file pathname. If the source is slang generated
-    there is no equivalent name so will return 'slang-generated'
-    @param translationUnitRequest The request to find an appropriate source path for
+    /* Determines a suitable filename to identify the input for a given entry point being compiled.
+    If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
+    pathname for the translation unit containing the entry point at `entryPointIndex.
+    If the compilation is not in a pass-through case, then always returns `"slang-generated"`.
+    @param endToEndReq The end-to-end compile request which might be using pass-through copmilation
+    @param entryPointIndex The index of the entry point to compute a filename for.
     @return the appropriate source filename */
-    String calcTranslationUnitSourcePath(TranslationUnitRequest* translationUnitRequest);
+    String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, UInt entryPointIndex);
 
     struct TypeCheckingCache;
     //
@@ -696,6 +1290,10 @@ namespace Slang
             String const&           path,
             String const&           source);
         ~Session();
+
+    private:
+            /// Linkage used for all built-in (stdlib) code.
+        RefPtr<Linkage> m_builtinLinkage;
     };
 
 }

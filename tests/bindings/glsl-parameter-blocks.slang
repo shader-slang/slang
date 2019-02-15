@@ -1,4 +1,3 @@
-#version 450 core
 //TEST:CROSS_COMPILE: -profile ps_5_0 -entry main -target spirv-assembly
 
 struct Test

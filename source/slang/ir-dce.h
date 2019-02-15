@@ -3,7 +3,7 @@
 
 namespace Slang
 {
-    class CompileRequest;
+    class BackEndCompileRequest;
     struct IRModule;
 
         /// Eliminate "dead" code from the given IR module.
@@ -14,6 +14,6 @@ namespace Slang
         /// etc.
         ///
     void eliminateDeadCode(
-        CompileRequest* compileRequest,
-        IRModule*       module);
+        BackEndCompileRequest*  compileRequest,
+        IRModule*               module);
 }

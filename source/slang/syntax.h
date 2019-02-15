@@ -12,6 +12,7 @@
 
 namespace Slang
 {
+    class Module;
     class Name;
     class Session;
     class Substitutions;
@@ -1360,6 +1361,10 @@ namespace Slang
         Function = 4,
         All = 7
     };
+
+        /// Get the module that a declaration is associated with, if any.
+    Module* getModule(Decl* decl);
+
 } // namespace Slang
 
 #endif

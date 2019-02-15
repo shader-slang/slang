@@ -3,7 +3,7 @@
 
 namespace Slang
 {
-    class CompileRequest;
+    class CompileRequestBase;
     class DiagnosticSink;
     struct IRModule;
 
@@ -30,6 +30,6 @@ namespace Slang
     // A wrapper that calls `validateIRModule` only when IR validation is enabled
     // for the given compile request.
     void validateIRModuleIfEnabled(
-        CompileRequest* compileRequest,
-        IRModule*       module);
+        CompileRequestBase* compileRequest,
+        IRModule*           module);
 }

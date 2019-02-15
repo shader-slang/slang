@@ -92,16 +92,25 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
 
     RefPtr<ShaderProgram> shaderProgram;
-    Slang::List<const char*> rawTypeNames;
+
+    Slang::List<const char*> rawGlobalTypeNames;
+    for (auto typeName : request.globalTypeArguments)
+        rawGlobalTypeNames.Add(typeName.Buffer());
+    spSetGlobalGenericArgs(
+        slangRequest,
+        (int)rawGlobalTypeNames.Count(),
+        rawGlobalTypeNames.Buffer());
+
+    Slang::List<const char*> rawEntryPointTypeNames;
     for (auto typeName : request.entryPointTypeArguments)
-        rawTypeNames.Add(typeName.Buffer());
+        rawEntryPointTypeNames.Add(typeName.Buffer());
     if (request.computeShader.name)
     {
         int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
             computeEntryPointName,
             SLANG_STAGE_COMPUTE,
-            (int)rawTypeNames.Count(),
-            rawTypeNames.Buffer());
+            (int)rawEntryPointTypeNames.Count(),
+            rawEntryPointTypeNames.Buffer());
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
         const SlangResult res = spCompile(slangRequest);
@@ -129,8 +138,8 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     }
     else
     {
-        int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawTypeNames.Count(), rawTypeNames.Buffer());
-        int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawTypeNames.Count(), rawTypeNames.Buffer());
+        int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
+        int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
 
         const SlangResult res = spCompile(slangRequest);
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))

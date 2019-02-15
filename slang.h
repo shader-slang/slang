@@ -923,6 +923,9 @@ extern "C"
     */
     typedef struct SlangSession SlangSession;
 
+    typedef struct SlangLinkage SlangLinkage;
+    typedef struct SlangModule SlangModule;
+
     /*!
     @brief A request for one or more compilation actions to be performed.
     */
@@ -988,6 +991,20 @@ extern "C"
         SlangSession*   session,
         char const*     sourcePath,
         char const*     sourceString);
+
+
+
+    SLANG_API SlangLinkage* spCreateLinkage(
+        SlangSession* session);
+
+    SLANG_API void spDestroyLinkage(
+        SlangLinkage* linkage);
+
+    SLANG_API SlangModule* spLoadModule(
+        SlangLinkage* linkage,
+        char const* moduleName);
+
+
 
     /*!
     @brief Create a compile request.
@@ -1263,15 +1280,22 @@ extern "C"
 
     /** Add an entry point in a particular translation unit,
         with additional arguments that specify the concrete
-        type names for global generic type parameters.
+        type names for entry-point generic type parameters.
     */
     SLANG_API int spAddEntryPointEx(
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             name,
         SlangStage              stage,
-        int                     genericTypeNameCount,
-        char const**            genericTypeNames);
+        int                     genericArgCount,
+        char const**            genericArgs);
+
+    /** Specify the arguments to use for global generic parameters.
+    */
+    SLANG_API SlangResult spSetGlobalGenericArgs(
+        SlangCompileRequest*    request,
+        int                     genericArgCount,
+        char const**            genericArgs);
 
     /** Execute the compilation request.
 

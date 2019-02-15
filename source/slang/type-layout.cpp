@@ -802,7 +802,7 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
 {
-    switch (targetReq->target)
+    switch (targetReq->getTarget())
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -821,12 +821,13 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     }
 }
 
-TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq)
+TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout)
 {
     LayoutRulesFamilyImpl* rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
 
     TypeLayoutContext context;
     context.targetReq = targetReq;
+    context.programLayout = programLayout;
     context.rules = nullptr;
     context.matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
 
@@ -962,7 +963,7 @@ static bool isOpenGLTarget(TargetRequest*)
 
 bool isD3DTarget(TargetRequest* targetReq)
 {
-    switch( targetReq->target )
+    switch( targetReq->getTarget() )
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -978,7 +979,7 @@ bool isD3DTarget(TargetRequest* targetReq)
 
 bool isKhronosTarget(TargetRequest* targetReq)
 {
-    switch( targetReq->target )
+    switch( targetReq->getTarget() )
     {
     default:
         return false;
@@ -1008,7 +1009,7 @@ static bool isSM5OrEarlier(TargetRequest* targetReq)
     if(!isD3DTarget(targetReq))
         return false;
 
-    auto profile = targetReq->targetProfile;
+    auto profile = targetReq->getTargetProfile();
 
     if(profile.getFamily() == ProfileFamily::DX)
     {
@@ -1024,7 +1025,7 @@ static bool isSM5_1OrLater(TargetRequest* targetReq)
     if(!isD3DTarget(targetReq))
         return false;
 
-    auto profile = targetReq->targetProfile;
+    auto profile = targetReq->getTargetProfile();
 
     if(profile.getFamily() == ProfileFamily::DX)
     {
@@ -2102,7 +2103,7 @@ SimpleLayoutInfo GetLayoutImpl(
             //
             // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
             // type layout for the element type which takes the array stride into
-            // acount. If it returns the same type layout that was passed in,
+            // account. If it returns the same type layout that was passed in,
             // then that means no adjustement took place.
             //
             // The `additionalSpacesNeededForAdjustedElementType` variable counts
@@ -2327,12 +2328,34 @@ SimpleLayoutInfo GetLayoutImpl(
                 // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
                 // so we can find the index of this generic param decl in the list
                 genParamTypeLayout->type = type;
-                genParamTypeLayout->paramIndex = findGenericParam(context.targetReq->layout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
+                genParamTypeLayout->paramIndex = findGenericParam(context.programLayout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
                 genParamTypeLayout->rules = rules;
                 genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
                 *outTypeLayout = genParamTypeLayout;
             }
             return info;
+        }
+        else if( auto simpleGenericParam = declRef.as<GenericTypeParamDecl>() )
+        {
+            // A bare generic type parameter can come up during layout
+            // of a generic entry point (or an entry point nested in
+            // a generic type). For now we will just pretend like
+            // the fields of generic parameter type take no space,
+            // since there is no reasonable way to account for them
+            // in the resulting layout.
+            //
+            // TODO: It might be better to completely ignore generic
+            // entry points during initial layout, but doing so would
+            // mean that users couldn't get layout information on
+            // any parameters, even those that don't depend on
+            // generics.
+            //
+            SimpleLayoutInfo info;
+            return GetSimpleLayoutImpl(
+                info,
+                type,
+                rules,
+                outTypeLayout);
         }
     }
     else if (auto errorType = as<ErrorType>(type))

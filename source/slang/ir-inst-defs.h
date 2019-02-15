@@ -392,6 +392,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// even if it does not otherwise reference it.
     INST(DependsOnDecoration,               dependsOn,              1, 0)
 
+        /// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
+    INST(KeepAliveDecoration,              keepAlive,             0, 0)
+
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)

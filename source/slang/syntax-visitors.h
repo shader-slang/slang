@@ -6,8 +6,10 @@
 
 namespace Slang
 {
-    class CompileRequest;
-    class EntryPointRequest;
+    class DiagnosticSink;
+    class EntryPoint;
+    class Linkage;
+    class Module;
     class ShaderCompiler;
     class ShaderLinkInfo;
     class ShaderSymbol;
@@ -24,10 +26,11 @@ namespace Slang
     // Needed by import declaration checking.
     //
     // TODO: need a better location to declare this.
-    RefPtr<ModuleDecl> findOrImportModule(
-        CompileRequest*     request,
+    RefPtr<Module> findOrImportModule(
+        Linkage*            linkage,
         Name*               name,
-        SourceLoc const&    loc);
+        SourceLoc const&    loc,
+        DiagnosticSink*     sink);
 }
 
 #endif

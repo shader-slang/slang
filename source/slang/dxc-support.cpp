@@ -30,8 +30,11 @@ namespace Slang
 {
     String GetHLSLProfileName(Profile profile);
     String emitHLSLForEntryPoint(
-        EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq);
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq);
 
     static UnownedStringSlice _getSlice(IDxcBlob* blob)
     {
@@ -46,19 +49,22 @@ namespace Slang
     }
 
     SlangResult emitDXILForEntryPointUsingDXC(
-        EntryPointRequest*  entryPoint,
-        TargetRequest*      targetReq,
-        List<uint8_t>&      outCode)
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq,
+        List<uint8_t>&          outCode)
     {
-        auto compileRequest = entryPoint->compileRequest;
-        auto session = compileRequest->mSession;
+        auto session = compileRequest->getSession();
+        auto sink = compileRequest->getSink();
 
         // First deal with all the rigamarole of loading
         // the `dxcompiler` library, and creating the
         // top-level COM objects that will be used to
         // compile things.
 
-        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, &compileRequest->mSink);
+        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, sink);
         if (!dxcCreateInstance)
         {
             return SLANG_FAIL;
@@ -69,9 +75,7 @@ namespace Slang
             {
                 // If can't load dxil - dxc will not be able to sign output
                 // Output a suitable warning to the user
-                auto& sink = entryPoint->compileRequest->mSink;
-
-                sink.diagnose(SourceLoc(), Diagnostics::dxilNotFound);
+                sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
             }
         }
 
@@ -89,8 +93,13 @@ namespace Slang
 
         // Now let's go ahead and generate HLSL for the entry
         // point, since we'll need that to feed into dxc.
-        auto hlslCode = emitHLSLForEntryPoint(entryPoint, targetReq);
-        maybeDumpIntermediate(entryPoint->compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
+        auto hlslCode = emitHLSLForEntryPoint(
+            compileRequest,
+            entryPoint,
+            entryPointIndex,
+            targetReq,
+            endToEndReq);
+        maybeDumpIntermediate(compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
 
         // Wrap the 
 
@@ -122,7 +131,7 @@ namespace Slang
             break;
         }
 
-        switch( targetReq->floatingPointMode )
+        switch( targetReq->getFloatingPointMode() )
         {
         default:
             break;
@@ -149,7 +158,7 @@ namespace Slang
         //
         args[argCount++] = L"-no-warnings";
 
-        String entryPointName = getText(entryPoint->name);
+        String entryPointName = getText(entryPoint->getName());
         OSString wideEntryPointName = entryPointName.ToWString();
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
@@ -172,7 +181,7 @@ namespace Slang
             args[argCount++] = L"-enable-16bit-types";
         }
 
-        const String sourcePath = calcTranslationUnitSourcePath(entryPoint->getTranslationUnit());
+        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
@@ -208,7 +217,7 @@ namespace Slang
             // into a string for safety.
             //
 
-            reportExternalCompileError("dxc", resultCode, _getSlice(dxcErrorBlob), &entryPoint->compileRequest->mSink);
+            reportExternalCompileError("dxc", resultCode, _getSlice(dxcErrorBlob), compileRequest->getSink());
             return resultCode;
         }
 
@@ -225,20 +234,21 @@ namespace Slang
     }
 
     SlangResult dissassembleDXILUsingDXC(
-        CompileRequest*     compileRequest,
-        void const*         data,
-        size_t              size,
-        String&             stringOut)
+        BackEndCompileRequest*  compileRequest,
+        void const*             data,
+        size_t                  size,
+        String&                 stringOut)
     {
         stringOut = String();
-        auto session = compileRequest->mSession;
+        auto session = compileRequest->getSession();
+        auto sink = compileRequest->getSink();
 
         // First deal with all the rigamarole of loading
         // the `dxcompiler` library, and creating the
         // top-level COM objects that will be used to
         // compile things.
 
-        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, &compileRequest->mSink);
+        auto dxcCreateInstance = (DxcCreateInstanceProc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Dxc_DxcCreateInstance, sink);
         if (!dxcCreateInstance)
         {
             return SLANG_FAIL;

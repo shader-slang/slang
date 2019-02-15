@@ -2713,4 +2713,15 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
     return substWitness;
 }
 
+Module* getModule(Decl* decl)
+{
+    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    {
+        if(auto moduleDecl = as<ModuleDecl>(dd))
+            return moduleDecl->module;
+    }
+    return nullptr;
+}
+
+
 } // namespace Slang

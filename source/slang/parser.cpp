@@ -8,7 +8,7 @@
 
 namespace Slang
 {
-    // Pre-declare
+    // pre-declare
     static Name* getName(Parser* parser, String const& text);
 
     // Helper class useful to build a list of modifiers. 
@@ -79,7 +79,11 @@ namespace Slang
     class Parser
     {
     public:
-        TranslationUnitRequest* translationUnit;
+        NamePool*       namePool;
+        SourceLanguage  sourceLanguage;
+
+        NamePool* getNamePool() { return namePool; }
+        SourceLanguage getSourceLanguage() { return sourceLanguage; }
 
         int anonymousCounter = 0;
 
@@ -124,27 +128,26 @@ namespace Slang
             currentScope = currentScope->parent;
         }
         Parser(
+            Session* session,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
             RefPtr<Scope> const& outerScope)
             : tokenReader(_tokens)
             , sink(sink)
             , outerScope(outerScope)
+            , m_session(session)
         {}
         Parser(const Parser & other) = default;
-        Session* getSession()
-        {
-            return translationUnit->compileRequest->mSession;
-        }
 
-        RefPtr<ModuleDecl> Parse();
+        Session* m_session = nullptr;
+        Session* getSession() { return m_session; }
+
         Token ReadToken();
         Token ReadToken(TokenType type);
         Token ReadToken(const char * string);
         bool LookAheadToken(TokenType type, int offset = 0);
         bool LookAheadToken(const char * string, int offset = 0);
         void                                        parseSourceFile(ModuleDecl* program);
-        RefPtr<ModuleDecl>					ParseProgram();
         RefPtr<Decl>					ParseStruct();
         RefPtr<ClassDecl>					    ParseClass();
         RefPtr<Stmt>					ParseStatement();
@@ -578,11 +581,6 @@ namespace Slang
         return false;
     }
 
-    RefPtr<ModuleDecl> Parser::Parse()
-    {
-        return ParseProgram();
-    }
-
     RefPtr<RefObject> ParseTypeDef(Parser* parser, void* /*userData*/)
     {
         RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
@@ -694,7 +692,7 @@ namespace Slang
         Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
 
         // Get the name pool
-        auto namePool = parser->translationUnit->compileRequest->getNamePool();
+        auto namePool = parser->getNamePool();
 
         // Since it's an Identifier have to set the name.
         token.ptrValue = namePool->getName(token.Content);
@@ -910,7 +908,7 @@ namespace Slang
 
     static Name* getName(Parser* parser, String const& text)
     {
-        return parser->translationUnit->compileRequest->getNamePool()->getName(text);
+        return parser->getNamePool()->getName(text);
     }
 
     static NameLoc expectIdentifier(Parser* parser)
@@ -1859,7 +1857,7 @@ namespace Slang
         }
 
         // GLSL allows `[]` directly in a type specifier
-        if (parser->translationUnit->sourceLanguage == SourceLanguage::GLSL)
+        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
         {
             typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
         }
@@ -1929,7 +1927,7 @@ namespace Slang
         // Just as a safety net, only apply this logic for
         // a file that is being passed in as "true" Slang code.
         //
-        if(parser->translationUnit->sourceLanguage == SourceLanguage::Slang)
+        if(parser->getSourceLanguage() == SourceLanguage::Slang)
         {
             if(typeSpec.decl)
             {
@@ -2311,171 +2309,6 @@ namespace Slang
         Parser*	parser, void* /*userData*/)
     {
         return ParseHLSLBufferDecl(parser, "TextureBuffer");
-    }
-
-    static void removeModifier(
-        Modifiers&          modifiers,
-        RefPtr<Modifier>    modifier)
-    {
-        RefPtr<Modifier>* link = &modifiers.first;
-        while (*link)
-        {
-            if (*link == modifier)
-            {
-                *link = (*link)->next;
-                return;
-            }
-
-            link = &(*link)->next;
-        }
-    }
-
-    static RefPtr<Decl> parseGLSLBlockDecl(
-        Parser*	    parser,
-        Modifiers&   modifiers)
-    {
-        // An GLSL block like this:
-        //
-        //     uniform Foo { int a; float b; } foo;
-        //
-        // is treated as syntax sugar for a type declaration
-        // and then a global variable declaration using that type:
-        //
-        //     struct $anonymous { int a; float b; };
-        //     Block<$anonymous> foo;
-        //
-        // where `$anonymous` is a fresh name.
-        //
-        // If a "local name" like `foo` is not given, then
-        // we make the declaration "transparent" so that lookup
-        // will see through it to the members inside.
-
-
-        SourceLoc pos = parser->tokenReader.PeekLoc();
-
-        // The initial name before the `{` is only supposed
-        // to be made visible to reflection
-        auto reflectionNameToken = parser->ReadToken(TokenType::Identifier);
-
-        // Look at the qualifiers present on the block to decide what kind
-        // of block we are looking at. Also *remove* those qualifiers so
-        // that they don't interfere with downstream work.
-        String blockWrapperTypeName;
-        if( auto uniformMod = modifiers.findModifier<HLSLUniformModifier>() )
-        {
-            removeModifier(modifiers, uniformMod);
-            blockWrapperTypeName = "ConstantBuffer";
-        }
-        else if( auto inMod = modifiers.findModifier<InModifier>() )
-        {
-            removeModifier(modifiers, inMod);
-            blockWrapperTypeName = "__GLSLInputParameterGroup";
-        }
-        else if( auto outMod = modifiers.findModifier<OutModifier>() )
-        {
-            removeModifier(modifiers, outMod);
-            blockWrapperTypeName = "__GLSLOutputParameterGroup";
-        }
-        else if( auto bufferMod = modifiers.findModifier<GLSLBufferModifier>() )
-        {
-            removeModifier(modifiers, bufferMod);
-            blockWrapperTypeName = "__GLSLShaderStorageBuffer";
-        }
-        else
-        {
-            // Unknown case: just map to a constant buffer and hope for the best
-            blockWrapperTypeName = "ConstantBuffer";
-        }
-
-        // We are going to represent each buffer as a pair of declarations.
-        // The first is a type declaration that holds all the members, while
-        // the second is a variable declaration that uses the buffer type.
-        RefPtr<StructDecl> blockDataTypeDecl = new StructDecl();
-        RefPtr<VarDecl> blockVarDecl = new VarDecl();
-
-        addModifier(blockDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
-        addModifier(blockVarDecl, new ImplicitParameterGroupVariableModifier());
-
-        // Attach the reflection name to the block so we can use it
-        auto reflectionNameModifier = new ParameterGroupReflectionName();
-        reflectionNameModifier->nameAndLoc = NameLoc(reflectionNameToken);
-        addModifier(blockVarDecl, reflectionNameModifier);
-
-        // Both declarations will have a location that points to the name
-        parser->FillPosition(blockDataTypeDecl.Ptr());
-        parser->FillPosition(blockVarDecl.Ptr());
-
-        // Generate a unique name for the data type
-        blockDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
-
-        // TODO(tfoley): We end up constructing unchecked syntax here that
-        // is expected to type check into the right form, but it might be
-        // cleaner to have a more explicit desugaring pass where we parse
-        // these constructs directly into the AST and *then* desugar them.
-
-        // Construct a type expression to reference the buffer data type
-        auto blockDataTypeExpr = new VarExpr();
-        blockDataTypeExpr->loc = blockDataTypeDecl->loc;
-        blockDataTypeExpr->name = blockDataTypeDecl->getName();
-        blockDataTypeExpr->scope = parser->currentScope.Ptr();
-
-        // Construct a type exrpession to reference the type constructor
-        auto blockWrapperTypeExpr = new VarExpr();
-        blockWrapperTypeExpr->loc = pos;
-        blockWrapperTypeExpr->name = getName(parser, blockWrapperTypeName);
-        // Always need to look this up in the outer scope,
-        // so that it won't collide with, e.g., a local variable called `ConstantBuffer`
-        blockWrapperTypeExpr->scope = parser->outerScope;
-
-        // Construct a type expression that represents the type for the variable,
-        // which is the wrapper type applied to the data type
-        auto blockVarTypeExpr = new GenericAppExpr();
-        blockVarTypeExpr->loc = blockVarDecl->loc;
-        blockVarTypeExpr->FunctionExpr = blockWrapperTypeExpr;
-        blockVarTypeExpr->Arguments.Add(blockDataTypeExpr);
-
-        blockVarDecl->type.exp = blockVarTypeExpr;
-
-        // The declarations in the body belong to the data type.
-        parseAggTypeDeclBody(parser, blockDataTypeDecl.Ptr());
-
-        if( parser->LookAheadToken(TokenType::Identifier) )
-        {
-            // The user gave an explicit name to the block,
-            // so we need to use that as our variable name
-            blockVarDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-
-            // TODO: in this case we make actually have a more complex
-            // declarator, including `[]` brackets.
-        }
-        else
-        {
-            // synthesize a dummy name
-            blockVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
-
-            // Otherwise we have a transparent declaration, similar
-            // to an HLSL `cbuffer`
-            auto transparentModifier = new TransparentModifier();
-            transparentModifier->loc = pos;
-            addModifier(blockVarDecl, transparentModifier);
-        }
-
-        // Expect a trailing `;`
-        parser->ReadToken(TokenType::Semicolon);
-
-        // Because we are constructing two declarations, we have a thorny
-        // issue that were are only supposed to return one.
-        // For now we handle this by adding the type declaration to
-        // the current scope manually, and then returning the variable
-        // declaration.
-        //
-        // Note: this means that any modifiers that have already been parsed
-        // will get attached to the variable declaration, not the type.
-        // There might be cases where we need to shuffle things around.
-
-        AddMember(parser->currentScope, blockDataTypeDecl);
-
-        return blockVarDecl;
     }
 
     static void parseOptionalInheritanceClause(Parser* parser, AggTypeDeclBase* decl)
@@ -3020,27 +2853,8 @@ namespace Slang
                 //
                 // - A keyword-based declaration (e.g., `cbuffer ...`)
                 // - The beginning of a type in a declarator-based declaration (e.g., `int ...`)
-                // - A GLSL block declaration (e.g., `uniform Foo { ... }`)
 
-                // Let's deal with the GLSL block case first. This is something like:
-                //
-                //     uniform Foo { ... };
-                //
-                // The `uniform` keyword has already been parsed as a modifier,
-                // so the identifier we are looking at is `Foo`. If the token
-                // after that is `{`, we assume this is a block.
-                //
-                // Of course, we only want to allow this syntax when parsing GLSL...
-                if (parser->translationUnit->sourceLanguage == SourceLanguage::GLSL)
-                {
-                    if( parser->LookAheadToken(TokenType::LBrace, 1) )
-                    {
-                        decl = parseGLSLBlockDecl(parser, modifiers);
-                        break;
-                    }
-                }
-
-                // Next we will check whether we can use the identifier token
+                // First we will check whether we can use the identifier token
                 // as a declaration keyword and parse a declaration using
                 // its associated callback:
                 RefPtr<Decl> parsedDecl;
@@ -3182,15 +2996,6 @@ namespace Slang
 
         SLANG_RELEASE_ASSERT(currentScope == outerScope);
         currentScope = nullptr;
-    }
-
-    RefPtr<ModuleDecl> Parser::ParseProgram()
-    {
-        RefPtr<ModuleDecl> program = new ModuleDecl();
-
-        parseSourceFile(program.Ptr());
-
-        return program;
     }
 
     RefPtr<Decl> Parser::ParseStruct()
@@ -3591,7 +3396,7 @@ namespace Slang
         // parsing HLSL code.
         //
 
-        bool brokenScoping = translationUnit->sourceLanguage == SourceLanguage::HLSL;
+        bool brokenScoping = getSourceLanguage() == SourceLanguage::HLSL;
 
         // We will create a distinct syntax node class for the unscoped
         // case, just so that we can correctly handle it in downstream
@@ -4439,14 +4244,18 @@ namespace Slang
         return parsePrefixExpr(this);
     }
 
-    RefPtr<Expr> parseTypeFromSourceFile(TranslationUnitRequest*         translationUnit,
+    RefPtr<Expr> parseTypeFromSourceFile(
+        Session*                        session,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        RefPtr<Scope> const&            outerScope)
+        RefPtr<Scope> const&            outerScope,
+        NamePool*                       namePool,
+        SourceLanguage                  sourceLanguage)
     {
-        Parser parser(tokens, sink, outerScope);
-        parser.translationUnit = translationUnit;
+        Parser parser(session, tokens, sink, outerScope);
         parser.currentScope = outerScope;
+        parser.namePool = namePool;
+        parser.sourceLanguage = sourceLanguage;
         return parser.ParseType();
     }
 
@@ -4457,12 +4266,11 @@ namespace Slang
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope)
     {
-        Parser parser(tokens, sink, outerScope);
+        Parser parser(translationUnit->getSession(), tokens, sink, outerScope);
+        parser.namePool = translationUnit->getNamePool();
+        parser.sourceLanguage = translationUnit->sourceLanguage;
 
-        parser.translationUnit = translationUnit;
-
-
-        return parser.parseSourceFile(translationUnit->SyntaxNode.Ptr());
+        return parser.parseSourceFile(translationUnit->getModuleDecl());
     }
 
     static void addBuiltinSyntaxImpl(

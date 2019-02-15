@@ -14,7 +14,7 @@ namespace Slang
 // instead of the input/request layer.
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*      programLayout,
-    EntryPointRequest*  entryPointRequest);
+    EntryPoint*  EntryPoint);
 
 struct IRSpecSymbol : RefObject
 {
@@ -38,9 +38,6 @@ struct IRSharedSpecContext
 
     // The specialized module we are building
     RefPtr<IRModule>   module;
-
-    // The original, unspecialized module we are copying
-    IRModule*   originalModule;
 
     // A map from mangled symbol names to zero or
     // more global IR values that have that name,
@@ -66,8 +63,6 @@ struct IRSpecContextBase
     IRSharedSpecContext* getShared() { return shared; }
 
     IRModule* getModule() { return getShared()->module; }
-
-    IRModule* getOriginalModule() { return getShared()->originalModule; }
 
     IRSharedSpecContext::SymbolDictionary& getSymbols() { return getShared()->symbols; }
 
@@ -668,8 +663,8 @@ IRInst* specializeGeneric(
     IRSpecialize*   specializeInst);
 
 IRFunc* specializeIRForEntryPoint(
-    IRSpecContext*  context,
-    EntryPointRequest*  entryPointRequest,
+    IRSpecContext*      context,
+    EntryPoint*         entryPoint,
     EntryPointLayout*   entryPointLayout)
 {
     // We start by looking up the IR symbol that
@@ -681,7 +676,7 @@ IRFunc* specializeIRForEntryPoint(
     // so that the mangled name of the decl-ref is
     // not the same as the mangled name of the decl.
     //
-    auto mangledName = getMangledName(entryPointRequest->getFuncDeclRef());
+    auto mangledName = getMangledName(entryPoint->getFuncDeclRef());
     RefPtr<IRSpecSymbol> sym;
     if (!context->getSymbols().TryGetValue(mangledName, sym))
     {
@@ -743,9 +738,9 @@ IRFunc* specializeIRForEntryPoint(
         return nullptr;
     }
 
-    if( !clonedFunc->findDecorationImpl(kIROp_EntryPointDecoration) )
+    if( !clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration) )
     {
-        context->builder->addEntryPointDecoration(clonedFunc);
+        context->builder->addKeepAliveDecoration(clonedFunc);
     }
 
     // We need to attach the layout information for
@@ -1148,7 +1143,6 @@ void initializeSharedSpecContext(
     IRSharedSpecContext*    sharedContext,
     Session*                session,
     IRModule*               module,
-    IRModule*               originalModule,
     CodeGenTarget           target)
 {
 
@@ -1166,19 +1160,15 @@ void initializeSharedSpecContext(
 
     sharedBuilder->module = module;
     sharedContext->module = module;
-    sharedContext->originalModule = originalModule;
     sharedContext->target = target;
-    // We will populate a map with all of the IR values
-    // that use the same mangled name, to make lookup easier
-    // in other steps.
-    insertGlobalValueSymbols(sharedContext, originalModule);
 }
 
 // implementation provided in parameter-binding.cpp
 RefPtr<ProgramLayout> specializeProgramLayout(
     TargetRequest * targetReq,
-    ProgramLayout* programLayout,
-    SubstitutionSet typeSubst);
+    ProgramLayout*  programLayout,
+    SubstitutionSet typeSubst,
+    DiagnosticSink* sink);
 
 struct IRSpecializationState
 {
@@ -1211,11 +1201,14 @@ struct IRSpecializationState
 };
 
 LinkedIR linkIR(
-    EntryPointRequest*  entryPointRequest,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target,
-    TargetRequest*      targetReq)
+    BackEndCompileRequest*  compileRequest,
+    EntryPoint*             entryPoint,
+    ProgramLayout*          programLayout,
+    CodeGenTarget           target,
+    TargetRequest*          targetReq)
 {
+    auto sink = compileRequest->getSink();
+
     IRSpecializationState stateStorage;
     auto state = &stateStorage;
 
@@ -1223,26 +1216,27 @@ LinkedIR linkIR(
     state->target = target;
     state->targetReq = targetReq;
 
-
-    auto compileRequest = entryPointRequest->compileRequest;
-    auto translationUnit = entryPointRequest->getTranslationUnit();
-    auto originalIRModule = translationUnit->irModule;
+    auto program = compileRequest->getProgram();
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(
         sharedContext,
-        compileRequest->mSession,
+        compileRequest->getSession(),
         nullptr,
-        originalIRModule,
         target);
 
     state->irModule = sharedContext->module;
 
-    // We also need to attach the IR definitions for symbols from
-    // any loaded modules:
-    for (auto loadedModule : compileRequest->loadedModulesList)
+    // We need to be able to look up IR definitions for any symbols in
+    // modules that the program depends on (transitively). To
+    // accelerate lookup, we will create a symbol table for looking
+    // up IR definitions by their mangled name.
+    //
+    auto originalProgramIRModule = program->getOrCreateIRModule(sink);
+    insertGlobalValueSymbols(sharedContext, originalProgramIRModule);
+    for (auto module : program->getModuleDependencies())
     {
-        insertGlobalValueSymbols(sharedContext, loadedModule->irModule);
+        insertGlobalValueSymbols(sharedContext, module->getIRModule());
     }
 
     auto context = state->getContext();
@@ -1257,7 +1251,8 @@ LinkedIR linkIR(
     RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(
         targetReq,
         programLayout,
-        SubstitutionSet(entryPointRequest->globalGenericSubst));
+        SubstitutionSet(program->getGlobalGenericSubstitution()),
+        compileRequest->getSink());
 
     // TODO: we need to register the (IR-level) arguments of the global generic parameters as the
     // substitutions for the generic parameters in the original IR.
@@ -1267,13 +1262,22 @@ LinkedIR linkIR(
 
     state->newProgramLayout = newProgramLayout;
 
-    // Next, we want to optimize lookup for layout infromation
+    // Next, we want to optimize lookup for layout information
     // associated with global declarations, so that we can
     // look things up based on the IR values (using mangled names)
+    //
+    // Note: We are scanning over all the key-value pairs for
+    // entries in the global scope, to account for the fact
+    // that the "same" shader parameter could be declared in
+    // multiple translation units, and thus end up with
+    // multiple mangled names (when the unique translation
+    // unit name gets involved).
+    //
     auto globalStructLayout = getScopeStructLayout(newProgramLayout);
-    for (auto globalVarLayout : globalStructLayout->fields)
+    for(auto entry : globalStructLayout->mapVarToLayout)
     {
-        auto mangledName = getMangledName(globalVarLayout->varDecl);
+        auto mangledName = getMangledName(entry.Key);
+        auto globalVarLayout = entry.Value;
         context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
     }
 
@@ -1290,19 +1294,19 @@ LinkedIR linkIR(
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
     }
 
-    auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPointRequest);
+    auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPoint);
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
     // this step to recursively copy over anything else
     // it might reference.
-    auto irEntryPoint = specializeIRForEntryPoint(context, entryPointRequest, entryPointLayout);
+    auto irEntryPoint = specializeIRForEntryPoint(context, entryPoint, entryPointLayout);
 
     // HACK: right now the bindings for global generic parameters are coming in
     // as part of the original IR module, and we need to make sure these get
     // copied over, even if they aren't referenced.
     //
-    for(auto inst : originalIRModule->getGlobalInsts())
+    for(auto inst : originalProgramIRModule->getGlobalInsts())
     {
         auto bindInst = as<IRBindGlobalGenericParam>(inst);
         if(!bindInst)

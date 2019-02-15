@@ -649,6 +649,14 @@ public:
     RefPtr<VarLayout> globalScopeLayout;
     */
 
+        /// The target and program for which layout was computed
+    TargetProgram* targetProgram;
+
+    TargetProgram* getTargetProgram() { return targetProgram; }
+    TargetRequest* getTargetReq() { return targetProgram->getTargetReq(); }
+    Program* getProgram() { return targetProgram->getProgram(); }
+
+
     // We catalog the requested entry points here,
     // and any entry-point-specific parameter data
     // will (eventually) belong there...
@@ -656,8 +664,6 @@ public:
 
     List<RefPtr<GenericParamLayout>> globalGenericParams;
     Dictionary<String, GenericParamLayout*> globalGenericParamsMap;
-
-    TargetRequest* targetRequest = nullptr;
 };
 
 StructTypeLayout* getGlobalStructLayout(
@@ -804,6 +810,8 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
 };
 
+typedef List<RefPtr<GenericParamLayout>> GenericParamLayouts;
+
 struct TypeLayoutContext
 {
     // The layout rules to use (e.g., we compute
@@ -812,7 +820,12 @@ struct TypeLayoutContext
     LayoutRulesImpl*    rules;
 
     // The target request that is triggering layout
-    TargetRequest*      targetReq;
+    TargetRequest*  targetReq;
+
+    // A parent program layout that will establish the ordering
+    // of all global generic type parameters.
+    //
+    ProgramLayout* programLayout;
 
     // Whether to lay out matrices column-major
     // or row-major.
@@ -840,8 +853,13 @@ struct TypeLayoutContext
 // Get an appropriate set of layout rules (packaged up
 // as a `TypeLayoutContext`) to perform type layout
 // for the given target.
+//
+// The provided `programLayout` is used to establish
+// the ordering of all global generic type paramters.
+//
 TypeLayoutContext getInitialLayoutContextForTarget(
-    TargetRequest* targetReq);
+    TargetRequest*  targetReq,
+    ProgramLayout*  programLayout);
 
 // Get the "simple" layout for a type according to a given set of layout
 // rules. Note that a "simple" layout can only consume one `LayoutResourceKind`,

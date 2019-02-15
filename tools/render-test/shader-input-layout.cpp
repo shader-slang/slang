@@ -10,6 +10,7 @@ namespace renderer_test
     {
         entries.Clear();
         globalTypeArguments.Clear();
+        entryPointTypeArguments.Clear();
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {
@@ -20,6 +21,14 @@ namespace renderer_test
                 try
                 {
                     if (parser.LookAhead("type"))
+                    {
+                        parser.ReadToken();
+                        StringBuilder typeExp;
+                        while (!parser.IsEnd())
+                            typeExp << parser.ReadToken().Content;
+                        entryPointTypeArguments.Add(typeExp);
+                    }
+                    else if (parser.LookAhead("global_type"))
                     {
                         parser.ReadToken();
                         StringBuilder typeExp;

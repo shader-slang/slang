@@ -8,6 +8,7 @@
 
 namespace Slang {
 
+class Program;
 class TargetRequest;
 
 // The parameter-binding interface is responsible for assigning
@@ -24,7 +25,9 @@ class TargetRequest;
 // of the program.
 
 void generateParameterBindings(
-    TargetRequest*     targetReq);
+    Program*        program,
+    TargetRequest*  targetReq,
+    DiagnosticSink* sink);
 
 }
 
