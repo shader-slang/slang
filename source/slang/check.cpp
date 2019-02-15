@@ -9937,7 +9937,7 @@ namespace Slang
                 // function should always be a `DeclRefExpr`
                 //
                 SLANG_UNEXPECTED("reference to generic decl wasn't a `DeclRefExpr`");
-                UNREACHABLE_RETURN(DeclRef<FuncDecl>());
+                UNREACHABLE_RETURN(nullptr);
             }
         }
 
