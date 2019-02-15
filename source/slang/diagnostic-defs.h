@@ -423,6 +423,9 @@ DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'vo
 //
 // 5xxxx - Target code generation.
 //
+
+DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot");
+
 DIAGNOSTIC(50020, Error, invalidTessCoordType,          "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType,          "FragCoord must be a vec4.")
 DIAGNOSTIC(50020, Error, invalidInvocationIdType,       "InvocationId must have int type.")
