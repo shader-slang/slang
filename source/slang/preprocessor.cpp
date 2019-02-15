@@ -1550,7 +1550,7 @@ static void HandleEndIfDirective(PreprocessorDirectiveContext* context)
 // we expect it.
 //
 // Most directives do not need to call this directly, since we have
-// a catch-all case in the main `HandleDirective()` funciton.
+// a catch-all case in the main `HandleDirective()` function.
 // The `#include` case will call it directly to avoid complications
 // when it switches the input stream.
 static void expectEndOfDirective(PreprocessorDirectiveContext* context)

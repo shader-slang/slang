@@ -1229,8 +1229,8 @@ LinkedIR linkIR(
 
     // We need to be able to look up IR definitions for any symbols in
     // modules that the program depends on (transitively). To
-    // accellerate lookup, we will create a symbol table for looking
-    // up IR definitions by their maingled name.
+    // accelerate lookup, we will create a symbol table for looking
+    // up IR definitions by their mangled name.
     //
     auto originalProgramIRModule = program->getOrCreateIRModule(sink);
     insertGlobalValueSymbols(sharedContext, originalProgramIRModule);
@@ -1262,7 +1262,7 @@ LinkedIR linkIR(
 
     state->newProgramLayout = newProgramLayout;
 
-    // Next, we want to optimize lookup for layout infromation
+    // Next, we want to optimize lookup for layout information
     // associated with global declarations, so that we can
     // look things up based on the IR values (using mangled names)
     //

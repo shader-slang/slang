@@ -6145,7 +6145,7 @@ static void lowerFrontEndEntryPointToIR(
     //
     // For now we just have an (implicit) constraint that a given
     // function should only be used as an entry point for one stage,
-    // and any such function should *not* be used as an ordinary funciton.
+    // and any such function should *not* be used as an ordinary function.
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 

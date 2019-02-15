@@ -2103,7 +2103,7 @@ SimpleLayoutInfo GetLayoutImpl(
             //
             // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
             // type layout for the element type which takes the array stride into
-            // acount. If it returns the same type layout that was passed in,
+            // account. If it returns the same type layout that was passed in,
             // then that means no adjustement took place.
             //
             // The `additionalSpacesNeededForAdjustedElementType` variable counts

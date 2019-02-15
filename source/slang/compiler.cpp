@@ -1412,7 +1412,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
     }
 
-    void _generateOutput(
+    static void _generateOutput(
         BackEndCompileRequest* compileRequest,
         EndToEndCompileRequest* endToEndReq)
     {

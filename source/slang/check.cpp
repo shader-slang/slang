@@ -9370,7 +9370,7 @@ namespace Slang
         // the (unique) function declaration that matches its name.
         //
         // TODO: We may eventually want/need to extend this to
-        // acount for nested names like `SomeStruct.vsMain`, or
+        // account for nested names like `SomeStruct.vsMain`, or
         // indeed even to handle generics.
         //
         auto compileRequest = entryPointReq->getCompileRequest();

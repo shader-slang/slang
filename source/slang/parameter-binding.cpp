@@ -395,7 +395,7 @@ struct ParameterBindingContext
     // the resource usage of shader parameters.
     TypeLayoutContext layoutContext;
 
-    // A dictionary to accellerate looking up parameters by name
+    // A dictionary to accelerate looking up parameters by name
     Dictionary<Name*, ParameterInfo*> mapNameToParameterInfo;
 
     // What stage (if any) are we compiling for?
