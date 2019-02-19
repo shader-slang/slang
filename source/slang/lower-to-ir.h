@@ -13,7 +13,6 @@
 
 namespace Slang
 {
-    class CompileRequest;
     class EntryPoint;
     class ProgramLayout;
     class TranslationUnitRequest;

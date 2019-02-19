@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "../core/slang-writer.h"
+#include "ir-bind-existentials.h"
 #include "ir-dce.h"
 #include "ir-entry-point-uniforms.h"
 #include "ir-glsl-legalize.h"
@@ -1671,6 +1672,7 @@ struct EmitVisitor
 
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
+        case LayoutResourceKind::ExistentialSlot:
             // ignore
             break;
         default:
@@ -6730,7 +6732,7 @@ String emitEntryPoint(
         auto irEntryPoint = linkedIR.entryPoint;
 
 #if 0
-        dumpIRIfEnabled(compileRequest, irModule, "CLONED");
+        dumpIRIfEnabled(compileRequest, irModule, "LINKED");
 #endif
 
         validateIRModuleIfEnabled(compileRequest, irModule);
@@ -6739,6 +6741,23 @@ String emitEntryPoint(
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
+
+        // When there are top-level existential-type parameters
+        // to the shader, we need to take the side-band information
+        // on how the existential "slots" were bound to concrete
+        // types, and use it to introduce additional explicit
+        // shader parameters for those slots, to be wired up to
+        // use sites.
+        //
+        bindExistentialSlots(irModule, sink);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS BOUND");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+
+
 
         // Now that we've linked the IR code, any layout/binding
         // information has been attached to shader parameters
@@ -6751,6 +6770,10 @@ String emitEntryPoint(
         // the global scope instead.
         //
         moveEntryPointUniformParamsToGlobalScope(irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // Desguar any union types, since these will be illegal on
         // various targets.
@@ -6787,6 +6810,23 @@ String emitEntryPoint(
         dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+        // Specialization can introduce dead code that could trip
+        // up downstream passes like type legalization, so we
+        // will run a DCE pass to clean up after the specialization.
+        //
+        // TODO: Are there other cleanup optimizations we should
+        // apply at this point?
+        //
+        eliminateDeadCode(compileRequest, irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+
 
         // After we've fully specialized all generics, and
         // "devirtualized" all the calls through interfaces,
@@ -6869,16 +6909,17 @@ String emitEntryPoint(
                 irEntryPoint,
                 compileRequest->getSink(),
                 &sharedContext.extensionUsageTracker);
+
+#if 0
+                dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
+#endif
+                validateIRModuleIfEnabled(compileRequest, irModule);
         }
         break;
 
         default:
             break;
         }
-#if 0
-        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
-#endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // The resource-based specialization pass above
         // may create specialized versions of functions, but

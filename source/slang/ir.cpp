@@ -2723,6 +2723,41 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitBindGlobalExistentialSlots(
+        UInt            argCount,
+        IRInst* const*  args)
+    {
+        auto inst = createInstWithTrailingArgs<IRInst>(
+            this,
+            kIROp_BindGlobalExistentialSlots,
+            getVoidType(),
+            0,
+            nullptr,
+            argCount,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRDecoration* IRBuilder::addBindExistentialSlotsDecoration(
+        IRInst*         value,
+        UInt            argCount,
+        IRInst* const*  args)
+    {
+        auto decoration = createInstWithTrailingArgs<IRDecoration>(
+            this,
+            kIROp_BindExistentialSlotsDecoration,
+            getVoidType(),
+            0,
+            nullptr,
+            argCount,
+            args);
+
+        decoration->insertAtStart(value);
+
+        return decoration;
+    }
+
     IRInst* IRBuilder::emitExtractTaggedUnionTag(
         IRInst* val)
     {

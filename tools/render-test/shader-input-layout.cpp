@@ -9,8 +9,10 @@ namespace renderer_test
     void ShaderInputLayout::Parse(const char * source)
     {
         entries.Clear();
-        globalTypeArguments.Clear();
-        entryPointTypeArguments.Clear();
+        globalGenericTypeArguments.Clear();
+        entryPointGenericTypeArguments.Clear();
+        globalExistentialTypeArguments.Clear();
+        entryPointExistentialTypeArguments.Clear();
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {
@@ -26,7 +28,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointTypeArguments.Add(typeExp);
+                        entryPointGenericTypeArguments.Add(typeExp);
                     }
                     else if (parser.LookAhead("global_type"))
                     {
@@ -34,7 +36,23 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalTypeArguments.Add(typeExp);
+                        globalGenericTypeArguments.Add(typeExp);
+                    }
+                    else if (parser.LookAhead("globalExistentialType"))
+                    {
+                        parser.ReadToken();
+                        StringBuilder typeExp;
+                        while (!parser.IsEnd())
+                            typeExp << parser.ReadToken().Content;
+                        globalExistentialTypeArguments.Add(typeExp);
+                    }
+                    else if (parser.LookAhead("entryPointExistentialType"))
+                    {
+                        parser.ReadToken();
+                        StringBuilder typeExp;
+                        while (!parser.IsEnd())
+                            typeExp << parser.ReadToken().Content;
+                        entryPointExistentialTypeArguments.Add(typeExp);
                     }
                     else
                     {

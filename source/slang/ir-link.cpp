@@ -731,6 +731,23 @@ IRFunc* specializeIRForEntryPoint(
         clonedVal = specializeGeneric(clonedSpec);
     }
 
+    // TODO: If there is an existential-related decoration
+    // on the entry point, we need to transfer it over
+    // to the specialized function.
+    if( auto bindExistentialSlots = originalVal->findDecorationImpl(kIROp_BindExistentialSlotsDecoration) )
+    {
+        if( !clonedVal->findDecorationImpl(kIROp_BindExistentialSlotsDecoration) )
+        {
+            IRBuilder builderStorage = *context->builder;
+            IRBuilder* builder = &builderStorage;
+            builder->setInsertInto(clonedVal);
+
+            auto clonedBind = cloneInst(context, builder, bindExistentialSlots);
+            clonedBind->moveToStart();
+        }
+    }
+
+
     auto clonedFunc = as<IRFunc>(clonedVal);
     if(!clonedFunc)
     {
@@ -1313,6 +1330,14 @@ LinkedIR linkIR(
             continue;
 
         cloneValue(context, bindInst);
+    }
+
+    for(auto inst : originalProgramIRModule->getGlobalInsts())
+    {
+        if(inst->op != kIROp_BindGlobalExistentialSlots)
+            continue;
+
+        cloneValue(context, inst);
     }
 
     // HACK: we need to ensure that any tagged union types

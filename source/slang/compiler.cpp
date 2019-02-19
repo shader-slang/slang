@@ -226,6 +226,10 @@ namespace Slang
                 }
             }
         }
+
+        // Collect any existential-type parameters used by the entry point
+        //
+        _collectExistentialParams();
     }
 
     Module* EntryPoint::getModule()

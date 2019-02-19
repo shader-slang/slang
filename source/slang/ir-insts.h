@@ -1081,6 +1081,15 @@ struct IRBuilder
         IRInst* param,
         IRInst* val);
 
+    IRInst* emitBindGlobalExistentialSlots(
+        UInt            argCount,
+        IRInst* const*  args);
+
+    IRDecoration* addBindExistentialSlotsDecoration(
+        IRInst*         value,
+        UInt            argCount,
+        IRInst* const*  args);
+
     IRInst* emitExtractTaggedUnionTag(
         IRInst* val);
 
