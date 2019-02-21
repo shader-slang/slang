@@ -1672,7 +1672,8 @@ struct EmitVisitor
 
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
-        case LayoutResourceKind::ExistentialSlot:
+        case LayoutResourceKind::ExistentialTypeParam:
+        case LayoutResourceKind::ExistentialObjectParam:
             // ignore
             break;
         default:
@@ -6641,9 +6642,28 @@ StructTypeLayout* getGlobalStructLayout(
     return getScopeStructLayout(programLayout);
 }
 
-void legalizeTypes(
-    TypeLegalizationContext*    context,
-    IRModule*                   module);
+static void dumpIR(
+    BackEndCompileRequest* compileRequest,
+    IRModule*       irModule,
+    char const*     label)
+{
+    DiagnosticSinkWriter writerImpl(compileRequest->getSink());
+    WriterHelper writer(&writerImpl);
+
+    if(label)
+    {
+        writer.put("### ");
+        writer.put(label);
+        writer.put(":\n");
+    }
+
+    dumpIR(irModule, writer.getWriter());
+
+    if( label )
+    {
+        writer.put("###\n");
+    }
+}
 
 static void dumpIRIfEnabled(
     BackEndCompileRequest* compileRequest,
@@ -6652,22 +6672,7 @@ static void dumpIRIfEnabled(
 {
     if(compileRequest->shouldDumpIR)
     {
-        DiagnosticSinkWriter writerImpl(compileRequest->getSink());
-        WriterHelper writer(&writerImpl);
-
-        if(label)
-        {
-            writer.put("### ");
-            writer.put(label);
-            writer.put(":\n");
-        }
-
-        dumpIR(irModule, writer.getWriter());
-
-        if( label )
-        {
-            writer.put("###\n");
-        }
+        dumpIR(compileRequest, irModule, label);
     }
 }
 
@@ -6825,30 +6830,54 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
-
-
-
-        // After we've fully specialized all generics, and
-        // "devirtualized" all the calls through interfaces,
-        // we need to ensure that the code only uses types
-        // that are legal on the chosen target.
+        // The Slang language allows interfaces to be used like
+        // ordinary types (including placing them in constant
+        // buffers and entry-point parameter lists), but then
+        // getting them to lay out in a reasonable way requires
+        // us to treat fields/variables with interface type
+        // *as if* they were pointers to heap-allocated "objects."
         //
-        {
-            // TODO: The presence of `TypeLegalizationContext`
-            // in the public API of the `legalizeTypes` function
-            // is a throwback to when there was AST-level
-            // type legalization and all the complications it
-            // created. The pass should be refactored to not
-            // expose these details.
-            //
-            TypeLegalizationContext typeLegalizationContext;
-            initialize(&typeLegalizationContext,
-                session,
-                irModule);
-            legalizeTypes(
-                &typeLegalizationContext,
-                irModule);
-        }
+        // Specialization will have replaced fields/variables
+        // with interface types like `IFoo` with fields/variables
+        // with pointer-like types like `ExistentialBox<SomeType>`.
+        //
+        // We need to legalize these pointer-like types away,
+        // which involves two main changes:
+        //
+        //  1. Any `ExistentialBox<...>` fields need to be moved
+        //  out of their enclosing `struct` type, so that the layout
+        //  of the enclosing type is computed as if the field had
+        //  zero size.
+        //
+        //  2. Once an `ExistentialBox<X>` has been floated out
+        //  of its parent and landed somwhere permanent (e.g., either
+        //  a dedicated variable, or a field of constant buffer),
+        //  we need to replace it with just an `X`, after which we
+        //  will have (more) legal shader code.
+        //
+        legalizeExistentialTypeLayout(
+            irModule,
+            sink);
+
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // Many of our target languages and/or downstream compilers
+        // don't support `struct` types that have resource-type fields.
+        // In order to work around this limitation, we will rewrite the
+        // IR so that any structure types with resource-type fields get
+        // split into a "tuple" that comprises the ordinary fields (still
+        // bundles up as a `struct`) and one element for each resource-type
+        // field (recursively).
+        //
+        // What used to be individual variables/parameters/arguments/etc.
+        // then become multiple variables/parameters/arguments/etc.
+        //
+        legalizeResourceTypes(
+            irModule,
+            sink);
 
         //  Debugging output of legalization
 #if 0

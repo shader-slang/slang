@@ -198,7 +198,7 @@ struct BindExistentialSlots
         // We only care about parameters that are associated
         // with one or more existential slots.
         //
-        auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::ExistentialSlot);
+        auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam);
         if(!resInfo)
             return;
 
@@ -208,7 +208,7 @@ struct BindExistentialSlots
         //
         UInt firstSlot = resInfo->index;
         UInt slotCount = 0;
-        if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialSlot))
+        if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
             slotCount = UInt(typeResInfo->count.getFiniteValue());
 
         // At this point we know that the parameter consumes
@@ -266,12 +266,9 @@ struct BindExistentialSlots
 
         // We are going to alter the type of the
         // given `inst` based on information in
-        // the `slotArgs`, but the exact kind
-        // of modification will depend on the
-        // original type of `inst`.
+        // the `slotArgs`.
 
         auto fullType = inst->getFullType();
-        auto type = inst->getDataType();
 
         SharedIRBuilder sharedBuilder;
         sharedBuilder.session = module->getSession();
@@ -280,81 +277,64 @@ struct BindExistentialSlots
         IRBuilder builder;
         builder.sharedBuilder = &sharedBuilder;
 
-        // The easy case is when the `type` of `inst`
-        // is directly an interface type.
+        // Every argument that is filling an existential
+        // type param/slot comprises both a type and
+        // a witness table, so the total number of operands
+        // is twice the number of slots we are filling.
         //
-        if( auto interfaceType = as<IRInterfaceType>(type) )
+        UInt slotOperandCount = slotCount*2;
+        List<IRInst*> slotOperands;
+        for(UInt ii = 0; ii < slotOperandCount; ++ii)
+            slotOperands.Add(slotArgs[ii].get());
+
+        // We are going to create a proxy type that represents
+        // the results of plugging all the information
+        // from the existential slots into the original type.
+        //
+        auto newType = builder.getBindExistentialsType(
+            fullType,
+            slotOperandCount,
+            slotOperands.Buffer());
+
+        // We will replace the type of the original parameter
+        // with the new proxy type.
+        //
+        builder.setDataType(inst, newType);
+
+        // Next we want to replace all uses of `inst` (which
+        // expect a value of its old type) with a fresh
+        // `wrapExistential(...)` instruction that refers to
+        // `inst` with its new type.
+        //
+        // Note: we make a copy of the list of uses for `inst`
+        // before going through and replacing them, because
+        // during the replacement we make *more* uses of `inst`,
+        // as an operand to the `makeExistential` instructions.
+        // We only want to replace the old uses, and not the
+        // new ones we'll be making.
+        //
+        List<IRUse*> usesToReplace;
+        for(auto use = inst->firstUse; use; use = use->nextUse )
+            usesToReplace.Add(use);
+
+        // Now we can loop over our list of uses and replace each.
+        //
+        for(auto use : usesToReplace)
         {
-            // An intereface-type parameter will use a
-            // single slot, which consits of a pair of
-            // operands.
+            // First we emit a `makeExisential` right before the
+            // use site.
             //
-            // The first operand is the concrete type
-            // we want to plug in.
-            //
-            auto newType = (IRType*) slotArgs[0].get();
+            builder.setInsertBefore(use->getUser());
+            auto newVal = builder.emitWrapExistential(
+                fullType,
+                inst,
+                slotOperandCount,
+                slotOperands.Buffer());
 
-            // The second operand is a witness that
-            // the concrete type conforms to the interface
-            // used for the original parameter.
+            // Second we make the use site point at the new
+            // value instead.
             //
-            auto newWitnessTable = slotArgs[1].get();
-
-            // We are going to replace the (interface) type of
-            // the parameter with the new (concrete) type.
-            //
-            builder.setDataType(inst, newType);
-
-            // Next we want to replace all uses of `inst` (which
-            // expect a value of its old type) with a fresh
-            // `makeExistential(...)` instruction that refers to
-            // `inst` with its new type.
-            //
-            // Note: we make a copy of the list of uses for `inst`
-            // before going through and replacing them, because
-            // during the replacement we make *more* uses of `inst`,
-            // as an operand to the `makeExistential` instructions.
-            // We only want to replace the old uses, and not the
-            // new ones we'll be making.
-            //
-            List<IRUse*> usesToReplace;
-            for(auto use = inst->firstUse; use; use = use->nextUse )
-                usesToReplace.Add(use);
-
-            // Now we can loop over our list of uses and replace each.
-            //
-            for(auto use : usesToReplace)
-            {
-                // First we emit a `makeExisential` right before the
-                // use site.
-                //
-                builder.setInsertBefore(use->getUser());
-                auto newVal = builder.emitMakeExistential(
-                    fullType,
-                    inst,
-                    newWitnessTable);
-
-                // Second we make the use site point at the new
-                // value instead.
-                //
-                use->set(newVal);
-            }
-        }
-        else
-        {
-            // TODO: We eventually need to handle cases where there
-            // are:
-            //
-            // * Arrays over existential types; e.g.: `IFoo[3]`
-            //
-            // * Structs with existential-type fields.
-            //
-            // * Constant buffers or other "containers" over existentials; e.g., `ConstantBuffer<IFoo>`
-            //
-            // * Nested combinations of the above; e.g., a `ConstantBuffer`
-            //   of a struct with a field that is an array of `IFoo`.
-            //
-            SLANG_UNIMPLEMENTED_X("shader parameters with nested existentials");
+            use->set(newVal);
         }
     }
 };
