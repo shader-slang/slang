@@ -328,6 +328,24 @@ public:
     // the space storing it in the above array
     UInt uniformAlignment = 1;
 
+        /// An item that is conceptually owned by this type, but is pending layout.
+        ///
+        /// When a type contains interface/existential fields (recursively), the
+        /// actual data referenced by these fields needs to get allocated somewhere,
+        /// but it cannot go inline at the point where the interface/existential
+        /// type appears, or else 
+        ///
+    struct PendingItem
+    {
+        RefPtr<TypeLayout> typeLayout;
+
+        RefPtr<TypeLayout> getTypeLayout() const { return typeLayout; }
+        RefPtr<Type> getType() const { return typeLayout->type; }
+    };
+
+        /// The pending items owned by this type, but which are pending layout.
+    List<PendingItem> pendingItems;
+
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
         for(auto& rr : resourceInfos)
@@ -854,6 +872,12 @@ struct TypeLayoutContext
     // or row-major.
     MatrixLayoutMode    matrixLayoutMode;
 
+    // The concrete types (if any) to plug into the currently in-scope
+    // existential type slots.
+    //
+    Int                             existentialTypeArgCount = 0;
+    ExistentialSlots::Arg const*    existentialTypeArgs = nullptr;
+
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
 
@@ -869,6 +893,34 @@ struct TypeLayoutContext
         TypeLayoutContext result = *this;
         result.matrixLayoutMode = inMatrixLayoutMode;
         return result;
+    }
+
+    TypeLayoutContext withExistentialTypeArgs(
+        Int                             argCount,
+        ExistentialSlots::Arg const*    args) const
+    {
+        TypeLayoutContext result = *this;
+        result.existentialTypeArgCount  = argCount;
+        result.existentialTypeArgs      = args;
+        return result;
+    }
+
+    TypeLayoutContext withExistentialTypeSlotsOffsetBy(
+        Int offset) const
+    {
+        TypeLayoutContext result = *this;
+        if( existentialTypeArgCount > offset )
+        {
+            result.existentialTypeArgCount  = existentialTypeArgCount - offset;
+            result.existentialTypeArgs      = existentialTypeArgs + offset;
+        }
+        else
+        {
+            result.existentialTypeArgCount  = 0;
+            result.existentialTypeArgs      = nullptr;
+        }
+        return result;
+
     }
 };
 
@@ -907,14 +959,6 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type);
-
-// Create a full type layout for a type, while applying the given "simple"
-// layout information as an offset to any `VarLayout`s created along
-// the way.
-RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type,
-    SimpleLayoutInfo            offset);
 
 //
 

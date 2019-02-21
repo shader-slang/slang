@@ -198,7 +198,7 @@ struct BindExistentialSlots
         // We only care about parameters that are associated
         // with one or more existential slots.
         //
-        auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::ExistentialSlot);
+        auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeSlot);
         if(!resInfo)
             return;
 
@@ -208,7 +208,7 @@ struct BindExistentialSlots
         //
         UInt firstSlot = resInfo->index;
         UInt slotCount = 0;
-        if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialSlot))
+        if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialTypeSlot))
             slotCount = UInt(typeResInfo->count.getFiniteValue());
 
         // At this point we know that the parameter consumes
@@ -342,19 +342,60 @@ struct BindExistentialSlots
         }
         else
         {
-            // TODO: We eventually need to handle cases where there
-            // are:
+            UInt slotOperandCount = slotCount*2;
+            List<IRInst*> slotOperands;
+            for(UInt ii = 0; ii < slotOperandCount; ++ii)
+                slotOperands.Add(slotArgs[ii].get());
+
+            // We are going to create a proxy type that represents
+            // the results of plugging all the information
+            // from the existential slots into the original type.
             //
-            // * Arrays over existential types; e.g.: `IFoo[3]`
+            auto newType = builder.getBindExistentialsType(
+                fullType,
+                slotOperandCount,
+                slotOperands.Buffer());
+
+            // We will replace the type of the original parameter
+            // with the new proxy type.
             //
-            // * Structs with existential-type fields.
+            builder.setDataType(inst, newType);
+
+            // Next we want to replace all uses of `inst` (which
+            // expect a value of its old type) with a fresh
+            // `wrapExistential(...)` instruction that refers to
+            // `inst` with its new type.
             //
-            // * Constant buffers or other "containers" over existentials; e.g., `ConstantBuffer<IFoo>`
+            // Note: we make a copy of the list of uses for `inst`
+            // before going through and replacing them, because
+            // during the replacement we make *more* uses of `inst`,
+            // as an operand to the `makeExistential` instructions.
+            // We only want to replace the old uses, and not the
+            // new ones we'll be making.
             //
-            // * Nested combinations of the above; e.g., a `ConstantBuffer`
-            //   of a struct with a field that is an array of `IFoo`.
+            List<IRUse*> usesToReplace;
+            for(auto use = inst->firstUse; use; use = use->nextUse )
+                usesToReplace.Add(use);
+
+            // Now we can loop over our list of uses and replace each.
             //
-            SLANG_UNIMPLEMENTED_X("shader parameters with nested existentials");
+            for(auto use : usesToReplace)
+            {
+                // First we emit a `makeExisential` right before the
+                // use site.
+                //
+                builder.setInsertBefore(use->getUser());
+                auto newVal = builder.emitWrapExistential(
+                    fullType,
+                    inst,
+                    slotOperandCount,
+                    slotOperands.Buffer());
+
+                // Second we make the use site point at the new
+                // value instead.
+                //
+                use->set(newVal);
+            }
         }
     }
 };

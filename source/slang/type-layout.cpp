@@ -973,10 +973,6 @@ static SimpleLayoutInfo getParameterGroupLayoutInfo(
     }
 }
 
-RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type);
-
 static bool isOpenGLTarget(TargetRequest*)
 {
     // We aren't officially supporting OpenGL right now
@@ -1184,12 +1180,62 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     return newTypeLayout;
 }
 
+static RefPtr<TypeLayout> flushPendingItems(
+    TypeLayoutContext const&    context,
+    RefPtr<TypeLayout>          layout)
+{
+    if(layout->pendingItems.Count() == 0)
+        return layout;
+
+    // Okay, we need to compute a new type layout that reflects
+    // the resource usage of the provided `layout`, plus
+    // any resource usage for the pending items.
+    //
+    // TODO: To be correct we should construct a new `TypeLayout`
+    // of the same class, but that would take more work, so
+    // we'll re-use the one we already have... kind of gross...
+    //
+    for( auto pendingItem : layout->pendingItems )
+    {
+        auto itemType = pendingItem.getType();
+        auto itemTypeLayout = createTypeLayout(context, itemType);
+
+        // Okay, lets add its resource usage in!
+        //
+        // TODO: need to handle unifform data correctly here
+
+        // TODO: we need to write something back to the item,
+        // which should have a `VarLayout` or something like
+        // that attached to it!
+
+        for( auto resInfo : itemTypeLayout->resourceInfos )
+        {
+            layout->addResourceUsage(resInfo);
+        }
+    }
+    layout->pendingItems.Clear();
+
+    return layout;
+}
+
 static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          rawElementTypeLayout)
 {
+    // If there are any "pending" items that need to be laid out in
+    // the element type of the parameter group, then we want to flush
+    // them here.
+    //
+    // TODO: We might need to make this only flush *parts* of the pending
+    // items, based on what the parameter group can absorb, and leave
+    // other parts still pending in the type layout we return...
+    //
+    rawElementTypeLayout = flushPendingItems(
+        context.with(context.getRulesFamily()->getConstantBufferRules()),
+        rawElementTypeLayout);
+
     auto parameterGroupRules = context.rules;
 
     RefPtr<ParameterGroupTypeLayout> typeLayout = new ParameterGroupTypeLayout();
@@ -1333,7 +1379,7 @@ static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     {
         // A parameter block type that gets its own register space will only
         // include resource usage from the element type when it itself consumes
-        // while register spaces.
+        // whole register spaces.
         if (auto elementResInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
         {
             typeLayout->addResourceUsage(*elementResInfo);
@@ -1378,14 +1424,29 @@ static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     return typeLayout;
 }
 
+static bool usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)
+{
+    auto resInfo = typeLayout->FindResourceInfo(kind);
+    return resInfo && resInfo->count != 0;
+}
+
+static bool usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
+{
+    return usesResourceKind(typeLayout, LayoutResourceKind::Uniform);
+}
+
     /// Doe we need to wrap the given element type in a constant buffer layout?
 static bool needsConstantBuffer(RefPtr<TypeLayout> elementTypeLayout)
 {
-    auto uniformResInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-    if(uniformResInfo && uniformResInfo->count != 0)
+    if(usesOrdinaryData(elementTypeLayout))
         return true;
 
-    // Note: additional cases are expected here, to deal with existential types.
+
+    for( auto pendingItem : elementTypeLayout->pendingItems )
+    {
+        if(usesOrdinaryData(pendingItem.getTypeLayout()))
+            return true;
+    }
 
     return false;
 }
@@ -2302,8 +2363,32 @@ static TypeLayoutResult _createTypeLayout(
 
             for (auto field : GetFields(structDeclRef))
             {
+                // Static fields shouldn't take part in layout.
+                if(field.getDecl()->HasModifier<HLSLStaticModifier>())
+                    continue;
+
+                // The fields of a `struct` type may include existential (interface)
+                // types (including as nested sub-fields), and any types present
+                // in those fields will need to be specialized based on the
+                // input arguments being passed to `_createTypeLayout`.
+                //
+                // We won't know how many type slots each field consumes until
+                // we process it, but we can figure out the starting index for
+                // the slots its will consume by looking at the layout we've
+                // computed so far.
+                //
+                Int baseExistentialSlotIndex = 0;
+                if(auto resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeSlot))
+                    baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+                //
+                // When computing the layout for the field, we will give it access
+                // to all the incoming specialized type slots that haven't already
+                // been consumed/claimed by preceding fields.
+                //
+                auto fieldLayoutContext = context.withExistentialTypeSlotsOffsetBy(baseExistentialSlotIndex);
+
                 TypeLayoutResult fieldResult = _createTypeLayout(
-                    context,
+                    fieldLayoutContext,
                     GetType(field).Ptr(),
                     field.getDecl());
                 RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
@@ -2384,6 +2469,19 @@ static TypeLayoutResult _createTypeLayout(
                         structTypeResourceInfo->count += fieldTypeResourceInfo.count;
                     }
                 }
+
+                // Fields of a structure type may have existential/interface type,
+                // or nested existential/interface-type fields. When doing layout
+                // for a specialized program, these will show up as "pending" types
+                // that need to be laid out at the end of the surrounding block/container.
+                //
+                // Any pending types on fields of a structure become pending types
+                // on the structure itself.
+                //
+                for( auto pendingItem : fieldTypeLayout->pendingItems )
+                {
+                    typeLayout->pendingItems.Add(pendingItem);
+                }
             }
 
             rules->EndStructLayout(&info);
@@ -2446,10 +2544,35 @@ static TypeLayoutResult _createTypeLayout(
             // represents the indirections needed to reference the
             // data to be referenced by this field.
             //
-            return createSimpleTypeLayout(
-                SimpleLayoutInfo(LayoutResourceKind::ExistentialSlot, 1),
-                type,
-                rules);
+
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+
+            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeSlot, 1);
+            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialValueSlot, 1);
+
+            // If there are any concrete types available, the first one will be
+            // the value that should be plugged into the slot we just introduced.
+            //
+            if( context.existentialTypeArgCount )
+            {
+                RefPtr<Type> concreteType = context.existentialTypeArgs[0].type;
+
+                RefPtr<TypeLayout> concreteTypeLayout = createTypeLayout(context, concreteType);
+
+                // Layout for this specialized interface type then results
+                // in a type layout that tracks both the resource usage of the
+                // interface type itself (just the type + value slots introduced
+                // above), plus a "pending" type that represents the value
+                // conceptually pointed to by the interface-type field/variable at runtime.
+                //
+                TypeLayout::PendingItem pendingItem;
+                pendingItem.typeLayout = concreteTypeLayout;
+                typeLayout->pendingItems.Add(pendingItem);
+            }
+
+            return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
         }
     }
     else if (auto errorType = as<ErrorType>(type))
@@ -2487,6 +2610,11 @@ static TypeLayoutResult _createTypeLayout(
         //
         for( auto caseType : taggedUnionType->caseTypes )
         {
+            // Note: A tagged union type is not expected to have any existential/interface type
+            // slots; the case types that are provided must be fully specialized before the union is
+            // formed. Thus we don't need to mess around with existential type slots here the
+            // way we do for the `struct` case.
+
             auto caseTypeResult = _createTypeLayout(context, caseType);
             RefPtr<TypeLayout> caseTypeLayout = caseTypeResult.layout;
             UniformLayoutInfo caseTypeInfo = caseTypeResult.info.getUniformLayout();
@@ -2705,7 +2833,10 @@ RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
-    return _createTypeLayout(context, type).layout;
+    TypeLayoutResult result = _createTypeLayout(
+        context,
+        type);
+    return result.layout;
 }
 
 RefPtr<TypeLayout> TypeLayout::unwrapArray()

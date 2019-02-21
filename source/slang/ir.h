@@ -1007,6 +1007,16 @@ struct IRTaggedUnionType : IRType
     IR_LEAF_ISA(TaggedUnionType)
 };
 
+struct IRBindExistentialsType : IRType
+{
+    IR_LEAF_ISA(BindExistentialsType)
+
+    IRType* getBaseType() { return (IRType*) getOperand(0); }
+    UInt getExistentialArgCount() { return getOperandCount() - 1; }
+    IRUse* getExistentialArgs() { return getOperands() + 1; }
+    IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
+};
+
 /// @brief A global value that potentially holds executable code.
 ///
 struct IRGlobalValueWithCode : IRInst

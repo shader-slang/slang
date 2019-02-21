@@ -42,6 +42,7 @@ INST(Nop, nop, 0, 0)
     INST(MatrixType, Mat, 3, 0)
 
     INST(TaggedUnionType, TaggedUnion, 0, 0)
+    INST(BindExistentialsType, BindExistentials, 1, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, 0)
@@ -410,6 +411,7 @@ INST_RANGE(Decoration, HighLevelDeclDecoration, ExportDecoration)
 
 
 INST(MakeExistential,                   makeExistential,                2, 0)
+INST(WrapExistential,                   wrapExistential,                2, 0)
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, 0)
 INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, 0)

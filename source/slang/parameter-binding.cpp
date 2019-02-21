@@ -1862,6 +1862,11 @@ struct ScopeLayoutBuilder
         {
             m_structLayout->mapVarToLayout.Add(firstVarLayout->varDecl.getDecl(), firstVarLayout);
         }
+
+        for( auto pendingItem : firstVarLayout->typeLayout->pendingItems )
+        {
+            m_structLayout->pendingItems.Add(pendingItem);
+        }
     }
 
     void addParameter(
@@ -2000,6 +2005,13 @@ static void collectEntryPointParameters(
     for( auto& shaderParamInfo : entryPoint->getShaderParams() )
     {
         auto paramDeclRef = shaderParamInfo.paramDeclRef;
+
+        context->layoutContext= context->layoutContext
+            .withExistentialTypeArgs(
+                entryPoint->getExistentialTypeArgCount(),
+                entryPoint->getExistentialTypeArgs())
+            .withExistentialTypeSlotsOffsetBy(
+                shaderParamInfo.firstExistentialTypeSlot);
 
         // Any error messages we emit during the process should
         // refer to the location of this parameter.
@@ -2142,8 +2154,16 @@ static void collectParameters(
     // we will be able to look up the index of a global generic type parameter
     // when we see it referenced in the type of one of the shader parameters.
 
+
     for(auto& globalParamInfo : program->getShaderParams() )
     {
+        context->layoutContext= context->layoutContext
+            .withExistentialTypeArgs(
+                program->getExistentialTypeArgCount(),
+                program->getExistentialTypeArgs())
+            .withExistentialTypeSlotsOffsetBy(
+                globalParamInfo.firstExistentialTypeSlot);
+
         collectGlobalScopeParameter(context, globalParamInfo, globalGenericSubst);
     }
 
@@ -2151,6 +2171,7 @@ static void collectParameters(
     for(auto entryPoint : program->getEntryPoints())
     {
         context->stage = entryPoint->getStage();
+
         collectEntryPointParameters(context, entryPoint, globalGenericSubst);
     }
     context->entryPointLayout = nullptr;

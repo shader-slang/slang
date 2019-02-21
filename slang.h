@@ -1303,7 +1303,7 @@ extern "C"
     that has an interface or array-of-interface type introduces an existential
     slot. The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
-    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_SLOT`.
 
     In order to generate specialized code, a concrete type needs to be specified
     for each existential slot. This function specifies the name of the type
@@ -1321,7 +1321,7 @@ extern "C"
     that has an interface or array-of-interface type introduces an existential
     slot. The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
-    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_SLOT`.
 
     In order to generate specialized code, a concrete type needs to be specified
     for each existential slot. This function specifies the name of the type
@@ -1558,7 +1558,8 @@ extern "C"
         // one existential slot, into which a concrete type must be plugged
         // to enable specialized code generation.
         //
-        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_SLOT,
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_VALUE_SLOT,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -1939,7 +1940,8 @@ namespace slang
 
         ShaderRecord = SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
 
-        ExistentialSlot = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
+        ExistentialTypeSlot = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_SLOT,
+        ExistentialValueSlot = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_VALUE_SLOT,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

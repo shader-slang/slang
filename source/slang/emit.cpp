@@ -1672,7 +1672,8 @@ struct EmitVisitor
 
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
-        case LayoutResourceKind::ExistentialSlot:
+        case LayoutResourceKind::ExistentialTypeSlot:
+        case LayoutResourceKind::ExistentialValueSlot:
             // ignore
             break;
         default:

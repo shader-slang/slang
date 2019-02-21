@@ -9331,16 +9331,24 @@ namespace Slang
         /// Recursively walk `paramDeclRef` and add any required existential slots to `ioSlots`.
     static void _collectExistentialSlotsRec(
         ExistentialSlots&       ioSlots,
-        DeclRef<VarDeclBase>    paramDeclRef)
-    {
-        auto type = GetType(paramDeclRef);
+        DeclRef<VarDeclBase>    paramDeclRef);
 
+    static void _collectExistentialParamsRec(
+        ExistentialSlots&   ioSlots,
+        Type*               type)
+    {
         // Whether or not something is an array does not affect
         // the number of existential slots it introduces.
         //
         while( auto arrayType = as<ArrayExpressionType>(type) )
         {
             type = arrayType->baseType;
+        }
+
+        if( auto parameterGroupType = as<ParameterGroupType>(type) )
+        {
+            _collectExistentialParamsRec(ioSlots, parameterGroupType->getElementType());
+            return;
         }
 
         if( auto declRefType = as<DeclRefType>(type) )
@@ -9371,6 +9379,14 @@ namespace Slang
         // buffers and parameter blocks that may have existential
         // element types.
     }
+
+    static void _collectExistentialSlotsRec(
+        ExistentialSlots&       ioSlots,
+        DeclRef<VarDeclBase>    paramDeclRef)
+    {
+        _collectExistentialParamsRec(ioSlots, GetType(paramDeclRef));
+    }
+
 
         /// Add information about a shader parameter to `ioParams` and `ioSlots`
     static void _collectExistentialSlotsForShaderParam(

@@ -630,6 +630,18 @@ struct IRMakeExistential : IRInst
     IR_LEAF_ISA(MakeExistential)
 };
 
+    /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
+struct IRWrapExistential : IRInst
+{
+    IRInst* getWrappedValue() { return getOperand(0); }
+
+    UInt getSlotOperandCount() { return getOperandCount() - 1; }
+    IRInst* getSlotOperand(UInt index) { return getOperand(index + 1); }
+    IRUse* getSlotOperands() { return getOperands() + 1; }
+
+    IR_LEAF_ISA(WrapExistential)
+};
+
 
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
@@ -779,6 +791,16 @@ struct IRBuilder
         return getTaggedUnionType(caseTypes.Count(), caseTypes.Buffer());
     }
 
+    IRType* getBindExistentialsType(
+        IRInst*         baseType,
+        UInt            slotArgCount,
+        IRInst* const*  slotArgs);
+
+    IRType* getBindExistentialsType(
+        IRInst*         baseType,
+        UInt            slotArgCount,
+        IRUse const*    slotArgs);
+
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
@@ -877,6 +899,12 @@ struct IRBuilder
         IRInst* value,
         IRInst* witnessTable);
 
+    IRInst* emitWrapExistential(
+        IRType*         type,
+        IRInst*         value,
+        UInt            slotArgCount,
+        IRInst* const*  slotArgs);
+
     IRUndefined* emitUndefined(IRType* type);
 
 
@@ -955,6 +983,10 @@ struct IRBuilder
 
     IRVar* emitVar(
         IRType* type);
+
+    IRInst* emitLoad(
+        IRType* type,
+        IRInst* ptr);
 
     IRInst* emitLoad(
         IRInst*    ptr);

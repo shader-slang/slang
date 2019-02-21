@@ -426,6 +426,14 @@ struct SpecializationContext
         case kIROp_ExtractExistentialWitnessTable:
             maybeSpecializeExtractExistentialWitnessTable(inst);
             break;
+
+        case kIROp_Load:
+            maybeSpecializeLoad(as<IRLoad>(inst));
+            break;
+
+        case kIROp_BindExistentialsType:
+            maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
+            break;
         }
     }
 
@@ -1142,6 +1150,145 @@ struct SpecializationContext
 
             inst->replaceUsesWith(valType);
             inst->removeAndDeallocate();
+        }
+    }
+
+    IRType* tryGetPointedToType(
+        IRBuilder*  builder,
+        IRType*     type)
+    {
+        if( auto ptrType = as<IRPtrTypeBase>(type) )
+        {
+            return ptrType->getValueType();
+        }
+        else if( auto ptrLikeType = as<IRPointerLikeType>(type) )
+        {
+            return ptrLikeType->getElementType();
+        }
+        else if( auto bindExistentials = as<IRBindExistentialsType>(type) )
+        {
+            auto baseType = bindExistentials->getBaseType();
+            if( auto baseElementType = tryGetPointedToType(builder, baseType) )
+            {
+                UInt existentialArgCount = bindExistentials->getExistentialArgCount();
+                List<IRInst*> existentialArgs;
+                for( UInt ii = 0; ii < existentialArgCount; ++ii )
+                {
+                    existentialArgs.Add(bindExistentials->getExistentialArg(ii));
+                }
+                return builder->getBindExistentialsType(
+                    baseElementType,
+                    existentialArgCount,
+                    existentialArgs.Buffer());
+            }
+        }
+
+        return nullptr;
+    }
+
+    void maybeSpecializeLoad(IRLoad* inst)
+    {
+        auto ptrArg = inst->ptr.get();
+
+        if( auto wrapInst = as<IRWrapExistential>(ptrArg) )
+        {
+            // We have an instruction of the form `load(wrapExistential(val, ...))`
+            //
+            auto val = wrapInst->getWrappedValue();
+
+            // We know what type we are expected to
+            // produce (which should be the pointed-to
+            // type for whatever the type of the
+            // `wrapExistential` is).
+            //
+            auto resultType = inst->getFullType();
+
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+
+            // We'd *like* to replace this instruction with
+            // `wrapExistential(load(val))` instead, since that
+            // will enable subsequent specializations.
+            //
+            // To do that, we need to be able to determine
+            // the type that `load(val)` should return.
+            //
+            auto elementType = tryGetPointedToType(&builder, val->getDataType());
+            if(!elementType)
+                return;
+
+
+            List<IRInst*> slotOperands;
+            UInt slotOperandCount = wrapInst->getSlotOperandCount();
+            for( UInt ii = 0; ii < slotOperandCount; ++ii )
+            {
+                slotOperands.Add(wrapInst->getSlotOperand(ii));
+            }
+
+            auto newLoadInst = builder.emitLoad(elementType, val);
+            auto newWrapExistentialInst = builder.emitWrapExistential(
+                resultType,
+                newLoadInst,
+                slotOperandCount,
+                slotOperands.Buffer());
+
+            addUsersToWorkList(inst);
+
+            inst->replaceUsesWith(newWrapExistentialInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
+    void maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
+    {
+        auto baseType = type->getBaseType();
+        UInt slotOperandCount = type->getExistentialArgCount();
+
+        IRBuilder builder;
+        builder.sharedBuilder = &sharedBuilderStorage;
+        builder.setInsertBefore(type);
+
+        if( auto baseInterfaceType = as<IRInterfaceType>(baseType) )
+        {
+            // A `BindExistentials<ISomeInterface, ConcreteType, ...>` can
+            // just be simplified to `ConcreteType`.
+
+            // We always expect two slot operands, for the concrete type
+            // and the witness table.
+            //
+            SLANG_ASSERT(slotOperandCount == 2);
+            if(slotOperandCount <= 1) return;
+
+
+            auto newVal = type->getExistentialArg(0);
+
+            addUsersToWorkList(type);
+            type->replaceUsesWith(newVal);
+            type->removeAndDeallocate();
+            return;
+        }
+        else if( auto basePtrLikeType = as<IRPointerLikeType>(baseType) )
+        {
+            // A `BindExistentials<P<T>, ...>` can be simplified to
+            // `P<BindExistentials<T, ...>>` when `P` is a pointer-like
+            // type constructor.
+            //
+            auto baseElementType = basePtrLikeType->getElementType();
+            IRInst* wrappedElementType = builder.getBindExistentialsType(
+                baseElementType,
+                slotOperandCount,
+                type->getExistentialArgs());
+
+            auto newPtrLikeType = builder.getType(
+                basePtrLikeType->op,
+                1,
+                &wrappedElementType);
+
+            addUsersToWorkList(type);
+            type->replaceUsesWith(newPtrLikeType);
+            type->removeAndDeallocate();
+            return;
         }
     }
 

@@ -6193,13 +6193,13 @@ static void lowerProgramEntryPointToIR(
     // We may have shader parameters of interface/existential type,
     // which need us to supply concrete type information for specialization.
     //
-    auto existentialSlotCount = entryPoint->getExistentialSlotCount();
-    if( existentialSlotCount )
+    auto existentialTypeArgCount = entryPoint->getExistentialTypeArgCount();
+    if( existentialTypeArgCount )
     {
         List<IRInst*> existentialSlotArgs;
-        for( UInt ii = 0; ii < existentialSlotCount; ++ii )
+        for( UInt ii = 0; ii < existentialTypeArgCount; ++ii )
         {
-            auto arg = entryPoint->getExistentialSlotArg(ii);
+            auto arg = entryPoint->getExistentialTypeArg(ii);
 
             auto irArgType = lowerType(context, arg.type);
             auto irWitnessTable = lowerSimpleVal(context, arg.witness);
@@ -6423,13 +6423,13 @@ RefPtr<IRModule> generateIRForProgram(
     // We may have shader parameters of interface/existential type,
     // which need us to supply concrete type information for specialization.
     //
-    auto existentialSlotCount = program->getExistentialSlotCount();
-    if( existentialSlotCount )
+    auto existentialTypeArgCount = program->getExistentialTypeArgCount();
+    if( existentialTypeArgCount )
     {
         List<IRInst*> existentialSlotArgs;
-        for( UInt ii = 0; ii < existentialSlotCount; ++ii )
+        for( UInt ii = 0; ii < existentialTypeArgCount; ++ii )
         {
-            auto arg = program->getExistentialSlotArg(ii);
+            auto arg = program->getExistentialTypeArg(ii);
 
             auto irArgType = lowerType(context, arg.type);
             auto irWitnessTable = lowerSimpleVal(context, arg.witness);

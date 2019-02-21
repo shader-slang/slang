@@ -299,9 +299,12 @@ namespace Slang
             Name*       name,
             Profile     profile);
 
-        UInt getExistentialSlotCount() { return m_existentialSlots.types.Count(); }
-        Type* getExistentialSlotType(UInt index) { return m_existentialSlots.types[index]; }
-        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_existentialSlots.args[index]; }
+        UInt getExistentialTypeParamCount() { return m_existentialSlots.types.Count(); }
+        Type* getExistentialTypeParam(UInt index) { return m_existentialSlots.types[index]; }
+
+        UInt getExistentialTypeArgCount() { return m_existentialSlots.args.Count(); }
+        ExistentialSlots::Arg getExistentialTypeArg(UInt index) { return m_existentialSlots.args[index]; }
+        ExistentialSlots::Arg const* getExistentialTypeArgs() { return m_existentialSlots.args.Buffer(); }
 
         List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
 
@@ -939,9 +942,12 @@ namespace Slang
             ///
         RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
 
-        UInt getExistentialSlotCount() { return m_globalExistentialSlots.types.Count(); }
-        Type* getExistentialSlotType(UInt index) { return m_globalExistentialSlots.types[index]; }
-        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+        UInt getExistentialTypeParamCount() { return m_globalExistentialSlots.types.Count(); }
+        Type* getExistentialTypeParam(UInt index) { return m_globalExistentialSlots.types[index]; }
+
+        UInt getExistentialTypeArgCount() { return m_globalExistentialSlots.args.Count(); }
+        ExistentialSlots::Arg getExistentialTypeArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+        ExistentialSlots::Arg const* getExistentialTypeArgs() { return m_globalExistentialSlots.args.Buffer(); }
 
         List<GlobalShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
 
