@@ -332,7 +332,8 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
         }
     }
 
-    return SLANG_OK;
+    // If success must have a pipeline state
+    return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
@@ -386,14 +387,13 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 		compileRequest.computeShader.source = sourceInfo;
 		compileRequest.computeShader.name = computeEntryPointName;
 	}
-	compileRequest.entryPointTypeArguments = m_shaderInputLayout.globalTypeArguments;
+	compileRequest.globalGenericTypeArguments = m_shaderInputLayout.globalGenericTypeArguments;
+	compileRequest.entryPointGenericTypeArguments = m_shaderInputLayout.entryPointGenericTypeArguments;
+	compileRequest.globalExistentialTypeArguments = m_shaderInputLayout.globalExistentialTypeArguments;
+	compileRequest.entryPointExistentialTypeArguments = m_shaderInputLayout.entryPointExistentialTypeArguments;
 	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
-	if (!m_shaderProgram)
-	{
-		return SLANG_FAIL;
-	}
 
-	return SLANG_OK;
+    return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
 void RenderTestApp::renderFrame()

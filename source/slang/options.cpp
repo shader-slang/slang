@@ -41,7 +41,7 @@ struct OptionsParser
     SlangSession*           session = nullptr;
     SlangCompileRequest*    compileRequest = nullptr;
 
-    Slang::CompileRequest*  requestImpl = nullptr;
+    Slang::EndToEndCompileRequest*  requestImpl = nullptr;
 
     Slang::RefPtr<Slang::ConfigurableSharedLibraryLoader> sharedLibraryLoader;
     
@@ -313,7 +313,7 @@ struct OptionsParser
         
         if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
         {
-            requestImpl->mSink.diagnose(SourceLoc(), Diagnostics::cannotDeduceSourceLanguage, inPath);
+            requestImpl->getSink()->diagnose(SourceLoc(), Diagnostics::cannotDeduceSourceLanguage, inPath);
             return SLANG_FAIL;
         }
 
@@ -425,9 +425,9 @@ struct OptionsParser
     {
         // Copy some state out of the current request, in case we've been called
         // after some other initialization has been performed.
-        flags = requestImpl->compileFlags;
+        flags = requestImpl->getFrontEndReq()->compileFlags;
 
-        DiagnosticSink* sink = &requestImpl->mSink;
+        DiagnosticSink* sink = requestImpl->getSink();
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
@@ -450,23 +450,24 @@ struct OptionsParser
                 }
                 else if(argStr == "-dump-ir" )
                 {
-                    requestImpl->shouldDumpIR = true;
+                    requestImpl->getFrontEndReq()->shouldDumpIR = true;
+                    requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
                 else if (argStr == "-serial-ir")
                 {
-                    requestImpl->useSerialIRBottleneck = true;
+                    requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
                 }
                 else if (argStr == "-verbose-paths")
                 {
-                    requestImpl->mSink.flags |= DiagnosticSink::Flag::VerbosePath;
+                    requestImpl->getSink()->flags |= DiagnosticSink::Flag::VerbosePath;
                 }
                 else if (argStr == "-verify-debug-serial-ir")
                 {
-                    requestImpl->verifyDebugSerialization = true;
+                    requestImpl->getFrontEndReq()->verifyDebugSerialization = true;
                 }
                 else if(argStr == "-validate-ir" )
                 {
-                    requestImpl->shouldValidateIR = true;
+                    requestImpl->getFrontEndReq()->shouldValidateIR = true;
                 }
                 else if(argStr == "-skip-codegen" )
                 {
@@ -1222,18 +1223,7 @@ struct OptionsParser
         // Now that we've diagnosed the output paths, we can add them
         // to the compile request at the appropriate locations.
         //
-        // We start by allocating the arrays for per-entry-point output
-        // paths on each of the requested targets.
-        //
-        for(auto rawTarget : rawTargets)
-        {
-            auto targetID = rawTarget.targetID;
-            auto targetReq = requestImpl->targets[targetID];
-
-            targetReq->entryPointOutputPaths.SetSize(rawEntryPoints.Count());
-        }
-
-        // Consider the output files specified via `-o` and try to figure
+        // We will consider the output files specified via `-o` and try to figure
         // out how to deal with them.
         //
         for(auto& rawOutput : rawOutputs)
@@ -1242,18 +1232,26 @@ struct OptionsParser
             if(rawOutput.entryPointIndex == -1) continue;
 
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;
-            auto entryPointID = rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
+            Int entryPointID = rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
 
-            auto targetReq = requestImpl->targets[targetID];
+            auto target = requestImpl->getLinkage()->targets[targetID];
+            auto entryPointReq = requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
 
-            if(targetReq->entryPointOutputPaths[entryPointID].Length())
+            RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+            if( !requestImpl->targetInfos.TryGetValue(target, targetInfo) )
             {
-                auto entryPointReq = requestImpl->entryPoints[entryPointID];
-                sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->name, targetReq->target);
+                targetInfo = new EndToEndCompileRequest::TargetInfo();
+                requestImpl->targetInfos[target] = targetInfo;
+            }
+
+            String outputPath;
+            if( targetInfo->entryPointOutputPaths.ContainsKey(entryPointID) )
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->getName(), target->getTarget());
             }
             else
             {
-                targetReq->entryPointOutputPaths[entryPointID] = rawOutput.path;
+                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
             }
         }
 
@@ -1272,16 +1270,16 @@ SlangResult parseOptions(
     int                     argc,
     char const* const*      argv)
 {
-    Slang::CompileRequest* compileRequest = (Slang::CompileRequest*) compileRequestIn;
+    Slang::EndToEndCompileRequest* compileRequest = (Slang::EndToEndCompileRequest*) compileRequestIn;
 
     OptionsParser parser;
     parser.compileRequest = compileRequestIn;
     parser.requestImpl = compileRequest;
-    parser.session = (SlangSession*)compileRequest->mSession;
+    parser.session = (SlangSession*)compileRequest->getSession();
 
     Result res = parser.parse(argc, argv);
 
-    DiagnosticSink* sink = &compileRequest->mSink;
+    DiagnosticSink* sink = compileRequest->getSink();
     if (sink->GetErrorCount() > 0)
     {
         // Put the errors in the diagnostic 

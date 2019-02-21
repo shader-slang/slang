@@ -881,22 +881,27 @@ RefPtr<EffectVariant> createEffectVaraint(
     int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
     spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, program->shaderModule->inputPath.c_str());
 
-    const int entryPointCont = int(program->entryPoints.size());
-    for(int ii = 0; ii < entryPointCont; ++ii)
+    // Because our shader code uses global generic parameters for
+    // specialization, we need to specify the concrete argument
+    // types for the compiler to use when generating code.
+    //
+    spSetGlobalGenericArgs(
+        slangRequest,
+        int(genericArgs.size()),
+        genericArgs.data());
+
+    // Next we tell the Slang compiler about all of the entry points
+    // we plan to use.
+    //
+    const int entryPointCount = int(program->entryPoints.size());
+    for(int ii = 0; ii < entryPointCount; ++ii)
     {
         auto entryPoint = program->entryPoints[ii];
-
-        // We are using the `spAddEntryPointEx` API so that we
-        // can specify the type names to use for the generic
-        // type parameters of the program.
-        //
-        spAddEntryPointEx(
+        spAddEntryPoint(
             slangRequest,
             translationUnitIndex,
             entryPoint->name.c_str(),
-            entryPoint->slangStage,
-            int(genericArgs.size()),
-            genericArgs.data());
+            entryPoint->slangStage);
     }
 
     // We expect compilation to go through without a hitch, because the
@@ -923,7 +928,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     //
     std::vector<ISlangBlob*> kernelBlobs;
     std::vector<gfx::ShaderProgram::KernelDesc> kernelDescs;
-    for(int ii = 0; ii < entryPointCont; ++ii)
+    for(int ii = 0; ii < entryPointCount; ++ii)
     {
         auto entryPoint = program->entryPoints[ii];
 

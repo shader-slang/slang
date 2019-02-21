@@ -16,8 +16,8 @@ struct DeadCodeEliminationContext
     // the parameters that were passed to the top-level
     // `eliminateDeadCode` function.
     //
-    CompileRequest* compileRequest;
-    IRModule*       module;
+    BackEndCompileRequest*  compileRequest;
+    IRModule*               module;
 
     // Our overall process is going to be to determine
     // which instructions in the module are "live"
@@ -235,9 +235,9 @@ struct DeadCodeEliminationContext
         // we'll just go ahead and eliminate every single function/type
         // in a module. There needs to be a way to identify the
         // functions we want to keep around, and for right now
-        // that is handled with the `[entryPoint]` decoration.
+        // that is handled with the `[keepAlive]` decoration.
         //
-        if(inst->findDecorationImpl(kIROp_EntryPointDecoration))
+        if(inst->findDecorationImpl(kIROp_KeepAliveDecoration))
             return true;
         //
         // TODO: Eventually it would make sense to consider everything
@@ -312,7 +312,7 @@ struct DeadCodeEliminationContext
 // and then defer to it for the real work.
 //
 void eliminateDeadCode(
-    CompileRequest* compileRequest,
+    BackEndCompileRequest* compileRequest,
     IRModule*       module)
 {
     DeadCodeEliminationContext context;

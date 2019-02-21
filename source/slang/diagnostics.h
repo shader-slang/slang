@@ -2,6 +2,7 @@
 #define RASTER_RENDERER_COMPILE_ERROR_H
 
 #include "../core/basic.h"
+#include "../core/slang-writer.h"
 
 #include "source-loc.h"
 #include "token.h"
@@ -153,7 +154,7 @@ namespace Slang
         StringBuilder outputBuffer;
 //            List<Diagnostic> diagnostics;
         int errorCount = 0;
-
+        int internalErrorLocsNoted = 0;
 
         ISlangWriter* writer                        = nullptr;
         Flags flags                                 = 0;
@@ -217,6 +218,32 @@ namespace Slang
         void diagnoseRaw(
             Severity    severity,
             const UnownedStringSlice& message);
+
+            /// During propagation of an exception for an internal
+            /// error, note that this source location was involved
+        void noteInternalErrorLoc(SourceLoc const& loc);
+    };
+
+        /// An `ISlangWriter` that writes directly to a diagnostic sink.
+    class DiagnosticSinkWriter : public AppendBufferWriter
+    {
+    public:
+        typedef AppendBufferWriter Super;
+
+        DiagnosticSinkWriter(DiagnosticSink* sink)
+            : Super(WriterFlag::IsStatic)
+            , m_sink(sink)
+        {}
+
+        // ISlangWriter
+        SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars) SLANG_OVERRIDE
+        {
+            m_sink->diagnoseRaw(Severity::Note, UnownedStringSlice(chars, chars+numChars));
+            return SLANG_OK;
+        }
+
+    private:
+        DiagnosticSink* m_sink = nullptr;
     };
 
     namespace Diagnostics

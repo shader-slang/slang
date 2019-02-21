@@ -114,8 +114,8 @@ IROpInfo getIROpInfo(IROp op);
 // A use of another value/inst within an IR operation
 struct IRUse
 {
-    IRInst* get() { return usedValue; }
-    IRInst* getUser() { return user; }
+    IRInst* get() const { return usedValue; }
+    IRInst* getUser() const { return user; }
 
     void init(IRInst* user, IRInst* usedValue);
     void set(IRInst* usedValue);

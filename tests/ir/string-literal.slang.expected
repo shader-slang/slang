@@ -1,7 +1,7 @@
 result code = 0
 standard error = {
 [entryPoint]
-[export("_S04mainp1puV")]
+[export("_S3tu04mainp1puV")]
 [nameHint("main")]
 func %main	: Func(Void, UInt)
 {

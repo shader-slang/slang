@@ -2,6 +2,7 @@
 #include "emit.h"
 
 #include "../core/slang-writer.h"
+#include "ir-bind-existentials.h"
 #include "ir-dce.h"
 #include "ir-entry-point-uniforms.h"
 #include "ir-glsl-legalize.h"
@@ -79,8 +80,10 @@ void requireGLSLVersionImpl(
 // Shared state for an entire emit session
 struct SharedEmitContext
 {
+    BackEndCompileRequest* compileRequest = nullptr;
+
     // The entry point we are being asked to compile
-    EntryPointRequest* entryPoint;
+    EntryPoint* entryPoint;
 
     // The layout for the entry point
     EntryPointLayout*   entryPointLayout;
@@ -153,7 +156,7 @@ struct SharedEmitContext
     // to use for it when emitting code.
     Dictionary<IRInst*, String> mapInstToName;
 
-    DiagnosticSink* getSink() { return &entryPoint->compileRequest->mSink; }
+    DiagnosticSink* getSink() { return compileRequest->getSink(); }
 
     Dictionary<IRInst*, UInt> mapIRValueToRayPayloadLocation;
     Dictionary<IRInst*, UInt> mapIRValueToCallablePayloadLocation;
@@ -165,6 +168,10 @@ struct EmitContext
     SharedEmitContext* shared;
 
     DiagnosticSink* getSink() { return shared->getSink(); }
+
+    LineDirectiveMode getLineDirectiveMode() { return shared->compileRequest->getLineDirectiveMode(); }
+    SourceManager* getSourceManager() { return shared->compileRequest->getSourceManager(); }
+    void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 };
 
 //
@@ -333,11 +340,6 @@ struct EmitVisitor
     EmitVisitor(EmitContext* context)
         : context(context)
     {}
-
-    Session* getSession()
-    {
-        return context->shared->entryPoint->compileRequest->mSession;
-    }
 
     // Low-level emit logic
 
@@ -556,7 +558,7 @@ struct EmitVisitor
 
             bool shouldUseGLSLStyleLineDirective = false;
 
-            auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+            auto mode = context->getLineDirectiveMode();
             switch (mode)
             {
             case LineDirectiveMode::None:
@@ -664,7 +666,7 @@ struct EmitVisitor
     {
         // Don't do any of this work if the user has requested that we
         // not emit line directives.
-        auto mode = context->shared->entryPoint->compileRequest->lineDirectiveMode;
+        auto mode = context->getLineDirectiveMode();
         switch(mode)
         {
         case LineDirectiveMode::None:
@@ -723,7 +725,7 @@ struct EmitVisitor
 
     SourceManager* getSourceManager()
     {
-        return context->shared->entryPoint->compileRequest->getSourceManager();
+        return context->getSourceManager();
     }
 
     void advanceToSourceLocation(
@@ -747,7 +749,7 @@ struct EmitVisitor
 
     DiagnosticSink* getSink()
     {
-        return &context->shared->entryPoint->compileRequest->mSink;
+        return context->getSink();
     }
 
     //
@@ -1670,6 +1672,7 @@ struct EmitVisitor
 
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
+        case LayoutResourceKind::ExistentialSlot:
             // ignore
             break;
         default:
@@ -1875,8 +1878,7 @@ struct EmitVisitor
         }
     }
 
-    void emitGLSLVersionDirective(
-        ModuleDecl*  /*program*/)
+    void emitGLSLVersionDirective()
     {
         auto effectiveProfile = context->shared->effectiveProfile;
         if(effectiveProfile.getFamily() == ProfileFamily::GLSL)
@@ -1931,8 +1933,7 @@ struct EmitVisitor
         Emit("#version 420\n");
     }
 
-    void emitGLSLPreprocessorDirectives(
-        RefPtr<ModuleDecl>   program)
+    void emitGLSLPreprocessorDirectives()
     {
         switch(context->shared->target)
         {
@@ -1944,24 +1945,7 @@ struct EmitVisitor
             break;
         }
 
-        emitGLSLVersionDirective(program);
-
-
-        // TODO: when cross-compiling we may need to output additional `#extension` directives
-        // based on the features that we have used.
-
-        for( auto extensionDirective :  program->GetModifiersOfType<GLSLExtensionDirective>() )
-        {
-            // TODO(tfoley): Emit an appropriate `#line` directive...
-
-            Emit("#extension ");
-            emit(extensionDirective->extensionNameToken.Content);
-            Emit(" : ");
-            emit(extensionDirective->dispositionToken.Content);
-            Emit("\n");
-        }
-
-        // TODO: handle other cases...
+        emitGLSLVersionDirective();
     }
 
     /// Emit directives to control overall layout computation for the emitted code.
@@ -4115,7 +4099,7 @@ struct EmitVisitor
         catch(AbortCompilationException&) { throw; }
         catch(...)
         {
-            ctx->shared->entryPoint->compileRequest->noteInternalErrorLoc(inst->sourceLoc);
+            ctx->noteInternalErrorLoc(inst->sourceLoc);
             throw;
         }
     }
@@ -6583,26 +6567,26 @@ struct EmitVisitor
 //
 
 EntryPointLayout* findEntryPointLayout(
-    ProgramLayout*      programLayout,
-    EntryPointRequest*  entryPointRequest)
+    ProgramLayout*  programLayout,
+    EntryPoint*     entryPoint)
 {
     for( auto entryPointLayout : programLayout->entryPoints )
     {
-        if(entryPointLayout->entryPoint->getName() != entryPointRequest->name)
+        if(entryPointLayout->entryPoint->getName() != entryPoint->getName())
             continue;
 
         // TODO: We need to be careful about this check, since it relies on
         // the profile information in the layout matching that in the request.
         //
         // What we really seem to want here is some dictionary mapping the
-        // `EntryPointRequest` directly to the `EntryPointLayout`, and maybe
+        // `EntryPoint` directly to the `EntryPointLayout`, and maybe
         // that is precisely what we should build...
         //
-        if(entryPointLayout->profile != entryPointRequest->profile)
+        if(entryPointLayout->profile != entryPoint->getProfile())
             continue;
 
         // TODO: can't easily filter on translation unit here...
-        // Ideally the `EntryPointRequest` should get filled in with a pointer
+        // Ideally the `EntryPoint` should get filled in with a pointer
         // the specific function declaration that represents the entry point.
 
         return entryPointLayout.Ptr();
@@ -6662,13 +6646,14 @@ void legalizeTypes(
     IRModule*                   module);
 
 static void dumpIRIfEnabled(
-    CompileRequest* compileRequest,
+    BackEndCompileRequest* compileRequest,
     IRModule*       irModule,
     char const*     label = nullptr)
 {
     if(compileRequest->shouldDumpIR)
     {
-        WriterHelper writer(compileRequest->getWriter(WriterChannel::StdError));
+        DiagnosticSinkWriter writerImpl(compileRequest->getSink());
+        WriterHelper writer(&writerImpl);
 
         if(label)
         {
@@ -6687,16 +6672,22 @@ static void dumpIRIfEnabled(
 }
 
 String emitEntryPoint(
-    EntryPointRequest*  entryPoint,
-    ProgramLayout*      programLayout,
-    CodeGenTarget       target,
-    TargetRequest*      targetRequest)
+    BackEndCompileRequest*  compileRequest,
+    EntryPoint*             entryPoint,
+    CodeGenTarget           target,
+    TargetRequest*          targetRequest)
 {
-    auto translationUnit = entryPoint->getTranslationUnit();
+    auto sink = compileRequest->getSink();
+    auto program = compileRequest->getProgram();
+    auto targetProgram = program->getTargetProgram(targetRequest);
+    auto programLayout = targetProgram->getOrCreateLayout(sink);
+
+//    auto translationUnit = entryPoint->getTranslationUnit();
 
     SharedEmitContext sharedContext;
+    sharedContext.compileRequest = compileRequest;
     sharedContext.target = target;
-    sharedContext.finalTarget = targetRequest->target;
+    sharedContext.finalTarget = targetRequest->getTarget();
     sharedContext.entryPoint = entryPoint;
     sharedContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
 
@@ -6715,16 +6706,13 @@ String emitEntryPoint(
     StructTypeLayout* globalStructLayout = getGlobalStructLayout(programLayout);
     sharedContext.globalStructLayout = globalStructLayout;
 
-    auto translationUnitSyntax = translationUnit->SyntaxNode.Ptr();
-
     EmitContext context;
     context.shared = &sharedContext;
 
     EmitVisitor visitor(&context);
 
     {
-        auto compileRequest = translationUnit->compileRequest;
-        auto session = compileRequest->mSession;
+        auto session = targetRequest->getSession();
 
         // We start out by performing "linking" at the level of the IR.
         // This step will create a fresh IR module to be used for
@@ -6735,6 +6723,7 @@ String emitEntryPoint(
         // any "profile-overloaded" symbols.
         //
         auto linkedIR = linkIR(
+            compileRequest,
             entryPoint,
             programLayout,
             target,
@@ -6743,7 +6732,7 @@ String emitEntryPoint(
         auto irEntryPoint = linkedIR.entryPoint;
 
 #if 0
-        dumpIRIfEnabled(compileRequest, irModule, "CLONED");
+        dumpIRIfEnabled(compileRequest, irModule, "LINKED");
 #endif
 
         validateIRModuleIfEnabled(compileRequest, irModule);
@@ -6752,6 +6741,23 @@ String emitEntryPoint(
         // IR, then do it here, for the target-specific, but
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
+
+        // When there are top-level existential-type parameters
+        // to the shader, we need to take the side-band information
+        // on how the existential "slots" were bound to concrete
+        // types, and use it to introduce additional explicit
+        // shader parameters for those slots, to be wired up to
+        // use sites.
+        //
+        bindExistentialSlots(irModule, sink);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS BOUND");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+
+
 
         // Now that we've linked the IR code, any layout/binding
         // information has been attached to shader parameters
@@ -6764,6 +6770,10 @@ String emitEntryPoint(
         // the global scope instead.
         //
         moveEntryPointUniformParamsToGlobalScope(irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // Desguar any union types, since these will be illegal on
         // various targets.
@@ -6800,6 +6810,23 @@ String emitEntryPoint(
         dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+        // Specialization can introduce dead code that could trip
+        // up downstream passes like type legalization, so we
+        // will run a DCE pass to clean up after the specialization.
+        //
+        // TODO: Are there other cleanup optimizations we should
+        // apply at this point?
+        //
+        eliminateDeadCode(compileRequest, irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
+
 
         // After we've fully specialized all generics, and
         // "devirtualized" all the calls through interfaces,
@@ -6880,18 +6907,19 @@ String emitEntryPoint(
                 session,
                 irModule,
                 irEntryPoint,
-                &compileRequest->mSink,
+                compileRequest->getSink(),
                 &sharedContext.extensionUsageTracker);
+
+#if 0
+                dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
+#endif
+                validateIRModuleIfEnabled(compileRequest, irModule);
         }
         break;
 
         default:
             break;
         }
-#if 0
-        dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
-#endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
 
         // The resource-based specialization pass above
         // may create specialized versions of functions, but
@@ -6916,10 +6944,6 @@ String emitEntryPoint(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         visitor.emitIRModule(&context, irModule);
-
-        // retain the specialized ir module, because the current
-        // GlobalGenericParamSubstitution implementation may reference ir objects
-        targetRequest->compileRequest->compiledModules.Add(irModule);
     }
 
     // Deal with cases where a particular stage requires certain GLSL versions
@@ -6950,7 +6974,7 @@ String emitEntryPoint(
     // it is time to stich together the final output.
 
     // There may be global-scope modifiers that we should emit now
-    visitor.emitGLSLPreprocessorDirectives(translationUnitSyntax);
+    visitor.emitGLSLPreprocessorDirectives();
 
     visitor.emitLayoutDirectives(targetRequest);
 

@@ -190,6 +190,7 @@ INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
+INST(BindGlobalExistentialSlots, bindGlobalExistentialSlots, 0, 0)
 
 INST(Construct, construct, 0, 0)
 
@@ -391,6 +392,11 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
         /// even if it does not otherwise reference it.
     INST(DependsOnDecoration,               dependsOn,              1, 0)
+
+        /// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
+    INST(KeepAliveDecoration,              keepAlive,             0, 0)
+
+    INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)

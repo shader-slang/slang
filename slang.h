@@ -923,6 +923,9 @@ extern "C"
     */
     typedef struct SlangSession SlangSession;
 
+    typedef struct SlangLinkage SlangLinkage;
+    typedef struct SlangModule SlangModule;
+
     /*!
     @brief A request for one or more compilation actions to be performed.
     */
@@ -988,6 +991,20 @@ extern "C"
         SlangSession*   session,
         char const*     sourcePath,
         char const*     sourceString);
+
+
+
+    SLANG_API SlangLinkage* spCreateLinkage(
+        SlangSession* session);
+
+    SLANG_API void spDestroyLinkage(
+        SlangLinkage* linkage);
+
+    SLANG_API SlangModule* spLoadModule(
+        SlangLinkage* linkage,
+        char const* moduleName);
+
+
 
     /*!
     @brief Create a compile request.
@@ -1263,15 +1280,59 @@ extern "C"
 
     /** Add an entry point in a particular translation unit,
         with additional arguments that specify the concrete
-        type names for global generic type parameters.
+        type names for entry-point generic type parameters.
     */
     SLANG_API int spAddEntryPointEx(
         SlangCompileRequest*    request,
         int                     translationUnitIndex,
         char const*             name,
         SlangStage              stage,
-        int                     genericTypeNameCount,
-        char const**            genericTypeNames);
+        int                     genericArgCount,
+        char const**            genericArgs);
+
+    /** Specify the arguments to use for global generic parameters.
+    */
+    SLANG_API SlangResult spSetGlobalGenericArgs(
+        SlangCompileRequest*    request,
+        int                     genericArgCount,
+        char const**            genericArgs);
+
+    /** Specify the concrete type to be used for a global "existential slot."
+
+    Every shader parameter (or leaf field of a `struct`-type shader parameter)
+    that has an interface or array-of-interface type introduces an existential
+    slot. The number of slots consumed by a shader parameter, and the starting
+    slot of each parameter can be queried via the reflection API using
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+
+    In order to generate specialized code, a concrete type needs to be specified
+    for each existential slot. This function specifies the name of the type
+    (or in general a type *expression*) to use for a specific slot at the
+    global scope.
+    */
+    SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
+        SlangCompileRequest*    request,
+        int                     slotIndex,
+        char const*             typeName);
+
+    /** Specify the concrete type to be used for an entry-point "existential slot."
+
+    Every shader parameter (or leaf field of a `struct`-type shader parameter)
+    that has an interface or array-of-interface type introduces an existential
+    slot. The number of slots consumed by a shader parameter, and the starting
+    slot of each parameter can be queried via the reflection API using
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+
+    In order to generate specialized code, a concrete type needs to be specified
+    for each existential slot. This function specifies the name of the type
+    (or in general a type *expression*) to use for a specific slot at the
+    entry-point scope.
+    */
+    SLANG_API SlangResult spSetTypeNameForEntryPointExistentialSlot(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     slotIndex,
+        char const*             typeName);
 
     /** Execute the compilation request.
 
@@ -1492,6 +1553,12 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
         SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
         SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
+
+        // A parameter of interface or array-of-interface type introduces
+        // one existential slot, into which a concrete type must be plugged
+        // to enable specialized code generation.
+        //
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -1871,6 +1938,8 @@ namespace slang
         CallablePayload = SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
 
         ShaderRecord = SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
+
+        ExistentialSlot = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

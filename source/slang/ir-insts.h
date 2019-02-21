@@ -1081,6 +1081,15 @@ struct IRBuilder
         IRInst* param,
         IRInst* val);
 
+    IRInst* emitBindGlobalExistentialSlots(
+        UInt            argCount,
+        IRInst* const*  args);
+
+    IRDecoration* addBindExistentialSlotsDecoration(
+        IRInst*         value,
+        UInt            argCount,
+        IRInst* const*  args);
+
     IRInst* emitExtractTaggedUnionTag(
         IRInst* val);
 
@@ -1199,6 +1208,11 @@ struct IRBuilder
     void addEntryPointDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_EntryPointDecoration);
+    }
+
+    void addKeepAliveDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_KeepAliveDecoration);
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.

@@ -240,6 +240,14 @@ SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
 // that provides a scope for some number of declarations.
 SYNTAX_CLASS(ModuleDecl, ContainerDecl)
     FIELD(RefPtr<Scope>, scope)
+
+    // The API-level module that this declaration belong to.
+    //
+    // This field allows lookup of the `Module` based on a
+    // declaration nested under a `ModuleDecl` by following
+    // its chain of parents.
+    //
+    RAW(Module* module = nullptr;)
 END_SYNTAX_CLASS()
 
 SYNTAX_CLASS(ImportDecl, Decl)

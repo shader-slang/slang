@@ -141,7 +141,10 @@ struct ShaderCompileRequest
     EntryPoint vertexShader;
     EntryPoint fragmentShader;
     EntryPoint computeShader;
-    Slang::List<Slang::String> entryPointTypeArguments;
+    Slang::List<Slang::String> globalGenericTypeArguments;
+    Slang::List<Slang::String> entryPointGenericTypeArguments;
+    Slang::List<Slang::String> entryPointExistentialTypeArguments;
+    Slang::List<Slang::String> globalExistentialTypeArguments;
 };
 
 /// Different formats of things like pixels or elements of vertices
