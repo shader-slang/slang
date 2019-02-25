@@ -26,6 +26,7 @@
 #include <d3dcompiler.h>
 
 #include "../../slang-com-ptr.h"
+#include "../../source/core/slang-combination-util.h"
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
@@ -101,6 +102,17 @@ public:
     ~D3D12Renderer();
 
 protected:
+    typedef uint32_t DeviceCheckFlags;
+    struct DeviceCheckFlag
+    {
+        enum Enum : DeviceCheckFlags
+        {
+            UseFullFeatureLevel = 0x1,      //< If set will use full feature level (to D3D_FEATURE_LEVEL_11_1) else will try D3D_FEATURE_LEVEL_11_0
+            UseHardwareDevice = 0x2,        //< If set will try a hardware device
+            UseDebug = 0x4,                 //< If set will enable use of debug
+        };
+    };
+
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
 
@@ -477,8 +489,8 @@ protected:
 //    Result _calcBindParameters(BindParameters& params);
 //    RenderState* findRenderState(PipelineType pipelineType);
 
-    PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
-
+    Result _createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<IDXGIFactory4>& outDxgiFactory, ComPtr<IDXGIAdapter>& outAdapter);
+    
     D3D12CircularResourceHeap m_circularResourceHeap;
 
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
@@ -559,6 +571,14 @@ protected:
 
     int32_t m_depthStencilUsageFlags = 0;    ///< D3DUtil::UsageFlag combination for depth stencil
     int32_t m_targetUsageFlags = 0;            ///< D3DUtil::UsageFlag combination for target
+
+    // Dll entry points
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+
+    PFN_D3D12_GET_DEBUG_INTERFACE m_D3D12GetDebugInterface = nullptr;
+    PFN_DXGI_CREATE_FACTORY_2 m_CreateDXGIFactory2 = nullptr;
+    PFN_D3D12_CREATE_DEVICE m_D3D12CreateDevice = nullptr;
+    PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
     HWND m_hwnd = nullptr;
 };
@@ -1278,6 +1298,67 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<IDXGIFactory4>& outDxgiFactory, ComPtr<IDXGIAdapter>& outAdapter)
+{
+    const UINT dxgiFactoryFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? DXGI_CREATE_FACTORY_DEBUG  : 0;
+
+    // Try and create DXGIFactory
+    ComPtr<IDXGIFactory4> dxgiFactory;
+    SLANG_RETURN_ON_FAIL(m_CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
+    
+    D3D_FEATURE_LEVEL featureLevel = DeviceCheckFlag::UseFullFeatureLevel ? D3D_FEATURE_LEVEL_11_1 : D3D_FEATURE_LEVEL_11_0;
+
+    // Search for an adapter that meets our requirements
+    ComPtr<IDXGIAdapter> adapter;
+
+    if ((deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) == 0)
+    {
+        SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
+        SLANG_RETURN_ON_FAIL(m_D3D12CreateDevice(adapter, featureLevel, IID_PPV_ARGS(m_device.writeRef())));
+    }
+    else
+    {
+        UINT adapterCounter = 0;
+        for (;;)
+        {
+            UINT adapterIndex = adapterCounter++;
+
+            ComPtr<IDXGIAdapter1> candidateAdapter;
+            if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
+                break;
+
+            DXGI_ADAPTER_DESC1 desc;
+            candidateAdapter->GetDesc1(&desc);
+
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                // TODO: may want to allow software driver as fallback
+            }
+            else
+            {
+                continue;
+            }
+
+            if (SUCCEEDED(m_D3D12CreateDevice(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
+            {
+                // We found one!
+                adapter = candidateAdapter;
+                break;
+            }
+        }
+    }
+
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    {
+        m_dxDebug->EnableDebugLayer();
+    }
+
+    outDxgiFactory = dxgiFactory;
+    outAdapter = adapter;
+    return SLANG_OK;
+}
+
 Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     m_hwnd = (HWND)inWindowHandle;
@@ -1297,94 +1378,63 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-
-#define LOAD_D3D_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(d3dModule, #NAME);
-#define LOAD_DXGI_PROC(TYPE, NAME) \
-        TYPE NAME##_ = (TYPE) loadProc(dxgiModule, #NAME);
-
-    UINT dxgiFactoryFlags = 0;
-
-#if ENABLE_DEBUG_LAYER
-    {
-        LOAD_D3D_PROC(PFN_D3D12_GET_DEBUG_INTERFACE, D3D12GetDebugInterface);
-        if (D3D12GetDebugInterface_)
-        {
-            if (SUCCEEDED(D3D12GetDebugInterface_(IID_PPV_ARGS(m_dxDebug.writeRef()))))
-            {
-                m_dxDebug->EnableDebugLayer();
-                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-            }
-        }
-    }
-#endif
-
+    // Get all the dll entry points
     m_D3D12SerializeRootSignature = (PFN_D3D12_SERIALIZE_ROOT_SIGNATURE)loadProc(d3dModule, "D3D12SerializeRootSignature");
     if (!m_D3D12SerializeRootSignature)
     {
         return SLANG_FAIL;
     }
 
-    // Try and create DXGIFactory
-    ComPtr<IDXGIFactory4> dxgiFactory;
+#if ENABLE_DEBUG_LAYER
+    m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+    if (m_D3D12GetDebugInterface)
     {
-        typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
-        LOAD_DXGI_PROC(PFN_DXGI_CREATE_FACTORY_2, CreateDXGIFactory2);
-        if (!CreateDXGIFactory2_)
+        if (SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
         {
-            return SLANG_FAIL;
+            m_dxDebug->EnableDebugLayer();
         }
-        SLANG_RETURN_ON_FAIL(CreateDXGIFactory2_(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
     }
+#endif
 
-    D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-
-    // Search for an adapter that meets our requirements
-    ComPtr<IDXGIAdapter> adapter;
-
-    LOAD_D3D_PROC(PFN_D3D12_CREATE_DEVICE, D3D12CreateDevice);
-    if (!D3D12CreateDevice_)
+    m_CreateDXGIFactory2 = (PFN_DXGI_CREATE_FACTORY_2)loadProc(dxgiModule, "CreateDXGIFactory2");
+    if (!m_CreateDXGIFactory2)
+    {
+        return SLANG_FAIL;
+    }
+    m_D3D12CreateDevice = (PFN_D3D12_CREATE_DEVICE)loadProc(d3dModule, "D3D12CreateDevice");
+    if (!m_D3D12CreateDevice)
     {
         return SLANG_FAIL;
     }
 
-    const bool useWarp = false;
+    // TODO: we should probably provide a command-line option
+    // to override UseDebug of default rather than leave it
+    // up to each back-end to specify.
 
-    if (useWarp)
+    // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
+    uint32_t flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
+    SwitchType switchTypes[] =
     {
-        SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
-        SLANG_RETURN_ON_FAIL(D3D12CreateDevice_(adapter, featureLevel, IID_PPV_ARGS(m_device.writeRef())));
-    }
-    else
+        SwitchType::OnOff,                  ///< First try fully featured, then degrade features
+        SwitchType::OnOff,                  ///< First try hardware, then reference
+#if ENABLE_DEBUG_LAYER
+        SwitchType::OnOff,                  ///< First try debug then non debug
+#else
+        SwitchType::Off,                    ///< On release we only don't bother with debug
+#endif
+    };
+
+    List<uint32_t> combinations;
+    CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), combinations);
+
+    ComPtr<IDXGIFactory4> dxgiFactory;
+    ComPtr<IDXGIAdapter> adapter;
+    for (const auto combination : combinations)
     {
-        UINT adapterCounter = 0;
-        for (;;)
+        adapter.setNull();
+        if (SLANG_SUCCEEDED(_createAdaptor(combination, dxgiFactory, adapter)))
         {
-            UINT adapterIndex = adapterCounter++;
-
-            ComPtr<IDXGIAdapter1> candidateAdapter;
-            if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
-                break;
-
-            DXGI_ADAPTER_DESC1 desc;
-            candidateAdapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            {
-                
-                // TODO: may want to allow software driver as fallback
-            }
-            else
-            {
-                continue;
-            }
-
-            if (SUCCEEDED(D3D12CreateDevice_(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
-            {
-                // We found one!
-                adapter = candidateAdapter;
-                break;
-            }
+            break;
         }
     }
 
@@ -1393,27 +1443,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         // Couldn't find an adapter
         return SLANG_FAIL;
     }
-
-    // set up debug layer
-#ifndef NDEBUG
-    {
-
-        LOAD_D3D_PROC(PFN_D3D12_GET_DEBUG_INTERFACE, D3D12GetDebugInterface);
-        if (!D3D12GetDebugInterface_)
-        {
-            return SLANG_FAIL;
-        }
-
-        ComPtr<ID3D12Debug> debug;
-
-        if (!SUCCEEDED(D3D12GetDebugInterface_(IID_PPV_ARGS(debug.writeRef()))))
-        {
-            return SLANG_FAIL;
-        }
-
-        debug->EnableDebugLayer();
-    }
-#endif
 
     m_numRenderFrames = 3;
     m_numRenderTargets = 2;
