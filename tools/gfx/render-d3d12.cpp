@@ -1412,8 +1412,8 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     // up to each back-end to specify.
 
     // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
-    uint32_t flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
-    SwitchType switchTypes[] =
+    const DeviceCheckFlags flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
+    const SwitchType switchTypes[] =
     {
         SwitchType::OnOff,                  ///< First try fully featured, then degrade features
         SwitchType::OnOff,                  ///< First try hardware, then reference
@@ -1424,15 +1424,15 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 #endif
     };
 
-    List<uint32_t> combinations;
-    CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), combinations);
+    List<DeviceCheckFlags> flagCombinations;
+    CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), flagCombinations);
 
     ComPtr<IDXGIFactory4> dxgiFactory;
     ComPtr<IDXGIAdapter> adapter;
-    for (const auto combination : combinations)
+    for (const auto deviceCheckFlags : flagCombinations)
     {
         adapter.setNull();
-        if (SLANG_SUCCEEDED(_createAdaptor(combination, dxgiFactory, adapter)))
+        if (SLANG_SUCCEEDED(_createAdaptor(deviceCheckFlags, dxgiFactory, adapter)))
         {
             break;
         }

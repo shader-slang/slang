@@ -445,13 +445,14 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     const int totalNumFeatureLevels = SLANG_COUNT_OF(featureLevels);
 
     {
+        typedef uint32_t DeviceCheckFlags;
         // On a machine that does not have an up-to-date version of D3D installed,
         // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
         // if you ask for feature level 11_1. The workaround is to call
         // `D3D11CreateDeviceAndSwapChain` the first time with 11_1 and then if that fails with 11_0
-        struct DeviceCheck
+        struct DeviceCheckFlag
         {
-            enum Enum : uint32_t
+            enum Enum : DeviceCheckFlags
             {
                 UseFullFeatureLevel     = 0x1,      //< If set will use full feature level (to D3D_FEATURE_LEVEL_11_1) else will try D3D_FEATURE_LEVEL_11_0
                 UseHardwareDevice       = 0x2,      //< If set will try a hardware device
@@ -464,7 +465,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         // up to each back-end to specify.
 
         // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
-        uint32_t flags[] = { DeviceCheck::UseFullFeatureLevel, DeviceCheck::UseHardwareDevice, DeviceCheck::UseDebug };
+        DeviceCheckFlags flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
         SwitchType switchTypes[] =
         {
             SwitchType::OnOff,                  ///< First try fully featured, then degrade features
@@ -476,16 +477,15 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 #endif
         };
 
-        List<uint32_t> combinations;
-        CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), combinations);
+        List<DeviceCheckFlags> flagCombinations;
+        CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), flagCombinations);
 
         Result res = SLANG_FAIL;
-        for (const auto combination: combinations)
+        for (const DeviceCheckFlags deviceCheckFlags: flagCombinations)
         {
-            const D3D_DRIVER_TYPE driverType = (combination & DeviceCheck::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
-            const int startFeatureIndex = (combination & DeviceCheck::UseFullFeatureLevel) ? 0 : 1; 
-
-            const UINT deviceFlags = (combination & DeviceCheck::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
+            const D3D_DRIVER_TYPE driverType = (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
+            const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
+            const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
             res = D3D11CreateDeviceAndSwapChain_(
                 nullptr,                    // adapter (use default)
