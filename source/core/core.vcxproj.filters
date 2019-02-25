@@ -48,6 +48,9 @@
     <ClInclude Include="slang-byte-encode-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-combination-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-cpu-defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -111,6 +114,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-byte-encode-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-combination-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-free-list.cpp">
