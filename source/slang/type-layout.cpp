@@ -120,12 +120,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
+    SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
         // The default behavior here is to lay out a matrix
-        // as an array of column vectors (that is column-major).
-        // That is because this is the default convention
-        // used by HLSL.
+        // as an array of row vectors (that is row-major).
         //
         // In practice, the code that calls `GetMatrixLayout` will
         // potentially transpose the row/column counts in order
@@ -1991,48 +1989,105 @@ SimpleLayoutInfo GetLayoutImpl(
     }
     else if(auto vecType = as<VectorExpressionType>(type))
     {
-        return GetSimpleLayoutImpl(
-            rules->GetVectorLayout(
-                GetLayout(context, vecType->elementType.Ptr()),
-                (size_t) GetIntVal(vecType->elementCount)),
-            type,
-            rules,
-            outTypeLayout);
+        auto elementType = vecType->elementType;
+        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+
+        RefPtr<TypeLayout> elementTypeLayout;
+        auto elementInfo = GetLayoutImpl(
+            context,
+            elementType,
+            outTypeLayout ? &elementTypeLayout : nullptr);
+
+        auto info = rules->GetVectorLayout(elementInfo, elementCount);
+
+        if( outTypeLayout )
+        {
+            RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
+            *outTypeLayout = typeLayout;
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+            typeLayout->uniformAlignment = info.alignment;
+
+            typeLayout->elementTypeLayout = elementTypeLayout;
+            typeLayout->uniformStride = elementInfo.getUniformLayout().size.getFiniteValue();
+
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return info;
     }
     else if(auto matType = as<MatrixExpressionType>(type))
     {
-        // The `GetMatrixLayout` implementation in the layout rules
-        // currently defaults to assuming column-major layout,
-        // so if we want row-major layout we achieve it here by
-        // transposing the row/column counts.
-        //
-        // TODO: If it is really a universal convention that matrices
-        // are laid out just like arrays of vectors, when we can
-        // probably eliminate the `virtual` `GetLayout` method entirely,
-        // and have the code here be responsible for the layout choice.
-        //
         size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
         size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+
+        auto elementType = matType->getElementType();
+        RefPtr<TypeLayout> elementTypeLayout;
+        auto elementInfo = GetLayoutImpl(
+            context,
+            elementType,
+            outTypeLayout ? &elementTypeLayout : nullptr);
+
+        // The `GetMatrixLayout` implementation in the layout rules
+        // currently defaults to assuming row-major layout,
+        // so if we want column-major layout we achieve it here by
+        // transposing the major/minor axes counts.
+        //
+        size_t layoutMajorCount = rowCount;
+        size_t layoutMinorCount = colCount;
         if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
         {
-            size_t tmp = rowCount;
-            rowCount = colCount;
-            colCount = tmp;
+            size_t tmp = layoutMajorCount;
+            layoutMajorCount = layoutMinorCount;
+            layoutMinorCount = tmp;
         }
-
         auto info = rules->GetMatrixLayout(
-            GetLayout(context, matType->getElementType()),
-            rowCount,
-            colCount);
+            elementInfo,
+            layoutMajorCount,
+            layoutMinorCount);
 
         if (outTypeLayout)
         {
+            auto rowType = matType->getRowType();
+            RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
+
+            auto rowInfo = rules->GetVectorLayout(
+                elementInfo,
+                colCount);
+
+            size_t majorStride = info.elementStride;
+            size_t minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
+
+            size_t rowStride = 0;
+            size_t colStride = 0;
+            if(context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+            {
+                colStride = majorStride;
+                rowStride = minorStride;
+            }
+            else
+            {
+                rowStride = majorStride;
+                colStride = minorStride;
+            }
+
+            rowTypeLayout->type = type;
+            rowTypeLayout->rules = rules;
+            rowTypeLayout->uniformAlignment = elementInfo.alignment;
+
+            rowTypeLayout->uniformStride = colStride;
+            rowTypeLayout->elementTypeLayout = elementTypeLayout;
+            rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+
             RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
             *outTypeLayout = typeLayout;
 
             typeLayout->type = type;
             typeLayout->rules = rules;
             typeLayout->uniformAlignment = info.alignment;
+
+            typeLayout->elementTypeLayout = rowTypeLayout;
+            typeLayout->uniformStride = rowStride;
             typeLayout->mode = context.matrixLayoutMode;
 
             typeLayout->addResourceUsage(info.kind, info.size);
