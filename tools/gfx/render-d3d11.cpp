@@ -15,6 +15,7 @@
 //#include <slang.h>
 
 #include "../../slang-com-ptr.h"
+#include "flag-combiner.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -412,17 +413,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    UINT deviceFlags = 0;
-
-#ifdef _DEBUG
-    // We will enable the D3D debug more for debug builds.
-    //
-    // TODO: we should probably provide a command-line option
-    // to override this kind of default rather than leave it
-    // up to each back-end to specify.
-    deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
     // Our swap chain uses RGBA8 with sRGB, with double buffering.
     DXGI_SWAP_CHAIN_DESC swapChainDesc = { 0 };
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -454,22 +444,35 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_9_1;
     const int totalNumFeatureLevels = SLANG_COUNT_OF(featureLevels);
 
-    // On a machine that does not have an up-to-date version of D3D installed,
-    // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
-    // if you ask for featuer level 11_1. The workaround is to call
-    // `D3D11CreateDeviceAndSwapChain` up to twice: the first time with 11_1
-    // at the start of the list of requested feature levels, and the second
-    // time without it.
-    // 
-    // We first try create using hardware and then software (reference) driver
-    // Test until we get a successful result
-
     {
+        // On a machine that does not have an up-to-date version of D3D installed,
+        // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
+        // if you ask for feature level 11_1 (DeviceCheckFlag::UseFullFeatureLevel).
+        // The workaround is to call `D3D11CreateDeviceAndSwapChain` the first time
+        // with 11_1 and then back off to 11_0 if that fails.
+
+        FlagCombiner combiner;
+        combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
+        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+
+        // TODO: we should probably provide a command-line option
+        // to override UseDebug of default rather than leave it
+        // up to each back-end to specify.
+
+#if _DEBUG
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
+#else
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
+#endif
+
+        const int numCombinations = combiner.getNumCombinations();
         Result res = SLANG_FAIL;
-        for (int ii = 0; ii < 4; ++ii)
+        for (int i = 0; i < numCombinations; ++i)
         {
-            const D3D_DRIVER_TYPE driverType = (ii & 2) ? D3D_DRIVER_TYPE_REFERENCE : D3D_DRIVER_TYPE_HARDWARE;
-            const int startFeatureIndex = (ii & 1);
+            const auto deviceCheckFlags = combiner.getCombination(i);
+            const D3D_DRIVER_TYPE driverType = (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
+            const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
+            const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
             res = D3D11CreateDeviceAndSwapChain_(
                 nullptr,                    // adapter (use default)

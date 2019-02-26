@@ -18,6 +18,9 @@
     <ClInclude Include="descriptor-heap-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="flag-combiner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -75,6 +78,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="descriptor-heap-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="flag-combiner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gui.cpp">
