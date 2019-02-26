@@ -895,14 +895,14 @@ SimpleLayoutInfo GetLayout(
 
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
-RefPtr<TypeLayout> CreateTypeLayout(
+RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type);
 
 // Create a full type layout for a type, while applying the given "simple"
 // layout information as an offset to any `VarLayout`s created along
 // the way.
-RefPtr<TypeLayout> CreateTypeLayout(
+RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type,
     SimpleLayoutInfo            offset);

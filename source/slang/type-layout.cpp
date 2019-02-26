@@ -1517,7 +1517,7 @@ createStructuredBufferTypeLayout(
         LayoutRule::HLSLStructuredBuffer);
 
     // Create and save type layout for the buffer contents.
-    auto elementTypeLayout = CreateTypeLayout(
+    auto elementTypeLayout = createTypeLayout(
         context.with(structuredBufferLayoutRules),
         elementType.Ptr());
 
@@ -2562,15 +2562,6 @@ SimpleLayoutInfo GetLayout(
 }
 
 RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type)
-{
-    RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout);
-    return typeLayout;
-}
-
-RefPtr<TypeLayout> CreateTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
