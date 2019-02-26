@@ -26,7 +26,7 @@
 #include <d3dcompiler.h>
 
 #include "../../slang-com-ptr.h"
-#include "../../source/core/slang-combination-util.h"
+#include "flag-combiner.h"
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
@@ -102,17 +102,7 @@ public:
     ~D3D12Renderer();
 
 protected:
-    typedef uint32_t DeviceCheckFlags;
-    struct DeviceCheckFlag
-    {
-        enum Enum : DeviceCheckFlags
-        {
-            UseFullFeatureLevel = 0x1,      //< If set will use full feature level (to D3D_FEATURE_LEVEL_11_1) else will try D3D_FEATURE_LEVEL_11_0
-            UseHardwareDevice = 0x2,        //< If set will try a hardware device
-            UseDebug = 0x4,                 //< If set will enable use of debug
-        };
-    };
-
+    
     static const Int kMaxNumRenderFrames = 4;
     static const Int kMaxNumRenderTargets = 3;
 
@@ -1407,32 +1397,27 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
+    FlagCombiner combiner;
+    combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
+    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+
     // TODO: we should probably provide a command-line option
     // to override UseDebug of default rather than leave it
     // up to each back-end to specify.
 
-    // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
-    const DeviceCheckFlags flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
-    const SwitchType switchTypes[] =
-    {
-        SwitchType::OnOff,                  ///< First try fully featured, then degrade features
-        SwitchType::OnOff,                  ///< First try hardware, then reference
 #if ENABLE_DEBUG_LAYER
-        SwitchType::OnOff,                  ///< First try debug then non debug
+    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
 #else
-        SwitchType::Off,                    ///< On release we only don't bother with debug
+    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
-    };
-
-    List<DeviceCheckFlags> flagCombinations;
-    CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), flagCombinations);
 
     ComPtr<IDXGIFactory4> dxgiFactory;
     ComPtr<IDXGIAdapter> adapter;
-    for (const auto deviceCheckFlags : flagCombinations)
+    const int numCombinations = combiner.getNumCombinations();
+    for (int i = 0; i < numCombinations; ++i)
     {
         adapter.setNull();
-        if (SLANG_SUCCEEDED(_createAdaptor(deviceCheckFlags, dxgiFactory, adapter)))
+        if (SLANG_SUCCEEDED(_createAdaptor(combiner.getCombination(i), dxgiFactory, adapter)))
         {
             break;
         }

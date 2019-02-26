@@ -15,7 +15,7 @@
 //#include <slang.h>
 
 #include "../../slang-com-ptr.h"
-#include "../../source/core/slang-combination-util.h"
+#include "flag-combiner.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -445,44 +445,27 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     const int totalNumFeatureLevels = SLANG_COUNT_OF(featureLevels);
 
     {
-        typedef uint32_t DeviceCheckFlags;
-        // On a machine that does not have an up-to-date version of D3D installed,
-        // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
-        // if you ask for feature level 11_1. The workaround is to call
-        // `D3D11CreateDeviceAndSwapChain` the first time with 11_1 and then if that fails with 11_0
-        struct DeviceCheckFlag
-        {
-            enum Enum : DeviceCheckFlags
-            {
-                UseFullFeatureLevel     = 0x1,      //< If set will use full feature level (to D3D_FEATURE_LEVEL_11_1) else will try D3D_FEATURE_LEVEL_11_0
-                UseHardwareDevice       = 0x2,      //< If set will try a hardware device
-                UseDebug                = 0x4,      //< If set will enable use of debug
-            };
-        };
+        // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
+
+        FlagCombiner combiner;
+        combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
+        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
 
         // TODO: we should probably provide a command-line option
         // to override UseDebug of default rather than leave it
         // up to each back-end to specify.
 
-        // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
-        DeviceCheckFlags flags[] = { DeviceCheckFlag::UseFullFeatureLevel, DeviceCheckFlag::UseHardwareDevice, DeviceCheckFlag::UseDebug };
-        SwitchType switchTypes[] =
-        {
-            SwitchType::OnOff,                  ///< First try fully featured, then degrade features
-            SwitchType::OnOff,                  ///< First try hardware, then reference
 #if _DEBUG
-            SwitchType::OnOff,                  ///< First try debug then non debug
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
 #else
-            SwitchType::Off,                    ///< On release we only don't bother with debug
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
-        };
 
-        List<DeviceCheckFlags> flagCombinations;
-        CombinationUtil::calc(flags, switchTypes, SLANG_COUNT_OF(flags), flagCombinations);
-
+        const int numCombinations = combiner.getNumCombinations();
         Result res = SLANG_FAIL;
-        for (const DeviceCheckFlags deviceCheckFlags: flagCombinations)
+        for (int i = 0; i < numCombinations; ++i)
         {
+            const auto deviceCheckFlags = combiner.getCombination(i);
             const D3D_DRIVER_TYPE driverType = (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
             const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
