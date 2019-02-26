@@ -447,15 +447,10 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         // On a machine that does not have an up-to-date version of D3D installed,
         // the `D3D11CreateDeviceAndSwapChain` call will fail with `E_INVALIDARG`
-        // if you ask for feature level 11_1. The workaround is to call
-        // `D3D11CreateDeviceAndSwapChain` up to twice: the first time with 11_1
-        // at the start of the list of requested feature levels, and the second
-        // time without it.
-        // 
-        // We first try create using hardware and then software (reference) driver
-        // Test until we get a successful result
+        // if you ask for feature level 11_1 (DeviceCheckFlag::UseFullFeatureLevel).
+        // The workaround is to call `D3D11CreateDeviceAndSwapChain` the first time
+        // with 11_1 and then back off to 11_0 if that fails.
 
-        // In order of changing test/s, so UseFullFeatureLevel will be tried On and then Off, before UseHardwareDevice is changed
         FlagCombiner combiner;
         combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
         combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
