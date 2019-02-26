@@ -26,9 +26,9 @@ enum class ChangeType
     OffOn,              ///< Initially off then on
 };
 
-/* Calculates all the combinations of flags specified the order they are added and the switch types.
-The entries are added controls the order that they will change, with the first specified being changed (if changing) first.
-Typically used to iterate over all the combinations of flags.
+/* Calculates all the combinations of flags as controlled by the change types.
+The earlier a flag/changeType is added increases the frequency the flag will change. This can be used to control the
+'importance' of a change, earlier added items will iterate through their combinations first.
 */
 class FlagCombiner
 {
