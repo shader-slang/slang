@@ -2554,11 +2554,161 @@ SimpleLayoutInfo GetLayoutImpl(
         outTypeLayout);
 }
 
-SimpleLayoutInfo GetLayout(
-    TypeLayoutContext const&    context,
-    Type*                       inType)
+RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
+    TypeLayoutContext const&            context,
+    Type*                               type,
+    EntryPointParameterDirectionMask    directionMask)
 {
-    return GetLayoutImpl(context, inType, nullptr);
+    auto rules = context.rules;
+
+    // TODO: This logic should ideally share as much
+    // as possible with the `GetLayoutImpl` function,
+    // to avoid duplication, but we also have to deal
+    // with the many ways in which varying parameter
+    // layout differs from non-varying layout.
+
+    // We will compute resource consumption for the type
+    // as a varying input, output, or both/neither.
+    // To avoid duplication, we'll build an array that
+    // includes all the layout rules we need to apply.
+    //
+    int varyingRulesCount = 0;
+    LayoutRulesImpl* varyingRules[2];
+
+    if( directionMask & kEntryPointParameterDirection_Input )
+    {
+        varyingRules[varyingRulesCount++] = context.getRulesFamily()->getVaryingInputRules();
+    }
+    if( directionMask & kEntryPointParameterDirection_Output )
+    {
+        varyingRules[varyingRulesCount++] = context.getRulesFamily()->getVaryingOutputRules();
+    }
+
+    if(auto basicType = as<BasicExpressionType>(type))
+    {
+        auto baseType = basicType->baseType;
+
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if(auto vecType = as<VectorExpressionType>(type))
+    {
+        auto elementType = vecType->elementType;
+        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+
+        BaseType elementBaseType = BaseType::Void;
+        if( auto elementBasicType = as<BasicExpressionType>(elementType) )
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
+        // Note that we do *not* add any resource usage to the type
+        // layout for the element type, because we currently cannot count
+        // varying parameter usage at a granularity finer than
+        // individual "locations."
+        //
+        RefPtr<TypeLayout> elementTypeLayout = new TypeLayout();
+        elementTypeLayout->type = elementType;
+        elementTypeLayout->rules = rules;
+
+        RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
+        typeLayout->type = vecType;
+        typeLayout->rules = rules;
+        typeLayout->elementTypeLayout = elementTypeLayout;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto info = varyingRuleSet->GetVectorLayout(elementInfo, elementCount);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if(auto matType = as<MatrixExpressionType>(type))
+    {
+        size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
+        size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+        auto elementType = matType->getElementType();
+
+        BaseType elementBaseType = BaseType::Void;
+        if( auto elementBasicType = as<BasicExpressionType>(elementType) )
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
+        // Just as for `GetLayoutImpl`, we need to handle row- and
+        // column-major matrices differently, to ensure we get
+        // the expected layout.
+        //
+        // A varying parameter with row-major layout is effectively
+        // just an array of row vectors, while a column-major one
+        // is just an array of column vectors.
+        //
+        size_t layoutMajorCount = rowCount;
+        size_t layoutMinorCount = colCount;
+        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        {
+            size_t tmp = layoutMajorCount;
+            layoutMajorCount = layoutMinorCount;
+            layoutMinorCount = tmp;
+        }
+
+        RefPtr<TypeLayout> elementTypeLayout = new TypeLayout();
+        elementTypeLayout->type = elementType;
+        elementTypeLayout->rules = rules;
+
+        RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
+        rowTypeLayout->type = matType->getRowType();
+        rowTypeLayout->rules = rules;
+        rowTypeLayout->elementTypeLayout = elementTypeLayout;
+
+        RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+        typeLayout->elementTypeLayout = rowTypeLayout;
+        typeLayout->mode = context.matrixLayoutMode;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+
+            auto info = varyingRuleSet->GetMatrixLayout(elementInfo, layoutMajorCount, layoutMinorCount);
+            typeLayout->addResourceUsage(info.kind, info.size);
+
+            if(context.matrixLayoutMode == kMatrixLayoutMode_RowMajor)
+            {
+                // For row-major matrices only, we can compute an effective
+                // resource usage for the row type.
+                auto rowInfo = varyingRuleSet->GetVectorLayout(elementInfo, colCount);
+                rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+            }
+        }
+
+        return typeLayout;
+    }
+
+    // catch-all case in case nothing matched
+    SLANG_ASSERT(!"unimplemented case for varying parameter layout");
+    SimpleLayoutInfo info;
+    RefPtr<TypeLayout> typeLayout;
+    GetSimpleLayoutImpl(
+        info,
+        type,
+        rules,
+        &typeLayout);
+    return typeLayout;
 }
 
 RefPtr<TypeLayout> createTypeLayout(

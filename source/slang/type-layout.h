@@ -506,7 +506,7 @@ public:
     RefPtr<TypeLayout>  elementTypeLayout;
 
         /// The stride in bytes between elements.
-    size_t              uniformStride;
+    size_t              uniformStride = 0;
 };
 
     /// Type layout for an array type
@@ -856,7 +856,7 @@ struct TypeLayoutContext
     MatrixLayoutMode    matrixLayoutMode;
 
     LayoutRulesImpl* getRules() { return rules; }
-    LayoutRulesFamilyImpl* getRulesFamily() { return rules->getLayoutRulesFamily(); }
+    LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
 
     TypeLayoutContext with(LayoutRulesImpl* inRules) const
     {
@@ -885,13 +885,23 @@ TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest*  targetReq,
     ProgramLayout*  programLayout);
 
-// Get the "simple" layout for a type according to a given set of layout
-// rules. Note that a "simple" layout can only consume one `LayoutResourceKind`,
-// and so this operation may not correctly capture the full resource usage
-// of a type.
-SimpleLayoutInfo GetLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type);
+    /// Direction(s) of a varying shader parameter
+typedef unsigned int EntryPointParameterDirectionMask;
+enum
+{
+    kEntryPointParameterDirection_Input  = 0x1,
+    kEntryPointParameterDirection_Output = 0x2,
+};
+
+
+    /// Get layout information for a simple varying parameter type.
+    ///
+    /// A simple varying parameter is a scalar, vector, or matrix.
+    ///
+RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
+    TypeLayoutContext const&            context,
+    Type*                               type,
+    EntryPointParameterDirectionMask    directionMask);
 
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
