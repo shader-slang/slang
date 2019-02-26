@@ -38,7 +38,7 @@ uint32_t FlagCombiner::getCombination(int index) const
 
     uint32_t combination = 0;
     uint32_t bit = 1;
-    for (int i = 0; i < m_numChangingBits; ++i, bit += bit)
+    for (int i = m_numChangingBits - 1; i >= 0; --i, bit += bit)
     {
         combination |= ((bit & index) ? m_changingBits[i] : 0);
     }
