@@ -388,7 +388,7 @@ namespace Slang
         }
         for (int ii = 0; ii < recoverAfterCount; ++ii)
         {
-            switch (recoverBefore[ii])
+            switch (recoverAfter[ii])
             {
             default:
                 break;
@@ -454,8 +454,9 @@ namespace Slang
                     // We are looking for end-of-file, so it is okay to skip here
                 }
                 else
-
-                return false;
+                {
+                    return false;
+                }
             }
 
             // Skip balanced tokens and try again.
@@ -1856,12 +1857,6 @@ namespace Slang
             }
         }
 
-        // GLSL allows `[]` directly in a type specifier
-        if (parser->getSourceLanguage() == SourceLanguage::GLSL)
-        {
-            typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
-        }
-
         typeSpec.expr = typeExpr;
         return typeSpec;
     }
@@ -3023,8 +3018,9 @@ namespace Slang
         FillPosition(rs.Ptr());
         ReadToken("class");
         rs->nameAndLoc = expectIdentifier(this);
-        ReadToken(TokenType::LBrace);
+
         parseOptionalInheritanceClause(this, rs.Ptr());
+
         parseAggTypeDeclBody(this, rs.Ptr());
         return rs;
     }
