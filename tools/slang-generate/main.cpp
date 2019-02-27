@@ -602,23 +602,21 @@ void emitCodeNodes(
 }
 
 // Given line starts and a location, find the line number. Returns -1 if not found
-static int _findLine(const List<const char*>& lineStarts, const char* location)
+static int _findLineIndex(const List<const char*>& lineBreaks, const char* location)
 {
     if (location == nullptr)
     {
         return -1;
     }
 
-    // At this point we can assume the `lineBreakOffsets` array has been filled in.
-    // We will use a binary search to find the line index that contains our
-    // chosen offset.
+    // Use a binary chop to find the associated line
     int lo = 0;
-    int hi = int(lineStarts.Count());
+    int hi = int(lineBreaks.Count());
 
     while (lo + 1 < hi)
     {
         const int mid = (hi + lo) >> 1;
-        const auto midOffset = lineStarts[mid];
+        const auto midOffset = lineBreaks[mid];
         if (midOffset <= location)
         {
             lo = mid;
@@ -632,7 +630,7 @@ static int _findLine(const List<const char*>& lineStarts, const char* location)
     return lo;
 }
 
-static void _calcLineStarts(const UnownedStringSlice& content, List<const char*>& outLineStarts)
+static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>& outLineStarts)
 {
     char const* begin = content.begin();
     char const* end = content.end();
@@ -674,8 +672,8 @@ void emitTemplateNodes(
     Node*   node)
 {
     // Work out
-    List<const char*> lineStarts;
-    _calcLineStarts(sourceFile->text, lineStarts);
+    List<const char*> lineBreaks;
+    _calcLineBreaks(sourceFile->text, lineBreaks);
 
     Node* prev = nullptr;
     for (auto nn = node; nn; prev = nn, nn = nn->next)
@@ -685,12 +683,12 @@ void emitTemplateNodes(
         if (enable && prev && prev->flavor == Node::Flavor::escape && nn->flavor == Node::Flavor::text)
         {
             // Find the line
-            int line = _findLine(lineStarts, nn->span.begin());
+            int lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
             // If found, output the directive
-            if (line >= 0)
+            if (lineIndex >= 0)
             {
                 StringBuilder buf;
-                buf << "SLANG_RAW(\"#line " << (line + 1) << " \\\"" << sourceFile->inputPath << "\\\"\")\n";
+                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->inputPath << "\\\"\")\n";
 
                 emit(stream, buf.getUnownedSlice());
             }
