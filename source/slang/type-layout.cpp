@@ -1561,7 +1561,7 @@ static TypeLayoutResult _createTypeLayout(
 
     /// Create layout information for the given `type`, obeying any layout modifiers on the given declaration.
     ///
-    /// If `declForModifiers` has any matrix layout modifiers assocaited with it, then
+    /// If `declForModifiers` has any matrix layout modifiers associated with it, then
     /// the resulting type layout will respect those modifiers.
     ///
 static TypeLayoutResult _createTypeLayout(
@@ -2435,7 +2435,7 @@ static TypeLayoutResult _createTypeLayout(
     {
         // An error type means that we encountered something we don't understand.
         //
-        // We should probalby inform the user with an error message here.
+        // We should probably inform the user with an error message here.
 
         return createSimpleTypeLayout(
             SimpleLayoutInfo(),
