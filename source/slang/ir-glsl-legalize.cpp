@@ -340,6 +340,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         name = "gl_InvocationID";
     }
+    else if (semanticName == "sv_pointsize")
+    {
+        name = "gl_PointSize";
+    }
     else if(semanticName == "sv_primitiveid")
     {
         name = "gl_PrimitiveID";

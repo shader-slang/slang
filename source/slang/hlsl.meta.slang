@@ -375,28 +375,33 @@ double asdouble(uint lowbits, uint highbits);
 
 // Reinterpret bits as a float (HLSL SM 4.0)
 
+// GLSL Scalar
 __target_intrinsic(glsl, "intBitsToFloat")
 float asfloat(int x);
 __target_intrinsic(glsl, "uintBitsToFloat")
 float asfloat(uint x);
 
+// GLSL Vector
 __generic<let N : int>
 __target_intrinsic(glsl, "intBitsToFloat")
 vector<float,N> asfloat(vector< int,N> x);
-
 __generic<let N : int>
 __target_intrinsic(glsl, "uintBitsToFloat")
 vector<float,N> asfloat(vector<uint,N> x);
 
-float asfloat( int x);
-__target_intrinsic(glsl, uintBitsToFloat)
+// No op
+__intrinsic_op($(kIRPseudoOp_Pos))
+float asfloat(float x);
+__generic<let N : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+vector<float,N> asfloat(vector<float,N> x);
+__generic<let N : int, let M : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+matrix<float,N,M> asfloat(matrix<float,N,M> x);
+
+// Pass thru to HLSL
 float asfloat(uint x);
-__generic<let N : int>
-__target_intrinsic(glsl, intBitsAsFloat)
-vector<float,N> asfloat(vector< int,N> x);
-__generic<let N : int>
-__target_intrinsic(glsl, uintBitsAsFloat)
-vector<float,N> asfloat(vector<uint,N> x);
+float asfloat(int x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);
 __generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);
 
@@ -407,29 +412,36 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M
 
 // Reinterpret bits as an int (HLSL SM 4.0)
 
+// GLSL scalar
 __target_intrinsic(glsl, "floatBitsToInt")
 int asint(float x);
-
-__generic<let N : int>
-__target_intrinsic(glsl, "floatBitsToInt")
-vector<int,N> asint(vector<float,N> x);
-
 __target_intrinsic(glsl, "int($0)")
 int asint(uint x);
 
+// GLSL Vector
+__generic<let N : int>
+__target_intrinsic(glsl, "floatBitsToInt")
+vector<int,N> asint(vector<float,N> x);
 __generic<let N : int>
 __target_intrinsic(glsl, "ivec$N0($0)")
 vector<int,N> asint(vector<uint,N> x);
 
+// No op
+__intrinsic_op($(kIRPseudoOp_Pos))
+int asint(int x);
+__generic<let N : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+vector<int,N> asint(vector<int,N> x);
+__generic<let N : int, let M : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+matrix<int,N,M> asint(matrix<int,N,M> x);
+
+// Pass thru HLSL
+
 int asint(float x);
-__target_intrinsic(glsl, "uint($0)")
 int asint(uint x);
 
-__generic<let N : int> 
-__target_intrinsic(glsl, floatBitsToInt)
-vector<int,N> asint(vector<float,N> x);
-__generic<let N : int> 
-vector<int,N> asint(vector<uint,N> x);
+__generic<let N : int> vector<int,N> asint(vector<uint,N> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
 
@@ -442,24 +454,38 @@ void asuint(double value, out uint lowbits, out uint highbits);
 void asuint(double value, out uint lowbits, out uint highbits);
 
 // Reinterpret bits as a uint (HLSL SM 4.0)
+
+// GLSL Scalar
 __target_intrinsic(glsl, "floatBitsToUint")
 uint asuint(float x);
-
-__generic<let N : int>
-__target_intrinsic(glsl, "floatBitsToUint")
-vector<uint,N> asuint(vector<float,N> x);
-
 __target_intrinsic(glsl, "uint($0)")
 uint asuint(int x);
 
+// GLSL Vector
+__generic<let N : int>
+__target_intrinsic(glsl, "floatBitsToUint")
+vector<uint,N> asuint(vector<float,N> x);
 __generic<let N : int>
 __target_intrinsic(glsl, "uvec$N0($0)")
 vector<uint,N> asuint(vector<int,N> x);
 
+// No op
+__intrinsic_op($(kIRPseudoOp_Pos))
+uint asuint(uint x);
+__generic<let N : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+vector<uint,N> asuint(vector<uint,N> x);
+__generic<let N : int, let M : int>
+__intrinsic_op($(kIRPseudoOp_Pos))
+matrix<uint,N,M> asuint(matrix<uint,N,M> x);
+
+// Pass thru HLSL
 uint asuint(float x);
 uint asuint(int x);
+
 __generic<let N : int> vector<uint,N> asuint(vector<float,N> x);
 __generic<let N : int> vector<uint,N> asuint(vector<int,N> x);
+
 __generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<float,N,M> x);
 __generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<int,N,M> x);
 
