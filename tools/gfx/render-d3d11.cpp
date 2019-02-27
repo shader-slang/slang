@@ -452,9 +452,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         // with 11_1 and then back off to 11_0 if that fails.
 
         FlagCombiner combiner;
-        combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
-        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
-
         // TODO: we should probably provide a command-line option
         // to override UseDebug of default rather than leave it
         // up to each back-end to specify.
@@ -464,6 +461,8 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 #else
         combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
+        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+        combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
 
         const int numCombinations = combiner.getNumCombinations();
         Result res = SLANG_FAIL;
