@@ -843,7 +843,7 @@ namespace Slang
 
 // Implementations in `dxc-support.cpp`
 
-int emitDXILForEntryPointUsingDXC(
+SlangResult emitDXILForEntryPointUsingDXC(
     BackEndCompileRequest*  compileRequest,
     EntryPoint*             entryPoint,
     Int                     entryPointIndex,

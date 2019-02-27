@@ -27,8 +27,16 @@ enum class ChangeType
 };
 
 /* Calculates all the combinations of flags as controlled by the change types.
-The earlier a flag/changeType is added increases the frequency the flag will change. This can be used to control the
-'importance' of a change, earlier added items will iterate through their combinations first.
+
+The order of adding flags can be considered to be like a nested loop
+for (first added) {
+    for (second added)
+    {
+        ///..
+    }
+}
+
+So the last added flags will have the highest frequency. 
 */
 class FlagCombiner
 {
