@@ -265,7 +265,7 @@ namespace Slang
             /// Get the module that contains the entry point.
         Module* getModule();
 
-            /// Get the linkage that contains the module for this entry pooint.
+            /// Get the linkage that contains the module for this entry point.
         Linkage* getLinkage();
 
             /// Get a list of modules that this entry point depends on.
