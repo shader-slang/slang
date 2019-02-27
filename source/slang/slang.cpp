@@ -1488,6 +1488,14 @@ void Session::addBuiltinSource(
         m_builtinLinkage,
         &sink);
 
+    SourceManager* sourceManager = getBuiltinSourceManager();
+
+    // Set the source manager on the sink
+    sink.sourceManager = sourceManager;
+    // Make the linkage use the builtin source manager
+    Linkage* linkage = compileRequest->getLinkage();
+    linkage->setSourceManager(sourceManager);
+
     Name* moduleName = getNamePool()->getName(path);
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, moduleName);
 

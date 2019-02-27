@@ -6970,8 +6970,8 @@ String emitEntryPoint(
     String code = sharedContext.sb.ProduceString();
     sharedContext.sb.Clear();
 
-    // Now that we've emitted the code for all the declaratiosn in the file,
-    // it is time to stich together the final output.
+    // Now that we've emitted the code for all the declarations in the file,
+    // it is time to stitch together the final output.
 
     // There may be global-scope modifiers that we should emit now
     visitor.emitGLSLPreprocessorDirectives();
