@@ -229,7 +229,7 @@ namespace Slang
 
         // Collect any existential-type parameters used by the entry point
         //
-        _collectExistentialParams();
+        _collectShaderParams();
     }
 
     Module* EntryPoint::getModule()

@@ -376,7 +376,6 @@ public:
 typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
-    IsRedeclaration = 1 << 0, ///< This is a redeclaration of some shader parameter
     HasSemantic = 1 << 1
 };
 
