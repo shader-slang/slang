@@ -120,12 +120,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
+    SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
         // The default behavior here is to lay out a matrix
-        // as an array of column vectors (that is column-major).
-        // That is because this is the default convention
-        // used by HLSL.
+        // as an array of row vectors (that is row-major).
         //
         // In practice, the code that calls `GetMatrixLayout` will
         // potentially transpose the row/column counts in order
@@ -880,26 +878,50 @@ bool IsResourceKind(LayoutResourceKind kind)
 
 }
 
-SimpleLayoutInfo GetSimpleLayoutImpl(
+    /// A custom tuple to capture the outputs of type layout
+struct TypeLayoutResult
+{
+        /// The actual heap-allocated layout object with all the details
+    RefPtr<TypeLayout>  layout;
+
+        /// A simplified representation of layout information.
+        ///
+        /// This information is suitable for the case where a type only
+        /// consumes a single resource.
+        ///
+    SimpleLayoutInfo    info;
+
+        /// Default constructor.
+    TypeLayoutResult()
+    {}
+
+        /// Construct a result from the given layout object and simple layout info.
+    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
+        : layout(inLayout)
+        , info(inInfo)
+    {}
+};
+
+    /// Create a type layout for a type that has simple layout needs.
+    ///
+    /// This handles any type that can express its layout in `SimpleLayoutInfo`,
+    /// and that only needs a `TypeLayout` and not a refined subclass.
+    ///
+static TypeLayoutResult createSimpleTypeLayout(
     SimpleLayoutInfo        info,
     RefPtr<Type>            type,
-    LayoutRulesImpl*        rules,
-    RefPtr<TypeLayout>*     outTypeLayout)
+    LayoutRulesImpl*        rules)
 {
-    if (outTypeLayout)
-    {
-        RefPtr<TypeLayout> typeLayout = new TypeLayout();
-        *outTypeLayout = typeLayout;
+    RefPtr<TypeLayout> typeLayout = new TypeLayout();
 
-        typeLayout->type = type;
-        typeLayout->rules = rules;
+    typeLayout->type = type;
+    typeLayout->rules = rules;
 
-        typeLayout->uniformAlignment = info.alignment;
+    typeLayout->uniformAlignment = info.alignment;
 
-        typeLayout->addResourceUsage(info.kind, info.size);
-    }
+    typeLayout->addResourceUsage(info.kind, info.size);
 
-    return info;
+    return TypeLayoutResult(typeLayout, info);
 }
 
 static SimpleLayoutInfo getParameterGroupLayoutInfo(
@@ -1162,8 +1184,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     return newTypeLayout;
 }
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     SimpleLayoutInfo            parameterGroupInfo,
@@ -1357,23 +1378,21 @@ createParameterGroupTypeLayout(
     return typeLayout;
 }
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            parameterGroupRules,
     SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
-    return createParameterGroupTypeLayout(
+    return _createParameterGroupTypeLayout(
         context.with(parameterGroupRules).with(context.targetReq->getDefaultMatrixLayoutMode()),
         parameterGroupType,
         parameterGroupInfo,
         elementTypeLayout);
 }
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
@@ -1408,7 +1427,7 @@ createParameterGroupTypeLayout(
         context.with(elementTypeRules),
         elementType);
 
-    return createParameterGroupTypeLayout(
+    return _createParameterGroupTypeLayout(
         context,
         parameterGroupType,
         info,
@@ -1450,8 +1469,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
 }
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType)
 {
@@ -1464,7 +1482,7 @@ createParameterGroupTypeLayout(
 
     auto elementType = parameterGroupType->elementType;
 
-    return createParameterGroupTypeLayout(
+    return _createParameterGroupTypeLayout(
         context,
         parameterGroupType,
         elementType,
@@ -1519,7 +1537,7 @@ createStructuredBufferTypeLayout(
         LayoutRule::HLSLStructuredBuffer);
 
     // Create and save type layout for the buffer contents.
-    auto elementTypeLayout = CreateTypeLayout(
+    auto elementTypeLayout = createTypeLayout(
         context.with(structuredBufferLayoutRules),
         elementType.Ptr());
 
@@ -1531,21 +1549,41 @@ createStructuredBufferTypeLayout(
 
 }
 
-SimpleLayoutInfo GetLayoutImpl(
+    /// Create layout information for the given `type`.
+    ///
+    /// This internal routine returns both the constructed type
+    /// layout object and the simple layout info, encapsulated
+    /// together as a `TypeLayoutResult`.
+    ///
+static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
-    Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout);
+    Type*                       type);
 
-SimpleLayoutInfo GetLayoutImpl(
+    /// Create layout information for the given `type`, obeying any layout modifiers on the given declaration.
+    ///
+    /// If `declForModifiers` has any matrix layout modifiers associated with it, then
+    /// the resulting type layout will respect those modifiers.
+    ///
+static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout,
     Decl*                       declForModifiers)
 {
     TypeLayoutContext subContext = context;
 
     if (declForModifiers)
     {
+        // TODO: The approach implemented here has a row/column-major
+        // layout model recursively affect any sub-fields (so that
+        // the layout of a nested struct depends on the context where
+        // it is nested). This is consistent with the GLSL behavior
+        // for these modifiers, but it is *not* how HLSL is supposed
+        // to work.
+        //
+        // In the trivial case where `row_major` and `column_major`
+        // are only applied to leaf fields/variables of matrix type
+        // the difference should be immaterial.
+
         if (declForModifiers->HasModifier<RowMajorLayoutModifier>())
             subContext.matrixLayoutMode = kMatrixLayoutMode_RowMajor;
 
@@ -1556,7 +1594,7 @@ SimpleLayoutInfo GetLayoutImpl(
         // layout, such as GLSL `std140`.
     }
 
-    return GetLayoutImpl(subContext, type, outTypeLayout);
+    return _createTypeLayout(subContext, type);
 }
 
 int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
@@ -1824,10 +1862,9 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     }
 }
 
-SimpleLayoutInfo GetLayoutImpl(
+static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
-    Type*                       type,
-    RefPtr<TypeLayout>*         outTypeLayout)
+    Type*                       type)
 {
     auto rules = context.rules;
 
@@ -1851,22 +1888,18 @@ SimpleLayoutInfo GetLayoutImpl(
         //    the constant buffer, which need to be surfaces out
         //    to the top level.
         //
-        if (outTypeLayout)
-        {
-            *outTypeLayout = createParameterGroupTypeLayout(
-                context,
-                parameterGroupType);
-        }
+        auto typeLayout = createParameterGroupTypeLayout(
+            context,
+            parameterGroupType); 
 
-        return info;
+        return TypeLayoutResult(typeLayout, info);
     }
     else if (auto samplerStateType = as<SamplerStateType>(type))
     {
-        return GetSimpleLayoutImpl(
+        return createSimpleTypeLayout(
             rules->GetObjectLayout(ShaderParameterKind::SamplerState),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
     else if (auto textureType = as<TextureType>(type))
     {
@@ -1884,11 +1917,10 @@ SimpleLayoutInfo GetLayoutImpl(
             break;
         }
 
-        return GetSimpleLayoutImpl(
+        return createSimpleTypeLayout(
             rules->GetObjectLayout(kind),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
     else if (auto imageType = as<GLSLImageType>(type))
     {
@@ -1906,11 +1938,10 @@ SimpleLayoutInfo GetLayoutImpl(
             break;
         }
 
-        return GetSimpleLayoutImpl(
+        return createSimpleTypeLayout(
             rules->GetObjectLayout(kind),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
     else if (auto textureSamplerType = as<TextureSamplerType>(type))
     {
@@ -1928,26 +1959,22 @@ SimpleLayoutInfo GetLayoutImpl(
             break;
         }
 
-        return GetSimpleLayoutImpl(
+        return createSimpleTypeLayout(
             rules->GetObjectLayout(kind),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                                \
-    else if(auto type_##TYPE = as<TYPE>(type)) do {                   \
+    else if(auto type_##TYPE = as<TYPE>(type)) do {                     \
         auto info = rules->GetObjectLayout(ShaderParameterKind::KIND);  \
-        if (outTypeLayout)                                              \
-        {                                                               \
-            *outTypeLayout = createStructuredBufferTypeLayout(          \
+        auto typeLayout = createStructuredBufferTypeLayout(             \
                 context,                                                \
                 ShaderParameterKind::KIND,                              \
                 type_##TYPE,                                            \
                 type_##TYPE->elementType.Ptr());                        \
-        }                                                               \
-        return info;                                                    \
+        return TypeLayoutResult(typeLayout, info);                      \
     } while(0)
 
     CASE(HLSLStructuredBufferType,                  StructuredBuffer);
@@ -1962,9 +1989,9 @@ SimpleLayoutInfo GetLayoutImpl(
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, KIND)                                        \
     else if(as<TYPE>(type)) do {                              \
-        return GetSimpleLayoutImpl(                             \
+        return createSimpleTypeLayout(                             \
             rules->GetObjectLayout(ShaderParameterKind::KIND),  \
-            type, rules, outTypeLayout);                        \
+            type, rules);                        \
     } while(0)
 
     CASE(HLSLByteAddressBufferType,                     RawBuffer);
@@ -1978,75 +2005,118 @@ SimpleLayoutInfo GetLayoutImpl(
 
 #undef CASE
 
-    //
-    // TODO(tfoley): Need to recognize any UAV types here
-    //
     else if(auto basicType = as<BasicExpressionType>(type))
     {
-        return GetSimpleLayoutImpl(
+        return createSimpleTypeLayout(
             rules->GetScalarLayout(basicType->baseType),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
     else if(auto vecType = as<VectorExpressionType>(type))
     {
-        return GetSimpleLayoutImpl(
-            rules->GetVectorLayout(
-                GetLayout(context, vecType->elementType.Ptr()),
-                (size_t) GetIntVal(vecType->elementCount)),
-            type,
-            rules,
-            outTypeLayout);
+        auto elementType = vecType->elementType;
+        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+
+        auto element = _createTypeLayout(
+            context,
+            elementType);
+
+        auto info = rules->GetVectorLayout(element.info, elementCount);
+
+        RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+        typeLayout->uniformAlignment = info.alignment;
+
+        typeLayout->elementTypeLayout = element.layout;
+        typeLayout->uniformStride = element.info.getUniformLayout().size.getFiniteValue();
+
+        typeLayout->addResourceUsage(info.kind, info.size);
+
+        return TypeLayoutResult(typeLayout, info);
     }
     else if(auto matType = as<MatrixExpressionType>(type))
     {
-        // The `GetMatrixLayout` implementation in the layout rules
-        // currently defaults to assuming column-major layout,
-        // so if we want row-major layout we achieve it here by
-        // transposing the row/column counts.
-        //
-        // TODO: If it is really a universal convention that matrices
-        // are laid out just like arrays of vectors, when we can
-        // probably eliminate the `virtual` `GetLayout` method entirely,
-        // and have the code here be responsible for the layout choice.
-        //
         size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
         size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+
+        auto elementType = matType->getElementType();
+        auto elementResult = _createTypeLayout(
+            context,
+            elementType);
+        auto elementTypeLayout = elementResult.layout;
+        auto elementInfo = elementResult.info;
+
+        // The `GetMatrixLayout` implementation in the layout rules
+        // currently defaults to assuming row-major layout,
+        // so if we want column-major layout we achieve it here by
+        // transposing the major/minor axes counts.
+        //
+        size_t layoutMajorCount = rowCount;
+        size_t layoutMinorCount = colCount;
         if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
         {
-            size_t tmp = rowCount;
-            rowCount = colCount;
-            colCount = tmp;
+            size_t tmp = layoutMajorCount;
+            layoutMajorCount = layoutMinorCount;
+            layoutMinorCount = tmp;
         }
-
         auto info = rules->GetMatrixLayout(
-            GetLayout(context, matType->getElementType()),
-            rowCount,
+            elementInfo,
+            layoutMajorCount,
+            layoutMinorCount);
+
+        auto rowType = matType->getRowType();
+        RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
+
+        auto rowInfo = rules->GetVectorLayout(
+            elementInfo,
             colCount);
 
-        if (outTypeLayout)
+        size_t majorStride = info.elementStride;
+        size_t minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
+
+        size_t rowStride = 0;
+        size_t colStride = 0;
+        if(context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
         {
-            RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
-            *outTypeLayout = typeLayout;
-
-            typeLayout->type = type;
-            typeLayout->rules = rules;
-            typeLayout->uniformAlignment = info.alignment;
-            typeLayout->mode = context.matrixLayoutMode;
-
-            typeLayout->addResourceUsage(info.kind, info.size);
+            colStride = majorStride;
+            rowStride = minorStride;
+        }
+        else
+        {
+            rowStride = majorStride;
+            colStride = minorStride;
         }
 
-        return info;
+        rowTypeLayout->type = type;
+        rowTypeLayout->rules = rules;
+        rowTypeLayout->uniformAlignment = elementInfo.getUniformLayout().alignment;
+
+        rowTypeLayout->uniformStride = colStride;
+        rowTypeLayout->elementTypeLayout = elementTypeLayout;
+        rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+
+        RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
+
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+        typeLayout->uniformAlignment = info.alignment;
+
+        typeLayout->elementTypeLayout = rowTypeLayout;
+        typeLayout->uniformStride = rowStride;
+        typeLayout->mode = context.matrixLayoutMode;
+
+        typeLayout->addResourceUsage(info.kind, info.size);
+
+        return TypeLayoutResult(typeLayout, info);
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        RefPtr<TypeLayout> elementTypeLayout;
-        auto elementInfo = GetLayoutImpl(
+        auto elementResult = _createTypeLayout(
             context,
-            arrayType->baseType.Ptr(),
-            outTypeLayout ? &elementTypeLayout : nullptr);
+            arrayType->baseType.Ptr());
+        auto elementInfo = elementResult.info;
+        auto elementTypeLayout = elementResult.layout;
 
         // To a first approximation, an array will usually be laid out
         // by taking the element's type layout and laying out `elementCount`
@@ -2073,124 +2143,121 @@ SimpleLayoutInfo GetLayoutImpl(
             elementInfo,
             elementCount).getUniformLayout();
 
-        if (outTypeLayout)
+        RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
+
+        // Some parts of the array type layout object are easy to fill in:
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+        typeLayout->originalElementTypeLayout = elementTypeLayout;
+        typeLayout->uniformAlignment = arrayUniformInfo.alignment;
+        typeLayout->uniformStride = arrayUniformInfo.elementStride;
+
+        typeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayUniformInfo.size);
+
+        //
+        // The tricky part in constructing an array type layout comes when
+        // the element type is (or nests) a structure with resource-type
+        // fields, because in that case we need to perform AoS-to-SoA
+        // conversion as part of computing the final type layout, and
+        // we also need to pre-compute an "adjusted" element type
+        // layout that accounts for the striding that happens with
+        // resource-type contents.
+        //
+        // This complication is only made worse when we have to deal with
+        // unbounded-size arrays over such element types, since those
+        // resource-type fields will each end up consuming a full space
+        // in the resulting layout.
+        //
+        // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
+        // type layout for the element type which takes the array stride into
+        // account. If it returns the same type layout that was passed in,
+        // then that means no adjustement took place.
+        //
+        // The `additionalSpacesNeededForAdjustedElementType` variable counts
+        // the number of additional register spaces that were consumed,
+        // in the case of an unbounded array.
+        //
+        UInt additionalSpacesNeededForAdjustedElementType = 0;
+        RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
+            elementTypeLayout,
+            elementCount,
+            additionalSpacesNeededForAdjustedElementType);
+
+        typeLayout->elementTypeLayout = adjustedElementTypeLayout;
+
+        // We will now iterate over the resources consumed by the element
+        // type to compute how they contribute to the resource usage
+        // of the overall array type.
+        //
+        for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
         {
-            RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
-            *outTypeLayout = typeLayout;
+            // The uniform case was already handled above
+            if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
+                continue;
 
-            // Some parts of the array type layout object are easy to fill in:
-            typeLayout->type = type;
-            typeLayout->rules = rules;
-            typeLayout->originalElementTypeLayout = elementTypeLayout;
-            typeLayout->uniformAlignment = arrayUniformInfo.alignment;
-            typeLayout->uniformStride = arrayUniformInfo.elementStride;
+            LayoutSize arrayResourceCount = 0;
 
-            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayUniformInfo.size);
-
+            // In almost all cases, the resources consumed by an array
+            // will be its element count times the resources consumed
+            // by its element type.
             //
-            // The tricky part in constructing an array type layout comes when
-            // the element type is (or nests) a structure with resource-type
-            // fields, because in that case we need to perform AoS-to-SoA
-            // conversion as part of computing the final type layout, and
-            // we also need to pre-compute an "adjusted" element type
-            // layout that accounts for the striding that happens with
-            // resource-type contents.
+            // The first exception to this is arrays of resources when
+            // compiling to GLSL for Vulkan, where an entire array
+            // only consumes a single descriptor-table slot.
             //
-            // This complication is only made worse when we have to deal with
-            // unbounded-size arrays over such element types, since those
-            // resource-type fields will each end up consuming a full space
-            // in the resulting layout.
-            //
-            // The `maybeAdjustLayoutForArrayElementType` computes an "adjusted"
-            // type layout for the element type which takes the array stride into
-            // account. If it returns the same type layout that was passed in,
-            // then that means no adjustement took place.
-            //
-            // The `additionalSpacesNeededForAdjustedElementType` variable counts
-            // the number of additional register spaces that were consumed,
-            // in the case of an unbounded array.
-            //
-            UInt additionalSpacesNeededForAdjustedElementType = 0;
-            RefPtr<TypeLayout> adjustedElementTypeLayout = maybeAdjustLayoutForArrayElementType(
-                elementTypeLayout,
-                elementCount,
-                additionalSpacesNeededForAdjustedElementType);
-
-            typeLayout->elementTypeLayout = adjustedElementTypeLayout;
-
-            // We will now iterate over the resources consumed by the element
-            // type to compute how they contribute to the resource usage
-            // of the overall array type.
-            //
-            for( auto elementResourceInfo : elementTypeLayout->resourceInfos )
+            if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
             {
-                // The uniform case was already handled above
-                if( elementResourceInfo.kind == LayoutResourceKind::Uniform )
-                    continue;
-
-                LayoutSize arrayResourceCount = 0;
-
-                // In almost all cases, the resources consumed by an array
-                // will be its element count times the resources consumed
-                // by its element type.
-                //
-                // The first exception to this is arrays of resources when
-                // compiling to GLSL for Vulkan, where an entire array
-                // only consumes a single descriptor-table slot.
-                //
-                if (elementResourceInfo.kind == LayoutResourceKind::DescriptorTableSlot)
-                {
-                    arrayResourceCount = elementResourceInfo.count;
-                }
-                //
-                // The next big exception is when we are forming an unbounded-size
-                // array and the element type got "adjusted," because that means
-                // the array type will need to allocate full spaces for any resource-type
-                // fields in the element type.
-                //
-                // Note: we carefully carve things out so that the case of a simple
-                // array of resources does *not* lead to the element type being adjusted,
-                // so that this logic doesn't trigger and we instead handle it with
-                // the default logic below.
-                //
-                else if(
-                    elementCount.isInfinite()
-                    && adjustedElementTypeLayout != elementTypeLayout
-                    && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
-                {
-                    // We want to ignore resource types consumed by the element type
-                    // that need adjustement if the array size is infinite, since
-                    // we will be allocating whole spaces for that part of the
-                    // element's resource usage.
-                }
-                else
-                {
-                    arrayResourceCount = elementResourceInfo.count * elementCount;
-                }
-
-                // Now that we've computed how the resource usage of the element type
-                // should contribute to the resource usage of the array, we can
-                // add in that resource usage.
-                //
-                typeLayout->addResourceUsage(
-                    elementResourceInfo.kind,
-                    arrayResourceCount);
+                arrayResourceCount = elementResourceInfo.count;
+            }
+            //
+            // The next big exception is when we are forming an unbounded-size
+            // array and the element type got "adjusted," because that means
+            // the array type will need to allocate full spaces for any resource-type
+            // fields in the element type.
+            //
+            // Note: we carefully carve things out so that the case of a simple
+            // array of resources does *not* lead to the element type being adjusted,
+            // so that this logic doesn't trigger and we instead handle it with
+            // the default logic below.
+            //
+            else if(
+                elementCount.isInfinite()
+                && adjustedElementTypeLayout != elementTypeLayout
+                && doesResourceRequireAdjustmentForArrayOfStructs(elementResourceInfo.kind) )
+            {
+                // We want to ignore resource types consumed by the element type
+                // that need adjustement if the array size is infinite, since
+                // we will be allocating whole spaces for that part of the
+                // element's resource usage.
+            }
+            else
+            {
+                arrayResourceCount = elementResourceInfo.count * elementCount;
             }
 
-            // The loop above to compute the resource usage of the array from its
-            // element type ignored any resource-type fields in an unbounded-size
-            // array if they would have been allocated as full register spaces.
-            // Those same fields were counted in `additionalSpacesNeededForAdjustedElementType`,
-            // and need to be added into the total resource usage for the array
-            // if we skipped them as part of the loop (which happens when
-            // we detect that the element type layout had been "adjusted").
+            // Now that we've computed how the resource usage of the element type
+            // should contribute to the resource usage of the array, we can
+            // add in that resource usage.
             //
-            if( adjustedElementTypeLayout != elementTypeLayout )
-            {
-                typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
-            }
+            typeLayout->addResourceUsage(
+                elementResourceInfo.kind,
+                arrayResourceCount);
         }
-        return arrayUniformInfo;
+
+        // The loop above to compute the resource usage of the array from its
+        // element type ignored any resource-type fields in an unbounded-size
+        // array if they would have been allocated as full register spaces.
+        // Those same fields were counted in `additionalSpacesNeededForAdjustedElementType`,
+        // and need to be added into the total resource usage for the array
+        // if we skipped them as part of the loop (which happens when
+        // we detect that the element type layout had been "adjusted").
+        //
+        if( adjustedElementTypeLayout != elementTypeLayout )
+        {
+            typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, additionalSpacesNeededForAdjustedElementType);
+        }
+
+        return TypeLayoutResult(typeLayout, arrayUniformInfo);
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
@@ -2198,14 +2265,9 @@ SimpleLayoutInfo GetLayoutImpl(
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
-            RefPtr<StructTypeLayout> typeLayout;
-            if (outTypeLayout)
-            {
-                typeLayout = new StructTypeLayout();
-                typeLayout->type = type;
-                typeLayout->rules = rules;
-                *outTypeLayout = typeLayout;
-            }
+            RefPtr<StructTypeLayout> typeLayout = new StructTypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
 
             // The layout of a `struct` type is computed in the somewhat
             // obvious fashion by keeping a running counter of the resource
@@ -2219,12 +2281,12 @@ SimpleLayoutInfo GetLayoutImpl(
 
             for (auto field : GetFields(structDeclRef))
             {
-                RefPtr<TypeLayout> fieldTypeLayout;
-                UniformLayoutInfo fieldInfo = GetLayoutImpl(
+                TypeLayoutResult fieldResult = _createTypeLayout(
                     context,
                     GetType(field).Ptr(),
-                    outTypeLayout ? &fieldTypeLayout : nullptr,
-                    field.getDecl()).getUniformLayout();
+                    field.getDecl());
+                RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
+                UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
 
                 // Note: we don't add any zero-size fields
                 // when computing structure layout, just
@@ -2240,81 +2302,75 @@ SimpleLayoutInfo GetLayoutImpl(
                     uniformOffset = rules->AddStructField(&info, fieldInfo);
                 }
 
-                if (outTypeLayout)
+                // We need to create variable layouts
+                // for each field of the structure.
+                RefPtr<VarLayout> fieldLayout = new VarLayout();
+                fieldLayout->varDecl = field;
+                fieldLayout->typeLayout = fieldTypeLayout;
+                typeLayout->fields.Add(fieldLayout);
+                typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+
+                // Set up uniform offset information, if there is any uniform data in the field
+                if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
                 {
-                    // If we are computing a complete layout,
-                    // then we need to create variable layouts
-                    // for each field of the structure.
-                    RefPtr<VarLayout> fieldLayout = new VarLayout();
-                    fieldLayout->varDecl = field;
-                    fieldLayout->typeLayout = fieldTypeLayout;
-                    typeLayout->fields.Add(fieldLayout);
-                    typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+                    fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+                }
 
-                    // Set up uniform offset information, if there is any uniform data in the field
-                    if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+                // Add offset information for any other resource kinds
+                for( auto fieldTypeResourceInfo : fieldTypeLayout->resourceInfos )
+                {
+                    // Uniforms were dealt with above
+                    if(fieldTypeResourceInfo.kind == LayoutResourceKind::Uniform)
+                        continue;
+
+                    // We should not have already processed this resource type
+                    SLANG_RELEASE_ASSERT(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
+
+                    // The field will need offset information for this kind
+                    auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
+
+                    // It is possible for a `struct` field to use an unbounded array
+                    // type, and in the D3D case that would consume an unbounded number
+                    // of registers. What is more, a single `struct` could have multiple
+                    // such fields, or ordinary resource fields after an unbounded field.
+                    //
+                    // We handle this case by allocating a distinct register space for
+                    // any field that consumes an unbounded amount of registers.
+                    //
+                    if( fieldTypeResourceInfo.count.isInfinite() )
                     {
-                        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+                        // We need to add one register space to own the storage for this field.
+                        //
+                        auto structTypeSpaceResourceInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
+                        auto spaceOffset = structTypeSpaceResourceInfo->count;
+                        structTypeSpaceResourceInfo->count += 1;
+
+                        // The field itself will record itself as having a zero offset into
+                        // the chosen space.
+                        //
+                        fieldResourceInfo->space = spaceOffset.getFiniteValue();
+                        fieldResourceInfo->index = 0;
                     }
-
-                    // Add offset information for any other resource kinds
-                    for( auto fieldTypeResourceInfo : fieldTypeLayout->resourceInfos )
+                    else
                     {
-                        // Uniforms were dealt with above
-                        if(fieldTypeResourceInfo.kind == LayoutResourceKind::Uniform)
-                            continue;
-
-                        // We should not have already processed this resource type
-                        SLANG_RELEASE_ASSERT(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
-
-                        // The field will need offset information for this kind
-                        auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
-
-                        // It is possible for a `struct` field to use an unbounded array
-                        // type, and in the D3D case that would consume an unbounded number
-                        // of registers. What is more, a single `struct` could have multiple
-                        // such fields, or ordinary resource fields after an unbounded field.
+                        // In the case where the field consumes a finite number of slots, we
+                        // can simply set its offset/index to the number of such slots consumed
+                        // so far, and then increment the number of slots consumed by the
+                        // `struct` type itself.
                         //
-                        // We handle this case by allocating a distinct register space for
-                        // any field that consumes an unbounded amount of registers.
-                        //
-                        if( fieldTypeResourceInfo.count.isInfinite() )
-                        {
-                            // We need to add one register space to own the storage for this field.
-                            //
-                            auto structTypeSpaceResourceInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
-                            auto spaceOffset = structTypeSpaceResourceInfo->count;
-                            structTypeSpaceResourceInfo->count += 1;
-
-                            // The field itself will record itself as having a zero offset into
-                            // the chosen space.
-                            //
-                            fieldResourceInfo->space = spaceOffset.getFiniteValue();
-                            fieldResourceInfo->index = 0;
-                        }
-                        else
-                        {
-                            // In the case where the field consumes a finite number of slots, we
-                            // can simply set its offset/index to the number of such slots consumed
-                            // so far, and then increment the number of slots consumed by the
-                            // `struct` type itself.
-                            //
-                            auto structTypeResourceInfo = typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-                            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
-                            structTypeResourceInfo->count += fieldTypeResourceInfo.count;
-                        }
+                        auto structTypeResourceInfo = typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
+                        fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
+                        structTypeResourceInfo->count += fieldTypeResourceInfo.count;
                     }
                 }
             }
 
             rules->EndStructLayout(&info);
-            if (outTypeLayout)
-            {
-                typeLayout->uniformAlignment = info.alignment;
-                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
-            }
 
-            return info;
+            typeLayout->uniformAlignment = info.alignment;
+            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
+
+            return TypeLayoutResult(typeLayout, info);
         }
         else if (auto globalGenParam = declRef.as<GlobalGenericParamDecl>())
         {
@@ -2322,18 +2378,16 @@ SimpleLayoutInfo GetLayoutImpl(
             info.alignment = 0;
             info.size = 0;
             info.kind = LayoutResourceKind::GenericResource;
-            if (outTypeLayout)
-            {
-                auto genParamTypeLayout = new GenericParamTypeLayout();
-                // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
-                // so we can find the index of this generic param decl in the list
-                genParamTypeLayout->type = type;
-                genParamTypeLayout->paramIndex = findGenericParam(context.programLayout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
-                genParamTypeLayout->rules = rules;
-                genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
-                *outTypeLayout = genParamTypeLayout;
-            }
-            return info;
+
+            auto genParamTypeLayout = new GenericParamTypeLayout();
+            // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
+            // so we can find the index of this generic param decl in the list
+            genParamTypeLayout->type = type;
+            genParamTypeLayout->paramIndex = findGenericParam(context.programLayout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
+            genParamTypeLayout->rules = rules;
+            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
+
+            return TypeLayoutResult(genParamTypeLayout, info);
         }
         else if( auto simpleGenericParam = declRef.as<GenericTypeParamDecl>() )
         {
@@ -2350,12 +2404,10 @@ SimpleLayoutInfo GetLayoutImpl(
             // any parameters, even those that don't depend on
             // generics.
             //
-            SimpleLayoutInfo info;
-            return GetSimpleLayoutImpl(
-                info,
+            return createSimpleTypeLayout(
+                SimpleLayoutInfo(),
                 type,
-                rules,
-                outTypeLayout);
+                rules);
         }
         else if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
         {
@@ -2373,25 +2425,22 @@ SimpleLayoutInfo GetLayoutImpl(
             // represents the indirections needed to reference the
             // data to be referenced by this field.
             //
-            return GetSimpleLayoutImpl(
+            return createSimpleTypeLayout(
                 SimpleLayoutInfo(LayoutResourceKind::ExistentialSlot, 1),
                 type,
-                rules,
-                outTypeLayout);
+                rules);
         }
     }
     else if (auto errorType = as<ErrorType>(type))
     {
         // An error type means that we encountered something we don't understand.
         //
-        // We should probalby inform the user with an error message here.
+        // We should probably inform the user with an error message here.
 
-        SimpleLayoutInfo info;
-        return GetSimpleLayoutImpl(
-            info,
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(),
             type,
-            rules,
-            outTypeLayout);
+            rules);
     }
     else if( auto taggedUnionType = as<TaggedUnionType>(type) )
     {
@@ -2408,47 +2457,34 @@ SimpleLayoutInfo GetLayoutImpl(
         //
         UniformLayoutInfo info(0, 1);
 
-        // If we are being asked to construct a full `TypeLayout`
-        // object, then we'll allocate it up front.
-        //
-        RefPtr<TaggedUnionTypeLayout> taggedUnionLayout;
-        if( outTypeLayout )
-        {
-            taggedUnionLayout = new TaggedUnionTypeLayout();
-            taggedUnionLayout->type = type;
-            taggedUnionLayout->rules = rules;
-            *outTypeLayout = taggedUnionLayout;
-        }
+        RefPtr<TaggedUnionTypeLayout> taggedUnionLayout = new TaggedUnionTypeLayout();
+        taggedUnionLayout->type = type;
+        taggedUnionLayout->rules = rules;
 
         // Now we iterate over the case types and see if they
         // change our computed maximum size/alignement.
         //
         for( auto caseType : taggedUnionType->caseTypes )
         {
-            RefPtr<TypeLayout> caseTypeLayout;
-            UniformLayoutInfo caseTypeInfo = GetLayoutImpl(context, caseType, outTypeLayout ? &caseTypeLayout : nullptr).getUniformLayout();
+            auto caseTypeResult = _createTypeLayout(context, caseType);
+            RefPtr<TypeLayout> caseTypeLayout = caseTypeResult.layout;
+            UniformLayoutInfo caseTypeInfo = caseTypeResult.info.getUniformLayout();
 
             info.size      = maximum(info.size, caseTypeInfo.size);
             info.alignment = std::max(info.alignment, caseTypeInfo.alignment);
 
-            // If we are building a full `TypeLayout` we need to
-            // do a few more steps for each case type.
+            // We need to remember the layout of the case type
+            // on the final `TaggedUnionTypeLayout`.
             //
-            if( outTypeLayout )
-            {
-                // We need to remember the layout of the case type
-                // on the final `TaggedUnionTypeLayout`.
-                //
-                taggedUnionLayout->caseTypeLayouts.Add(caseTypeLayout);
+            taggedUnionLayout->caseTypeLayouts.Add(caseTypeLayout);
 
-                // We also need to consider contributions for other
-                // resource kinds beyond uniform data.
-                //
-                for( auto caseResInfo : caseTypeLayout->resourceInfos )
-                {
-                    auto unionResInfo = taggedUnionLayout->findOrAddResourceInfo(caseResInfo.kind);
-                    unionResInfo->count = maximum(unionResInfo->count, caseResInfo.count);
-                }
+            // We also need to consider contributions for other
+            // resource kinds beyond uniform data.
+            //
+            for( auto caseResInfo : caseTypeLayout->resourceInfos )
+            {
+                auto unionResInfo = taggedUnionLayout->findOrAddResourceInfo(caseResInfo.kind);
+                unionResInfo->count = maximum(unionResInfo->count, caseResInfo.count);
             }
         }
 
@@ -2467,10 +2503,7 @@ SimpleLayoutInfo GetLayoutImpl(
             auto tagInfo = context.rules->GetScalarLayout(BaseType::UInt);
             info.size = RoundToAlignment(info.size, tagInfo.alignment);
 
-            if( outTypeLayout )
-            {
-                taggedUnionLayout->tagOffset = info.size;
-            }
+            taggedUnionLayout->tagOffset = info.size;
 
             info.size += tagInfo.size;
             info.alignment = std::max(info.alignment, tagInfo.alignment);
@@ -2480,48 +2513,178 @@ SimpleLayoutInfo GetLayoutImpl(
         // we will make sure that its information on uniform layout
         // matches what we've computed in the `UniformLayoutInfo` we return.
         //
-        if( outTypeLayout )
-        {
-            taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
-            taggedUnionLayout->uniformAlignment = info.alignment;
-        }
+        taggedUnionLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->count = info.size;
+        taggedUnionLayout->uniformAlignment = info.alignment;
 
-        return info;
+        return TypeLayoutResult(taggedUnionLayout, info);
     }
 
     // catch-all case in case nothing matched
-    SLANG_ASSERT(!"unimplemented");
-    SimpleLayoutInfo info;
-    return GetSimpleLayoutImpl(
-        info,
+    SLANG_ASSERT(!"unimplemented case in type layout");
+    return createSimpleTypeLayout(
+        SimpleLayoutInfo(),
         type,
-        rules,
-        outTypeLayout);
+        rules);
 }
 
-SimpleLayoutInfo GetLayout(
-    TypeLayoutContext const&    context,
-    Type*                       inType)
+RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
+    TypeLayoutContext const&            context,
+    Type*                               type,
+    EntryPointParameterDirectionMask    directionMask)
 {
-    return GetLayoutImpl(context, inType, nullptr);
+    auto rules = context.rules;
+
+    // TODO: This logic should ideally share as much
+    // as possible with the `_createTypeLayout` function,
+    // to avoid duplication, but we also have to deal
+    // with the many ways in which varying parameter
+    // layout differs from non-varying layout.
+
+    // We will compute resource consumption for the type
+    // as a varying input, output, or both/neither.
+    // To avoid duplication, we'll build an array that
+    // includes all the layout rules we need to apply.
+    //
+    int varyingRulesCount = 0;
+    LayoutRulesImpl* varyingRules[2];
+
+    if( directionMask & kEntryPointParameterDirection_Input )
+    {
+        varyingRules[varyingRulesCount++] = context.getRulesFamily()->getVaryingInputRules();
+    }
+    if( directionMask & kEntryPointParameterDirection_Output )
+    {
+        varyingRules[varyingRulesCount++] = context.getRulesFamily()->getVaryingOutputRules();
+    }
+
+    if(auto basicType = as<BasicExpressionType>(type))
+    {
+        auto baseType = basicType->baseType;
+
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if(auto vecType = as<VectorExpressionType>(type))
+    {
+        auto elementType = vecType->elementType;
+        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+
+        BaseType elementBaseType = BaseType::Void;
+        if( auto elementBasicType = as<BasicExpressionType>(elementType) )
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
+        // Note that we do *not* add any resource usage to the type
+        // layout for the element type, because we currently cannot count
+        // varying parameter usage at a granularity finer than
+        // individual "locations."
+        //
+        RefPtr<TypeLayout> elementTypeLayout = new TypeLayout();
+        elementTypeLayout->type = elementType;
+        elementTypeLayout->rules = rules;
+
+        RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
+        typeLayout->type = vecType;
+        typeLayout->rules = rules;
+        typeLayout->elementTypeLayout = elementTypeLayout;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto info = varyingRuleSet->GetVectorLayout(elementInfo, elementCount);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if(auto matType = as<MatrixExpressionType>(type))
+    {
+        size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
+        size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+        auto elementType = matType->getElementType();
+
+        BaseType elementBaseType = BaseType::Void;
+        if( auto elementBasicType = as<BasicExpressionType>(elementType) )
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
+        // Just as for `_createTypeLayout`, we need to handle row- and
+        // column-major matrices differently, to ensure we get
+        // the expected layout.
+        //
+        // A varying parameter with row-major layout is effectively
+        // just an array of row vectors, while a column-major one
+        // is just an array of column vectors.
+        //
+        size_t layoutMajorCount = rowCount;
+        size_t layoutMinorCount = colCount;
+        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+        {
+            size_t tmp = layoutMajorCount;
+            layoutMajorCount = layoutMinorCount;
+            layoutMinorCount = tmp;
+        }
+
+        RefPtr<TypeLayout> elementTypeLayout = new TypeLayout();
+        elementTypeLayout->type = elementType;
+        elementTypeLayout->rules = rules;
+
+        RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
+        rowTypeLayout->type = matType->getRowType();
+        rowTypeLayout->rules = rules;
+        rowTypeLayout->elementTypeLayout = elementTypeLayout;
+
+        RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+        typeLayout->elementTypeLayout = rowTypeLayout;
+        typeLayout->mode = context.matrixLayoutMode;
+
+        for( int rr = 0; rr < varyingRulesCount; ++rr )
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+
+            auto info = varyingRuleSet->GetMatrixLayout(elementInfo, layoutMajorCount, layoutMinorCount);
+            typeLayout->addResourceUsage(info.kind, info.size);
+
+            if(context.matrixLayoutMode == kMatrixLayoutMode_RowMajor)
+            {
+                // For row-major matrices only, we can compute an effective
+                // resource usage for the row type.
+                auto rowInfo = varyingRuleSet->GetVectorLayout(elementInfo, colCount);
+                rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+            }
+        }
+
+        return typeLayout;
+    }
+
+    // catch-all case in case nothing matched
+    SLANG_ASSERT(!"unimplemented case for varying parameter layout");
+    return createSimpleTypeLayout(
+        SimpleLayoutInfo(),
+        type,
+        rules).layout;
 }
 
 RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
 {
-    RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout);
-    return typeLayout;
-}
-
-RefPtr<TypeLayout> CreateTypeLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type)
-{
-    RefPtr<TypeLayout> typeLayout;
-    GetLayoutImpl(context, type, &typeLayout);
-    return typeLayout;
+    return _createTypeLayout(context, type).layout;
 }
 
 RefPtr<TypeLayout> TypeLayout::unwrapArray()

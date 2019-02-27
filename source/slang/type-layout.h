@@ -493,21 +493,33 @@ public:
     RefPtr<TypeLayout> elementTypeLayout;
 };
 
-// Specific case of type layout for an array
-class ArrayTypeLayout : public TypeLayout
+    /// Type layout for a logical sequence type
+class SequenceTypeLayout : public TypeLayout
 {
 public:
-    // The original type layout for the array elements,
-    // which doesn't include any adjustments based on
-    // resource type splitting.
-    RefPtr<TypeLayout> originalElementTypeLayout;
-
-    // The *adjusted* layout used for the element type
+        /// The layout of the element type.
+        ///
+        /// This layout may include adjustments to make lookups in elements
+        /// of the array Just Work, and may not be the same as the layout
+        /// of the element type when used in a non-array context.
+        ///
     RefPtr<TypeLayout>  elementTypeLayout;
 
-    // the stride between elements when used in
-    // a uniform buffer
-    size_t              uniformStride;
+        /// The stride in bytes between elements.
+    size_t              uniformStride = 0;
+};
+
+    /// Type layout for an array type
+class ArrayTypeLayout : public SequenceTypeLayout
+{
+public:
+        /// The original layout of the element type.
+        ///
+        /// This layout does not include any adjustments that
+        /// were made to the element type in order to make
+        /// lookup into array elements Just Work.
+        ///
+    RefPtr<TypeLayout> originalElementTypeLayout;
 };
 
 // type layout for a variable with stream-output type
@@ -517,11 +529,23 @@ public:
     RefPtr<TypeLayout> elementTypeLayout;
 };
 
-
-class MatrixTypeLayout : public TypeLayout
+class VectorTypeLayout : public SequenceTypeLayout
 {
 public:
-    MatrixLayoutMode    mode;
+};
+
+
+class MatrixTypeLayout : public SequenceTypeLayout
+{
+public:
+        /// Is this matrix laid out as row-major or column-major?
+        ///
+        /// Note that this does *not* affect the interpretation
+        /// of the `elementTypeLayout` field, which always represents
+        /// the logical elements of the matrix type, which are its
+        /// rows.
+        ///
+    MatrixLayoutMode            mode;
 };
 
 // Specific case of type layout for a struct
@@ -719,7 +743,7 @@ struct SimpleLayoutRulesImpl
 
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
-    virtual SimpleLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
+    virtual SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
 
     // Begin doing layout on a `struct` type
     virtual UniformLayoutInfo BeginStructLayout() = 0;
@@ -760,7 +784,7 @@ struct LayoutRulesImpl
         return simpleRules->GetVectorLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount)
+    SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount)
     {
         return simpleRules->GetMatrixLayout(elementInfo, rowCount, columnCount);
     }
@@ -832,7 +856,7 @@ struct TypeLayoutContext
     MatrixLayoutMode    matrixLayoutMode;
 
     LayoutRulesImpl* getRules() { return rules; }
-    LayoutRulesFamilyImpl* getRulesFamily() { return rules->getLayoutRulesFamily(); }
+    LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
 
     TypeLayoutContext with(LayoutRulesImpl* inRules) const
     {
@@ -861,52 +885,51 @@ TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest*  targetReq,
     ProgramLayout*  programLayout);
 
-// Get the "simple" layout for a type according to a given set of layout
-// rules. Note that a "simple" layout can only consume one `LayoutResourceKind`,
-// and so this operation may not correctly capture the full resource usage
-// of a type.
-SimpleLayoutInfo GetLayout(
-    TypeLayoutContext const&    context,
-    Type*                       type);
+    /// Direction(s) of a varying shader parameter
+typedef unsigned int EntryPointParameterDirectionMask;
+enum
+{
+    kEntryPointParameterDirection_Input  = 0x1,
+    kEntryPointParameterDirection_Output = 0x2,
+};
+
+
+    /// Get layout information for a simple varying parameter type.
+    ///
+    /// A simple varying parameter is a scalar, vector, or matrix.
+    ///
+RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
+    TypeLayoutContext const&            context,
+    Type*                               type,
+    EntryPointParameterDirectionMask    directionMask);
 
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
-RefPtr<TypeLayout> CreateTypeLayout(
+RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type);
 
 // Create a full type layout for a type, while applying the given "simple"
 // layout information as an offset to any `VarLayout`s created along
 // the way.
-RefPtr<TypeLayout> CreateTypeLayout(
+RefPtr<TypeLayout> createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type,
     SimpleLayoutInfo            offset);
 
 //
 
-// Create a type layout for a parameter block type.
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType);
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
-    TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    RefPtr<Type>                elementType,
-    LayoutRulesImpl*            elementTypeRules);
-
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
-    TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    SimpleLayoutInfo            parameterGroupInfo,
-    RefPtr<TypeLayout>          elementTypeLayout);
-
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+    ///
+    /// This overload allows the `parameterGroupType` parameter to be null, for cases
+    /// where an anonymous parameter group needs to be constructed.
+    ///
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            parameterGroupRules,

@@ -1117,7 +1117,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     if( varDecl->HasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type) )
     {
-        return CreateTypeLayout(
+        return createTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
             type);
     }
@@ -1127,7 +1127,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // qualifier before we move on to anything else.
     if (varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type))
     {
-        return CreateTypeLayout(
+        return createTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
             type);
     }
@@ -1144,7 +1144,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // An "ordinary" global variable is implicitly a uniform
     // shader parameter.
-    return CreateTypeLayout(
+    return createTypeLayout(
         layoutContext.with(rules->getConstantBufferRules()),
         type);
 }
@@ -1157,13 +1157,6 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 }
 
 //
-
-enum EntryPointParameterDirection
-{
-    kEntryPointParameterDirection_Input  = 0x1,
-    kEntryPointParameterDirection_Output = 0x2,
-};
-typedef unsigned int EntryPointParameterDirectionMask;
 
 struct EntryPointParameterState
 {
@@ -1891,7 +1884,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     String semanticName = optSemanticName ? *optSemanticName : "";
     String sn = semanticName.ToLower();
 
-    RefPtr<TypeLayout> typeLayout =  new TypeLayout();
+    RefPtr<TypeLayout> typeLayout;
     if (sn.StartsWith("sv_")
         || sn.StartsWith("nv_"))
     {
@@ -1915,11 +1908,11 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 
                 // We also need to track this as an ordinary varying output from the stage,
                 // since that is how GLSL will want to see it.
-                auto rules = context->getRulesFamily()->getVaryingOutputRules();
-                SimpleLayoutInfo layout = GetLayout(
-                    context->layoutContext.with(rules),
-                    type);
-                typeLayout->addResourceUsage(layout.kind, layout.size);
+                //
+                typeLayout = getSimpleVaryingParameterTypeLayout(
+                    context->layoutContext,
+                    type,
+                    kEntryPointParameterDirection_Output);
             }
         }
 
@@ -1929,6 +1922,21 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             {
                 state.isSampleRate = true;
             }
+        }
+
+        if( !typeLayout )
+        {
+            // If we didn't compute a special-case layout for the
+            // system-value parameter (e.g., because it was an
+            // `SV_Target` output), then create a default layout
+            // that consumes no input/output varying slots.
+            // (since system parameters are distinct from
+            // user-defined parameters for layout purposes)
+            //
+            typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                0);
         }
 
         // Remember the system-value semantic so that we can query it later
@@ -1942,25 +1950,13 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     }
     else
     {
-        // user-defined semantic
-
-        if (state.directionMask & kEntryPointParameterDirection_Input)
-        {
-            auto rules = context->getRulesFamily()->getVaryingInputRules();
-            SimpleLayoutInfo layout = GetLayout(
-                context->layoutContext.with(rules),
-                type);
-            typeLayout->addResourceUsage(layout.kind, layout.size);
-        }
-
-        if (state.directionMask & kEntryPointParameterDirection_Output)
-        {
-            auto rules = context->getRulesFamily()->getVaryingOutputRules();
-            SimpleLayoutInfo layout = GetLayout(
-                context->layoutContext.with(rules),
-                type);
-            typeLayout->addResourceUsage(layout.kind, layout.size);
-        }
+        // In this case we have a user-defined semantic, which means
+        // an ordinary input and/or output varying parameter.
+        //
+        typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                state.directionMask);
     }
 
     if (state.isSampleRate
@@ -2097,13 +2093,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
-            return CreateTypeLayout(context->layoutContext.with(
+            return createTypeLayout(context->layoutContext.with(
                 context->getRulesFamily()->getRayPayloadParameterRules()),
                 type);
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
-            return CreateTypeLayout(context->layoutContext.with(
+            return createTypeLayout(context->layoutContext.with(
                 context->getRulesFamily()->getCallablePayloadParameterRules()),
                 type);
 
@@ -2133,7 +2129,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::AnyHit:
         case Stage::ClosestHit:
             // `in` parameter is hit attributes
-            return CreateTypeLayout(context->layoutContext.with(
+            return createTypeLayout(context->layoutContext.with(
                 context->getRulesFamily()->getHitAttributesParameterRules()),
                 type);
         }
@@ -2294,7 +2290,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // a uniform shader parameter passed via the implicitly-defined
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
-        return CreateTypeLayout(
+        return createTypeLayout(
             context->layoutContext.with(context->getRulesFamily()->getConstantBufferRules()),
             paramType);
     }
@@ -2518,7 +2514,7 @@ static void collectEntryPointParameters(
     {
         SLANG_ASSERT(taggedUnionType);
         auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
-        auto typeLayout = CreateTypeLayout(context->layoutContext, substType);
+        auto typeLayout = createTypeLayout(context->layoutContext, substType);
         entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
     }
 
