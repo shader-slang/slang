@@ -1297,7 +1297,7 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<I
     ComPtr<IDXGIFactory4> dxgiFactory;
     SLANG_RETURN_ON_FAIL(m_CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
     
-    D3D_FEATURE_LEVEL featureLevel = DeviceCheckFlag::UseFullFeatureLevel ? D3D_FEATURE_LEVEL_11_1 : D3D_FEATURE_LEVEL_11_0;
+    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
     // Search for an adapter that meets our requirements
     ComPtr<IDXGIAdapter> adapter;
@@ -1361,7 +1361,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    HMODULE dxgiModule = LoadLibraryA("Dxgi.dll");
+    HMODULE dxgiModule = LoadLibraryA("dxgi.dll");
     if (!dxgiModule)
     {
         fprintf(stderr, "error: failed load 'dxgi.dll'\n");
@@ -1398,19 +1398,16 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     }
 
     FlagCombiner combiner;
-    combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
-    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
-
     // TODO: we should probably provide a command-line option
     // to override UseDebug of default rather than leave it
     // up to each back-end to specify.
-
 #if ENABLE_DEBUG_LAYER
     combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
 #else
     combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
-
+    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+    
     ComPtr<IDXGIFactory4> dxgiFactory;
     ComPtr<IDXGIAdapter> adapter;
     const int numCombinations = combiner.getNumCombinations();
