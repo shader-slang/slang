@@ -210,19 +210,19 @@ Generics
 Generic type parameters complicate these layout rules.
 For example, we cannot compute the exact resource requirements for a `vector<T,3>` without knowing what the type `T` is.
 
-When generic parameters are used in a program, the layout rules are ammended as follows:
+When computing layouts for fully specialized types or programs, no special considerations are needed: the rules as described in this document still apply.
+One important consequence to understand is that given a type like:
 
-* Identify those parameters with types that *depend on* a generic parameter
-  * A generic type parameter depends on itself
-  * An instantiation of a generic type `F<A>` depends on a generic parameter if `A` does
-  * An aggregate (`struct`) type depends on a generic type if the type of any of its fields does
+```hlsl
+struct MyStuff<T>
+{
+	int a;
+	T b;
+	int c;
+}
+```
 
-* Split the global parameter order into two lists: one for parameters that do not depend on generic parameters, and one for parameters that do
+the offset computed for the `c` field depends on the concrete type that gets plugged in for `T`.
+We think this is the least surprising behavior for programmers who might be familiar with things like C++ template specialization.
 
-* When enumerating shader parameters, always enumerate the non-generic-dependent parameter first
-
-This choie ensures that plugging in different types for the generic type parameters of an entry point will not change the layout that was computed for any "ordinary" parameters that did not depend on the generics.
-
-Note that we do *not* currently apply this same logic to `struct` types (e.g., lay out all the non-generic-dependent fields before the generic-dependent ones).
-At present, we think it is valuable for a specialization of a generic type to lay out like an "equivalent" non-generic type, but we may consider changing that decision.
-To avoid problems, users are encourage to declare types so that all non-generic-dependent fields come before generic-dependent ones.
+In cases where confusion about a field like `c` getting different offsets in different specializations is a concern, users are encouraged to declare types so that all non-generic-dependent fields come before generic-dependent ones.

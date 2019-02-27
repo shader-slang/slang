@@ -1149,13 +1149,6 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
         type);
 }
 
-RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
-    ParameterBindingContext*    context,
-    VarDeclBase*                varDecl)
-{
-    return getTypeLayoutForGlobalShaderParameter(context, varDecl, varDecl->getType());
-}
-
 //
 
 struct EntryPointParameterState
@@ -1191,14 +1184,19 @@ static void collectGlobalGenericParameter(
 // Collect a single declaration into our set of parameters
 static void collectGlobalScopeParameter(
     ParameterBindingContext*    context,
-    RefPtr<VarDeclBase>         varDecl)
+    RefPtr<VarDeclBase>         varDecl,
+    SubstitutionSet             globalGenericSubst)
 {
+    // We apply any substitutions for global generic parameters here.
+    auto type = varDecl->getType()->Substitute(globalGenericSubst).as<Type>();
+
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
     // the layout for that parameter's type.
     auto typeLayout = getTypeLayoutForGlobalShaderParameter(
         context,
-        varDecl.Ptr());
+        varDecl,
+        type);
 
     // If we did not find appropriate layout rules, then it
     // must mean that this global variable is *not* a shader
@@ -1789,7 +1787,8 @@ static void completeBindingsForParameter(
 
 static void collectGlobalScopeParameters(
     ParameterBindingContext*    context,
-    ModuleDecl*          program)
+    ModuleDecl*                 program,
+    SubstitutionSet             globalGenericSubst)
 {
     // First enumerate parameters at global scope
     // We collect two things here:
@@ -1807,7 +1806,7 @@ static void collectGlobalScopeParameters(
     for (auto decl : program->Members)
     {
         if (auto varDecl = as<VarDeclBase>(decl))
-            collectGlobalScopeParameter(context, varDecl);
+            collectGlobalScopeParameter(context, varDecl, globalGenericSubst);
     }
 
     // Next, we need to enumerate the parameters of
@@ -2663,19 +2662,21 @@ static void collectParameters(
     ParameterBindingContext contextData = *inContext;
     auto context = &contextData;
 
+    auto globalGenericSubst = program->getGlobalGenericSubstitution();
+
     for(RefPtr<Module> module : program->getModuleDependencies())
     {
         context->stage = Stage::Unknown;
 
         // First look at global-scope parameters
-        collectGlobalScopeParameters(context, module->getModuleDecl());
+        collectGlobalScopeParameters(context, module->getModuleDecl(), globalGenericSubst);
     }
 
     // Next consider parameters for entry points
     for(auto entryPoint : program->getEntryPoints())
     {
         context->stage = entryPoint->getStage();
-        collectEntryPointParameters(context, entryPoint, SubstitutionSet());
+        collectEntryPointParameters(context, entryPoint, globalGenericSubst);
     }
     context->entryPointLayout = nullptr;
 }
@@ -2947,288 +2948,6 @@ void generateParameterBindings(
     DiagnosticSink* sink)
 {
     program->getTargetProgram(targetReq)->getOrCreateLayout(sink);
-}
-
-RefPtr<ProgramLayout> specializeProgramLayout(
-    TargetRequest*  targetReq,
-    ProgramLayout*  oldProgramLayout, 
-    SubstitutionSet typeSubst,
-    DiagnosticSink* sink)
-{
-    // The goal of the layout specialization step is to take an existing `ProgramLayout`,
-    // and add a layout to any parameter(s) that could not be laid out previously, because
-    // they had a dependence on generic type parameters that made layout impossible at
-    // the time.
-    //
-    // TODO: It would be far simpler to just "re-do" the entire layout process, just
-    // with knowledge of what the global type substitution is, but that would mean that
-    // global parameters that come after a generic-dependent parameter might change
-    // their location/binding/register depending on what types are plugged in.
-    // Our current design preserves the layout for any global parameter that was placed during
-    // the initial layout of a program (before the generic arguments were know).
-    // It isn't clear that this design choice pays off in practice, since there is  lot
-    // of complexity in this function.
-
-    RefPtr<ProgramLayout> newProgramLayout;
-    newProgramLayout = new ProgramLayout();
-    newProgramLayout->targetProgram = oldProgramLayout->targetProgram;
-    newProgramLayout->globalGenericParams = oldProgramLayout->globalGenericParams;
-
-    // The basic idea will be to iterate over the parameters in the old layout,
-    // and "pick up where we left off" in terms of allocating registers to things.
-    //
-    // That means we will look at the existing parameters (that were laid out already)
-    // and mark any registers/bytes/bindings/etc. that they occupy as "used" so
-    // that the subsequent layout of the generic-dependency parameters will not
-    // collide with them.
-    //
-    // We will use the same kind of context type as the original parameter binding
-    // step did, so we initialize its state here:
-
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, newProgramLayout);
-    SLANG_ASSERT(layoutContext.rules);
-
-    SharedParameterBindingContext sharedContext(
-        layoutContext.getRulesFamily(),
-        newProgramLayout,
-        targetReq,
-        sink);
-
-    ParameterBindingContext context;
-    context.shared = &sharedContext;
-    context.layoutContext = layoutContext;
-
-    // We will also need state for laying out any global-scope parameters
-    // that include ordinary/uniform data.
-    //
-    auto oldGlobalStructLayout = getGlobalStructLayout(oldProgramLayout);
-    SLANG_ASSERT(oldGlobalStructLayout);
-
-    ScopeLayoutBuilder newGlobalScopeLayoutBuilder;
-    newGlobalScopeLayoutBuilder.beginLayout(&context);
-    auto& newGlobalStructLayoutInfo = newGlobalScopeLayoutBuilder.m_structLayoutInfo;
-    auto newGlobalStructLayout = newGlobalScopeLayoutBuilder.m_structLayout;
-
-    // The initial state for uniform layout will be based on whatever
-    // global-scope ordinary/uniform parameters were laid out before.
-    // The alignment can be read directly from the old global layout.
-    //
-    newGlobalStructLayoutInfo.alignment = oldGlobalStructLayout->uniformAlignment;
-    newGlobalStructLayoutInfo.size = 0;
-
-    // The remaining information needs to be collected by looking at
-    // the individual parameters in the existing layout.
-    //
-    bool oldAnyUniforms = false;
-    for(auto oldVarLayout : oldGlobalStructLayout->fields)
-    {
-        // If a parameter made use of a global generic parameter, then we would
-        // have skipped applying layout to it in the original layout process,
-        // and so we should skip it for the process of recovering the existing
-        // layout information.
-        //
-        if (oldVarLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
-            continue;
-
-        // Otherwise, we will "reserve" any resources that the parameter was
-        // determined to consume.
-        //
-        // The easy case is any registers/bindings used for textures/sampler/etc.
-        // We iterate over the kinds of resources consumed by teh parameter.
-        //
-        for( auto varResInfo : oldVarLayout->resourceInfos )
-        {
-            // For each kind of resource consumed the `varResInfo` will tell us
-            // the start of the consumed range, whle the type will be needed
-            // to tell us the amount of resources consumed.
-            //
-            if( auto typeResInfo = oldVarLayout->typeLayout->FindResourceInfo(varResInfo.kind) )
-            {
-                // We will mark the range of resources consumed by theis parameter
-                // as "used" so that it cannot be claimed by later parameters.
-                //
-                auto usedRangeSet = findUsedRangeSetForSpace(&context, varResInfo.space);
-                markSpaceUsed(&context, varResInfo.space);
-                usedRangeSet->usedResourceRanges[(int)varResInfo.kind].Add(
-                    nullptr, // we don't need to track parameter info here
-                    varResInfo.index,
-                    varResInfo.index + typeResInfo->count);
-            }
-        }
-
-        // The more subtle case is when the parameter consumes ordinary bytes
-        // of uniform (constant buffer) memory, because we do not use the
-        // same "used range" model to allocate space for ordinary data.
-        //
-        // Instead, we simply track the highest byte offset covered by any parameter.
-        //
-        if (auto varUniformInfo = oldVarLayout->FindResourceInfo(LayoutResourceKind::Uniform))
-        {
-            oldAnyUniforms = true;
-
-            if( auto typeUniformInfo = oldVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
-            {
-                newGlobalStructLayoutInfo.size = maximum(
-                    newGlobalStructLayoutInfo.size,
-                    varUniformInfo->index + typeUniformInfo->count);
-            }
-        }
-    }
-
-    // Rather than attempt to re-use the entry-point layout information
-    // that was collected in the first pass, we will re-collect the
-    // information for entry points from scratch.
-    //
-    // This ensures that when an entry point makes use of a generic type
-    // parameter, the layout of its parameter list strictly follows
-    // the declaration order.
-    //
-    for( auto entryPoint : oldProgramLayout->getProgram()->getEntryPoints() )
-    {
-        collectEntryPointParameters(&context, entryPoint, typeSubst);
-        context.entryPointLayout = nullptr;
-    }
-
-    // Now that we've marked thing as being used, we can make a second
-    // sweep to compute the requirements of any generic-dependent parameters.
-    //
-    // Along the way we will build up the new layout for the global-scope
-    // structure type, including the offsets of all ordinary/uniform fields.
-    //
-
-    bool newAnyUniforms = oldAnyUniforms;
-    List<RefPtr<VarLayout>> newVarLayouts;
-    Dictionary<RefPtr<VarLayout>, RefPtr<VarLayout>> mapOldLayoutToNew;
-    for(auto oldVarLayout : oldGlobalStructLayout->fields)
-    {
-        // In this pass, the variables that *don't* depend on generic parameters
-        // are the easy ones to handle. We can just copy them over to the new layout.
-        //
-        if(!oldVarLayout->FindResourceInfo(LayoutResourceKind::GenericResource))
-        {
-            newGlobalStructLayout->fields.Add(oldVarLayout);
-            continue;
-        }
-
-        // In the case where things are generic-dependent, we need to re-do
-        // the type layout process on the type that results from doing
-        // substitution with the global generic arguments.
-        //
-        RefPtr<Type> oldType = oldVarLayout->getTypeLayout()->getType();
-        SLANG_ASSERT(oldType);
-        RefPtr<Type> newType = oldType->Substitute(typeSubst).as<Type>();
-
-        RefPtr<TypeLayout> newTypeLayout = getTypeLayoutForGlobalShaderParameter(
-            &context,
-            oldVarLayout->varDecl,
-            newType);
-
-        RefPtr<VarLayout> newVarLayout = new VarLayout();
-        newVarLayout->varDecl = oldVarLayout->varDecl;
-        newVarLayout->stage = oldVarLayout->stage;
-        newVarLayout->typeLayout = newTypeLayout;
-
-        newGlobalScopeLayoutBuilder.addParameter(newVarLayout);
-        newVarLayouts.Add(newVarLayout);
-        mapOldLayoutToNew.Add(oldVarLayout, newVarLayout);
-
-        if(auto uniformInfo = newTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
-        {
-            if(uniformInfo->count != 0)
-            {
-                newAnyUniforms = true;
-                diagnoseGlobalUniform(&sharedContext, newVarLayout->varDecl);
-            }
-        }
-
-    }
-    auto newGlobalScopeVarLayout = newGlobalScopeLayoutBuilder.endLayout();
-
-    // We had better have made a copy of every field in the original layout.
-    //
-    SLANG_ASSERT(oldGlobalStructLayout->fields.Count() == newGlobalStructLayout->fields.Count());
-
-    // If there were no global-scope uniforms before, but there
-    // are now that we've done global substitution, then we
-    // need to allocate a global constant buffer to hold them.
-    //
-    auto newGlobalConstantBufferBinding = maybeAllocateConstantBufferBinding(&context, newAnyUniforms && !oldAnyUniforms);
-
-    // Now we need to "complete" finding for each of the new parameters,
-    // which is the step that actually allocates resource to them.
-    //
-    // Note: we don't support generic-dependent parameters with explicit bindings,
-    // so we should probably emit an error message about that in the original
-    // layout step.
-    //
-    for(auto newVarLayout : newVarLayouts)
-    {
-        completeBindingsForParameter(&context, newVarLayout);
-    }
-
-    // One remaining missing step is that the `StructLayout` type maintains
-    // a map from variable declarations to their layouts, and in some cases
-    // multiple declarations will map to the same layout (because, e.g., the
-    // same `cbuffer` was declared in both a vertex and fragment shader file).
-    //
-    // We need to clone that remapping information over from the old program
-    // layout. This is why we created the `mapOldLayoutToNew` mapping in
-    // the preceding loop.
-    //
-    // TODO: This step would be easier if the `StructLayout::mapVarToLayout`
-    // dictionary were instead a mapping from variable declaration to the
-    // *index* of the corresponding layout in the `fields` array.
-    //
-    for(auto entry : oldGlobalStructLayout->mapVarToLayout)
-    {
-        RefPtr<VarLayout> varLayout = entry.Value;
-        mapOldLayoutToNew.TryGetValue(varLayout, varLayout);
-        newGlobalStructLayout->mapVarToLayout[entry.Key] = varLayout;
-    }
-
-    // Just as for the initial computation of layout, we will complete
-    // binding for entry-point parameters *after* we have laid out
-    // all the global-scope parameters.
-    //
-    // Note that this includes layout of generic-dependent global scope
-    // parameters, so it is possible for entry point uniform parameters
-    // to end up with a different register/binding after generic specialization.
-    // (There really isn't a great way around that)
-    //
-    for( auto entryPoint : sharedContext.programLayout->entryPoints )
-    {
-        auto entryPointParamsLayout = entryPoint->parametersLayout;
-        completeBindingsForParameter(&context, entryPointParamsLayout);
-    }
-
-    // As a last step we need to set up the binding/offset information
-    // for the global scope itself.
-    //
-    // We will start by copying whatever information was in the old layout.
-    //
-    {
-        auto oldGlobalScopeVarLayout = oldProgramLayout->parametersLayout;
-        for( auto oldResInfo : oldGlobalScopeVarLayout->resourceInfos )
-        {
-            auto newResInfo = newGlobalScopeVarLayout->findOrAddResourceInfo(oldResInfo.kind);
-            newResInfo->space = oldResInfo.space;
-            newResInfo->kind = oldResInfo.kind;
-        }
-    }
-
-    // If we had to create a constant buffer to house the global-scope
-    // ordinary/uniform data, then we need to make sure to set that
-    // information on the global scope.
-    //
-    if(newGlobalConstantBufferBinding.kind != LayoutResourceKind::None )
-    {
-        auto resInfo = newGlobalScopeVarLayout->findOrAddResourceInfo(newGlobalConstantBufferBinding.kind);
-        resInfo->space = newGlobalConstantBufferBinding.space;
-        resInfo->index = newGlobalConstantBufferBinding.index;
-    }
-
-    newProgramLayout->parametersLayout = newGlobalScopeVarLayout;
-    return newProgramLayout;
 }
 
 } // namespace Slang
