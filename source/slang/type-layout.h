@@ -919,28 +919,17 @@ RefPtr<TypeLayout> createTypeLayout(
 
 //
 
-// Create a type layout for a parameter block type.
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType);
 
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
-    TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    RefPtr<Type>                elementType,
-    LayoutRulesImpl*            elementTypeRules);
-
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
-    TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    SimpleLayoutInfo            parameterGroupInfo,
-    RefPtr<TypeLayout>          elementTypeLayout);
-
-RefPtr<ParameterGroupTypeLayout>
-createParameterGroupTypeLayout(
+    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+    ///
+    /// This overload allows the `parameterGroupType` parameter to be null, for cases
+    /// where an anonymous parameter group needs to be constructed.
+    ///
+RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     LayoutRulesImpl*            parameterGroupRules,
