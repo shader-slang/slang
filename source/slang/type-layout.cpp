@@ -1378,19 +1378,40 @@ static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     return typeLayout;
 }
 
-RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
+    /// Doe we need to wrap the given element type in a constant buffer layout?
+static bool needsConstantBuffer(RefPtr<TypeLayout> elementTypeLayout)
+{
+    auto uniformResInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+    if(uniformResInfo && uniformResInfo->count != 0)
+        return true;
+
+    // Note: additional cases are expected here, to deal with existential types.
+
+    return false;
+}
+
+RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    LayoutRulesImpl*            parameterGroupRules,
-    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
+    // First things first, we need to check whether the element type
+    // we are trying to lay out even needs a constant buffer allocated
+    // for it.
+    //
+    if(!needsConstantBuffer(elementTypeLayout))
+        return elementTypeLayout;
+
+    auto parameterGroupRules = context.getRulesFamily()->getConstantBufferRules();
+
     return _createParameterGroupTypeLayout(
-        context.with(parameterGroupRules).with(context.targetReq->getDefaultMatrixLayoutMode()),
-        parameterGroupType,
-        parameterGroupInfo,
+        context
+            .with(parameterGroupRules)
+            .with(context.targetReq->getDefaultMatrixLayoutMode()),
+        nullptr,
+        parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),
         elementTypeLayout);
 }
+
 
 static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
