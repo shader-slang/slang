@@ -119,6 +119,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
 };
 for(auto item : kMutableByteAddressBufferCases) {
+SLANG_RAW("#line 104 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__magic_type(HLSL")
@@ -271,6 +272,7 @@ SLANG_RAW("};\n")
 SLANG_RAW("\n")
 
 }
+SLANG_RAW("#line 247 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 
@@ -283,6 +285,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
+SLANG_RAW("#line 259 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
@@ -320,6 +323,7 @@ SLANG_RAW("};\n")
 SLANG_RAW("\n")
 
 }
+SLANG_RAW("#line 287 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
@@ -1509,6 +1513,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
+SLANG_RAW("#line 1440 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")

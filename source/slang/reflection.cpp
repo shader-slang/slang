@@ -609,7 +609,7 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     RefPtr<TypeLayout> result;
     if (targetReq->getTypeLayouts().TryGetValue(type, result))
         return (SlangReflectionTypeLayout*)result.Ptr();
-    result = CreateTypeLayout(layoutContext, type);
+    result = createTypeLayout(layoutContext, type);
     targetReq->getTypeLayouts()[type] = result;
     return (SlangReflectionTypeLayout*)result.Ptr();
 }

@@ -265,7 +265,7 @@ namespace Slang
             /// Get the module that contains the entry point.
         Module* getModule();
 
-            /// Get the linkage that contains the module for this entry pooint.
+            /// Get the linkage that contains the module for this entry point.
         Linkage* getLinkage();
 
             /// Get a list of modules that this entry point depends on.
@@ -706,7 +706,7 @@ namespace Slang
     {
         // TODO: We really shouldn't need this type in the long run.
         // The few places that rely on it should be refactored to just
-        // depend on the unerlying information (a linkage and a diagnostic
+        // depend on the underlying information (a linkage and a diagnostic
         // sink) directly.
         //
         // The flags to control dumping and validation of IR should be

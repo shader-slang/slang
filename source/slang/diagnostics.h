@@ -138,10 +138,7 @@ namespace Slang
 
     class DiagnosticSink
     {
-    public:
-        // The source manager to use when mapping source locations to file+line info
-        SourceManager*  sourceManager;
-
+    public:        
         struct Flag 
         {
             enum Enum: uint32_t
@@ -158,7 +155,10 @@ namespace Slang
 
         ISlangWriter* writer                        = nullptr;
         Flags flags                                 = 0;
-        
+
+        // The source manager to use when mapping source locations to file+line info
+        SourceManager*  sourceManager = nullptr;
+
 /*
         void Error(int id, const String & msg, const SourceLoc & pos)
         {

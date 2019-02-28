@@ -1180,13 +1180,6 @@ void initializeSharedSpecContext(
     sharedContext->target = target;
 }
 
-// implementation provided in parameter-binding.cpp
-RefPtr<ProgramLayout> specializeProgramLayout(
-    TargetRequest * targetReq,
-    ProgramLayout*  programLayout,
-    SubstitutionSet typeSubst,
-    DiagnosticSink* sink);
-
 struct IRSpecializationState
 {
     ProgramLayout*      programLayout;
@@ -1194,7 +1187,6 @@ struct IRSpecializationState
     TargetRequest*      targetReq;
 
     IRModule* irModule = nullptr;
-    RefPtr<ProgramLayout> newProgramLayout;
 
     IRSharedSpecContext sharedContextStorage;
     IRSpecContext contextStorage;
@@ -1211,7 +1203,6 @@ struct IRSpecializationState
 
     ~IRSpecializationState()
     {
-        newProgramLayout = nullptr;
         contextStorage = IRSpecContext();
         sharedContextStorage = IRSharedSpecContext();
     }
@@ -1260,25 +1251,6 @@ LinkedIR linkIR(
     context->shared = sharedContext;
     context->builder = &sharedContext->builderStorage;
 
-    // Now specialize the program layout using the substitution
-    //
-    // TODO: The specialization of the layout is conceptually an AST-level operations,
-    // and shouldn't be done here in the IR at all.
-    //
-    RefPtr<ProgramLayout> newProgramLayout = specializeProgramLayout(
-        targetReq,
-        programLayout,
-        SubstitutionSet(program->getGlobalGenericSubstitution()),
-        compileRequest->getSink());
-
-    // TODO: we need to register the (IR-level) arguments of the global generic parameters as the
-    // substitutions for the generic parameters in the original IR.
-
-    // applyGlobalGenericParamSubsitution(...);
-
-
-    state->newProgramLayout = newProgramLayout;
-
     // Next, we want to optimize lookup for layout information
     // associated with global declarations, so that we can
     // look things up based on the IR values (using mangled names)
@@ -1290,7 +1262,7 @@ LinkedIR linkIR(
     // multiple mangled names (when the unique translation
     // unit name gets involved).
     //
-    auto globalStructLayout = getScopeStructLayout(newProgramLayout);
+    auto globalStructLayout = getScopeStructLayout(programLayout);
     for(auto entry : globalStructLayout->mapVarToLayout)
     {
         auto mangledName = getMangledName(entry.Key);
@@ -1311,7 +1283,7 @@ LinkedIR linkIR(
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
     }
 
-    auto entryPointLayout = findEntryPointLayout(newProgramLayout, entryPoint);
+    auto entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on

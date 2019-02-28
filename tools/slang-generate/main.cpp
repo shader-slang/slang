@@ -35,6 +35,14 @@ struct Node
     Node*       next;
 };
 
+// Information about a source file
+struct SourceFile
+{
+    char const* inputPath;
+    StringSpan  text;
+    Node*       node;
+};
+
 void addNode(
     Node**&         ioLink,
     Node::Flavor    flavor,
@@ -593,12 +601,99 @@ void emitCodeNodes(
     }
 }
 
+// Given line starts and a location, find the line number. Returns -1 if not found
+static int _findLineIndex(const List<const char*>& lineBreaks, const char* location)
+{
+    if (location == nullptr)
+    {
+        return -1;
+    }
+
+    // Use a binary chop to find the associated line
+    int lo = 0;
+    int hi = int(lineBreaks.Count());
+
+    while (lo + 1 < hi)
+    {
+        const int mid = (hi + lo) >> 1;
+        const auto midOffset = lineBreaks[mid];
+        if (midOffset <= location)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+
+    return lo;
+}
+
+static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>& outLineStarts)
+{
+    char const* begin = content.begin();
+    char const* end = content.end();
+
+    char const* cursor = begin;
+
+    // Treat the beginning of the file as a line break
+    outLineStarts.Add(cursor);
+
+    while (cursor != end)
+    {
+        int c = *cursor++;
+        switch (c)
+        {
+        case '\r': case '\n':
+        {
+            // When we see a line-break character we need
+            // to record the line break, but we also need
+            // to deal with the annoying issue of encodings,
+            // where a multi-byte sequence might encode
+            // the line break.
+
+            int d = *cursor;
+            if ((c^d) == ('\r' ^ '\n'))
+                cursor++;
+
+            outLineStarts.Add(cursor);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
 void emitTemplateNodes(
+    SourceFile* sourceFile,
     FILE*   stream,
     Node*   node)
 {
-    for (auto nn = node; nn; nn = nn->next)
+    // Work out
+    List<const char*> lineBreaks;
+    _calcLineBreaks(sourceFile->text, lineBreaks);
+
+    Node* prev = nullptr;
+    for (auto nn = node; nn; prev = nn, nn = nn->next)
     {
+        // If we transition from escape to text, insert line number directive
+        bool enable = true;
+        if (enable && prev && prev->flavor == Node::Flavor::escape && nn->flavor == Node::Flavor::text)
+        {
+            // Find the line
+            int lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
+            // If found, output the directive
+            if (lineIndex >= 0)
+            {
+                StringBuilder buf;
+                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->inputPath << "\\\"\")\n";
+
+                emit(stream, buf.getUnownedSlice());
+            }
+        }
+
         switch (nn->flavor)
         {
         case Node::Flavor::text:
@@ -616,7 +711,7 @@ void emitTemplateNodes(
         case Node::Flavor::escape:
             emitCodeNodes(stream, nn->body);
             break;
-        }
+        }  
     }
 }
 
@@ -691,13 +786,7 @@ PARSE_HANDLER(parseUnknownFile)
     return nullptr;
 }
 
-// Information about a source file
-struct SourceFile
-{
-    char const* inputPath;
-    StringSpan  text;
-    Node*       node;
-};
+
 
 Node* parseSourceFile(SourceFile* file)
 {
@@ -810,7 +899,7 @@ int main(
         FILE* outputStream;
         fopen_s(&outputStream, outputPath.Buffer(), "w");
 
-        emitTemplateNodes(outputStream, node);
+        emitTemplateNodes(sourceFile, outputStream, node);
 
         fclose(outputStream);
 
