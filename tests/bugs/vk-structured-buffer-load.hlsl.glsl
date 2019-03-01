@@ -29,7 +29,7 @@ void main()
 
     float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(int(uint(0)))]);
 
-    _S2.PackedHitInfoA_0.y = offsfloat_0;
+    _S2.PackedHitInfoA_0.y = inversesqrt(offsfloat_0);
     
     return;
 }

@@ -20,5 +20,5 @@ void HitMain(inout RayHitInfoPacked RayData, BuiltInTriangleIntersectionAttribut
     uint offs = 0;
     float offsfloat = gParamBlock.sbuf.Load(offs);
     
-    RayData.PackedHitInfoA.y = offsfloat;
+    RayData.PackedHitInfoA.y = rsqrt(offsfloat);
 }
