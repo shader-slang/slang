@@ -790,6 +790,13 @@ namespace Slang
         UInt getEntryPointReqCount() { return m_entryPointReqs.Count(); }
         FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
 
+        // Directories to search for `#include` files or `import`ed modules
+        // NOTE! That for now these search directories are not settable via the API
+        // so the search directories on Linkage is used for #include as well as for modules.
+        SearchDirectoryList searchDirectories;
+
+        SearchDirectoryList const& getSearchDirectories() { return searchDirectories; }
+
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
 

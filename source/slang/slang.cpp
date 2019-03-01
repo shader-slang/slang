@@ -590,6 +590,13 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     auto linkage = getLinkage();
 
+    // TODO(JS): NOTE! Here we are using the searchDirectories on the linkage. This is because
+    // currently the API only allows the setting search paths on linkage.
+    // 
+    // Here we should probably be using the searchDirectories on the FrontEndCompileRequest.
+    // If searchDirectories.parent pointed to the one in the Linkage would mean linkage paths
+    // would be checked too (after those on the FrontEndCompileRequest). 
+
     includeHandler.linkage = linkage;
     includeHandler.searchDirectories = &linkage->searchDirectories;
 
