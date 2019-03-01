@@ -1221,6 +1221,20 @@ namespace Slang
         return rs;
     }
 
+        /// The the user-level name for a variable that might be a shader parameter.
+        ///
+        /// In most cases this is just the name of the variable declaration itself,
+        /// but in the specific case of a `cbuffer`, the name that the user thinks
+        /// of is really metadata. For example:
+        ///
+        ///     cbuffer C { int x; }
+        ///
+        /// In this example, error messages relating to the constant buffer should
+        /// really use the name `C`, but that isn't the name of the declaration
+        /// (it is in practice anonymous, and `C` can be used for a different
+        /// declaration in the same file).
+        ///
+    Name* getReflectionName(VarDeclBase* varDecl);
 
     inline RefPtr<Type> GetType(DeclRef<VarDeclBase> const& declRef)
     {
