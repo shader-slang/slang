@@ -395,9 +395,6 @@ struct ParameterBindingContext
     // the resource usage of shader parameters.
     TypeLayoutContext layoutContext;
 
-    // A dictionary to accelerate looking up parameters by name
-    Dictionary<Name*, ParameterInfo*> mapNameToParameterInfo;
-
     // What stage (if any) are we compiling for?
     Stage stage;
 
@@ -573,424 +570,6 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     return info;
 }
 
-static Name* getReflectionName(VarDeclBase* varDecl)
-{
-    if (auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>())
-        return reflectionNameModifier->nameAndLoc.name;
-
-    return varDecl->getName();
-}
-
-// Information tracked when doing a structural
-// match of types.
-struct StructuralTypeMatchStack
-{
-    DeclRef<VarDeclBase>        leftDecl;
-    DeclRef<VarDeclBase>        rightDecl;
-    StructuralTypeMatchStack*   parent;
-};
-
-static void diagnoseParameterTypeMismatch(
-    ParameterBindingContext*    context,
-    StructuralTypeMatchStack*   inStack)
-{
-    SLANG_ASSERT(inStack);
-
-    // The bottom-most entry in the stack should represent
-    // the shader parameters that kicked things off
-    auto stack = inStack;
-    while(stack->parent)
-        stack = stack->parent;
-
-    getSink(context)->diagnose(stack->leftDecl, Diagnostics::shaderParameterDeclarationsDontMatch, getReflectionName(stack->leftDecl));
-    getSink(context)->diagnose(stack->rightDecl, Diagnostics::seeOtherDeclarationOf, getReflectionName(stack->rightDecl));
-}
-
-// Two types that were expected to match did not.
-// Inform the user with a suitable message.
-static void diagnoseTypeMismatch(
-    ParameterBindingContext*    context,
-    StructuralTypeMatchStack*   inStack)
-{
-    auto stack = inStack;
-    SLANG_ASSERT(stack);
-    diagnoseParameterTypeMismatch(context, stack);
-
-    auto leftType = GetType(stack->leftDecl);
-    auto rightType = GetType(stack->rightDecl);
-
-    if( stack->parent )
-    {
-        getSink(context)->diagnose(stack->leftDecl, Diagnostics::fieldTypeMisMatch, getReflectionName(stack->leftDecl), leftType, rightType);
-        getSink(context)->diagnose(stack->rightDecl, Diagnostics::seeOtherDeclarationOf, getReflectionName(stack->rightDecl));
-
-        stack = stack->parent;
-        if( stack )
-        {
-            while( stack->parent )
-            {
-                getSink(context)->diagnose(stack->leftDecl, Diagnostics::usedInDeclarationOf, getReflectionName(stack->leftDecl));
-                stack = stack->parent;
-            }
-        }
-    }
-    else
-    {
-        getSink(context)->diagnose(stack->leftDecl, Diagnostics::shaderParameterTypeMismatch, leftType, rightType);
-    }
-}
-
-// Two types that were expected to match did not.
-// Inform the user with a suitable message.
-static void diagnoseTypeFieldsMismatch(
-    ParameterBindingContext*    context,
-    DeclRef<Decl> const&        left,
-    DeclRef<Decl> const&        right,
-    StructuralTypeMatchStack*   stack)
-{
-    diagnoseParameterTypeMismatch(context, stack);
-
-    getSink(context)->diagnose(left, Diagnostics::fieldDeclarationsDontMatch, left.GetName());
-    getSink(context)->diagnose(right, Diagnostics::seeOtherDeclarationOf, right.GetName());
-
-    if( stack )
-    {
-        while( stack->parent )
-        {
-            getSink(context)->diagnose(stack->leftDecl, Diagnostics::usedInDeclarationOf, getReflectionName(stack->leftDecl));
-            stack = stack->parent;
-        }
-    }
-}
-
-static void collectFields(
-    DeclRef<AggTypeDecl>    declRef,
-    List<DeclRef<VarDecl>>& outFields)
-{
-    for( auto fieldDeclRef : getMembersOfType<VarDecl>(declRef) )
-    {
-        if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
-            continue;
-
-        outFields.Add(fieldDeclRef);
-    }
-}
-
-static bool validateTypesMatch(
-    ParameterBindingContext*    context,
-    Type*                       left,
-    Type*                       right,
-    StructuralTypeMatchStack*   stack);
-
-static bool validateIntValuesMatch(
-    ParameterBindingContext*    context,
-    IntVal*                     left,
-    IntVal*                     right,
-    StructuralTypeMatchStack*   stack)
-{
-    if(left->EqualsVal(right))
-        return true;
-
-    // TODO: are there other cases we need to handle here?
-
-    diagnoseTypeMismatch(context, stack);
-    return false;
-}
-
-
-static bool validateValuesMatch(
-    ParameterBindingContext*    context,
-    Val*                        left,
-    Val*                        right,
-    StructuralTypeMatchStack*   stack)
-{
-    if( auto leftType = dynamicCast<Type>(left) )
-    {
-        if( auto rightType = dynamicCast<Type>(right) )
-        {
-            return validateTypesMatch(context, leftType, rightType, stack);
-        }
-    }
-
-    if( auto leftInt = dynamicCast<IntVal>(left) )
-    {
-        if( auto rightInt = dynamicCast<IntVal>(right) )
-        {
-            return validateIntValuesMatch(context, leftInt, rightInt, stack);
-        }
-    }
-
-    if( auto leftWitness = dynamicCast<SubtypeWitness>(left) )
-    {
-        if( auto rightWitness = dynamicCast<SubtypeWitness>(right) )
-        {
-            return true;
-        }
-    }
-
-    diagnoseTypeMismatch(context, stack);
-    return false;
-}
-
-static bool validateGenericSubstitutionsMatch(
-    ParameterBindingContext*    context,
-    GenericSubstitution*        left,
-    GenericSubstitution*        right,
-    StructuralTypeMatchStack*   stack)
-{
-    if( !left )
-    {
-        if( !right )
-        {
-            return true;
-        }
-
-        diagnoseTypeMismatch(context, stack);
-        return false;
-    }
-
-
-
-    UInt argCount = left->args.Count();
-    if( argCount != right->args.Count() )
-    {
-        diagnoseTypeMismatch(context, stack);
-        return false;
-    }
-
-    for( UInt aa = 0; aa < argCount; ++aa )
-    {
-        auto leftArg = left->args[aa];
-        auto rightArg = right->args[aa];
-
-        if(!validateValuesMatch(context, leftArg, rightArg, stack))
-            return false;
-    }
-
-    return true;
-}
-
-static bool validateThisTypeSubstitutionsMatch(
-    ParameterBindingContext*    /*context*/,
-    ThisTypeSubstitution*       /*left*/,
-    ThisTypeSubstitution*       /*right*/,
-    StructuralTypeMatchStack*   /*stack*/)
-{
-    // TODO: actual checking.
-    return true;
-}
-
-static bool validateSpecializationsMatch(
-    ParameterBindingContext*    context,
-    SubstitutionSet             left,
-    SubstitutionSet             right,
-    StructuralTypeMatchStack*   stack)
-{
-    auto ll = left.substitutions;
-    auto rr = right.substitutions;
-    for(;;)
-    {
-        // Skip any global generic substitutions.
-        if(auto leftGlobalGeneric = as<GlobalGenericParamSubstitution>(ll))
-        {
-            ll = leftGlobalGeneric->outer;
-            continue;
-        }
-        if(auto rightGlobalGeneric = as<GlobalGenericParamSubstitution>(rr))
-        {
-            rr = rightGlobalGeneric->outer;
-            continue;
-        }
-
-        // If either ran out, then we expect both to have run out.
-        if(!ll || !rr)
-            return !ll && !rr;
-
-        auto leftSubst = ll;
-        auto rightSubst = rr;
-
-        ll = ll->outer;
-        rr = rr->outer;
-
-        if(auto leftGeneric = as<GenericSubstitution>(leftSubst))
-        {
-            if(auto rightGeneric = as<GenericSubstitution>(rightSubst))
-            {
-                if(validateGenericSubstitutionsMatch(context, leftGeneric, rightGeneric, stack))
-                {
-                    continue;
-                }
-            }
-        }
-        else if(auto leftThisType = as<ThisTypeSubstitution>(leftSubst))
-        {
-            if(auto rightThisType = as<ThisTypeSubstitution>(rightSubst))
-            {
-                if(validateThisTypeSubstitutionsMatch(context, leftThisType, rightThisType, stack))
-                {
-                    continue;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    return true;
-}
-
-// Determine if two types "match" for the purposes of `cbuffer` layout rules.
-//
-static bool validateTypesMatch(
-    ParameterBindingContext*    context,
-    Type*                       left,
-    Type*                       right,
-    StructuralTypeMatchStack*   stack)
-{
-    if(left->Equals(right))
-        return true;
-
-    // It is possible that the types don't match exactly, but
-    // they *do* match structurally.
-
-    // Note: the following code will lead to infinite recursion if there
-    // are ever recursive types. We'd need a more refined system to
-    // cache the matches we've already found.
-
-    if( auto leftDeclRefType = as<DeclRefType>(left) )
-    {
-        if( auto rightDeclRefType = as<DeclRefType>(right) )
-        {
-            // Are they references to matching decl refs?
-            auto leftDeclRef = leftDeclRefType->declRef;
-            auto rightDeclRef = rightDeclRefType->declRef;
-
-            // Do the reference the same declaration? Or declarations
-            // with the same name?
-            //
-            // TODO: we should only consider the same-name case if the
-            // declarations come from translation units being compiled
-            // (and not an imported module).
-            if( leftDeclRef.getDecl() == rightDeclRef.getDecl()
-                || leftDeclRef.GetName() == rightDeclRef.GetName() )
-            {
-                // Check that any generic arguments match
-                if( !validateSpecializationsMatch(
-                    context,
-                    leftDeclRef.substitutions,
-                    rightDeclRef.substitutions,
-                    stack) )
-                {
-                    return false;
-                }
-
-                // Check that any declared fields match too.
-                if( auto leftStructDeclRef = leftDeclRef.as<AggTypeDecl>() )
-                {
-                    if( auto rightStructDeclRef = rightDeclRef.as<AggTypeDecl>() )
-                    {
-                        List<DeclRef<VarDecl>> leftFields;
-                        List<DeclRef<VarDecl>> rightFields;
-
-                        collectFields(leftStructDeclRef, leftFields);
-                        collectFields(rightStructDeclRef, rightFields);
-
-                        UInt leftFieldCount = leftFields.Count();
-                        UInt rightFieldCount = rightFields.Count();
-
-                        if( leftFieldCount != rightFieldCount )
-                        {
-                            diagnoseTypeFieldsMismatch(context, leftDeclRef, rightDeclRef, stack);
-                            return false;
-                        }
-
-                        for( UInt ii = 0; ii < leftFieldCount; ++ii )
-                        {
-                            auto leftField = leftFields[ii];
-                            auto rightField = rightFields[ii];
-
-                            if( leftField.GetName() != rightField.GetName() )
-                            {
-                                diagnoseTypeFieldsMismatch(context, leftDeclRef, rightDeclRef, stack);
-                                return false;
-                            }
-
-                            auto leftFieldType = GetType(leftField);
-                            auto rightFieldType = GetType(rightField);
-
-                            StructuralTypeMatchStack subStack;
-                            subStack.parent = stack;
-                            subStack.leftDecl = leftField;
-                            subStack.rightDecl = rightField;
-
-                            if(!validateTypesMatch(context, leftFieldType,rightFieldType, &subStack))
-                                return false;
-                        }
-                    }
-                }
-
-                // Everything seemed to match recursively.
-                return true;
-            }
-        }
-    }
-
-    // If we are looking at `T[N]` and `U[M]` we want to check that
-    // `T` is structurally equivalent to `U` and `N` is the same as `M`.
-    else if( auto leftArrayType = as<ArrayExpressionType>(left) )
-    {
-        if( auto rightArrayType = as<ArrayExpressionType>(right) )
-        {
-            if(!validateTypesMatch(context, leftArrayType->baseType, rightArrayType->baseType, stack) )
-                return false;
-
-            if(!validateValuesMatch(context, leftArrayType->ArrayLength, rightArrayType->ArrayLength, stack))
-                return false;
-
-            return true;
-        }
-    }
-
-    diagnoseTypeMismatch(context, stack);
-    return false;
-}
-
-// This function is supposed to determine if two global shader
-// parameter declarations represent the same logical parameter
-// (so that they should get the exact same binding(s) allocated).
-//
-static bool doesParameterMatch(
-    ParameterBindingContext* context,
-    RefPtr<VarLayout>   varLayout,
-    ParameterInfo* parameterInfo)
-{
-    // Any "varying" parameter should automatically be excluded
-    //
-    // Note that we use the `typeLayout` field rather than
-    // looking at resource information on the variable directly,
-    // because this may be called when binding hasn't been performed.
-    for (auto rr : varLayout->typeLayout->resourceInfos)
-    {
-        switch (rr.kind)
-        {
-        case LayoutResourceKind::VertexInput:
-        case LayoutResourceKind::FragmentOutput:
-            return false;
-
-        default:
-            break;
-        }
-    }
-
-    StructuralTypeMatchStack stack;
-    stack.parent = nullptr;
-    stack.leftDecl = varLayout->varDecl;
-    stack.rightDecl = parameterInfo->varLayouts[0]->varDecl;
-
-    validateTypesMatch(context, varLayout->typeLayout->type, parameterInfo->varLayouts[0]->typeLayout->type, &stack);
-
-    return true;
-}
 
 //
 
@@ -1018,90 +597,6 @@ static bool findLayoutArg(
     UInt*           outVal)
 {
     return findLayoutArg<T>(declRef.getDecl(), outVal);
-}
-
-//
-
-static bool isGLSLBuiltinName(VarDeclBase* varDecl)
-{
-    return getText(getReflectionName(varDecl)).StartsWith("gl_");
-}
-
-RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingInput(
-    ParameterBindingContext*    context,
-    VarDeclBase*                varDecl)
-{
-    if (isGLSLBuiltinName(varDecl))
-        return nullptr;
-
-    auto type = varDecl->getType();
-    if( varDecl->HasModifier<InModifier>() || as<GLSLInputParameterGroupType>(type))
-    {
-        // Special case to handle "arrayed" shader inputs, as used
-        // for Geometry and Hull input
-        switch( context->stage )
-        {
-        case Stage::Geometry:
-        case Stage::Hull:
-        case Stage::Domain:
-            // Tessellation `patch` variables should stay as written
-            if( !varDecl->HasModifier<GLSLPatchModifier>() )
-            {
-                // Unwrap array type, if present
-                if( auto arrayType = as<ArrayExpressionType>(type) )
-                {
-                    type = arrayType->baseType.Ptr();
-                }
-            }
-            break;
-
-        default:
-            break;
-        }
-
-        return type;
-    }
-
-    return nullptr;
-}
-
-RefPtr<Type> tryGetEffectiveTypeForGLSLVaryingOutput(
-    ParameterBindingContext*    context,
-    VarDeclBase*                varDecl)
-{
-    if (isGLSLBuiltinName(varDecl))
-        return nullptr;
-
-    auto type = varDecl->getType();
-    if( varDecl->HasModifier<OutModifier>() || as<GLSLOutputParameterGroupType>(type))
-    {
-        // Special case to handle "arrayed" shader outputs, as used
-        // for Hull Shader output
-        //
-        // Note(tfoley): there is unfortunate code duplication
-        // with the `in` case above.
-        switch( context->stage )
-        {
-        case Stage::Hull:
-            // Tessellation `patch` variables should stay as written
-            if( !varDecl->HasModifier<GLSLPatchModifier>() )
-            {
-                // Unwrap array type, if present
-                if( auto arrayType = as<ArrayExpressionType>(type) )
-                {
-                    type = arrayType->baseType.Ptr();
-                }
-            }
-            break;
-
-        default:
-            break;
-        }
-
-        return type;
-    }
-
-    return nullptr;
 }
 
     /// Determine how to lay out a global variable that might be a shader parameter.
@@ -1183,19 +678,21 @@ static void collectGlobalGenericParameter(
 
 // Collect a single declaration into our set of parameters
 static void collectGlobalScopeParameter(
-    ParameterBindingContext*    context,
-    RefPtr<VarDeclBase>         varDecl,
-    SubstitutionSet             globalGenericSubst)
+    ParameterBindingContext*        context,
+    GlobalShaderParamInfo const&    shaderParamInfo,
+    SubstitutionSet                 globalGenericSubst)
 {
+    auto varDeclRef = shaderParamInfo.paramDeclRef;
+
     // We apply any substitutions for global generic parameters here.
-    auto type = varDecl->getType()->Substitute(globalGenericSubst).as<Type>();
+    auto type = GetType(varDeclRef)->Substitute(globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
     // the layout for that parameter's type.
     auto typeLayout = getTypeLayoutForGlobalShaderParameter(
         context,
-        varDecl,
+        varDeclRef.getDecl(),
         type);
 
     // If we did not find appropriate layout rules, then it
@@ -1207,45 +704,43 @@ static void collectGlobalScopeParameter(
     // Now create a variable layout that we can use
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->typeLayout = typeLayout;
-    varLayout->varDecl = DeclRef<Decl>(varDecl.Ptr(), nullptr).as<VarDeclBase>();
+    varLayout->varDecl = varDeclRef;
 
-    // This declaration may represent the same logical parameter
-    // as a declaration that came from a different translation unit.
-    // If that is the case, we want to re-use the same `VarLayout`
-    // across both parameters.
+    // The logic in `check.cpp` that created the `GlobalShaderParamInfo`
+    // will have identified any cases where there might be multiple
+    // global variables that logically represent the same shader parameter.
     //
-    // TODO: This logic currently detects *any* global-scope parameters
-    // with matching names, but it should eventually be narrowly
-    // scoped so that it only applies to parameters from unnamed modules.
+    // We will track the same basic information during layout using
+    // the `ParameterInfo` type.
     //
-    // First we look for an existing entry matching the name
-    // of this parameter:
-    auto parameterName = getReflectionName(varDecl);
-    ParameterInfo* parameterInfo = nullptr;
-    if( context->mapNameToParameterInfo.TryGetValue(parameterName, parameterInfo) )
-    {
-        // If the parameters have the same name, but don't "match" according to some reasonable rules,
-        // then we need to bail out.
-        if( !doesParameterMatch(context, varLayout, parameterInfo) )
-        {
-            parameterInfo = nullptr;
-        }
-    }
+    // TODO: `ParameterInfo` should probably become `LayoutParamInfo`.
+    //
+    ParameterInfo* parameterInfo = new ParameterInfo();
+    context->shared->parameters.Add(parameterInfo);
 
-    // If we didn't find a matching parameter, then we need to create one here
-    if( !parameterInfo )
-    {
-        parameterInfo = new ParameterInfo();
-        context->shared->parameters.Add(parameterInfo);
-        context->mapNameToParameterInfo.AddIfNotExists(parameterName, parameterInfo);
-    }
-    else
-    {
-        varLayout->flags |= VarLayoutFlag::IsRedeclaration;
-    }
-
-    // Add this variable declaration to the list of declarations for the parameter
+    // Add the first variable declaration to the list of declarations for the parameter
     parameterInfo->varLayouts.Add(varLayout);
+
+    // Add any additional variables to the list of declarations
+    for( auto additionalVarDeclRef : shaderParamInfo.additionalParamDeclRefs )
+    {
+        // TODO: We should either eliminate the design choice where different
+        // declarations of the "same" shade parameter get merged across
+        // translation units (it is effectively just a compatiblity feature),
+        // or we should clean things up earlier in the chain so that we can
+        // re-use a single `VarLayout` across all of the different declarations.
+        //
+        // TODO: It would also make sense in these cases to ensure that
+        // such global shader parameters get the same mangled name across
+        // all translation units, so that they can automatically be collapsed
+        // during linking.
+
+        RefPtr<VarLayout> additionalVarLayout = new VarLayout();
+        additionalVarLayout->typeLayout = typeLayout;
+        additionalVarLayout->varDecl = additionalVarDeclRef;
+
+        parameterInfo->varLayouts.Add(additionalVarLayout);
+    }
 }
 
 static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
@@ -1783,41 +1278,6 @@ static void completeBindingsForParameter(
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 
-
-
-static void collectGlobalScopeParameters(
-    ParameterBindingContext*    context,
-    ModuleDecl*                 program,
-    SubstitutionSet             globalGenericSubst)
-{
-    // First enumerate parameters at global scope
-    // We collect two things here:
-    // 1. A shader parameter, which is always a variable
-    // 2. A global entry-point generic parameter type (`type_param`),
-    //    which is a GlobalGenericParamDecl
-    // We collect global generic type parameters in the first pass,
-    // So we can fill in the correct index into ordinary type layouts 
-    // for generic types in the second pass.
-    for (auto decl : program->Members)
-    {
-        if (auto genParamDecl = as<GlobalGenericParamDecl>(decl))
-            collectGlobalGenericParameter(context, genParamDecl);
-    }
-    for (auto decl : program->Members)
-    {
-        if (auto varDecl = as<VarDeclBase>(decl))
-            collectGlobalScopeParameter(context, varDecl, globalGenericSubst);
-    }
-
-    // Next, we need to enumerate the parameters of
-    // each entry point (which requires knowing what the
-    // entry points *are*)
-
-    // TODO(tfoley): Entry point functions should be identified
-    // by looking for a generated modifier that is attached
-    // to global-scope function declarations.
-}
-
 struct SimpleSemanticInfo
 {
     String  name;
@@ -2274,7 +1734,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     ParameterBindingContext*        context,
     SubstitutionSet                 typeSubst,
-    DeclRef<ParamDecl>              paramDeclRef,
+    DeclRef<VarDeclBase>            paramDeclRef,
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
@@ -2537,8 +1997,10 @@ static void collectEntryPointParameters(
     scopeBuilder.beginLayout(context);
     auto paramsStructLayout = scopeBuilder.m_structLayout;
 
-    for( auto paramDeclRef : getMembersOfType<ParamDecl>(entryPointFuncDeclRef) )
+    for( auto& shaderParamInfo : entryPoint->getShaderParams() )
     {
+        auto paramDeclRef = shaderParamInfo.paramDeclRef;
+
         // Any error messages we emit during the process should
         // refer to the location of this parameter.
         //
@@ -2656,17 +2118,33 @@ static void collectParameters(
     // logical namespace/"linkage" so that two parameters
     // with the same name should represent the same
     // parameter, and get the same binding(s)
+
     ParameterBindingContext contextData = *inContext;
     auto context = &contextData;
+    context->stage = Stage::Unknown;
 
     auto globalGenericSubst = program->getGlobalGenericSubstitution();
 
+    // We will start by looking for any global generic type parameters.
+
     for(RefPtr<Module> module : program->getModuleDependencies())
     {
-        context->stage = Stage::Unknown;
+        for( auto genParamDecl : module->getModuleDecl()->getMembersOfType<GlobalGenericParamDecl>() )
+        {
+            collectGlobalGenericParameter(context, genParamDecl);
+        }
+    }
 
-        // First look at global-scope parameters
-        collectGlobalScopeParameters(context, module->getModuleDecl(), globalGenericSubst);
+    // Once we have enumerated global generic type parameters, we can
+    // begin enumerating shader parameters, starting at the global scope.
+    //
+    // Because we have already enumerated the global generic type parameters,
+    // we will be able to look up the index of a global generic type parameter
+    // when we see it referenced in the type of one of the shader parameters.
+
+    for(auto& globalParamInfo : program->getShaderParams() )
+    {
+        collectGlobalScopeParameter(context, globalParamInfo, globalGenericSubst);
     }
 
     // Next consider parameters for entry points
