@@ -587,8 +587,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
     IncludeHandlerImpl includeHandler;
-    includeHandler.linkage = getLinkage();
-    includeHandler.searchDirectories = &searchDirectories;
+
+    auto linkage = getLinkage();
+
+    includeHandler.linkage = linkage;
+    includeHandler.searchDirectories = &linkage->searchDirectories;
 
     RefPtr<Scope> languageScope;
     switch (translationUnit->sourceLanguage)

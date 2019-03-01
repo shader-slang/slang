@@ -790,11 +790,6 @@ namespace Slang
         UInt getEntryPointReqCount() { return m_entryPointReqs.Count(); }
         FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
 
-        // Directories to search for `#include` files or `import`ed modules
-        SearchDirectoryList searchDirectories;
-
-        SearchDirectoryList const& getSearchDirectories() { return searchDirectories; }
-
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
 
