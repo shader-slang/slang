@@ -1805,7 +1805,6 @@ struct ScopeLayoutBuilder
     LayoutRulesImpl*            m_rules = nullptr;
     RefPtr<StructTypeLayout>    m_structLayout;
     UniformLayoutInfo           m_structLayoutInfo;
-    bool                        m_needConstantBuffer = false;
 
     void beginLayout(
         ParameterBindingContext* context)
@@ -1827,8 +1826,6 @@ struct ScopeLayoutBuilder
         LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
         if( uniformSize != 0 )
         {
-            m_needConstantBuffer = true;
-
             // Make sure uniform fields get laid out properly...
 
             UniformLayoutInfo fieldInfo(
@@ -1884,25 +1881,25 @@ struct ScopeLayoutBuilder
 
     RefPtr<VarLayout> endLayout()
     {
+        // Finish computing the layout for the ordindary data (if any).
+        //
         m_rules->EndStructLayout(&m_structLayoutInfo);
+
+        // Copy the final layout information computed for ordinary data
+        // over to the struct type layout for the scope.
+        //
+        m_structLayout->addResourceUsage(LayoutResourceKind::Uniform, m_structLayoutInfo.size);
+        m_structLayout->uniformAlignment = m_structLayout->uniformAlignment;
 
         RefPtr<TypeLayout> scopeTypeLayout = m_structLayout;
 
-        // If the caller decided to allocate a constant buffer for
-        // the ordinary data, then we need to wrap up the structure
-        // type (layout) in a constant buffer type (layout).
+        // If a constant buffer is needed (because there is a non-zero
+        // amount of uniform data), then we need to wrap up the layout
+        // to reflect the constant buffer that will be generated.
         //
-        if( m_needConstantBuffer )
-        {
-            auto constantBufferLayout = createParameterGroupTypeLayout(
-                m_context->layoutContext,
-                nullptr,
-                m_rules,
-                m_rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),
-                m_structLayout);
-
-            scopeTypeLayout = constantBufferLayout;
-        }
+        scopeTypeLayout = createConstantBufferTypeLayoutIfNeeded(
+            m_context->layoutContext,
+            scopeTypeLayout);
 
         // We now have a bunch of layout information, which we should
         // record into a suitable object that represents the scope
