@@ -1,7 +1,7 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
-//TEST_INPUT: Texture2D(size=16, content=chessboard):dxbinding(0),glbinding(0)
+//TEST_INPUT: Texture2D(size=16, content=chessboard, format=R_Float32):dxbinding(0),glbinding(0)
 
-Texture2D<float4> g_texture : register(t0);
+Texture2D<float> g_texture : register(t0);
 SamplerState g_sampler : register(s0);
 
 cbuffer Uniforms
