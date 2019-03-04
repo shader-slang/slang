@@ -2604,8 +2604,15 @@ namespace Slang
                 else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
                 {
                     SLANG_ASSERT(attr->args.Count() == 2);
+
                     auto binding = checkConstantIntVal(attr->args[0]);
                     auto set = checkConstantIntVal(attr->args[1]);
+
+                    if (!binding || !set)
+                    {
+                        getSink()->diagnose(attr, Diagnostics::attributeExpectsTwoIntArgs, attr->name);
+                        return false;
+                    }
 
                     bindingAttr->binding = int32_t(binding->value);
                     bindingAttr->set = int32_t(set->value);

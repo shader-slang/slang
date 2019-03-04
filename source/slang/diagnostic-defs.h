@@ -259,6 +259,7 @@ DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a sing
 
 DIAGNOSTIC(31006, Error, attributeFunctionNotFound, "Could not find function '$0' for attribute'$1'")
 
+DIAGNOSTIC(31007, Error, attributeExpectsTwoIntArgs, "attribute '$0' expects two int arguments")
 
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
