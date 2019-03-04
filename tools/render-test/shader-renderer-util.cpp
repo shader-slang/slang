@@ -28,7 +28,10 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     TextureResource::Desc textureResourceDesc;
     textureResourceDesc.init(Resource::Type::Unknown);
 
-    textureResourceDesc.format = Format::RGBA_Unorm_UInt8;
+    // Default to RGBA_Unorm_UInt8
+    const Format format = (inputDesc.format == Format::Unknown) ? Format::RGBA_Unorm_UInt8 : inputDesc.format;
+
+    textureResourceDesc.format = format;
     textureResourceDesc.numMipLevels = texData.mipLevels;
     textureResourceDesc.arraySize = inputDesc.arrayLength;
     textureResourceDesc.bindFlags = bindFlags;
