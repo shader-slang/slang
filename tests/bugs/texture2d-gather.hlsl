@@ -40,11 +40,5 @@ VertexStageOutput vertexMain(VertexStageInput input)
 // Fragment Shader
 float4 fragmentMain(VertexStageOutput input) : SV_Target
 {
-    //return input.color;
-
-    //float2 samplePos = ((pos.xy * 0.5f) + float2(0.5f, 0.5f));
-    //return float4(samplePos, 0, 1.0f);
-    //return g_texture.Sample(g_sampler, input.color.xy);
-    
     return g_texture.GatherRed(g_sampler, input.color.xy);
 }
