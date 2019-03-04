@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/bugs/glsl-layout-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_BINDING'.
+tests/bugs/glsl-layout-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_SET'.
+tests/bugs/glsl-layout-define.hlsl(3): error 31007: attribute 'vk_binding' expects two int arguments
+}
+standard output = {
+}
