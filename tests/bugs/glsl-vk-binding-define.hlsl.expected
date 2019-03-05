@@ -1,0 +1,7 @@
+result code = -1
+standard error = {
+tests/bugs/glsl-vk-binding-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_BINDING'.
+tests/bugs/glsl-vk-binding-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_SET'.
+}
+standard output = {
+}
