@@ -2603,17 +2603,22 @@ namespace Slang
                 }
                 else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 2);
+                    // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
+                    // Must have 2 int parameters. Ideally this would all be checked from the specification
+                    // in core.meta.slang, but that's not completely unimplemented. So for now we check here.
+                    if (attr->args.Count() != 2)
+                    {
+                        return false;
+                    }
 
                     auto binding = checkConstantIntVal(attr->args[0]);
                     auto set = checkConstantIntVal(attr->args[1]);
 
-                    if (!binding || !set)
+                    if (binding == nullptr || set == nullptr)
                     {
-                        getSink()->diagnose(attr, Diagnostics::attributeExpectsTwoIntArgs, attr->name);
                         return false;
                     }
-
+                    
                     bindingAttr->binding = int32_t(binding->value);
                     bindingAttr->set = int32_t(set->value);
                 }
@@ -2709,6 +2714,11 @@ namespace Slang
                         getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
                         return false;
                     }
+                }
+                else if (auto unrollAttr = as<UnrollAttribute>(attr))
+                {
+                    // Check has an argument
+                    SLANG_ASSERT(attr->args.Count() == 1);
                 }
                 else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
                 {
@@ -2820,7 +2830,6 @@ namespace Slang
                 {
                     // TODO: support checking the argument against the declared
                     // type for the parameter.
-                    
                 }
                 else
                 {
@@ -2833,6 +2842,9 @@ namespace Slang
                         //
                         // TODO: we need to figure out how to hook up
                         // default arguments as needed.
+                        // For now just copy the expression over.
+
+                        attr->args.Add(paramDecl->initExpr);
                     }
                     else
                     {
