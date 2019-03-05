@@ -91,7 +91,7 @@ namespace Slang
         RefPtr<Scope> currentScope;
 
         TokenReader tokenReader;
-        DiagnosticSink * sink;
+        DiagnosticSink* sink;
         int genericDepth = 0;
 
         // Have we seen any `import` declarations? If so, we need
@@ -819,8 +819,12 @@ namespace Slang
         auto keywordToken = advanceToken(parser);
 
         RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
-        auto syntax = as<T>(parsedObject);
+        if (!parsedObject)
+        {
+            return false;
+        }
 
+        auto syntax = as<T>(parsedObject);
         if (syntax)
         {
             if (!syntax->loc.isValid())
@@ -4440,7 +4444,14 @@ namespace Slang
 
                 parser->ReadToken(TokenType::OpAssign);
 
+                // If the token asked for is not returned found will put in recovering state, and return token found
                 Token valToken = parser->ReadToken(TokenType::IntegerLiteral);
+                // If wasn't the desired IntegerLiteral return that couldn't parse
+                if (valToken.type != TokenType::IntegerLiteral)
+                {
+                    return nullptr;
+                }
+
                 // Work out the value
                 auto value = getIntegerLiteralValue(valToken);
 
