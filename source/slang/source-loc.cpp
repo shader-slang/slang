@@ -14,7 +14,11 @@ const String PathInfo::getMostUniqueIdentity() const
     switch (type)
     {
         case Type::Normal:      return uniqueIdentity;
-        case Type::FoundPath:   return foundPath;
+        case Type::FoundPath:   
+        case Type::FromString:
+        {
+            return foundPath;
+        }
         default:                return "";
     }
 }
