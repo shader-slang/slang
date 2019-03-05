@@ -208,10 +208,25 @@ namespace renderer_test
                                 }
                                 else if(word == "format")
                                 {
+                                    Format format = Format::Unknown;
+
                                     parser.Read("=");
                                     auto formatWord = parser.ReadWord();
                                     if(formatWord == "R_UInt32")
-                                        entry.bufferDesc.format = Format::R_UInt32;
+                                    {
+                                        format = Format::R_UInt32;
+                                    }
+                                    else if (formatWord == "R_Float32")
+                                    {
+                                        format = Format::R_Float32;
+                                    }
+                                    else if (formatWord == "RGBA_Unorm_UInt8")
+                                    {
+                                        format = Format::RGBA_Unorm_UInt8;
+                                    }
+
+                                    entry.textureDesc.format = format;
+                                    entry.bufferDesc.format = format;
                                 }
                                 if (parser.LookAhead(","))
                                     parser.Read(",");
@@ -265,15 +280,64 @@ namespace renderer_test
                 }
             }
         }
-
-
     }
-    void generateTextureData(TextureData & output, const InputTextureDesc & inputDesc)
+
+    void generateTextureData(TextureData& output, const InputTextureDesc& desc)
+    {
+        switch (desc.format)
+        {
+            case Format::RGBA_Unorm_UInt8:
+            {
+                generateTextureDataRGB8(output, desc);
+                break;
+            }
+            case Format::R_Float32:
+            {
+                TextureData work;
+                generateTextureDataRGB8(work, desc);
+
+                output.textureSize = work.textureSize;
+                output.mipLevels = work.mipLevels;
+                output.arraySize = work.arraySize;
+
+                List<List<unsigned int>>& dstBuffer = output.dataBuffer;
+
+                int numMips = int(work.dataBuffer.Count());
+                dstBuffer.SetSize(numMips);
+
+                for (int i = 0; i < numMips; ++i)
+                {
+                    const int numPixels = int(work.dataBuffer[i].Count());
+                    const unsigned int* srcPixels = work.dataBuffer[i].Buffer();
+
+                    dstBuffer[i].SetSize(numPixels);
+
+                    float* dstPixels = (float*)dstBuffer[i].Buffer();
+
+                    for (int j = 0; j < numPixels; ++j)
+                    {
+                        // Copy out red
+                        const unsigned int srcPixel = srcPixels[j];
+                        const float value = (srcPixel & 0xff) * 1.0f / 255;
+                        dstPixels[j] = value;
+                    }
+                }
+                break;
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled format");
+                break;
+            }
+        }
+    }
+
+    void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputDesc)
     {
         int arrLen = inputDesc.arrayLength;
         if (arrLen == 0)
             arrLen = 1;
-        List<List<unsigned int>> & dataBuffer = output.dataBuffer;
+        List<List<unsigned int>>& dataBuffer = output.dataBuffer;
         int arraySize = arrLen;
         if (inputDesc.isCube)
             arraySize *= 6;

@@ -27,6 +27,9 @@ struct InputTextureDesc
     bool isDepthTexture = false;
     bool isRWTexture = false;
     int size = 4;
+
+    Format format = Format::RGBA_Unorm_UInt8;            
+
     InputTextureContent content = InputTextureContent::One;
 };
 
@@ -80,7 +83,9 @@ public:
     void Parse(const char * source);
 };
 
-void generateTextureData(TextureData & output, const InputTextureDesc & desc);
+void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
+void generateTextureData(TextureData& output, const InputTextureDesc& desc);
+
 
 } // namespace render_test
 

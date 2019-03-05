@@ -1019,8 +1019,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             static const struct {
                 char const* genericPrefix;
                 char const* elementType;
+                char const* outputType;
             } kGatherExtensionCases[] = {
-                { "__generic<T, let N : int>", "vector<T,N>" },
+                { "__generic<T, let N : int>", "vector<T,N>", "vector<T, 4>" },
+                { "", "float", "vector<float, 4>" },
+                { "", "int" , "vector<int, 4>"},
+                { "", "uint", "vector<uint, 4>"},
 
                 // TODO: need a case here for scalars `T`, but also
                 // need to ensure that case doesn't accidentally match
@@ -1039,7 +1043,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isArray) sb << "Array";
                 sb << "<" << cc.elementType << " >";
                 sb << "\n{\n";
-
 
                 // `Gather`
                 // (tricky because it returns a 4-vector of the element type
@@ -1064,27 +1067,29 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     auto componentIndex = kk.componentIndex;
                     auto componentName = kk.componentName;
 
+                    auto outputType = cc.outputType;
+
                     EMIT_LINE_DIRECTIVE();
 
                     sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
-                    sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                    sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
                     EMIT_LINE_DIRECTIVE();
                     sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
-                    sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                    sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
                     EMIT_LINE_DIRECTIVE();
-                    sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                    sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                     sb << "out uint status);\n";
 
                     EMIT_LINE_DIRECTIVE();
                     sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << kBaseTextureTypes[tt].coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
-                    sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                    sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
@@ -1092,7 +1097,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset4);\n";
 
                     EMIT_LINE_DIRECTIVE();
-                    sb << "vector<T, 4> Gather" << componentName << "(SamplerState s, ";
+                    sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
                     sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
@@ -1197,7 +1202,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1182 \"core.meta.slang\"")
+SLANG_RAW("#line 1187 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Operators to apply to `enum` types\n")
