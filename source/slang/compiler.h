@@ -137,6 +137,22 @@ namespace Slang
         List<Arg> args;
     };
 
+        /// Information collected about global or entry-point shader parameters
+    struct ShaderParamInfo
+    {
+        DeclRef<VarDeclBase>    paramDeclRef;
+        UInt                    firstExistentialTypeSlot = 0;
+        UInt                    existentialTypeSlotCount = 0;
+    };
+
+        /// Extended information specific to global shader parameters
+    struct GlobalShaderParamInfo : ShaderParamInfo
+    {
+        // Additional global-scope declarations that are conceptually
+        // declaring the "same" parameter as the `paramDeclRef`.
+        List<DeclRef<VarDeclBase>> additionalParamDeclRefs;
+    };
+
         /// A request for the front-end to find and validate an entry-point function
     struct FrontEndEntryPointRequest : RefObject
     {
@@ -287,6 +303,8 @@ namespace Slang
         Type* getExistentialSlotType(UInt index) { return m_existentialSlots.types[index]; }
         ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_existentialSlots.args[index]; }
 
+        List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
+
         void _specializeExistentialSlots(
             List<RefPtr<Expr>> const&   args,
             DiagnosticSink*             sink);
@@ -297,7 +315,7 @@ namespace Slang
             Profile             profile,
             DeclRef<FuncDecl>   funcDeclRef);
 
-        void _collectExistentialParams();
+        void _collectShaderParams();
 
         // The name of the entry point function (e.g., `main`)
         //
@@ -309,6 +327,9 @@ namespace Slang
 
             /// The existential/interface slots associated with the entry point parameter scope.
         ExistentialSlots m_existentialSlots;
+
+            /// Information about entry-point parameters
+        List<ShaderParamInfo> m_shaderParams;
 
         // The profile that the entry point will be compiled for
         // (this is a combination of the target stage, and also
@@ -770,6 +791,8 @@ namespace Slang
         FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
 
         // Directories to search for `#include` files or `import`ed modules
+        // NOTE! That for now these search directories are not settable via the API
+        // so the search directories on Linkage is used for #include as well as for modules.
         SearchDirectoryList searchDirectories;
 
         SearchDirectoryList const& getSearchDirectories() { return searchDirectories; }
@@ -920,7 +943,9 @@ namespace Slang
         Type* getExistentialSlotType(UInt index) { return m_globalExistentialSlots.types[index]; }
         ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_globalExistentialSlots.args[index]; }
 
-        void _collectExistentialParams();
+        List<GlobalShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
+
+        void _collectShaderParams(DiagnosticSink* sink);
         void _specializeExistentialSlots(
             List<RefPtr<Expr>> const&   args,
             DiagnosticSink*             sink);
@@ -948,6 +973,9 @@ namespace Slang
 
         // The existential/interface slots associated with the global scope.
         ExistentialSlots m_globalExistentialSlots;
+
+            /// Information about global shader parameters
+        List<GlobalShaderParamInfo> m_shaderParams;
 
         // Generated IR for this program.
         RefPtr<IRModule> m_irModule;
