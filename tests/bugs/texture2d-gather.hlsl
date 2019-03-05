@@ -14,7 +14,7 @@ struct AssembledVertex
 {
 	float3	position;
 	float3	color;
-    float2  uv;
+	float2	uv;
 };
 
 // Vertex  Shader
