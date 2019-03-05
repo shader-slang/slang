@@ -427,13 +427,12 @@ void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
     // We want to record that the compiled module has a dependency
     // on the path of the source file, but we also need to account
     // for cases where the user added a source string/blob without
-    // an associated path (so that the API passes along an empty
-    // string).
-    //
-    auto path = sourceFile->getPathInfo().foundPath;
-    if(path.Length())
+    // an associated path and/or wasn't from a file.
+
+    auto pathInfo = sourceFile->getPathInfo();
+    if (pathInfo.hasFileFoundPath())
     {
-        getModule()->addFilePathDependency(path);
+        getModule()->addFilePathDependency(pathInfo.foundPath);
     }
 }
 
@@ -976,8 +975,8 @@ void FrontEndCompileRequest::addTranslationUnitSourceBlob(
     String const&   path,
     ISlangBlob*     sourceBlob)
 {
-    PathInfo pathInfo = PathInfo::makePath(path);
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+    // The path specified may or may not be a file path - mark as being constructed 'FromString'.
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(PathInfo::makeFromString(path), sourceBlob);
     
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -987,9 +986,9 @@ void FrontEndCompileRequest::addTranslationUnitSourceString(
     String const&   path,
     String const&   source)
 {
-    PathInfo pathInfo = PathInfo::makePath(path);
-    SourceFile* sourceFile = getSourceManager()->createSourceFileWithString(pathInfo, source);
-    
+    // The path specified may or may not be a file path - mark as being constructed 'FromString'.
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithString(PathInfo::makeFromString(path), source);
+
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
@@ -1017,10 +1016,10 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
         return;
     }
 
-    addTranslationUnitSourceBlob(
-        translationUnitIndex,
-        path,
-        sourceBlob);
+    // Was loaded from the specified path
+    const auto pathInfo = PathInfo::makePath(path);
+    SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
+    addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
 
 int FrontEndCompileRequest::addEntryPoint(

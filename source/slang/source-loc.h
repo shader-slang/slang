@@ -45,7 +45,8 @@ struct PathInfo
     {
         Unknown,                    ///< The path is not known
         Normal,                     ///< Normal has both path and uniqueIdentity
-        FoundPath,                  ///< Just has a found path (uniqueIdentity is unknown, or even 'unknowable') 
+        FoundPath,                  ///< Just has a found path (uniqueIdentity is unknown, or even 'unknowable')
+        FromString,                 ///< Created from a string (so found path might not be defined and should not be taken as to map to a loaded file)
         TokenPaste,                 ///< No paths, just created to do a macro expansion
         TypeParse,                  ///< No path, just created to do a type parse
         CommandLine,                ///< A macro constructed from the command line
@@ -54,7 +55,9 @@ struct PathInfo
         /// True if has a canonical path
     SLANG_FORCE_INLINE bool hasUniqueIdentity() const { return type == Type::Normal && uniqueIdentity.Length() > 0; }
         /// True if has a regular found path
-    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath; }
+    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath || (type == Type::FromString && foundPath.Length() > 0); }
+        /// True if has a found path that has originated from a file (as opposed to string or some other origin)
+    SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.Length() > 0; }
 
         /// Returns the 'most unique' identity for the path. If has a 'uniqueIdentity' returns that, else the foundPath, else "".
     const String getMostUniqueIdentity() const;
@@ -66,6 +69,7 @@ struct PathInfo
     static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
     static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string", String() }; }
     static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line", String() }; }
+    static PathInfo makeFromString(const String& userPath) { return PathInfo{ Type::FromString, userPath, String() }; }
 
     Type type;                      ///< The type of path
     String foundPath;               ///< The path where the file was found (might contain relative elements) 
