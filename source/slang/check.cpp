@@ -2605,12 +2605,14 @@ namespace Slang
                 {
                     // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
                     // Must have 2 int parameters. Ideally this would all be checked from the specification
-                    // in core.meta.slang, but that's not completely unimplemented. So for now we check here.
+                    // in core.meta.slang, but that's not completely implemented. So for now we check here.
                     if (attr->args.Count() != 2)
                     {
                         return false;
                     }
 
+                    // TODO(JS): Prior validation currently doesn't ensure both args are ints (as specified in core.meta.slang), so check here
+                    // to make sure they both are
                     auto binding = checkConstantIntVal(attr->args[0]);
                     auto set = checkConstantIntVal(attr->args[1]);
 
@@ -2717,7 +2719,9 @@ namespace Slang
                 }
                 else if (auto unrollAttr = as<UnrollAttribute>(attr))
                 {
-                    // Check has an argument
+                    // Check has an argument. We need this because default behavior is to give an error
+                    // if an attribute has arguments, but not handled explicitly (and the default param will come through
+                    // as 1 arg if nothing is specified)
                     SLANG_ASSERT(attr->args.Count() == 1);
                 }
                 else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
