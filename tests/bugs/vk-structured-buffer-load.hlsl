@@ -1,4 +1,5 @@
 //TEST:CROSS_COMPILE: -profile lib_6_3 -entry HitMain -stage closesthit -target spirv-assembly
+
 struct ParameterBlockTest
 {
     SamplerState sam;
