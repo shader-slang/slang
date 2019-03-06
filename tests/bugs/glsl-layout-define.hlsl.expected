@@ -1,0 +1,7 @@
+result code = -1
+standard error = {
+tests/bugs/glsl-layout-define.hlsl(3): error 20001: unexpected identifier, expected integer literal
+tests/bugs/glsl-layout-define.hlsl(3): error 20001: unexpected ')', expected ';'
+}
+standard output = {
+}

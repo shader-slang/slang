@@ -105,16 +105,16 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     for (auto typeName : request.entryPointGenericTypeArguments)
         rawEntryPointTypeNames.Add(typeName.Buffer());
 
-    UInt globalExistentialTypeCount = request.globalExistentialTypeArguments.Count();
-    for( UInt ii = 0; ii < globalExistentialTypeCount; ++ii )
+    const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.Count());
+    for(int ii = 0; ii < globalExistentialTypeCount; ++ii )
     {
         spSetTypeNameForGlobalExistentialSlot(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
     }
 
-    UInt entryPointExistentialTypeCount = request.entryPointExistentialTypeArguments.Count();
+    const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.Count());
     auto setEntryPointExistentialTypeArgs = [&](int entryPoint)
     {
-        for( UInt ii = 0; ii < entryPointExistentialTypeCount; ++ii )
+        for( int ii = 0; ii < entryPointExistentialTypeCount; ++ii )
         {
             spSetTypeNameForEntryPointExistentialSlot(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
         }

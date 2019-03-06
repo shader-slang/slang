@@ -376,7 +376,6 @@ public:
 typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
-    IsRedeclaration = 1 << 0, ///< This is a redeclaration of some shader parameter
     HasSemantic = 1 << 1
 };
 
@@ -924,16 +923,19 @@ RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType);
 
-    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+    /// Create a wrapper constant buffer type layout, if needed.
     ///
-    /// This overload allows the `parameterGroupType` parameter to be null, for cases
-    /// where an anonymous parameter group needs to be constructed.
+    /// When dealing with entry-point `uniform` and global-scope parameters,
+    /// we want to create a wrapper constant buffer for all the parameters
+    /// if and only if there exist some parameters that use "ordinary" data
+    /// (`LayoutResourceKind::Uniform`).
     ///
-RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
+    /// This function determines whether such a wrapper is needed, based
+    /// on the `elementTypeLayout` given, and either creates and returns
+    /// the layout for the wrapper, or the unmodified `elementTypeLayout`.
+    ///
+RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    LayoutRulesImpl*            parameterGroupRules,
-    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          elementTypeLayout);
 
 // Create a type layout for a structured buffer type.
