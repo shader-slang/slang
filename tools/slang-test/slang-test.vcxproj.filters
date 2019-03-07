@@ -15,9 +15,6 @@
     <ClInclude Include="os.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="render-api-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slangc-tool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -33,9 +30,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-api-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-test-main.cpp">

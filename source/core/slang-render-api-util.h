@@ -1,9 +1,12 @@
-﻿#ifndef SLANG_RENDER_API_UTIL_H
+#ifndef SLANG_RENDER_API_UTIL_H
 #define SLANG_RENDER_API_UTIL_H
 
 #include "../../source/core/slang-string.h"
 
 #include "../../slang-com-helper.h"
+
+namespace Slang
+{
 
 enum class RenderApiType
 {
@@ -33,8 +36,9 @@ struct RenderApiUtil
 {
     struct Info
     {
-        RenderApiType type;               ///< The type
-        const char* names;          ///< Comma separated list of names associated with the type
+        RenderApiType type;                 ///< The type
+        const char* names;                  ///< Comma separated list of names associated with the type
+        const char* languageNames;          ///< Comma separated list of target language names associated with the type
     };
 
         /// Returns true if the API is available. 
@@ -42,6 +46,9 @@ struct RenderApiUtil
 
         /// Returns a combination of RenderApiFlag bits which if set indicates that the API is available.
     static int getAvailableApis();
+
+        /// Get the name 
+    static UnownedStringSlice getApiName(RenderApiType type);
 
         /// Returns RenderApiType::Unknown if not found
     static RenderApiType findApiTypeByName(const Slang::UnownedStringSlice& name);
@@ -54,11 +61,18 @@ struct RenderApiUtil
         /// -vk would be whatever is in initial flags, but not vulkan.
     static Slang::Result parseApiFlags(const Slang::UnownedStringSlice& text, RenderApiFlags initialFlags, RenderApiFlags* apiBitsOut);
 
+        /// Gets the API type from a string, or returns RenderApiType::Unknown if not found
+    static RenderApiType findRenderApiType(const Slang::UnownedStringSlice& text);
+
+    static RenderApiType findImplicitLanguageRenderApiType(const Slang::UnownedStringSlice& text);
+
         /// Get information about a render API
     static const Info& getInfo(RenderApiType type) { return s_infos[int(type)]; }
 
         /// Static information about each render api
     static const Info s_infos[int(RenderApiType::CountOf)];
 };
+
+} // namespace Slang
 
 #endif // SLANG_RENDER_API_UTIL_H
