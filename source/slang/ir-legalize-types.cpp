@@ -1872,9 +1872,9 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
         return isResourceType(type);
     }
 
-    virtual LegalType createLegalUniformBufferType(
+    LegalType createLegalUniformBufferType(
         IROp        op,
-        LegalType   legalElementType)
+        LegalType   legalElementType) override
     {
         // The appropriate strategy for legalizing uniform buffers
         // with resources inside already exists, so we can delegate to it.
@@ -1903,9 +1903,9 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
         return as<IRExistentialBoxType>(type) != nullptr;
     }
 
-    virtual LegalType createLegalUniformBufferType(
+    LegalType createLegalUniformBufferType(
         IROp        op,
-        LegalType   legalElementType)
+        LegalType   legalElementType) override
     {
         // We'll delegate the logic for creating uniform buffers
         // over a mix of ordinary and existential-box types to
