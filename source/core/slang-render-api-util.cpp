@@ -243,6 +243,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return RenderApiType::Unknown;
 }
 
+#if SLANG_WINDOWS_FAMILY
 static bool _canLoadSharedLibrary(const char* libName)
 {
     SharedLibrary::Handle handle;
@@ -254,6 +255,7 @@ static bool _canLoadSharedLibrary(const char* libName)
     SharedLibrary::unload(handle);
     return true;
 }
+#endif
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
