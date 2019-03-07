@@ -1529,7 +1529,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1448 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1456 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
