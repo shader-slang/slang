@@ -39,6 +39,58 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
     }
 }
 
+/* static */int StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
+{
+    const char* start = in.begin();
+    const char* end = in.end();
+
+    for (int i = 0; start < end; ++i)
+    {
+        // Move cur so it's either at the end or at next split character
+        const char* cur = start;
+        while (cur < end && *cur != splitChar)
+        {
+            cur++;
+        }
+
+        // See if we have a match
+        if (UnownedStringSlice(start, cur) == find)
+        {
+            return i;
+        }
+
+        // Skip the split character, if at end we are okay anyway
+        start = cur + 1;
+    }
+    return -1;
+}
+
+UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char splitChar, int index)
+{
+    const char* start = in.begin();
+    const char* end = in.end();
+
+    for (int i = 0; start < end; ++i)
+    {
+        // Move cur so it's either at the end or at next split character
+        const char* cur = start;
+        while (cur < end && *cur != splitChar)
+        {
+            cur++;
+        }
+
+        if (i == index)
+        {
+            return UnownedStringSlice(start, cur);
+        }
+
+        // Skip the split character, if at end we are okay anyway
+        start = cur + 1;
+    }
+
+    return UnownedStringSlice();
+}
+
 /* static */size_t StringUtil::calcFormattedSize(const char* format, va_list args)
 {
 #if SLANG_WINDOWS_FAMILY
