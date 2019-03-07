@@ -717,12 +717,20 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp2(vector<T
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp2(matrix<T,N,M> x);
 
 // Convert 16-bit float stored in low bits of integer
+__target_intrinsic(glsl, "unpackHalf2x16($0).x")
 float f16tof32(uint value);
-__generic<let N : int> vector<float,N> f16tof32(vector<uint,N> value);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "unpackHalf2x16($0).x")
+vector<float,N> f16tof32(vector<uint,N> value);
 
 // Convert to 16-bit float stored in low bits of integer
+__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 uint f32tof16(float value);
-__generic<let N : int> vector<uint,N> f32tof16(vector<float,N> value);
+
+__generic<let N : int>
+__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
+vector<uint,N> f32tof16(vector<float,N> value);
 
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
@@ -1148,9 +1156,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> round(vector<
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> round(matrix<T,N,M> x);
 
 // Reciprocal of square root
-__generic<T : __BuiltinFloatingPointType> T rsqrt(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rsqrt(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rsqrt(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "inversesqrt($0)")
+T rsqrt(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "inversesqrt($0)")
+vector<T,N> rsqrt(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(glsl, "inversesqrt($0)")
+matrix<T,N,M> rsqrt(matrix<T,N,M> x);
 
 // Clamp value to [0,1] range
 __generic<T : __BuiltinFloatingPointType>

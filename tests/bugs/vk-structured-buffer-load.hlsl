@@ -1,4 +1,5 @@
 //TEST:CROSS_COMPILE: -profile lib_6_3 -entry HitMain -stage closesthit -target spirv-assembly
+
 struct ParameterBlockTest
 {
     SamplerState sam;
@@ -20,5 +21,5 @@ void HitMain(inout RayHitInfoPacked RayData, BuiltInTriangleIntersectionAttribut
     uint offs = 0;
     float offsfloat = gParamBlock.sbuf.Load(offs);
     
-    RayData.PackedHitInfoA.y = offsfloat;
+    RayData.PackedHitInfoA.y = rsqrt(offsfloat);
 }
