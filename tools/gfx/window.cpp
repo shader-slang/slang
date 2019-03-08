@@ -173,7 +173,7 @@ static LRESULT CALLBACK windowProc(
             window = (Window*) createInfo->lpCreateParams;
             window->handle = windowHandle;
 
-            SetWindowLongPtrW(windowHandle, GWLP_USERDATA, (LONG)size_t(window));
+            SetWindowLongPtrW(windowHandle, GWLP_USERDATA, (LONG_PTR) window);
         }
         break;
 
