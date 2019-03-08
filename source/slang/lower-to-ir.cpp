@@ -2607,6 +2607,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         IRInst*         indexVal)
     {
         auto builder = getBuilder();
+
+        // The `tryGetAddress` operation will take a complex value representation
+        // and try to turn it into a single pointer, if possible.
+        //
+        baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+
+        // The `materialize` operation should ensure that we only have to deal
+        // with the small number of base cases for lowered value representations.
+        //
+        baseVal = materialize(context, baseVal);
+
         switch (baseVal.flavor)
         {
         case LoweredValInfo::Flavor::Simple:
