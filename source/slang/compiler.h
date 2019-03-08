@@ -710,7 +710,7 @@ namespace Slang
         };
 
         // Any modules currently being imported will be listed here
-        ModuleBeingImportedRAII* m_modulesBeingImported;
+        ModuleBeingImportedRAII* m_modulesBeingImported = nullptr;
 
             /// Is the given module in the middle of being imported?
         bool isBeingImported(Module* module);
