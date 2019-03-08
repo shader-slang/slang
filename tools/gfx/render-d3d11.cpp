@@ -778,8 +778,15 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
-    // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
-    const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
+    auto d3dBindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+
+    size_t alignedSizeInBytes = srcDesc.sizeInBytes;
+
+    if(d3dBindFlags & D3D11_BIND_CONSTANT_BUFFER)
+    {
+        // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
+        alignedSizeInBytes = D3DUtil::calcAligned(alignedSizeInBytes, 256);
+    }
 
     // Hack to make the initialization never read from out of bounds memory, by copying into a buffer
     List<uint8_t> initDataBuffer;
@@ -792,7 +799,7 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
 
     D3D11_BUFFER_DESC bufferDesc = { 0 };
     bufferDesc.ByteWidth = UINT(alignedSizeInBytes);
-    bufferDesc.BindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+    bufferDesc.BindFlags = d3dBindFlags;
     // For read we'll need to do some staging
     bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.cpuAccessFlags & Resource::AccessFlag::Write);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -1049,7 +1056,6 @@ Result D3D11Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
             uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
@@ -1059,6 +1065,11 @@ Result D3D11Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             {
                 uavDesc.Buffer.Flags |= D3D11_BUFFER_UAV_FLAG_RAW;
                 uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+            }
+            else
+            {
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
             }
 
             ComPtr<ID3D11UnorderedAccessView> uav;
@@ -1077,15 +1088,33 @@ Result D3D11Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
             srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
             srvDesc.Format = D3DUtil::getMapFormat(desc.format);
-            srvDesc.Buffer.ElementOffset = 0;
-            srvDesc.Buffer.ElementWidth = 1;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
-                srvDesc.Buffer.ElementWidth = resourceDesc.elementSize;
                 srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
+            }
+            else if(desc.format == Format::Unknown)
+            {
+                // We need to switch to a different member of the `union`,
+                // so that we can set the `BufferEx.Flags` member.
+                //
+                srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+
+                // Because we've switched, we need to re-set the `FirstElement`
+                // field to be valid, since we can't count on all compilers
+                // to respect that `Buffer.FirstElement` and `BufferEx.FirstElement`
+                // alias in memory.
+                //
+                srvDesc.BufferEx.FirstElement = 0;
+
+                srvDesc.BufferEx.Flags = D3D11_BUFFEREX_SRV_FLAG_RAW;
+                srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+                srvDesc.BufferEx.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+            }
+            else
+            {
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
             }
 
             ComPtr<ID3D11ShaderResourceView> srv;

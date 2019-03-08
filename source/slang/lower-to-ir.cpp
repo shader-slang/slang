@@ -1849,6 +1849,43 @@ void addArgs(
 
 //
 
+// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
+// we can either do it "aggressively" or not (what we'll call the "default" behavior,
+// although it isn't strictly more common).
+//
+// The case that this is mostly there to address is when somebody writes an operation
+// like:
+//
+//      foo[a] = b;
+//
+// In that case, we might as well just use the `set` accessor if there is one, rather
+// than complicate things. However, in more complex cases like:
+//
+//      foo[a].x = b;
+//
+// there is no way to satisfy the semantics of the code the user wrote (in terms of
+// only writing one vector component, and not a full vector) by using the `set`
+// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
+// an address.
+//
+// TODO: realistically IR lowering is too early to be binding to this choice,
+// because different accessors might be supported on different targets.
+//
+enum class TryGetAddressMode
+{
+    Default,
+    Aggressive,
+};
+
+/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
+LoweredValInfo tryGetAddress(
+    IRGenContext*           context,
+    LoweredValInfo const&   inVal,
+    TryGetAddressMode       mode);
+
+
+//
+
 template<typename Derived>
 struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 {
@@ -2607,6 +2644,17 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         IRInst*         indexVal)
     {
         auto builder = getBuilder();
+
+        // The `tryGetAddress` operation will take a complex value representation
+        // and try to turn it into a single pointer, if possible.
+        //
+        baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+
+        // The `materialize` operation should ensure that we only have to deal
+        // with the small number of base cases for lowered value representations.
+        //
+        baseVal = materialize(context, baseVal);
+
         switch (baseVal.flavor)
         {
         case LoweredValInfo::Flavor::Simple:
@@ -3646,35 +3694,6 @@ static LoweredValInfo moveIntoMutableTemp(
     return var;
 }
 
-// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
-// we can either do it "aggressively" or not (what we'll call the "default" behavior,
-// although it isn't strictly more common).
-//
-// The case that this is mostly there to address is when somebody writes an operation
-// like:
-//
-//      foo[a] = b;
-//
-// In that case, we might as well just use the `set` accessor if there is one, rather
-// than complicate things. However, in more complex cases like:
-//
-//      foo[a].x = b;
-//
-// there is no way to satisfy the semantics of the code the user wrote (in terms of
-// only writing one vector component, and not a full vector) by using the `set`
-// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
-// an address.
-//
-// TODO: realistically IR lowering is too early to be binding to this choice,
-// because different accessors might be supported on different targets.
-//
-enum class TryGetAddressMode
-{
-    Default,
-    Aggressive,
-};
-
-/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
 LoweredValInfo tryGetAddress(
     IRGenContext*           context,
     LoweredValInfo const&   inVal,
