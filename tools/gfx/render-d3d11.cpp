@@ -778,8 +778,15 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
-    // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
-    const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
+    auto d3dBindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+
+    size_t alignedSizeInBytes = srcDesc.sizeInBytes;
+
+    if(d3dBindFlags & D3D11_BIND_CONSTANT_BUFFER)
+    {
+        // Make aligned to 256 bytes... not sure why, but if you remove this the tests do fail.
+        alignedSizeInBytes = D3DUtil::calcAligned(alignedSizeInBytes, 256);
+    }
 
     // Hack to make the initialization never read from out of bounds memory, by copying into a buffer
     List<uint8_t> initDataBuffer;
@@ -792,7 +799,7 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
 
     D3D11_BUFFER_DESC bufferDesc = { 0 };
     bufferDesc.ByteWidth = UINT(alignedSizeInBytes);
-    bufferDesc.BindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+    bufferDesc.BindFlags = d3dBindFlags;
     // For read we'll need to do some staging
     bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.cpuAccessFlags & Resource::AccessFlag::Write);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
