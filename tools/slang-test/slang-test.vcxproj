@@ -164,7 +164,6 @@
   <ItemGroup>
     <ClInclude Include="options.h" />
     <ClInclude Include="os.h" />
-    <ClInclude Include="render-api-util.h" />
     <ClInclude Include="slangc-tool.h" />
     <ClInclude Include="test-context.h" />
     <ClInclude Include="test-reporter.h" />
@@ -172,7 +171,6 @@
   <ItemGroup>
     <ClCompile Include="options.cpp" />
     <ClCompile Include="os.cpp" />
-    <ClCompile Include="render-api-util.cpp" />
     <ClCompile Include="slang-test-main.cpp" />
     <ClCompile Include="slangc-tool.cpp" />
     <ClCompile Include="test-context.cpp" />

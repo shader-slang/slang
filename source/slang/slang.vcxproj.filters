@@ -171,6 +171,9 @@
     <ClInclude Include="syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tmpC85.tmp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="token-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>

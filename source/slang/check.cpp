@@ -8843,21 +8843,167 @@ namespace Slang
             }
         }
 
-        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* /*expr*/)
+        // Look up a static member
+        // @param expr Can be StaticMemberExpr or MemberExpr
+        // @param baseExpression Is the underlying type expression determined from resolving expr
+        RefPtr<Expr> _lookupStaticMember(RefPtr<DeclRefExpr> expr, RefPtr<Expr> baseExpression)
         {
-            // StaticMemberExpr means it is already checked
-            SLANG_UNEXPECTED("should not occur in unchecked AST");
-            UNREACHABLE_RETURN(nullptr);
+            auto& baseType = baseExpression->type;
+
+            if (auto typeType = as<TypeType>(baseType))
+            {
+                // We are looking up a member inside a type.
+                // We want to be careful here because we should only find members
+                // that are implicitly or explicitly `static`.
+                //
+                // TODO: this duplicates a *lot* of logic with the case below.
+                // We need to fix that.
+                auto type = typeType->type;
+
+                if (as<ErrorType>(type))
+                {
+                    return CreateErrorExpr(expr);
+                }
+
+                LookupResult lookupResult = lookUpMember(
+                    getSession(),
+                    this,
+                    expr->name,
+                    type);
+                if (!lookupResult.isValid())
+                {
+                    return lookupMemberResultFailure(expr, baseType);
+                }
+
+                // We need to confirm that whatever member we
+                // are trying to refer to is usable via static reference.
+                //
+                // TODO: eventually we might allow a non-static
+                // member to be adapted by turning it into something
+                // like a closure that takes the missing `this` parameter.
+                //
+                // E.g., a static reference to a method could be treated
+                // as a value with a function type, where the first parameter
+                // is `type`.
+                //
+                // The biggest challenge there is that we'd need to arrange
+                // to generate "dispatcher" functions that could be used
+                // to implement that function, in the case where we are
+                // making a static reference to some kind of polymorphic declaration.
+                //
+                // (Also, static references to fields/properties would get even
+                // harder, because you'd have to know whether a getter/setter/ref-er
+                // is needed).
+                //
+                // For now let's just be expedient and disallow all of that, because
+                // we can always add it back in later.
+
+                if (!lookupResult.isOverloaded())
+                {
+                    // The non-overloaded case is relatively easy. We just want
+                    // to look at the member being referenced, and check if
+                    // it is allowed in a `static` context:
+                    //
+                    if (!isUsableAsStaticMember(lookupResult.item))
+                    {
+                        getSink()->diagnose(
+                            expr->loc,
+                            Diagnostics::staticRefToNonStaticMember,
+                            type,
+                            expr->name);
+                    }
+                }
+                else
+                {
+                    // The overloaded case is trickier, because we should first
+                    // filter the list of candidates, because if there is anything
+                    // that *is* usable in a static context, then we should assume
+                    // the user just wants to reference that. We should only
+                    // issue an error if *all* of the items that were discovered
+                    // are non-static.
+                    bool anyNonStatic = false;
+                    List<LookupResultItem> staticItems;
+                    for (auto item : lookupResult.items)
+                    {
+                        // Is this item usable as a static member?
+                        if (isUsableAsStaticMember(item))
+                        {
+                            // If yes, then it will be part of the output.
+                            staticItems.Add(item);
+                        }
+                        else
+                        {
+                            // If no, then we might need to output an error.
+                            anyNonStatic = true;
+                        }
+                    }
+
+                    // Was there anything non-static in the list?
+                    if (anyNonStatic)
+                    {
+                        // If we had some static items, then that's okay,
+                        // we just want to use our newly-filtered list.
+                        if (staticItems.Count())
+                        {
+                            lookupResult.items = staticItems;
+                        }
+                        else
+                        {
+                            // Otherwise, it is time to report an error.
+                            getSink()->diagnose(
+                                expr->loc,
+                                Diagnostics::staticRefToNonStaticMember,
+                                type,
+                                expr->name);
+                        }
+                    }
+                    // If there were no non-static items, then the `items`
+                    // array already represents what we'd get by filtering...
+                }
+
+                return createLookupResultExpr(
+                    lookupResult,
+                    baseExpression,
+                    expr->loc);
+            }
+            else if (as<ErrorType>(baseType))
+            {
+                return CreateErrorExpr(expr);
+            }
+
+            // Failure
+            return lookupMemberResultFailure(expr, baseType);
         }
 
-        RefPtr<Expr> lookupResultFailure(
-            MemberExpr*     expr,
+        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr)
+        {
+            expr->BaseExpression = CheckExpr(expr->BaseExpression);
+
+            // Not sure this is needed -> but guess someone could do 
+            expr->BaseExpression = MaybeDereference(expr->BaseExpression);
+
+            // If the base of the member lookup has an interface type
+            // *without* a suitable this-type substitution, then we are
+            // trying to perform lookup on a value of existential type,
+            // and we should "open" the existential here so that we
+            // can expose its structure.
+            //
+
+            expr->BaseExpression = maybeOpenExistential(expr->BaseExpression);
+            // Do a static lookup
+            return _lookupStaticMember(expr, expr->BaseExpression);
+        }
+
+        RefPtr<Expr> lookupMemberResultFailure(
+            DeclRefExpr*     expr,
             QualType const& baseType)
         {
+            // Check it's a member expression
+            SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
+
             getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
             expr->type = QualType(getSession()->getErrorType());
             return expr;
-
         }
 
         RefPtr<Expr> visitMemberExpr(MemberExpr * expr)
@@ -8901,119 +9047,7 @@ namespace Slang
             }
             else if(auto typeType = as<TypeType>(baseType))
             {
-                // We are looking up a member inside a type.
-                // We want to be careful here because we should only find members
-                // that are implicitly or explicitly `static`.
-                //
-                // TODO: this duplicates a *lot* of logic with the case below.
-                // We need to fix that.
-                auto type = typeType->type;
-
-                if (as<ErrorType>(type))
-                {
-                    return CreateErrorExpr(expr);
-                }
-
-                LookupResult lookupResult = lookUpMember(
-                    getSession(),
-                    this,
-                    expr->name,
-                    type);
-                if (!lookupResult.isValid())
-                {
-                    return lookupResultFailure(expr, baseType);
-                }
-
-                // We need to confirm that whatever member we
-                // are trying to refer to is usable via static reference.
-                //
-                // TODO: eventually we might allow a non-static
-                // member to be adapted by turning it into something
-                // like a closure that takes the missing `this` parameter.
-                //
-                // E.g., a static reference to a method could be treated
-                // as a value with a function type, where the first parameter
-                // is `type`.
-                //
-                // The biggest challenge there is that we'd need to arrange
-                // to generate "dispatcher" functions that could be used
-                // to implement that function, in the case where we are
-                // making a static reference to some kind of polymorphic declaration.
-                //
-                // (Also, static references to fields/properties would get even
-                // harder, because you'd have to know whether a getter/setter/ref-er
-                // is needed).
-                //
-                // For now let's just be expedient and disallow all of that, because
-                // we can always add it back in later.
-
-                if(!lookupResult.isOverloaded())
-                {
-                    // The non-overloaded case is relatively easy. We just want
-                    // to look at the member being referenced, and check if
-                    // it is allowed in a `static` context:
-                    //
-                    if(!isUsableAsStaticMember(lookupResult.item))
-                    {
-                        getSink()->diagnose(
-                            expr->loc,
-                            Diagnostics::staticRefToNonStaticMember,
-                            type,
-                            expr->name);
-                    }
-                }
-                else
-                {
-                    // The overloaded case is trickier, because we should first
-                    // filter the list of candidates, because if there is anything
-                    // that *is* usable in a static context, then we should assume
-                    // the user just wants to reference that. We should only
-                    // issue an error if *all* of the items that were discovered
-                    // are non-static.
-                    bool anyNonStatic = false;
-                    List<LookupResultItem> staticItems;
-                    for(auto item : lookupResult.items)
-                    {
-                        // Is this item usable as a static member?
-                        if(isUsableAsStaticMember(item))
-                        {
-                            // If yes, then it will be part of the output.
-                            staticItems.Add(item);
-                        }
-                        else
-                        {
-                            // If no, then we might need to output an error.
-                            anyNonStatic = true;
-                        }
-                    }
-
-                    // Was there anything non-static in the list?
-                    if(anyNonStatic)
-                    {
-                        // If we had some static items, then that's okay,
-                        // we just want to use our newly-filtered list.
-                        if(staticItems.Count())
-                        {
-                            lookupResult.items = staticItems;
-                        }
-                        else
-                        {
-                            // Otherwise, it is time to report an error.
-                            getSink()->diagnose(
-                                expr->loc,
-                                Diagnostics::staticRefToNonStaticMember,
-                                type,
-                                expr->name);
-                        }
-                    }
-                    // If there were no non-static items, then the `items`
-                    // array already represents what we'd get by filtering...
-                }
-
-                return createLookupResultExpr(
-                    lookupResult,
-                    expr->BaseExpression,
-                    expr->loc);
+                return _lookupStaticMember(expr, expr->BaseExpression);
             }
             else if (as<ErrorType>(baseType))
             {
@@ -9028,7 +9062,7 @@ namespace Slang
                     baseType.Ptr());
                 if (!lookupResult.isValid())
                 {
-                    return lookupResultFailure(expr, baseType);
+                    return lookupMemberResultFailure(expr, baseType);
                 }
 
                 // TODO: need to filter for declarations that are valid to refer

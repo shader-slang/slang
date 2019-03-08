@@ -1,4 +1,6 @@
 // vk-structured-buffer-load.hlsl.glsl
+//TEST_IGNORE_FILE:
+
 #version 460
 layout(row_major) uniform;
 layout(row_major) buffer;
@@ -29,7 +31,9 @@ void main()
 
     float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(int(uint(0)))]);
 
-    _S2.PackedHitInfoA_0.y = offsfloat_0;
-    
+    float _S4 = inversesqrt(offsfloat_0);
+
+    _S2.PackedHitInfoA_0.y = _S4;
+
     return;
 }

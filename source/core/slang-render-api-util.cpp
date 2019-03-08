@@ -1,17 +1,22 @@
-﻿
-#include "render-api-util.h"
+
+#include "slang-render-api-util.h"
 
 #include "../../slang.h"
 
 #include "../../source/core/list.h"
 #include "../../source/core/slang-string-util.h"
 
+#include "platform.h"
+
+namespace Slang {
+
+// NOTE! Must keep in same order as RenderApiType and have same amount of entries
 /* static */const RenderApiUtil::Info RenderApiUtil::s_infos[] =
 {
-    { RenderApiType::OpenGl, "gl,ogl,opengl"},
-    { RenderApiType::Vulkan, "vk,vulkan"},
-    { RenderApiType::D3D12,  "dx12,d3d12"},
-    { RenderApiType::D3D11,  "dx11,d3d11"},
+    { RenderApiType::OpenGl, "gl,ogl,opengl",   "glsl,glsl-rewrite,glsl-cross"},
+    { RenderApiType::Vulkan, "vk,vulkan",       ""},
+    { RenderApiType::D3D12,  "dx12,d3d12",      ""},
+    { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
 };
 
 static int _calcAvailableApis()
@@ -32,6 +37,17 @@ static int _calcAvailableApis()
 {
     static int s_availableApis = _calcAvailableApis();
     return s_availableApis;
+}
+
+UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
+{
+    int index = int(type);
+    if (index < 0 || index >= int(RenderApiType::CountOf))
+    {
+        return UnownedStringSlice();
+    }
+    SLANG_ASSERT(s_infos[index].type == type);
+    return StringUtil::getAtInSplit(UnownedStringSlice(s_infos[index].names), ',', 0);
 }
 
 /* static */RenderApiType RenderApiUtil::findApiTypeByName(const Slang::UnownedStringSlice& name)
@@ -197,64 +213,48 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! Platform specific stuff !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* static */RenderApiType RenderApiUtil::findRenderApiType(const Slang::UnownedStringSlice& text)
+{
+    using namespace Slang;
+    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    {
+        const auto& apiInfo = RenderApiUtil::s_infos[j];
+        if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.names), ',', text) >= 0)
+        {
+            return apiInfo.type;
+        }
+    }
+    // Didn't find any
+    return RenderApiType::Unknown;
+}
 
+/* static */RenderApiType RenderApiUtil::findImplicitLanguageRenderApiType(const Slang::UnownedStringSlice& text)
+{
+    using namespace Slang;
+    for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+    {
+        const auto& apiInfo = RenderApiUtil::s_infos[j];
+        if (StringUtil::indexOfInSplit(UnownedStringSlice(apiInfo.languageNames), ',', text) >= 0)
+        {
+            return apiInfo.type;
+        }
+    }
+    // Didn't find any
+    return RenderApiType::Unknown;
+}
 
 #if SLANG_WINDOWS_FAMILY
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-
-namespace { // anonymous
-
-class WinModule
+static bool _canLoadSharedLibrary(const char* libName)
 {
-public:
-
-    /// Initialize. Returns the module on success
-    HMODULE init(const char* name)
+    SharedLibrary::Handle handle;
+    SlangResult res = SharedLibrary::load(libName, handle);
+    if (SLANG_FAILED(res))
     {
-        if (m_module)
-        {
-            ::FreeModule(m_module);
-            m_module = nullptr;
-        }
-        return m_module = ::LoadLibraryA(name);
+        return false;
     }
-
-    /// convert to HMODULE
-    SLANG_FORCE_INLINE operator HMODULE() const { return m_module; }
-
-    /// True if loaded
-    bool isLoaded() const { return m_module != nullptr; }
-
-    explicit WinModule(const char* name) :
-        m_module(nullptr)
-    {
-        init(name);
-    }
-
-    /// Ctor
-    WinModule() :m_module(nullptr) {}
-    /// Dtor
-    ~WinModule()
-    {
-        if (m_module)
-        {
-            ::FreeLibrary(m_module);
-        }
-    }
-
-protected:
-    HMODULE m_module;
-};
-
-} // anonymous
-
-#else
+    SharedLibrary::unload(handle);
+    return true;
+}
 #endif
 
 /* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
@@ -262,16 +262,14 @@ protected:
 #if SLANG_WINDOWS_FAMILY
     switch (type)
     {
-        case RenderApiType::OpenGl:    return WinModule("opengl32.dll").isLoaded();
-        case RenderApiType::Vulkan:    return WinModule("vulkan-1.dll").isLoaded();
-        case RenderApiType::D3D11:     return WinModule("d3d11.dll").isLoaded();
-        case RenderApiType::D3D12:     return WinModule("d3d12.dll").isLoaded();
-
-        default: return false;
+        case RenderApiType::OpenGl:    return _canLoadSharedLibrary("opengl32.dll");
+        case RenderApiType::Vulkan:    return _canLoadSharedLibrary("vulkan-1.dll");
+        case RenderApiType::D3D11:     return _canLoadSharedLibrary("d3d11.dll"); 
+        case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12.dll"); 
+        default: break; 
     }
-
-#else
-
+#elif SLANG_UNIX_FAMILY
+    // Assume on unix target we have Opengl and Vulkan for now
     switch (type)
     {
         case RenderApiType::OpenGl:
@@ -279,8 +277,10 @@ protected:
         {
             return true;
         }
-        default: return false;
+        default: break; 
     }
 #endif
-
+    return false;
 }
+
+} // namespace Slang
