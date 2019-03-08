@@ -1153,7 +1153,7 @@ struct SpecializationContext
         }
     }
 
-        /// Given a type being used as pointer, try to determin the type it points to.
+        /// Given a type being used as pointer, try to determine the type it points to.
     IRType* tryGetPointedToType(
         IRBuilder*  builder,
         IRType*     type)

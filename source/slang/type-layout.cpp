@@ -1214,7 +1214,7 @@ static RefPtr<TypeLayout> flushPendingItems(
         //
         // TODO: We should only be adding in resource usage
         // that can be "hidden" by the type of parameter block
-        // being built (e.g., only a `ParamterBlock` that allocates
+        // being built (e.g., only a `ParameterBlock` that allocates
         // full `set`s/`space`s can hide the `register`s/`binding`s
         // used by resource fields).
         //

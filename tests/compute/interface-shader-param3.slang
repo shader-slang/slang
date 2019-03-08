@@ -85,7 +85,7 @@ void computeMain(
 // type we'll be plugging in for `modifier` is a `struct` type,
 // it will need to start on a 16-byte-aligned boundary.
 //
-// Here's the incantation to make teh test runner ifll in the constant buffer:
+// Here's the incantation to make the test runner fill in the constant buffer:
 //
 //TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(1),glbinding(2)
 //
