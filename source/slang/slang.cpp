@@ -2098,7 +2098,7 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
+SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
     SlangCompileRequest*    request,
     int                     slotIndex,
     char const*             typeName)
@@ -2115,7 +2115,7 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spSetTypeNameForEntryPointExistentialSlot(
+SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     SlangCompileRequest*    request,
     int                     entryPointIndex,
     int                     slotIndex,

@@ -74,30 +74,21 @@ LegalVal LegalVal::getImplicitDeref()
     return as<ImplicitDerefVal>(obj)->val;
 }
 
+//
 
-struct IRTypeLegalizationContext
+IRTypeLegalizationContext::IRTypeLegalizationContext(
+    IRModule* inModule)
 {
-    Session*    session;
-    IRModule*   module;
-    IRBuilder*  builder;
+    session = inModule->getSession();
+    module = inModule;
 
-    /// Context to use for underlying (non-IR) type legalization.
-    TypeLegalizationContext* typeLegalizationContext;
+    auto sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->session = session;
+    sharedBuilder->module = module;
 
-    // When inserting new globals, put them before this one.
-    IRInst* insertBeforeGlobal = nullptr;
-
-    // When inserting new parameters, put them before this one.
-    IRParam* insertBeforeParam = nullptr;
-
-    Dictionary<IRInst*, LegalVal> mapValToLegalVal;
-
-    IRVar* insertBeforeLocalVar = nullptr;
-
-    // store instructions that have been replaced here, so we can free them
-    // when legalization has done
-    List<IRInst*> replacedInstructions;
-};
+    builder = &builderStorage;
+    builder->sharedBuilder = sharedBuilder;
+}
 
 static void registerLegalizedValue(
     IRTypeLegalizationContext*  context,
@@ -121,13 +112,6 @@ static LegalVal declareVars(
     LegalVarChain*              varChain,
     UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo);
-
-static LegalType legalizeType(
-    IRTypeLegalizationContext*  context,
-    IRType*                     type)
-{
-    return legalizeType(context->typeLegalizationContext, type);
-}
 
 // Take a value that is being used as an operand,
 // and turn it into the equivalent legalized value.
@@ -306,7 +290,16 @@ static LegalVal legalizeStore(
 
     case LegalVal::Flavor::implicitDeref:
         // TODO: what is the right behavior here?
-        if (legalVal.flavor == LegalVal::Flavor::implicitDeref)
+        //
+        // The crux of the problem is that we may legalize a pointer-to-pointer
+        // type in cases where one of the two needs to become an implicit-deref,
+        // so that we have `PtrA<PtrB<Thing>>` become, say, `PtrA<Thing>` with
+        // an `implicitDeref` wrapper. When we encounter a store to that
+        // wrapped value, we seemingly need to know whether the original code
+        // meant to store to `*ptrPtr` or `**ptrPtr`, and need to legalize
+        // the result accordingly...
+        //
+        if( legalVal.flavor == LegalVal::Flavor::implicitDeref )
             return legalizeStore(context, legalPtrVal.getImplicitDeref(), legalVal.getImplicitDeref());
         else
             return legalizeStore(context, legalPtrVal.getImplicitDeref(), legalVal);
@@ -462,6 +455,111 @@ static LegalVal legalizeFieldExtract(
         (IRStructKey*) fieldKey);
 }
 
+    /// Take a value of some buffer/pointer type and wrap it according to provided info.
+static LegalVal wrapBufferValue(
+    IRTypeLegalizationContext*  context,
+    LegalVal                    legalPtrOperand,
+    LegalElementWrapping const& elementInfo)
+{
+    // The `elementInfo` tells us how a non-simple element
+    // type was wrapped up into a new structure types used
+    // as the element type of the buffer.
+    //
+    // This function will recurse through the structure of
+    // `elementInfo` to pull out all the required data from
+    // the buffer represented by `legalPtrOperand`.
+
+    switch( elementInfo.flavor )
+    {
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
+        break;
+
+    case LegalElementWrapping::Flavor::none:
+        return LegalVal();
+
+    case LegalElementWrapping::Flavor::simple:
+        {
+            // In the leaf case, we just had to store some
+            // data of a simple type in the buffer. We can
+            // produce a valid result by computing the
+            // address of the field used to represent the
+            // element, and then returning *that* as if
+            // it were the buffer type itself.
+            //
+            // (Basically instead of `someBuffer` we will
+            // end up with `&(someBuffer->field)`.
+            //
+            auto builder = context->getBuilder();
+
+            auto simpleElementInfo = elementInfo.getSimple();
+            auto valPtr = builder->emitFieldAddress(
+                simpleElementInfo->type,
+                legalPtrOperand.getSimple(),
+                simpleElementInfo->key);
+
+            return LegalVal::simple(valPtr);
+        }
+
+    case LegalElementWrapping::Flavor::implicitDeref:
+        {
+            // If the element type was logically `ImplicitDeref<T>`,
+            // then we declared actual fields based on `T`, and
+            // we need to extract references to those fields and
+            // wrap them up in an `implicitDeref` value.
+            //
+            auto derefField = elementInfo.getImplicitDeref();
+            auto baseVal = wrapBufferValue(context, legalPtrOperand, derefField->field);
+            return LegalVal::implicitDeref(baseVal);
+        }
+
+    case LegalElementWrapping::Flavor::pair:
+        {
+            // If the element type was logically a `Pair<O,S>`
+            // then we encoded fields for both `O` and `S` into
+            // the actual element type, and now we need to
+            // extract references to both and pair them up.
+            //
+            auto pairField = elementInfo.getPair();
+            auto pairInfo = pairField->pairInfo;
+
+            auto ordinaryVal = wrapBufferValue(context, legalPtrOperand, pairField->ordinary);
+            auto specialVal = wrapBufferValue(context, legalPtrOperand, pairField->special);
+            return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
+        }
+
+    case LegalElementWrapping::Flavor::tuple:
+        {
+            // If the element type was logically a `Tuple<E0, E1, ...>`
+            // then we encoded fields for each of the `Ei` and
+            // need to extract references to all of them and
+            // encode them as a tuple.
+            //
+            auto tupleField = elementInfo.getTuple();
+
+            RefPtr<TuplePseudoVal> obj = new TuplePseudoVal();
+            for( auto ee : tupleField->elements )
+            {
+                auto elementVal = wrapBufferValue(
+                    context,
+                    legalPtrOperand,
+                    ee.field);
+
+                TuplePseudoVal::Element element;
+                element.key = ee.key;
+                element.val = wrapBufferValue(
+                    context,
+                    legalPtrOperand,
+                    ee.field);
+                obj->elements.Add(element);
+            }
+
+            return LegalVal::tuple(obj);
+        }
+    }
+}
+
 static LegalVal legalizeFieldAddress(
     IRTypeLegalizationContext*    context,
     LegalType                   type,
@@ -478,11 +576,23 @@ static LegalVal legalizeFieldAddress(
         return LegalVal();
 
     case LegalVal::Flavor::simple:
-        return LegalVal::simple(
-            builder->emitFieldAddress(
-                type.getSimple(),
-                legalPtrOperand.getSimple(),
-                fieldKey));
+        switch( type.flavor )
+        {
+        case LegalType::Flavor::implicitDeref:
+            // TODO: Should this case be needed?
+            return legalizeFieldAddress(
+                context,
+                type.getImplicitDeref()->valueType,
+                legalPtrOperand,
+                fieldKey);
+
+        default:
+            return LegalVal::simple(
+                builder->emitFieldAddress(
+                    type.getSimple(),
+                    legalPtrOperand.getSimple(),
+                    fieldKey));
+        }
 
     case LegalVal::Flavor::pair:
         {
@@ -801,7 +911,7 @@ static LegalVal legalizeGetElementPtr(
             // and somebody is trying to get at an element pointer.
             // Now we just have an array (wrapped with an implicit
             // dereference) and need to just fetch the chosen element
-            // instead (and then wrapp the element value with an
+            // instead (and then wrap the element value with an
             // implicit dereference).
             //
             auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
@@ -884,10 +994,9 @@ static LegalVal legalizeMakeStruct(
                 UInt argIndex = argCounter++;
                 LegalVal arg = legalArgs[argIndex];
 
-                if((ee.flags & Slang::PairInfo::kFlag_hasOrdinaryAndSpecial) == Slang::PairInfo::kFlag_hasOrdinaryAndSpecial)
+                if( arg.flavor == LegalVal::Flavor::pair )
                 {
-                    // The field is itself a pair type, so we expect
-                    // the argument value to be one too...
+                    // The argument is itself a pair
                     auto argPair = arg.getPair();
                     ordinaryArgs.Add(argPair->ordinaryVal);
                     specialArgs.Add(argPair->specialVal);
@@ -1470,7 +1579,7 @@ static LegalVal declareVars(
                 context,
                 op,
                 type.getImplicitDeref()->valueType,
-                getDerefTypeLayout(typeLayout),
+                typeLayout,
                 varChain,
                 nameHint,
                 globalNameInfo);
@@ -1551,8 +1660,30 @@ static LegalVal declareVars(
         }
         break;
 
+    case LegalType::Flavor::wrappedBuffer:
+        {
+            auto wrappedBuffer = type.getWrappedBuffer();
+
+            auto innerVal = declareSimpleVar(
+                context,
+                op,
+                wrappedBuffer->simpleType,
+                typeLayout,
+                varChain,
+                nameHint,
+                globalNameInfo);
+
+            auto wrappedVal = wrapBufferValue(
+                context,
+                innerVal,
+                wrappedBuffer->elementInfo);
+
+            return wrappedVal;
+        }
+
     default:
         SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
         break;
     }
 }
@@ -1714,52 +1845,107 @@ static void legalizeTypes(
     }
 }
 
-
-void legalizeTypes(
-    TypeLegalizationContext*    typeLegalizationContext,
-    IRModule*                   module)
+// We use the same basic type legalization machinery for both simplifying
+// away resource-type fields nested in `struct`s and for shuffling around
+// exisential-box fields to get the layout right.
+//
+// The differences between the two passes come down to some very small
+// distinctions about what types each pass considers "special" (e.g.,
+// resources in one case and existential boxes in the other), along
+// with what they want to do when a uniform/constant buffer needs to
+// be made where the element type is non-simple (that is, includes
+// some fields of "special" type).
+//
+// The resource case is then the simpler one:
+//
+struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 {
-    auto session = module->session;
+    IRResourceTypeLegalizationContext(IRModule* module)
+        : IRTypeLegalizationContext(module)
+    {}
 
-    SharedIRBuilder sharedBuilderStorage;
-    auto sharedBuilder = &sharedBuilderStorage;
-
-    sharedBuilder->session = session;
-    sharedBuilder->module = module;
-
-    IRBuilder builderStorage;
-    auto builder = &builderStorage;
-
-    builder->sharedBuilder = sharedBuilder;
-
-
-    IRTypeLegalizationContext contextStorage;
-    auto context = &contextStorage;
-
-    context->session = session;
-    context->module = module;
-    context->builder = builder;
-
-    context->typeLegalizationContext = typeLegalizationContext;
-
-    legalizeTypes(context);
-
-    // Clean up after any type instructions we removed (e.g.,
-    // global `struct` types).
-    //
-    // TODO: this logic should probably get paired up with
-    // the case for `IRTypeLegalizationContext::replacedInstructions`,
-    // but we haven't yet folded all the legalization logic into
-    // the IR legalization pass (since it used to apply to the AST too).
-    //
-    // TODO: This code has issues that can lead to IR validation
-    // failure, because we might remove a `struct X` that has been
-    // legalized away, but leave around a `ParameterBlock<X>` instruction
-    // that is no longer valid.
-    for (auto& oldInst : typeLegalizationContext->instsToRemove)
+    bool isSpecialType(IRType* type) override
     {
-        oldInst->removeAndDeallocate();
+        // For resource type legalization, the "special" types
+        // we are working with are resource types.
+        //
+        return isResourceType(type);
     }
+
+    LegalType createLegalUniformBufferType(
+        IROp        op,
+        LegalType   legalElementType) override
+    {
+        // The appropriate strategy for legalizing uniform buffers
+        // with resources inside already exists, so we can delegate to it.
+        //
+        return createLegalUniformBufferTypeForResources(
+            this,
+            op,
+            legalElementType);
+    }
+};
+
+// The case for legalizing existential box types is then similar.
+//
+struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
+{
+    IRExistentialTypeLegalizationContext(IRModule* module)
+        : IRTypeLegalizationContext(module)
+    {}
+
+    bool isSpecialType(IRType* inType) override
+    {
+        // The "special" types for our purposes are existential
+        // boxes, or arrays thereof.
+        //
+        auto type = unwrapArray(inType);
+        return as<IRExistentialBoxType>(type) != nullptr;
+    }
+
+    LegalType createLegalUniformBufferType(
+        IROp        op,
+        LegalType   legalElementType) override
+    {
+        // We'll delegate the logic for creating uniform buffers
+        // over a mix of ordinary and existential-box types to
+        // a subroutine so it can live near the resource case.
+        //
+        // TODO: We should eventually try to refactor this code
+        // so that related functionality is grouped together.
+        //
+        return createLegalUniformBufferTypeForExistentials(
+            this,
+            op,
+            legalElementType);
+    }
+};
+
+// The main entry points that are used when transforming IR code
+// to get it ready for lower-level codegen are then simple
+// wrappers around `legalizeTypes()` that pick an appropriately
+// specialized context type to use to get the job done.
+
+void legalizeResourceTypes(
+    IRModule*       module,
+    DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    IRResourceTypeLegalizationContext context(module);
+    legalizeTypes(&context);
 }
+
+void legalizeExistentialTypeLayout(
+    IRModule*       module,
+    DiagnosticSink* sink)
+{
+    SLANG_UNUSED(module);
+    SLANG_UNUSED(sink);
+
+    IRExistentialTypeLegalizationContext context(module);
+    legalizeTypes(&context);
+}
+
 
 }

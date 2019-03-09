@@ -9363,18 +9363,27 @@ namespace Slang
     }
 
         /// Recursively walk `paramDeclRef` and add any required existential slots to `ioSlots`.
-    static void _collectExistentialSlotsRec(
-        ExistentialSlots&       ioSlots,
-        DeclRef<VarDeclBase>    paramDeclRef)
-    {
-        auto type = GetType(paramDeclRef);
+    static void _collectExistentialTypeParamsRec(
+        ExistentialTypeSlots&       ioSlots,
+        DeclRef<VarDeclBase>    paramDeclRef);
 
+        /// Recursively walk `type` and discover any required existential type parameters.
+    static void _collectExistentialTypeParamsRec(
+        ExistentialTypeSlots&   ioSlots,
+        Type*               type)
+    {
         // Whether or not something is an array does not affect
         // the number of existential slots it introduces.
         //
         while( auto arrayType = as<ArrayExpressionType>(type) )
         {
             type = arrayType->baseType;
+        }
+
+        if( auto parameterGroupType = as<ParameterGroupType>(type) )
+        {
+            _collectExistentialTypeParamsRec(ioSlots, parameterGroupType->getElementType());
+            return;
         }
 
         if( auto declRefType = as<DeclRefType>(type) )
@@ -9384,7 +9393,7 @@ namespace Slang
             {
                 // Each leaf parameter of interface type adds one slot.
                 //
-                ioSlots.types.Add(type);
+                ioSlots.paramTypes.Add(type);
             }
             else if( auto structDeclRef = typeDeclRef.as<StructDecl>() )
             {
@@ -9396,7 +9405,7 @@ namespace Slang
                     if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
 
-                    _collectExistentialSlotsRec(ioSlots, fieldDeclRef);
+                    _collectExistentialTypeParamsRec(ioSlots, fieldDeclRef);
                 }
             }
         }
@@ -9406,15 +9415,23 @@ namespace Slang
         // element types.
     }
 
+    static void _collectExistentialTypeParamsRec(
+        ExistentialTypeSlots&       ioSlots,
+        DeclRef<VarDeclBase>    paramDeclRef)
+    {
+        _collectExistentialTypeParamsRec(ioSlots, GetType(paramDeclRef));
+    }
+
+
         /// Add information about a shader parameter to `ioParams` and `ioSlots`
     static void _collectExistentialSlotsForShaderParam(
         ShaderParamInfo&        ioParamInfo,
-        ExistentialSlots&       ioSlots,
+        ExistentialTypeSlots&       ioSlots,
         DeclRef<VarDeclBase>    paramDeclRef)
     {
-        UInt startSlot = ioSlots.types.Count();
-        _collectExistentialSlotsRec(ioSlots, paramDeclRef);
-        UInt endSlot = ioSlots.types.Count();
+        UInt startSlot = ioSlots.paramTypes.Count();
+        _collectExistentialTypeParamsRec(ioSlots, paramDeclRef);
+        UInt endSlot = ioSlots.paramTypes.Count();
         UInt slotCount = endSlot - startSlot;
 
         ioParamInfo.firstExistentialTypeSlot = startSlot;
@@ -10343,13 +10360,13 @@ static bool doesParameterMatch(
         return program;
     }
 
-    static void _specializeExistentialSlots(
+    static void _specializeExistentialTypeParams(
         Linkage*                    linkage,
-        ExistentialSlots&           ioSlots,
+        ExistentialTypeSlots&           ioSlots,
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        UInt slotCount = ioSlots.types.Count();
+        UInt slotCount = ioSlots.paramTypes.Count();
         UInt argCount = args.Count();
 
         if( slotCount != argCount )
@@ -10362,7 +10379,7 @@ static bool doesParameterMatch(
 
         for( UInt ii = 0; ii < slotCount; ++ii )
         {
-            auto slotType = ioSlots.types[ii];
+            auto slotType = ioSlots.paramTypes[ii];
             auto argExpr = args[ii];
 
             auto argType = checkProperType(linkage, TypeExp(argExpr), sink);
@@ -10385,18 +10402,18 @@ static bool doesParameterMatch(
                 return;
             }
 
-            ExistentialSlots::Arg arg;
+            ExistentialTypeSlots::Arg arg;
             arg.type = argType;
             arg.witness = witness;
             ioSlots.args.Add(arg);
         }
     }
 
-    void EntryPoint::_specializeExistentialSlots(
+    void EntryPoint::_specializeExistentialTypeParams(
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        Slang::_specializeExistentialSlots(getLinkage(), m_existentialSlots, args, sink);
+        Slang::_specializeExistentialTypeParams(getLinkage(), m_existentialSlots, args, sink);
     }
 
             /// Create a specialization an existing entry point based on generic arguments.
@@ -10489,7 +10506,7 @@ static bool doesParameterMatch(
             unspecializedEntryPoint->getProfile());
 
         // Next we need to validate the existential arguments.
-        specializedEntryPoint->_specializeExistentialSlots(existentialArgs, sink);
+        specializedEntryPoint->_specializeExistentialTypeParams(existentialArgs, sink);
 
         return specializedEntryPoint;
     }
@@ -10548,11 +10565,11 @@ static bool doesParameterMatch(
         }
     }
 
-    void Program::_specializeExistentialSlots(
+    void Program::_specializeExistentialTypeParams(
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        Slang::_specializeExistentialSlots(getLinkage(), m_globalExistentialSlots, args, sink);
+        Slang::_specializeExistentialTypeParams(getLinkage(), m_globalExistentialSlots, args, sink);
     }
 
 
@@ -10733,7 +10750,7 @@ static bool doesParameterMatch(
         // unspecialized on first, which is maybe not always desirable.
         //
         specializedProgram->_collectShaderParams(sink);
-        specializedProgram->_specializeExistentialSlots(globalExistentialArgs, sink);
+        specializedProgram->_specializeExistentialTypeParams(globalExistentialArgs, sink);
 
         return specializedProgram;
     }

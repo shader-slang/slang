@@ -195,7 +195,7 @@ RefPtr<EntryPoint> loadEntryPoint(
 // Along with the entry points themselves, the `Program` object will
 // cache information gleaned from Slang's reflection interface. Notably:
 //
-// * The number of `ParamterBlock`s that the program uses
+// * The number of `ParameterBlock`s that the program uses
 // * Information about generic (type) parameters
 //
 struct Program : RefObject
