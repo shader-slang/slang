@@ -592,7 +592,8 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     // when type lookup fails.
     //
     Slang::DiagnosticSink sink;
-
+    
+    sink.sourceManager = programLayout->getTargetReq()->getLinkage()->getSourceManager();;
     RefPtr<Type> result = program->getTypeFromString(name, &sink);
     return (SlangReflectionType*)result.Ptr();
 }
