@@ -557,7 +557,7 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
         RefPtr<Expr> typeExpr = linkage->parseTypeString(
             typeStr, s);
         type = checkProperType(linkage, TypeExp(typeExpr), sink);
-        if(type)
+        if (type && !type.as<ErrorType>())
             break;
     }
     if( type )
