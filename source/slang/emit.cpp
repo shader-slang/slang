@@ -3959,14 +3959,29 @@ struct EmitVisitor
 
         case kIROp_Select:
             {
-                auto prec = kEOp_Conditional;
-                needClose = maybeEmitParens(outerPrec, prec);
+                if (getTarget(ctx) == CodeGenTarget::GLSL &&
+                    inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
+                {
+                    // For GLSL, emit a call to `mix` if condition is a vector
+                    emit("mix(");
+                    emitIROperand(ctx, inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(", ");
+                    emitIROperand(ctx, inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(", ");
+                    emitIROperand(ctx, inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(")");
+                }
+                else
+                {
+                    auto prec = kEOp_Conditional;
+                    needClose = maybeEmitParens(outerPrec, prec);
 
-                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                emit(" ? ");
-                emitIROperand(ctx, inst->getOperand(1), mode, prec);
-                emit(" : ");
-                emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
+                    emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                    emit(" ? ");
+                    emitIROperand(ctx, inst->getOperand(1), mode, prec);
+                    emit(" : ");
+                    emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
+                }
             }
             break;
 
