@@ -591,6 +591,18 @@ LegalType createLegalUniformBufferTypeForResources(
 {
     switch (legalElementType.flavor)
     {
+    case LegalType::Flavor::simple:
+        {
+            // Seeing a simple type here means that it must be a
+            // "special" type (a resource type or array thereof)
+            // because otherwise the catch-all behavior in
+            // `createLegalUniformBufferType()` would have handled it.
+            //
+            // This case is the same as what we do for tuple elements below.
+            //
+            return LegalType::implicitDeref(legalElementType);
+        }
+
     case LegalType::Flavor::pair:
         {
             auto pairType = legalElementType.getPair();
@@ -1080,6 +1092,10 @@ LegalType legalizeTypeImpl(
     TypeLegalizationContext*    context,
     IRType*                     type)
 {
+    if(!type)
+        return LegalType::simple(nullptr);
+
+    context->builder->setInsertBefore(type);
 
     if (auto uniformBufferType = as<IRUniformParameterGroupType>(type))
     {
@@ -1097,9 +1113,27 @@ LegalType legalizeTypeImpl(
         // we'll want to completely eliminate the uniform/ordinary
         // part.
 
+        auto originalElementType = uniformBufferType->getElementType();
+
         // Legalize the element type to see what we are working with.
         auto legalElementType = legalizeType(context,
-            uniformBufferType->getElementType());
+            originalElementType);
+
+        // As a bit of a corner case, if the user requested something
+        // like `ConstantBuffer<Texture2D>` the element type would
+        // legalize to a "simple" type, and that would be interpreted
+        // as an *ordinary* type, but we really need to notice the
+        // case when the element type is simple, but *special*.
+        //
+        if( context->isSpecialType(originalElementType) )
+        {
+            // Anything that has a special element type needs to
+            // be handled by the pass-specific logic in the context.
+            //
+            return context->createLegalUniformBufferType(
+                uniformBufferType->op,
+                legalElementType);
+        }
 
         // Note that even when legalElementType.flavor == Simple
         // we still need to create a new uniform buffer type
@@ -1270,7 +1304,7 @@ RefPtr<TypeLayout> getDerefTypeLayout(
 
 RefPtr<VarLayout> getFieldLayout(
     TypeLayout*     typeLayout,
-    String const&   mangledFieldName)
+    IRInst*         fieldKey)
 {
     if (!typeLayout)
         return nullptr;
@@ -1294,9 +1328,26 @@ RefPtr<VarLayout> getFieldLayout(
 
     if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
+        // First, let's see if the field had a layout registered
+        // directly using its IR key.
+        //
+        RefPtr<VarLayout> fieldLayout;
+        if(structTypeLayout->mapKeyToLayout.TryGetValue(fieldKey, fieldLayout))
+            return fieldLayout;
+
+        // Otherwise, fall back to doing lookup using the linkage
+        // attached to the key, and its mangled name.
+        //
+        auto fieldLinkage = fieldKey->findDecoration<IRLinkageDecoration>();
+        if(!fieldLinkage)
+            return nullptr;
+        auto mangledFieldName = fieldLinkage->getMangledName();
+
+        // In this case we fall back to a linear search over the fields.
+        //
         for(auto ff : structTypeLayout->fields)
         {
-            if(mangledFieldName == getMangledName(ff->varDecl.getDecl()) )
+            if(mangledFieldName == getMangledName(ff->varDecl.getDecl()).getUnownedSlice() )
             {
                 return ff;
             }
@@ -1306,9 +1357,9 @@ RefPtr<VarLayout> getFieldLayout(
     return nullptr;
 }
 
-RefPtr<VarLayout> createVarLayout(
-    LegalVarChain*  varChain,
-    TypeLayout*     typeLayout)
+RefPtr<VarLayout> createSimpleVarLayout(
+    SimpleLegalVarChain*    varChain,
+    TypeLayout*             typeLayout)
 {
     if (!typeLayout)
         return nullptr;
@@ -1372,7 +1423,23 @@ RefPtr<VarLayout> createVarLayout(
         }
     }
 
+    return varLayout;
+}
 
+
+RefPtr<VarLayout> createVarLayout(
+    LegalVarChain const&    varChain,
+    TypeLayout*             typeLayout)
+{
+    if(!typeLayout)
+        return nullptr;
+
+    auto varLayout = createSimpleVarLayout(varChain.primaryChain, typeLayout);
+
+    if(auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
+    {
+        varLayout->pendingVarLayout = createSimpleVarLayout(varChain.pendingChain, typeLayout);
+    }
 
     return varLayout;
 }

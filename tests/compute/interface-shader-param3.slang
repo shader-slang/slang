@@ -4,20 +4,6 @@
 // interface types at more complicated places in the overall layout.
 //
 
-// NOTE TO SELF:
-//
-// First issue is that the constant buffer layouts aren't being
-// computed correctly for `gStrategy` (even in the previous test),
-// so that it doesn't get a `b` register bound.
-//
-// Second issue is that the type legalization logic is now overzealous,
-// and moves the `modifier` member of the entry-point constant buffer
-// out to global scope, when it should allocate it inside the constant
-// buffer.
-//
-
-
-
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
@@ -59,7 +45,15 @@ int test(
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> gOutputBuffer;
 
-//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(0),glbinding(1)
+// Note: while we declare `gStartegy` here, there is no matching
+// line providing input data at this point. That is partly to
+// work around an apparent bug in the test runner, but it is also
+// to reflect the fact that this declaration does not cause a
+// constant buffer binding to be allocated, because just from
+// the declaration of `gStrategy` we cannot tell whether a
+// constant buffer binding is even needed (there might be no
+// uniform/ordinary data).
+//
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 
 [numthreads(4, 1, 1)]
@@ -87,7 +81,7 @@ void computeMain(
 //
 // Here's the incantation to make the test runner fill in the constant buffer:
 //
-//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(1),glbinding(2)
+//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(0),glbinding(1)
 //
 // So, the value `256` will be used for `extra` and the value `16`
 // will be written to the first four bytes of the concrete value
@@ -142,3 +136,14 @@ struct MyModifier : IModifier
 
 //TEST_INPUT: globalExistentialType MyStrategy
 //TEST_INPUT: entryPointExistentialType MyModifier
+
+// Once the concrete types are plugged in, the compiler can
+// see that `gStrategy` needs a constant buffer register/binding.
+// It will alocate the location for `gStrategy` after all other
+// shader parameters, to ensure that different specializations
+// of the same shader will agree on the locations for all the
+// non-interface-type parameters.
+//
+//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(1),glbinding(2)
+
+

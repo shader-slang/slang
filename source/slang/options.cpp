@@ -468,6 +468,7 @@ struct OptionsParser
                 else if(argStr == "-validate-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldValidateIR = true;
+                    requestImpl->getBackEndReq()->shouldValidateIR = true;
                 }
                 else if(argStr == "-skip-codegen" )
                 {

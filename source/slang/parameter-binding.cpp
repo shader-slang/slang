@@ -1278,6 +1278,27 @@ static void completeBindingsForParameter(
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 
+    /// Allocate binding location for any "pending" data in a shader parameter.
+    ///
+    /// When a parameter contains interface-type fields (recursively), we might
+    /// not have included them in the base layout for the parameter, and instead
+    /// need to allocate space for them after all other shader parameters have
+    /// been laid out.
+    ///
+    /// This function shold be called on the `pendingVarLayout` field of an
+    /// existing `VarLayout` to ensure that its pending data has been properly
+    /// assigned storage. It handles the case where the `pendingVarLayout`
+    /// field is null.
+    ///
+static void _allocateBindingsForPendingData(
+    ParameterBindingContext*    context,
+    RefPtr<VarLayout>           pendingVarLayout)
+{
+    if(!pendingVarLayout) return;
+
+    completeBindingsForParameter(context, pendingVarLayout);
+}
+
 struct SimpleSemanticInfo
 {
     String  name;
@@ -1806,6 +1827,13 @@ struct ScopeLayoutBuilder
     RefPtr<StructTypeLayout>    m_structLayout;
     UniformLayoutInfo           m_structLayoutInfo;
 
+    // We need to compute a layout for any "pending" data inside
+    // of the parameters being added to the scope, to facilitate
+    // later allocating space for all the pending parameters after
+    // the primary shader parameters.
+    //
+    StructTypeLayoutBuilder     m_pendingDataTypeLayoutBuilder;
+
     void beginLayout(
         ParameterBindingContext* context)
     {
@@ -1870,9 +1898,24 @@ struct ScopeLayoutBuilder
         // `struct` layout logic in `type-layout.cpp`. If this gets any
         // more complicated we should see if there is a way to share it.
         //
-        for( auto pendingItem : firstVarLayout->typeLayout->pendingItems )
+        if( auto fieldPendingDataTypeLayout = firstVarLayout->typeLayout->pendingDataTypeLayout )
         {
-            m_structLayout->pendingItems.Add(pendingItem);
+            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, m_rules);
+            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(firstVarLayout->varDecl, fieldPendingDataTypeLayout);
+
+            m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
+
+            if( parameterInfo )
+            {
+                for( auto& varLayout : parameterInfo->varLayouts )
+                {
+                    varLayout->pendingVarLayout = fieldPendingDataVarLayout;
+                }
+            }
+            else
+            {
+                firstVarLayout->pendingVarLayout = fieldPendingDataVarLayout;
+            }
         }
     }
 
@@ -1896,6 +1939,7 @@ struct ScopeLayoutBuilder
         // Finish computing the layout for the ordindary data (if any).
         //
         m_rules->EndStructLayout(&m_structLayoutInfo);
+        m_pendingDataTypeLayoutBuilder.endLayout();
 
         // Copy the final layout information computed for ordinary data
         // over to the struct type layout for the scope.
@@ -1917,6 +1961,14 @@ struct ScopeLayoutBuilder
         // record into a suitable object that represents the scope
         RefPtr<VarLayout> scopeVarLayout = new VarLayout();
         scopeVarLayout->typeLayout = scopeTypeLayout;
+
+        if( auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout )
+        {
+            RefPtr<VarLayout> pendingVarLayout = new VarLayout();
+            pendingVarLayout->typeLayout = pendingTypeLayout;
+            scopeVarLayout->pendingVarLayout = pendingVarLayout;
+        }
+
         return scopeVarLayout;
     }
 };
@@ -2431,6 +2483,47 @@ RefPtr<ProgramLayout> generateParameterBindings(
         cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
     }
+
+    // After we have laid out all the ordinary parameters,
+    // we need to go through the global scope plus each entry point,
+    // and "flush" out any pending data that was associated with
+    // those scopes as part of dealing with interface-type parameters.
+    //
+    _allocateBindingsForPendingData(&context, globalScopeVarLayout->pendingVarLayout);
+    for( auto entryPoint : sharedContext.programLayout->entryPoints )
+    {
+        _allocateBindingsForPendingData(&context, entryPoint->parametersLayout->pendingVarLayout);
+    }
+
+
+    // HACK: we want global parameters to not have to deal with offsetting
+    // by the `VarLayout` stored in `globalScopeVarLayout`, so we will scan
+    // through and for any global parameter that used "pending" data, we will manually
+    // offset all of its resource infos to account for where the global pending data
+    // got placed.
+    //
+    // TODO: A more appropriate solution would be to pass the `globalScopeVarLayout`
+    // down into the pass that puts layout information onto global parameters in
+    // the IR, and apply the offsetting there.
+    //
+    for( auto& parameterInfo : sharedContext.parameters )
+    {
+        for( auto varLayout : parameterInfo->varLayouts )
+        {
+            auto pendingVarLayout = varLayout->pendingVarLayout;
+            if(!pendingVarLayout) continue;
+
+            for( auto& resInfo : pendingVarLayout->resourceInfos )
+            {
+                if( auto globalResInfo = globalScopeVarLayout->pendingVarLayout->FindResourceInfo(resInfo.kind) )
+                {
+                    resInfo.index += globalResInfo->index;
+                    resInfo.space += globalResInfo->space;
+                }
+            }
+        }
+    }
+
     programLayout->parametersLayout = globalScopeVarLayout;
 
     {

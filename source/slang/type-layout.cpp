@@ -878,30 +878,6 @@ bool IsResourceKind(LayoutResourceKind kind)
 
 }
 
-    /// A custom tuple to capture the outputs of type layout
-struct TypeLayoutResult
-{
-        /// The actual heap-allocated layout object with all the details
-    RefPtr<TypeLayout>  layout;
-
-        /// A simplified representation of layout information.
-        ///
-        /// This information is suitable for the case where a type only
-        /// consumes a single resource.
-        ///
-    SimpleLayoutInfo    info;
-
-        /// Default constructor.
-    TypeLayoutResult()
-    {}
-
-        /// Construct a result from the given layout object and simple layout info.
-    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
-        : layout(inLayout)
-        , info(inInfo)
-    {}
-};
-
     /// Create a type layout for a type that has simple layout needs.
     ///
     /// This handles any type that can express its layout in `SimpleLayoutInfo`,
@@ -1090,18 +1066,17 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(
 }
 
 // Given an existing type layout `oldTypeLayout`, apply offsets
-// to any contained fields based on the resource infos in `offsetTypeLayout`
-// *and* the usage implied by `offsetLayout`
+// to any contained fields based on the resource infos in `offsetVarLayout`.
 RefPtr<TypeLayout> applyOffsetToTypeLayout(
     RefPtr<TypeLayout>  oldTypeLayout,
-    RefPtr<TypeLayout>  offsetTypeLayout)
+    RefPtr<VarLayout>   offsetVarLayout)
 {
     // There is no need to apply offsets if the old type and the offset
     // don't share any resource infos in common.
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->resourceInfos)
     {
-        if (auto offsetResInfo = offsetTypeLayout->FindResourceInfo(oldResInfo.kind))
+        if (auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
         {
             anyHit = true;
             break;
@@ -1138,12 +1113,9 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 auto newResInfo = newField->findOrAddResourceInfo(oldResInfo.kind);
                 newResInfo->index = oldResInfo.index;
                 newResInfo->space = oldResInfo.space;
-                if (auto offsetResInfo = offsetTypeLayout->FindResourceInfo(oldResInfo.kind))
+                if (auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
                 {
-                    // We should not be trying to offset things by an infinite amount,
-                    // since that would leave all the indices undefined.
-                    SLANG_RELEASE_ASSERT(offsetResInfo->count.isFinite());
-                    newResInfo->index += offsetResInfo->count.getFiniteValue();
+                    newResInfo->index += offsetResInfo->index;
                 }
             }
 
@@ -1180,273 +1152,466 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     return newTypeLayout;
 }
 
-    /// Take a type layout that might include pending items and fold them into the layout.
-static RefPtr<TypeLayout> flushPendingItems(
-    TypeLayoutContext const&    context,
-    RefPtr<TypeLayout>          layout)
+static bool _usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)
 {
-    SLANG_UNUSED(context);
-
-    // If there are no pending items on the layout,
-    // then there is nothing to be done.
-    //
-    if(layout->pendingItems.Count() == 0)
-        return layout;
-
-    // We need to compute a new type layout that reflects
-    // the resource usage of the provided `layout`, plus
-    // any resource usage for the pending items.
-    //
-    // TODO: To be correct we should construct a new `TypeLayout`
-    // of the same class, but that would take more work, so
-    // we'll re-use the one we already have... kind of gross...
-    //
-    for( auto pendingItem : layout->pendingItems )
-    {
-        auto itemTypeLayout = pendingItem.getTypeLayout();
-
-        // Any resources used by a pending item should be
-        // billed against the flushed layout we are computing.
-        //
-        // TODO: We need to make this handlde ordinary/uniform
-        // data carefully, so that it respects alignment and
-        // other layout rules for the target.
-        //
-        // TODO: We should only be adding in resource usage
-        // that can be "hidden" by the type of parameter block
-        // being built (e.g., only a `ParameterBlock` that allocates
-        // full `set`s/`space`s can hide the `register`s/`binding`s
-        // used by resource fields).
-        //
-        // TODO: we need to write something back to the item,
-        // which should have a `VarLayout` or something like
-        // that attached to it!
-        //
-        for( auto resInfo : itemTypeLayout->resourceInfos )
-        {
-            layout->addResourceUsage(resInfo);
-        }
-    }
-    layout->pendingItems.Clear();
-
-    return layout;
+    auto resInfo = typeLayout->FindResourceInfo(kind);
+    return resInfo && resInfo->count != 0;
 }
 
-static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
+static bool _usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
+{
+    return _usesResourceKind(typeLayout, LayoutResourceKind::Uniform);
+}
+
+    /// Add resource usage from `srcTypeLayout` to `dstTypeLayout` unless it would be "masked."
+    ///
+    /// This function is appropriate for applying resource usage from an element type
+    /// to the resource usage of a container like a `ConstantBuffer<X>` or
+    /// `ParameterBlock<X>`.
+    ///
+static void _addUnmaskedResourceUsage(
+    TypeLayout* dstTypeLayout,
+    TypeLayout* srcTypeLayout,
+    bool        haveFullRegisterSpaceOrSet)
+{
+    for( auto resInfo : srcTypeLayout->resourceInfos )
+    {
+        switch( resInfo.kind )
+        {
+        case LayoutResourceKind::Uniform:
+            // Ordinary/uniform resource usage will always be masked.
+            break;
+
+        case LayoutResourceKind::RegisterSpace:
+        case LayoutResourceKind::ExistentialTypeParam:
+            // A parameter group will always pay for full registers
+            // spaces consumed by its element type.
+            //
+            // The same is true for existential type parameters,
+            // since these need to be exposed up through the API.
+            //
+            dstTypeLayout->addResourceUsage(resInfo);
+            break;
+
+        default:
+            // For all other resource kinds, a parameter group
+            // will be able to mask them if and only if it
+            // has a full space/set allocated to it.
+            //
+            // Otherwise, the resource usage of the group must
+            // include the resource usage of the element.
+            //
+            if( !haveFullRegisterSpaceOrSet )
+            {
+                dstTypeLayout->addResourceUsage(resInfo);
+            }
+            break;
+        }
+    }
+}
+
+static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
-    SimpleLayoutInfo            parameterGroupInfo,
     RefPtr<TypeLayout>          rawElementTypeLayout)
 {
-    // If there are any "pending" items that need to be laid out in
-    // the element type of the parameter group, then we want to flush
-    // them here.
+    // We are being asked to create a layout for a parameter group,
+    // which is curently either a `ParameterBlock<T>` or a `ConstantBuffer<T>`
     //
-    // TODO: We might need to make this only flush *parts* of the pending
-    // items, based on what the parameter group can absorb, and leave
-    // other parts still pending in the type layout we return...
-    //
-    rawElementTypeLayout = flushPendingItems(
-        context.with(context.getRulesFamily()->getConstantBufferRules()),
-        rawElementTypeLayout);
-
     auto parameterGroupRules = context.rules;
-
     RefPtr<ParameterGroupTypeLayout> typeLayout = new ParameterGroupTypeLayout();
     typeLayout->type = parameterGroupType;
     typeLayout->rules = parameterGroupRules;
+
+    // Computing the layout is made tricky by several factors.
+    //
+    // A parameter group has to draw a distinction between the element type,
+    // and the resources it consumes, and the "container," which main
+    // consume other resources. The type of resource consumed by
+    // the two can overlap.
+    //
+    // Consider:
+    //
+    //      struct MyMaterial { float2 uvScale; Texture2D albedoMap; }
+    //      ParameterBlock<MyMaterial> gMaterial;
+    //
+    // In this example, `gMaterial` will need both a constant buffer
+    // binding (to hold the data for `uvScale`) and a texture binding
+    // (for `albedoMap`). On Vulkan, those two things require the *same*
+    // `LayoutResourceKind` (representing a GLSL `binding`). We will
+    // thus track the resource usage of the "container" type and
+    // element type separately, and then combine these to form
+    // the overall layout for the parameter group.
 
     RefPtr<TypeLayout> containerTypeLayout = new TypeLayout();
     containerTypeLayout->type = parameterGroupType;
     containerTypeLayout->rules = parameterGroupRules;
 
-    // The layout of the constant buffer if it gets stored
-    // in another constant buffer is just what we computed
-    // originally (which should be a single binding "slot"
-    // and hence no uniform data).
-    // 
-    SLANG_RELEASE_ASSERT(parameterGroupInfo.kind != LayoutResourceKind::Uniform);
-    typeLayout->uniformAlignment = 1;
-    containerTypeLayout->uniformAlignment = 1;
-
-    // TODO(tfoley): There is a subtle question here of whether
-    // a constant buffer declaration that then contains zero
-    // bytes of uniform data should actually allocate a CB
-    // binding slot. For now I'm going to try to ignore it,
-    // but handling this robustly could let other code
-    // simply handle the "global scope" as a giant outer
-    // CB declaration...
-
-    // Make sure that we allocate resource usage for the
-    // parameter block itself.
-    if( parameterGroupInfo.size != 0 )
-    {
-        containerTypeLayout->addResourceUsage(
-            parameterGroupInfo.kind,
-            parameterGroupInfo.size);
-    }
-
-    // There are several different cases that need to be handled here,
-    // depending on whether we have a `ParameterBlock`, a `ConstantBuffer`,
-    // or some other kind of parameter group. Furthermore, in the
-    // `ParameterBlock` case, we need to deal with different layout
-    // rules depending on whether a block should map to a register `space`
-    // in HLSL or not.
-
-    // Check if we are working with a parameter block...
-    auto parameterBlockType = as<ParameterBlockType>(parameterGroupType);
-    
-    // Check if we have a parameter block *and* it should be
-    // allocated into its own register space(s)
-    bool ownRegisterSpace = false;
-    if (parameterBlockType)
-    {
-        // Should we allocate this block its own register space?
-        if( shouldAllocateRegisterSpaceForParameterBlock(context) )
-        {
-            ownRegisterSpace = true;
-        }
-
-        // If we need a register space, then maybe allocate one.
-        if( ownRegisterSpace )
-        {
-            // The basic logic here is that if the parameter block only
-            // contains other parameter blocks (which themselves have
-            // their own register spaces), then we don't need to
-            // allocate *yet another* register space for the block.
-
-            bool needsARegisterSpace = false;
-            for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
-            {
-                if(elementResourceInfo.kind != LayoutResourceKind::RegisterSpace)
-                {
-                    needsARegisterSpace = true;
-                    break;
-                }
-            }
-
-            // If we determine that a register space is needed, then add one here.
-            if( needsARegisterSpace )
-            {
-                typeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
-            }
-        }
-
-        // Next, we check if the parameter block has any uniform data, since
-        // that means we need to allocate a constant-buffer binding for it.
-        bool anyUniformData = false;
-        if(auto elementUniformInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
-        {
-            if( elementUniformInfo->count != 0 )
-            {
-                // We have a non-zero number of bytes of uniform data here.
-                anyUniformData = true;
-            }
-        }
-        if( anyUniformData )
-        {
-            // We need to ensure that the block itself consumes at least one "register" for its
-            // constant buffer part.
-            auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
-            containerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
-        }
-    }
-
-    // The layout for the element type was computed without any knowledge
-    // of what resources the parent type was going to consume; we now
-    // need to go through and offset that any starting locations (e.g.,
-    // in nested `StructTypeLayout`s) based on what we allocated to
-    // the parent.
-    //
-    // Note: at the moment, constant buffers apply their own offsetting
-    // logic elsewhere, so we need to only do this logic for parameter blocks
-    RefPtr<TypeLayout> offsetTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, containerTypeLayout);
-    typeLayout->offsetElementTypeLayout = offsetTypeLayout;
-
+    // Because the container and element types will each be situated
+    // at some offset relative to the initial register/binding for
+    // the group as a whole, we allocate a `VarLayout` for both
+    // the container and the element type, to store that offset
+    // information (think of `TypeLayout`s as holding size information,
+    // while `VarLayout`s hold offset information).
 
     RefPtr<VarLayout> containerVarLayout = new VarLayout();
     containerVarLayout->typeLayout = containerTypeLayout;
+    typeLayout->containerVarLayout = containerVarLayout;
+
+    RefPtr<VarLayout> elementVarLayout = new VarLayout();
+    elementVarLayout->typeLayout = rawElementTypeLayout;
+    typeLayout->elementVarLayout = elementVarLayout;
+
+    // It is possible to have a `ConstantBuffer<T>` that doesn't
+    // actually need a constant buffer register/binding allocated to it,
+    // because the type `T` doesn't actually contain any ordinary/uniform
+    // data that needs to go into the constant buffer. For example:
+    //
+    //      struct MyMaterial { Texture2D t; SamplerState s; };
+    //      ConstantBuffer<MyMaterial> gMaterial;
+    //
+    // In this example, the `gMaterial` parameter doesn't actually need
+    // a constant buffer allocated for it. This isn't something that
+    // comes up often for `ConstantBuffer`, but can happen a lot for
+    // `ParameterBlock`.
+    //
+    // To determine if we actually need a constant-buffer binding,
+    // we will inspect the element type and see if it contains
+    // any ordinary/uniform data.
+    //
+    bool wantConstantBuffer = _usesOrdinaryData(rawElementTypeLayout);
+    if( wantConstantBuffer )
+    {
+        // If there is any ordinary data, then we'll need to
+        // allocate a constant buffer regiser/binding into
+        // the overall layout, to account for it.
+        //
+        auto cbUsage = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+        containerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
+    }
+
+    // Similarly to how we only need a constant buffer to be allocated
+    // if the contents of the group actually had ordinary/uniform data,
+    // we also only want to allocate a `space` or `set` if that is really
+    // required.
+    //
+    //
+    bool canUseSpaceOrSet = false;
+    //
+    // We will only allocate a `space` or `set` if the type is `ParameterBlock<T>`
+    // and not just `ConstantBuffer<T>`.
+    //
+    // Note: `parameterGroupType` is allowed to be null here, if we are allocating
+    // an anonymous constant buffer for global or entry-point parameters, but that
+    // is fine because the case will just return null in that case anyway.
+    //
+    auto parameterBlockType = as<ParameterBlockType>(parameterGroupType);
+    if( parameterBlockType )
+    {
+        // We also can't allocate a `space` or `set` unless the compilation
+        // target actually supports them.
+        //
+        if( shouldAllocateRegisterSpaceForParameterBlock(context) )
+        {
+            canUseSpaceOrSet = true;
+        }
+    }
+
+    // Just knowing that we *can* use a `space` or `set` doesn't tell
+    // us if we would *like* to.
+    //
+    // The basic rule here is that if the element type of the parameter
+    // block contains anything that isn't itself consuming a full
+    // register `space` or `set`, then we'll want an umbrella `space`/`set`
+    // for all such data.
+    //
+    bool wantSpaceOrSet = false;
+    if( canUseSpaceOrSet )
+    {
+        // Note that if we are allocating a constant buffer to hold
+        // some ordinary/uniform data then we definitely want a space/set,
+        // but we don't need to special-case that because the loop
+        // here will also detect the `LayoutResourceKind::Uniform` usage.
+
+        for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
+        {
+            if(elementResourceInfo.kind != LayoutResourceKind::RegisterSpace)
+            {
+                wantSpaceOrSet = true;
+                break;
+            }
+        }
+    }
+
+    // If after all that we determine that we want a register space/set,
+    // then we allocate one as part of the overall resource usage for
+    // the parameter group type.
+    //
+    if( wantSpaceOrSet )
+    {
+        containerTypeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
+    }
+
+    // Now that we've computed basic resource requirements for the container
+    // part of things (i.e., does it require a constant buffer or not?),
+    // let's go ahead and assign the container variable a relative offset
+    // of zero for each of the kinds of resources that it consumes.
+    //
     for( auto typeResInfo : containerTypeLayout->resourceInfos )
     {
         containerVarLayout->findOrAddResourceInfo(typeResInfo.kind);
     }
-    typeLayout->containerVarLayout = containerVarLayout;
 
-    // We will construct a dummy variable layout to represent the offsettting
-    // that needs to be applied to the element type to put it after the
-    // container.
-    RefPtr<VarLayout> elementVarLayout = new VarLayout();
-    elementVarLayout->typeLayout = rawElementTypeLayout;
+    // Because the container's resource allocation is logically coming
+    // first in the overall group, the element needs to have a layout
+    // such that it comes *after* the container in the relative order.
+    //
     for( auto elementTypeResInfo : rawElementTypeLayout->resourceInfos )
     {
         auto kind = elementTypeResInfo.kind;
         auto elementVarResInfo = elementVarLayout->findOrAddResourceInfo(kind);
+
+        // If the container part of things is using the same resource kind
+        // as the element type, then the element needs to start at an offset
+        // after the container.
+        //
         if( auto containerTypeResInfo = containerTypeLayout->FindResourceInfo(kind) )
         {
             SLANG_RELEASE_ASSERT(containerTypeResInfo->count.isFinite());
             elementVarResInfo->index += containerTypeResInfo->count.getFiniteValue();
         }
     }
-    typeLayout->elementVarLayout = elementVarLayout;
 
-    if (ownRegisterSpace)
+    // The existing Slang reflection API was created before we really
+    // understood the wrinkle that the "container" and elements parts
+    // of a parameter group could collide on some resource kinds,
+    // so the API doesn't currently expose the nice `VarLayout`s we've
+    // just computed.
+    //
+    // Instead, the API allows the user to query the element type layout
+    // for the group, and the user just assumes that the offsettting
+    // is magically applied there. To go back to the earlier example:
+    //
+    //      struct MyMaterial { Texture2D t; SamplerState s; };
+    //      ConstantBuffer<MyMaterial> gMaterial;
+    //
+    // A user of the existing reflection API expects to be able to
+    // query the `binding` of `gMaterial` and get back zero, then
+    // query the `binding` of the `t` field of the element type
+    // and get *one*. It is clear that in the abstract, the
+    // `MyMaterial::t` field should have an offset of zero (as
+    // the first field in a `struct`), so to meet the user's
+    // expectations, some cleverness is needed.
+    //
+    // We will use a subroutine `applyOffsetToTypeLayout`
+    // that tries to recursively walk an existing `TypeLayout`
+    // and apply an offset to its fields. This is currently
+    // quite ad hoc, but that doesn't matter much as it
+    // handles `struct` types which are the 99% case for
+    // parameter blocks.
+    //
+    typeLayout->offsetElementTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, elementVarLayout);
+
+    // Next, resource usage from the container and element
+    // types may need to "bleed through" to the overall
+    // parameter group type.
+    //
+    // If the parameter group is a `ConstantBuffer<Foo>` then
+    // any ordinary/uniform bytes consumed by `Foo` are masked,
+    // but any other resources it consumes (e.g. `binding`s) need
+    // to bleed through and be accounted for in the overall
+    // layout of the type.
+    //
+    // If we have a `ParameterBlock<Foo>` then any ordinary/uniform
+    // bytes are masked. Furthermore, *if* a whole `space`/`set`
+    // was allocated to the block, then any `register`s or
+    // `binding`s consumed by `Foo` (and by the "container" constant
+    // buffer if we allocated one) are also masked. Any whole
+    // spaces/sets consumed by `Foo` need to bleed through.
+    //
+    // We can start with the easier case of the container type,
+    // since it will either be empty or consume a single constant
+    // buffer. Its resource usage will only bleed through if we
+    // didn't allocate a full `space` or `set`.
+    //
+    _addUnmaskedResourceUsage(typeLayout, containerTypeLayout, wantSpaceOrSet);
+
+    // next we turn to the element type, where the cases are slightly
+    // more involved (technically we could use this same logic for
+    // the container, as it is more general, but it was simpler to
+    // just special-case the container).
+    //
+
+    _addUnmaskedResourceUsage(typeLayout, rawElementTypeLayout, wantSpaceOrSet);
+
+    // At this point we have handled all the complexities that
+    // arise for a parameter group that doesn't include interface-type
+    // fields, or that doesn't include specialization for those fields.
+    //
+    // The remaining complexity all arises if we have interface-type
+    // data in the parameter group, and we are specializing it to
+    // concrete types, that will have their own layout requirements.
+    // In those cases there will be "pending data" on the element
+    // type layout that need to get placed somwhere, but wasn't
+    // included in the layout computed so far.
+    //
+    // All of this is extra work we only have to do if there is
+    // "pending" data in the element type layout.
+    //
+    if( auto pendingElementTypeLayout = rawElementTypeLayout->pendingDataTypeLayout )
     {
-        // A parameter block type that gets its own register space will only
-        // include resource usage from the element type when it itself consumes
-        // whole register spaces.
-        if (auto elementResInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
-        {
-            typeLayout->addResourceUsage(*elementResInfo);
-        }
-    }
-    else
-    {
-        // If the parameter block is *not* getting its own regsiter space, then
-        // it needs to include the resource usage from the "container" type, plus
-        // any relevant resource usage for the element type.
+        auto rules = rawElementTypeLayout->rules;
 
-        // We start by accumulating any resource usage from the container.
-        for (auto containerResourceInfo : containerTypeLayout->resourceInfos)
+        // One really annoying complication we need to deal with here
+        // its that it is possible that the original parameter group
+        // declaration didn't need a constant buffer or `space`/`set`
+        // to be allocated, but once we consider the "pending" data
+        // we need to have a constant buffer and/or space.
+        //
+        // We will compute whether the pending data create a demand
+        // for a constant buffer and/or a space/set, so that we know
+        // if we are in the tricky case.
+        //
+        bool pendingDataWantsConstantBuffer = _usesOrdinaryData(pendingElementTypeLayout);
+        bool pendingDataWantsSpaceOrSet = false;
+        if( canUseSpaceOrSet )
         {
-            typeLayout->addResourceUsage(containerResourceInfo);
-        }
-
-        // Now we will (possibly) accumulate the resources used by the element
-        // type into the resources used by the parameter group. The reason
-        // this is "possibly" is because, e.g., a `ConstantBuffer<Foo>` should
-        // not report itself as consuming `sizeof(Foo)` bytes of uniform data,
-        // or else it would mess up layout for any type that contains the
-        // constant buffer.
-        for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
-        {
-            switch( elementResourceInfo.kind )
+            for( auto resInfo : pendingElementTypeLayout->resourceInfos )
             {
-            case LayoutResourceKind::Uniform:
-                // Uniform resource usages will always be hidden.
-                break;
-
-            default:
-                // All other register types will not be hidden,
-                // since we aren't in the case where the parameter group
-                // gets its own register space.
-                typeLayout->addResourceUsage(elementResourceInfo);
-                break;
+                if( resInfo.kind != LayoutResourceKind::RegisterSpace )
+                {
+                    pendingDataWantsSpaceOrSet = true;
+                    break;
+                }
             }
         }
+
+        // We will use a few different variables to track resource
+        // usage for the pending data, with roles similar to the
+        // umbrella type layout, container layout, and element layout
+        // that already came up for the main part of the parameter group type.
+
+
+        RefPtr<TypeLayout> pendingContainerTypeLayout = new TypeLayout();
+        pendingContainerTypeLayout->type = parameterGroupType;
+        pendingContainerTypeLayout->rules = parameterGroupRules;
+
+        containerTypeLayout->pendingDataTypeLayout = pendingContainerTypeLayout;
+
+        RefPtr<VarLayout> pendingContainerVarLayout = new VarLayout();
+        pendingContainerVarLayout->typeLayout = pendingContainerTypeLayout;
+
+        containerVarLayout->pendingVarLayout = pendingContainerVarLayout;
+
+
+        RefPtr<VarLayout> pendingElementVarLayout = new VarLayout();
+        pendingElementVarLayout->typeLayout = pendingElementTypeLayout;
+
+        elementVarLayout->pendingVarLayout = pendingElementVarLayout;
+
+        // If we need a space/set for the pending data, and don't already
+        // have one, then we will allocate it now, as part of the
+        // "full" data type.
+        //
+        if( pendingDataWantsSpaceOrSet && !wantSpaceOrSet )
+        {
+            pendingContainerTypeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
+
+            // From here on, we know we have access to a register space,
+            // and we can mask any registers/bindings appropriately.
+            //
+            wantSpaceOrSet = true;
+        }
+
+        // If we need a constant buffer for laying out ordinary
+        // data, and didn't have one allocated before, we will create
+        // one.
+        //
+        if( pendingDataWantsConstantBuffer && !wantConstantBuffer )
+        {
+            auto cbUsage = rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
+            pendingContainerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
+
+            wantConstantBuffer = true;
+        }
+
+        for( auto resInfo : pendingContainerTypeLayout->resourceInfos )
+        {
+            pendingContainerVarLayout->findOrAddResourceInfo(resInfo.kind);
+        }
+
+        // Now that we've added in the resource usage for any CB or set/space
+        // we needed to allocate just for the pending data, we can safely
+        // lay out the pending data itself.
+        //
+        // The ordinary/uniform part of things wil always be "masked" and
+        // needs to come after any uniform data from the original element type.
+        //
+        // To kick things off we will initialize state for `struct` type layout,
+        // so that we can lay out the pending data as if it were the second
+        // field in a structure type, after the original data.
+        //
+        UniformLayoutInfo uniformLayout = rules->BeginStructLayout();
+        if( auto resInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+        {
+            uniformLayout.alignment = rawElementTypeLayout->uniformAlignment;
+            uniformLayout.size = resInfo->count;
+        }
+
+        // Now we can scan through the resources used by the pending data.
+        //
+        for( auto resInfo : pendingElementTypeLayout->resourceInfos )
+        {
+            if( resInfo.kind == LayoutResourceKind::Uniform )
+            {
+                // For the ordinary/uniform resource kind, we will add the resource
+                // usage as a structure field, and then write the resulting offset
+                // into the variable layout for the pending data.
+                //
+                auto offset = rules->AddStructField(
+                    &uniformLayout,
+                    UniformLayoutInfo(
+                        resInfo.count,
+                        pendingElementTypeLayout->uniformAlignment));
+                pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind)->index = offset.getFiniteValue();
+            }
+            else
+            {
+                // For all other resource kinds, we will set the offset in
+                // the variable layout based on the total resources of that
+                // kind seen so far (including the "container" if any),
+                // and then bump the count for total resource usage.
+                //
+                auto elementVarResInfo = pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind);
+                if( auto containerTypeInfo = pendingContainerTypeLayout->FindResourceInfo(resInfo.kind) )
+                {
+                    elementVarResInfo->index = containerTypeInfo->count.getFiniteValue();
+                }
+            }
+        }
+        rules->EndStructLayout(&uniformLayout);
+
+        // Okay, now we have a `VarLayout` for the element data, and an overall `TypeLayout`
+        // for all the data that this parameter group needs allocated for pending
+        // data.
+        //
+        // The next major step is to compute the version of that combined resource usage
+        // that will "bleed through" and thus needs to be allocated at the next level
+        // up the hierarchy.
+        //
+        RefPtr<TypeLayout> unmaskedPendingDataTypeLayout = new TypeLayout();
+        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
+        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
+
+        // TODO: we should probably optimize for the case where there is no unmasked
+        // usage that needs to be reported out, since it should be a common case.
+
+        // Now we need to update the type layout to  what we've done.
+        //
+        typeLayout->pendingDataTypeLayout = unmaskedPendingDataTypeLayout;
     }
 
     return typeLayout;
-}
-
-static bool usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)
-{
-    auto resInfo = typeLayout->FindResourceInfo(kind);
-    return resInfo && resInfo->count != 0;
-}
-
-static bool usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
-{
-    return usesResourceKind(typeLayout, LayoutResourceKind::Uniform);
 }
 
     /// Do we need to wrap the given element type in a constant buffer layout?
@@ -1454,15 +1619,15 @@ static bool needsConstantBuffer(RefPtr<TypeLayout> elementTypeLayout)
 {
     // We need a constant buffer if the element type has ordinary/uniform data.
     //
-    if(usesOrdinaryData(elementTypeLayout))
+    if(_usesOrdinaryData(elementTypeLayout))
         return true;
 
-    // We also need a constant buffer if there are any "pending"
-    // items that need ordinary/uniform data allocated to them.
+    // We also need a constant buffer if there is any "pending"
+    // data that need ordinary/uniform data allocated to them.
     //
-    for( auto pendingItem : elementTypeLayout->pendingItems )
+    if(auto pendingDataTypeLayout = elementTypeLayout->pendingDataTypeLayout)
     {
-        if(usesOrdinaryData(pendingItem.getTypeLayout()))
+        if(_usesOrdinaryData(pendingDataTypeLayout))
             return true;
     }
 
@@ -1487,50 +1652,29 @@ RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
             .with(parameterGroupRules)
             .with(context.targetReq->getDefaultMatrixLayoutMode()),
         nullptr,
-        parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer),
         elementTypeLayout);
 }
 
 
-static RefPtr<ParameterGroupTypeLayout> _createParameterGroupTypeLayout(
+static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType,
     RefPtr<Type>                elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
-    auto parameterGroupRules = context.rules;
-
-    // First compute resource usage of the block itself.
-    // For now we assume that the layout of the block can
-    // always be described in a `SimpleLayoutInfo` (only
-    // a single resource kind consumed).
-    SimpleLayoutInfo info;
-    if (parameterGroupType)
-    {
-        info = getParameterGroupLayoutInfo(
-            parameterGroupType,
-            parameterGroupRules);
-    }
-    else
-    {
-        // If there is no concrete type, then it seems like we are
-        // being asked to compute layout for the global scope
-        info = parameterGroupRules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
-    }
-
-    // Now compute a layout for the elements of the parameter block.
-    // Note that we need to be careful and deal with the case where
-    // the elements of the block use the same resource kind consumed
-    // by the block itself.
-
+    // We will first compute a layout for the element type of
+    // the parameter group.
+    //
     auto elementTypeLayout = createTypeLayout(
         context.with(elementTypeRules),
         elementType);
 
+    // Now we delegate to a routine that does the meat of
+    // the complicated layout logic.
+    //
     return _createParameterGroupTypeLayout(
         context,
         parameterGroupType,
-        info,
         elementTypeLayout);
 }
 
@@ -1569,7 +1713,7 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     }
 }
 
-RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
+RefPtr<TypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType)
 {
@@ -1960,6 +2104,197 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
         return originalTypeLayout;
     }
+}
+
+    /// Convert a `TypeLayout` to a `TypeLayoutResult`
+    ///
+    /// A `TypeLayout` holds all the data needed to make a `TypeLayoutResult` in practice,
+    /// but sometimes it is more convenient to have the data split out.
+    ///
+TypeLayoutResult makeTypeLayoutResult(RefPtr<TypeLayout> typeLayout)
+{
+    TypeLayoutResult result;
+    result.layout = typeLayout;
+
+    // If the type only consumes a single kind of non-uniform resource,
+    // we can fill in the `info` field directly.
+    //
+    if( typeLayout->resourceInfos.Count() == 1 )
+    {
+        auto resInfo = typeLayout->resourceInfos[0];
+        if( resInfo.kind != LayoutResourceKind::Uniform )
+        {
+            result.info.kind = resInfo.kind;
+            result.info.size = resInfo.count;
+            return result;
+        }
+    }
+
+    // Otherwise, we will fill out the info based on the uniform
+    // resources consumed, if any.
+    //
+    if( auto resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+    {
+        result.info.kind = LayoutResourceKind::Uniform;
+        result.info.alignment = typeLayout->uniformAlignment;
+        result.info.size = resInfo->count;
+    }
+
+    // If there was no ordinary/uniform resource usage, then we
+    // will leave the `info` field in its default state (which
+    // shows no resources consumed).
+    //
+    // The type layout might have more detailed information, but
+    // at this point it must contain either zero, or more than one
+    // `ResourceInfo`, so there is nothing unambiguous we can
+    // store into `info`.
+
+    return result;
+}
+
+//
+// StructTypeLayoutBuilder
+//
+
+void StructTypeLayoutBuilder::beginLayout(
+    Type*               type,
+    LayoutRulesImpl*    rules)
+{
+    m_rules = rules;
+
+    m_typeLayout = new StructTypeLayout();
+    m_typeLayout->type = type;
+    m_typeLayout->rules = m_rules;
+
+    m_info = m_rules->BeginStructLayout();
+}
+
+void StructTypeLayoutBuilder::beginLayoutIfNeeded(
+    Type*               type,
+    LayoutRulesImpl*    rules)
+{
+    if( !m_typeLayout )
+    {
+        beginLayout(type, rules);
+    }
+}
+
+RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
+    DeclRef<VarDeclBase>    field,
+    TypeLayoutResult        fieldResult)
+{
+    SLANG_ASSERT(m_typeLayout);
+
+    RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
+    UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
+
+    // Note: we don't add any zero-size fields
+    // when computing structure layout, just
+    // to avoid having a resource type impact
+    // the final layout.
+    //
+    // This means that the code to generate final
+    // declarations needs to *also* eliminate zero-size
+    // fields to be safe...
+    //
+    LayoutSize uniformOffset = m_info.size;
+    if(fieldInfo.size != 0)
+    {
+        uniformOffset = m_rules->AddStructField(&m_info, fieldInfo);
+    }
+
+
+    // We need to create variable layouts
+    // for each field of the structure.
+    RefPtr<VarLayout> fieldLayout = new VarLayout();
+    fieldLayout->varDecl = field;
+    fieldLayout->typeLayout = fieldTypeLayout;
+    m_typeLayout->fields.Add(fieldLayout);
+    m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+
+    // Set up uniform offset information, if there is any uniform data in the field
+    if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+    {
+        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+    }
+
+    // Add offset information for any other resource kinds
+    for( auto fieldTypeResourceInfo : fieldTypeLayout->resourceInfos )
+    {
+        // Uniforms were dealt with above
+        if(fieldTypeResourceInfo.kind == LayoutResourceKind::Uniform)
+            continue;
+
+        // We should not have already processed this resource type
+        SLANG_RELEASE_ASSERT(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
+
+        // The field will need offset information for this kind
+        auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
+
+        // It is possible for a `struct` field to use an unbounded array
+        // type, and in the D3D case that would consume an unbounded number
+        // of registers. What is more, a single `struct` could have multiple
+        // such fields, or ordinary resource fields after an unbounded field.
+        //
+        // We handle this case by allocating a distinct register space for
+        // any field that consumes an unbounded amount of registers.
+        //
+        if( fieldTypeResourceInfo.count.isInfinite() )
+        {
+            // We need to add one register space to own the storage for this field.
+            //
+            auto structTypeSpaceResourceInfo = m_typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
+            auto spaceOffset = structTypeSpaceResourceInfo->count;
+            structTypeSpaceResourceInfo->count += 1;
+
+            // The field itself will record itself as having a zero offset into
+            // the chosen space.
+            //
+            fieldResourceInfo->space = spaceOffset.getFiniteValue();
+            fieldResourceInfo->index = 0;
+        }
+        else
+        {
+            // In the case where the field consumes a finite number of slots, we
+            // can simply set its offset/index to the number of such slots consumed
+            // so far, and then increment the number of slots consumed by the
+            // `struct` type itself.
+            //
+            auto structTypeResourceInfo = m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
+            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
+            structTypeResourceInfo->count += fieldTypeResourceInfo.count;
+        }
+    }
+
+    return fieldLayout;
+}
+
+RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
+    DeclRef<VarDeclBase>    field,
+    RefPtr<TypeLayout>      fieldTypeLayout)
+{
+    TypeLayoutResult fieldResult = makeTypeLayoutResult(fieldTypeLayout);
+    return addField(field, fieldResult);
+}
+
+void StructTypeLayoutBuilder::endLayout()
+{
+    if(!m_typeLayout) return;
+
+    m_rules->EndStructLayout(&m_info);
+
+    m_typeLayout->uniformAlignment = m_info.alignment;
+    m_typeLayout->addResourceUsage(LayoutResourceKind::Uniform, m_info.size);
+}
+
+RefPtr<StructTypeLayout> StructTypeLayoutBuilder::getTypeLayout()
+{
+    return m_typeLayout;
+}
+
+TypeLayoutResult StructTypeLayoutBuilder::getTypeLayoutResult()
+{
+    return TypeLayoutResult(m_typeLayout, m_info);
 }
 
 static TypeLayoutResult _createTypeLayout(
@@ -2365,20 +2700,11 @@ static TypeLayoutResult _createTypeLayout(
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
-            RefPtr<StructTypeLayout> typeLayout = new StructTypeLayout();
-            typeLayout->type = type;
-            typeLayout->rules = rules;
+            StructTypeLayoutBuilder typeLayoutBuilder;
+            StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            // The layout of a `struct` type is computed in the somewhat
-            // obvious fashion by keeping a running counter of the resource
-            // usage for each kind of resource, and then for a field that
-            // uses a given resource, assigning it the current offset and
-            // then bumping the offset by the field size. In the case of
-            // uniform data we also need to deal with alignment and other
-            // detailed layout rules.
-
-            UniformLayoutInfo info = rules->BeginStructLayout();
-
+            typeLayoutBuilder.beginLayout(type, rules);
+            auto typeLayout = typeLayoutBuilder.getTypeLayout();
             for (auto field : GetFields(structDeclRef))
             {
                 // Static fields shouldn't take part in layout.
@@ -2409,105 +2735,37 @@ static TypeLayoutResult _createTypeLayout(
                     fieldLayoutContext,
                     GetType(field).Ptr(),
                     field.getDecl());
-                RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
-                UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
+                auto fieldTypeLayout = fieldResult.layout;
 
-                // Note: we don't add any zero-size fields
-                // when computing structure layout, just
-                // to avoid having a resource type impact
-                // the final layout.
+                auto fieldVarLayout = typeLayoutBuilder.addField(field, fieldResult);
+
+                // If any of the fields of the `struct` type had existential/interface
+                // type, then we need to compute a second `StructTypeLayout` that
+                // represents the layout and resource using for the "pending data"
+                // that this type needs to have stored somewhere, but which can't
+                // be laid out in the layout of the type itself.
                 //
-                // This means that the code to generate final
-                // declarations needs to *also* eliminate zero-size
-                // fields to be safe...
-                LayoutSize uniformOffset = info.size;
-                if(fieldInfo.size != 0)
+                if(auto fieldPendingDataTypeLayout = fieldTypeLayout->pendingDataTypeLayout)
                 {
-                    uniformOffset = rules->AddStructField(&info, fieldInfo);
-                }
-
-                // We need to create variable layouts
-                // for each field of the structure.
-                RefPtr<VarLayout> fieldLayout = new VarLayout();
-                fieldLayout->varDecl = field;
-                fieldLayout->typeLayout = fieldTypeLayout;
-                typeLayout->fields.Add(fieldLayout);
-                typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
-
-                // Set up uniform offset information, if there is any uniform data in the field
-                if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
-                {
-                    fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
-                }
-
-                // Add offset information for any other resource kinds
-                for( auto fieldTypeResourceInfo : fieldTypeLayout->resourceInfos )
-                {
-                    // Uniforms were dealt with above
-                    if(fieldTypeResourceInfo.kind == LayoutResourceKind::Uniform)
-                        continue;
-
-                    // We should not have already processed this resource type
-                    SLANG_RELEASE_ASSERT(!fieldLayout->FindResourceInfo(fieldTypeResourceInfo.kind));
-
-                    // The field will need offset information for this kind
-                    auto fieldResourceInfo = fieldLayout->AddResourceInfo(fieldTypeResourceInfo.kind);
-
-                    // It is possible for a `struct` field to use an unbounded array
-                    // type, and in the D3D case that would consume an unbounded number
-                    // of registers. What is more, a single `struct` could have multiple
-                    // such fields, or ordinary resource fields after an unbounded field.
+                    // We only create this secondary layout on-demand, so that
+                    // we don't end up with a bunch of empty structure type layouts
+                    // created for no reason.
                     //
-                    // We handle this case by allocating a distinct register space for
-                    // any field that consumes an unbounded amount of registers.
-                    //
-                    if( fieldTypeResourceInfo.count.isInfinite() )
-                    {
-                        // We need to add one register space to own the storage for this field.
-                        //
-                        auto structTypeSpaceResourceInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace);
-                        auto spaceOffset = structTypeSpaceResourceInfo->count;
-                        structTypeSpaceResourceInfo->count += 1;
-
-                        // The field itself will record itself as having a zero offset into
-                        // the chosen space.
-                        //
-                        fieldResourceInfo->space = spaceOffset.getFiniteValue();
-                        fieldResourceInfo->index = 0;
-                    }
-                    else
-                    {
-                        // In the case where the field consumes a finite number of slots, we
-                        // can simply set its offset/index to the number of such slots consumed
-                        // so far, and then increment the number of slots consumed by the
-                        // `struct` type itself.
-                        //
-                        auto structTypeResourceInfo = typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-                        fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
-                        structTypeResourceInfo->count += fieldTypeResourceInfo.count;
-                    }
-                }
-
-                // Fields of a structure type may have existential/interface type,
-                // or nested existential/interface-type fields. When doing layout
-                // for a specialized program, these will show up as "pending" types
-                // that need to be laid out at the end of the surrounding block/container.
-                //
-                // Any pending types on fields of a structure become pending types
-                // on the structure itself.
-                //
-                for( auto pendingItem : fieldTypeLayout->pendingItems )
-                {
-                    typeLayout->pendingItems.Add(pendingItem);
+                    pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(type, rules);
+                    auto fieldPendingVarLayout = pendingDataTypeLayoutBuilder.addField(field, fieldPendingDataTypeLayout);
+                    fieldVarLayout->pendingVarLayout = fieldPendingVarLayout;
                 }
             }
 
-            rules->EndStructLayout(&info);
+            typeLayoutBuilder.endLayout();
+            pendingDataTypeLayoutBuilder.endLayout();
 
-            typeLayout->uniformAlignment = info.alignment;
-            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
+            if( auto pendingDataTypeLayout = pendingDataTypeLayoutBuilder.getTypeLayout() )
+            {
+                typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
+            }
 
-            return TypeLayoutResult(typeLayout, info);
+            return typeLayoutBuilder.getTypeLayoutResult();
         }
         else if (auto globalGenParam = declRef.as<GlobalGenericParamDecl>())
         {
@@ -2582,12 +2840,10 @@ static TypeLayoutResult _createTypeLayout(
                 // Layout for this specialized interface type then results
                 // in a type layout that tracks both the resource usage of the
                 // interface type itself (just the type + value slots introduced
-                // above), plus a "pending" type that represents the value
+                // above), plus a "pending data" type that represents the value
                 // conceptually pointed to by the interface-type field/variable at runtime.
                 //
-                TypeLayout::PendingItem pendingItem;
-                pendingItem.typeLayout = concreteTypeLayout;
-                typeLayout->pendingItems.Add(pendingItem);
+                typeLayout->pendingDataTypeLayout = concreteTypeLayout;
             }
 
             return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
@@ -2853,6 +3109,13 @@ RefPtr<TypeLayout> createTypeLayout(
 {
     return _createTypeLayout(context, type).layout;
 }
+
+void TypeLayout::addResourceUsageFrom(TypeLayout* otherTypeLayout)
+{
+    for(auto resInfo : otherTypeLayout->resourceInfos)
+        addResourceUsage(resInfo);
+}
+
 
 RefPtr<TypeLayout> TypeLayout::unwrapArray()
 {
