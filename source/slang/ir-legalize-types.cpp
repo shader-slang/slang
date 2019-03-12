@@ -816,6 +816,60 @@ static LegalVal legalizeGetElement(
         indexOperand);
 }
 
+static IRType* getPointedToType(
+    IRTypeLegalizationContext*  context,
+    IRType*                     ptrType)
+{
+    auto valueType = tryGetPointedToType(context->builder, ptrType);
+    if( !valueType )
+    {
+        SLANG_UNEXPECTED("expected a pointer type during type legalization");
+    }
+    return valueType;
+}
+
+static LegalType getPointedToType(
+    IRTypeLegalizationContext*  context,
+    LegalType                   type)
+{
+    switch( type.flavor )
+    {
+    case LegalType::Flavor::none:
+        return LegalType();
+
+    case LegalType::Flavor::simple:
+        return LegalType::simple(getPointedToType(context, type.getSimple()));
+
+    case LegalType::Flavor::implicitDeref:
+        return type.getImplicitDeref()->valueType;
+
+    case LegalType::Flavor::pair:
+        {
+            auto pairType = type.getPair();
+            auto ordinary = getPointedToType(context, pairType->ordinaryType);
+            auto special = getPointedToType(context, pairType->specialType);
+            return LegalType::pair(ordinary, special, pairType->pairInfo);
+        }
+
+    case LegalType::Flavor::tuple:
+        {
+            auto tupleType = type.getTuple();
+            RefPtr<TuplePseudoType> resultTuple = new TuplePseudoType();
+            for( auto ee : tupleType->elements )
+            {
+                TuplePseudoType::Element resultElement;
+                resultElement.key = ee.key;
+                resultElement.type = getPointedToType(context, ee.type);
+            }
+            return LegalType::tuple(resultTuple);
+        }
+
+    default:
+        SLANG_UNEXPECTED("unhandled case in type legalization");
+        UNREACHABLE_RETURN(LegalType());
+    }
+}
+
 
 static LegalVal legalizeGetElementPtr(
     IRTypeLegalizationContext*  context,
@@ -914,10 +968,15 @@ static LegalVal legalizeGetElementPtr(
             // instead (and then wrap the element value with an
             // implicit dereference).
             //
+            // The result type for our `getElement` instruction needs
+            // to be the type *pointed to* by `type`, and not `type.
+            //
+            auto valueType = getPointedToType(context, type);
+
             auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
             return LegalVal::implicitDeref(legalizeGetElement(
                 context,
-                type,
+                valueType,
                 implicitDerefVal,
                 indexOperand));
         }
