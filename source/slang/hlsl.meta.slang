@@ -1036,10 +1036,12 @@ __generic<let N : int> float noise(vector<float, N> x);
 /// is more semantically "correct."
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
+[__readNone]
 uint NonUniformResourceIndex(uint index);
 
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
+[__readNone]
 int NonUniformResourceIndex(int index);
 
 // Normalize a vector
