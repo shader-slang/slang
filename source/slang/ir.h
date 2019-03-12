@@ -25,6 +25,7 @@ class   Layout;
 class   Type;
 class   Session;
 class   Name;
+struct  IRBuilder;
 struct  IRFunc;
 struct  IRGlobalValueWithCode;
 struct  IRInst;
@@ -933,6 +934,13 @@ SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+    /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
+    ///
+    /// The given IR `builder` will be used if new instructions need to be created.
+IRType* tryGetPointedToType(
+        IRBuilder*  builder,
+        IRType*     type);
 
 struct IRFuncType : IRType
 {

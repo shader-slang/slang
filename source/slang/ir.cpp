@@ -236,6 +236,60 @@ namespace Slang
         return nullptr;
     }
 
+    // IRPtrTypeBase
+
+    IRType* tryGetPointedToType(
+        IRBuilder*  builder,
+        IRType*     type)
+    {
+        if( auto rateQualType = as<IRRateQualifiedType>(type) )
+        {
+            type = rateQualType->getDataType();
+        }
+
+        // The "true" pointers and the pointer-like stdlib types are the easy cases.
+        if( auto ptrType = as<IRPtrTypeBase>(type) )
+        {
+            return ptrType->getValueType();
+        }
+        else if( auto ptrLikeType = as<IRPointerLikeType>(type) )
+        {
+            return ptrLikeType->getElementType();
+        }
+        //
+        // A more interesting case arises when we have a `BindExistentials<P<T>, ...>`
+        // where `P<T>` is a pointer(-like) type.
+        //
+        else if( auto bindExistentials = as<IRBindExistentialsType>(type) )
+        {
+            // We know that `BindExistentials` won't introduce its own
+            // existential type parameters, nor will any of the pointer(-like)
+            // type constructors `P`.
+            //
+            // Thus we know that the type that is pointed to should be
+            // the same as `BindExistentials<T, ...>`.
+            //
+            auto baseType = bindExistentials->getBaseType();
+            if( auto baseElementType = tryGetPointedToType(builder, baseType) )
+            {
+                UInt existentialArgCount = bindExistentials->getExistentialArgCount();
+                List<IRInst*> existentialArgs;
+                for( UInt ii = 0; ii < existentialArgCount; ++ii )
+                {
+                    existentialArgs.Add(bindExistentials->getExistentialArg(ii));
+                }
+                return builder->getBindExistentialsType(
+                    baseElementType,
+                    existentialArgCount,
+                    existentialArgs.Buffer());
+            }
+        }
+
+        // TODO: We may need to handle other cases here.
+
+        return nullptr;
+    }
+
 
     // IRBlock
 
@@ -2395,21 +2449,8 @@ namespace Slang
         // results) at the "default" rate of the parent function,
         // unless a subsequent analysis pass constraints it.
 
-        IRType* valueType = nullptr;
-        if(auto ptrType = as<IRPtrTypeBase>(ptr->getDataType()))
-        {
-            valueType = ptrType->getValueType();
-        }
-        else if(auto ptrLikeType = as<IRPointerLikeType>(ptr->getDataType()))
-        {
-            valueType = ptrLikeType->getElementType();
-        }
-        else
-        {
-            // Bad!
-            SLANG_ASSERT(ptrType);
-            return nullptr;
-        }
+        IRType* valueType = tryGetPointedToType(this, ptr->getFullType());
+        SLANG_ASSERT(valueType);
 
         // Ugly special case: if the front-end created a variable with
         // type `Ptr<@R T>` instead of `@R Ptr<T>`, then the above
