@@ -89,6 +89,15 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
             gOptions.outputPath = *argCursor++;
         }
+        else if (strcmp(arg, "-profile") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("expected argument for '%s' option\n", arg);
+                return SLANG_FAIL;
+            }
+            gOptions.profileName = *argCursor++;
+        }
         else if( strcmp(arg, "-xslang") == 0 )
         {
             // This is an option that we want to pass along to Slang
