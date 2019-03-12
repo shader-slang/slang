@@ -17,10 +17,12 @@ in vec3 _S2;
 
 void main()
 {
-    int _S3 = nonuniformEXT(int(_S2.z));
+    vec4 _S3 = texture(
+    	sampler2D(
+    		t_0[nonuniformEXT(int(_S2.z))],
+    		s_0),
+		_S2.xy);
 
-    vec4 _S4 = texture(sampler2D(t_0[_S3],s_0), _S2.xy);
-
-    _S1 = _S4;
+    _S1 = _S3;
     return;
 }

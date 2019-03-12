@@ -1153,54 +1153,6 @@ struct SpecializationContext
         }
     }
 
-        /// Given a type being used as pointer, try to determine the type it points to.
-    IRType* tryGetPointedToType(
-        IRBuilder*  builder,
-        IRType*     type)
-    {
-        // The "true" pointers and the pointer-like stdlib types are the easy cases.
-        if( auto ptrType = as<IRPtrTypeBase>(type) )
-        {
-            return ptrType->getValueType();
-        }
-        else if( auto ptrLikeType = as<IRPointerLikeType>(type) )
-        {
-            return ptrLikeType->getElementType();
-        }
-        //
-        // A more interesting case arises when we have a `BindExistentials<P<T>, ...>`
-        // where `P<T>` is a pointer(-like) type.
-        //
-        else if( auto bindExistentials = as<IRBindExistentialsType>(type) )
-        {
-            // We know that `BindExistentials` won't introduce its own
-            // existential type parameters, nor will any of the pointer(-like)
-            // type constructors `P`.
-            //
-            // Thus we know that the type that is pointed to should be
-            // the same as `BindExistentials<T, ...>`.
-            //
-            auto baseType = bindExistentials->getBaseType();
-            if( auto baseElementType = tryGetPointedToType(builder, baseType) )
-            {
-                UInt existentialArgCount = bindExistentials->getExistentialArgCount();
-                List<IRInst*> existentialArgs;
-                for( UInt ii = 0; ii < existentialArgCount; ++ii )
-                {
-                    existentialArgs.Add(bindExistentials->getExistentialArg(ii));
-                }
-                return builder->getBindExistentialsType(
-                    baseElementType,
-                    existentialArgCount,
-                    existentialArgs.Buffer());
-            }
-        }
-
-        // TODO: We may need to handle other cases here.
-
-        return nullptr;
-    }
-
     void maybeSpecializeLoad(IRLoad* inst)
     {
         auto ptrArg = inst->ptr.get();

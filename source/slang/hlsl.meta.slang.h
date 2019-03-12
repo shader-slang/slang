@@ -1112,10 +1112,12 @@ SLANG_RAW("/// the user's responsibility, so that the default behavior of the la
 SLANG_RAW("/// is more semantically \"correct.\"\n")
 SLANG_RAW("__target_intrinsic(glsl, nonuniformEXT)\n")
 SLANG_RAW("__glsl_extension(GL_EXT_nonuniform_qualifier)\n")
+SLANG_RAW("[__readNone]\n")
 SLANG_RAW("uint NonUniformResourceIndex(uint index);\n")
 SLANG_RAW("\n")
 SLANG_RAW("__target_intrinsic(glsl, nonuniformEXT)\n")
 SLANG_RAW("__glsl_extension(GL_EXT_nonuniform_qualifier)\n")
+SLANG_RAW("[__readNone]\n")
 SLANG_RAW("int NonUniformResourceIndex(int index);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Normalize a vector\n")
@@ -1529,7 +1531,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1456 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1458 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
