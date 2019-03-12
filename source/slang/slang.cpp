@@ -1831,6 +1831,30 @@ SLANG_API void spSetTargetMatrixLayoutMode(
     spSetMatrixLayoutMode(request, mode);
 }
 
+/*!
+@brief Set the level of debug information to produce.
+*/
+SLANG_API void spSetDebugInfoLevel(
+    SlangCompileRequest*    request,
+    SlangDebugInfoLevel     level)
+{
+    auto req = convert(request);
+    auto linkage = req->getLinkage();
+    linkage->debugInfoLevel = Slang::DebugInfoLevel(level);
+}
+
+/*!
+@brief Set the level of optimization to perform.
+*/
+SLANG_API void spSetOptimizationLevel(
+    SlangCompileRequest*    request,
+    SlangOptimizationLevel  level)
+{
+    auto req = convert(request);
+    auto linkage = req->getLinkage();
+    linkage->optimizationLevel = Slang::OptimizationLevel(level);
+}
+
 
 SLANG_API void spSetOutputContainerFormat(
     SlangCompileRequest*    request,

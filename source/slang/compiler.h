@@ -89,6 +89,22 @@ namespace Slang
         kMatrixLayoutMode_ColumnMajor   = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
+    enum class DebugInfoLevel : SlangDebugInfoLevel
+    {
+        None        = SLANG_DEBUG_INFO_LEVEL_NONE,
+        Minimal     = SLANG_DEBUG_INFO_LEVEL_MINIMAL,
+        Standard    = SLANG_DEBUG_INFO_LEVEL_STANDARD,
+        Maximal     = SLANG_DEBUG_INFO_LEVEL_MAXIMAL,
+    };
+
+    enum class OptimizationLevel : SlangOptimizationLevel
+    {
+        None    = SLANG_OPTIMIZATION_LEVEL_NONE,
+        Default = SLANG_OPTIMIZATION_LEVEL_DEFAULT,
+        High    = SLANG_OPTIMIZATION_LEVEL_HIGH,
+        Maximal = SLANG_OPTIMIZATION_LEVEL_MAXIMAL,
+    };
+
     class Linkage;
     class Module;
     class Program;
@@ -696,6 +712,10 @@ namespace Slang
         /// The layout to use for matrices by default (row/column major)
         MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
         MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
+
+        DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
+
+        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
     private:
         Session* m_session = nullptr;
