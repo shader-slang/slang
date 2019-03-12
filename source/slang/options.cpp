@@ -727,6 +727,51 @@ struct OptionsParser
 
                     setFloatingPointMode(getCurrentTarget(), mode);
                 }
+                else if( argStr[1] == 'O' )
+                {
+                    char const* name = arg + 2;
+                    SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+
+                    bool invalidOptimizationLevel = strlen(name) > 2;
+                    switch( name[0] )
+                    {
+                    case '0':   level = SLANG_OPTIMIZATION_LEVEL_NONE;      break;
+                    case '1':   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
+                    case '2':   level = SLANG_OPTIMIZATION_LEVEL_HIGH;      break;
+                    case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
+                    case  0 :   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
+                    default:
+                        invalidOptimizationLevel = true;
+                        break;
+                    }
+                    if( invalidOptimizationLevel )
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownOptimiziationLevel, name);
+                        return SLANG_FAIL;
+                    }
+
+                    spSetOptimizationLevel(compileRequest, level);
+                }
+
+                // Note: unlike with `-O` above, we have to consider that other
+                // options might have names that start with `-g` and so cannot
+                // just detect it as a prefix.
+                else if( argStr == "-g" || argStr == "-g2" )
+                {
+                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_STANDARD);
+                }
+                else if( argStr == "-g0" )
+                {
+                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_NONE);
+                }
+                else if( argStr == "-g1" )
+                {
+                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MINIMAL);
+                }
+                else if( argStr == "-g3" )
+                {
+                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
