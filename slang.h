@@ -1535,6 +1535,7 @@ extern "C"
         SLANG_STRUCTURED_BUFFER             = 0x06,
         SLANG_BYTE_ADDRESS_BUFFER           = 0x07,
         SLANG_RESOURCE_UNKNOWN              = 0x08,
+        SLANG_ACCELERATION_STRUCTURE        = 0x09,
 
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
         SLANG_TEXTURE_ARRAY_FLAG            = 0x40,
