@@ -203,6 +203,16 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
+
+    // Get size and alignment for a single value of base type.
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        // TODO (JS): On GLSL we do not support half currently. 
+        // To work around half is interpreted as Float
+        baseType = (baseType == BaseType::Half) ? BaseType::Float : baseType;
+        return Super::GetScalarLayout(baseType);
+    }
+
     SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
         // The `std140` and `std430` rules require vectors to be aligned to the next power of

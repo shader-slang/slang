@@ -12,7 +12,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint tid = dispatchThreadID.x;
     
     half v = tid;
-    v *= half(1.0f / 3.0f);
+    v *= half(3.0f);
     v += half(1.0f);
     
     outputBuffer[tid] = v;
