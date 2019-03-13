@@ -604,6 +604,7 @@ static LegalType getPointedToType(
                 TuplePseudoType::Element resultElement;
                 resultElement.key = ee.key;
                 resultElement.type = getPointedToType(context, ee.type);
+                resultTuple->elements.Add(resultElement);
             }
             return LegalType::tuple(resultTuple);
         }
