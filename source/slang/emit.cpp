@@ -3621,10 +3621,8 @@ struct EmitVisitor
         }
     }
 
-    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& inOutOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
-    {
-        *needCloseOut = maybeEmitParens(inOutOuterPrec, opPrec);
-
+    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    {        
         if (getTarget(ctx) == CodeGenTarget::GLSL)
         {
             IRInst* left = inst->getOperand(0);
@@ -3641,22 +3639,29 @@ struct EmitVisitor
 
                 // Determine the vector type
                 const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
-                
+
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
+
                 emit(funcName);
                 emit("(");
                 _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
                 emit(",");
                 _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
                 emit(")");
+
                 return;
             }
         }
 
-        emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
+        *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
+
+        emitIROperand(ctx, inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
         emit(" ");
         emit(opPrec.op);
         emit(" ");
-        emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+        emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
     }
 
     void emitIRInstExpr(
