@@ -789,6 +789,25 @@ struct EmitVisitor
         }
     }
 
+    bool _useFloatForHalf() const
+    {
+        switch (context->shared->target)
+        {
+            case CodeGenTarget::GLSL:
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                // TODO: We currently don't support half on glsl based targets,
+                // but to make code compile we interpret half as float 
+                return false;
+            }
+            default:
+            {
+                return true;
+            }
+        }
+    }
+
     void emitGLSLTypePrefix(
         IRType* type)
     {
@@ -810,7 +829,18 @@ struct EmitVisitor
 
         case kIROp_BoolType:    Emit("b");		break;
 
-        case kIROp_HalfType:    Emit("f16");		break;
+        case kIROp_HalfType:
+        {
+            if (_useFloatForHalf())
+            {
+                // We are using float, which has no prefix
+            }
+            else
+            {
+                Emit("f16");
+            }
+            break;
+        }
         case kIROp_DoubleType:  Emit("d");		break;
 
         case kIROp_VectorType:
@@ -1217,7 +1247,19 @@ struct EmitVisitor
         case kIROp_UIntType:    Emit("uint");       return;
         case kIROp_UInt64Type:  Emit("uint64_t");   return;
 
-        case kIROp_HalfType:    Emit("half");       return;
+        case kIROp_HalfType:
+        {
+            if (!_useFloatForHalf())
+            {
+                Emit("float");
+            }
+            else
+            {
+                Emit("half");
+            }
+            return;
+        }
+
         case kIROp_FloatType:   Emit("float");      return;
         case kIROp_DoubleType:  Emit("double");     return;
 
@@ -5623,7 +5665,18 @@ struct EmitVisitor
                             {
                             default:
                             case BaseType::Float:   Emit("32f");  break;
-                            case BaseType::Half:    Emit("16f");  break;
+                            case BaseType::Half:
+                            {
+                                if (_useFloatForHalf())
+                                {
+                                    Emit("32f");
+                                }
+                                else
+                                {
+                                    Emit("16f");   
+                                }
+                                break;
+                            }
                             case BaseType::UInt:    Emit("32ui"); break;
                             case BaseType::Int:     Emit("32i"); break;
 
