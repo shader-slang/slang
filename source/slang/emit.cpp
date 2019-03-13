@@ -3601,18 +3601,23 @@ struct EmitVisitor
         }
     }
 
-    void _maybeEmitGLSLVectorCast(EmitContext* ctx, IRType* vecType, IRInst* inst, IREmitMode mode, const EOpInfo& opPrec)
+    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
     {
-        if (as<IRVectorType>(inst->getDataType()) == nullptr)
+        // Wrap in cast if a cast type is specified
+        if (castType)
         {
-            emitIRType(ctx, vecType);
+            emitIRType(ctx, castType);
             emit("(");
+
+            // Emit the operand
             emitIROperand(ctx, inst, mode, kEOp_General);
+
             emit(")");
         }
         else
         {
-            emitIROperand(ctx, inst, mode, opPrec);
+            // Emit the operand
+            emitIROperand(ctx, inst, mode, kEOp_General);
         }
     }
 
@@ -3634,13 +3639,14 @@ struct EmitVisitor
                 const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
                 SLANG_ASSERT(funcName);
 
+                // Determine the vector type
                 const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
                 
                 emit(funcName);
                 emit("(");
-                _maybeEmitGLSLVectorCast(ctx, vecType, left, mode, leftSide(inOutOuterPrec, opPrec));
+                _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
                 emit(",");
-                _maybeEmitGLSLVectorCast(ctx, vecType, right, mode, rightSide(inOutOuterPrec, opPrec));
+                _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
                 emit(")");
                 return;
             }
