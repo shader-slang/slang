@@ -5612,9 +5612,20 @@ struct EmitVisitor
                             {
                             default: Emit("rgba");  break;
 
-                            // TODO: GLSL doesn't actually seem to support 3-component formats
-                            // universally, so this might cause problems.
-                            case 3:  Emit("rgb");   break;
+                            case 3:
+                            {
+                                // TODO: GLSL doesn't actually seem to support 3-component formats
+                                // universally so for now we are going to default to rgba
+                                //
+                                // It seems that SPIR-V can support such formats, so with direct SPIR-V
+                                // path, and/or with support glslang could support in the future.
+                                //
+                                // Should this emit a warning? That it requires something different bound
+                                // than specified in source, and that could be pretty confusing.
+                                Emit("rgba");
+                                //Emit("rgb");                                
+                                break;
+                            }
 
                             case 2:  Emit("rg");    break;
                             case 1:  Emit("r");     break;
