@@ -535,7 +535,25 @@ extern "C"
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
-    
+    typedef SlangUInt32 SlangDebugInfoLevel;
+    enum
+    {
+        SLANG_DEBUG_INFO_LEVEL_NONE = 0,    /**< Don't emit debug information at all. */
+        SLANG_DEBUG_INFO_LEVEL_MINIMAL,     /**< Emit as little debug information as possible, while still supporting stack trackes. */
+        SLANG_DEBUG_INFO_LEVEL_STANDARD,    /**< Emit whatever is the standard level of debug information for each target. */
+        SLANG_DEBUG_INFO_LEVEL_MAXIMAL,     /**< Emit as much debug infromation as possible for each target. */
+        
+    };
+
+    typedef SlangUInt32 SlangOptimizationLevel;
+    enum
+    {
+        SLANG_OPTIMIZATION_LEVEL_NONE = 0,  /**< Don't optimize at all. */
+        SLANG_OPTIMIZATION_LEVEL_DEFAULT,   /**< Default optimization level: balance code quality and compilation time. */
+        SLANG_OPTIMIZATION_LEVEL_HIGH,      /**< Optimize aggressively. */
+        SLANG_OPTIMIZATION_LEVEL_MAXIMAL,   /**< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs */
+    };
+
     /** A result code for a Slang API operation.
 
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
@@ -1101,6 +1119,20 @@ extern "C"
     SLANG_API void spSetMatrixLayoutMode(
         SlangCompileRequest*    request,
         SlangMatrixLayoutMode   mode);
+
+    /*!
+    @brief Set the level of debug information to produce.
+    */
+    SLANG_API void spSetDebugInfoLevel(
+        SlangCompileRequest*    request,
+        SlangDebugInfoLevel     level);
+
+    /*!
+    @brief Set the level of optimization to perform.
+    */
+    SLANG_API void spSetOptimizationLevel(
+        SlangCompileRequest*    request,
+        SlangOptimizationLevel  level);
 
     /*!
     @brief Set the container format to be used for binary output.

@@ -74,6 +74,8 @@ DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for c
 
 DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'");
 DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'");
+DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'");
+DIAGNOSTIC(    27, Error, uknownDebugInfoLevel, "unknown debug info level '$0'");
 
 DIAGNOSTIC(    30, Warning, sameStageSpecifiedMoreThanOnce, "the stage '$0' was specified more than once for entry point '$1'")
 DIAGNOSTIC(    31, Error, conflictingStagesForEntryPoint, "conflicting stages have been specified for entry point '$0'")
