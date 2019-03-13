@@ -48,6 +48,9 @@ struct Options
     RendererType rendererType = RendererType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
 
+        /// Can be used for overriding the profile
+    const char* profileName = nullptr;
+
     char const* slangArgs[kMaxSlangArgs];
     int slangArgCount = 0;
 
