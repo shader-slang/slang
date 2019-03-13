@@ -5612,9 +5612,29 @@ struct EmitVisitor
                             {
                             default: Emit("rgba");  break;
 
-                            // TODO: GLSL doesn't actually seem to support 3-component formats
-                            // universally, so this might cause problems.
-                            case 3:  Emit("rgb");   break;
+                            case 3:
+                            {
+                                // TODO: GLSL doesn't support 3-component formats so for now we are going to
+                                // default to rgba
+                                //
+                                // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
+                                // section 3.11 on Image Formats it does not list rgbf32.
+                                //
+                                // It seems SPIR-V can support having an image with an unknown-at-compile-time
+                                // format, so long as the underlying API supports it. Ideally this would mean that we can
+                                // just drop all these qualifiers when emitting GLSL for Vulkan targets.
+                                //
+                                // This raises the question of what to do more long term. For Vulkan hopefully we can just
+                                // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
+                                // for inferring the format (and just document that 3-component formats map to 4-component formats,
+                                // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
+                                // and add an attribute for specifying the format manually if you really want to override our
+                                // inference (e.g., to specify r11fg11fb10f).
+
+                                Emit("rgba");
+                                //Emit("rgb");                                
+                                break;
+                            }
 
                             case 2:  Emit("rg");    break;
                             case 1:  Emit("r");     break;
