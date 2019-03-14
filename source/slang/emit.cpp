@@ -3621,6 +3621,33 @@ struct EmitVisitor
         }
     }
 
+    void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+    {
+        IRInst* operand = inst->getOperand(0);
+
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            {
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+                emit("not(");
+                emitIROperand(ctx, operand, mode, kEOp_General);
+                emit(")");
+                return;
+            }
+        }
+
+        auto prec = kEOp_Prefix;
+        *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+        emit("!");
+        emitIROperand(ctx, operand, mode, rightSide(prec, ioOuterPrec));
+    }
+
+
     void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
     {        
         if (getTarget(ctx) == CodeGenTarget::GLSL)
@@ -3839,11 +3866,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                auto prec = kEOp_Prefix;
-                needClose = maybeEmitParens(outerPrec, prec);
-
-                emit("!");
-                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+                emitNot(ctx, inst,  mode, outerPrec, &needClose);
             }
             break;
 
