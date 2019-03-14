@@ -47,6 +47,8 @@ struct ExtensionUsageTracker
     StringBuilder glslExtensionRequireLines;
 
     ProfileVersion profileVersion = ProfileVersion::GLSL_110;
+
+    bool hasHalfExtension = false;
 };
 
 void requireGLSLExtension(
@@ -73,6 +75,23 @@ void requireGLSLVersionImpl(
     if ((UInt)version > (UInt)tracker->profileVersion)
     {
         tracker->profileVersion = version;
+    }
+}
+
+void requireGLSLHalfExtension(ExtensionUsageTracker* tracker)
+{
+    if (!tracker->hasHalfExtension)
+    {
+        // https://www.khronos.org/registry/spir-v/extensions/AMD/SPV_AMD_gpu_shader_half_float.html
+        requireGLSLExtension(tracker, "GL_AMD_gpu_shader_half_float");
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
+        requireGLSLExtension(tracker, "GL_EXT_shader_16bit_storage");
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
+        requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types");
+
+        requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types_float16");
+
+        tracker->hasHalfExtension = true;
     }
 }
 
@@ -810,7 +829,12 @@ struct EmitVisitor
 
         case kIROp_BoolType:    Emit("b");		break;
 
-        case kIROp_HalfType:    Emit("f16");		break;
+        case kIROp_HalfType:
+        {
+            _requireHalf();
+            Emit("f16");
+            break;
+        }
         case kIROp_DoubleType:  Emit("d");		break;
 
         case kIROp_VectorType:
@@ -1197,6 +1221,14 @@ struct EmitVisitor
         }
     }
 
+    void _requireHalf()
+    {
+        if (getTarget(context) == CodeGenTarget::GLSL)
+        {
+            requireGLSLHalfExtension(&context->shared->extensionUsageTracker);
+        }
+    }
+
     void emitSimpleTypeImpl(IRType* type)
     {
         switch (type->op)
@@ -1217,7 +1249,19 @@ struct EmitVisitor
         case kIROp_UIntType:    Emit("uint");       return;
         case kIROp_UInt64Type:  Emit("uint64_t");   return;
 
-        case kIROp_HalfType:    Emit("half");       return;
+        case kIROp_HalfType:
+        {
+            _requireHalf();
+            if (getTarget(context) == CodeGenTarget::GLSL)
+            {
+                Emit("float16_t");
+            }
+            else
+            {
+                Emit("half");
+            }
+            return;
+        }
         case kIROp_FloatType:   Emit("float");      return;
         case kIROp_DoubleType:  Emit("double");     return;
 

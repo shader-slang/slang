@@ -961,6 +961,8 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     char const* const deviceExtensions[] =
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        //"VK_KHR_get_physical_device_properties2",
+        "VK_KHR_shader_float16_int8",
     };
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
