@@ -64,5 +64,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         r |= 0x0100;
     }
     
+    // TODO(JS): Support on GLSL targets
+    // This doesn't currently work on GLSL targets, and because there 
+    // do not appear to be any vector bitwise operations. Could be achieved
+    // by deconstructing, and reconstructing the vec result
+    /* if (all(f2 || bv2))
+    {
+        r |= 0x0200;
+    } */
+    
     outputBuffer[tid] = r;
 }
