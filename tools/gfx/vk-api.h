@@ -26,8 +26,7 @@ namespace gfx {
     x(vkGetPhysicalDeviceMemoryProperties) \
     x(vkGetPhysicalDeviceQueueFamilyProperties) \
     x(vkGetPhysicalDeviceFormatProperties) \
-    x(vkGetDeviceProcAddr) \
-    VK_API_INSTANCE_PROCS_OPT(x) \
+    x(vkGetDeviceProcAddr) 
     /* */
 
 #define VK_API_DEVICE_PROCS(x) \
@@ -152,6 +151,8 @@ namespace gfx {
     VK_API_ALL_GLOBAL_PROCS(x) \
     VK_API_ALL_INSTANCE_PROCS(x) \
     VK_API_ALL_DEVICE_PROCS(x) \
+    \
+    VK_API_INSTANCE_PROCS_OPT(x)   
     /* */
 
 #define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;

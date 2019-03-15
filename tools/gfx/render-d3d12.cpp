@@ -55,6 +55,7 @@ class D3D12Renderer : public Renderer
 public:
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual const List<String>& getFeatures() override { return m_features; }
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -571,6 +572,8 @@ protected:
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
     HWND m_hwnd = nullptr;
+
+    List<String> m_features;
 };
 
 Renderer* createD3D12Renderer()
@@ -1396,6 +1399,9 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         return SLANG_FAIL;
     }
+
+    // For now we assume all dx12 devices can do half
+    m_features.Add("half");
 
     FlagCombiner combiner;
     // TODO: we should probably provide a command-line option

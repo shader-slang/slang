@@ -81,6 +81,7 @@ public:
 
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual const List<String>& getFeatures() override { return m_features; }
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -353,6 +354,8 @@ public:
     UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
 
     Desc m_desc;
+
+    List<String> m_features;
 
     // Declare a function pointer for each OpenGL
     // extension function we need to load

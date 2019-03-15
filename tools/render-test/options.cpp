@@ -9,7 +9,11 @@
 #include "../../source/core/slang-writer.h"
 #include "../../source/core/slang-render-api-util.h"
 
+#include "../../source/core/list.h"
+#include "../../source/core/slang-string-util.h"
+
 namespace renderer_test {
+using namespace Slang;
 
 static const Options gDefaultOptions;
 
@@ -97,6 +101,23 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
                 return SLANG_FAIL;
             }
             gOptions.profileName = *argCursor++;
+        }
+        else if (strcmp(arg, "-render-features") == 0 || strcmp(arg, "-render-feature") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("expected argument for '%s' option\n", arg);
+                return SLANG_FAIL;
+            }
+            const char* value = *argCursor++;
+
+            List<UnownedStringSlice> values;
+            StringUtil::split(UnownedStringSlice(*argCursor++), ',', values);
+
+            for (const auto& value : values)
+            {
+                gOptions.renderFeatures.Add(value);
+            }
         }
         else if( strcmp(arg, "-xslang") == 0 )
         {

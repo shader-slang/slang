@@ -54,6 +54,7 @@ public:
 
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual const List<String>& getFeatures() override { return m_features; }
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -329,6 +330,8 @@ public:
     Desc m_desc;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
+
+    List<String> m_features;
 };
 
 Renderer* createD3D11Renderer()
