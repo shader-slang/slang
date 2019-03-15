@@ -83,14 +83,14 @@ void requireGLSLHalfExtension(ExtensionUsageTracker* tracker)
     if (!tracker->hasHalfExtension)
     {
         // https://www.khronos.org/registry/spir-v/extensions/AMD/SPV_AMD_gpu_shader_half_float.html
-        requireGLSLExtension(tracker, "GL_AMD_gpu_shader_half_float");
+        //requireGLSLExtension(tracker, "GL_AMD_gpu_shader_half_float");
+        //requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types_float16");
+
         // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
         requireGLSLExtension(tracker, "GL_EXT_shader_16bit_storage");
         // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
         requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types");
-
-        requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types_float16");
-
+        
         tracker->hasHalfExtension = true;
     }
 }
