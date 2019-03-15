@@ -1121,22 +1121,25 @@ for (auto op : unaryOps)
         if ((type.flags & op.flags) == 0)
             continue;
 
+        char const* resultType = type.name;
+        if (op.flags & BOOL_RESULT) resultType = "bool";
+
         char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
         char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
 
         // scalar version
         sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << type.name << " operator" << op.opName << "(" << qual << type.name << " value);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << qual << type.name << " value);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
         sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << type.name << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
 
         // matrix version
         sb << "__generic<let N : int, let M : int> ";
         sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << type.name << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
     }
 }
 
@@ -1151,7 +1154,7 @@ for (auto op : binaryOps)
         char const* rightType = leftType;
         char const* resultType = leftType;
 
-        if (op.flags & COMPARISON) resultType = "bool";
+        if (op.flags & BOOL_RESULT) resultType = "bool";
 
         char const* leftQual = "";
         if(op.flags & ASSIGNMENT) leftQual = "in out ";
@@ -1202,7 +1205,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1187 \"core.meta.slang\"")
+SLANG_RAW("#line 1190 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Operators to apply to `enum` types\n")

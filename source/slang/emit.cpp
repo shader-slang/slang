@@ -1513,6 +1513,7 @@ struct EmitVisitor
     EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec)
     {
         EOpInfo result;
+        result.op = nullptr;
         result.leftPrecedence = outerPrec.leftPrecedence;
         result.rightPrecedence = prec.leftPrecedence;
         return result;
@@ -1521,6 +1522,7 @@ struct EmitVisitor
     EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec)
     {
         EOpInfo result;
+        result.op = nullptr;
         result.leftPrecedence = prec.rightPrecedence;
         result.rightPrecedence = outerPrec.rightPrecedence;
         return result;
@@ -3643,32 +3645,94 @@ struct EmitVisitor
         }
     }
 
-    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& inOutOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
     {
-        *needCloseOut = maybeEmitParens(inOutOuterPrec, opPrec);
-
-        if (getTarget(ctx) == CodeGenTarget::GLSL
-            && as<IRVectorType>(inst->getOperand(0)->getDataType())
-            && as<IRVectorType>(inst->getOperand(1)->getDataType()))
+        // Wrap in cast if a cast type is specified
+        if (castType)
         {
-            const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
-            SLANG_ASSERT(funcName);
-
-            emit(funcName);
+            emitIRType(ctx, castType);
             emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
-            emit(",");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+
+            // Emit the operand
+            emitIROperand(ctx, inst, mode, kEOp_General);
+
             emit(")");
         }
         else
         {
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
-            emit(" ");
-            emit(opPrec.op);
-            emit(" ");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+            // Emit the operand
+            emitIROperand(ctx, inst, mode, kEOp_General);
         }
+    }
+
+    void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+    {
+        IRInst* operand = inst->getOperand(0);
+
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            {
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+                emit("not(");
+                emitIROperand(ctx, operand, mode, kEOp_General);
+                emit(")");
+                return;
+            }
+        }
+
+        auto prec = kEOp_Prefix;
+        *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+        emit("!");
+        emitIROperand(ctx, operand, mode, rightSide(prec, ioOuterPrec));
+    }
+
+
+    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    {        
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            IRInst* left = inst->getOperand(0);
+            IRInst* right = inst->getOperand(1);
+
+            auto leftVectorType = as<IRVectorType>(left->getDataType());
+            auto rightVectorType = as<IRVectorType>(right->getDataType());
+
+            // If either side is a vector handle as a vector
+            if (leftVectorType || rightVectorType)
+            {
+                const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
+                SLANG_ASSERT(funcName);
+
+                // Determine the vector type
+                const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
+
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
+
+                emit(funcName);
+                emit("(");
+                _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
+                emit(",");
+                _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
+                emit(")");
+
+                return;
+            }
+        }
+
+        *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
+
+        emitIROperand(ctx, inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
+        emit(" ");
+        emit(opPrec.op);
+        emit(" ");
+        emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
     }
 
     void emitIRInstExpr(
@@ -3846,11 +3910,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                auto prec = kEOp_Prefix;
-                needClose = maybeEmitParens(outerPrec, prec);
-
-                emit("!");
-                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+                emitNot(ctx, inst,  mode, outerPrec, &needClose);
             }
             break;
 
