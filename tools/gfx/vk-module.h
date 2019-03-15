@@ -12,8 +12,8 @@
 #endif
 
 #define VK_NO_PROTOTYPES
-//#include <vulkan/vulkan.h>
-#include <Vulkan-Headers/include/vulkan/vulkan.h>
+
+#include <vulkan/include/vulkan/vulkan.h>
 
 namespace gfx {
 
