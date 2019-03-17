@@ -135,6 +135,14 @@ For completeness, here are the options that `slangc` currently accepts:
 
 * `-verbose-paths`: When displaying diagnostic output aim to display more detailed path information. In practice this is typically the complete 'canonical' path to the source file used.
 
+* `-g`: Include debug information in the generated code, where possible. Currently only supported for DXBC and DXIL output (not SPIR-V).
+
+* `-O`: Control optimization levels. This currently only affects DXBC and DXIL generation.
+  * `-O0`: Disable all optimizations
+  * `-O1`, `-O`: Enable a default level of optimization. This is the default if no `-O` options are used.
+  * `-O2`: Enable aggressive optimizations for speed.
+  * `-O3`: Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size.
+
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
 
 ### Specifying where dlls/shared libraries are loaded from

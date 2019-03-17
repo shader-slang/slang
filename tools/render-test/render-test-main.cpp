@@ -574,6 +574,9 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         }
     }
 
+    // Use the profilename set on options if set
+    profileName = gOptions.profileName ? gOptions.profileName : profileName;
+
     ShaderCompiler shaderCompiler;
     shaderCompiler.renderer = renderer;
     shaderCompiler.target = slangTarget;

@@ -315,6 +315,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if(semanticName == "sv_groupid")
     {
         name = "gl_WorkGroupID";
+
+        auto builder = context->getBuilder();
+        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_groupindex")
     {
@@ -323,6 +326,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if(semanticName == "sv_groupthreadid")
     {
         name = "gl_LocalInvocationID";
+
+        auto builder = context->getBuilder();
+        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_gsinstanceid")
     {

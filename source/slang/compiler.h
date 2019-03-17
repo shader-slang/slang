@@ -89,6 +89,22 @@ namespace Slang
         kMatrixLayoutMode_ColumnMajor   = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
     };
 
+    enum class DebugInfoLevel : SlangDebugInfoLevel
+    {
+        None        = SLANG_DEBUG_INFO_LEVEL_NONE,
+        Minimal     = SLANG_DEBUG_INFO_LEVEL_MINIMAL,
+        Standard    = SLANG_DEBUG_INFO_LEVEL_STANDARD,
+        Maximal     = SLANG_DEBUG_INFO_LEVEL_MAXIMAL,
+    };
+
+    enum class OptimizationLevel : SlangOptimizationLevel
+    {
+        None    = SLANG_OPTIMIZATION_LEVEL_NONE,
+        Default = SLANG_OPTIMIZATION_LEVEL_DEFAULT,
+        High    = SLANG_OPTIMIZATION_LEVEL_HIGH,
+        Maximal = SLANG_OPTIMIZATION_LEVEL_MAXIMAL,
+    };
+
     class Linkage;
     class Module;
     class Program;
@@ -117,23 +133,28 @@ namespace Slang
         ComPtr<ISlangBlob> blob;
     };
 
-        /// Collects information about placeholder "slots" for interface/existential types.
-    struct ExistentialSlots
+        /// Collects information about existential type parameters and their arguments.
+    struct ExistentialTypeSlots
     {
-            /// The existential/interface type associated with each slot.
-        List<RefPtr<Type>> types;
+            /// For each type parameter, holds the interface/existential type that constrains it.
+        List<RefPtr<Type>> paramTypes;
 
-            /// Source code for concrete type to plug in for each slot.
-//        List<String> argStrings;
-
-            /// A concrete type argument plus a witness table for its conformance to the desired interface
+            /// An argument for an existential type parameter.
+            ///
+            /// Comprises a concrete type and a witness for its conformance to the desired
+            /// interface/existential type for the corresponding parameter.
+            ///
         struct Arg
         {
             RefPtr<Type>    type;
             RefPtr<Val>     witness;
         };
 
-            /// Concrete type arguments to plug into each slot
+            /// Any arguments provided for the existential type parameters.
+            ///
+            /// It is possible for `args` to be empty even if `paramTypes` is non-empty;
+            /// that situation represents an unspecialized program or entry point.
+            ///
         List<Arg> args;
     };
 
@@ -299,13 +320,28 @@ namespace Slang
             Name*       name,
             Profile     profile);
 
-        UInt getExistentialSlotCount() { return m_existentialSlots.types.Count(); }
-        Type* getExistentialSlotType(UInt index) { return m_existentialSlots.types[index]; }
-        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_existentialSlots.args[index]; }
+            /// Get the number of existential type parameters for the entry point.
+        UInt getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.Count(); }
 
+            /// Get the existential type parameter at `index`.
+        Type* getExistentialTypeParam(UInt index) { return m_existentialSlots.paramTypes[index]; }
+
+            /// Get the number of arguments supplied for existential type parameters.
+            ///
+            /// Note that the number of arguments may not match the number of parameters.
+            /// In particular, an unspecialized entry point may have many parameters, but zero arguments.
+        UInt getExistentialTypeArgCount() { return m_existentialSlots.args.Count(); }
+
+            /// Get the existential type argument (type and witness table) at `index`.
+        ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_existentialSlots.args[index]; }
+
+            /// Get an array of all existential type arguments.
+        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_existentialSlots.args.Buffer(); }
+
+            /// Get an array of all entry-point shader parameters.
         List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
 
-        void _specializeExistentialSlots(
+        void _specializeExistentialTypeParams(
             List<RefPtr<Expr>> const&   args,
             DiagnosticSink*             sink);
 
@@ -326,7 +362,7 @@ namespace Slang
         DeclRef<FuncDecl> m_funcDeclRef;
 
             /// The existential/interface slots associated with the entry point parameter scope.
-        ExistentialSlots m_existentialSlots;
+        ExistentialTypeSlots m_existentialSlots;
 
             /// Information about entry-point parameters
         List<ShaderParamInfo> m_shaderParams;
@@ -677,6 +713,10 @@ namespace Slang
         MatrixLayoutMode defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
         MatrixLayoutMode getDefaultMatrixLayoutMode() { return defaultMatrixLayoutMode; }
 
+        DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
+
+        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
+
     private:
         Session* m_session = nullptr;
 
@@ -710,7 +750,7 @@ namespace Slang
         };
 
         // Any modules currently being imported will be listed here
-        ModuleBeingImportedRAII* m_modulesBeingImported;
+        ModuleBeingImportedRAII* m_modulesBeingImported = nullptr;
 
             /// Is the given module in the middle of being imported?
         bool isBeingImported(Module* module);
@@ -939,14 +979,29 @@ namespace Slang
             ///
         RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
 
-        UInt getExistentialSlotCount() { return m_globalExistentialSlots.types.Count(); }
-        Type* getExistentialSlotType(UInt index) { return m_globalExistentialSlots.types[index]; }
-        ExistentialSlots::Arg getExistentialSlotArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+            /// Get the number of existential type parameters for the program.
+        UInt getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.Count(); }
 
+            /// Get the existential type parameter at `index`.
+        Type* getExistentialTypeParam(UInt index) { return m_globalExistentialSlots.paramTypes[index]; }
+
+            /// Get the number of arguments supplied for existential type parameters.
+            ///
+            /// Note that the number of arguments may not match the number of parameters.
+            /// In particular, an unspecialized program may have many parameters, but zero arguments.
+        UInt getExistentialTypeArgCount() { return m_globalExistentialSlots.args.Count(); }
+
+            /// Get the existential type argument (type and witness table) at `index`.
+        ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+
+            /// Get an array of all existential type arguments.
+        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_globalExistentialSlots.args.Buffer(); }
+
+            /// Get an array of all global shader parameters.
         List<GlobalShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
 
         void _collectShaderParams(DiagnosticSink* sink);
-        void _specializeExistentialSlots(
+        void _specializeExistentialTypeParams(
             List<RefPtr<Expr>> const&   args,
             DiagnosticSink*             sink);
 
@@ -972,7 +1027,7 @@ namespace Slang
         RefPtr<Substitutions> m_globalGenericSubst;
 
         // The existential/interface slots associated with the global scope.
-        ExistentialSlots m_globalExistentialSlots;
+        ExistentialTypeSlots m_globalExistentialSlots;
 
             /// Information about global shader parameters
         List<GlobalShaderParamInfo> m_shaderParams;

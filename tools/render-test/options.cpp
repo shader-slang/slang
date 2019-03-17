@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "../../source/core/slang-writer.h"
+#include "../../source/core/slang-render-api-util.h"
 
 namespace renderer_test {
 
@@ -14,14 +15,34 @@ static const Options gDefaultOptions;
 
 Options gOptions;
 
-// Only set it, if the 
-void setDefaultRendererType(RendererType type)
+static gfx::RendererType _toRenderType(Slang::RenderApiType apiType)
 {
-    gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? type : gOptions.rendererType;
+    using namespace Slang;
+    switch (apiType)
+    {
+    case RenderApiType::D3D11: return gfx::RendererType::DirectX11;
+    case RenderApiType::D3D12: return gfx::RendererType::DirectX12;
+    case RenderApiType::OpenGl: return gfx::RendererType::OpenGl;
+    case RenderApiType::Vulkan: return gfx::RendererType::Vulkan;
+    default: return gfx::RendererType::Unknown;
+    }
+}
+
+static SlangResult _setRendererType(RendererType type, const char* arg, Slang::WriterHelper stdError)
+{
+    if (gOptions.rendererType != RendererType::Unknown)
+    {
+        stdError.print("Already has renderer option set. Found '%s'\n", arg);
+        return SLANG_FAIL;
+    }
+    gOptions.rendererType = type;
+    return SLANG_OK;
 }
 
 SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper stdError)
 {
+    using namespace Slang;
+
     // Reset the options
     gOptions = gDefaultOptions;
 
@@ -68,35 +89,14 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
             gOptions.outputPath = *argCursor++;
         }
-        else if( strcmp(arg, "-hlsl") == 0 )
+        else if (strcmp(arg, "-profile") == 0)
         {
-            setDefaultRendererType( RendererType::DirectX11);
-            gOptions.inputLanguageID = InputLanguageID::Native;
-        }
-        else if( strcmp(arg, "-glsl") == 0 )
-        {
-            setDefaultRendererType( RendererType::OpenGl);
-            gOptions.inputLanguageID = InputLanguageID::Native;
-        }
-        else if( strcmp(arg, "-hlsl-rewrite") == 0 )
-        {
-            setDefaultRendererType( RendererType::DirectX11);
-            gOptions.inputLanguageID = InputLanguageID::Slang;
-        }
-        else if( strcmp(arg, "-glsl-rewrite") == 0 )
-        {
-            setDefaultRendererType(RendererType::OpenGl);
-            gOptions.inputLanguageID = InputLanguageID::Slang;
-        }
-        else if( strcmp(arg, "-slang") == 0 )
-        {
-            setDefaultRendererType( RendererType::DirectX11);
-            gOptions.inputLanguageID = InputLanguageID::Slang;
-        }
-        else if( strcmp(arg, "-glsl-cross") == 0 )
-        {
-            setDefaultRendererType(RendererType::OpenGl);
-            gOptions.inputLanguageID = InputLanguageID::Slang;
+            if (argCursor == argEnd)
+            {
+                stdError.print("expected argument for '%s' option\n", arg);
+                return SLANG_FAIL;
+            }
+            gOptions.profileName = *argCursor++;
         }
         else if( strcmp(arg, "-xslang") == 0 )
         {
@@ -126,37 +126,44 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             gOptions.shaderType = ShaderProgramType::GraphicsCompute;
         }
-        else if (strcmp(arg, "-vk") == 0
-            || strcmp(arg, "-vulkan") == 0)
-        {
-            gOptions.rendererType = RendererType::Vulkan;
-        }
-        else if (strcmp(arg, "-d3d12") == 0
-            || strcmp(arg, "-dx12") == 0)
-        {
-            gOptions.rendererType = RendererType::DirectX12;
-        }
-        else if(strcmp(arg, "-gl") == 0)
-        {
-            gOptions.rendererType = RendererType::OpenGl;
-        }
-        else if (strcmp(arg, "-d3d11") == 0 
-            || strcmp(arg, "-dx11") == 0)
-        {
-            gOptions.rendererType = RendererType::DirectX11;
-        }
         else if( strcmp(arg, "-use-dxil") == 0 )
         {
             gOptions.useDXIL = true;
         }
         else
         {
+            // Lookup
+            Slang::UnownedStringSlice argSlice(arg);
+            if (argSlice.size() && argSlice[0] == '-')
+            {
+                // Look up the rendering API if set
+                UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
+                RendererType rendererType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
+
+                if (rendererType != RendererType::Unknown)
+                {
+                    gOptions.rendererType = rendererType;
+                    continue;
+                }
+
+                // Lookup the target language type
+                RendererType languageRenderType = _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
+                if (languageRenderType != RendererType::Unknown)
+                {
+                    gOptions.targetLanguageRendererType = languageRenderType;
+                    gOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl") ?  InputLanguageID::Native : InputLanguageID::Slang;
+                    continue;
+                }
+            }
+
             stdError.print("unknown option '%s'\n", arg);
             return SLANG_FAIL;
         }
     }
-    
-    
+
+    // If a render option isn't set use defaultRenderType 
+    gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? gOptions.targetLanguageRendererType : gOptions.rendererType;
+
     // first positional argument is source shader path
     if(positionalArgs.Count())
     {

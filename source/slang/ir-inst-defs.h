@@ -43,6 +43,14 @@ INST(Nop, nop, 0, 0)
 
     INST(TaggedUnionType, TaggedUnion, 0, 0)
 
+    // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
+    // taking type `B` and binding each of its existential type
+    // parameters, recursively, with the specified arguments,
+    // where each `Ti, wi` pair represents the concrete type
+    // and witness table to plug in for parameter `i`.
+    //
+    INST(BindExistentialsType, BindExistentials, 1, 0)
+
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, 0)
         INST(GroupSharedRate, GroupShared, 0, 0)
@@ -63,6 +71,14 @@ INST(Nop, nop, 0, 0)
     /* PtrTypeBase */
         INST(PtrType, Ptr, 1, 0)
         INST(RefType, Ref, 1, 0)
+
+        // An `ExistentialBox<T>` represents a logical pointer to a value of type `T`.
+        // On targets that support pointers this might lower to a pointer, but on
+        // current targets it will lower to zero bytes, with a value of type `T`
+        // being stored "out of line" somewhere.
+        //
+        INST(ExistentialBoxType, ExistentialBox, 1, 0)
+
         /* OutTypeBase */
             INST(OutType, Out, 1, 0)
             INST(InOutType, InOut, 1, 0)
@@ -408,8 +424,19 @@ INST_RANGE(Decoration, HighLevelDeclDecoration, ExportDecoration)
 
 //
 
-
+// A `makeExistential(v : C, w) : I` instruction takes a value `v` of type `C`
+// and produces a value of interface type `I` by using the witness `w` which
+// shows that `C` conforms to `I`.
+//
 INST(MakeExistential,                   makeExistential,                2, 0)
+
+// A `wrapExistential(v, T0,w0, T1,w0) : T` instruction is similar to `makeExistential`.
+// but applies to a value `v` that is of type `BindExistentials(T, T0,w0, ...)`. The
+// result of the `wrapExistentials` operation is a value of type `T`, allowing us to
+// "smuggle" a value of specialized type into computations that expect an unspecialized type.
+//
+INST(WrapExistential,                   wrapExistential,                2, 0)
+
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, 0)
 INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, 0)

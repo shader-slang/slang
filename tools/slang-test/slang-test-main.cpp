@@ -7,11 +7,12 @@
 #include "../../slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-byte-encode-util.h"
 
 using namespace Slang;
 
 #include "os.h"
-#include "render-api-util.h"
+#include "../../source/core/slang-render-api-util.h"
 #include "test-context.h"
 #include "test-reporter.h"
 #include "options.h"
@@ -1437,6 +1438,12 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
 
 static bool hasRenderOption(RenderApiType apiType, const List<String>& options)
 {
+    SLANG_ASSERT(apiType != RenderApiType::Unknown);
+    if (apiType == RenderApiType::Unknown)
+    {
+        return false;
+    }
+
     const RenderApiUtil::Info& info = RenderApiUtil::getInfo(apiType);
 
     List<UnownedStringSlice> namesList;
@@ -1448,25 +1455,12 @@ static bool hasRenderOption(RenderApiType apiType, const List<String>& options)
         if (option.StartsWith("-"))
         {
             const UnownedStringSlice parameter(option.Buffer() + 1, option.Buffer() + option.Length());
-            // See if we have a match
-            for (int j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
+            const RenderApiType paramType = RenderApiUtil::findApiTypeByName(parameter);
+
+            // Found it
+            if (apiType == paramType)
             {
-                const auto& apiInfo = RenderApiUtil::s_infos[j];
-                const UnownedStringSlice names(info.names);
-
-                if (names.indexOf(',') >= 0)
-                {
-                    StringUtil::split(names, ',', namesList);
-
-                    if (namesList.IndexOf(parameter) != UInt(-1))
-                    {
-                        return true;
-                    }
-                }
-                else if (names == parameter)
-                {
-                    return true;
-                }
+                return true;
             }
         }
     }
@@ -1656,6 +1650,74 @@ bool testPassesCategoryMask(
     return false;
 }
 
+static RenderApiType _findRenderApi(const List<String>& args, bool onlyExplicit)
+{
+    RenderApiType targetLanguageRenderer = RenderApiType::Unknown;
+   
+    for (const auto& arg: args)
+    {
+        const UnownedStringSlice argSlice = arg.getUnownedSlice();
+        if (argSlice.size() && argSlice[0] == '-' && !argSlice.startsWith(UnownedStringSlice::fromLiteral("--")))
+        {
+            UnownedStringSlice argName(argSlice.begin() + 1, argSlice.end());
+
+            RenderApiType renderType = RenderApiUtil::findRenderApiType(argName);
+            if (renderType != RenderApiType::Unknown)
+            {
+                return renderType;
+            }
+
+            if (!onlyExplicit)
+            {
+                RenderApiType implicitRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
+                if (implicitRenderType != RenderApiType::Unknown)
+                {
+                    targetLanguageRenderer = implicitRenderType;
+                }
+            }
+        }
+    }
+
+    return targetLanguageRenderer;
+}
+
+static void _addSythesizedTest(RenderApiType rendererType, const List<TestOptions>& renderTests, List<TestOptions>& outSynthesizedTests)
+{
+    for (const auto& test : renderTests)
+    {
+        // If doesn't have an explicit render api, add one and add to the synthesized tests
+        RenderApiType explicitRenderer = _findRenderApi(test.args, true);
+
+        if (explicitRenderer == RenderApiType::Unknown)
+        {
+            // Add the explicit parameter
+
+            TestOptions options(test);
+
+            StringBuilder builder;
+            builder << "-";
+            builder << RenderApiUtil::getApiName(rendererType);
+
+            options.args.Add(builder);
+
+            // If the target is vulkan remove the -hlsl option
+            if (rendererType == RenderApiType::Vulkan)
+            {
+                UInt index = options.args.IndexOf("-hlsl");
+                if (index != UInt(-1))
+                {
+                    options.args.RemoveAt(index);
+                }
+            }
+
+            // Add to the tests
+            outSynthesizedTests.Add(options);
+
+            return;
+        }
+    }
+}
+
 void runTestsOnFile(
     TestContext*    context,
     String          filePath)
@@ -1676,64 +1738,50 @@ void runTestsOnFile(
         return;
     }
 
-    List<TestOptions> synthesizedTests;
-
-    // If dx12 is available synthesize Dx12 test
-    if ((context->options.synthesizedTestApis & RenderApiFlag::D3D12) != 0)
+    // If synthesized tests are wanted look into adding them
+    if (context->options.synthesizedTestApis)
     {
-        // If doesn't have option generate dx12 options from dx11
-        if (!hasRenderOption(RenderApiType::D3D12, testList))
-        {
-            const int numTests = int(testList.tests.Count());
-            for (int i = 0; i < numTests; i++)
-            {
-                const TestOptions& testOptions = testList.tests[i];
-                // If it's a render test, and there is on d3d option, add one
-                if (isRenderTest(testOptions.command) && !hasRenderOption(RenderApiType::D3D12, testOptions))
-                {
-                    // Add with -dx12 option
-                    TestOptions testOptionsCopy(testOptions);
-                    testOptionsCopy.args.Add("-dx12");
+        List<TestOptions> synthesizedTests;
 
-                    synthesizedTests.Add(testOptionsCopy);
+        // Lets find all tests which are render tests
+        RenderApiFlags apisUsed = 0;
+        List<TestOptions> renderTests;
+
+        const int numTests = int(testList.tests.Count());
+        for (int i = 0; i < numTests; i++)
+        {
+            const TestOptions& testOptions = testList.tests[i];
+            if (isRenderTest(testOptions.command))
+            {
+                RenderApiType renderType = _findRenderApi(testOptions.args, false);
+                if (renderType != RenderApiType::Unknown)
+                {
+                    apisUsed |= (1 << int(renderType));
                 }
+                renderTests.Add(testOptions);
             }
         }
-    }
+        // What render options do we want to synthesize
+        RenderApiFlags missingApis = (~apisUsed) & context->options.synthesizedTestApis;
+        
+        // We can only synthesize if if there isn't an explicit render option
 
-    // If Vulkan is available synthesize Vulkan test
-    if ((context->options.synthesizedTestApis & RenderApiFlag::Vulkan) != 0)
-    {
-        // If doesn't have option generate dx12 options from dx11
-        if (!hasRenderOption(RenderApiType::Vulkan, testList))
+        while (missingApis)
         {
-            const int numTests = int(testList.tests.Count());
-            for (int i = 0; i < numTests; i++)
-            {
-                const TestOptions& testOptions = testList.tests[i];
-                // If it's a render test, and there is on d3d option, add one
-                if (isRenderTest(testOptions.command) && !isHLSLTest(testOptions.command) && !hasRenderOption(RenderApiType::Vulkan, testOptions))
-                {
-                    // Add with -vk option
-                    TestOptions testOptionsCopy(testOptions);
-                    testOptionsCopy.args.Add("-vk");
+            const int index = ByteEncodeUtil::calcMsb8(missingApis);
+            SLANG_ASSERT(index >= 0 && index <= int(RenderApiType::CountOf));
 
-                    UInt index = testOptionsCopy.args.IndexOf("-hlsl");
-                    if (index != UInt(-1))
-                    {
-                        testOptionsCopy.args.RemoveAt(index);
-                    }
+            _addSythesizedTest(RenderApiType(index), renderTests, synthesizedTests); 
 
-                    synthesizedTests.Add(testOptionsCopy);
-                }
-            }
+            // Disable the bit
+            missingApis &= ~(RenderApiFlags(1) << index);
         }
-    }
 
-    // Add any tests that were synthesized
-    for (UInt i = 0; i < synthesizedTests.Count(); ++i)
-    {
-        testList.tests.Add(synthesizedTests[i]);
+        // Add any tests that were synthesized
+        for (UInt i = 0; i < synthesizedTests.Count(); ++i)
+        {
+            testList.tests.Add(synthesizedTests[i]);
+        }
     }
 
     // We have found a test to run!

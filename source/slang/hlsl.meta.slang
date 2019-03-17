@@ -1036,10 +1036,12 @@ __generic<let N : int> float noise(vector<float, N> x);
 /// is more semantically "correct."
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
+[__readNone]
 uint NonUniformResourceIndex(uint index);
 
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
+[__readNone]
 int NonUniformResourceIndex(int index);
 
 // Normalize a vector
@@ -1156,9 +1158,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> round(vector<
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> round(matrix<T,N,M> x);
 
 // Reciprocal of square root
-__generic<T : __BuiltinFloatingPointType> T rsqrt(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rsqrt(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rsqrt(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "inversesqrt($0)")
+T rsqrt(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "inversesqrt($0)")
+vector<T,N> rsqrt(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(glsl, "inversesqrt($0)")
+matrix<T,N,M> rsqrt(matrix<T,N,M> x);
 
 // Clamp value to [0,1] range
 __generic<T : __BuiltinFloatingPointType>

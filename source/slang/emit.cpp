@@ -1469,6 +1469,7 @@ struct EmitVisitor
     EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec)
     {
         EOpInfo result;
+        result.op = nullptr;
         result.leftPrecedence = outerPrec.leftPrecedence;
         result.rightPrecedence = prec.leftPrecedence;
         return result;
@@ -1477,6 +1478,7 @@ struct EmitVisitor
     EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec)
     {
         EOpInfo result;
+        result.op = nullptr;
         result.leftPrecedence = prec.rightPrecedence;
         result.rightPrecedence = outerPrec.rightPrecedence;
         return result;
@@ -1672,7 +1674,8 @@ struct EmitVisitor
 
         case LayoutResourceKind::RegisterSpace:
         case LayoutResourceKind::GenericResource:
-        case LayoutResourceKind::ExistentialSlot:
+        case LayoutResourceKind::ExistentialTypeParam:
+        case LayoutResourceKind::ExistentialObjectParam:
             // ignore
             break;
         default:
@@ -3598,32 +3601,94 @@ struct EmitVisitor
         }
     }
 
-    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& inOutOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
     {
-        *needCloseOut = maybeEmitParens(inOutOuterPrec, opPrec);
-
-        if (getTarget(ctx) == CodeGenTarget::GLSL
-            && as<IRVectorType>(inst->getOperand(0)->getDataType())
-            && as<IRVectorType>(inst->getOperand(1)->getDataType()))
+        // Wrap in cast if a cast type is specified
+        if (castType)
         {
-            const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
-            SLANG_ASSERT(funcName);
-
-            emit(funcName);
+            emitIRType(ctx, castType);
             emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
-            emit(",");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+
+            // Emit the operand
+            emitIROperand(ctx, inst, mode, kEOp_General);
+
             emit(")");
         }
         else
         {
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(inOutOuterPrec, opPrec));
-            emit(" ");
-            emit(opPrec.op);
-            emit(" ");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(inOutOuterPrec, opPrec));
+            // Emit the operand
+            emitIROperand(ctx, inst, mode, kEOp_General);
         }
+    }
+
+    void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+    {
+        IRInst* operand = inst->getOperand(0);
+
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            {
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+                emit("not(");
+                emitIROperand(ctx, operand, mode, kEOp_General);
+                emit(")");
+                return;
+            }
+        }
+
+        auto prec = kEOp_Prefix;
+        *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
+
+        emit("!");
+        emitIROperand(ctx, operand, mode, rightSide(prec, ioOuterPrec));
+    }
+
+
+    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    {        
+        if (getTarget(ctx) == CodeGenTarget::GLSL)
+        {
+            IRInst* left = inst->getOperand(0);
+            IRInst* right = inst->getOperand(1);
+
+            auto leftVectorType = as<IRVectorType>(left->getDataType());
+            auto rightVectorType = as<IRVectorType>(right->getDataType());
+
+            // If either side is a vector handle as a vector
+            if (leftVectorType || rightVectorType)
+            {
+                const char* funcName = getGLSLVectorCompareFunctionName(inst->op);
+                SLANG_ASSERT(funcName);
+
+                // Determine the vector type
+                const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
+
+                // Handle as a function call
+                auto prec = kEOp_Postfix;
+                *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
+
+                emit(funcName);
+                emit("(");
+                _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
+                emit(",");
+                _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
+                emit(")");
+
+                return;
+            }
+        }
+
+        *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
+
+        emitIROperand(ctx, inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
+        emit(" ");
+        emit(opPrec.op);
+        emit(" ");
+        emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
     }
 
     void emitIRInstExpr(
@@ -3801,11 +3866,7 @@ struct EmitVisitor
 
         case kIROp_Not:
             {
-                auto prec = kEOp_Prefix;
-                needClose = maybeEmitParens(outerPrec, prec);
-
-                emit("!");
-                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+                emitNot(ctx, inst,  mode, outerPrec, &needClose);
             }
             break;
 
@@ -3958,14 +4019,29 @@ struct EmitVisitor
 
         case kIROp_Select:
             {
-                auto prec = kEOp_Conditional;
-                needClose = maybeEmitParens(outerPrec, prec);
+                if (getTarget(ctx) == CodeGenTarget::GLSL &&
+                    inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
+                {
+                    // For GLSL, emit a call to `mix` if condition is a vector
+                    emit("mix(");
+                    emitIROperand(ctx, inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(", ");
+                    emitIROperand(ctx, inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(", ");
+                    emitIROperand(ctx, inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
+                    emit(")");
+                }
+                else
+                {
+                    auto prec = kEOp_Conditional;
+                    needClose = maybeEmitParens(outerPrec, prec);
 
-                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                emit(" ? ");
-                emitIROperand(ctx, inst->getOperand(1), mode, prec);
-                emit(" : ");
-                emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
+                    emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                    emit(" ? ");
+                    emitIROperand(ctx, inst->getOperand(1), mode, prec);
+                    emit(" : ");
+                    emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
+                }
             }
             break;
 
@@ -5596,9 +5672,29 @@ struct EmitVisitor
                             {
                             default: Emit("rgba");  break;
 
-                            // TODO: GLSL doesn't actually seem to support 3-component formats
-                            // universally, so this might cause problems.
-                            case 3:  Emit("rgb");   break;
+                            case 3:
+                            {
+                                // TODO: GLSL doesn't support 3-component formats so for now we are going to
+                                // default to rgba
+                                //
+                                // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
+                                // section 3.11 on Image Formats it does not list rgbf32.
+                                //
+                                // It seems SPIR-V can support having an image with an unknown-at-compile-time
+                                // format, so long as the underlying API supports it. Ideally this would mean that we can
+                                // just drop all these qualifiers when emitting GLSL for Vulkan targets.
+                                //
+                                // This raises the question of what to do more long term. For Vulkan hopefully we can just
+                                // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
+                                // for inferring the format (and just document that 3-component formats map to 4-component formats,
+                                // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
+                                // and add an attribute for specifying the format manually if you really want to override our
+                                // inference (e.g., to specify r11fg11fb10f).
+
+                                Emit("rgba");
+                                //Emit("rgb");                                
+                                break;
+                            }
 
                             case 2:  Emit("rg");    break;
                             case 1:  Emit("r");     break;
@@ -6641,9 +6737,28 @@ StructTypeLayout* getGlobalStructLayout(
     return getScopeStructLayout(programLayout);
 }
 
-void legalizeTypes(
-    TypeLegalizationContext*    context,
-    IRModule*                   module);
+static void dumpIR(
+    BackEndCompileRequest* compileRequest,
+    IRModule*       irModule,
+    char const*     label)
+{
+    DiagnosticSinkWriter writerImpl(compileRequest->getSink());
+    WriterHelper writer(&writerImpl);
+
+    if(label)
+    {
+        writer.put("### ");
+        writer.put(label);
+        writer.put(":\n");
+    }
+
+    dumpIR(irModule, writer.getWriter());
+
+    if( label )
+    {
+        writer.put("###\n");
+    }
+}
 
 static void dumpIRIfEnabled(
     BackEndCompileRequest* compileRequest,
@@ -6652,22 +6767,7 @@ static void dumpIRIfEnabled(
 {
     if(compileRequest->shouldDumpIR)
     {
-        DiagnosticSinkWriter writerImpl(compileRequest->getSink());
-        WriterHelper writer(&writerImpl);
-
-        if(label)
-        {
-            writer.put("### ");
-            writer.put(label);
-            writer.put(":\n");
-        }
-
-        dumpIR(irModule, writer.getWriter());
-
-        if( label )
-        {
-            writer.put("###\n");
-        }
+        dumpIR(compileRequest, irModule, label);
     }
 }
 
@@ -6825,30 +6925,54 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
-
-
-
-        // After we've fully specialized all generics, and
-        // "devirtualized" all the calls through interfaces,
-        // we need to ensure that the code only uses types
-        // that are legal on the chosen target.
+        // The Slang language allows interfaces to be used like
+        // ordinary types (including placing them in constant
+        // buffers and entry-point parameter lists), but then
+        // getting them to lay out in a reasonable way requires
+        // us to treat fields/variables with interface type
+        // *as if* they were pointers to heap-allocated "objects."
         //
-        {
-            // TODO: The presence of `TypeLegalizationContext`
-            // in the public API of the `legalizeTypes` function
-            // is a throwback to when there was AST-level
-            // type legalization and all the complications it
-            // created. The pass should be refactored to not
-            // expose these details.
-            //
-            TypeLegalizationContext typeLegalizationContext;
-            initialize(&typeLegalizationContext,
-                session,
-                irModule);
-            legalizeTypes(
-                &typeLegalizationContext,
-                irModule);
-        }
+        // Specialization will have replaced fields/variables
+        // with interface types like `IFoo` with fields/variables
+        // with pointer-like types like `ExistentialBox<SomeType>`.
+        //
+        // We need to legalize these pointer-like types away,
+        // which involves two main changes:
+        //
+        //  1. Any `ExistentialBox<...>` fields need to be moved
+        //  out of their enclosing `struct` type, so that the layout
+        //  of the enclosing type is computed as if the field had
+        //  zero size.
+        //
+        //  2. Once an `ExistentialBox<X>` has been floated out
+        //  of its parent and landed somwhere permanent (e.g., either
+        //  a dedicated variable, or a field of constant buffer),
+        //  we need to replace it with just an `X`, after which we
+        //  will have (more) legal shader code.
+        //
+        legalizeExistentialTypeLayout(
+            irModule,
+            sink);
+
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+        // Many of our target languages and/or downstream compilers
+        // don't support `struct` types that have resource-type fields.
+        // In order to work around this limitation, we will rewrite the
+        // IR so that any structure types with resource-type fields get
+        // split into a "tuple" that comprises the ordinary fields (still
+        // bundles up as a `struct`) and one element for each resource-type
+        // field (recursively).
+        //
+        // What used to be individual variables/parameters/arguments/etc.
+        // then become multiple variables/parameters/arguments/etc.
+        //
+        legalizeResourceTypes(
+            irModule,
+            sink);
 
         //  Debugging output of legalization
 #if 0
