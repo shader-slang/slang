@@ -557,7 +557,7 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
         RefPtr<Expr> typeExpr = linkage->parseTypeString(
             typeStr, s);
         type = checkProperType(linkage, TypeExp(typeExpr), sink);
-        if(type)
+        if (type && !type.as<ErrorType>())
             break;
     }
     if( type )
@@ -1831,6 +1831,30 @@ SLANG_API void spSetTargetMatrixLayoutMode(
     spSetMatrixLayoutMode(request, mode);
 }
 
+/*!
+@brief Set the level of debug information to produce.
+*/
+SLANG_API void spSetDebugInfoLevel(
+    SlangCompileRequest*    request,
+    SlangDebugInfoLevel     level)
+{
+    auto req = convert(request);
+    auto linkage = req->getLinkage();
+    linkage->debugInfoLevel = Slang::DebugInfoLevel(level);
+}
+
+/*!
+@brief Set the level of optimization to perform.
+*/
+SLANG_API void spSetOptimizationLevel(
+    SlangCompileRequest*    request,
+    SlangOptimizationLevel  level)
+{
+    auto req = convert(request);
+    auto linkage = req->getLinkage();
+    linkage->optimizationLevel = Slang::OptimizationLevel(level);
+}
+
 
 SLANG_API void spSetOutputContainerFormat(
     SlangCompileRequest*    request,
@@ -2098,7 +2122,7 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
+SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
     SlangCompileRequest*    request,
     int                     slotIndex,
     char const*             typeName)
@@ -2115,7 +2139,7 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spSetTypeNameForEntryPointExistentialSlot(
+SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     SlangCompileRequest*    request,
     int                     entryPointIndex,
     int                     slotIndex,

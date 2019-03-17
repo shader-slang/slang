@@ -25,6 +25,7 @@ class   Layout;
 class   Type;
 class   Session;
 class   Name;
+struct  IRBuilder;
 struct  IRFunc;
 struct  IRGlobalValueWithCode;
 struct  IRInst;
@@ -926,15 +927,20 @@ struct IRPtrTypeBase : IRType
     IR_PARENT_ISA(PtrTypeBase)
 };
 
-struct IRPtrType : IRPtrTypeBase
-{
-    IR_LEAF_ISA(PtrType)
-};
+SIMPLE_IR_TYPE(PtrType, PtrTypeBase)
+SIMPLE_IR_TYPE(RefType, PtrTypeBase)
 
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
-SIMPLE_IR_TYPE(RefType, OutTypeBase)
+SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+    /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
+    ///
+    /// The given IR `builder` will be used if new instructions need to be created.
+IRType* tryGetPointedToType(
+        IRBuilder*  builder,
+        IRType*     type);
 
 struct IRFuncType : IRType
 {
@@ -1005,6 +1011,16 @@ struct IRInterfaceType : IRType
 struct IRTaggedUnionType : IRType
 {
     IR_LEAF_ISA(TaggedUnionType)
+};
+
+struct IRBindExistentialsType : IRType
+{
+    IR_LEAF_ISA(BindExistentialsType)
+
+    IRType* getBaseType() { return (IRType*) getOperand(0); }
+    UInt getExistentialArgCount() { return getOperandCount() - 1; }
+    IRUse* getExistentialArgs() { return getOperands() + 1; }
+    IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
 };
 
 /// @brief A global value that potentially holds executable code.

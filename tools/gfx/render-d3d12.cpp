@@ -2255,7 +2255,6 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
             uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
@@ -2266,6 +2265,11 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             {
                 uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
                 uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+            }
+            else
+            {
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
             }
 
 
@@ -2284,12 +2288,21 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             srvDesc.Format = D3DUtil::getMapFormat(desc.format);
             srvDesc.Buffer.StructureByteStride = 0;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes);
 
             if(resourceDesc.elementSize)
             {
                 srvDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
                 srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
+            }
+            else if(desc.format == Format::Unknown)
+            {
+                srvDesc.Buffer.Flags |= D3D12_BUFFER_SRV_FLAG_RAW;
+                srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+            }
+            else
+            {
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
             }
 
             SLANG_RETURN_ON_FAIL(m_viewAllocator.allocate(&viewImpl->m_descriptor));

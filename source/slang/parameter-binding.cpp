@@ -1862,6 +1862,18 @@ struct ScopeLayoutBuilder
         {
             m_structLayout->mapVarToLayout.Add(firstVarLayout->varDecl.getDecl(), firstVarLayout);
         }
+
+        // Any "pending" items on a field type become "pending" items
+        // on the overall `struct` type layout.
+        //
+        // TODO: This logic ends up duplicated between here and the main
+        // `struct` layout logic in `type-layout.cpp`. If this gets any
+        // more complicated we should see if there is a way to share it.
+        //
+        for( auto pendingItem : firstVarLayout->typeLayout->pendingItems )
+        {
+            m_structLayout->pendingItems.Add(pendingItem);
+        }
     }
 
     void addParameter(
@@ -2000,6 +2012,18 @@ static void collectEntryPointParameters(
     for( auto& shaderParamInfo : entryPoint->getShaderParams() )
     {
         auto paramDeclRef = shaderParamInfo.paramDeclRef;
+
+        // When computing layout for an entry-point parameter,
+        // we want to make sure that the layout context has access
+        // to the existential type arguments (if any) that were
+        // provided for the entry-point existential type parameters (if any).
+        //
+        context->layoutContext= context->layoutContext
+            .withExistentialTypeArgs(
+                entryPoint->getExistentialTypeArgCount(),
+                entryPoint->getExistentialTypeArgs())
+            .withExistentialTypeSlotsOffsetBy(
+                shaderParamInfo.firstExistentialTypeSlot);
 
         // Any error messages we emit during the process should
         // refer to the location of this parameter.
@@ -2144,6 +2168,18 @@ static void collectParameters(
 
     for(auto& globalParamInfo : program->getShaderParams() )
     {
+        // When computing layout for a global shader parameter,
+        // we want to make sure that the layout context has access
+        // to the existential type arguments (if any) that were
+        // provided for the global existential type parameters (if any).
+        //
+        context->layoutContext= context->layoutContext
+            .withExistentialTypeArgs(
+                program->getExistentialTypeArgCount(),
+                program->getExistentialTypeArgs())
+            .withExistentialTypeSlotsOffsetBy(
+                globalParamInfo.firstExistentialTypeSlot);
+
         collectGlobalScopeParameter(context, globalParamInfo, globalGenericSubst);
     }
 

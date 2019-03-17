@@ -41,6 +41,14 @@ struct StringUtil
         /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
     static void split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);
 
+        /// Equivalent to doing a split and then finding the index of 'find' on the array
+        /// Returns -1 if not found
+    static int indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find);
+
+        /// Given the entry at the split index specified.
+        /// Will return slice with begin() == nullptr if not found or input has begin() == nullptr)
+    static UnownedStringSlice getAtInSplit(const UnownedStringSlice& in, char splitChar, int index);
+
         /// Returns the size in bytes needed to hold the formatted string using the specified args, NOT including a terminating 0
         /// NOTE! The caller *should* assume this will consume the va_list (use va_copy to make a copy to be consumed)
     static size_t calcFormattedSize(const char* format, va_list args);

@@ -535,7 +535,25 @@ extern "C"
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
-    
+    typedef SlangUInt32 SlangDebugInfoLevel;
+    enum
+    {
+        SLANG_DEBUG_INFO_LEVEL_NONE = 0,    /**< Don't emit debug information at all. */
+        SLANG_DEBUG_INFO_LEVEL_MINIMAL,     /**< Emit as little debug information as possible, while still supporting stack trackes. */
+        SLANG_DEBUG_INFO_LEVEL_STANDARD,    /**< Emit whatever is the standard level of debug information for each target. */
+        SLANG_DEBUG_INFO_LEVEL_MAXIMAL,     /**< Emit as much debug infromation as possible for each target. */
+        
+    };
+
+    typedef SlangUInt32 SlangOptimizationLevel;
+    enum
+    {
+        SLANG_OPTIMIZATION_LEVEL_NONE = 0,  /**< Don't optimize at all. */
+        SLANG_OPTIMIZATION_LEVEL_DEFAULT,   /**< Default optimization level: balance code quality and compilation time. */
+        SLANG_OPTIMIZATION_LEVEL_HIGH,      /**< Optimize aggressively. */
+        SLANG_OPTIMIZATION_LEVEL_MAXIMAL,   /**< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs */
+    };
+
     /** A result code for a Slang API operation.
 
     This type is generally compatible with the Windows API `HRESULT` type. In particular, negative values indicate
@@ -1103,6 +1121,20 @@ extern "C"
         SlangMatrixLayoutMode   mode);
 
     /*!
+    @brief Set the level of debug information to produce.
+    */
+    SLANG_API void spSetDebugInfoLevel(
+        SlangCompileRequest*    request,
+        SlangDebugInfoLevel     level);
+
+    /*!
+    @brief Set the level of optimization to perform.
+    */
+    SLANG_API void spSetOptimizationLevel(
+        SlangCompileRequest*    request,
+        SlangOptimizationLevel  level);
+
+    /*!
     @brief Set the container format to be used for binary output.
     */
     SLANG_API void spSetOutputContainerFormat(
@@ -1303,14 +1335,14 @@ extern "C"
     that has an interface or array-of-interface type introduces an existential
     slot. The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
-    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 
     In order to generate specialized code, a concrete type needs to be specified
     for each existential slot. This function specifies the name of the type
     (or in general a type *expression*) to use for a specific slot at the
     global scope.
     */
-    SLANG_API SlangResult spSetTypeNameForGlobalExistentialSlot(
+    SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
         SlangCompileRequest*    request,
         int                     slotIndex,
         char const*             typeName);
@@ -1321,14 +1353,14 @@ extern "C"
     that has an interface or array-of-interface type introduces an existential
     slot. The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
-    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT`.
+    `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 
     In order to generate specialized code, a concrete type needs to be specified
     for each existential slot. This function specifies the name of the type
     (or in general a type *expression*) to use for a specific slot at the
     entry-point scope.
     */
-    SLANG_API SlangResult spSetTypeNameForEntryPointExistentialSlot(
+    SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
         int                     slotIndex,
@@ -1503,6 +1535,7 @@ extern "C"
         SLANG_STRUCTURED_BUFFER             = 0x06,
         SLANG_BYTE_ADDRESS_BUFFER           = 0x07,
         SLANG_RESOURCE_UNKNOWN              = 0x08,
+        SLANG_ACCELERATION_STRUCTURE        = 0x09,
 
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
         SLANG_TEXTURE_ARRAY_FLAG            = 0x40,
@@ -1554,11 +1587,44 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
         SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
 
-        // A parameter of interface or array-of-interface type introduces
-        // one existential slot, into which a concrete type must be plugged
-        // to enable specialized code generation.
+        // An existential type parameter represents a "hole" that
+        // needs to be filled with a concrete type to enable
+        // generation of specialized code.
         //
-        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
+        // Consider this example:
+        //
+        //      struct MyParams
+        //      {
+        //          IMaterial material;
+        //          ILight lights[3];
+        //      };
+        //
+        // This `MyParams` type introduces two existential type parameters:
+        // one for `material` and one for `lights`. Even though `lights`
+        // is an array, it only introduces one type parameter, because
+        // we need to hae a *single* concrete type for all the array
+        // elements to be able to generate specialized code.
+        //
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM,
+
+        // An existential object parameter represents a value
+        // that needs to be passed in to provide data for some
+        // interface-type shader paameter.
+        //
+        // Consider this example:
+        //
+        //      struct MyParams
+        //      {
+        //          IMaterial material;
+        //          ILight lights[3];
+        //      };
+        //
+        // This `MyParams` type introduces four existential object parameters:
+        // one for `material` and three for `lights` (one for each array
+        // element). This is consistent with the number of interface-type
+        // "objects" that are being passed through to the shader.
+        //
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -1939,7 +2005,8 @@ namespace slang
 
         ShaderRecord = SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
 
-        ExistentialSlot = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_SLOT,
+        ExistentialTypeParam = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM,
+        ExistentialObjectParam = SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
 
         // DEPRECATED:
         VertexInput = SLANG_PARAMETER_CATEGORY_VERTEX_INPUT,

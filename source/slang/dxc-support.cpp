@@ -141,6 +141,28 @@ namespace Slang
             break;
         }
 
+        auto linkage = compileRequest->getLinkage();
+        switch( linkage->optimizationLevel )
+        {
+        default:
+            break;
+
+        case OptimizationLevel::None:       args[argCount++] = L"-Od"; break;
+        case OptimizationLevel::Default:    args[argCount++] = L"-O1"; break;
+        case OptimizationLevel::High:       args[argCount++] = L"-O2"; break;
+        case OptimizationLevel::Maximal:    args[argCount++] = L"-O3"; break;
+        }
+
+        switch( linkage->debugInfoLevel )
+        {
+        case DebugInfoLevel::None:
+            break;
+
+        default:
+            args[argCount++] = L"-Zi";
+            break;
+        }
+
         // Slang strives to produce correct code, and by default
         // we do not show the user warnings produced by a downstream
         // compiler. When the downstream compiler *does* produce an

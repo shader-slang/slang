@@ -108,7 +108,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.Count());
     for(int ii = 0; ii < globalExistentialTypeCount; ++ii )
     {
-        spSetTypeNameForGlobalExistentialSlot(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
+        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
     }
 
     const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.Count());
@@ -116,7 +116,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     {
         for( int ii = 0; ii < entryPointExistentialTypeCount; ++ii )
         {
-            spSetTypeNameForEntryPointExistentialSlot(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
+            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
         }
     };
 
