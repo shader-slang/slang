@@ -574,7 +574,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         }
     }
 
-    // Use the profilename set on options if set
+    // Use the profile name set on options if set
     profileName = gOptions.profileName ? gOptions.profileName : profileName;
 
     ShaderCompiler shaderCompiler;
@@ -670,7 +670,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 	return SLANG_OK;
 }
 
-
 int main(int argc, char**  argv)
 {
     using namespace Slang;
@@ -681,6 +680,6 @@ int main(int argc, char**  argv)
     SlangResult res = innerMain(stdWriters, session, argc, argv);
     spDestroySession(session);
 
-	return SLANG_FAILED(res) ? 1 : 0;
+	return (int)TestToolUtil::getReturnCode(res);
 }
 
