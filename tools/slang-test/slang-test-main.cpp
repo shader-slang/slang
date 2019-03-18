@@ -1694,7 +1694,7 @@ static RenderApiType _findRenderApi(const List<String>& args, bool onlyExplicit)
     return targetLanguageRenderer;
 }
 
-static void _addSythesizedTest(RenderApiType rendererType, const List<TestOptions>& renderTests, List<TestOptions>& outSynthesizedTests)
+static void _addSynthesizedTest(RenderApiType rendererType, const List<TestOptions>& renderTests, List<TestOptions>& outSynthesizedTests)
 {
     for (const auto& test : renderTests)
     {
@@ -1784,7 +1784,7 @@ void runTestsOnFile(
             const int index = ByteEncodeUtil::calcMsb8(missingApis);
             SLANG_ASSERT(index >= 0 && index <= int(RenderApiType::CountOf));
 
-            _addSythesizedTest(RenderApiType(index), renderTests, synthesizedTests); 
+            _addSynthesizedTest(RenderApiType(index), renderTests, synthesizedTests); 
 
             // Disable the bit
             missingApis &= ~(RenderApiFlags(1) << index);
