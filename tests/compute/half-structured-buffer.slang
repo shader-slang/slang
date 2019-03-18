@@ -1,5 +1,5 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -use-dxil -profile cs_6_2
-//TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -use-dxil -profile cs_6_2 -render-features half
+//TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2 -render-features half
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):dxbinding(0),glbinding(0),out
 
 struct Thing
