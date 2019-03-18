@@ -668,6 +668,8 @@ extern "C"
 #define SLANG_E_NOT_FOUND                   SLANG_MAKE_CORE_ERROR(5)
     //! An unhandled internal failure (typically from unhandled exception)
 #define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
+    //! Could not complete because some underlying feature (hardware or software) was not available 
+#define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
 
     /** A "Universally Unique Identifier" (UUID)
 

@@ -87,7 +87,7 @@ int MAIN(int argc, char** argv)
         res = innerMain(stdWriters, session, argc, argv);
         spDestroySession(session);
     }
-    return TestToolUtil::getReturnCode(res);
+    return (int)TestToolUtil::getReturnCode(res);
 }
 
 #ifdef _WIN32
