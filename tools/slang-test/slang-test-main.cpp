@@ -437,7 +437,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         spawner.standardError_ = stdErrorString;
         spawner.standardOutput_ = stdOutString;
 
-        spawner.resultCode_ = TestToolUtil::getReturnCode(res);
+        spawner.resultCode_ = (int)TestToolUtil::getReturnCode(res);
 
         return kOSError_None;
     }
@@ -445,21 +445,35 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
     return kOSError_OperationFailed;
 }
 
-
-OSError spawnAndWait(TestContext* context, const String& testPath, SpawnType spawnType, OSProcessSpawner& spawner)
+ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 {
+    return TestToolUtil::getReturnCodeFromInt(spawner.getResultCode());
+}
+
+ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnType spawnType, OSProcessSpawner& spawner)
+{
+    OSError spawnResult = kOSError_OperationFailed;
     switch (spawnType)
     {
         case SpawnType::UseExe:
         {
-            return spawnAndWaitExe(context, testPath, spawner);
+            spawnResult = spawnAndWaitExe(context, testPath, spawner);
+            break;
         }
         case SpawnType::UseSharedLibrary:
         {
-            return spawnAndWaitSharedLibrary(context, testPath, spawner);
+            spawnResult = spawnAndWaitSharedLibrary(context, testPath, spawner);
+            break;
         }
+        default: break;
     }
-    return kOSError_OperationFailed;
+
+    if (spawnResult != kOSError_None)
+    {
+        return ToolReturnCode::FailedToRun;
+    }
+
+    return getReturnCode(spawner);
 }
 
 String getOutput(OSProcessSpawner& spawner)
@@ -530,6 +544,25 @@ static void _initSlangCompiler(TestContext* context, OSProcessSpawner& spawnerOu
     }
 }
 
+TestResult asTestResult(ToolReturnCode code)
+{
+    switch (code)
+    {
+        case ToolReturnCode::Success:               return TestResult::Pass;
+        case ToolReturnCode::Ignored:               return TestResult::Ignored;
+        default:                                    return TestResult::Fail;
+    }
+}
+
+#define TEST_RETURN_ON_DONE(x) \
+    { \
+        const ToolReturnCode toolRet_ = x; \
+        if (TestToolUtil::isDone(toolRet_)) \
+        { \
+            return asTestResult(toolRet_); \
+        } \
+    }
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -547,10 +580,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         spawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     String actualOutput = getOutput(spawner);
 
@@ -621,10 +651,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         spawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     String actualOutput = getOutput(spawner);
 
@@ -772,11 +799,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         expectedSpawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(context, outputStem, input.spawnType, expectedSpawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
-
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, expectedSpawner));
+    
     String expectedOutput = getOutput(expectedSpawner);
     String expectedOutputPath = outputStem + ".expected";
     try
@@ -788,10 +812,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
-    if (spawnAndWait(context, outputStem, input.spawnType, actualSpawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, actualSpawner));
+
     String actualOutput = getOutput(actualSpawner);
 
     TestResult result = TestResult::Pass;
@@ -847,10 +869,7 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     spawner.pushArgument("-pass-through");
     spawner.pushArgument("fxc");
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     String expectedOutput = getOutput(spawner);
     String expectedOutputPath = outputStem + ".expected";
@@ -895,10 +914,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     spawner.pushArgument("-target");
     spawner.pushArgument("dxbc-assembly");
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     // We ignore output to stdout, and only worry about what the compiler
     // wrote to stderr.
@@ -1004,10 +1020,7 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
         spawner.pushArgument(arg);
     }
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
@@ -1042,6 +1055,13 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
     TestResult hlslResult   =  doGLSLComparisonTestRun(context, input, "__GLSL__",  "glslang", ".expected",    &expectedOutput);
     TestResult slangResult  =  doGLSLComparisonTestRun(context, input, "__SLANG__", nullptr,   ".actual",      &actualOutput);
+
+    // If either is ignored, the whole test is
+    if (hlslResult == TestResult::Ignored ||
+        slangResult == TestResult::Ignored)
+    {
+        return TestResult::Ignored;
+    }
 
     Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
     Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
@@ -1093,11 +1113,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
     File::WriteAllText(actualOutputFile, "");
 
-	if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-	{
-        printf("error spawning render-test\n");
-		return TestResult::Fail;
-	}
+	TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     auto actualOutput = getOutput(spawner);
     auto expectedOutput = getExpectedOutput(outputStem);
@@ -1192,10 +1208,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     spawner.pushArgument("-o");
     spawner.pushArgument(outputStem + outputKind + ".png");
 
-    if (spawnAndWait(context, outputStem, input.spawnType, spawner) != kOSError_None)
-    {
-        return TestResult::Fail;
-    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
