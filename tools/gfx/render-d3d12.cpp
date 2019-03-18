@@ -1400,8 +1400,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    // For now we assume all dx12 devices can do half
-    m_features.Add("half");
+
 
     FlagCombiner combiner;
     // TODO: we should probably provide a command-line option
@@ -1430,6 +1429,23 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
+    }
+
+    // Find what features are supported
+    {
+        // Check this is how this is laid out...
+        SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
+
+        D3D12_FEATURE_DATA_SHADER_MODEL featureShaderMode;
+        featureShaderMode.HighestShaderModel = D3D_SHADER_MODEL(0x62);
+
+        SLANG_RETURN_ON_FAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode)));
+        
+        if (featureShaderMode.HighestShaderModel >= 0x62)
+        {
+            // With sm_6_2 we have half
+            m_features.Add("half");
+        }
     }
 
     m_numRenderFrames = 3;
