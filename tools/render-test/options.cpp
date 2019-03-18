@@ -112,7 +112,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             const char* value = *argCursor++;
 
             List<UnownedStringSlice> values;
-            StringUtil::split(UnownedStringSlice(*argCursor++), ',', values);
+            StringUtil::split(UnownedStringSlice(value), ',', values);
 
             for (const auto& value : values)
             {
