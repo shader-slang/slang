@@ -55,6 +55,8 @@ struct Options
     int slangArgCount = 0;
 
     bool useDXIL = false;
+
+    Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 };
 
 extern Options gOptions;
