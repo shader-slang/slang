@@ -1439,9 +1439,8 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         D3D12_FEATURE_DATA_SHADER_MODEL featureShaderMode;
         featureShaderMode.HighestShaderModel = D3D_SHADER_MODEL(0x62);
 
-        SLANG_RETURN_ON_FAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode)));
-        
-        if (featureShaderMode.HighestShaderModel >= 0x62)
+        if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode))) &&
+            featureShaderMode.HighestShaderModel >= 0x62)
         {
             // With sm_6_2 we have half
             m_features.Add("half");
