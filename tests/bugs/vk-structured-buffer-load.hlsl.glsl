@@ -29,11 +29,27 @@ void main()
     float HitT_0 = (gl_HitTNV);
     _S2.PackedHitInfoA_0.x = HitT_0;
 
+    const uint use_rcp_0 = uint(0);
+
     float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(int(uint(0)))]);
 
-    float _S4 = inversesqrt(offsfloat_0);
 
-    _S2.PackedHitInfoA_0.y = _S4;
+
+    if(bool(use_rcp_0 | uint(HitT_0 > 0.00000000000000000000)))
+    {
+
+        float _S4 = (1.0/((offsfloat_0)));
+
+        _S2.PackedHitInfoA_0.y = _S4;
+
+    }
+    else
+    {
+        float _S5 = (inversesqrt((offsfloat_0)));
+
+        _S2.PackedHitInfoA_0.y = _S5;
+
+    }
 
     return;
 }

@@ -1133,7 +1133,11 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> radians(vecto
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> radians(matrix<T,N,M> x);
 
 // Approximate reciprocal
-__generic<T : __BuiltinFloatingPointType> T rcp(T x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "1.0/($0)")
+T rcp(T x);
+
+// TODO: vector and matrix approx. reciprocals needto be deconstructed for GLSL
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rcp(vector<T,N> x);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rcp(matrix<T,N,M> x);
 
