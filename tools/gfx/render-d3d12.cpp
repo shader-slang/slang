@@ -119,8 +119,10 @@ protected:
             m_adapter.setNull();
             m_desc = {}; 
             m_desc1 = {};
+            m_isWarp = false;
         }
 
+        bool m_isWarp;
         ComPtr<IDXGIFactory4> m_dxgiFactory;
         ComPtr<ID3D12Device> m_device;
         ComPtr<IDXGIAdapter> m_adapter;
@@ -1331,9 +1333,11 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEAT
     if ((deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) == 0)
     {
         // Look for software renderer (warp)
-
+        
         SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
         SLANG_RETURN_ON_FAIL(m_D3D12CreateDevice(adapter, featureLevel, IID_PPV_ARGS(device.writeRef())));
+
+        outAdapterInfo.m_isWarp = true;
     }
     else
     {
@@ -1365,9 +1369,54 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEAT
         }
     }
 
+    // Didn't find an adapter
+    if (!adapter)
+    {
+        return SLANG_FAIL;
+    }
+
     if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
     {
         m_dxDebug->EnableDebugLayer();
+
+        ComPtr<ID3D12InfoQueue> infoQueue;
+        if (SLANG_SUCCEEDED(device->QueryInterface(infoQueue.writeRef())))
+        {
+            // Make break 
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+            // infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+
+            // Apparently there is a problem with sm 6.3 with spurious errors, with debug layer enabled
+            D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
+            featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x63);
+            SLANG_SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel)));
+
+            if (featureShaderModel.HighestShaderModel >= D3D_SHADER_MODEL(0x63))
+            {
+                // Filter out any messages that cause issues
+                // TODO: Remove this when the debug layers work properly
+                D3D12_MESSAGE_ID messageIds[] =
+                {
+                    // When the debug layer is enabled this error is triggered sometimes after a CopyDescriptorsSimple
+                    // call The failed check validates that the source and destination ranges of the copy do not
+                    // overlap. The check assumes descriptor handles are pointers to memory, but this is not always the
+                    // case and the check fails (even though everything is okay).
+                    D3D12_MESSAGE_ID_COPY_DESCRIPTORS_INVALID_RANGES,
+                };
+
+                // We filter INFO messages because they are way too many
+                D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+
+                D3D12_INFO_QUEUE_FILTER infoQueueFilter = {};
+                infoQueueFilter.DenyList.NumSeverities = SLANG_COUNT_OF(severities);
+                infoQueueFilter.DenyList.pSeverityList = severities;
+                infoQueueFilter.DenyList.NumIDs = SLANG_COUNT_OF(messageIds);
+                infoQueueFilter.DenyList.pIDList = messageIds;
+
+                infoQueue->PushStorageFilter(&infoQueueFilter);
+            }
+        }
     }
 
     // Get the descs
@@ -1420,8 +1469,23 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
     if (m_D3D12GetDebugInterface)
     {
-        if (SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
+        if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
         {
+#if 0
+            // Can enable for extra validation. NOTE! That d3d12 warns if you do.... 
+            // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
+            // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
+            // added directly to the shader. However, it can slow things down a lot, especially for applications with numerous
+            // PSOs.Time to see the first render frame may take several minutes.
+            // [INITIALIZATION MESSAGE #1016: CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS]
+
+            ComPtr<ID3D12Debug1> debug1;
+            if (SLANG_SUCCEEDED(m_dxDebug->QueryInterface(debug1.writeRef())))
+            {
+                debug1->SetEnableGPUBasedValidation(true);
+            }
+#endif
+
             m_dxDebug->EnableDebugLayer();
         }
     }
@@ -1474,16 +1538,26 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         // Check this is how this is laid out...
         SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
 
-        D3D12_FEATURE_DATA_SHADER_MODEL featureShaderMode;
-        featureShaderMode.HighestShaderModel = D3D_SHADER_MODEL(0x62);
-
-        // TODO: Currently software renderer causes a crash when using half, so disable for now
-        if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode))) &&
-            (m_adapterInfo.m_desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
-            featureShaderMode.HighestShaderModel >= 0x62)
         {
-            // With sm_6_2 we have half
-            m_features.Add("half");
+            D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
+            featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x62);
+
+            // TODO: Currently warp causes a crash when using half, so disable for now
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel))) &&
+                m_adapterInfo.m_isWarp == false &&
+                featureShaderModel.HighestShaderModel >= 0x62)
+            {
+                // With sm_6_2 we have half
+                m_features.Add("half");
+            }
+        }
+        // Check what min precision support we have
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+            {
+                auto minPrecisionSupport = options.MinPrecisionSupport;
+            }
         }
     }
 
