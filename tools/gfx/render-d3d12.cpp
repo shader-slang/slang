@@ -110,6 +110,24 @@ protected:
     static const Int kMaxRTVCount = 8;
     static const Int kMaxDescriptorSetCount = 16;
 
+    struct AdapterInfo
+    {
+        void clear()
+        {
+            m_dxgiFactory.setNull();
+            m_device.setNull();
+            m_adapter.setNull();
+            m_desc = {}; 
+            m_desc1 = {};
+        }
+
+        ComPtr<IDXGIFactory4> m_dxgiFactory;
+        ComPtr<ID3D12Device> m_device;
+        ComPtr<IDXGIAdapter> m_adapter;
+        DXGI_ADAPTER_DESC m_desc;
+        DXGI_ADAPTER_DESC1 m_desc1;
+    };
+
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
@@ -480,7 +498,7 @@ protected:
 //    Result _calcBindParameters(BindParameters& params);
 //    RenderState* findRenderState(PipelineType pipelineType);
 
-    Result _createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<IDXGIFactory4>& outDxgiFactory, ComPtr<IDXGIAdapter>& outAdapter);
+    Result _createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEATURE_LEVEL featureLevel, AdapterInfo& outAdapterInfo);
     
     D3D12CircularResourceHeap m_circularResourceHeap;
 
@@ -522,7 +540,9 @@ protected:
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
-    ComPtr<ID3D12Device> m_device;
+    AdapterInfo m_adapterInfo;
+    ID3D12Device* m_device = nullptr;
+
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
 //    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
@@ -557,6 +577,7 @@ protected:
     D3D12Resource m_backBufferResources[kMaxNumRenderTargets];
     D3D12Resource m_renderTargetResources[kMaxNumRenderTargets];
 
+    
     RefPtr<ResourceViewImpl> m_rtvs[kMaxRTVCount];
     RefPtr<ResourceViewImpl> m_dsv;
 
@@ -1292,26 +1313,31 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<IDXGIFactory4>& outDxgiFactory, ComPtr<IDXGIAdapter>& outAdapter)
+Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEATURE_LEVEL featureLevel, AdapterInfo& outAdapterInfo)
 {
+    outAdapterInfo.clear();
+
     const UINT dxgiFactoryFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? DXGI_CREATE_FACTORY_DEBUG  : 0;
 
-    // Try and create DXGIFactory
     ComPtr<IDXGIFactory4> dxgiFactory;
+
+    // Try and create DXGIFactory
     SLANG_RETURN_ON_FAIL(m_CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
     
-    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-
     // Search for an adapter that meets our requirements
     ComPtr<IDXGIAdapter> adapter;
+    ComPtr<ID3D12Device> device;
 
     if ((deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) == 0)
     {
+        // Look for software renderer (warp)
+
         SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
-        SLANG_RETURN_ON_FAIL(m_D3D12CreateDevice(adapter, featureLevel, IID_PPV_ARGS(m_device.writeRef())));
+        SLANG_RETURN_ON_FAIL(m_D3D12CreateDevice(adapter, featureLevel, IID_PPV_ARGS(device.writeRef())));
     }
     else
     {
+        // Look for hardware
         UINT adapterCounter = 0;
         for (;;)
         {
@@ -1330,7 +1356,7 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<I
                 continue;
             }
 
-            if (SUCCEEDED(m_D3D12CreateDevice(candidateAdapter, featureLevel, IID_PPV_ARGS(m_device.writeRef()))))
+            if (SUCCEEDED(m_D3D12CreateDevice(candidateAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
             {
                 // We found one!
                 adapter = candidateAdapter;
@@ -1344,8 +1370,23 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<I
         m_dxDebug->EnableDebugLayer();
     }
 
-    outDxgiFactory = dxgiFactory;
-    outAdapter = adapter;
+    // Get the descs
+    {
+        adapter->GetDesc(&outAdapterInfo.m_desc);
+
+        // Look up GetDesc1 info
+        ComPtr<IDXGIAdapter1> adapter1;
+        if (SLANG_SUCCEEDED(adapter->QueryInterface(adapter1.writeRef())))
+        {
+            adapter1->GetDesc1(&outAdapterInfo.m_desc1);
+        }
+    }
+
+    // Save other info
+    outAdapterInfo.m_device = device;
+    outAdapterInfo.m_dxgiFactory = dxgiFactory;
+    outAdapterInfo.m_adapter = adapter;
+
     return SLANG_OK;
 }
 
@@ -1397,8 +1438,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-
-
     FlagCombiner combiner;
     // TODO: we should probably provide a command-line option
     // to override UseDebug of default rather than leave it
@@ -1410,23 +1449,25 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 #endif
     combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
     
-    ComPtr<IDXGIFactory4> dxgiFactory;
-    ComPtr<IDXGIAdapter> adapter;
+    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+
     const int numCombinations = combiner.getNumCombinations();
     for (int i = 0; i < numCombinations; ++i)
     {
-        adapter.setNull();
-        if (SLANG_SUCCEEDED(_createAdaptor(combiner.getCombination(i), dxgiFactory, adapter)))
+        if (SLANG_SUCCEEDED(_createAdaptor(combiner.getCombination(i), featureLevel, m_adapterInfo)))
         {
             break;
         }
     }
 
-    if (!adapter)
+    if (!m_adapterInfo.m_adapter)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
     }
+
+    // Set the device
+    m_device = m_adapterInfo.m_device;
 
     // Find what features are supported
     {
@@ -1436,7 +1477,9 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         D3D12_FEATURE_DATA_SHADER_MODEL featureShaderMode;
         featureShaderMode.HighestShaderModel = D3D_SHADER_MODEL(0x62);
 
+        // TODO: Currently software renderer causes a crash when using half, so disable for now
         if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode))) &&
+            (m_adapterInfo.m_desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
             featureShaderMode.HighestShaderModel >= 0x62)
         {
             // With sm_6_2 we have half
@@ -1498,7 +1541,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
     // Swap chain needs the queue so that it can force a flush on it.
     ComPtr<IDXGISwapChain> swapChain;
-    SLANG_RETURN_ON_FAIL(dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_adapterInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
     SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
 
     if (!m_hasVsync)
@@ -1515,7 +1558,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     }
 
     // This sample does not support fullscreen transitions.
-    SLANG_RETURN_ON_FAIL(dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
+    SLANG_RETURN_ON_FAIL(m_adapterInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
 
     m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
 
@@ -2880,7 +2923,7 @@ void D3D12Renderer::setBindingState(BindingState* state)
 
 void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, BufferResource* buffer)
 {
-    auto dxDevice = m_renderer->m_device.get();
+    auto dxDevice = m_renderer->m_device;
 
     auto resourceImpl = (BufferResourceImpl*) buffer;
     auto resourceDesc = resourceImpl->getDesc();
