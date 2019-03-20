@@ -10,6 +10,11 @@ namespace gfx {
     x(vkCreateInstance) \
     /* */
 
+#define VK_API_INSTANCE_PROCS_OPT(x) \
+    x(vkGetPhysicalDeviceFeatures2) \
+    x(vkGetPhysicalDeviceProperties2) \
+    /* */
+
 #define VK_API_INSTANCE_PROCS(x) \
     x(vkCreateDevice) \
     x(vkCreateDebugReportCallbackEXT) \
@@ -146,6 +151,8 @@ namespace gfx {
     VK_API_ALL_GLOBAL_PROCS(x) \
     VK_API_ALL_INSTANCE_PROCS(x) \
     VK_API_ALL_DEVICE_PROCS(x) \
+    \
+    VK_API_INSTANCE_PROCS_OPT(x) \
     /* */
 
 #define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;

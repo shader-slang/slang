@@ -49,10 +49,14 @@ Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
 
     VK_API_ALL_INSTANCE_PROCS(VK_API_GET_INSTANCE_PROC)
 
+    // Get optional 
+    VK_API_INSTANCE_PROCS_OPT(VK_API_GET_INSTANCE_PROC)
+
     if (!areDefined(ProcType::Instance))
     {
         return SLANG_FAIL;
     }
+
 
     m_instance = instance;
     return SLANG_OK;

@@ -55,6 +55,7 @@ class D3D12Renderer : public Renderer
 public:
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual const List<String>& getFeatures() override { return m_features; }
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -571,6 +572,8 @@ protected:
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
     HWND m_hwnd = nullptr;
+
+    List<String> m_features;
 };
 
 Renderer* createD3D12Renderer()
@@ -1397,6 +1400,8 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
+
+
     FlagCombiner combiner;
     // TODO: we should probably provide a command-line option
     // to override UseDebug of default rather than leave it
@@ -1424,6 +1429,22 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
+    }
+
+    // Find what features are supported
+    {
+        // Check this is how this is laid out...
+        SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
+
+        D3D12_FEATURE_DATA_SHADER_MODEL featureShaderMode;
+        featureShaderMode.HighestShaderModel = D3D_SHADER_MODEL(0x62);
+
+        if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderMode, sizeof(featureShaderMode))) &&
+            featureShaderMode.HighestShaderModel >= 0x62)
+        {
+            // With sm_6_2 we have half
+            m_features.Add("half");
+        }
     }
 
     m_numRenderFrames = 3;

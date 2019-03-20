@@ -42,6 +42,7 @@ public:
 
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual const List<String>& getFeatures() override { return m_features; }
     virtual void setClearColor(const float color[4]) override;
     virtual void clearFrame() override;
     virtual void presentFrame() override;
@@ -488,6 +489,7 @@ public:
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
     Desc m_desc;
+    List<String> m_features;
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -898,6 +900,8 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         VK_KHR_SURFACE_EXTENSION_NAME,
 
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+
 #if SLANG_WINDOWS_FAMILY
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #else
@@ -949,6 +953,71 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
 
+    List<const char*> deviceExtensions;
+    deviceExtensions.Add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+    deviceCreateInfo.queueCreateInfoCount = 1;
+    
+    deviceCreateInfo.pEnabledFeatures = &m_api.m_deviceFeatures;
+
+    // Get the device features (doesn't use, but useful when debugging)
+    if (m_api.vkGetPhysicalDeviceFeatures2)
+    {
+        VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+        deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
+    }
+
+    VkPhysicalDeviceProperties basicProps = {};
+    m_api.vkGetPhysicalDeviceProperties(m_api.m_physicalDevice, &basicProps);
+
+    // Get the API version
+    const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
+    const uint32_t minorVersion = VK_VERSION_MINOR(basicProps.apiVersion);
+
+    // Float16 features
+    // Need in this scope because it will be linked into the device creation (if it is available)
+    VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
+
+    // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
+    if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
+        m_api.vkGetPhysicalDeviceProperties2 &&
+        m_api.vkGetPhysicalDeviceFeatures2)
+    {
+        VkPhysicalDeviceProperties2 physicalDeviceProps2;
+
+        physicalDeviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        physicalDeviceProps2.pNext = nullptr;
+        physicalDeviceProps2.properties = {};
+
+        m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &physicalDeviceProps2);
+
+        // Get device features
+        VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+        deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+        // Link together for lookup 
+        float16Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &float16Features;
+
+        m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
+
+        // If we have float16 features then enable
+        if (float16Features.shaderFloat16)
+        {
+            // Link into the creation features
+            float16Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &float16Features;
+
+            // Add the Float16 extension
+            deviceExtensions.Add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+
+            // We have half support
+            m_features.Add("half");
+        }   
+    }
+
     int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
     assert(queueFamilyIndex >= 0);
 
@@ -958,18 +1027,10 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
-    char const* const deviceExtensions[] =
-    {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    };
-
-    VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-    deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.pEnabledFeatures = &m_api.m_deviceFeatures;
 
-    deviceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(deviceExtensions);
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
+    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.Count());
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.Buffer();
 
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
