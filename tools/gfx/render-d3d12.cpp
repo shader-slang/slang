@@ -1326,10 +1326,7 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, ComPtr<I
 
             if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
             {
-                // TODO: may want to allow software driver as fallback
-            }
-            else
-            {
+                // If it's software - then ignore it
                 continue;
             }
 
