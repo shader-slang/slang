@@ -453,7 +453,7 @@ protected:
         /// Blocks until gpu has completed all work
     void releaseFrameResources();
 
-    Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
+    Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
 
     void beginRender();
 
@@ -709,7 +709,7 @@ static void _initBufferResourceDesc(size_t bufferSize, D3D12_RESOURCE_DESC& out)
     out.Flags = D3D12_RESOURCE_FLAG_NONE;
 }
 
-Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut)
+Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
@@ -750,7 +750,7 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
         ID3D12Resource* dxUploadResource = uploadResource.getResource();
 
         SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
-        ::memcpy(dstData, srcData, bufferSize);
+        ::memcpy(dstData, srcData, srcDataSize);
         dxUploadResource->Unmap(0, nullptr);
 
         m_commandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
@@ -2062,7 +2062,7 @@ Result D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const B
         case Style::ResourceBacked:
         {
             const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
-            SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, buffer->m_uploadResource, initialState, buffer->m_resource));
+            SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
             break;
         }
         default:
