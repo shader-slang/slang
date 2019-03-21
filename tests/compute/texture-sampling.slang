@@ -98,13 +98,8 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     
     val += t2dArray.Sample(samplerState, float3(uv, 0.0));
     
-    // TODO(JS): Disable for now, as doesn't work correctly on dx12
-#if 0    
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
-#else    
-    val += float4(2, 2, 2, 2);
-#endif    
     
     outputBuffer[0] = val.x;
 	return output;

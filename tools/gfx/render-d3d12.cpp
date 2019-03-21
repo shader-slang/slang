@@ -2023,18 +2023,16 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
     // We should have this many sub resources
     assert(initData->numSubResources == numMipMaps * srcDesc.size.depth * arraySize);
 
-    // This is just the size for one array upload -> not for the whole texure
+    // NOTE! This is just the size for one array upload -> not for the whole texture
     UInt64 requiredSize = 0;
     m_device->GetCopyableFootprints(&resourceDesc, 0, numMipMaps, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
 
     // Sub resource indexing
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing
-
-    int subResourceIndex = 0;
-    for (int i = 0; i < arraySize; i++)
     {
         // Create the upload texture
         D3D12Resource uploadTexture;
+       
         {
             D3D12_HEAP_PROPERTIES heapProps;
 
@@ -2062,68 +2060,71 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
 
             uploadTexture.setDebugName(L"TextureUpload");
         }
-
+        // Get the pointer to the upload resource
         ID3D12Resource* uploadResource = uploadTexture;
 
-        uint8_t* p;
-        uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
-
-        for (int j = 0; j < numMipMaps; ++j)
+        int subResourceIndex = 0;
+        for (int arrayIndex = 0; arrayIndex < arraySize; arrayIndex++)
         {
-            const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
-            const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
+            uint8_t* p;
+            uploadResource->Map(0, nullptr, reinterpret_cast<void**>(&p));
 
-            const TextureResource::Size mipSize = srcDesc.size.calcMipSize(j);
-
-            assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
-
-            const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
-            const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]);
-
-            assert(dstMipRowPitch >= srcMipRowPitch);
-
-            const uint8_t* srcRow = (const uint8_t*)initData->subResources[subResourceIndex];
-            uint8_t* dstRow = p + layouts[j].Offset;
-
-            // Copy the depth each mip
-            for (int l = 0; l < mipSize.depth; l++)
+            for (int j = 0; j < numMipMaps; ++j)
             {
-                // Copy rows
-                for (int k = 0; k < mipSize.height; ++k)
-                {
-                    ::memcpy(dstRow, srcRow, srcMipRowPitch);
+                const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
+                const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-                    srcRow += srcMipRowPitch;
-                    dstRow += dstMipRowPitch;
+                const TextureResource::Size mipSize = srcDesc.size.calcMipSize(j);
+
+                assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
+
+                const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
+                const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]);
+
+                assert(dstMipRowPitch >= srcMipRowPitch);
+
+                const uint8_t* srcRow = (const uint8_t*)initData->subResources[subResourceIndex];
+                uint8_t* dstRow = p + layouts[j].Offset;
+
+                // Copy the depth each mip
+                for (int l = 0; l < mipSize.depth; l++)
+                {
+                    // Copy rows
+                    for (int k = 0; k < mipSize.height; ++k)
+                    {
+                        ::memcpy(dstRow, srcRow, srcMipRowPitch);
+
+                        srcRow += srcMipRowPitch;
+                        dstRow += dstMipRowPitch;
+                    }
                 }
+
+                //assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
+            }
+            uploadResource->Unmap(0, nullptr);
+
+            for (int mipIndex = 0; mipIndex < numMipMaps; ++mipIndex)
+            {
+                // https://msdn.microsoft.com/en-us/library/windows/desktop/dn903862(v=vs.85).aspx
+
+                D3D12_TEXTURE_COPY_LOCATION src;
+                src.pResource = uploadTexture;
+                src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                src.PlacedFootprint = layouts[mipIndex];
+
+                D3D12_TEXTURE_COPY_LOCATION dst;
+                dst.pResource = texture->m_resource;
+                dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                dst.SubresourceIndex = subResourceIndex;
+                m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+                subResourceIndex++;
             }
 
-            //assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
+            // Block - waiting for copy to complete (so can drop upload texture)
+            submitGpuWorkAndWait();
         }
-        uploadResource->Unmap(0, nullptr);
-
-        for (int mipIndex = 0; mipIndex < numMipMaps; ++mipIndex)
-        {
-            // https://msdn.microsoft.com/en-us/library/windows/desktop/dn903862(v=vs.85).aspx
-
-            D3D12_TEXTURE_COPY_LOCATION src;
-            src.pResource = uploadTexture;
-            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            src.PlacedFootprint = layouts[mipIndex];
-
-            D3D12_TEXTURE_COPY_LOCATION dst;
-            dst.pResource = texture->m_resource;
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            dst.SubresourceIndex = subResourceIndex;
-            m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-
-            subResourceIndex++;
-        }
-
-        // Block - waiting for copy to complete (so can drop upload texture)
-        submitGpuWorkAndWait();
     }
-
     {
         const D3D12_RESOURCE_STATES finalState = _calcResourceState(initialUsage);
         D3D12BarrierSubmitter submitter(m_commandList);
@@ -2362,7 +2363,16 @@ Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::
     case ResourceView::Type::ShaderResource:
         {
             SLANG_RETURN_ON_FAIL(m_viewAllocator.allocate(&viewImpl->m_descriptor));
-            m_device->CreateShaderResourceView(resourceImpl->m_resource, nullptr, viewImpl->m_descriptor.cpuHandle);
+
+            // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube is not accessed
+            // appropriately (rather than just passing nullptr to CreateShaderResourceView)
+            const D3D12_RESOURCE_DESC resourceDesc = resourceImpl->m_resource.getResource()->GetDesc();
+            const DXGI_FORMAT pixelFormat = resourceDesc.Format;
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            _initSrvDesc(resourceImpl->getType(), resourceImpl->getDesc(), resourceDesc, pixelFormat, srvDesc);
+
+            m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
     }
