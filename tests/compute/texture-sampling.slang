@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE:
+
 //TEST_INPUT: Texture1D(size=4, content = one) : dxbinding(0),glbinding(0)
 //TEST_INPUT: Texture2D(size=4, content = one) : dxbinding(1),glbinding(1)
 //TEST_INPUT: Texture3D(size=4, content = one) : dxbinding(2),glbinding(2)
@@ -8,7 +9,6 @@
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2) : dxbinding(6),glbinding(6)
 //TEST_INPUT: Sampler : dxbinding(0),glbinding(0,1,2,3,4,5,6)
 //TEST_INPUT: ubuffer(data=[0], stride=4):dxbinding(1),glbinding(0),out
-
 
 Texture1D t1D;
 Texture2D t2D;
@@ -95,9 +95,12 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     val += t2D.Sample(samplerState, uv);
     val += t3D.Sample (samplerState, float3(uv, 0.5));
     val += t1dArray.Sample(samplerState, float2(uv.x, 0.0));
+    
     val += t2dArray.Sample(samplerState, float3(uv, 0.0));
+    
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
+    
     outputBuffer[0] = val.x;
 	return output;
 }

@@ -1209,7 +1209,11 @@ SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ra
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> radians(matrix<T,N,M> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Approximate reciprocal\n")
-SLANG_RAW("__generic<T : __BuiltinFloatingPointType> T rcp(T x);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"1.0/($0)\")\n")
+SLANG_RAW("T rcp(T x);\n")
+SLANG_RAW("\n")
+SLANG_RAW("// TODO: vector and matrix approx. reciprocals needto be deconstructed for GLSL\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rcp(vector<T,N> x);\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rcp(matrix<T,N,M> x);\n")
 SLANG_RAW("\n")
@@ -1531,7 +1535,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1458 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1462 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
