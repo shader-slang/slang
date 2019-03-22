@@ -366,7 +366,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     return findAdapters(flags, adapaterName, factory, outDxgiAdapters);
 }
 
-static bool _nameMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& lowerAdapaterName)
+static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& lowerAdapaterName)
 {
     if (lowerAdapaterName.size() == 0)
     {
@@ -394,7 +394,7 @@ static bool _nameMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& l
         if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
         {
             dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
-            if (_nameMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
+            if (_isMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
             {
                 outDxgiAdapters.Add(warpAdapter);
             }
@@ -412,7 +412,7 @@ static bool _nameMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& l
         {
             continue;
         }
-        if (!_nameMatch(dxgiAdapter, lowerAdapterName.getUnownedSlice()))
+        if (!_isMatch(dxgiAdapter, lowerAdapterName.getUnownedSlice()))
         {
             continue;
         }
