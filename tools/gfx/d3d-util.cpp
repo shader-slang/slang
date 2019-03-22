@@ -381,6 +381,20 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
     return descName.IndexOf(lowerAdapaterName) != UInt(-1);
 }
 
+/* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
+{
+    ComPtr<IDXGIFactory4> dxgiFactory4;
+    if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
+    {
+        ComPtr<IDXGIAdapter> warpAdapter;
+        dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
+
+        return adapterIn == warpAdapter;
+    }
+
+    return false;
+}
+
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     String lowerAdapterName = String(adapterName).ToLower();

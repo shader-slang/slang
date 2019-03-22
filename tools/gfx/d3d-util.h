@@ -70,6 +70,10 @@ class D3DUtil
     static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, IDXGIFactory* dxgiFactory, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
         /// Find adapters
     static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+
+        /// True if the adapter is warp
+    static bool isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapter);
+
 };
 
 } // renderer_test

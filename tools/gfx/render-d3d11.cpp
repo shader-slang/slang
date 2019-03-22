@@ -486,6 +486,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
                 adapter = dxgiAdapters[0];
             }
 
+            // The adapter can be nullptr - that just means 'default', but when so we need to select the driver type
             D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_UNKNOWN;
             if (adapter == nullptr)
             {
@@ -497,7 +498,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
             res = D3D11CreateDeviceAndSwapChain_(
-                adapter,                    // adapter (use default)
+                adapter,                   
                 driverType,
                 nullptr,                    // software
                 deviceFlags,

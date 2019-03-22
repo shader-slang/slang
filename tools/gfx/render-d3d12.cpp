@@ -1399,6 +1399,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     outDeviceInfo.m_device = device;
     outDeviceInfo.m_dxgiFactory = dxgiFactory;
     outDeviceInfo.m_adapter = adapter;
+    outDeviceInfo.m_isWarp = D3DUtil::isWarp(dxgiFactory, adapter);
 
     return SLANG_OK;
 }
