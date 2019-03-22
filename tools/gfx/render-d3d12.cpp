@@ -1330,6 +1330,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
         if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
         {
             adapter = dxgiAdapter;
+            break;
         }
     }
 
