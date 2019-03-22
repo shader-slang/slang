@@ -57,6 +57,8 @@ struct Options
     bool useDXIL = false;
 
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
+
+    Slang::String adapter;                              ///< The adapter to use either name or index
 };
 
 extern Options gOptions;

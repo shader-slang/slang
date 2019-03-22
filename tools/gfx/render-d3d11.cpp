@@ -472,12 +472,32 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         for (int i = 0; i < numCombinations; ++i)
         {
             const auto deviceCheckFlags = combiner.getCombination(i);
-            const D3D_DRIVER_TYPE driverType = (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
+
+            // If we have an adapter set on the desc, look it up. We only need to do so for hardware
+            ComPtr<IDXGIAdapter> adapter;
+            if (desc.adapter.Length() &&  (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
+            {
+                List<ComPtr<IDXGIAdapter>> dxgiAdapters;
+                D3DUtil::findAdapters(deviceCheckFlags, desc.adapter.getUnownedSlice(), dxgiAdapters);
+                if (dxgiAdapters.Count() == 0)
+                {
+                    continue;
+                }
+                adapter = dxgiAdapters[0];
+            }
+
+            D3D_DRIVER_TYPE driverType = D3D_DRIVER_TYPE_UNKNOWN;
+            if (adapter == nullptr)
+            {
+                // If we don't have an adapter, select directly
+                driverType = (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) ? D3D_DRIVER_TYPE_HARDWARE : D3D_DRIVER_TYPE_REFERENCE;
+            }
+
             const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
             res = D3D11CreateDeviceAndSwapChain_(
-                nullptr,                    // adapter (use default)
+                adapter,                    // adapter (use default)
                 driverType,
                 nullptr,                    // software
                 deviceFlags,

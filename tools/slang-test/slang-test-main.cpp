@@ -452,6 +452,8 @@ ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 
 ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnType spawnType, OSProcessSpawner& spawner)
 {
+    const auto& options = context->options;
+
     OSError spawnResult = kOSError_OperationFailed;
     switch (spawnType)
     {
@@ -1079,6 +1081,14 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+static void _addRenderTestOptions(const Options& options, OSProcessSpawner& spawner)
+{
+    if (options.adapter.Length())
+    {
+        spawner.pushArgument("-adapter");
+        spawner.pushArgument(options.adapter);
+    }
+}
 
 TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, const char *const* langOpts, size_t numLangOpts)
 {
@@ -1096,6 +1106,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
 	spawner.pushArgument(filePath999);
+
+    _addRenderTestOptions(context->options, spawner);
 
 	for (auto arg : input.testOptions->args)
 	{
@@ -1198,6 +1210,8 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
     spawner.pushArgument(filePath);
+
+    _addRenderTestOptions(context->options, spawner);
 
     for( auto arg : input.testOptions->args )
     {
@@ -1405,7 +1419,15 @@ TestResult runHLSLRenderComparisonTestImpl(
     String actualOutput;
 
     TestResult hlslResult   =  doRenderComparisonTestRun(context, input, expectedArg, ".expected", &expectedOutput);
+    if (hlslResult != TestResult::Pass)
+    {
+        return hlslResult;
+    }
     TestResult slangResult  =  doRenderComparisonTestRun(context, input, actualArg, ".actual", &actualOutput);
+    if (slangResult != TestResult::Pass)
+    {
+        return slangResult;
+    }
 
     Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
     Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);

@@ -110,7 +110,7 @@ protected:
     static const Int kMaxRTVCount = 8;
     static const Int kMaxDescriptorSetCount = 16;
 
-    struct AdapterInfo
+    struct DeviceInfo
     {
         void clear()
         {
@@ -123,7 +123,7 @@ protected:
         }
 
         bool m_isWarp;
-        ComPtr<IDXGIFactory4> m_dxgiFactory;
+        ComPtr<IDXGIFactory> m_dxgiFactory;
         ComPtr<ID3D12Device> m_device;
         ComPtr<IDXGIAdapter> m_adapter;
         DXGI_ADAPTER_DESC m_desc;
@@ -500,7 +500,7 @@ protected:
 //    Result _calcBindParameters(BindParameters& params);
 //    RenderState* findRenderState(PipelineType pipelineType);
 
-    Result _createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEATURE_LEVEL featureLevel, AdapterInfo& outAdapterInfo);
+    Result _createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo);
     
     D3D12CircularResourceHeap m_circularResourceHeap;
 
@@ -542,7 +542,7 @@ protected:
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
-    AdapterInfo m_adapterInfo;
+    DeviceInfo m_adapterInfo;
     ID3D12Device* m_device = nullptr;
 
     ComPtr<IDXGISwapChain3> m_swapChain;
@@ -587,10 +587,7 @@ protected:
     int32_t m_targetUsageFlags = 0;            ///< D3DUtil::UsageFlag combination for target
 
     // Dll entry points
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
-
     PFN_D3D12_GET_DEBUG_INTERFACE m_D3D12GetDebugInterface = nullptr;
-    PFN_DXGI_CREATE_FACTORY_2 m_CreateDXGIFactory2 = nullptr;
     PFN_D3D12_CREATE_DEVICE m_D3D12CreateDevice = nullptr;
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
@@ -1314,63 +1311,29 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEATURE_LEVEL featureLevel, AdapterInfo& outAdapterInfo)
+Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
-    outAdapterInfo.clear();
+    outDeviceInfo.clear();
 
-    const UINT dxgiFactoryFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? DXGI_CREATE_FACTORY_DEBUG  : 0;
+    ComPtr<IDXGIFactory> dxgiFactory;
+    SLANG_RETURN_ON_FAIL(D3DUtil::createFactory(deviceCheckFlags, dxgiFactory));
 
-    ComPtr<IDXGIFactory4> dxgiFactory;
+    List<ComPtr<IDXGIAdapter>> dxgiAdapters;
+    SLANG_RETURN_ON_FAIL(D3DUtil::findAdapters(deviceCheckFlags, nameMatch, dxgiFactory, dxgiAdapters));
 
-    // Try and create DXGIFactory
-    SLANG_RETURN_ON_FAIL(m_CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(dxgiFactory.writeRef())));
-    
-    // Search for an adapter that meets our requirements
-    ComPtr<IDXGIAdapter> adapter;
     ComPtr<ID3D12Device> device;
+    ComPtr<IDXGIAdapter> adapter;
 
-    if ((deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice) == 0)
+    for (int i = 0; i < int(dxgiAdapters.Count()); ++i)
     {
-        // Look for software renderer (warp)
-        
-        SLANG_RETURN_ON_FAIL(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.writeRef())));
-        SLANG_RETURN_ON_FAIL(m_D3D12CreateDevice(adapter, featureLevel, IID_PPV_ARGS(device.writeRef())));
-
-        outAdapterInfo.m_isWarp = true;
-    }
-    else
-    {
-        // Look for hardware
-        UINT adapterCounter = 0;
-        for (;;)
+        IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
+        if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
         {
-            UINT adapterIndex = adapterCounter++;
-
-            ComPtr<IDXGIAdapter1> candidateAdapter;
-            if (dxgiFactory->EnumAdapters1(adapterIndex, candidateAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
-                break;
-
-            DXGI_ADAPTER_DESC1 desc;
-            candidateAdapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            {
-                // If it's software - then ignore it
-                continue;
-            }
-
-            if (SUCCEEDED(m_D3D12CreateDevice(candidateAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
-            {
-                // We found one!
-                adapter = candidateAdapter;
-                break;
-            }
+            adapter = dxgiAdapter;
         }
     }
 
-    // Didn't find an adapter
-    if (!adapter)
+    if (!device)
     {
         return SLANG_FAIL;
     }
@@ -1421,20 +1384,20 @@ Result D3D12Renderer::_createAdaptor(DeviceCheckFlags deviceCheckFlags, D3D_FEAT
 
     // Get the descs
     {
-        adapter->GetDesc(&outAdapterInfo.m_desc);
+        adapter->GetDesc(&outDeviceInfo.m_desc);
 
         // Look up GetDesc1 info
         ComPtr<IDXGIAdapter1> adapter1;
         if (SLANG_SUCCEEDED(adapter->QueryInterface(adapter1.writeRef())))
         {
-            adapter1->GetDesc1(&outAdapterInfo.m_desc1);
+            adapter1->GetDesc1(&outDeviceInfo.m_desc1);
         }
     }
 
     // Save other info
-    outAdapterInfo.m_device = device;
-    outAdapterInfo.m_dxgiFactory = dxgiFactory;
-    outAdapterInfo.m_adapter = adapter;
+    outDeviceInfo.m_device = device;
+    outDeviceInfo.m_dxgiFactory = dxgiFactory;
+    outDeviceInfo.m_adapter = adapter;
 
     return SLANG_OK;
 }
@@ -1448,13 +1411,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     if (!d3dModule)
     {
         fprintf(stderr, "error: failed load 'd3d12.dll'\n");
-        return SLANG_FAIL;
-    }
-
-    HMODULE dxgiModule = LoadLibraryA("dxgi.dll");
-    if (!dxgiModule)
-    {
-        fprintf(stderr, "error: failed load 'dxgi.dll'\n");
         return SLANG_FAIL;
     }
 
@@ -1491,11 +1447,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     }
 #endif
 
-    m_CreateDXGIFactory2 = (PFN_DXGI_CREATE_FACTORY_2)loadProc(dxgiModule, "CreateDXGIFactory2");
-    if (!m_CreateDXGIFactory2)
-    {
-        return SLANG_FAIL;
-    }
     m_D3D12CreateDevice = (PFN_D3D12_CREATE_DEVICE)loadProc(d3dModule, "D3D12CreateDevice");
     if (!m_D3D12CreateDevice)
     {
@@ -1518,7 +1469,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     const int numCombinations = combiner.getNumCombinations();
     for (int i = 0; i < numCombinations; ++i)
     {
-        if (SLANG_SUCCEEDED(_createAdaptor(combiner.getCombination(i), featureLevel, m_adapterInfo)))
+        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), desc.adapter.getUnownedSlice(), featureLevel, m_adapterInfo)))
         {
             break;
         }

@@ -948,8 +948,35 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     physicalDevices.SetSize(numPhysicalDevices);
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
-    // TODO: allow override of selected device
-    uint32_t selectedDeviceIndex = 0;
+    int32_t selectedDeviceIndex = 0;
+
+    if (desc.adapter.Length())
+    {
+        selectedDeviceIndex = -1;
+
+        String lowerAdapter = desc.adapter.ToLower();
+
+        for (int i = 0; i < int(physicalDevices.Count()); ++i)
+        {
+            auto physicalDevice = physicalDevices[i];
+
+            VkPhysicalDeviceProperties basicProps = {};
+            m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
+
+            String lowerName = String(basicProps.deviceName).ToLower();
+
+            if (lowerName.IndexOf(lowerAdapter) != UInt(-1))
+            {
+                selectedDeviceIndex = i;
+                break;
+            }
+        }
+        if (selectedDeviceIndex < 0)
+        {
+            // Device not found
+            return SLANG_FAIL;
+        }
+    }
 
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
 
@@ -2704,7 +2731,7 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     VkPipeline pipeline = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api.vkCreateGraphicsPipelines(m_device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline));
 
-    RefPtr<PipelineStateImpl> pipelineStateImpl;
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(m_api);
     pipelineStateImpl->m_pipeline = pipeline;
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_shaderProgram = programImpl;
