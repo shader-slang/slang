@@ -542,7 +542,7 @@ protected:
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
-    DeviceInfo m_adapterInfo;
+    DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
 
     ComPtr<IDXGISwapChain3> m_swapChain;
@@ -1469,20 +1469,20 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     const int numCombinations = combiner.getNumCombinations();
     for (int i = 0; i < numCombinations; ++i)
     {
-        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), desc.adapter.getUnownedSlice(), featureLevel, m_adapterInfo)))
+        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), desc.adapter.getUnownedSlice(), featureLevel, m_deviceInfo)))
         {
             break;
         }
     }
 
-    if (!m_adapterInfo.m_adapter)
+    if (!m_deviceInfo.m_adapter)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
     }
 
     // Set the device
-    m_device = m_adapterInfo.m_device;
+    m_device = m_deviceInfo.m_device;
 
     // Find what features are supported
     {
@@ -1495,7 +1495,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
             // TODO: Currently warp causes a crash when using half, so disable for now
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel))) &&
-                m_adapterInfo.m_isWarp == false &&
+                m_deviceInfo.m_isWarp == false &&
                 featureShaderModel.HighestShaderModel >= 0x62)
             {
                 // With sm_6_2 we have half
@@ -1566,7 +1566,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
     // Swap chain needs the queue so that it can force a flush on it.
     ComPtr<IDXGISwapChain> swapChain;
-    SLANG_RETURN_ON_FAIL(m_adapterInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
     SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
 
     if (!m_hasVsync)
@@ -1583,7 +1583,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     }
 
     // This sample does not support fullscreen transitions.
-    SLANG_RETURN_ON_FAIL(m_adapterInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
+    SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
 
     m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
 
