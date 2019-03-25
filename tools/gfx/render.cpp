@@ -389,4 +389,17 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
     }
 }
 
+/* static */UnownedStringSlice RendererUtil::toText(RendererType type)
+{
+    switch (type)
+    {
+        case RendererType::DirectX11:       return UnownedStringSlice::fromLiteral("DirectX11");
+        case RendererType::DirectX12:       return UnownedStringSlice::fromLiteral("DirectX11");
+        case RendererType::OpenGl:          return UnownedStringSlice::fromLiteral("OpenGL");
+        case RendererType::Vulkan:          return UnownedStringSlice::fromLiteral("Vulkan");
+        case RendererType::Unknown:         return UnownedStringSlice::fromLiteral("Unknown");
+        default:                            return UnownedStringSlice::fromLiteral("?!?");
+    }
+}
+
 } // renderer_test

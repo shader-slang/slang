@@ -86,6 +86,9 @@ struct Options
     // OpenGL is disabled for now
     Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl);
 
+    // The adapter to use. If empty will match first found adapter.
+    Slang::String adapter;
+
         /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(int argc, char** argv, TestCategorySet* categorySet, Slang::WriterHelper stdError, Options* optionsOut);
 };

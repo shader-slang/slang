@@ -151,6 +151,16 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             gOptions.useDXIL = true;
         }
+        else if (strcmp(arg, "-adapter") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("expected argument for '%s' option\n", arg);
+                return SLANG_FAIL;
+            }
+
+            gOptions.adapter = *argCursor++;
+        }
         else
         {
             // Lookup
