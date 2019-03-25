@@ -2393,6 +2393,7 @@ struct EmitVisitor
         case kIROp_GlobalConstant:
         case kIROp_GlobalParam:
         case kIROp_Param:
+        case kIROp_Func:
             return false;
 
         // Always fold these in, because they are trivial
@@ -2511,6 +2512,15 @@ struct EmitVisitor
             {
                 return true;
             }
+        }
+
+        // If the instruction is at global scope, then it might represent
+        // a constant (e.g., the value of an enum case).
+        //
+        if(as<IRModuleInst>(inst->getParent()))
+        {
+            if(!inst->mightHaveSideEffects())
+                return true;
         }
 
         // Having dealt with all of the cases where we *must* fold things
