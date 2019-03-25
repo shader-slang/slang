@@ -8,10 +8,13 @@
 #include "../../slang-com-ptr.h"
 #include "../../source/core/list.h"
 
+#include "flag-combiner.h"
+
 #include "render.h"
 
 #include <D3Dcommon.h>
 #include <DXGIFormat.h>
+#include <dxgi.h>
 
 namespace gfx {
 
@@ -56,6 +59,21 @@ class D3DUtil
 
         /// Append text in in, into wide char array
     static void appendWideChars(const char* in, Slang::List<wchar_t>& out);
+
+    
+    static SlangResult createFactory(DeviceCheckFlags flags, Slang::ComPtr<IDXGIFactory>& outFactory);
+
+        /// Get the dxgiModule
+    static HMODULE getDxgiModule();
+
+        /// Find adapters
+    static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, IDXGIFactory* dxgiFactory, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+        /// Find adapters
+    static SlangResult findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, Slang::List<Slang::ComPtr<IDXGIAdapter>>& dxgiAdapters);
+
+        /// True if the adapter is warp
+    static bool isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapter);
+
 };
 
 } // renderer_test

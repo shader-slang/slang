@@ -3,6 +3,8 @@
 
 #include <d3dcompiler.h>
 
+#include <dxgi1_4.h>
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -302,6 +304,151 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
         // Remove terminating 0 from array
         out.UnsafeShrinkToSize(prevSize + outSize);
     }
+}
+
+/* static */HMODULE D3DUtil::getDxgiModule()
+{
+    static HMODULE s_dxgiModule = LoadLibraryA("dxgi.dll");
+    if (!s_dxgiModule)
+    {
+        fprintf(stderr, "error: failed load 'dxgi.dll'\n");
+        return nullptr;
+    }
+
+    return s_dxgiModule;
+}
+
+/* static */SlangResult D3DUtil::createFactory(DeviceCheckFlags flags, ComPtr<IDXGIFactory>& outFactory)
+{
+    auto dxgiModule =  getDxgiModule();
+    if (!dxgiModule)
+    {
+        return SLANG_FAIL;
+    }
+
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY)(REFIID riid, void   **ppFactory);
+    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, _COM_Outptr_ void **ppFactory);
+
+    {
+        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)::GetProcAddress(dxgiModule, "CreateDXGIFactory2");
+        if (createFactory2)
+        {
+            UINT dxgiFlags = 0;
+
+            if (flags & DeviceCheckFlag::UseDebug)
+            {
+                dxgiFlags |= DXGI_CREATE_FACTORY_DEBUG;
+            }
+
+            ComPtr<IDXGIFactory4> factory;
+            SLANG_RETURN_ON_FAIL(createFactory2(dxgiFlags, IID_PPV_ARGS(factory.writeRef())));
+
+            outFactory = factory;
+            return SLANG_OK;
+        }
+    }
+
+    {
+        auto createFactory = (PFN_DXGI_CREATE_FACTORY)::GetProcAddress(dxgiModule, "CreateDXGIFactory");
+        if (!createFactory)
+        {
+            fprintf(stderr, "error: failed load symbol '%s'\n", "CreateDXGIFactory");
+            return SLANG_FAIL;
+        }
+        return createFactory(IID_PPV_ARGS(outFactory.writeRef()));
+    }
+}
+
+/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const Slang::UnownedStringSlice& adapaterName, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+{
+    ComPtr<IDXGIFactory> factory;
+    SLANG_RETURN_ON_FAIL(createFactory(flags, factory));
+    return findAdapters(flags, adapaterName, factory, outDxgiAdapters);
+}
+
+static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& lowerAdapaterName)
+{
+    if (lowerAdapaterName.size() == 0)
+    {
+        return true;
+    }
+
+    DXGI_ADAPTER_DESC desc;
+    adapter->GetDesc(&desc);
+
+    String descName = String::FromWString(desc.Description).ToLower();
+
+    return descName.IndexOf(lowerAdapaterName) != UInt(-1);
+}
+
+/* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
+{
+    ComPtr<IDXGIFactory4> dxgiFactory4;
+    if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
+    {
+        ComPtr<IDXGIAdapter> warpAdapter;
+        dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
+
+        return adapterIn == warpAdapter;
+    }
+
+    return false;
+}
+
+/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+{
+    String lowerAdapterName = String(adapterName).ToLower();
+
+    outDxgiAdapters.Clear();
+
+    ComPtr<IDXGIAdapter> warpAdapter;
+    if ((flags & DeviceCheckFlag::UseHardwareDevice) == 0)
+    {
+        ComPtr<IDXGIFactory4> dxgiFactory4;
+        if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
+        {
+            dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
+            if (_isMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
+            {
+                outDxgiAdapters.Add(warpAdapter);
+            }
+        }
+    }
+
+    for (UINT adapterIndex = 0; true; adapterIndex++)
+    {
+        ComPtr<IDXGIAdapter> dxgiAdapter;
+        if (dxgiFactory->EnumAdapters(adapterIndex, dxgiAdapter.writeRef()) == DXGI_ERROR_NOT_FOUND)
+            break;
+
+        // Skip if warp (as we will have already added it)
+        if (dxgiAdapter == warpAdapter)
+        {
+            continue;
+        }
+        if (!_isMatch(dxgiAdapter, lowerAdapterName.getUnownedSlice()))
+        {
+            continue;
+        }
+
+        // Get if it's software
+        UINT deviceFlags = 0;
+        ComPtr<IDXGIAdapter1> dxgiAdapter1;
+        if (SLANG_SUCCEEDED(dxgiAdapter->QueryInterface(IID_PPV_ARGS(dxgiAdapter1.writeRef()))))
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            dxgiAdapter1->GetDesc1(&desc);
+            deviceFlags = desc.Flags;
+        }
+
+        // If the right type then add it
+        if ((deviceFlags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 && (flags & DeviceCheckFlag::UseHardwareDevice) != 0)
+        {
+            outDxgiAdapters.Add(dxgiAdapter);
+        }
+    }
+
+    return SLANG_OK;
 }
 
 } // renderer_test

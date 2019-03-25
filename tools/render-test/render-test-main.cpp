@@ -555,21 +555,30 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 			return SLANG_FAIL;
 	}
 
+    StringBuilder rendererName;
+    rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
+    if (gOptions.adapter.Length())
+    {
+        rendererName << "'" << gOptions.adapter << "'";
+    }
+
+
     if (!renderer)
     {
-        fprintf(stderr, "Unable to create renderer\n");
+        fprintf(stderr, "Unable to create renderer %s\n", rendererName.Buffer());
         return SLANG_FAIL;
     }
 
     Renderer::Desc desc;
     desc.width = gWindowWidth;
     desc.height = gWindowHeight;
+    desc.adapter = gOptions.adapter;
 
     {
         SlangResult res = renderer->initialize(desc, (HWND)window->getHandle());
         if (SLANG_FAILED(res))
         {
-            fprintf(stderr, "Unable to initialize renderer\n");
+            fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.Buffer());
             return res;
         }
     }
