@@ -807,7 +807,8 @@ struct EmitVisitor
     }
 
     void emitGLSLTypePrefix(
-        IRType* type)
+        IRType* type,
+        bool promoteHalfToFloat = false)
     {
         switch (type->op)
         {
@@ -830,17 +831,24 @@ struct EmitVisitor
         case kIROp_HalfType:
         {
             _requireHalf();
-            Emit("f16");
+            if (promoteHalfToFloat)
+            {
+                // no prefix
+            }
+            else
+            {
+                Emit("f16");
+            }
             break;
         }
         case kIROp_DoubleType:  Emit("d");		break;
 
         case kIROp_VectorType:
-            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType());
+            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         case kIROp_MatrixType:
-            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType());
+            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         default:
@@ -907,7 +915,15 @@ struct EmitVisitor
         IRTextureTypeBase*  type,
         char const*         baseName)
     {
-        emitGLSLTypePrefix(type->getElementType());
+        if (type->getElementType()->op == kIROp_HalfType)
+        {
+            // Texture access is always as float types if half is specified
+
+        }
+        else
+        {
+            emitGLSLTypePrefix(type->getElementType(), true);
+        }
 
         Emit(baseName);
         switch (type->GetBaseShape())
@@ -3020,6 +3036,7 @@ struct EmitVisitor
 
         auto name = String(targetIntrinsic->getDefinition());
 
+        int openParenCount = 0;
 
         if(isOrdinaryName(name))
         {
@@ -3120,6 +3137,35 @@ struct EmitVisitor
                     }
                     break;
 
+                case 'c':
+                    {
+                        // When doing texturing operation in glsl the result needs to be cast into the output type
+                        SLANG_RELEASE_ASSERT(argCount >= 1);
+                        
+                        auto textureArg = args[0].get();
+                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
+                        {
+                            auto elementType = baseTextureType->getElementType();
+                            IRType* underlyingType = nullptr;
+                            if (auto basicType = as<IRBasicType>(elementType))
+                            {
+                                underlyingType = basicType;
+                            }
+                            else if (auto vectorType = as<IRVectorType>(elementType))
+                            {
+                                underlyingType = vectorType->getElementType();
+                            }
+
+                            if (underlyingType && underlyingType->op == kIROp_HalfType)
+                            {
+                                emitSimpleTypeImpl(elementType);
+                                emit("(");
+                                openParenCount++;
+                            }
+                        }    
+                    }
+                    break;
+
                 case 'z':
                     {
                         // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
@@ -3156,6 +3202,11 @@ struct EmitVisitor
                         else
                         {
                             SLANG_UNEXPECTED("bad format in intrinsic definition");
+                        }
+
+                        if (openParenCount-- > 0)
+                        {
+                            Emit(")");
                         }
                     }
                     break;
@@ -3209,7 +3260,7 @@ struct EmitVisitor
                         }
                         else
                         {
-                            // Othwerwise, we need to construct a 4-vector from the
+                            // Otherwise, we need to construct a 4-vector from the
                             // value we have, padding it out with zero elements as
                             // needed.
                             //

@@ -1,0 +1,141 @@
+result code = 0
+standard error = {
+}
+standard output = {
+;
+; Note: shader requires additional functionality:
+;       Typed UAV Load Additional Formats
+;       Use native low precision
+;
+;
+; Input signature:
+;
+; Name                 Index   Mask Register SysValue  Format   Used
+; -------------------- ----- ------ -------- -------- ------- ------
+; no parameters
+;
+; Output signature:
+;
+; Name                 Index   Mask Register SysValue  Format   Used
+; -------------------- ----- ------ -------- -------- ------- ------
+; no parameters
+;
+; Pipeline Runtime Information: 
+;
+;
+;
+; Buffer Definitions:
+;
+; Resource bind info for outputBuffer_0
+; {
+;
+;   int $Element;                                     ; Offset:    0 Size:     4
+;
+; }
+;
+;
+; Resource Bindings:
+;
+; Name                                 Type  Format         Dim      ID      HLSL Bind  Count
+; ------------------------------ ---------- ------- ----------- ------- -------------- ------
+; halfTexture_0                         UAV     f16          2d      U0             u1     1
+; halfTexture2_0                        UAV     f16          2d      U1             u2     1
+; halfTexture4_0                        UAV     f16          2d      U2             u3     1
+; outputBuffer_0                        UAV  struct         r/w      U3             u0     1
+;
+target datalayout = "e-m:e-p:32:32-i1:32-i8:8-i16:16-i32:32-i64:64-f16:16-f32:32-f64:64-n8:16:32:64"
+target triple = "dxil-ms-dx"
+
+%"class.RWTexture2D<half>" = type { half }
+%"class.RWTexture2D<vector<half, 2> >" = type { <2 x half> }
+%"class.RWTexture2D<vector<half, 4> >" = type { <4 x half> }
+%"class.RWStructuredBuffer<int>" = type { i32 }
+%dx.types.Handle = type { i8* }
+%dx.types.ResRet.f16 = type { half, half, half, half, i32 }
+
+@"\01?halfTexture_0@@3V?$RWTexture2D@$f16@@@A" = external constant %"class.RWTexture2D<half>", align 2
+@"\01?halfTexture2_0@@3V?$RWTexture2D@V?$vector@$f16@$01@@@@A" = external constant %"class.RWTexture2D<vector<half, 2> >", align 2
+@"\01?halfTexture4_0@@3V?$RWTexture2D@V?$vector@$f16@$03@@@@A" = external constant %"class.RWTexture2D<vector<half, 4> >", align 2
+@"\01?outputBuffer_0@@3V?$RWStructuredBuffer@H@@A" = external constant %"class.RWStructuredBuffer<int>", align 4
+
+define void @computeMain() {
+  %outputBuffer_0_UAV_structbuf = call %dx.types.Handle @dx.op.createHandle(i32 57, i8 1, i32 3, i32 0, i1 false)  ; CreateHandle(resourceClass,rangeId,index,nonUniformIndex)
+  %halfTexture4_0_UAV_2d = call %dx.types.Handle @dx.op.createHandle(i32 57, i8 1, i32 2, i32 3, i1 false)  ; CreateHandle(resourceClass,rangeId,index,nonUniformIndex)
+  %halfTexture2_0_UAV_2d = call %dx.types.Handle @dx.op.createHandle(i32 57, i8 1, i32 1, i32 2, i1 false)  ; CreateHandle(resourceClass,rangeId,index,nonUniformIndex)
+  %halfTexture_0_UAV_2d = call %dx.types.Handle @dx.op.createHandle(i32 57, i8 1, i32 0, i32 1, i1 false)  ; CreateHandle(resourceClass,rangeId,index,nonUniformIndex)
+  %1 = call i32 @dx.op.threadId.i32(i32 93, i32 0)  ; ThreadId(component)
+  %2 = call i32 @dx.op.threadId.i32(i32 93, i32 1)  ; ThreadId(component)
+  %3 = sub nsw i32 3, %2
+  %4 = sub nsw i32 3, %1
+  %TextureLoad = call %dx.types.ResRet.f16 @dx.op.textureLoad.f16(i32 66, %dx.types.Handle %halfTexture_0_UAV_2d, i32 undef, i32 %3, i32 %4, i32 undef, i32 undef, i32 undef, i32 undef)  ; TextureLoad(srv,mipLevelOrSampleCount,coord0,coord1,coord2,offset0,offset1,offset2)
+  %5 = extractvalue %dx.types.ResRet.f16 %TextureLoad, 0
+  %TextureLoad1 = call %dx.types.ResRet.f16 @dx.op.textureLoad.f16(i32 66, %dx.types.Handle %halfTexture2_0_UAV_2d, i32 undef, i32 %3, i32 %4, i32 undef, i32 undef, i32 undef, i32 undef)  ; TextureLoad(srv,mipLevelOrSampleCount,coord0,coord1,coord2,offset0,offset1,offset2)
+  %6 = extractvalue %dx.types.ResRet.f16 %TextureLoad1, 0
+  %7 = extractvalue %dx.types.ResRet.f16 %TextureLoad1, 1
+  %TextureLoad2 = call %dx.types.ResRet.f16 @dx.op.textureLoad.f16(i32 66, %dx.types.Handle %halfTexture4_0_UAV_2d, i32 undef, i32 %3, i32 %4, i32 undef, i32 undef, i32 undef, i32 undef)  ; TextureLoad(srv,mipLevelOrSampleCount,coord0,coord1,coord2,offset0,offset1,offset2)
+  %8 = extractvalue %dx.types.ResRet.f16 %TextureLoad2, 0
+  %9 = extractvalue %dx.types.ResRet.f16 %TextureLoad2, 1
+  %10 = fadd fast half %6, %7
+  call void @dx.op.textureStore.f16(i32 67, %dx.types.Handle %halfTexture_0_UAV_2d, i32 %1, i32 %2, i32 undef, half %10, half %10, half %10, half %10, i8 15)  ; TextureStore(srv,coord0,coord1,coord2,value0,value1,value2,value3,mask)
+  call void @dx.op.textureStore.f16(i32 67, %dx.types.Handle %halfTexture2_0_UAV_2d, i32 %1, i32 %2, i32 undef, half %8, half %9, half %8, half %8, i8 15)  ; TextureStore(srv,coord0,coord1,coord2,value0,value1,value2,value3,mask)
+  call void @dx.op.textureStore.f16(i32 67, %dx.types.Handle %halfTexture4_0_UAV_2d, i32 %1, i32 %2, i32 undef, half %6, half %7, half %5, half %5, i8 15)  ; TextureStore(srv,coord0,coord1,coord2,value0,value1,value2,value3,mask)
+  %11 = shl nsw i32 %2, 2
+  %12 = add nsw i32 %11, %1
+  call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle %outputBuffer_0_UAV_structbuf, i32 %12, i32 0, i32 %12, i32 undef, i32 undef, i32 undef, i8 1, i32 4)  ; RawBufferStore(uav,index,elementOffset,value0,value1,value2,value3,mask,alignment)
+  ret void
+}
+
+; Function Attrs: nounwind readnone
+declare i32 @dx.op.threadId.i32(i32, i32) #0
+
+; Function Attrs: nounwind readonly
+declare %dx.types.ResRet.f16 @dx.op.textureLoad.f16(i32, %dx.types.Handle, i32, i32, i32, i32, i32, i32, i32) #1
+
+; Function Attrs: nounwind
+declare void @dx.op.textureStore.f16(i32, %dx.types.Handle, i32, i32, i32, half, half, half, half, i8) #2
+
+; Function Attrs: nounwind
+declare void @dx.op.rawBufferStore.i32(i32, %dx.types.Handle, i32, i32, i32, i32, i32, i32, i8, i32) #2
+
+; Function Attrs: nounwind readonly
+declare %dx.types.Handle @dx.op.createHandle(i32, i8, i32, i32, i1) #1
+
+attributes #0 = { nounwind readnone }
+attributes #1 = { nounwind readonly }
+attributes #2 = { nounwind }
+
+!llvm.ident = !{!0}
+!dx.version = !{!1}
+!dx.valver = !{!2}
+!dx.shaderModel = !{!3}
+!dx.resources = !{!4}
+!dx.typeAnnotations = !{!12, !19}
+!dx.entryPoints = !{!23}
+
+!0 = !{!"dxc 1.2"}
+!1 = !{i32 1, i32 2}
+!2 = !{i32 1, i32 3}
+!3 = !{!"cs", i32 6, i32 2}
+!4 = !{null, !5, null, null}
+!5 = !{!6, !8, !9, !10}
+!6 = !{i32 0, %"class.RWTexture2D<half>"* undef, !"halfTexture_0", i32 0, i32 1, i32 1, i32 2, i1 false, i1 false, i1 false, !7}
+!7 = !{i32 0, i32 8}
+!8 = !{i32 1, %"class.RWTexture2D<vector<half, 2> >"* undef, !"halfTexture2_0", i32 0, i32 2, i32 1, i32 2, i1 false, i1 false, i1 false, !7}
+!9 = !{i32 2, %"class.RWTexture2D<vector<half, 4> >"* undef, !"halfTexture4_0", i32 0, i32 3, i32 1, i32 2, i1 false, i1 false, i1 false, !7}
+!10 = !{i32 3, %"class.RWStructuredBuffer<int>"* undef, !"outputBuffer_0", i32 0, i32 0, i32 1, i32 12, i1 false, i1 false, i1 false, !11}
+!11 = !{i32 1, i32 4}
+!12 = !{i32 0, %"class.RWTexture2D<half>" undef, !13, %"class.RWTexture2D<vector<half, 2> >" undef, !15, %"class.RWTexture2D<vector<half, 4> >" undef, !16, %"class.RWStructuredBuffer<int>" undef, !17}
+!13 = !{i32 2, !14}
+!14 = !{i32 6, !"h", i32 3, i32 0, i32 7, i32 8}
+!15 = !{i32 4, !14}
+!16 = !{i32 8, !14}
+!17 = !{i32 4, !18}
+!18 = !{i32 6, !"h", i32 3, i32 0, i32 7, i32 4}
+!19 = !{i32 1, void ()* @computeMain, !20}
+!20 = !{!21}
+!21 = !{i32 0, !22, !22}
+!22 = !{}
+!23 = !{void ()* @computeMain, !"computeMain", null, !4, !24}
+!24 = !{i32 0, i64 8396848, i32 4, !25}
+!25 = !{i32 4, i32 4, i32 1}
+}
