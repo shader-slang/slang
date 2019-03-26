@@ -1815,7 +1815,7 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // Here we recurse on both the ordinary and special
             // sides, and the only interesting tidbit is that
             // we pass along appropriate values for the `isSpecial`
-            // flat so that we act appropriately upon running
+            // flag so that we act appropriately upon running
             // into a leaf field.
             //
             auto pairElementInfo = elementInfo.getPair();
@@ -1987,7 +1987,7 @@ static void addOffsetResInfo(
     /// can't apply because we have a new element type with new fields.
     ///
     /// This function is used to create a layout for a legalized
-    /// buffer type that requires wrapping, base don the original
+    /// buffer type that requires wrapping, based on the original
     /// type layout information and the variable layout information
     /// of the surrounding context (e.g., the global shader parameter
     /// that has this type).

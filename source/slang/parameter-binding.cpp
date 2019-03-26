@@ -1285,7 +1285,7 @@ static void completeBindingsForParameter(
     /// need to allocate space for them after all other shader parameters have
     /// been laid out.
     ///
-    /// This function shold be called on the `pendingVarLayout` field of an
+    /// This function should be called on the `pendingVarLayout` field of an
     /// existing `VarLayout` to ensure that its pending data has been properly
     /// assigned storage. It handles the case where the `pendingVarLayout`
     /// field is null.

@@ -1389,7 +1389,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // just computed.
     //
     // Instead, the API allows the user to query the element type layout
-    // for the group, and the user just assumes that the offsettting
+    // for the group, and the user just assumes that the offsetting
     // is magically applied there. To go back to the earlier example:
     //
     //      struct MyMaterial { Texture2D t; SamplerState s; };

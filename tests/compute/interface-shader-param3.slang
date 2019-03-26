@@ -45,7 +45,7 @@ int test(
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> gOutputBuffer;
 
-// Note: while we declare `gStartegy` here, there is no matching
+// Note: while we declare `gStrategy` here, there is no matching
 // line providing input data at this point. That is partly to
 // work around an apparent bug in the test runner, but it is also
 // to reflect the fact that this declaration does not cause a
