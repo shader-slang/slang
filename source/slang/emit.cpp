@@ -558,7 +558,7 @@ struct EmitVisitor
 
 
     // Emit a `#line` directive to the output.
-    // Doesn't udpate state of source-location tracking.
+    // Doesn't update state of source-location tracking.
     void emitLineDirective(
         HumaneSourceLoc const& sourceLocation)
     {
@@ -3036,8 +3036,6 @@ struct EmitVisitor
 
         auto name = String(targetIntrinsic->getDefinition());
 
-        int openParenCount = 0;
-
         if(isOrdinaryName(name))
         {
             // Simple case: it is just an ordinary name, so we call it like a builtin.
@@ -3058,19 +3056,18 @@ struct EmitVisitor
         }
         else
         {
-            // If it returns void -> then we don't need parenthesis
+            int openParenCount = 0;
 
             const auto returnType = inst->getDataType();
-            const bool isVoid = as<IRVoidType>(returnType) != nullptr;
-            
-            // We could determine here is the return type is void... if so no braces?
 
-            // General case: we are going to emit some more complex text.
-
-            if (!isVoid)
+            // If it returns void -> then we don't need parenthesis 
+            if (as<IRVoidType>(returnType) == nullptr)
             {
                 Emit("(");
+                openParenCount++;
             }
+
+            // General case: we are going to emit some more complex text.
 
             char const* cursor = name.begin();
             char const* end = name.end();
@@ -3202,11 +3199,6 @@ struct EmitVisitor
                         else
                         {
                             SLANG_UNEXPECTED("bad format in intrinsic definition");
-                        }
-
-                        if (openParenCount-- > 0)
-                        {
-                            Emit(")");
                         }
                     }
                     break;
@@ -3464,7 +3456,8 @@ struct EmitVisitor
                 }
             }
 
-            if (!isVoid)
+            // Close any remaining open parens
+            for (; openParenCount > 0; --openParenCount)
             {
                 Emit(")");
             }
