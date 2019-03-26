@@ -3136,23 +3136,28 @@ struct EmitVisitor
 
                 case 'c':
                     {
-                        // When doing texturing operation in glsl the result needs to be cast into the output type
+                        // When doing texture access in glsl the result may need to be cast.
+                        // In particular if the underlying texture is 'half' based, glsl only accesses (read/write)
+                        // as float. So we need to cast to a half type on output.
+                        // When storing into a texture it is still the case the value written must be half - but
+                        // we don't need to do any casting there as half is coerced to float without a problem.
                         SLANG_RELEASE_ASSERT(argCount >= 1);
                         
                         auto textureArg = args[0].get();
                         if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
                         {
                             auto elementType = baseTextureType->getElementType();
-                            IRType* underlyingType = nullptr;
+                            IRBasicType* underlyingType = nullptr;
                             if (auto basicType = as<IRBasicType>(elementType))
                             {
                                 underlyingType = basicType;
                             }
                             else if (auto vectorType = as<IRVectorType>(elementType))
                             {
-                                underlyingType = vectorType->getElementType();
+                                underlyingType = as<IRBasicType>(vectorType->getElementType());
                             }
 
+                            // We only need to output a cast if the underlying type is half.
                             if (underlyingType && underlyingType->op == kIROp_HalfType)
                             {
                                 emitSimpleTypeImpl(elementType);
