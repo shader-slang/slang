@@ -6758,25 +6758,19 @@ StructTypeLayout* getScopeStructLayout(
     ScopeLayout*  scopeLayout)
 {
     auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
+
+    if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
+    {
+        scopeTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
+    }
+
     if( auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout) )
     {
         return structTypeLayout;
     }
-    else if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
-    {
-        auto elementTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
-        auto elementTypeStructLayout = as<StructTypeLayout>(elementTypeLayout);
 
-        // We expect all constant buffers to contain `struct` types for now
-        SLANG_RELEASE_ASSERT(elementTypeStructLayout);
-
-        return elementTypeStructLayout;
-    }
-    else
-    {
-        SLANG_UNEXPECTED("uhandled global-scope binding layout");
-        return nullptr;
-    }
+    SLANG_UNEXPECTED("uhandled global-scope binding layout");
+    return nullptr;
 }
 
     /// Given a layout computed for a program, get the layout to use when lookup up variables.
@@ -7005,6 +6999,7 @@ String emitEntryPoint(
         legalizeExistentialTypeLayout(
             irModule,
             sink);
+        eliminateDeadCode(compileRequest, irModule);
 
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
@@ -7025,6 +7020,7 @@ String emitEntryPoint(
         legalizeResourceTypes(
             irModule,
             sink);
+        eliminateDeadCode(compileRequest, irModule);
 
         //  Debugging output of legalization
 #if 0

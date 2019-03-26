@@ -424,9 +424,9 @@ struct ResourceParameterSpecializationContext
     // An easy case is when P is a parameter that doesn't need
     // specialization. In that case:
     //
-    // * The existing argument A shold be used as an argument in
+    // * The existing argument A should be used as an argument in
     //   the specialized call.
-    // * A clone P' of the existing parameter P shold be used as a
+    // * A clone P' of the existing parameter P should be used as a
     //   parameter of the specialized callee.
     // * No additional instructions are needed in the body of
     //   the callee; the cloned parameter P' should stand in for P.

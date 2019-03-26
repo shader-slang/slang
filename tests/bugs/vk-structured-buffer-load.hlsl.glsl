@@ -6,7 +6,7 @@ layout(row_major) uniform;
 layout(row_major) buffer;
 #extension GL_NV_ray_tracing : require
 
-layout(std430, binding = 2) readonly buffer _S1 {
+layout(std430, binding = 1) readonly buffer _S1 {
     float _data[];
 } gParamBlock_sbuf_0;
 

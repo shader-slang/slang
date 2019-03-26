@@ -328,23 +328,20 @@ public:
     // the space storing it in the above array
     UInt uniformAlignment = 1;
 
-        /// An item that is conceptually owned by this type, but is pending layout.
+
+        /// The layout for data that is conceptually owned by this type, but which is pending layout.
         ///
         /// When a type contains interface/existential fields (recursively), the
         /// actual data referenced by these fields needs to get allocated somewhere,
         /// but it cannot go inline at the point where the interface/existential
-        /// type appears, or else 
+        /// type appears, or else the layout of a composite object would change
+        /// when the concrete type(s) we plug in change.
         ///
-    struct PendingItem
-    {
-        RefPtr<TypeLayout> typeLayout;
-
-        RefPtr<TypeLayout> getTypeLayout() const { return typeLayout; }
-        RefPtr<Type> getType() const { return typeLayout->type; }
-    };
-
-        /// The pending items owned by this type, but which are pending layout.
-    List<PendingItem> pendingItems;
+        /// We solve this problem by tracking this data that is "pending" layout,
+        /// and then "flushing" the pending data at appropriate places during
+        /// the layout process.
+        ///
+    RefPtr<TypeLayout> pendingDataTypeLayout;
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
@@ -382,6 +379,8 @@ public:
         info.count = count;
         addResourceUsage(info);
     }
+
+    void addResourceUsageFrom(TypeLayout* otherTypeLayout);
 
         /// "Unwrap" any layers of array-ness from this type layout.
         ///
@@ -475,6 +474,8 @@ public:
 
         return AddResourceInfo(kind);
     }
+
+    RefPtr<VarLayout> pendingVarLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -501,6 +502,16 @@ public:
     // so that any fields (if the element type is a `struct`)
     // will be offset by the resource usage of the container.
     RefPtr<TypeLayout>  offsetElementTypeLayout;
+
+    // If the element type layout had any "pending" data, then
+    // as much of that data as possible will be flushed to
+    // fit into the overall layout of the parameter group.
+    //
+    // This field stores the offset information for where
+    // the pending data got stored relative to the start of
+    // the group.
+    //
+//    RefPtr<VarLayout> flushedDataVarLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -585,6 +596,12 @@ public:
     // in the array above, rather than to the actual pointer,
     // so that we 
     Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
+
+    // As an accellerator for type layouts created at the
+    // IR layer, we include a second map that use IR "key"
+    // instructions to map to fields.
+    //
+    Dictionary<IRInst*, RefPtr<VarLayout>> mapKeyToLayout;
 };
 
 class GenericParamTypeLayout : public TypeLayout
@@ -924,6 +941,98 @@ struct TypeLayoutContext
     }
 };
 
+//
+
+    /// A custom tuple to capture the outputs of type layout
+struct TypeLayoutResult
+{
+        /// The actual heap-allocated layout object with all the details
+    RefPtr<TypeLayout>  layout;
+
+        /// A simplified representation of layout information.
+        ///
+        /// This information is suitable for the case where a type only
+        /// consumes a single resource.
+        ///
+    SimpleLayoutInfo    info;
+
+        /// Default constructor.
+    TypeLayoutResult()
+    {}
+
+        /// Construct a result from the given layout object and simple layout info.
+    TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
+        : layout(inLayout)
+        , info(inInfo)
+    {}
+};
+
+    /// Helper type for building `struct` type layouts
+struct StructTypeLayoutBuilder
+{
+public:
+        /// Begin the layout process for `type`, using `rules`
+    void beginLayout(
+        Type*               type,
+        LayoutRulesImpl*    rules);
+
+        /// Begin the layout process for `type`, using `rules`, if it hasn't already been begun.
+        ///
+        /// This functions allows for a `StructTypeLayoutBuilder` to be use lazily,
+        /// only allocating a type layout object if it is actaully needed.
+        ///
+    void beginLayoutIfNeeded(
+        Type*               type,
+        LayoutRulesImpl*    rules);
+
+        /// Add a field to the struct type layout.
+        ///
+        /// One of the `beginLayout*()` functions must have been called previously.
+        ///
+    RefPtr<VarLayout> addField(
+        DeclRef<VarDeclBase>    field,
+        TypeLayoutResult        fieldResult);
+
+        /// Add a field to the struct type layout.
+        ///
+        /// One of the `beginLayout*()` functions must have been called previously.
+        ///
+    RefPtr<VarLayout> addField(
+        DeclRef<VarDeclBase>    field,
+        RefPtr<TypeLayout>      fieldTypeLayout);
+
+        /// Complete layout.
+        ///
+        /// If layout was begun, ensures that the result of `getTypeLayout()` is usable.
+        /// If layout was never begin, does nothing.
+        ///
+    void endLayout();
+
+        /// Get the type layout.
+        ///
+        /// This can be called any time after `beginLayout*()`.
+        /// In particular, it can be called before `endLayout`.
+        ///
+    RefPtr<StructTypeLayout> getTypeLayout();
+
+        /// The the type layout result.
+        ///
+        /// This is primarily useful for implementation code in `_createTypeLayout`.
+        ///
+    TypeLayoutResult getTypeLayoutResult();
+
+private:
+        /// The layout rules being used, if layout has begun.
+    LayoutRulesImpl* m_rules = nullptr;
+
+        /// The type layout being computed, if layout has begun.
+    RefPtr<StructTypeLayout> m_typeLayout;
+
+        /// Uniform offset/alignment statte used when computing offset for uniform fields.
+    UniformLayoutInfo m_info;
+};
+
+//
 
 // Get an appropriate set of layout rules (packaged up
 // as a `TypeLayoutContext`) to perform type layout
@@ -963,7 +1072,7 @@ RefPtr<TypeLayout> createTypeLayout(
 //
 
     /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
-RefPtr<ParameterGroupTypeLayout> createParameterGroupTypeLayout(
+RefPtr<TypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
     RefPtr<ParameterGroupType>  parameterGroupType);
 
@@ -992,6 +1101,12 @@ createStructuredBufferTypeLayout(
 
 int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl);
 //
+
+// Given an existing type layout `oldTypeLayout`, apply offsets
+// to any contained fields based on the resource infos in `offsetVarLayout`.
+RefPtr<TypeLayout> applyOffsetToTypeLayout(
+    RefPtr<TypeLayout>  oldTypeLayout,
+    RefPtr<VarLayout>   offsetVarLayout);
 
 }
 
