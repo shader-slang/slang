@@ -677,6 +677,19 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
     wglMakeCurrent(m_hdc, m_glContext);
 
     auto renderer = glGetString(GL_RENDERER);
+
+    if (renderer && desc.adapter.Length() > 0)
+    {
+        String lowerAdapter = desc.adapter.ToLower();
+        String lowerRenderer = String((const char*)renderer).ToLower();
+
+        // The adapter is not available
+        if (lowerRenderer.IndexOf(lowerAdapter) == UInt(-1))
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+    }
+
     auto extensions = glGetString(GL_EXTENSIONS);
 
     // Load each of our extension functions by name

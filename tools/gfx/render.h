@@ -779,8 +779,9 @@ public:
 
     struct Desc
     {
-        int width;          ///< Width in pixels
-        int height;         ///< height in pixels
+        int width;                  ///< Width in pixels
+        int height;                 ///< height in pixels
+        Slang::String adapter;      ///< Name to identify the adapter to use
     };
 
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;
@@ -977,6 +978,9 @@ struct RendererUtil
 
         /// Get the binding style from the type
     static BindingStyle getBindingStyle(RendererType type) { return s_rendererTypeToBindingStyle[int(type)]; }
+
+        /// Get as text
+    static Slang::UnownedStringSlice toText(RendererType type);
 
     private:
     static void compileTimeAsserts();

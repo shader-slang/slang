@@ -2350,23 +2350,43 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // As a starting point, we will definitely need a "default" space if
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
+    //
     bool needDefaultSpace = needDefaultConstantBuffer;
     if (!needDefaultSpace)
     {
+        // Next we will look at the global-scope parameters and see if
+        // any of them requires a `register` or `binding` that will
+        // thus need to land in a default space.
+        //
         for (auto& parameterInfo : sharedContext.parameters)
         {
             SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
             auto firstVarLayout = parameterInfo->varLayouts.First();
 
-            // Does the parameter have any resource usage that isn't just
-            // allocating a whole register space?
+            // For each parameter, we will look at each resource it consumes.
+            //
             for (auto resInfo : firstVarLayout->typeLayout->resourceInfos)
             {
-                if (resInfo.kind != LayoutResourceKind::RegisterSpace)
-                {
-                    needDefaultSpace = true;
-                    break;
-                }
+                // We don't care about whole register spaces/sets, since
+                // we don't need to allocate a default space/set for a parameter
+                // that itself consumes a whole space/set.
+                //
+                if( resInfo.kind == LayoutResourceKind::RegisterSpace )
+                    continue;
+
+                // We also don't want to consider resource kinds for which
+                // the variable already has an (explicit) binding, since
+                // the space from the explicit binding will be used, so
+                // that a default space isn't needed.
+                //
+                if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
+                    continue;
+
+                // Otherwise, we have a shader parameter that will need
+                // a default space or set to live in.
+                //
+                needDefaultSpace = true;
+                break;
             }
         }
     }
