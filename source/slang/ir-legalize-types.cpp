@@ -74,6 +74,20 @@ LegalVal LegalVal::getImplicitDeref()
     return as<ImplicitDerefVal>(obj)->val;
 }
 
+LegalVal LegalVal::wrappedBuffer(
+    LegalVal const& baseVal,
+    LegalElementWrapping const& elementInfo)
+{
+    RefPtr<WrappedBufferPseudoVal> obj = new WrappedBufferPseudoVal();
+    obj->base = baseVal;
+    obj->elementInfo = elementInfo;
+
+    LegalVal result;
+    result.flavor = LegalVal::Flavor::wrappedBuffer;
+    result.obj = obj;
+    return result;
+}
+
 //
 
 IRTypeLegalizationContext::IRTypeLegalizationContext(
@@ -109,9 +123,54 @@ static LegalVal declareVars(
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain,
+    LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo);
+
+    /// Unwrap a value with flavor `wrappedBuffer`
+    ///
+    /// The original `legalPtrOperand` has a wrapped-buffer type
+    /// which encodes the way that, e.g., a `ConstantBuffer<Foo>`
+    /// where `Foo` includes interface types, got legalized
+    /// into a buffer that stores a `Foo` value plus addition
+    /// fields for the concrete types that got plugged in.
+    ///
+    /// The `elementInfo` is the layout information for the
+    /// modified ("wrapped") buffer type, and specifies how
+    /// the logical element type was expanded into actual fields.
+    ///
+    /// This function returns a new value that undoes all of
+    /// the wrapping and produces a new `LegalVal` that matches
+    /// the nominal type of the original buffer.
+    ///
+static LegalVal unwrapBufferValue(
+    IRTypeLegalizationContext*  context,
+    LegalVal                    legalPtrOperand,
+    LegalElementWrapping const& elementInfo);
+
+    /// Perform any actions required to materialize `val` into a usable value.
+    ///
+    /// Certain case of `LegalVal` (currently just the `wrappedBuffer` case) are
+    /// suitable for use to represent a variable, but cannot be used directly
+    /// in computations, because their structured needs to be "unwrapped."
+    ///
+    /// This function unwraps any `val` that needs it, which may involve
+    /// emitting additional IR instructions, and returns the unmodified
+    /// `val` otherwise.
+    ///
+static LegalVal maybeMaterializeWrappedValue(
+    IRTypeLegalizationContext*  context,
+    LegalVal                    val)
+{
+    if(val.flavor != LegalVal::Flavor::wrappedBuffer)
+        return val;
+
+    auto wrappedBufferVal = val.getWrappedBuffer();
+    return unwrapBufferValue(
+        context,
+        wrappedBufferVal->base,
+        wrappedBufferVal->elementInfo);
+}
 
 // Take a value that is being used as an operand,
 // and turn it into the equivalent legalized value.
@@ -120,8 +179,10 @@ static LegalVal legalizeOperand(
     IRInst*                    irValue)
 {
     LegalVal legalVal;
-    if (context->mapValToLegalVal.TryGetValue(irValue, legalVal))
-        return legalVal;
+    if( context->mapValToLegalVal.TryGetValue(irValue, legalVal) )
+    {
+        return maybeMaterializeWrappedValue(context, legalVal);
+    }
 
     // For now, assume that anything not covered
     // by the mapping is legal as-is.
@@ -455,8 +516,8 @@ static LegalVal legalizeFieldExtract(
         (IRStructKey*) fieldKey);
 }
 
-    /// Take a value of some buffer/pointer type and wrap it according to provided info.
-static LegalVal wrapBufferValue(
+    /// Take a value of some buffer/pointer type and unwrap it according to provided info.
+static LegalVal unwrapBufferValue(
     IRTypeLegalizationContext*  context,
     LegalVal                    legalPtrOperand,
     LegalElementWrapping const& elementInfo)
@@ -495,7 +556,7 @@ static LegalVal wrapBufferValue(
 
             auto simpleElementInfo = elementInfo.getSimple();
             auto valPtr = builder->emitFieldAddress(
-                simpleElementInfo->type,
+                builder->getPtrType(simpleElementInfo->type),
                 legalPtrOperand.getSimple(),
                 simpleElementInfo->key);
 
@@ -510,7 +571,7 @@ static LegalVal wrapBufferValue(
             // wrap them up in an `implicitDeref` value.
             //
             auto derefField = elementInfo.getImplicitDeref();
-            auto baseVal = wrapBufferValue(context, legalPtrOperand, derefField->field);
+            auto baseVal = unwrapBufferValue(context, legalPtrOperand, derefField->field);
             return LegalVal::implicitDeref(baseVal);
         }
 
@@ -524,8 +585,8 @@ static LegalVal wrapBufferValue(
             auto pairField = elementInfo.getPair();
             auto pairInfo = pairField->pairInfo;
 
-            auto ordinaryVal = wrapBufferValue(context, legalPtrOperand, pairField->ordinary);
-            auto specialVal = wrapBufferValue(context, legalPtrOperand, pairField->special);
+            auto ordinaryVal = unwrapBufferValue(context, legalPtrOperand, pairField->ordinary);
+            auto specialVal = unwrapBufferValue(context, legalPtrOperand, pairField->special);
             return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
         }
 
@@ -541,14 +602,14 @@ static LegalVal wrapBufferValue(
             RefPtr<TuplePseudoVal> obj = new TuplePseudoVal();
             for( auto ee : tupleField->elements )
             {
-                auto elementVal = wrapBufferValue(
+                auto elementVal = unwrapBufferValue(
                     context,
                     legalPtrOperand,
                     ee.field);
 
                 TuplePseudoVal::Element element;
                 element.key = ee.key;
-                element.val = wrapBufferValue(
+                element.val = unwrapBufferValue(
                     context,
                     legalPtrOperand,
                     ee.field);
@@ -1244,16 +1305,10 @@ static LegalVal legalizeLocalVar(
 
         context->insertBeforeLocalVar = irLocalVar;
 
-        LegalVarChain* varChain = nullptr;
-        LegalVarChain varChainStorage;
-        if (varLayout)
-        {
-            varChainStorage.next = nullptr;
-            varChainStorage.varLayout = varLayout;
-            varChain = &varChainStorage;
-        }
+        LegalVarChainLink varChain(LegalVarChain(), varLayout);
 
         UnownedStringSlice nameHint = findNameHint(irLocalVar);
+        context->builder->setInsertBefore(irLocalVar);
         LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, nullptr);
 
         // Remove the old local var.
@@ -1286,7 +1341,9 @@ static LegalVal legalizeParam(
         context->insertBeforeParam = originalParam;
 
         UnownedStringSlice nameHint = findNameHint(originalParam);
-        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, nullptr, nameHint, nullptr);
+
+        context->builder->setInsertBefore(originalParam);
+        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, nullptr);
 
         originalParam->removeFromParent();
         context->replacedInstructions.Add(originalParam);
@@ -1314,6 +1371,12 @@ static LegalVal legalizeInst(
     IRTypeLegalizationContext*  context,
     IRInst*                     inst)
 {
+    // Any additional instructions we need to emit
+    // in the process of legalizing `inst` should
+    // by default be insertied right before `inst`.
+    //
+    context->builder->setInsertBefore(inst);
+
     // Special-case certain operations
     switch (inst->op)
     {
@@ -1343,9 +1406,15 @@ static LegalVal legalizeInst(
         break;
     }
 
-    // Need to legalize all the operands.
+    // We will iterate over all the operands, extract the legalized
+    // value of each, and collect them in an array for subsequent use.
+    //
     auto argCount = inst->getOperandCount();
     List<LegalVal> legalArgs;
+    //
+    // Along the way we will also note whether there were any operands
+    // with non-simple legalized values.
+    //
     bool anyComplex = false;
     for (UInt aa = 0; aa < argCount; ++aa)
     {
@@ -1357,14 +1426,19 @@ static LegalVal legalizeInst(
             anyComplex = true;
     }
 
-    // Also legalize the type of the instruction
+    // We must also legalize the type of the instruction, since that
+    // is implicitly one of its operands.
+    //
     LegalType legalType = legalizeType(context, inst->getFullType());
 
+    // If there was nothing interesting that occured for the operands
+    // then we can re-use this instruction as-is.
+    //
     if (!anyComplex && legalType.flavor == LegalType::Flavor::simple)
     {
-        // Nothing interesting happened to the operands,
-        // so we seem to be okay, right?
-
+        // While the operands are all "simple," they might not necessarily
+        // be equal to the operands we started with.
+        //
         for (UInt aa = 0; aa < argCount; ++aa)
         {
             auto legalArg = legalArgs[aa];
@@ -1510,7 +1584,7 @@ static LegalVal declareSimpleVar(
     IROp                        op,
     IRType*                     type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain,
+    LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo)
 {
@@ -1518,11 +1592,7 @@ static LegalVal declareSimpleVar(
 
     RefPtr<VarLayout> varLayout = createVarLayout(varChain, typeLayout);
 
-    DeclRef<VarDeclBase> varDeclRef;
-    if (varChain)
-    {
-        varDeclRef = varChain->varLayout->varDecl;
-    }
+    DeclRef<VarDeclBase> varDeclRef = varChain.getLeafVarDeclRef();
 
     IRBuilder* builder = context->builder;
 
@@ -1611,12 +1681,526 @@ static LegalVal declareSimpleVar(
     return legalVarVal;
 }
 
+    /// Add layout information for the fields of a wrapped buffer type.
+    ///
+    /// A wrapped buffer type encodes a buffer like `ConstantBuffer<Foo>`
+    /// where `Foo` might have interface-type fields that have been
+    /// specialized to a concrete type. E.g.:
+    ///
+    ///     struct Car { IDriver driver; int mph; };
+    ///     ConstantBuffer<Car> machOne;
+    ///
+    /// In a case where the `machOne.driver` field has been specialized
+    /// to the type `SpeedRacer`, we need to generate a legalized
+    /// buffer layout something like:
+    ///
+    ///     struct Car_0 { int mph; }
+    ///     struct Wrapped { Car_0 car; SpeedRacer card_d; }
+    ///     ConstantBuffer<Wrapped> machOne;
+    ///
+    /// The layout information for the existing `machOne` clearly
+    /// can't apply because we have a new element type with new fields.
+    ///
+    /// This function is used to recursively fill in the layout for
+    /// the fields of the `Wrapped` type, using information recorded
+    /// when the legal wrapped buffer type was created.
+    ///
+static void _addFieldsToWrappedBufferElementTypeLayout(
+    TypeLayout*                 elementTypeLayout,  // layout of the original field type
+    StructTypeLayout*           newTypeLayout,      // layout we are filling in
+    LegalElementWrapping const& elementInfo,        // information on how the original type got wrapped
+    LegalVarChain const&        varChain,           // chain of variables that is leading to this field
+    bool                        isSpecial)          // should we assume a leaf field is a special (interface) type?
+{
+    // The way we handle things depends primary on the
+    // `elementInfo`, because that tells us how things
+    // were wrapped up when the type was legalized.
+
+    switch( elementInfo.flavor )
+    {
+    case LegalElementWrapping::Flavor::none:
+        // A leaf `none` value meant there was nothing
+        // to encode for a particular field (probably
+        // had a `void` or empty structure type).
+        break;
+
+    case LegalElementWrapping::Flavor::simple:
+        {
+            auto simpleInfo = elementInfo.getSimple();
+
+            // A `simple` wrapping means we hit a leaf
+            // field that can be encoded directly.
+            // What we do here depends on whether we've
+            // reached an ordinary field of the original
+            // data type, or if we've reached a leaf
+            // field of interface type.
+            //
+            // We've been tracking a `varChain` that
+            // remembers all the parent `struct` fields
+            // we've navigated through to get here, and
+            // that information has been tracking two
+            // different pieces of layout:
+            //
+            // * The "primary" layout represents the storage
+            // of the buffer element type as we usually
+            // think of its (e.g., the bytes starting at offset zero).
+            //
+            // * The "pending" layout tells us where all the
+            // fields representing concrete types plugged in
+            // for interface-type slots got placed.
+            //
+            // We have tunneled down info to tell us which case
+            // we should use (`isSpecial`).
+            //
+            // Most of the logic is the same between the two
+            // cases. We will be computing layout information
+            // for a field of the new/wrapped buffer element type.
+            //
+            RefPtr<VarLayout> newFieldLayout;
+            if(isSpecial)
+            {
+                // In the special case, that field will be laid out
+                // based on the "pending" var chain, and the type
+                // of the pending data for the element.
+                //
+                newFieldLayout = createSimpleVarLayout(varChain.pendingChain, elementTypeLayout->pendingDataTypeLayout);
+            }
+            else
+            {
+                // The ordinary case just uses the primary layout
+                // information and the primary/nominal type of
+                // the field.
+                //
+                newFieldLayout = createSimpleVarLayout(varChain.primaryChain, elementTypeLayout);
+            }
+
+            // Either way, we add the new field to the struct type
+            // layout we are building, and also update the mapping
+            // information so that we can find the field layout
+            // based on the IR key for the struct field.
+            //
+            newTypeLayout->fields.Add(newFieldLayout);
+            newTypeLayout->mapKeyToLayout.Add(simpleInfo->key, newFieldLayout);
+        }
+        break;
+
+    case LegalElementWrapping::Flavor::implicitDeref:
+        {
+            // This is the case where a field in the element type
+            // has been legalized from `SomePtrLikeType<T>` to
+            // `T`, so there is a different in levels of indirection.
+            //
+            // We need to recurse and see how the type `T`
+            // got laid out to know what field(s) it might comprise.
+            //
+            auto implicitDerefInfo = elementInfo.getImplicitDeref();
+            _addFieldsToWrappedBufferElementTypeLayout(
+                elementTypeLayout,
+                newTypeLayout,
+                implicitDerefInfo->field,
+                varChain,
+                isSpecial);
+            return;
+        }
+        break;
+
+    case LegalElementWrapping::Flavor::pair:
+        {
+            // The pair case is the first main workhorse where
+            // if we had a type that mixed ordinary and interface-type
+            // fields, it would get split into an ordinary part
+            // and a "special" part, each of which might comprise
+            // zero or more fields.
+            //
+            // Here we recurse on both the ordinary and special
+            // sides, and the only interesting tidbit is that
+            // we pass along appropriate values for the `isSpecial`
+            // flag so that we act appropriately upon running
+            // into a leaf field.
+            //
+            auto pairElementInfo = elementInfo.getPair();
+            _addFieldsToWrappedBufferElementTypeLayout(
+                elementTypeLayout,
+                newTypeLayout,
+                pairElementInfo->ordinary,
+                varChain,
+                false);
+            _addFieldsToWrappedBufferElementTypeLayout(
+                elementTypeLayout,
+                newTypeLayout,
+                pairElementInfo->special,
+                varChain,
+                true);
+        }
+        break;
+
+    case LegalElementWrapping::Flavor::tuple:
+        {
+            // A tuple comes up when we've turned an aggregate
+            // with one or more interface-type fields into
+            // distinct fields at the top level.
+            //
+            // For the most part we just recurse on each field,
+            // but note that we set the `isSpecial` flag on
+            // the recursive calls, since we never use tuples
+            // to store anything that isn't special.
+
+            auto tupleInfo = elementInfo.getTuple();
+            for( auto ee : tupleInfo->elements )
+            {
+                auto oldFieldLayout = getFieldLayout(elementTypeLayout, ee.key);
+                SLANG_ASSERT(oldFieldLayout);
+
+                LegalVarChainLink fieldChain(varChain, oldFieldLayout);
+
+                _addFieldsToWrappedBufferElementTypeLayout(
+                    oldFieldLayout->typeLayout,
+                    newTypeLayout,
+                    ee.field,
+                    fieldChain,
+                    true);
+            }
+        }
+        break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled element wrapping flavor");
+        break;
+    }
+}
+
+    /// Add offset information for `kind` to `resultVarLayout`,
+    /// if it doesn't already exist, and adjust the offset so
+    /// that it will represent an offset relative to the
+    /// "primary" data for the surrounding type, rather than
+    /// being relative to the "pending" data.
+    ///
+static void _addOffsetVarLayoutEntry(
+    VarLayout*              resultVarLayout,
+    LegalVarChain const&    varChain,
+    LayoutResourceKind      kind)
+{
+    // If the target already has an offset for this kind, bail out.
+    //
+    if(resultVarLayout->FindResourceInfo(kind))
+        return;
+
+    // Add the `ResourceInfo` that will represent the offset for
+    // this resource kind (it will be initialized to zero by default)
+    //
+    auto resultResInfo = resultVarLayout->findOrAddResourceInfo(kind);
+
+    // Add in any contributions from the "pending" var chain, since
+    // that chain of offsets will accumulate to get the leaf offset
+    // within the pending data, which in this case we assume amounts
+    // to an *absolute* offset.
+    //
+    for(auto vv = varChain.pendingChain; vv; vv = vv->next )
+    {
+        if( auto chainResInfo = vv->varLayout->FindResourceInfo(kind) )
+        {
+            resultResInfo->index += chainResInfo->index;
+            resultResInfo->space += chainResInfo->space;
+        }
+    }
+
+    // Subtract any contributions from the primary var chain, since
+    // we want the resulting offset to be relative to the same
+    // base as that chain.
+    //
+    for(auto vv = varChain.primaryChain; vv; vv = vv->next )
+    {
+        if( auto chainResInfo = vv->varLayout->FindResourceInfo(kind) )
+        {
+            resultResInfo->index -= chainResInfo->index;
+            resultResInfo->space -= chainResInfo->space;
+        }
+    }
+}
+
+    /// Create a variable layout for an field with "pending" type.
+    ///
+    /// The given `typeLayout` should represent the type of a field
+    /// that is being stored in "pending" data, but that now needs
+    /// to be made relative to the "primary" data, because we are
+    /// legalizing the pending data out of the code.
+    ///
+static RefPtr<VarLayout> _createOffsetVarLayout(
+    LegalVarChain const&    varChain,
+    TypeLayout*             typeLayout)
+{
+    RefPtr<VarLayout> resultVarLayout = new VarLayout();
+
+    // For every resource kind the type consumes, we will
+    // compute an adjusted offset for the variable that
+    // encodes the (absolute) offset of the pending data
+    // in `varChain` relative to its primary data.
+    //
+    for( auto resInfo : typeLayout->resourceInfos )
+    {
+        _addOffsetVarLayoutEntry(resultVarLayout, varChain, resInfo.kind);
+    }
+
+    return resultVarLayout;
+}
+
+    /// Place offset information from `srcResInfo` onto `dstLayout`,
+    /// offset by whatever is in `offsetVarLayout`
+static void addOffsetResInfo(
+    VarLayout*                      dstLayout,
+    VarLayout::ResourceInfo const&  srcResInfo,
+    VarLayout*                      offsetVarLayout)
+{
+    auto kind = srcResInfo.kind;
+    auto dstResInfo = dstLayout->findOrAddResourceInfo(kind);
+
+    dstResInfo->index = srcResInfo.index;
+    dstResInfo->space = srcResInfo.space;
+
+    if( auto offsetResInfo = offsetVarLayout->findOrAddResourceInfo(kind) )
+    {
+        dstResInfo->index += offsetResInfo->index;
+        dstResInfo->space += offsetResInfo->space;
+    }
+}
+
+    /// Create layout information for a wrapped buffer type.
+    ///
+    /// A wrapped buffer type encodes a buffer like `ConstantBuffer<Foo>`
+    /// where `Foo` might have interface-type fields that have been
+    /// specialized to a concrete type.
+    ///
+    /// Consider:
+    ///
+    ///     struct Car { IDriver driver; int mph; };
+    ///     ConstantBuffer<Car> machOne;
+    ///
+    /// In a case where the `machOne.driver` field has been specialized
+    /// to the type `SpeedRacer`, we need to generate a legalized
+    /// buffer layout something like:
+    ///
+    ///     struct Car_0 { int mph; }
+    ///     struct Wrapped { Car_0 car; SpeedRacer card_d; }
+    ///     ConstantBuffer<Wrapped> machOne;
+    ///
+    /// The layout information for the existing `machOne` clearly
+    /// can't apply because we have a new element type with new fields.
+    ///
+    /// This function is used to create a layout for a legalized
+    /// buffer type that requires wrapping, based on the original
+    /// type layout information and the variable layout information
+    /// of the surrounding context (e.g., the global shader parameter
+    /// that has this type).
+    ///
+static RefPtr<TypeLayout> _createWrappedBufferTypeLayout(
+    TypeLayout*                 oldTypeLayout,
+    WrappedBufferPseudoType*    wrappedBufferTypeInfo,
+    LegalVarChain const&        outerVarChain)
+{
+    // We shouldn't get invoked unless there was a parameter group type,
+    // so we will sanity check for that just to be sure.
+    //
+    auto oldParameterGroupTypeLayout = as<ParameterGroupTypeLayout>(oldTypeLayout);
+    SLANG_ASSERT(oldParameterGroupTypeLayout);
+    if(!oldParameterGroupTypeLayout)
+        return oldTypeLayout;
+
+    // The original type must have been split between the direct/primary
+    // data and some amount of "pending" data to deal with interface-type
+    // data in the element type of the parameter group.
+    //
+    // The legalization step will have already flattened the data inside of
+    // the group to a single `struct` type, which places the primary data first,
+    // and then any pending data into additional fields.
+    //
+    // Our job is to compute a type layout that we can apply to that new
+    // element type, and to a parameter group surrounding it, that will
+    // re-create the original intention of the split layout (both primary
+    // and pending data) for a type that now only has the "primary" data.
+    //
+    RefPtr<ParameterGroupTypeLayout> newTypeLayout = new ParameterGroupTypeLayout();
+    newTypeLayout->type = oldTypeLayout->type;
+    newTypeLayout->rules = oldTypeLayout->rules;
+    newTypeLayout->uniformAlignment = oldTypeLayout->uniformAlignment;
+    for(auto resInfo : oldTypeLayout->resourceInfos)
+        newTypeLayout->addResourceUsage(resInfo);
+
+    // Any fields in the "pending" data will have offset information
+    // that is relative to the pending data for their parent, and so on.
+    // We need to compute layout information that only includes primary
+    // data, so any offset information that is relative to the pending data
+    // needs to instead be relative to the primary data. That amounts to
+    // computing the absolute offset of each pending field, and then
+    // subtracting off the absolute offset of the primary data.
+    //
+    // We will compute the offset that needs to be added up front,
+    // and store it in the form of a `VarLayout`. The offsets we need
+    // can be computed from the `outerVarChain`, and we only need to
+    // store offset information for resource kinds actually consumed
+    // by the pending data type for the buffer as a whole (e.g., we
+    // don't need to apply offsetting to uniform bytes, because
+    // those don't show up in the resource usage of a constant buffer
+    // itself, and so the offsets already *are* relative to the start
+    // of the buffer).
+    //
+    auto offsetVarLayout = _createOffsetVarLayout(outerVarChain, oldTypeLayout->pendingDataTypeLayout);
+    LegalVarChainLink offsetVarChain(LegalVarChain(), offsetVarLayout);
+
+    // We will start our construction of the pieces of the output
+    // type layout by looking at the "container" type/variable.
+    //
+    // A parameter block or constant buffer in Slang needs to
+    // distinguish between the resource usage of the thing in
+    // the block/buffer, vs. the resource usage of the block/buffer
+    // itself. Consider:
+    //
+    //      struct Material { float4 color; Texture2D tex; }
+    //      ConstantBuffer<Material> gMat;
+    //
+    // When compiling for Vulkan, the `gMat` constant buffer needs
+    // a `binding`, and the `tex` field does too, so the overall
+    // resource usage of `gMat` is two bindings, but we need a
+    // way to encode which of those bindings goes to `gMat.tex`
+    // and which to the constant buffer for `gMat` itself.
+    //
+    {
+        // We will start by extracting the "primary" part of the old
+        // container type/var layout, and constructing new objects
+        // that will represent the layout for our wrapped buffer.
+        //
+        auto oldPrimaryContainerVarLayout = oldParameterGroupTypeLayout->containerVarLayout;
+        auto oldPrimaryContainerTypeLayout = oldPrimaryContainerVarLayout->typeLayout;
+
+        RefPtr<TypeLayout> newContainerTypeLayout = new TypeLayout();
+        newContainerTypeLayout->type = oldPrimaryContainerTypeLayout->type;
+
+        RefPtr<VarLayout> newContainerVarLayout = new VarLayout();
+        newContainerVarLayout->typeLayout = newContainerTypeLayout;
+
+        newTypeLayout->containerVarLayout = newContainerVarLayout;
+
+        // Whatever got allocated for the primary container should get copied
+        // over to the new layout (e.g., if we allocated a constant buffer
+        // for `gMat` then we need to retain that information).
+        //
+        newContainerTypeLayout->addResourceUsageFrom(oldPrimaryContainerTypeLayout);
+        for( auto resInfo : oldPrimaryContainerVarLayout->resourceInfos )
+        {
+            auto newResInfo = newContainerVarLayout->findOrAddResourceInfo(resInfo.kind);
+            newResInfo->index = resInfo.index;
+            newResInfo->space = resInfo.space;
+        }
+
+        // It is possible that a constant buffer and/or space didn't get
+        // allocated for the "primary" data, but ended up being required for
+        // the "pending" data (this would happen if, e.g., a constant buffer
+        // didn't appear to have any uniform data in it, but then once we
+        // plugged in concrete types for interface fields it did...), so
+        // we need to account for that case and copy over the relevant
+        // resource usage from the pending data, if there is any.
+        //
+        if( auto oldPendingContainerVarLayout = oldPrimaryContainerVarLayout->pendingVarLayout )
+        {
+            // Whatever resources were allocated for the pending data type,
+            // our new combined container type needs to account for them
+            // (e.g., if we didn't have a constant buffer in the primary
+            // data, but one got allocated in the pending data, we need
+            // to end up with type layout information that includes a
+            // constnat buffer).
+            //
+            auto oldPendingContainerTypeLayout = oldPendingContainerVarLayout->typeLayout;
+            newContainerTypeLayout->addResourceUsageFrom(oldPendingContainerTypeLayout);
+
+            // We also need to add offset information based on the "pending"
+            // var layout, but we need to deal with the fact that this information
+            // is currently stored relative to the pending var layout for the surrounding
+            // context (passed in as `outerVarChain.pendingChain`), but we need it to be
+            // relative to the primary layout for the surrounding context (`outerVarChain.primaryChain`).
+            // This is where the `offsetVarLayout` we computed above comes
+            // in handy, because it represents the value(s) we need to
+            // add to each of the per-resource-kind offsets.
+            //
+            for( auto resInfo : oldPendingContainerVarLayout->resourceInfos )
+            {
+                addOffsetResInfo(newContainerVarLayout, resInfo, offsetVarLayout);
+            }
+        }
+    }
+
+    // Now that we've dealt with the container variable, we can turn
+    // our attention to the element type. This is the part that
+    // actually got legalized and required us to create a "wrapped"
+    // buffer type in the first place, so we know that it will
+    // have both primary and "pending" parts.
+    //
+    // Let's start by extracting the fields we care about from
+    // the original element type/var layout, and constructing
+    // the objects we'll use to represent the type/var layout for
+    // the new element type.
+    //
+    auto oldElementVarLayout = oldParameterGroupTypeLayout->elementVarLayout;
+    auto oldElementTypeLayout = oldElementVarLayout->typeLayout;
+
+    // Now matter what, the element type of a wrapped buffer
+    // will always have a structure type.
+    //
+    RefPtr<StructTypeLayout> newElementTypeLayout = new StructTypeLayout();
+    newElementTypeLayout->type = oldElementTypeLayout->type;
+
+    // The `wrappedBufferTypeInfo` that was passed in tells
+    // us how the fields of the original type got turned into
+    // zero or more fields in the new element type, so we
+    // need to follow its recursive structure to build
+    // layout information for each of the new fields.
+    //
+    // We will track a "chain" of parent variables that
+    // determines how we got to each leaf field, and is
+    // used to add up the offsets that will be stored
+    // in the new `VarLayout`s that get created.
+    // We know we need to add in some offsets (usually
+    // negative) to any fields that were pending data,
+    // so we will account for that in the initial
+    // chain of outer variables that we pass in.
+    //
+    LegalVarChain varChainForElementType;
+    varChainForElementType.primaryChain = nullptr;
+    varChainForElementType.pendingChain = offsetVarChain.primaryChain;
+
+    _addFieldsToWrappedBufferElementTypeLayout(
+        oldElementTypeLayout,
+        newElementTypeLayout,
+        wrappedBufferTypeInfo->elementInfo,
+        varChainForElementType,
+        true);
+
+    // A parameter group type layout holds a `VarLayout` for the element type,
+    // which encodes the offset of the element type with respect to the
+    // start of the parameter group as a whole (e.g., to handle the case
+    // where a constant buffer needs a `binding`, and so does its
+    // element type, so the offset to the first `binding` for the element
+    // type is one, not zero.
+    //
+    LegalVarChainLink elementVarChain(LegalVarChain(), oldParameterGroupTypeLayout->elementVarLayout);
+    auto newElementVarLayout = createVarLayout(elementVarChain, newElementTypeLayout);
+    newTypeLayout->elementVarLayout = newElementVarLayout;
+
+    // For legacy/API reasons, we also need to compute a version of the
+    // element type where the offset stored in the `elementVarLayout`
+    // gets "baked in" to the fields of the element type.
+    //
+    newTypeLayout->offsetElementTypeLayout = applyOffsetToTypeLayout(
+        newElementTypeLayout,
+        newElementVarLayout);
+
+    return newTypeLayout;
+}
+
 static LegalVal declareVars(
     IRTypeLegalizationContext*  context,
     IROp                        op,
     LegalType                   type,
     TypeLayout*                 typeLayout,
-    LegalVarChain*              varChain,
+    LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
     IRGlobalNameInfo*           globalNameInfo)
 {
@@ -1663,27 +2247,18 @@ static LegalVal declareVars(
 
             for (auto ee : tupleType->elements)
             {
-                // Fields are currently required to have linkage, since we use
-                // their mangled name to look up field layout information.
-                //
-                auto fieldLinkage = ee.key->findDecoration<IRLinkageDecoration>();
-                SLANG_ASSERT(fieldLinkage);
-
-                auto fieldLayout = getFieldLayout(typeLayout, fieldLinkage->getMangledName());
+                auto fieldLayout = getFieldLayout(typeLayout, ee.key);
                 RefPtr<TypeLayout> fieldTypeLayout = fieldLayout ? fieldLayout->typeLayout : nullptr;
+
+                // If we have a type layout coming in, we really expect to have a layout for each field.
+                SLANG_ASSERT(fieldLayout || !typeLayout);
 
                 // If we are processing layout information, then
                 // we need to create a new link in the chain
                 // of variables that will determine offsets
                 // for the eventual leaf fields...
-                LegalVarChain newVarChainStorage;
-                LegalVarChain* newVarChain = varChain;
-                if (fieldLayout)
-                {
-                    newVarChainStorage.next = varChain;
-                    newVarChainStorage.varLayout = fieldLayout;
-                    newVarChain = &newVarChainStorage;
-                }
+                //
+                LegalVarChainLink newVarChain(varChain, fieldLayout);
 
                 UnownedStringSlice fieldNameHint;
                 String joinedNameHintStorage;
@@ -1723,21 +2298,18 @@ static LegalVal declareVars(
         {
             auto wrappedBuffer = type.getWrappedBuffer();
 
+            auto wrappedTypeLayout = _createWrappedBufferTypeLayout(typeLayout, wrappedBuffer, varChain);
+
             auto innerVal = declareSimpleVar(
                 context,
                 op,
                 wrappedBuffer->simpleType,
-                typeLayout,
+                wrappedTypeLayout,
                 varChain,
                 nameHint,
                 globalNameInfo);
 
-            auto wrappedVal = wrapBufferValue(
-                context,
-                innerVal,
-                wrappedBuffer->elementInfo);
-
-            return wrappedVal;
+            return LegalVal::wrappedBuffer(innerVal, wrappedBuffer->elementInfo);
         }
 
     default:
@@ -1776,7 +2348,8 @@ static LegalVal legalizeGlobalVar(
             globalNameInfo.counter = 0;
 
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
-            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, nullptr, nameHint, &globalNameInfo);
+            context->builder->setInsertBefore(irGlobalVar);
+            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, LegalVarChain(), nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
@@ -1819,7 +2392,8 @@ static LegalVal legalizeGlobalConstant(
             // TODO: need to handle initializer here!
 
             UnownedStringSlice nameHint = findNameHint(irGlobalConstant);
-            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, nullptr, nameHint, &globalNameInfo);
+            context->builder->setInsertBefore(irGlobalConstant);
+            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalConstant, newVal);
@@ -1858,14 +2432,7 @@ static LegalVal legalizeGlobalParam(
         {
             context->insertBeforeGlobal = irGlobalParam->getNextInst();
 
-            LegalVarChain* varChain = nullptr;
-            LegalVarChain varChainStorage;
-            if (varLayout)
-            {
-                varChainStorage.next = nullptr;
-                varChainStorage.varLayout = varLayout;
-                varChain = &varChainStorage;
-            }
+            LegalVarChainLink varChain(LegalVarChain(), varLayout);
 
             IRGlobalNameInfo globalNameInfo;
             globalNameInfo.globalVar = irGlobalParam;
@@ -1874,6 +2441,7 @@ static LegalVal legalizeGlobalParam(
             // TODO: need to handle initializer here!
 
             UnownedStringSlice nameHint = findNameHint(irGlobalParam);
+            context->builder->setInsertBefore(irGlobalParam);
             LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, &globalNameInfo);
 
             // Register the new value as the replacement for the old

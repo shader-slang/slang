@@ -6,7 +6,10 @@ standard output = {
     "parameters": [
         {
             "name": "a",
-            "binding": {"kind": "constantBuffer", "space": 2, "index": 0, "count": 0},
+            "bindings": [
+                {"kind": "constantBuffer", "space": 2, "index": 0, "count": 0},
+                {"kind": "registerSpace", "index": 2}
+            ],
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
@@ -54,7 +57,10 @@ standard output = {
         },
         {
             "name": "b",
-            "binding": {"kind": "constantBuffer", "space": 3, "index": 0, "count": 0},
+            "bindings": [
+                {"kind": "constantBuffer", "space": 3, "index": 0, "count": 0},
+                {"kind": "registerSpace", "index": 3}
+            ],
             "type": {
                 "kind": "parameterBlock",
                 "elementType": {
