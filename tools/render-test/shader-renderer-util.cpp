@@ -392,6 +392,11 @@ static RefPtr<SamplerState> _createSamplerState(
                         texture,
                         viewDesc);
 
+                    if (!textureView)
+                    {
+                        return SLANG_FAIL;
+                    }
+
                     descriptorSet->setResource(rangeIndex, 0, textureView);
 
                     if(srcEntry.isOutput)
