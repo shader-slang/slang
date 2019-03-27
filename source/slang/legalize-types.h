@@ -328,20 +328,139 @@ RefPtr<TypeLayout> getDerefTypeLayout(
 
 RefPtr<VarLayout> getFieldLayout(
     TypeLayout*     typeLayout,
-    String const&   mangledFieldName);
+    IRInst*         fieldKey);
 
-// Represents the "chain" of declarations that
-// were followed to get to a variable that we
-// are now declaring as a leaf variable.
+    /// Represents a "chain" of variables leading to some leaf field.
+    ///
+    /// Consider code like:
+    ///
+    ///     struct Branch { int leaf; }
+    ///     struct Tree { Branch left; Branch right; }
+    ///     cbuffer Forest
+    ///     {
+    ///         int maxTreeHeight;
+    ///         Tree tree;
+    ///     }
+    ///
+    /// If we ask "what is the offset of `leaf`" the simple answer is zero,
+    /// but sometimes we are talking about `Forest.tree.right.leaf` which
+    /// will have a very different offset. In Slang parameters can consume
+    /// various (and multiple) resource kinds, so a single offset can't
+    /// be tunneled down through most recursive procedures.
+    ///
+    /// Instead we use a "chain" that works up through the stack, and
+    /// records the path from leaf field like `leaf` up to whatever
+    /// variable is the root for the curent operation.
+    ///
+    /// Operations like computing an offset can then be encoded by
+    /// starting with zero and then walking up the chain and adding in
+    /// offsets as encountered.
+    ///
+struct SimpleLegalVarChain
+{
+    // The next link up the chain, or null if this is the end.
+    SimpleLegalVarChain*    next = nullptr;
+
+    // The layout for the variable at this link in thain.
+    VarLayout*              varLayout = nullptr;
+};
+
+    /// A "chain" of variable declarations that can handle both primary and "pending" data.
+    ///
+    /// In the presence of interface-type fields, a single variable may
+    /// have data that sits in two distinct allocations, and may have
+    /// `VarLayout`s that represent offseting into each of those
+    /// allocations.
+    ///
+    /// A `LegalVarChain` tracks two distinct `SimpleVarChain`s: one for
+    /// the primary/ordinary data allocation, and one for any pending
+    /// data.
+    ///
+    /// It is okay if the primary/pending chains have different numbers
+    /// of links in them.
+    ///
+    /// Offsets for particular resource kinds in the primary or pending
+    /// data allocation can be queried on the appropriate sub-chain.
+    ///
 struct LegalVarChain
 {
-    LegalVarChain*  next;
-    VarLayout*      varLayout;
+    // The chain of variables that represents the primary allocation.
+    SimpleLegalVarChain*    primaryChain = nullptr;
+
+    // The chain of variables that represents the pending allocation.
+    SimpleLegalVarChain*    pendingChain = nullptr;
+
+    // If the primary chain is non-empty, gets the variable at the leaf.
+    DeclRef<VarDeclBase> getLeafVarDeclRef() const
+    {
+        if(!primaryChain)
+            return DeclRef<VarDeclBase>();
+
+        return primaryChain->varLayout->varDecl;
+    }
+};
+
+    /// RAII type for adding a link to a `LegalVarChain` as needed.
+    ///
+    /// This type handles the bookkeeping for creating a `LegalVarChain`
+    /// that links in one more variable. It will add a link to each of
+    /// the primary and pending sub-chains if and only if there is non-null
+    /// layout information for the primary/pending case.
+    ///
+    /// Typical usage in a recursive function is:
+    ///
+    ///     void someRecursiveFunc(LegalVarChain const& outerChain, ...)
+    ///     {
+    ///         if(auto subVar = needToRecurse(...))
+    ///         {
+    ///             LegalVarChainLink subChain(outerChain, subVar);
+    ///             someRecursiveFunc(subChain, ...);
+    ///         }
+    ///         ...
+    ///     }
+    ///
+struct LegalVarChainLink : LegalVarChain
+{
+        /// Default constructor: yields an empty chain.
+    LegalVarChainLink()
+    {
+    }
+
+        /// Copy constructor: yields a copy of the `parent` chain.
+    LegalVarChainLink(LegalVarChain const& parent)
+        : LegalVarChain(parent)
+    {}
+
+        /// Construct a chain that extends `parent` with `varLayout`, if it is non-null.
+    LegalVarChainLink(LegalVarChain const& parent, VarLayout* varLayout)
+        : LegalVarChain(parent)
+    {
+        if( varLayout )
+        {
+            primaryLink.next = parent.primaryChain;
+            primaryLink.varLayout = varLayout;
+            primaryChain = &primaryLink;
+
+            if( auto pendingVarLayout = varLayout->pendingVarLayout )
+            {
+                pendingLink.next = parent.pendingChain;
+                pendingLink.varLayout = pendingVarLayout;
+                pendingChain = &pendingLink;
+            }
+        }
+    }
+
+    SimpleLegalVarChain primaryLink;
+    SimpleLegalVarChain pendingLink;
 };
 
 RefPtr<VarLayout> createVarLayout(
-    LegalVarChain*  varChain,
-    TypeLayout*     typeLayout);
+    LegalVarChain const&    varChain,
+    TypeLayout*             typeLayout);
+
+RefPtr<VarLayout> createSimpleVarLayout(
+    SimpleLegalVarChain*    varChain,
+    TypeLayout*             typeLayout);
 
 //
 // The result of legalizing an IR value will be
@@ -409,6 +528,16 @@ struct LegalVal
         SLANG_ASSERT(flavor == Flavor::pair);
         return obj.as<PairPseudoVal>();
     }
+
+    static LegalVal wrappedBuffer(
+        LegalVal const& baseVal,
+        LegalElementWrapping const& elementInfo);
+
+    RefPtr<WrappedBufferPseudoVal> getWrappedBuffer() const
+    {
+        SLANG_ASSERT(flavor == Flavor::wrappedBuffer);
+        return obj.as<WrappedBufferPseudoVal>();
+    }
 };
 
 struct TuplePseudoVal : LegalValImpl
@@ -435,6 +564,12 @@ struct PairPseudoVal : LegalValImpl
 struct ImplicitDerefVal : LegalValImpl
 {
     LegalVal val;
+};
+
+struct WrappedBufferPseudoVal : LegalValImpl
+{
+    LegalVal                base;
+    LegalElementWrapping    elementInfo;
 };
 
 //

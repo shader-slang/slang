@@ -68,7 +68,7 @@ namespace Slang
 //          return t.Sample(s, uv);
 //      }
 //
-// In this case the output of the transformation shold be:
+// In this case the output of the transformation should be:
 //
 //      struct Params
 //      {

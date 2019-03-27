@@ -188,7 +188,7 @@ namespace Slang
             FixityChecked,
             TypeChecked,
             DirectionChecked,
-            Appicable,
+            Applicable,
         };
         Status status = Status::Unchecked;
 
@@ -1452,10 +1452,33 @@ namespace Slang
             // we want to check for is whether a direct initialization
             // is possible (a type conversion exists).
             //
-            return CanCoerce(toType, fromExpr->type);
+            return canCoerce(toType, fromExpr->type);
         }
 
-        bool tryReadArgFromInitializerList(
+            /// Read a value from an initializer list expression.
+            ///
+            /// This reads one or more argument from the initializer list
+            /// given as `fromInitializerListExpr` to initialize a value
+            /// of type `toType`. This may involve reading one or
+            /// more arguments from the initializer list, depending
+            /// on whether `toType` is an aggregate or not, and on
+            /// whether the next argument in the initializer list is
+            /// itself an initializer list.
+            ///
+            /// This routine returns `true` if it was able to read
+            /// arguments that can form a value of type `toType`,
+            /// and `false` otherwise.
+            ///
+            /// If the routine succeeds and `outToExpr` is non-null,
+            /// then it will be filled in with an expression
+            /// representing the value (or type `toType`) that was read,
+            /// or it will be left null to indicate that a default
+            /// value should be used.
+            ///
+            /// If the routine fails and `outToExpr` is non-null,
+            /// then a suitable diagnostic will be emitted.
+            ///
+        bool _readValueFromInitializerList(
             RefPtr<Type>                toType,
             RefPtr<Expr>*               outToExpr,
             RefPtr<InitializerListExpr> fromInitializerListExpr,
@@ -1487,7 +1510,7 @@ namespace Slang
             if(shouldUseInitializerDirectly(toType, firstInitExpr))
             {
                 ioInitArgIndex++;
-                return TryCoerceImpl(
+                return _coerce(
                     toType,
                     outToExpr,
                     firstInitExpr->type,
@@ -1511,14 +1534,33 @@ namespace Slang
             // The fallback case is to recursively read the
             // type from the same list as an aggregate.
             //
-            return tryReadAggregateFromInitializerList(
+            return _readAggregateValueFromInitializerList(
                 toType,
                 outToExpr,
                 fromInitializerListExpr,
                 ioInitArgIndex);
         }
 
-        bool tryReadAggregateFromInitializerList(
+            /// Read an aggregate value from an initializer list expression.
+            ///
+            /// This reads one or more arguments from the initializer list
+            /// given as `fromInitializerListExpr` to initialize the
+            /// fields/elements of a value of type `toType`.
+            ///
+            /// This routine returns `true` if it was able to read
+            /// arguments that can form a value of type `toType`,
+            /// and `false` otherwise.
+            ///
+            /// If the routine succeeds and `outToExpr` is non-null,
+            /// then it will be filled in with an expression
+            /// representing the value (or type `toType`) that was read,
+            /// or it will be left null to indicate that a default
+            /// value should be used.
+            ///
+            /// If the routine fails and `outToExpr` is non-null,
+            /// then a suitable diagnostic will be emitted.
+            ///
+        bool _readAggregateValueFromInitializerList(
             RefPtr<Type>                inToType,
             RefPtr<Expr>*               outToExpr,
             RefPtr<InitializerListExpr> fromInitializerListExpr,
@@ -1539,7 +1581,7 @@ namespace Slang
                 if(ioArgIndex < argCount)
                 {
                     auto arg = fromInitializerListExpr->args[ioArgIndex++];
-                    return TryCoerceImpl(
+                    return _coerce(
                         toType,
                         outToExpr,
                         arg->type,
@@ -1583,7 +1625,7 @@ namespace Slang
                 for(UInt ee = 0; ee < elementCount; ++ee)
                 {
                     RefPtr<Expr> coercedArg;
-                    bool argResult = tryReadArgFromInitializerList(
+                    bool argResult = _readValueFromInitializerList(
                         toElementType,
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
@@ -1631,7 +1673,7 @@ namespace Slang
                     for(UInt ee = 0; ee < elementCount; ++ee)
                     {
                         RefPtr<Expr> coercedArg;
-                        bool argResult = tryReadArgFromInitializerList(
+                        bool argResult = _readValueFromInitializerList(
                             toElementType,
                             outToExpr ? &coercedArg : nullptr,
                             fromInitializerListExpr,
@@ -1657,7 +1699,7 @@ namespace Slang
                     while(ioArgIndex < argCount)
                     {
                         RefPtr<Expr> coercedArg;
-                        bool argResult = tryReadArgFromInitializerList(
+                        bool argResult = _readValueFromInitializerList(
                             toElementType,
                             outToExpr ? &coercedArg : nullptr,
                             fromInitializerListExpr,
@@ -1721,7 +1763,7 @@ namespace Slang
                 for(UInt rr = 0; rr < rowCount; ++rr)
                 {
                     RefPtr<Expr> coercedArg;
-                    bool argResult = tryReadArgFromInitializerList(
+                    bool argResult = _readValueFromInitializerList(
                         toRowType,
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
@@ -1749,7 +1791,7 @@ namespace Slang
                     for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef))
                     {
                         RefPtr<Expr> coercedArg;
-                        bool argResult = tryReadArgFromInitializerList(
+                        bool argResult = _readValueFromInitializerList(
                             GetType(fieldDeclRef),
                             outToExpr ? &coercedArg : nullptr,
                             fromInitializerListExpr,
@@ -1773,6 +1815,10 @@ namespace Slang
                 // list invalid if we are trying to read something
                 // off of it that wasn't handled by the cases above.
                 //
+                if(outToExpr)
+                {
+                    getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForType, inToType);
+                }
                 return false;
             }
 
@@ -1792,7 +1838,26 @@ namespace Slang
             return true;
         }
 
-        bool tryCoerceInitializerList(
+            /// Coerce an initializer-list expression to a specific type.
+            ///
+            /// This reads one or more arguments from the initializer list
+            /// given as `fromInitializerListExpr` to initialize the
+            /// fields/elements of a value of type `toType`.
+            ///
+            /// This routine returns `true` if it was able to read
+            /// arguments that can form a value of type `toType`,
+            /// with no arguments left over, and `false` otherwise.
+            ///
+            /// If the routine succeeds and `outToExpr` is non-null,
+            /// then it will be filled in with an expression
+            /// representing the value (or type `toType`) that was read,
+            /// or it will be left null to indicate that a default
+            /// value should be used.
+            ///
+            /// If the routine fails and `outToExpr` is non-null,
+            /// then a suitable diagnostic will be emitted.
+            ///
+        bool _coerceInitializerList(
             RefPtr<Type>                toType,
             RefPtr<Expr>*               outToExpr,
             RefPtr<InitializerListExpr> fromInitializerListExpr)
@@ -1803,53 +1868,106 @@ namespace Slang
             // TODO: we should handle the special case of `{0}` as an initializer
             // for arbitrary `struct` types here.
 
-            if(!tryReadAggregateFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
+            if(!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
                 return false;
 
             if(argIndex != argCount)
             {
-                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
+                if( outToExpr )
+                {
+                    getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
+                }
             }
 
             return true;
         }
 
-
-        // Central engine for implementing implicit coercion logic
-        bool TryCoerceImpl(
-            RefPtr<Type>			toType,		// the target type for conversion
-            RefPtr<Expr>*	outToExpr,	// (optional) a place to stuff the target expression
-            RefPtr<Type>			fromType,	// the source type for the conversion
-            RefPtr<Expr>	fromExpr,	// the source expression
-            ConversionCost*					outCost)	// (optional) a place to stuff the conversion cost
+            /// Report that implicit type coercion is not possible.
+        bool _failedCoercion(
+            RefPtr<Type>    toType,
+            RefPtr<Expr>*   outToExpr,
+            RefPtr<Expr>    fromExpr)
         {
-            // Easy case: the types are equal
-            if (toType->Equals(fromType))
+            if(outToExpr)
             {
-                if (outToExpr)
+                getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+            }
+            return false;
+        }
+
+            /// Central engine for implementing implicit coercion logic
+            ///
+            /// This function tries to find an implicit conversion path from
+            /// `fromType` to `toType`. It returns `true` if a conversion
+            /// is found, and `false` if not.
+            ///
+            /// If a conversion is found, then its cost will be written to `outCost`.
+            ///
+            /// If a `fromExpr` is provided, it must be of type `fromType`,
+            /// and represent a value to be converted.
+            ///
+            /// If `outToExpr` is non-null, and if a conversion is found, then
+            /// `*outToExpr` will be set to an expression that performs the
+            /// implicit conversion of `fromExpr` (which must be non-null
+            /// to `toType`).
+            ///
+            /// The case where `outToExpr` is non-null is used to identify
+            /// when a conversion is being done "for real" so that diagnostics
+            /// should be emitted on failure.
+            ///
+        bool _coerce(
+            RefPtr<Type>    toType,
+            RefPtr<Expr>*   outToExpr,
+            RefPtr<Type>    fromType,
+            RefPtr<Expr>    fromExpr,
+            ConversionCost* outCost)
+        {
+            // An important and easy case is when the "to" and "from" types are equal.
+            //
+            if( toType->Equals(fromType) )
+            {
+                if(outToExpr)
                     *outToExpr = fromExpr;
-                if (outCost)
+                if(outCost)
                     *outCost = kConversionCost_None;
                 return true;
             }
 
-            // If either type is an error, then let things pass.
-            if (as<ErrorType>(toType) || as<ErrorType>(fromType))
+            // Another important case is when either the "to" or "from" type
+            // represents an error. In such a case we must have already
+            // reporeted the error, so it is better to allow the conversion
+            // to pass than to report a "cascading" error that might not
+            // make any sense.
+            //
+            if(as<ErrorType>(toType) || as<ErrorType>(fromType))
             {
-                if (outToExpr)
+                if(outToExpr)
                     *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
-                if (outCost)
+                if(outCost)
                     *outCost = kConversionCost_None;
                 return true;
             }
 
-            // Coercion from an initializer list is allowed for many types
+            // Coercion from an initializer list is allowed for many types,
+            // so we will farm that out to its own subroutine.
+            //
             if( auto fromInitializerListExpr = as<InitializerListExpr>(fromExpr))
             {
-                if(!tryCoerceInitializerList(toType, outToExpr, fromInitializerListExpr))
+                if( !_coerceInitializerList(
+                    toType,
+                    outToExpr,
+                    fromInitializerListExpr) )
+                {
                     return false;
+                }
 
-                // For now, coercion from an initializer list has no cost
+                // For now, we treat coercion from an initializer list
+                // as having  no cost, so that all conversions from initializer
+                // lists are equally valid. This is fine given where initializer
+                // lists are allowed to appear now, but might need to be made
+                // more strict if we allow for initializer lists in more
+                // places in the language (e.g., as function arguments).
+                //
                 if(outCost)
                 {
                     *outCost = kConversionCost_None;
@@ -1858,16 +1976,14 @@ namespace Slang
                 return true;
             }
 
+            // If we are casting to an interface type, then that will succeed
+            // if the "from" type conforms to the interface.
             //
             if (auto toDeclRefType = as<DeclRefType>(toType))
             {
                 auto toTypeDeclRef = toDeclRefType->declRef;
                 if (auto interfaceDeclRef = toTypeDeclRef.as<InterfaceDecl>())
                 {
-                    // Trying to convert to an interface type.
-                    //
-                    // We will allow this if the type conforms to the interface.
-
                     if(auto witness = tryGetInterfaceConformanceWitness(fromType, interfaceDeclRef))
                     {
                         if (outToExpr)
@@ -1877,89 +1993,54 @@ namespace Slang
                         return true;
                     }
                 }
-
-                // Note: The following seems completely broken, and we should be using
-                // a `fromTypeDeclRef` here for the case when casting *from* a generic
-                // type parameter to an interface type...
-                //
-#if 0
-                else if (auto genParamDeclRef = toTypeDeclRef.as<GenericTypeParamDecl>())
-                {
-                    // We need to enumerate the constraints placed on this type by its outer
-                    // generic declaration, and see if any of them guarantees that we
-                    // satisfy the given interface..
-                    auto genericDeclRef = genParamDeclRef.GetParent().as<GenericDecl>();
-                    SLANG_ASSERT(genericDeclRef);
-
-                    for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
-                    {
-                        auto sub = GetSub(constraintDeclRef);
-                        auto sup = GetSup(constraintDeclRef);
-
-                        auto subDeclRef = as<DeclRefType>(sub);
-                        if (!subDeclRef)
-                            continue;
-                        if (subDeclRef->declRef != genParamDeclRef)
-                            continue;
-                        auto supDeclRefType = as<DeclRefType>(sup);
-                        if (supDeclRefType)
-                        {
-                            auto toInterfaceDeclRef = supDeclRefType->declRef.as<InterfaceDecl>();
-                            if (DoesTypeConformToInterface(fromType, toInterfaceDeclRef))
-                            {
-                                if (outToExpr)
-                                    *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
-                                if (outCost)
-                                    *outCost = kConversionCost_CastToInterface;
-                                return true;
-                            }
-                        }
-                    }
-
-                }
-#endif
-
             }
 
-            // Are we converting from a parameter group type to its element type?
+            // We allow implicit conversion of a parameter group type like
+            // `ConstantBuffer<X>` or `ParameterBlock<X>` to its element
+            // type `X`.
+            //
             if(auto fromParameterGroupType = as<ParameterGroupType>(fromType))
             {
                 auto fromElementType = fromParameterGroupType->getElementType();
 
-                // If we have, e.g., `ConstantBuffer<A>` and we want to convert
-                // to `B`, where conversion from `A` to `B` is possible, then
-                // we will do so here.
+                // If we convert, e.g., `ConstantBuffer<A> to `A`, we will allow
+                // subsequent conversion of `A` to `B` if such a conversion
+                // is possible.
+                //
+                ConversionCost subCost = kConversionCost_None;
 
-                ConversionCost subCost = 0;
-                if(CanCoerce(toType, fromElementType, &subCost))
+                RefPtr<DerefExpr> derefExpr;
+                if(outToExpr)
                 {
-                    if(outCost)
-                        *outCost = subCost + kConversionCost_ImplicitDereference;
-
-                    if(outToExpr)
-                    {
-                        auto derefExpr = new DerefExpr();
-                        derefExpr->base = fromExpr;
-                        derefExpr->type = QualType(fromElementType);
-
-                        return TryCoerceImpl(
-                            toType,
-                            outToExpr,
-                            fromElementType,
-                            derefExpr,
-                            nullptr);
-                    }
-                    return true;
+                    derefExpr = new DerefExpr();
+                    derefExpr->base = fromExpr;
+                    derefExpr->type = QualType(fromElementType);
                 }
+
+                if(!_coerce(
+                    toType,
+                    outToExpr,
+                    fromElementType,
+                    derefExpr,
+                    &subCost))
+                {
+                    return false;
+                }
+
+                if(outCost)
+                    *outCost = subCost + kConversionCost_ImplicitDereference;
+                return true;
             }
 
-
-            // Look for an initializer/constructor declaration in the target type,
-            // which is marked as usable for implicit conversion, and which takes
-            // the source type as an argument.
+            // The main general-purpose approach for conversion is
+            // using suitable marked initializer ("constructor")
+            // declarations on the target type.
+            //
+            // This is treated as a form of overload resolution,
+            // since we are effectively forming an overloaded
+            // call to one of the initializers in the target type.
 
             OverloadResolveContext overloadContext;
-
             overloadContext.disallowNestedConversions = true;
             overloadContext.argCount = 1;
             overloadContext.argTypes = &fromType;
@@ -1977,64 +2058,86 @@ namespace Slang
 
             AddTypeOverloadCandidates(toType, overloadContext, toType);
 
+            // After all of the overload candidates have been added
+            // to the context and processed, we need to see whether
+            // there was one best overload or not.
+            //
             if(overloadContext.bestCandidates.Count() != 0)
             {
-                // There were multiple candidates that were equally good.
+                // In this case there were multiple equally-good candidates to call.
+                //
+                // We will start by checking if the candidates are
+                // even applicable, because if not, then we shouldn't
+                // consider the conversion as possible.
+                //
+                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                    return _failedCoercion(toType, outToExpr, fromExpr);
 
-                // First, we will check if these candidates are even applicable.
-                // If they aren't, then they can't be used for conversion.
-                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
-                    return false;
-
-                // If we reach this point, then we have multiple candidates which are
-                // all equally applicable, which means we have an ambiguity.
-                // If the user is just querying whether a conversion is possible, we
-                // will tell them it is, because ambiguity should trigger an ambiguity
-                // error, and not a "no conversion possible" error.
-
+                // If all of the candidates in `bestCandidates` are applicable,
+                // then we have an ambiguity.
+                //
                 // We will compute a nominal conversion cost as the minimum over
                 // all the conversions available.
-                ConversionCost cost = kConversionCost_GeneralConversion;
+                //
+                ConversionCost bestCost = kConversionCost_Explicit;
                 for(auto candidate : overloadContext.bestCandidates)
                 {
                     ConversionCost candidateCost = getImplicitConversionCost(
                         candidate.item.declRef.getDecl());
 
-                    if(candidateCost < cost)
-                        cost = candidateCost;
+                    if(candidateCost < bestCost)
+                        bestCost = candidateCost;
+                }
+
+                // Conceptually, we want to treat the conversion as
+                // possible, but report it as ambiguous if we actually
+                // need to reify the result as an expression.
+                //
+                if(outToExpr)
+                {
+                    getSink()->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+
+                    *outToExpr = CreateErrorExpr(fromExpr);
                 }
 
                 if(outCost)
-                    *outCost = cost;
-
-                if(outToExpr)
-                {
-                    // The user is asking for us to actually perform the conversion,
-                    // so we need to generate an appropriate expression here.
-
-                    // YONGH: I am confused why we are not hitting this case before
-                    //throw "foo bar baz";
-                    // YONGH: temporary work around, may need to create the actual
-                    // invocation expr to the constructor call
-                    *outToExpr = fromExpr;
-                }
+                    *outCost = bestCost;
 
                 return true;
             }
             else if(overloadContext.bestCandidate)
             {
-                // There is a single best candidate for conversion.
+                // If there is a single best candidate for conversion,
+                // then we want to use it.
+                //
+                // It is possible that there was a single best candidate,
+                // but it wasn't actually usable, so we will check for
+                // that case first.
+                //
+                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                    return _failedCoercion(toType, outToExpr, fromExpr);
 
-                // It might not actually be usable, so let's check that first.
-                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Appicable)
-                    return false;
-
-                // Okay, it is applicable, and we just need to let the user
-                // know about it, and optionally construct a call.
-
-                // We need to extract the conversion cost from the candidate we found.
+                // Next, we need to look at the implicit conversion
+                // cost associated with the initializer we are invoking.
+                //
                 ConversionCost cost = getImplicitConversionCost(
                         overloadContext.bestCandidate->item.declRef.getDecl());;
+
+                // If the cost is too high to be usable as an
+                // implicit conversion, then we will report the
+                // conversion as possible (so that an overload involving
+                // this conversion will be selected over one without),
+                // but then emit a diagnostic when actually reifying
+                // the result expression.
+                //
+                if( cost >= kConversionCost_Explicit )
+                {
+                    if( outToExpr )
+                    {
+                        getSink()->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
+                        getSink()->diagnose(fromExpr, Diagnostics::noteExplicitConversionPossible, fromType, toType);
+                    }
+                }
 
                 if(outCost)
                     *outCost = cost;
@@ -2085,21 +2188,30 @@ namespace Slang
                 return true;
             }
 
-            return false;
+            return _failedCoercion(toType, outToExpr, fromExpr);
         }
 
-        // Check whether a type coercion is possible
-        bool CanCoerce(
-            RefPtr<Type>			toType,			// the target type for conversion
-            RefPtr<Type>			fromType,		// the source type for the conversion
-            ConversionCost*					outCost = 0)	// (optional) a place to stuff the conversion cost
+            /// Check whether implicit type coercion from `fromType` to `toType` is possible.
+            ///
+            /// If conversion is possible, returns `true` and sets `outCost` to the cost
+            /// of the conversion found (if `outCost` is non-null).
+            ///
+            /// If conversion is not possible, returns `false`.
+            ///
+        bool canCoerce(
+            RefPtr<Type>    toType,
+            RefPtr<Type>    fromType,
+            ConversionCost* outCost = 0)
         {
+            // As an optimization, we will maintain a cache of conversion results
+            // for basic types such as scalars and vectors.
+            //
             BasicTypeKey key1, key2;
             BasicTypeKeyPair cacheKey;
             bool shouldAddToCache = false;
             ConversionCost cost;
             TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
-            if (key1.fromType(toType.Ptr()) && key2.fromType(fromType.Ptr()))
+            if( key1.fromType(toType.Ptr()) && key2.fromType(fromType.Ptr()) )
             {
                 cacheKey.type1 = key1;
                 cacheKey.type2 = key2;
@@ -2113,20 +2225,33 @@ namespace Slang
                 else
                     shouldAddToCache = true;
             }
-            bool rs = TryCoerceImpl(
+
+            // If there was no suitable entry in the cache,
+            // then we fall back to the general-purpose
+            // conversion checking logic.
+            //
+            // Note that we are passing in `nullptr` as
+            // the output expression to be constructed,
+            // which suppresses emission of any diagnostics
+            // during the coercion process.
+            //
+            bool rs = _coerce(
                 toType,
                 nullptr,
                 fromType,
                 nullptr,
                 &cost);
+
             if (outCost)
                 *outCost = cost;
+
             if (shouldAddToCache)
             {
                 if (!rs)
                     cost = kConversionCost_Impossible;
                 typeCheckingCache->conversionCostCache[cacheKey] = cost;
             }
+
             return rs;
         }
 
@@ -2173,21 +2298,19 @@ namespace Slang
             return expr;
         }
 
-        // Perform type coercion, and emit errors if it isn't possible
-        RefPtr<Expr> Coerce(
-            RefPtr<Type>			toType,
-            RefPtr<Expr>	fromExpr)
+            /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
+        RefPtr<Expr> coerce(
+            RefPtr<Type>    toType,
+            RefPtr<Expr>    fromExpr)
         {
             RefPtr<Expr> expr;
-            if (!TryCoerceImpl(
+            if (!_coerce(
                 toType,
                 &expr,
                 fromExpr->type.Ptr(),
                 fromExpr.Ptr(),
                 nullptr))
             {
-                getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
-
                 // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
                 // clobber the type on `fromExpr`, and an invariant here is that coercion
                 // really shouldn't *change* the expression that is passed in, but should
@@ -2249,7 +2372,7 @@ namespace Slang
                     if (auto initExpr = varDecl->initExpr)
                     {
                         initExpr = CheckTerm(initExpr);
-                        initExpr = Coerce(varDecl->type.Ptr(), initExpr);
+                        initExpr = coerce(varDecl->type.Ptr(), initExpr);
                         varDecl->initExpr = initExpr;
 
                         // If this is an array variable, then we first want to give
@@ -2392,6 +2515,25 @@ namespace Slang
             expr = CheckExpr(expr);
 
             auto intVal = CheckIntegerConstantExpression(expr.Ptr());
+            if(!intVal)
+                return nullptr;
+
+            auto constIntVal = as<ConstantIntVal>(intVal);
+            if(!constIntVal)
+            {
+                getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
+                return nullptr;
+            }
+            return constIntVal;
+        }
+
+        RefPtr<ConstantIntVal> checkConstantEnumVal(
+            RefPtr<Expr>    expr)
+        {
+            // First type-check the expression as normal
+            expr = CheckExpr(expr);
+
+            auto intVal = CheckEnumConstantExpression(expr.Ptr());
             if(!intVal)
                 return nullptr;
 
@@ -2701,7 +2843,7 @@ namespace Slang
                     if (attr->args.Count() == 1)
                     {
                         RefPtr<IntVal> outIntVal;
-                        if (auto cInt = checkConstantIntVal(attr->args[0]))
+                        if (auto cInt = checkConstantEnumVal(attr->args[0]))
                         {
                             targetClassId = (uint32_t)(cInt->value);
                         }
@@ -2749,7 +2891,7 @@ namespace Slang
                             if (!typeChecked)
                             {
                                 arg = CheckExpr(arg);
-                                arg = Coerce(paramDecl->getType(), arg);
+                                arg = coerce(paramDecl->getType(), arg);
                             }
                         }
                         paramIndex++;
@@ -4053,7 +4195,7 @@ namespace Slang
                 if(auto initExpr = decl->tagExpr)
                 {
                     initExpr = CheckExpr(initExpr);
-                    initExpr = Coerce(tagType, initExpr);
+                    initExpr = coerce(tagType, initExpr);
 
                     // We want to enforce that this is an integer constant
                     // expression, but we don't actually care to retain
@@ -4587,7 +4729,7 @@ namespace Slang
                 // actual type of the parameter.
                 //
                 initExpr = CheckExpr(initExpr);
-                initExpr = Coerce(typeExpr.type, initExpr);
+                initExpr = coerce(typeExpr.type, initExpr);
                 paramDecl->initExpr = initExpr;
 
                 // TODO: a default argument expression needs to
@@ -4729,7 +4871,7 @@ namespace Slang
         {
             RefPtr<Expr> e = expr;
             e = CheckTerm(e);
-            e = Coerce(getSession()->getBoolType(), e);
+            e = coerce(getSession()->getBoolType(), e);
             return e;
         }
 
@@ -4880,7 +5022,7 @@ namespace Slang
                 {
                     if (function)
                     {
-                        stmt->Expression = Coerce(function->ReturnType.Ptr(), stmt->Expression);
+                        stmt->Expression = coerce(function->ReturnType.Ptr(), stmt->Expression);
                     }
                     else
                     {
@@ -5250,7 +5392,7 @@ namespace Slang
             if(IsErrorExpr(inExpr)) return nullptr;
 
             // First coerce the expression to the expected type
-            auto expr = Coerce(getSession()->getIntType(),inExpr);
+            auto expr = coerce(getSession()->getIntType(),inExpr);
 
             // No need to issue further errors if the type coercion failed.
             if(IsErrorExpr(expr)) return nullptr;
@@ -5263,6 +5405,21 @@ namespace Slang
             return result;
         }
 
+        RefPtr<IntVal> CheckEnumConstantExpression(Expr* expr)
+        {
+            // No need to issue further errors if the expression didn't even type-check.
+            if(IsErrorExpr(expr)) return nullptr;
+
+            // No need to issue further errors if the type coercion failed.
+            if(IsErrorExpr(expr)) return nullptr;
+
+            auto result = TryConstantFoldExpr(expr);
+            if (!result)
+            {
+                getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+            }
+            return result;
+        }
 
 
         RefPtr<Expr> CheckSimpleSubscriptExpr(
@@ -5439,15 +5596,6 @@ namespace Slang
             return true;
         }
 
-        // Coerce an expression to a specific  type that it is expected to have in context
-        RefPtr<Expr> CoerceExprToType(
-            RefPtr<Expr>	expr,
-            RefPtr<Type>			type)
-        {
-            // TODO(tfoley): clean this up so there is only one version...
-            return Coerce(type, expr);
-        }
-
         RefPtr<Expr> visitParenExpr(ParenExpr* expr)
         {
             auto base = expr->base;
@@ -5504,7 +5652,7 @@ namespace Slang
 
             auto type = expr->left->type;
 
-            expr->right = Coerce(type, CheckTerm(expr->right));
+            expr->right = coerce(type, CheckTerm(expr->right));
 
             if (!type.IsLeftValue)
             {
@@ -6117,7 +6265,7 @@ namespace Slang
         {
             // Can we convert at all?
             ConversionCost conversionCost;
-            if(!CanCoerce(toType, fromType, &conversionCost))
+            if(!canCoerce(toType, fromType, &conversionCost))
                 return false;
 
             // Is the conversion cheap enough to be done implicitly?
@@ -6742,14 +6890,14 @@ namespace Slang
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
                         ConversionCost cost = kConversionCost_None;
-                        if (!CanCoerce(GetType(valParamRef), arg->type, &cost))
+                        if (!canCoerce(GetType(valParamRef), arg->type, &cost))
                         {
                             return false;
                         }
                         candidate.conversionCostSum += cost;
                     }
 
-                    arg = Coerce(GetType(valParamRef), arg);
+                    arg = coerce(GetType(valParamRef), arg);
                     auto val = ExtractGenericArgInteger(arg);
                     checkedArgs.Add(val);
                 }
@@ -6803,7 +6951,7 @@ namespace Slang
                         if(!GetType(param)->Equals(argType))
                             return false;
                     }
-                    else if (!CanCoerce(GetType(param), argType, &cost))
+                    else if (!canCoerce(GetType(param), argType, &cost))
                     {
                         return false;
                     }
@@ -6811,7 +6959,7 @@ namespace Slang
                 }
                 else
                 {
-                    arg = Coerce(GetType(param), arg);
+                    arg = coerce(GetType(param), arg);
                 }
             }
             return true;
@@ -6948,7 +7096,7 @@ namespace Slang
             if (!TryCheckOverloadCandidateConstraints(context, candidate))
                 return;
 
-            candidate.status = OverloadCandidate::Status::Appicable;
+            candidate.status = OverloadCandidate::Status::Applicable;
         }
 
         // Create the representation of a given generic applied to some arguments
@@ -7107,7 +7255,7 @@ namespace Slang
 
             // If both candidates are applicable, then we need to compare
             // the costs of their type conversion sequences
-            if(left->status == OverloadCandidate::Status::Appicable)
+            if(left->status == OverloadCandidate::Status::Applicable)
             {
                 if (left->conversionCostSum != right->conversionCostSum)
                     return left->conversionCostSum - right->conversionCostSum;
@@ -8300,7 +8448,7 @@ namespace Slang
 
                 String argsList = getCallSignatureString(context);
 
-                if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
+                if (context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
                 {
                     // There were multiple equally-good candidates, but none actually usable.
                     // We will construct a diagnostic message to help out.
@@ -8378,7 +8526,7 @@ namespace Slang
             else
             {
                 // Nothing at all was found that we could even consider invoking
-                getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
+                getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction, funcExprType);
                 expr->type = QualType(getSession()->getErrorType());
                 return expr;
             }
@@ -8479,7 +8627,7 @@ namespace Slang
             if (context.bestCandidates.Count() > 0)
             {
                 // Things were ambiguous.
-                if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
+                if (context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
                 {
                     // There were multiple equally-good candidates, but none actually usable.
                     // We will construct a diagnostic message to help out.
