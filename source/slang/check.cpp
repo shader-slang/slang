@@ -4737,6 +4737,22 @@ namespace Slang
                 // For example, it should not be allowed to refer
                 // to other parameters of the same function (or maybe
                 // only the parameters to its left...).
+
+                // A default argument value should not be allowed on an
+                // `out` or `inout` parameter.
+                //
+                // TODO: we could relax this by requiring the expression
+                // to yield an lvalue, but that seems like a feature
+                // with limited practical utility (and an easy source
+                // of confusing behavior).
+                //
+                // Note: the `InOutModifier` class inherits from `OutModifier`,
+                // so we only need to check for the base case.
+                //
+                if(paramDecl->FindModifier<OutModifier>())
+                {
+                    getSink()->diagnose(initExpr, Diagnostics::outputParameterCannotHaveDefaultValue);
+                }
             }
 
             paramDecl->SetCheckState(DeclCheckState::Checked);
@@ -8738,15 +8754,25 @@ namespace Slang
                             }
                             else
                             {
-                                // This implies that the function had an `out`
-                                // or `inout` parameter and they gave it a default
-                                // argument expression. I'm not even sure what
-                                // that would mean.
+                                // There are two ways we could get here, both involving
+                                // a call where the number of argument expressions is
+                                // less than the number of parameters on the callee:
                                 //
-                                // TODO: make sure this gets validated on the
-                                // declaring side.
+                                // 1. There might be fewer arguments than parameters
+                                // because the trailing parameters should be defaulted
                                 //
-                                SLANG_DIAGNOSE_UNEXPECTED(getSink(), invoke, "default argument expression for out/inout paameter");
+                                // 2. There might be fewer arguments than parameters
+                                // because the call is incorrect.
+                                //
+                                // In case (2) an error would have already been diagnosed,
+                                // and we don't want to emit another cascading error here.
+                                //
+                                // In case (1) this implies the user declared an `out`
+                                // or `inout` parameter with a default argument expression.
+                                // That should be an error, but it should be detected
+                                // on the declaration instead of here at the use site.
+                                //
+                                // Thus, it makes sense to ignore this case here.
                             }
                         }
                     }
