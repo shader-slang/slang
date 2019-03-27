@@ -721,12 +721,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, $1, $3)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, $1, $3)$z\")\n";
                 }
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ";
+                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, ";
                     if( needsMipLevel )
                     {
                         sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
@@ -748,12 +748,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetchOffset($0, $0, $1, $2)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctexelFetchOffset($0, $0, $1, $2)$z\")\n";
                 }
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, ";
+                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, ";
                     if( needsMipLevel )
                     {
                         sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
@@ -804,7 +804,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"texelFetch($0, " << ivecN << "($1)";
+                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, " << ivecN << "($1)";
                     if( !isMultisample )
                     {
                         sb << ", 0";
@@ -817,7 +817,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     break;
 
                 default:
-                    sb << "__target_intrinsic(glsl, \"imageLoad($0, " << ivecN << "($1)";
+                    sb << "__target_intrinsic(glsl, \"$cimageLoad($0, " << ivecN << "($1)";
                     if( isMultisample )
                     {
                         // TODO: how to handle passing through sample index?
@@ -852,13 +852,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
             {
                 // `Sample()`
 
-                sb << "__target_intrinsic(glsl, \"texture($p, $2)$z\")\n";
+                sb << "__target_intrinsic(glsl, \"$ctexture($p, $2)$z\")\n";
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3)$z\")\n";
                     sb << "T Sample(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -882,13 +882,13 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 
                 // `SampleBias()`
-                sb << "__target_intrinsic(glsl, \"texture($p, $2, $3)$z\")\n";
+                sb << "__target_intrinsic(glsl, \"$ctexture($p, $2, $3)$z\")\n";
                 sb << "T SampleBias(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureOffset($p, $2, $3, $4)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctextureOffset($p, $2, $3, $4)$z\")\n";
                     sb << "T SampleBias(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
@@ -916,7 +916,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if (extCoordCount < 3)
                         extCoordCount = 3;
 
-                    sb << "__target_intrinsic(glsl, \"textureLod($p, ";
+                    sb << "__target_intrinsic(glsl, \"$ctextureLod($p, ";
 
                     sb << "vec" << extCoordCount << "($2,";
                     for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -934,7 +934,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     if (extCoordCount < 3)
                         extCoordCount = 3;
 
-                    sb << "__target_intrinsic(glsl, \"textureGrad($p, ";
+                    sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, ";
 
                     sb << "vec" << extCoordCount << "($2,";
                     for (int ii = arrCoordCount; ii < extCoordCount - 1; ++ii)
@@ -971,7 +971,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 }
 
 
-                sb << "__target_intrinsic(glsl, \"textureGrad($p, $2, $3, $4)$z\")\n";
+                sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
 //                sb << "__intrinsic_op(sampleGrad)\n";
                 sb << "T SampleGrad(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -981,7 +981,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureGradOffset($p, $2, $3, $4, $5)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctextureGradOffset($p, $2, $3, $4, $5)$z\")\n";
 //                    sb << "__intrinsic_op(sampleGrad)\n";
                     sb << "T SampleGrad(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -992,14 +992,14 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 // `SampleLevel`
 
-                sb << "__target_intrinsic(glsl, \"textureLod($p, $2, $3)$z\")\n";
+                sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(glsl, \"textureLodOffset($p, $2, $3, $4)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";
                     sb << "T SampleLevel(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float level, ";
