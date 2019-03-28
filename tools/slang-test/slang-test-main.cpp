@@ -21,11 +21,6 @@ using namespace Slang;
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
-//#ifdef _WIN32
-//#define SLANG_TEST_SUPPORT_HLSL 1
-//#include <d3dcompiler.h>
-//#endif
-
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -73,9 +68,6 @@ struct TestInput
     // Arguments for the test (usually to be interpreted
     // as command line args)
     TestOptions const*  testOptions;
-
-    // The list of tests that will be run on this file
-    //FileTestList const* testList;
 
     // Determines how the test will be spawned
     SpawnType spawnType;
@@ -383,7 +375,6 @@ OSError spawnAndWaitExe(TestContext* context, const String& testPath, OSProcessS
     return err;
 }
 
-
 OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, OSProcessSpawner& spawner)
 {
     const auto& options = context->options;
@@ -494,7 +485,6 @@ static BackendType _toBackendType(const UnownedStringSlice& slice)
     return BackendType::Unknown;
 }
 
-
 static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -563,6 +553,12 @@ static SlangResult _extractRenderTestInfo(OSProcessSpawner& spawner, TestInfo* i
 {
     const auto& args = spawner.argumentList_;
 
+    // TODO(JS): 
+    // This is rather convoluted in that it has to work out from the command line parameters passed
+    // to render-test what renderer will be used. 
+    // That a similar logic has to be kept inside the implementation of render-test and both this
+    // and render-test will have to be kept in sync.
+   
     bool useDxil = _hasOption(args, "-use-dxil");
 
     bool usePassthru = false;
@@ -672,6 +668,7 @@ static SlangResult _extractRenderTestInfo(OSProcessSpawner& spawner, TestInfo* i
 
 static SlangResult _extractSlangCTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
 {
+    // This determines what the requirements are for a slangc like command line
     const auto& args = spawner.argumentList_;
 
     // First check pass through
@@ -698,6 +695,7 @@ static SlangResult _extractSlangCTestInfo(OSProcessSpawner& spawner, TestInfo* i
 
 static SlangResult _extractReflectionTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
 {
+    // There are no specialized constraints for a reflection test
     return SLANG_OK;
 }
 
@@ -724,14 +722,13 @@ static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
 
 static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 {
+    // Only evaluate if it hasn't already been evaluated (the actual evaluation is slow...)
     if (!context->isAvailableRenderApiFlagsValid)
     {
-        // Make sure the test can run on the context
-        auto testInfo = context->testInfo;
-        context->testInfo = nullptr;
+        // Call the render-test tool asking it only to startup a specified render api
+        // (taking into account adapter options)
 
         RenderApiFlags availableRenderApiFlags = 0;
-
         for (int i = 0; i < int(RenderApiType::CountOf); ++i)
         {
             const RenderApiType apiType = RenderApiType(i);
@@ -1949,53 +1946,6 @@ bool testPassesCategoryMask(
 
     // skip by default
     return false;
-}
-
-static RenderApiType _findRenderApi(const List<String>& args, bool onlyExplicit)
-{
-    RenderApiType targetLanguageRenderer = RenderApiType::Unknown;
-   
-    for (const auto& arg: args)
-    {
-        const UnownedStringSlice argSlice = arg.getUnownedSlice();
-        if (argSlice.size() && argSlice[0] == '-' && !argSlice.startsWith(UnownedStringSlice::fromLiteral("--")))
-        {
-            UnownedStringSlice argName(argSlice.begin() + 1, argSlice.end());
-
-            RenderApiType renderType = RenderApiUtil::findRenderApiType(argName);
-            if (renderType != RenderApiType::Unknown)
-            {
-                return renderType;
-            }
-
-            if (!onlyExplicit)
-            {
-                RenderApiType implicitRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
-                if (implicitRenderType != RenderApiType::Unknown)
-                {
-                    targetLanguageRenderer = implicitRenderType;
-                }
-            }
-        }
-    }
-
-    return targetLanguageRenderer;
-}
-
-static void _addSynthesizedTest(RenderApiType rendererType, const List<TestOptions>& renderTests, List<TestOptions>& outSynthesizedTests)
-{
-    for (const auto& test : renderTests)
-    {
-        // If doesn't have an explicit render api, add one and add to the synthesized tests
-        RenderApiType explicitRenderer = _findRenderApi(test.args, true);
-
-        if (explicitRenderer == RenderApiType::Unknown)
-        {
-            
-
-            return;
-        }
-    }
 }
 
 static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestOptions>& srcTests, List<TestOptions>& ioSynthTests)
