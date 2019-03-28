@@ -21,10 +21,10 @@ using namespace Slang;
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
-#ifdef _WIN32
-#define SLANG_TEST_SUPPORT_HLSL 1
-#include <d3dcompiler.h>
-#endif
+//#ifdef _WIN32
+//#define SLANG_TEST_SUPPORT_HLSL 1
+//#include <d3dcompiler.h>
+//#endif
 
 #include <assert.h>
 #include <math.h>
@@ -42,6 +42,9 @@ struct TestOptions
     // The categories that this test was assigned to
     List<TestCategory*> categories;
 
+    bool isSynthesized = false;
+
+    // The test info determined for this specific test
     TestInfo info;
 };
 
@@ -72,7 +75,7 @@ struct TestInput
     TestOptions const*  testOptions;
 
     // The list of tests that will be run on this file
-    FileTestList const* testList;
+    //FileTestList const* testList;
 
     // Determines how the test will be spawned
     SpawnType spawnType;
@@ -81,6 +84,9 @@ struct TestInput
 typedef TestResult(*TestCallback)(TestContext* context, TestInput& input);
 
 // Globals
+
+// Pre declare
+static void _addRenderTestOptions(const Options& options, OSProcessSpawner& spawner);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -716,6 +722,51 @@ static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
     return SLANG_FAIL;
 }
 
+static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
+{
+    if (!context->isAvailableRenderApiFlagsValid)
+    {
+        // Make sure the test can run on the context
+        auto testInfo = context->testInfo;
+        context->testInfo = nullptr;
+
+        RenderApiFlags availableRenderApiFlags = 0;
+
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // See if it's possible the api is available
+            if (RenderApiUtil::calcHasApi(apiType))
+            {
+                // Try starting up the device
+                OSProcessSpawner spawner;
+                spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
+                _addRenderTestOptions(context->options, spawner);
+                // We just want to see if the device can be started up
+                spawner.pushArgument("-only-startup");
+
+                // Select what api to use
+                StringBuilder builder;
+                builder << "-" << RenderApiUtil::getApiName(apiType);
+                spawner.pushArgument(builder);
+
+                // Run the render-test tool and see if the device could startup
+                if (spawnAndWaitSharedLibrary(context, "device-startup", spawner) == OSError::kOSError_None
+                    && TestToolUtil::getReturnCodeFromInt(spawner.resultCode_) == ToolReturnCode::Success)
+                {
+                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);   
+                }
+            }
+        }
+
+        context->availableRenderApiFlags = availableRenderApiFlags;
+        context->isAvailableRenderApiFlagsValid = true;
+    }
+
+    return context->availableRenderApiFlags;
+}
+
 ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 {
     return TestToolUtil::getReturnCodeFromInt(spawner.getResultCode());
@@ -1130,8 +1181,6 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-
-#ifdef SLANG_TEST_SUPPORT_HLSL
 TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
 {
     auto filePath999 = input.filePath;
@@ -1276,7 +1325,6 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     return result;
 }
-#endif
 
 TestResult doGLSLComparisonTestRun(TestContext* context,
     TestInput& input,
@@ -1397,12 +1445,6 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	auto filePath999 = input.filePath;
 	auto outputStem = input.outputStem;
 
-    const String referenceOutput = findExpectedPath(input, ".expected.txt");
-    if (referenceOutput.Length() <= 0)
-    {
-        return TestResult::Fail;
-    }
-
 	OSProcessSpawner spawner;
 
 	spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
@@ -1434,6 +1476,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     if (context->isCollectingTestInfo())
     {
         return TestResult::Pass;
+    }
+
+    const String referenceOutput = findExpectedPath(input, ".expected.txt");
+    if (referenceOutput.Length() <= 0)
+    {
+        return TestResult::Fail;
     }
 
     auto actualOutput = getOutput(spawner);
@@ -1790,100 +1838,6 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
     return TestResult::Ignored;
 }
 
-
-static RenderApiType _findRenderApiOption(const List<String>& options)
-{
-    for (UInt i = 0; i < options.Count(); ++i)
-    {
-        const String& option = options[i];
-        if (option.StartsWith("-"))
-        {
-            const UnownedStringSlice parameter(option.Buffer() + 1, option.Buffer() + option.Length());
-            const RenderApiType apiType = RenderApiUtil::findApiTypeByName(parameter);
-            // Found it
-            if (apiType != RenderApiType::Unknown)
-            {
-                return apiType;
-            }
-        }
-    }
-    return RenderApiType::Unknown;
-}
-
-static bool hasRenderOption(RenderApiType apiType, const List<String>& options)
-{
-    SLANG_ASSERT(apiType != RenderApiType::Unknown);
-    if (apiType == RenderApiType::Unknown)
-    {
-        return false;
-    }
-
-    const RenderApiUtil::Info& info = RenderApiUtil::getInfo(apiType);
-
-    for (UInt i = 0; i < options.Count(); ++i)
-    {
-        const String& option = options[i];
-
-        if (option.StartsWith("-"))
-        {
-            const UnownedStringSlice parameter(option.Buffer() + 1, option.Buffer() + option.Length());
-            const RenderApiType paramType = RenderApiUtil::findApiTypeByName(parameter);
-
-            // Found it
-            if (apiType == paramType)
-            {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-bool hasRenderOption(RenderApiType apiType, const TestOptions& options)
-{
-    return hasRenderOption(apiType, options.args);
-}
-
-bool hasRenderOption(RenderApiType apiType, const FileTestList& testList)
-{
-    const int numTests = int(testList.tests.Count());
-    for (int i = 0; i < numTests; i++)
-    {
-        if (hasRenderOption(apiType, testList.tests[i].args))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isRenderTest(const String& command)
-{
-    return command == "COMPARE_COMPUTE" ||
-        command == "COMPARE_COMPUTE_EX" ||
-        command == "HLSL_COMPUTE" ||
-        command == "COMPARE_RENDER_COMPUTE" ||
-        command == "COMPARE_HLSL_RENDER" ||
-        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" ||
-        command == "COMPARE_HLSL_GLSL_RENDER";
-}
-
-static bool canIgnoreTestWithDisabledRenderer(const TestOptions& testOptions, const Options& appOptions)
-{
-    for (int i = 0; i < int(RenderApiType::CountOf); ++i)
-    {
-        RenderApiType apiType = RenderApiType(i);
-        RenderApiFlag::Enum apiFlag = RenderApiFlag::Enum(1 << i);
-        
-        if (hasRenderOption(apiType, testOptions) && (appOptions.enabledApis & apiFlag) == 0)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 // based on command name, dispatch to an appropriate callback
 struct TestCommandInfo
 {
@@ -1908,35 +1862,13 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
 };
 
-
-#if 0
-#if SLANG_TEST_SUPPORT_HLSL
-else
-{ "COMPARE_HLSL",                       &skipTest },
-{ "COMPARE_HLSL_RENDER",                &skipTest },
-{ "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest },
-{ "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
-{ "COMPARE_COMPUTE",                    &skipTest },
-{ "COMPARE_COMPUTE_EX",                 &skipTest },
-{ "HLSL_COMPUTE",                       &skipTest },
-{ "COMPARE_RENDER_COMPUTE",             &skipTest },
-#endif
-#endif
-
-
 TestResult runTest(
     TestContext*        context, 
     String const&       filePath,
     String const&       outputStem,
-    TestOptions const&  testOptions,
-    FileTestList const& testList)
+    String const&       testName,
+    TestOptions const&  testOptions)
 {
-    // If this test can be ignored
-    if (canIgnoreTestWithDisabledRenderer(testOptions, context->options))
-    {
-        return TestResult::Ignored;
-    }
-
     const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
 
     for( const auto& command : s_testCommandInfos)
@@ -1948,26 +1880,25 @@ TestResult runTest(
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
-        testInput.testList = &testList;
         testInput.spawnType = defaultSpawnType;
 
+        if (context->isExecuting())
         {
             TestReporter* reporter = context->reporter;
-            TestReporter::TestScope scope(reporter, outputStem);
+            TestReporter::TestScope scope(reporter, testName);
 
             TestResult testResult = command.callback(context, testInput);
-
-            if (context->isExecuting())
-            {
-                reporter->addResult(testResult);
-            }
-
+            reporter->addResult(testResult);
+        
             return testResult;
-       }
+        }
+        else
+        {
+            return command.callback(context, testInput);
+        }
     }
 
     // No actual test runner found!
-
     return TestResult::Fail;
 }
 
@@ -2060,31 +1991,62 @@ static void _addSynthesizedTest(RenderApiType rendererType, const List<TestOptio
 
         if (explicitRenderer == RenderApiType::Unknown)
         {
-            // Add the explicit parameter
-
-            TestOptions options(test);
-
-            StringBuilder builder;
-            builder << "-";
-            builder << RenderApiUtil::getApiName(rendererType);
-
-            options.args.Add(builder);
-
-            // If the target is vulkan remove the -hlsl option
-            if (rendererType == RenderApiType::Vulkan)
-            {
-                UInt index = options.args.IndexOf("-hlsl");
-                if (index != UInt(-1))
-                {
-                    options.args.RemoveAt(index);
-                }
-            }
-
-            // Add to the tests
-            outSynthesizedTests.Add(options);
+            
 
             return;
         }
+    }
+}
+
+static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestOptions>& srcTests, List<TestOptions>& ioSynthTests)
+{
+    // Add the explicit parameter
+    for (const auto& test: srcTests)
+    {
+        const auto& testInfo = test.info;
+
+        // Render tests use renderApis...
+        // If it's an explicit test, we don't synth from it now
+
+        // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
+        // although that may not always work.
+        if (testInfo.usedRenderApiFlags == 0 ||
+            testInfo.explicitRenderApi != RenderApiType::Unknown)
+        {
+            continue;
+        }
+
+        TestOptions synthTest(test);
+        // Clear the test info
+        synthTest.info = TestInfo();
+        synthTest.isSynthesized = true;
+
+        StringBuilder builder;
+        builder << "-";
+        builder << RenderApiUtil::getApiName(synthRenderApiType);
+
+        synthTest.args.Add(builder);
+
+        // If the target is vulkan remove the -hlsl option
+        if (synthRenderApiType == RenderApiType::Vulkan)
+        {
+            UInt index = synthTest.args.IndexOf("-hlsl");
+            if (index != UInt(-1))
+            {
+                synthTest.args.RemoveAt(index);
+            }
+        }
+
+        // Work out the info about this test
+        context->testInfo = &synthTest.info;
+        runTest(context, "", "", "", synthTest);
+        context->testInfo = nullptr;
+
+        // It does set the explict render target
+        SLANG_ASSERT(synthTest.info.explicitRenderApi == synthRenderApiType);
+
+        // Add to the tests
+        ioSynthTests.Add(synthTest);
     }
 }
 
@@ -2101,7 +2063,6 @@ void runTestsOnFile(
         return;
     }
 
-
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.Count() == 0 )
     {
@@ -2109,71 +2070,56 @@ void runTestsOnFile(
         return;
     }
 
-    List<TestInfo> testInfos;
-    testInfos.SetSize(testList.tests.Count());
-    // We can get the test info for each of them
-    for (UInt i = 0; i < testList.tests.Count(); ++i)
+    RenderApiFlags apiUsedFlags = 0;
+    RenderApiFlags explictUsedApiFlags = 0;
+
     {
-        TestInfo& dstInfo = testInfos[i];
-        context->testInfo = &dstInfo;
-        runTest(context, filePath, filePath, testList.tests[i], testList);
+        // We can get the test info for each of them
+        for (auto& test : testList.tests)
+        {
+            auto& info = test.info;
+
+            // Collect what the test needs (by setting testInfo the test isn't actually run)
+            context->testInfo = &info;
+            runTest(context, filePath, filePath, filePath, test);
+
+            // 
+            apiUsedFlags |= info.usedRenderApiFlags;
+            explictUsedApiFlags |= (info.explicitRenderApi != RenderApiType::Unknown) ? (RenderApiFlags(1) << int(info.explicitRenderApi)) : 0;
+        }
         context->testInfo = nullptr;
     }
 
+    SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
+
+    // Work out what render api flags are available
+    const RenderApiFlags availableRenderApiFlags = apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
+
     // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis)
+    if (context->options.synthesizedTestApis  && availableRenderApiFlags)
     {
         List<TestOptions> synthesizedTests;
 
-        // Lets find all tests which are render tests
-        RenderApiFlags apisUsed = 0;
-        List<TestOptions> renderTests;
-
-        const int numTests = int(testList.tests.Count());
-        for (int i = 0; i < numTests; i++)
-        {
-            const TestOptions& testOptions = testList.tests[i];
-
-            const TestInfo& testInfo = testInfos[i];
-
-            // If uses renderApiFlags must be a render test
-            SLANG_ASSERT((testInfo.usedRenderApiFlags != 0) == isRenderTest(testOptions.command));
-
-            if (isRenderTest(testOptions.command))
-            {
-                RenderApiType renderType = _findRenderApi(testOptions.args, false);
-                if (renderType != RenderApiType::Unknown)
-                {
-                    apisUsed |= (1 << int(renderType));
-                }
-
-                // Make sure these agree
-                SLANG_ASSERT(renderType == RenderApiType::Unknown || testInfo.isUsed(renderType));
-
-                renderTests.Add(testOptions);
-            }
-        }
         // What render options do we want to synthesize
-        RenderApiFlags missingApis = (~apisUsed) & context->options.synthesizedTestApis;
-        
-        // We can only synthesize if if there isn't an explicit render option
+        RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
+
+        const UInt numInitialTests = testList.tests.Count();
 
         while (missingApis)
         {
             const int index = ByteEncodeUtil::calcMsb8(missingApis);
             SLANG_ASSERT(index >= 0 && index <= int(RenderApiType::CountOf));
 
-            _addSynthesizedTest(RenderApiType(index), renderTests, synthesizedTests); 
+            const RenderApiType synthRenderApiType = RenderApiType(index);
 
+            _calcSynthesizedTests(context, synthRenderApiType, testList.tests, synthesizedTests);
+            
             // Disable the bit
             missingApis &= ~(RenderApiFlags(1) << index);
         }
 
-        // Add any tests that were synthesized
-        for (UInt i = 0; i < synthesizedTests.Count(); ++i)
-        {
-            testList.tests.Add(synthesizedTests[i]);
-        }
+        // Add all the synthesized tests
+        testList.tests.AddRange(synthesizedTests);
     }
 
     // We have found a test to run!
@@ -2188,13 +2134,59 @@ void runTestsOnFile(
             continue;
         }
 
-        String outputStem = filePath;
-        if(subTestIndex != 0)
+        // If this test can be ignored
+        const auto& testInfo = tt.info;
+
+        // Are all the required backends available?
+        if (((testInfo.usedBackendFlags & context->availableBackendFlags) != testInfo.usedBackendFlags))
         {
-            outputStem = outputStem + "." + String(subTestIndex);
+            continue;
         }
 
-        /* TestResult result = */ runTest(context, filePath, outputStem, tt, testList);
+        // Are all the required rendering apis available?
+        if ((testInfo.usedRenderApiFlags & availableRenderApiFlags) != testInfo.usedRenderApiFlags)
+        {
+            continue;
+        }
+
+        StringBuilder outputStem;
+        outputStem << filePath;
+        if(subTestIndex != 0)
+        {
+            outputStem << "." << subTestIndex;
+        }
+
+        StringBuilder testName(outputStem);
+
+        if (tt.isSynthesized)
+        {
+            testName << " syn";
+        }
+
+        // Display list of used apis on render test
+        if (testInfo.usedRenderApiFlags)
+        {
+            RenderApiFlags usedFlags = testInfo.usedRenderApiFlags;
+            testName << " (";
+            bool isPrev = false;
+            while (usedFlags)
+            {
+                const int index = ByteEncodeUtil::calcMsb8(usedFlags);
+                const RenderApiType renderApiType = RenderApiType(index);
+                if (isPrev)
+                {
+                    testName << ",";
+                }
+                testName << RenderApiUtil::getApiName(renderApiType);
+
+                // Disable bit
+                usedFlags &= ~(RenderApiFlags(1) << index);
+                isPrev = true;
+            }
+            testName << ")";
+        }
+
+        /* TestResult result = */ runTest(context, filePath, outputStem, testName, tt);
 
         // Could determine if to continue or not here... based on result
     }
@@ -2268,6 +2260,7 @@ void runTestsInDirectory(
     }
 }
 
+
 SlangResult innerMain(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
@@ -2320,6 +2313,22 @@ SlangResult innerMain(int argc, char** argv)
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
+
+    // Work out what backends are available
+    {
+        SlangSession* session = context.getSession();
+        const SlangPassThrough passThrus[] = { SLANG_PASS_THROUGH_DXC, SLANG_PASS_THROUGH_FXC, SLANG_PASS_THROUGH_GLSLANG };
+        for (auto passThru: passThrus)
+        {
+            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            {
+                context.availableBackendFlags |= BackendFlags(1) << int(_toBackendTypeFromPassThroughType(passThru));
+            }
+        }
+    }
+
+    // Working out what renderApis is worked on on demand through
+    // _getAvailableRenderApiFlags()
 
     {
         // We can set the slangc command line tool, to just use the function defined here

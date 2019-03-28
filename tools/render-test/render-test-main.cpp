@@ -555,6 +555,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 			return SLANG_FAIL;
 	}
 
+    
     StringBuilder rendererName;
     rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
     if (gOptions.adapter.Length())
@@ -565,7 +566,10 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
     if (!renderer)
     {
-        fprintf(stderr, "Unable to create renderer %s\n", rendererName.Buffer());
+        if (!gOptions.onlyStartup)
+        {
+            fprintf(stderr, "Unable to create renderer %s\n", rendererName.Buffer());
+        }
         return SLANG_FAIL;
     }
 
@@ -578,9 +582,18 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         SlangResult res = renderer->initialize(desc, (HWND)window->getHandle());
         if (SLANG_FAILED(res))
         {
-            fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.Buffer());
+            if (!gOptions.onlyStartup)
+            {
+                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.Buffer());
+            }
             return res;
         }
+    }
+
+    // If the only test is we can startup, then we are done
+    if (gOptions.onlyStartup)
+    {
+        return SLANG_OK;
     }
 
     {

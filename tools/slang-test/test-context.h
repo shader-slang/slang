@@ -105,6 +105,10 @@ class TestContext
         /// If set then tests are not run, but their requirements are set 
     TestInfo* testInfo = nullptr;
 
+    BackendFlags availableBackendFlags = 0;
+    Slang::RenderApiFlags availableRenderApiFlags = 0;
+    bool isAvailableRenderApiFlagsValid = false;
+
 protected:
     struct SharedLibraryTool
     {
