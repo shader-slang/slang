@@ -558,7 +558,7 @@ struct EmitVisitor
 
 
     // Emit a `#line` directive to the output.
-    // Doesn't udpate state of source-location tracking.
+    // Doesn't update state of source-location tracking.
     void emitLineDirective(
         HumaneSourceLoc const& sourceLocation)
     {
@@ -807,7 +807,8 @@ struct EmitVisitor
     }
 
     void emitGLSLTypePrefix(
-        IRType* type)
+        IRType* type,
+        bool promoteHalfToFloat = false)
     {
         switch (type->op)
         {
@@ -830,17 +831,24 @@ struct EmitVisitor
         case kIROp_HalfType:
         {
             _requireHalf();
-            Emit("f16");
+            if (promoteHalfToFloat)
+            {
+                // no prefix
+            }
+            else
+            {
+                Emit("f16");
+            }
             break;
         }
         case kIROp_DoubleType:  Emit("d");		break;
 
         case kIROp_VectorType:
-            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType());
+            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         case kIROp_MatrixType:
-            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType());
+            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         default:
@@ -907,7 +915,15 @@ struct EmitVisitor
         IRTextureTypeBase*  type,
         char const*         baseName)
     {
-        emitGLSLTypePrefix(type->getElementType());
+        if (type->getElementType()->op == kIROp_HalfType)
+        {
+            // Texture access is always as float types if half is specified
+
+        }
+        else
+        {
+            emitGLSLTypePrefix(type->getElementType(), true);
+        }
 
         Emit(baseName);
         switch (type->GetBaseShape())
@@ -3020,7 +3036,6 @@ struct EmitVisitor
 
         auto name = String(targetIntrinsic->getDefinition());
 
-
         if(isOrdinaryName(name))
         {
             // Simple case: it is just an ordinary name, so we call it like a builtin.
@@ -3041,19 +3056,18 @@ struct EmitVisitor
         }
         else
         {
-            // If it returns void -> then we don't need parenthesis
+            int openParenCount = 0;
 
             const auto returnType = inst->getDataType();
-            const bool isVoid = as<IRVoidType>(returnType) != nullptr;
-            
-            // We could determine here is the return type is void... if so no braces?
 
-            // General case: we are going to emit some more complex text.
-
-            if (!isVoid)
+            // If it returns void -> then we don't need parenthesis 
+            if (as<IRVoidType>(returnType) == nullptr)
             {
                 Emit("(");
+                openParenCount++;
             }
+
+            // General case: we are going to emit some more complex text.
 
             char const* cursor = name.begin();
             char const* end = name.end();
@@ -3117,6 +3131,40 @@ struct EmitVisitor
                         {
                             SLANG_UNEXPECTED("bad format in intrinsic definition");
                         }
+                    }
+                    break;
+
+                case 'c':
+                    {
+                        // When doing texture access in glsl the result may need to be cast.
+                        // In particular if the underlying texture is 'half' based, glsl only accesses (read/write)
+                        // as float. So we need to cast to a half type on output.
+                        // When storing into a texture it is still the case the value written must be half - but
+                        // we don't need to do any casting there as half is coerced to float without a problem.
+                        SLANG_RELEASE_ASSERT(argCount >= 1);
+                        
+                        auto textureArg = args[0].get();
+                        if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
+                        {
+                            auto elementType = baseTextureType->getElementType();
+                            IRBasicType* underlyingType = nullptr;
+                            if (auto basicType = as<IRBasicType>(elementType))
+                            {
+                                underlyingType = basicType;
+                            }
+                            else if (auto vectorType = as<IRVectorType>(elementType))
+                            {
+                                underlyingType = as<IRBasicType>(vectorType->getElementType());
+                            }
+
+                            // We only need to output a cast if the underlying type is half.
+                            if (underlyingType && underlyingType->op == kIROp_HalfType)
+                            {
+                                emitSimpleTypeImpl(elementType);
+                                emit("(");
+                                openParenCount++;
+                            }
+                        }    
                     }
                     break;
 
@@ -3209,7 +3257,7 @@ struct EmitVisitor
                         }
                         else
                         {
-                            // Othwerwise, we need to construct a 4-vector from the
+                            // Otherwise, we need to construct a 4-vector from the
                             // value we have, padding it out with zero elements as
                             // needed.
                             //
@@ -3413,7 +3461,8 @@ struct EmitVisitor
                 }
             }
 
-            if (!isVoid)
+            // Close any remaining open parens
+            for (; openParenCount > 0; --openParenCount)
             {
                 Emit(")");
             }

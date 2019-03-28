@@ -13,7 +13,7 @@ enum RoseColors
 
 int test(int val)
 {
-	return val + RoseColors.Red;
+	return val + int(RoseColors.Red);
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
