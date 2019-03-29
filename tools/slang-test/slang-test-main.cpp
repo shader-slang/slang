@@ -31,6 +31,14 @@ using namespace Slang;
 // Options for a particular test
 struct TestOptions
 {
+    enum Type
+    {
+        Normal,             ///< A regular test
+        Diagnostic,         ///< Diagnostic tests will always run (as form of failure is being tested)  
+    };
+
+    Type type = Type::Normal;
+
     String command;
     List<String> args;
 
@@ -38,15 +46,23 @@ struct TestOptions
     List<TestCategory*> categories;
 
     bool isSynthesized = false;
+};
 
-    // The test info determined for this specific test
-    TestRequirements requirements;
+struct TestDetails
+{
+    TestDetails() {}
+    explicit TestDetails(const TestOptions& inOptions):
+        options(inOptions)
+    {}
+
+    TestOptions options;                    ///< The options for the test
+    TestRequirements requirements;          ///< The requirements for the test to work
 };
 
 // Information on tests to run for a particular file
 struct FileTestList
 {
-    List<TestOptions> tests;
+    List<TestDetails> tests;
 };
 
 enum class SpawnType
@@ -166,15 +182,12 @@ String collectRestOfLine(char const** ioCursor)
 }
 
 
-
-TestResult gatherTestOptions(
+static TestResult _gatherTestOptions(
     TestCategorySet*    categorySet, 
     char const**    ioCursor,
-    FileTestList*   testList)
+    TestOptions&    outOptions)
 {
     char const* cursor = *ioCursor;
-
-    TestOptions testOptions;
 
     // Right after the `TEST` keyword, the user may specify
     // one or more categories for the test.
@@ -207,7 +220,7 @@ TestResult gatherTestOptions(
                     }
                     
 
-                    testOptions.categories.Add(category);
+                    outOptions.categories.Add(category);
 
                     if( *categoryEnd == ',' )
                     {
@@ -227,9 +240,9 @@ TestResult gatherTestOptions(
     }
 
     // If no categories were specified, then add the default category
-    if(testOptions.categories.Count() == 0)
+    if(outOptions.categories.Count() == 0)
     {
-        testOptions.categories.Add(categorySet->defaultCategory);
+        outOptions.categories.Add(categorySet->defaultCategory);
     }
 
     if(*cursor == ':')
@@ -260,7 +273,7 @@ TestResult gatherTestOptions(
     }
     char const* commandEnd = cursor;
 
-    testOptions.command = getString(commandStart, commandEnd);
+    outOptions.command = getString(commandStart, commandEnd);
 
     if(*cursor == ':')
         cursor++;
@@ -281,7 +294,6 @@ TestResult gatherTestOptions(
         {
         case 0: case '\r': case '\n':
             skipToEndOfLine(&cursor);
-            testList->tests.Add(testOptions);
             return TestResult::Pass;
 
         default:
@@ -307,7 +319,7 @@ TestResult gatherTestOptions(
         char const* argEnd = cursor;
         assert(argBegin != argEnd);
 
-        testOptions.args.Add(getString(argBegin, argEnd));
+        outOptions.args.Add(getString(argBegin, argEnd));
     }
 }
 
@@ -344,8 +356,23 @@ TestResult gatherTestsForFile(
         }
         else if(match(&cursor, "//TEST"))
         {
-            if(gatherTestOptions(categorySet, &cursor, testList) != TestResult::Pass)
+            TestDetails testDetails;
+
+            if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            testList->tests.Add(testDetails);
+        }
+        else if (match(&cursor, "//DIAGNOSTIC_TEST"))
+        {
+            TestDetails testDetails;
+            
+            if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
+                return TestResult::Fail;
+
+            // Mark that it is a diagnostic test
+            testDetails.options.type = TestOptions::Type::Diagnostic;
+            testList->tests.Add(testDetails);
         }
         else
         {
@@ -699,7 +726,7 @@ static SlangResult _extractReflectionTestRequirements(OSProcessSpawner& spawner,
     return SLANG_OK;
 }
 
-static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestRequirements* ioInfo)
+static SlangResult _extractTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioInfo)
 {
     String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
 
@@ -709,11 +736,6 @@ static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestRequirements*
     }
     else if (exeName == "slangc")
     {
-        // We need to know the test type.. because if it's diagnostic we say that it has no
-        // requirements
-
-
-
         return _extractSlangCTestRequirements(spawner, ioInfo);
     }
     else if (exeName == "slang-reflection-test")
@@ -776,10 +798,10 @@ ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 
 ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnType spawnType, OSProcessSpawner& spawner)
 {
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         // If we just want info... don't bother running anything
-        const SlangResult res = _extractTestInfo(spawner, context->testRequirements);
+        const SlangResult res = _extractTestRequirements(spawner, context->testRequirements);
         // Keep compiler happy on release
         SLANG_UNUSED(res);
         SLANG_ASSERT(SLANG_SUCCEEDED(res));
@@ -916,10 +938,10 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         spawner.pushArgument(arg);
     }
-
+    
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -995,7 +1017,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1145,7 +1167,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, actualSpawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1205,7 +1227,7 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1255,7 +1277,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1365,7 +1387,7 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1404,7 +1426,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     TestResult hlslResult   =  doGLSLComparisonTestRun(context, input, "__GLSL__",  "glslang", ".expected",    &expectedOutput);
     TestResult slangResult  =  doGLSLComparisonTestRun(context, input, "__SLANG__", nullptr,   ".actual",      &actualOutput);
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1475,7 +1497,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1583,7 +1605,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1793,7 +1815,7 @@ TestResult runHLSLRenderComparisonTestImpl(
         return slangResult;
     }
 
-    if (context->isCollectingTestInfo())
+    if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
     }
@@ -1871,6 +1893,13 @@ TestResult runTest(
     String const&       testName,
     TestOptions const&  testOptions)
 {
+    // If we are collecting requirements and it's diagnostic test, we always run
+    // (ie no requirements need to be captured - effectively it has 'no requirements')
+    if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
+    {
+        return TestResult::Pass;
+    }
+
     const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
 
     for( const auto& command : s_testCommandInfos)
@@ -1940,12 +1969,12 @@ bool testPassesCategoryMask(
     return false;
 }
 
-static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestOptions>& srcTests, List<TestOptions>& ioSynthTests)
+static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestDetails>& srcTests, List<TestDetails>& ioSynthTests)
 {
     // Add the explicit parameter
-    for (const auto& test: srcTests)
+    for (const auto& testDetails: srcTests)
     {
-        const auto& requirements = test.requirements;
+        const auto& requirements = testDetails.requirements;
 
         // Render tests use renderApis...
         // If it's an explicit test, we don't synth from it now
@@ -1958,45 +1987,43 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
             continue;
         }
 
-        TestOptions synthTest(test);
-        // Clear the test info
-        synthTest.requirements = TestRequirements();
-        synthTest.isSynthesized = true;
+        TestDetails synthTestDetails(testDetails.options);
+        TestOptions& synthOptions = synthTestDetails.options;
+
+        // Mark as synthesized
+        synthOptions.isSynthesized = true;
 
         StringBuilder builder;
         builder << "-";
         builder << RenderApiUtil::getApiName(synthRenderApiType);
 
-        synthTest.args.Add(builder);
+        synthOptions.args.Add(builder);
 
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            UInt index = synthTest.args.IndexOf("-hlsl");
+            UInt index = synthOptions.args.IndexOf("-hlsl");
             if (index != UInt(-1))
             {
-                synthTest.args.RemoveAt(index);
+                synthOptions.args.RemoveAt(index);
             }
         }
 
-        // Work out the info about this test
-        context->testRequirements = &synthTest.requirements;
-        runTest(context, "", "", "", synthTest);
+        // Work out the info about this tests
+        context->testRequirements = &synthTestDetails.requirements;
+        runTest(context, "", "", "", synthOptions);
         context->testRequirements = nullptr;
 
-        // It does set the explict render target
-        SLANG_ASSERT(synthTest.requirements.explicitRenderApi == synthRenderApiType);
-
+        // It does set the explicit render target
+        SLANG_ASSERT(synthOptions.requirements.explicitRenderApi == synthRenderApiType);
         // Add to the tests
-        ioSynthTests.Add(synthTest);
+        ioSynthTests.Add(synthTestDetails);
     }
 }
 
 static bool _canIgnore(TestContext* context,
-    const TestOptions& testOptions)
+    const TestRequirements& requirements)
 {
-    const auto& requirements = testOptions.requirements;
-
     // Work out what render api flags are available
     const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
 
@@ -2040,13 +2067,13 @@ void runTestsOnFile(
 
     {
         // We can get the test info for each of them
-        for (auto& test : testList.tests)
+        for (auto& testDetails : testList.tests)
         {
-            auto& requirements = test.requirements;
+            auto& requirements = testDetails.requirements;
 
-            // Collect what the test needs (by setting testInfo the test isn't actually run)
+            // Collect what the test needs (by setting restRequirements the test isn't actually run)
             context->testRequirements = &requirements;
-            runTest(context, filePath, filePath, filePath, test);
+            runTest(context, filePath, filePath, filePath, testDetails.options);
 
             // 
             apiUsedFlags |= requirements.usedRenderApiFlags;
@@ -2062,7 +2089,7 @@ void runTestsOnFile(
     // If synthesized tests are wanted look into adding them
     if (context->options.synthesizedTestApis  && availableRenderApiFlags)
     {
-        List<TestOptions> synthesizedTests;
+        List<TestDetails> synthesizedTests;
 
         // What render options do we want to synthesize
         RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
@@ -2088,12 +2115,12 @@ void runTestsOnFile(
 
     // We have found a test to run!
     int subTestCount = 0;
-    for( auto& tt : testList.tests )
+    for( auto& testDetails : testList.tests )
     {
         int subTestIndex = subTestCount++;
 
         // Check that the test passes our current category mask
-        if(!testPassesCategoryMask(context, tt))
+        if(!testPassesCategoryMask(context, testDetails.options))
         {
             continue;
         }
@@ -2110,12 +2137,12 @@ void runTestsOnFile(
         // Work out the test name - taking into account render api / if synthesized
         StringBuilder testName(outputStem);
 
-        if (tt.isSynthesized)
+        if (testDetails.options.isSynthesized)
         {
             testName << " syn";
         }
 
-        const auto& requirements = tt.requirements;
+        const auto& requirements = testDetails.requirements;
 
         // Display list of used apis on render test
         if (requirements.usedRenderApiFlags)
@@ -2148,13 +2175,13 @@ void runTestsOnFile(
             TestResult testResult = TestResult::Fail;
 
             // If this test can be ignored
-            if (_canIgnore(context, tt))
+            if (_canIgnore(context, testDetails.requirements))
             {
                 testResult = TestResult::Ignored;
             }
             else
             {
-                testResult = runTest(context, filePath, outputStem, testName, tt);
+                testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
             }
 
             reporter->addResult(testResult);

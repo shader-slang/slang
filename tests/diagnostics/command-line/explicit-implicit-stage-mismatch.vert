@@ -1,3 +1,3 @@
 // explicit-implicit-stage-mismatch.vert
 
-//TEST:SIMPLE:-stage fragment
+//DIAGNOSTIC_TEST:SIMPLE:-stage fragment

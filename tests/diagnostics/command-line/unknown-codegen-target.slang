@@ -1,3 +1,3 @@
 // unknown-codegen-target.slang
 
-//TEST:SIMPLE:-target z80
+//DIAGNOSTIC_TEST:SIMPLE:-target z80

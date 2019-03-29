@@ -4,7 +4,7 @@
 // compiling an entry point without any
 // stage specified.
 
-//TEST:SIMPLE:-entry main
+//DIAGNOSTIC_TEST:SIMPLE:-entry main
 
 void main()
 {}

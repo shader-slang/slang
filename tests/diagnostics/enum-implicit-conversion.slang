@@ -1,6 +1,6 @@
 // enum-implicit-conversion.slang
 
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Confirm that suitable error messages are
 // generated for code that relies on implicit

@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 
 struct Color

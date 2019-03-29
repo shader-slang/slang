@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 // expected one token, but got another
 
 int foo()

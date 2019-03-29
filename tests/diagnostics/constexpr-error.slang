@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Failure to pass compile-time-constant data
 // where it is expected.

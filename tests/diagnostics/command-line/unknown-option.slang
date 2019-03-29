@@ -1,3 +1,3 @@
 // unknown-option.slang
 
-//TEST:SIMPLE:-destroy-all-humans
+//DIAGNOSTIC_TEST:SIMPLE:-destroy-all-humans

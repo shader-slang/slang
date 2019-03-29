@@ -1,3 +1,3 @@
 // unknown-stage.slang
 
-//TEST:SIMPLE:-stage green_hills_zone
+//DIAGNOSTIC_TEST:SIMPLE:-stage green_hills_zone

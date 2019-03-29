@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target dxbc -profile ps_5_0
+//DIAGNOSTIC_TEST:SIMPLE:-target dxbc -profile ps_5_0
 
 // Early versions of the front-end had bugs when local
 // variables were used before their definition, or

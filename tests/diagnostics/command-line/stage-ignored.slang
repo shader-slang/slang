@@ -6,4 +6,4 @@
 // A `-stage` option before any `-entry`, possibly because
 // the user is specifying things in the wrong order.
 //
-//TEST:SIMPLE:-stage vertex -entry vsMain -stage fragment -entry psMain
+//DIAGNOSTIC_TEST:SIMPLE:-stage vertex -entry vsMain -stage fragment -entry psMain

@@ -1,6 +1,6 @@
 // setter-method.slang
 
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Make sure we provide a user a diagnostic if they
 // try to declare a setter method without `mutating`

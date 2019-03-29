@@ -91,7 +91,7 @@ class TestContext
     void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
 
         /// If true tests aren't being run just the information on testing is being accumulated
-    bool isCollectingTestInfo() const { return testRequirements != nullptr; }
+    bool isCollectingRequirements() const { return testRequirements != nullptr; }
         /// If set, then tests are executed
     bool isExecuting() const { return testRequirements == nullptr; }
 

@@ -1,5 +1,5 @@
 // packoffset.slang
-//TEST:SIMPLE:-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
 
 // use of `packoffset` (not supported):
 cbuffer B
