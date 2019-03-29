@@ -32,9 +32,11 @@ struct BackendFlag
     };
 };
 
-struct TestInfo
+/// Structure that describes requirements needs to run - such as rendering APIs or
+/// back-end availability 
+struct TestRequirements
 {
-    TestInfo& addUsed(BackendType type)
+    TestRequirements& addUsed(BackendType type)
     {
         if (type != BackendType::Unknown)
         {
@@ -42,7 +44,7 @@ struct TestInfo
         }
         return *this;
     }
-    TestInfo& addUsed(Slang::RenderApiType type)
+    TestRequirements& addUsed(Slang::RenderApiType type)
     {
         using namespace Slang;
         if (type != RenderApiType::Unknown)
@@ -51,12 +53,12 @@ struct TestInfo
         }
         return *this;
     }
-    TestInfo& addUsedBackends(BackendFlags flags)
+    TestRequirements& addUsedBackends(BackendFlags flags)
     {
         usedBackendFlags |= flags;
         return *this;
     }
-    TestInfo& addUsedRenderApis(Slang::RenderApiFlags flags)
+    TestRequirements& addUsedRenderApis(Slang::RenderApiFlags flags)
     {
         usedRenderApiFlags |= flags;
         return *this;
@@ -89,9 +91,9 @@ class TestContext
     void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
 
         /// If true tests aren't being run just the information on testing is being accumulated
-    bool isCollectingTestInfo() const { return testInfo != nullptr; }
+    bool isCollectingTestInfo() const { return testRequirements != nullptr; }
         /// If set, then tests are executed
-    bool isExecuting() const { return testInfo == nullptr; }
+    bool isExecuting() const { return testRequirements == nullptr; }
 
         /// Ctor
     TestContext();
@@ -103,7 +105,7 @@ class TestContext
     TestCategorySet categorySet;
 
         /// If set then tests are not run, but their requirements are set 
-    TestInfo* testInfo = nullptr;
+    TestRequirements* testRequirements = nullptr;
 
     BackendFlags availableBackendFlags = 0;
     Slang::RenderApiFlags availableRenderApiFlags = 0;

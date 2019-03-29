@@ -40,7 +40,7 @@ struct TestOptions
     bool isSynthesized = false;
 
     // The test info determined for this specific test
-    TestInfo info;
+    TestRequirements requirements;
 };
 
 // Information on tests to run for a particular file
@@ -549,7 +549,7 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         return SLANG_TARGET_UNKNOWN;
 }
 
-static SlangResult _extractRenderTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
+static SlangResult _extractRenderTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
 {
     const auto& args = spawner.argumentList_;
 
@@ -583,10 +583,10 @@ static SlangResult _extractRenderTestInfo(OSProcessSpawner& spawner, TestInfo* i
                     foundRenderApiType = renderApiType;
 
                     // There should be only one explicit api
-                    SLANG_ASSERT(ioInfo->explicitRenderApi == RenderApiType::Unknown || ioInfo->explicitRenderApi == renderApiType);
+                    SLANG_ASSERT(ioRequirements->explicitRenderApi == RenderApiType::Unknown || ioRequirements->explicitRenderApi == renderApiType);
 
                     // Set the explicitly set render api
-                    ioInfo->explicitRenderApi = renderApiType;
+                    ioRequirements->explicitRenderApi = renderApiType;
                     continue;
                 }
 
@@ -653,20 +653,20 @@ static SlangResult _extractRenderTestInfo(OSProcessSpawner& spawner, TestInfo* i
     if (passThru == SLANG_PASS_THROUGH_NONE)
     {
         // Work out backends needed based on the target
-        ioInfo->addUsedBackends(_getBackendFlagsForTarget(target));
+        ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
     }
     else
     {
-        ioInfo->addUsed(_toBackendTypeFromPassThroughType(passThru));
+        ioRequirements->addUsed(_toBackendTypeFromPassThroughType(passThru));
     }
 
     // Add the render api used
-    ioInfo->addUsed(renderApiType);
+    ioRequirements->addUsed(renderApiType);
 
     return SLANG_OK;
 }
 
-static SlangResult _extractSlangCTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
+static SlangResult _extractSlangCTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
 {
     // This determines what the requirements are for a slangc like command line
     const auto& args = spawner.argumentList_;
@@ -676,7 +676,7 @@ static SlangResult _extractSlangCTestInfo(OSProcessSpawner& spawner, TestInfo* i
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(args, "-pass-through", passThrough)))
         {
-            ioInfo->addUsed(_toBackendType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
         }
     }
 
@@ -686,34 +686,39 @@ static SlangResult _extractSlangCTestInfo(OSProcessSpawner& spawner, TestInfo* i
         if (SLANG_SUCCEEDED(_extractArg(args, "-target", targetName)))
         {
             const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
-            ioInfo->addUsedBackends(_getBackendFlagsForTarget(target));
+            ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
         }
     }
     return SLANG_OK;
 
 }
 
-static SlangResult _extractReflectionTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
+static SlangResult _extractReflectionTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
 {
     // There are no specialized constraints for a reflection test
     return SLANG_OK;
 }
 
-static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestInfo* ioInfo)
+static SlangResult _extractTestInfo(OSProcessSpawner& spawner, TestRequirements* ioInfo)
 {
     String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
 
     if (exeName == "render-test")
     {
-        return _extractRenderTestInfo(spawner, ioInfo);
+        return _extractRenderTestRequirements(spawner, ioInfo);
     }
     else if (exeName == "slangc")
     {
-        return _extractSlangCTestInfo(spawner, ioInfo);
+        // We need to know the test type.. because if it's diagnostic we say that it has no
+        // requirements
+
+
+
+        return _extractSlangCTestRequirements(spawner, ioInfo);
     }
     else if (exeName == "slang-reflection-test")
     {
-        return _extractReflectionTestInfo(spawner, ioInfo);
+        return _extractReflectionTestRequirements(spawner, ioInfo);
     }
 
     SLANG_ASSERT(!"Unknown tool type");
@@ -774,7 +779,7 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
     if (context->isCollectingTestInfo())
     {
         // If we just want info... don't bother running anything
-        const SlangResult res = _extractTestInfo(spawner, context->testInfo);
+        const SlangResult res = _extractTestInfo(spawner, context->testRequirements);
         // Keep compiler happy on release
         SLANG_UNUSED(res);
         SLANG_ASSERT(SLANG_SUCCEEDED(res));
@@ -1940,22 +1945,22 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
     // Add the explicit parameter
     for (const auto& test: srcTests)
     {
-        const auto& testInfo = test.info;
+        const auto& requirements = test.requirements;
 
         // Render tests use renderApis...
         // If it's an explicit test, we don't synth from it now
 
         // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
         // although that may not always work.
-        if (testInfo.usedRenderApiFlags == 0 ||
-            testInfo.explicitRenderApi != RenderApiType::Unknown)
+        if (requirements.usedRenderApiFlags == 0 ||
+            requirements.explicitRenderApi != RenderApiType::Unknown)
         {
             continue;
         }
 
         TestOptions synthTest(test);
         // Clear the test info
-        synthTest.info = TestInfo();
+        synthTest.requirements = TestRequirements();
         synthTest.isSynthesized = true;
 
         StringBuilder builder;
@@ -1975,12 +1980,12 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         }
 
         // Work out the info about this test
-        context->testInfo = &synthTest.info;
+        context->testRequirements = &synthTest.requirements;
         runTest(context, "", "", "", synthTest);
-        context->testInfo = nullptr;
+        context->testRequirements = nullptr;
 
         // It does set the explict render target
-        SLANG_ASSERT(synthTest.info.explicitRenderApi == synthRenderApiType);
+        SLANG_ASSERT(synthTest.requirements.explicitRenderApi == synthRenderApiType);
 
         // Add to the tests
         ioSynthTests.Add(synthTest);
@@ -1990,19 +1995,19 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
 static bool _canIgnore(TestContext* context,
     const TestOptions& testOptions)
 {
-    const auto& testInfo = testOptions.info;
+    const auto& requirements = testOptions.requirements;
 
     // Work out what render api flags are available
-    const RenderApiFlags availableRenderApiFlags = testInfo.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
 
     // Are all the required backends available?
-    if (((testInfo.usedBackendFlags & context->availableBackendFlags) != testInfo.usedBackendFlags))
+    if (((requirements.usedBackendFlags & context->availableBackendFlags) != requirements.usedBackendFlags))
     {
         return true;
     }
 
     // Are all the required rendering apis available?
-    if ((testInfo.usedRenderApiFlags & availableRenderApiFlags) != testInfo.usedRenderApiFlags)
+    if ((requirements.usedRenderApiFlags & availableRenderApiFlags) != requirements.usedRenderApiFlags)
     {
         return true;
     }
@@ -2037,17 +2042,17 @@ void runTestsOnFile(
         // We can get the test info for each of them
         for (auto& test : testList.tests)
         {
-            auto& info = test.info;
+            auto& requirements = test.requirements;
 
             // Collect what the test needs (by setting testInfo the test isn't actually run)
-            context->testInfo = &info;
+            context->testRequirements = &requirements;
             runTest(context, filePath, filePath, filePath, test);
 
             // 
-            apiUsedFlags |= info.usedRenderApiFlags;
-            explictUsedApiFlags |= (info.explicitRenderApi != RenderApiType::Unknown) ? (RenderApiFlags(1) << int(info.explicitRenderApi)) : 0;
+            apiUsedFlags |= requirements.usedRenderApiFlags;
+            explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown) ? (RenderApiFlags(1) << int(requirements.explicitRenderApi)) : 0;
         }
-        context->testInfo = nullptr;
+        context->testRequirements = nullptr;
     }
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
@@ -2110,12 +2115,12 @@ void runTestsOnFile(
             testName << " syn";
         }
 
-        const auto& testInfo = tt.info;
+        const auto& requirements = tt.requirements;
 
         // Display list of used apis on render test
-        if (testInfo.usedRenderApiFlags)
+        if (requirements.usedRenderApiFlags)
         {
-            RenderApiFlags usedFlags = testInfo.usedRenderApiFlags;
+            RenderApiFlags usedFlags = requirements.usedRenderApiFlags;
             testName << " (";
             bool isPrev = false;
             while (usedFlags)
