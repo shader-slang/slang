@@ -1879,20 +1879,7 @@ TestResult runTest(
         testInput.testOptions = &testOptions;
         testInput.spawnType = defaultSpawnType;
 
-        if (context->isExecuting())
-        {
-            TestReporter* reporter = context->reporter;
-            TestReporter::TestScope scope(reporter, testName);
-
-            TestResult testResult = command.callback(context, testInput);
-            reporter->addResult(testResult);
-        
-            return testResult;
-        }
-        else
-        {
-            return command.callback(context, testInput);
-        }
+        return command.callback(context, testInput);
     }
 
     // No actual test runner found!
@@ -2000,6 +1987,29 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
     }
 }
 
+static bool _canIgnore(TestContext* context,
+    const TestOptions& testOptions)
+{
+    const auto& testInfo = testOptions.info;
+
+    // Work out what render api flags are available
+    const RenderApiFlags availableRenderApiFlags = testInfo.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+
+    // Are all the required backends available?
+    if (((testInfo.usedBackendFlags & context->availableBackendFlags) != testInfo.usedBackendFlags))
+    {
+        return true;
+    }
+
+    // Are all the required rendering apis available?
+    if ((testInfo.usedRenderApiFlags & availableRenderApiFlags) != testInfo.usedRenderApiFlags)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void runTestsOnFile(
     TestContext*    context,
     String          filePath)
@@ -2042,7 +2052,6 @@ void runTestsOnFile(
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
 
-    // Work out what render api flags are available
     const RenderApiFlags availableRenderApiFlags = apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
 
     // If synthesized tests are wanted look into adding them
@@ -2084,34 +2093,24 @@ void runTestsOnFile(
             continue;
         }
 
-        // If this test can be ignored
-        const auto& testInfo = tt.info;
-
-        // Are all the required backends available?
-        if (((testInfo.usedBackendFlags & context->availableBackendFlags) != testInfo.usedBackendFlags))
-        {
-            continue;
-        }
-
-        // Are all the required rendering apis available?
-        if ((testInfo.usedRenderApiFlags & availableRenderApiFlags) != testInfo.usedRenderApiFlags)
-        {
-            continue;
-        }
+        // Work out the test stem
 
         StringBuilder outputStem;
         outputStem << filePath;
-        if(subTestIndex != 0)
+        if (subTestIndex != 0)
         {
             outputStem << "." << subTestIndex;
         }
 
+        // Work out the test name - taking into account render api / if synthesized
         StringBuilder testName(outputStem);
 
         if (tt.isSynthesized)
         {
             testName << " syn";
         }
+
+        const auto& testInfo = tt.info;
 
         // Display list of used apis on render test
         if (testInfo.usedRenderApiFlags)
@@ -2136,9 +2135,27 @@ void runTestsOnFile(
             testName << ")";
         }
 
-        /* TestResult result = */ runTest(context, filePath, outputStem, testName, tt);
+        // Report the test and run/ignore
+        {
+            auto reporter = context->reporter;
+            TestReporter::TestScope scope(reporter, testName);
 
-        // Could determine if to continue or not here... based on result
+            TestResult testResult = TestResult::Fail;
+
+            // If this test can be ignored
+            if (_canIgnore(context, tt))
+            {
+                testResult = TestResult::Ignored;
+            }
+            else
+            {
+                testResult = runTest(context, filePath, outputStem, testName, tt);
+            }
+
+            reporter->addResult(testResult);
+
+            // Could determine if to continue or not here... based on result
+        }        
     }
 }
 
