@@ -2015,7 +2015,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         context->testRequirements = nullptr;
 
         // It does set the explicit render target
-        SLANG_ASSERT(synthOptions.requirements.explicitRenderApi == synthRenderApiType);
+        SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == synthRenderApiType);
         // Add to the tests
         ioSynthTests.Add(synthTestDetails);
     }
