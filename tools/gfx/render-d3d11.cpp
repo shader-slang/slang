@@ -96,7 +96,7 @@ public:
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
-    virtual RendererType getRendererType() const override { return RendererType::DirectX11; }
+    virtual RenderApiType getRendererType() const override { return RenderApiType::D3D11; }
 
     ~D3D11Renderer() {}
 

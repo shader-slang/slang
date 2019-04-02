@@ -12,6 +12,7 @@
 #include "../../source/core/smart-pointer.h"
 #include "../../source/core/list.h"
 #include "../../source/core/dictionary.h"
+#include "../../source/core/slang-render-api-util.h"
 
 namespace gfx {
 
@@ -54,16 +55,6 @@ enum class StageType
     Geometry,
     Fragment,
     Compute,
-    CountOf,
-};
-
-enum class RendererType
-{
-    Unknown,
-    DirectX11,
-    DirectX12,
-    OpenGl,
-    Vulkan,
     CountOf,
 };
 
@@ -956,7 +947,7 @@ public:
     virtual void waitForGpu() = 0;
 
         /// Get the type of this renderer
-    virtual RendererType getRendererType() const = 0;
+    virtual Slang::RenderApiType getRendererType() const = 0;
 };
 
 // ----------------------------------------------------------------------------------------
@@ -971,21 +962,20 @@ struct RendererUtil
         /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
         /// Given a renderer type, gets a projection style
-    static ProjectionStyle getProjectionStyle(RendererType type);
+    static ProjectionStyle getProjectionStyle(Slang::RenderApiType type);
 
         /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
     static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
         /// Get the binding style from the type
-    static BindingStyle getBindingStyle(RendererType type) { return s_rendererTypeToBindingStyle[int(type)]; }
-
+    static BindingStyle getBindingStyle(Slang::RenderApiType type);
+    
         /// Get as text
-    static Slang::UnownedStringSlice toText(RendererType type);
+    static Slang::UnownedStringSlice toText(Slang::RenderApiType type);
 
     private:
     static void compileTimeAsserts();
     static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
-    static const BindingStyle s_rendererTypeToBindingStyle[];           ///< Maps a RendererType to a BindingStyle
 };
 
 } // renderer_test

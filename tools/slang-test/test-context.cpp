@@ -29,7 +29,9 @@ TestContext::~TestContext()
 {
     for (auto& pair : m_sharedLibTools)
     {
-        const auto& tool = pair.Value;
+        auto& tool = pair.Value;
+        tool.m_testTool.setNull();
+
         if (tool.m_sharedLibrary)
         {
             SharedLibrary::unload(tool.m_sharedLibrary);
@@ -42,13 +44,15 @@ TestContext::~TestContext()
     }
 }
 
-TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, const String& name)
+static const Guid IID_ITestTool = SLANG_UUID_Slang_ITestTool;
+
+ITestTool* TestContext::getTestTool(const String& dirPath, const String& name)
 {
     {
         SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
         if (tool)
         {
-            return tool->m_func;
+            return tool->m_testTool;
         }
     }
 
@@ -64,14 +68,24 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     if (SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformFilename(path.begin(), tool.m_sharedLibrary)))
     {
-        tool.m_func = (InnerMainFunc)SharedLibrary::findFuncByName(tool.m_sharedLibrary, "innerMain");
+        auto getTestToolFunc = (TestToolUtil::getTestToolFunc)SharedLibrary::findFuncByName(tool.m_sharedLibrary, "getTestTool");
+
+        if (getTestToolFunc)
+        {
+            ComPtr<ITestTool> testTool;
+
+            if (SLANG_SUCCEEDED(getTestToolFunc(IID_ITestTool, (ISlangUnknown**)testTool.writeRef())))
+            {
+                tool.m_testTool = testTool;
+            }
+        }
     }
 
     m_sharedLibTools.Add(name, tool);
-    return tool.m_func;
+    return tool.m_testTool;
 }
 
-void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
+void TestContext::setTestTool(const String& name, ITestTool* testTool)
 {
     SharedLibraryTool* tool = m_sharedLibTools.TryGetValue(name);
     if (tool)
@@ -82,12 +96,12 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
             tool->m_sharedLibrary = nullptr;
         }
 
-        tool->m_func = func;
+        tool->m_testTool = testTool;
     }
     else
     {
         SharedLibraryTool tool = {};
-        tool.m_func = func;
+        tool.m_testTool = testTool;
         m_sharedLibTools.Add(name, tool);
     }
 }

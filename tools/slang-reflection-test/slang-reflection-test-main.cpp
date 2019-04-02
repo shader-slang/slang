@@ -19,7 +19,7 @@ struct PrettyWriter
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
 {
     SLANG_ASSERT(end >= begin);
-    Slang::StdWriters::getOut().write(begin, size_t(end - begin));
+    Slang::GlobalWriters::getOut().write(begin, size_t(end - begin));
 }
 
 static void writeRaw(PrettyWriter& writer, char const* begin)
@@ -80,19 +80,19 @@ static void write(PrettyWriter& writer, char const* text, size_t length = 0)
 static void write(PrettyWriter& writer, SlangUInt val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
+    Slang::GlobalWriters::getOut().print("%llu", (unsigned long long)val);
 }
 
 static void write(PrettyWriter& writer, int val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%d", val);
+    Slang::GlobalWriters::getOut().print("%d", val);
 }
 
 static void write(PrettyWriter& writer, float val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%f", val);
+    Slang::GlobalWriters::getOut().print("%f", val);
 }
 
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
@@ -1017,14 +1017,45 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     const char* diagnostic;
     if (SLANG_FAILED(res) && (diagnostic = spGetDiagnosticOutput(request)))
     {
-        Slang::StdWriters::getError().put(diagnostic);
+        Slang::GlobalWriters::getError().put(diagnostic);
     }
     return res;
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+using namespace Slang;
+
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_Slang_ITestTool = SLANG_UUID_Slang_ITestTool;
+
+class SlangReflectionTestTool : public Slang::ITestTool
 {
-    Slang::StdWriters::setSingleton(stdWriters);
+public:
+    typedef SlangReflectionTestTool ThisType;
+
+    SLANG_IUNKNOWN_QUERY_INTERFACE
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ITestTool
+    SLANG_NO_THROW SlangResult SLANG_MCALL run(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL calcTestRequirements(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv, TestRequirements* ioRequirements) SLANG_OVERRIDE;
+
+    static ThisType* getSingleton() { static ThisType s_singleton; return &s_singleton; }
+
+private:
+    SlangReflectionTestTool() {}
+
+    ISlangUnknown* getInterface(const Slang::Guid& guid);
+};
+
+ISlangUnknown* SlangReflectionTestTool::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_Slang_ITestTool) ? static_cast<ITestTool*>(this) : nullptr;
+}
+
+SlangResult SlangReflectionTestTool::run(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+{
+    Slang::GlobalWriters::setSingleton(stdWriters);
     
     SlangCompileRequest* request = spCreateCompileRequest(session);
 
@@ -1047,6 +1078,17 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     return SLANG_OK;
 }
 
+SlangResult SlangReflectionTestTool::calcTestRequirements(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv, TestRequirements* ioRequirements)
+{
+    // This tool has no specific requirements
+    return SLANG_OK;
+}
+
+SLANG_TEST_TOOL_API SlangResult getTestTool(const Slang::Guid& iid, ISlangUnknown** outUnk)
+{
+    return SlangReflectionTestTool::getSingleton()->queryInterface(iid, (void**)outUnk);
+}
+
 int main(
     int argc,
     char** argv)
@@ -1055,9 +1097,9 @@ int main(
 
     SlangSession* session = spCreateSession(nullptr);
 
-    auto stdWriters = StdWriters::initDefaultSingleton();
+    auto stdWriters = GlobalWriters::initDefaultSingleton();
     
-    SlangResult res = innerMain(stdWriters, session, argc, argv);
+    SlangResult res = SlangReflectionTestTool::getSingleton()->run(stdWriters, session, argc, argv);
     spDestroySession(session);
 
     return SLANG_FAILED(res) ? 1 : 0;

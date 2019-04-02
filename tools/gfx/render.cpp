@@ -62,19 +62,9 @@ const Resource::DescBase& Resource::getDescBase() const
     uint8_t(sizeof(uint32_t)),       // D_Unorm24_S8,
 };
 
-/* static */const BindingStyle RendererUtil::s_rendererTypeToBindingStyle[] =
-{
-    BindingStyle::Unknown,      // Unknown,
-    BindingStyle::DirectX,      // DirectX11,
-    BindingStyle::DirectX,      // DirectX12,
-    BindingStyle::OpenGl,       // OpenGl,
-    BindingStyle::Vulkan,       // Vulkan
-};
-
 /* static */void RendererUtil::compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
-    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_rendererTypeToBindingStyle) == int(RendererType::CountOf));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! BindingState::Desc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -333,22 +323,42 @@ void TextureResource::Desc::init3D(Format formatIn, int widthIn, int heightIn, i
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! RennderUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
+ProjectionStyle RendererUtil::getProjectionStyle(Slang::RenderApiType type)
 {
     switch (type)
     {
-        case RendererType::DirectX11:
-        case RendererType::DirectX12:
+        case RenderApiType::D3D11:
+        case RenderApiType::D3D12:
         {
             return ProjectionStyle::DirectX;
         }
-        case RendererType::OpenGl:              return ProjectionStyle::OpenGl;
-        case RendererType::Vulkan:              return ProjectionStyle::Vulkan;
-        case RendererType::Unknown:             return ProjectionStyle::Unknown;
+        case RenderApiType::OpenGl:              return ProjectionStyle::OpenGl;
+        case RenderApiType::Vulkan:              return ProjectionStyle::Vulkan;
+        case RenderApiType::Unknown:             return ProjectionStyle::Unknown;
         default:
         {
             assert(!"Unhandled type");
             return ProjectionStyle::Unknown;
+        }
+    }
+}
+
+/* static */BindingStyle RendererUtil::getBindingStyle(Slang::RenderApiType type)
+{
+    switch (type)
+    {
+        case RenderApiType::D3D11:
+        case RenderApiType::D3D12:
+        {
+            return BindingStyle::DirectX;
+        }
+        case RenderApiType::OpenGl:              return BindingStyle::OpenGl;
+        case RenderApiType::Vulkan:              return BindingStyle::Vulkan;
+        case RenderApiType::Unknown:             return BindingStyle::Unknown;
+        default:
+        {
+            assert(!"Unhandled type");
+            return BindingStyle::Unknown;
         }
     }
 }
@@ -389,15 +399,15 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
     }
 }
 
-/* static */UnownedStringSlice RendererUtil::toText(RendererType type)
+/* static */UnownedStringSlice RendererUtil::toText(RenderApiType type)
 {
     switch (type)
     {
-        case RendererType::DirectX11:       return UnownedStringSlice::fromLiteral("DirectX11");
-        case RendererType::DirectX12:       return UnownedStringSlice::fromLiteral("DirectX11");
-        case RendererType::OpenGl:          return UnownedStringSlice::fromLiteral("OpenGL");
-        case RendererType::Vulkan:          return UnownedStringSlice::fromLiteral("Vulkan");
-        case RendererType::Unknown:         return UnownedStringSlice::fromLiteral("Unknown");
+        case RenderApiType::D3D11:          return UnownedStringSlice::fromLiteral("DirectX11");
+        case RenderApiType::D3D12:          return UnownedStringSlice::fromLiteral("DirectX11");
+        case RenderApiType::OpenGl:         return UnownedStringSlice::fromLiteral("OpenGL");
+        case RenderApiType::Vulkan:         return UnownedStringSlice::fromLiteral("Vulkan");
+        case RenderApiType::Unknown:        return UnownedStringSlice::fromLiteral("Unknown");
         default:                            return UnownedStringSlice::fromLiteral("?!?");
     }
 }

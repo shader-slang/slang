@@ -15,7 +15,7 @@ static void diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
-    auto stdError = StdWriters::getError();
+    auto stdError = GlobalWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
@@ -28,7 +28,7 @@ static void diagnosticCallback(
 
 SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
 {
-    StdWriters::setSingleton(stdWriters);
+    GlobalWriters::setSingleton(stdWriters);
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
 
@@ -66,7 +66,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        GlobalWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
         res = SLANG_FAIL;
     }
 #endif
@@ -82,7 +82,7 @@ int MAIN(int argc, char** argv)
     {
         SlangSession* session = spCreateSession(nullptr);
 
-        auto stdWriters = StdWriters::initDefaultSingleton();
+        auto stdWriters = GlobalWriters::initDefaultSingleton();
         
         res = innerMain(stdWriters, session, argc, argv);
         spDestroySession(session);

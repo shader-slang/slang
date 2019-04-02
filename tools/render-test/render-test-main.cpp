@@ -489,73 +489,146 @@ Result RenderTestApp::writeScreen(const char* filename)
     return PngSerializeUtil::write(filename, surface);
 }
 
-} //  namespace renderer_test
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_Slang_ITestTool = SLANG_UUID_Slang_ITestTool;
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
+class RenderTestTool : public ITestTool
 {
-    using namespace renderer_test;
-    using namespace Slang;
+public:
+    typedef RenderTestTool ThisType;
+    SLANG_IUNKNOWN_QUERY_INTERFACE
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
 
-    StdWriters::setSingleton(stdWriters);
+    // ITestTool
+    SLANG_NO_THROW SlangResult SLANG_MCALL run(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL calcTestRequirements(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv, TestRequirements* ioRequirements) SLANG_OVERRIDE;
 
-	// Parse command-line options
-	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getError()));
+    static ThisType* getSingleton() { static ThisType s_singleton; return &s_singleton; }
+
+private:
+    RenderTestTool() {}
+
+    ISlangUnknown* getInterface(const Guid& guid);
+};
+
+ISlangUnknown* RenderTestTool::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_Slang_ITestTool) ? static_cast<ITestTool*>(this) : nullptr;
+}
+
+struct CommandLineInfo
+{
+    SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangCompileTarget target = SLANG_TARGET_NONE;
+    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+    char const* profileName = "";
+};
+
+static SlangResult _parseCommandLine(Slang::StdWriters* stdWriters, int argcIn, const char*const* argvIn, CommandLineInfo* outCommandLineInfo )
+{
+    // Parse command-line options
+    SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, stdWriters->getError()));
+
+    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangCompileTarget target = SLANG_TARGET_NONE;
+    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+    char const* profileName = "";
+
+    switch (gOptions.rendererType)
+    {
+        case RenderApiType::D3D11:
+            target = SLANG_DXBC;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            passThrough = SLANG_PASS_THROUGH_FXC;
+            profileName = "sm_5_0";
+            break;
+
+        case RenderApiType::D3D12:
+            target = SLANG_DXBC;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            passThrough = SLANG_PASS_THROUGH_FXC;
+            profileName = "sm_5_0";
+            if (gOptions.useDXIL)
+            {
+                target = SLANG_DXIL;
+                passThrough = SLANG_PASS_THROUGH_DXC;
+                profileName = "sm_6_0";
+            }
+            break;
+
+        case RenderApiType::OpenGl:
+            target = SLANG_GLSL;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            passThrough = SLANG_PASS_THROUGH_GLSLANG;
+            profileName = "glsl_430";
+            break;
+
+        case RenderApiType::Vulkan:
+            target = SLANG_SPIRV;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            passThrough = SLANG_PASS_THROUGH_GLSLANG;
+            profileName = "glsl_430";
+            break;
+
+        default:
+            stdWriters->getError().put("error: unexpected\n");
+            return SLANG_FAIL;
+    }
+
+    // Use the profile name set on options if set
+    profileName = gOptions.profileName ? gOptions.profileName : profileName;
+
+    SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+
+    switch (gOptions.inputLanguageID)
+    {
+        case Options::InputLanguageID::Slang:
+            sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+            passThrough = SLANG_PASS_THROUGH_NONE;
+            break;
+
+        case Options::InputLanguageID::Native:
+            sourceLanguage = nativeLanguage;
+            //passThrough = passThrough;
+            break;
+
+        default:
+            break;
+    }
+
+    outCommandLineInfo->target = target;
+    outCommandLineInfo->sourceLanguage = sourceLanguage;
+    outCommandLineInfo->nativeLanguage = nativeLanguage;
+    outCommandLineInfo->passThrough = passThrough;
+    outCommandLineInfo->profileName = profileName;
+
+    return SLANG_OK;
+}
+
+static Renderer* _createRenderer(RenderApiType type)
+{
+    switch (gOptions.rendererType)
+    {
+        case RenderApiType::D3D11:      return createD3D11Renderer();
+        case RenderApiType::D3D12:      return createD3D12Renderer();
+        case RenderApiType::OpenGl:     return createGLRenderer();
+        case RenderApiType::Vulkan:     return createVKRenderer();
+        default: return nullptr;
+    }
+}
+
+SlangResult RenderTestTool::run(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
+{
+    GlobalWriters::setSingleton(stdWriters);
+
+    CommandLineInfo commandLineInfo;
+    SLANG_RETURN_ON_FAIL(_parseCommandLine(stdWriters, argcIn, argvIn, &commandLineInfo ));
 
     RefPtr<renderer_test::Window> window(new renderer_test::Window);
     SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
 
-	Slang::RefPtr<Renderer> renderer;
-
-	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
-	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
-    SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
-    char const* profileName = "";
-	switch (gOptions.rendererType)
-	{
-		case RendererType::DirectX11:
-			renderer = createD3D11Renderer();
-			slangTarget = SLANG_DXBC;
-			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-            slangPassThrough = SLANG_PASS_THROUGH_FXC;
-            profileName = "sm_5_0";
-			break;
-
-		case RendererType::DirectX12:
-			renderer = createD3D12Renderer();
-			slangTarget = SLANG_DXBC;
-			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-            slangPassThrough = SLANG_PASS_THROUGH_FXC;
-            profileName = "sm_5_0";
-            if( gOptions.useDXIL )
-            {
-                slangTarget = SLANG_DXIL;
-                slangPassThrough = SLANG_PASS_THROUGH_DXC;
-                profileName = "sm_6_0";
-            }
-			break;
-
-		case RendererType::OpenGl:
-			renderer = createGLRenderer();
-			slangTarget = SLANG_GLSL;
-			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
-            profileName = "glsl_430";
-			break;
-
-		case RendererType::Vulkan:
-			renderer = createVKRenderer();
-			slangTarget = SLANG_SPIRV;
-			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
-            profileName = "glsl_430";
-			break;
-
-		default:
-			fprintf(stderr, "error: unexpected\n");
-			return SLANG_FAIL;
-	}
-
-    
     StringBuilder rendererName;
     rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
     if (gOptions.adapter.Length())
@@ -563,7 +636,8 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         rendererName << "'" << gOptions.adapter << "'";
     }
 
-
+    // Create the renderer
+    Slang::RefPtr<Renderer> renderer = _createRenderer(gOptions.rendererType);
     if (!renderer)
     {
         if (!gOptions.onlyStartup)
@@ -607,84 +681,68 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         }
     }
 
-    // Use the profile name set on options if set
-    profileName = gOptions.profileName ? gOptions.profileName : profileName;
-
     ShaderCompiler shaderCompiler;
     shaderCompiler.renderer = renderer;
-    shaderCompiler.target = slangTarget;
-    shaderCompiler.profile = profileName;
+
+    shaderCompiler.target = commandLineInfo.target;
+    shaderCompiler.profile = commandLineInfo.profileName;
     shaderCompiler.slangSession = session;
+    shaderCompiler.sourceLanguage = commandLineInfo.sourceLanguage;
+    shaderCompiler.passThrough = commandLineInfo.passThrough;
+    
+    {
+        RenderTestApp app;
 
-	switch (gOptions.inputLanguageID)
-	{
-		case Options::InputLanguageID::Slang:
-            shaderCompiler.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
-            shaderCompiler.passThrough = SLANG_PASS_THROUGH_NONE;
-			break;
-
-        case Options::InputLanguageID::Native:
-            shaderCompiler.sourceLanguage = nativeLanguage;
-            shaderCompiler.passThrough = slangPassThrough;
-			break;
-
-		default:
-			break;
-	}
-
-	{
-		RenderTestApp app;
-
-		SLANG_RETURN_ON_FAIL(app.initialize(renderer, &shaderCompiler));
+        SLANG_RETURN_ON_FAIL(app.initialize(renderer, &shaderCompiler));
 
         window->show();
 
-		// ... and enter the event loop:
-		for (;;)
-		{
-			MSG message;
+        // ... and enter the event loop:
+        for (;;)
+        {
+            MSG message;
 
-			int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
-			if (result != 0)
-			{
-				if (message.message == WM_QUIT)
-				{
-					return (int)message.wParam;
-				}
+            int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
+            if (result != 0)
+            {
+                if (message.message == WM_QUIT)
+                {
+                    return (int)message.wParam;
+                }
 
-				TranslateMessage(&message);
-				DispatchMessageW(&message);
-			}
-			else
-			{
-				// Whenever we don't have Windows events to process, we render a frame.
-				if (gOptions.shaderType == Options::ShaderProgramType::Compute)
-				{
-					app.runCompute();
-				}
-				else
-				{
-					static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-					renderer->setClearColor(kClearColor);
-					renderer->clearFrame();
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+            else
+            {
+                // Whenever we don't have Windows events to process, we render a frame.
+                if (gOptions.shaderType == Options::ShaderProgramType::Compute)
+                {
+                    app.runCompute();
+                }
+                else
+                {
+                    static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+                    renderer->setClearColor(kClearColor);
+                    renderer->clearFrame();
 
-					app.renderFrame();
-				}
-				// If we are in a mode where output is requested, we need to snapshot the back buffer here
-				if (gOptions.outputPath)
-				{
+                    app.renderFrame();
+                }
+                // If we are in a mode where output is requested, we need to snapshot the back buffer here
+                if (gOptions.outputPath)
+                {
                     // Submit the work
                     renderer->submitGpuWork();
                     // Wait until everything is complete
                     renderer->waitForGpu();
 
-					if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+                    if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
                     {
                         SLANG_RETURN_ON_FAIL(app.writeBindingOutput(gOptions.outputPath));
                     }
-					else
+                    else
                     {
-						SlangResult res = app.writeScreen(gOptions.outputPath);
+                        SlangResult res = app.writeScreen(gOptions.outputPath);
 
                         if (SLANG_FAILED(res))
                         {
@@ -692,15 +750,54 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
                             return res;
                         }
                     }
-					return SLANG_OK;
-				}
+                    return SLANG_OK;
+                }
 
-				renderer->presentFrame();
-			}
-		}
-	}
+                renderer->presentFrame();
+            }
+        }
+    }
 
-	return SLANG_OK;
+    return SLANG_OK;
+}
+
+SlangResult RenderTestTool::calcTestRequirements(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv, TestRequirements* ioRequirements)
+{
+    CommandLineInfo commandLineInfo;
+    SLANG_RETURN_ON_FAIL(_parseCommandLine(stdWriters, argc, argv, &commandLineInfo));
+
+    if (commandLineInfo.passThrough == SLANG_PASS_THROUGH_NONE)
+    {
+        // Work out backends needed based on the target
+        ioRequirements->addUsedBackends(TestToolUtil::getBackendFlagsForTarget(commandLineInfo.target));
+    }
+    else
+    {
+        ioRequirements->addUsed(TestToolUtil::toBackendTypeFromPassThroughType(commandLineInfo.passThrough));
+    }
+
+    auto rendererType = gOptions.rendererType;
+
+    // Add the render api used
+    ioRequirements->addUsed(rendererType);
+
+    // Set the explicit render API (if not already set or different)
+    if (rendererType != RenderApiType::Unknown)
+    {
+        // There should be only one explicit api
+        SLANG_ASSERT(ioRequirements->explicitRenderApi == RenderApiType::Unknown || ioRequirements->explicitRenderApi == rendererType);
+        // Set the explicitly set render api
+        ioRequirements->explicitRenderApi = rendererType;
+    }
+
+    return SLANG_OK;
+}
+
+} //  namespace renderer_test
+
+SLANG_TEST_TOOL_API SlangResult getTestTool(const Slang::Guid& iid, ISlangUnknown** outUnk)
+{
+    return renderer_test::RenderTestTool::getSingleton()->queryInterface(iid, (void**)outUnk);
 }
 
 int main(int argc, char**  argv)
@@ -708,9 +805,9 @@ int main(int argc, char**  argv)
     using namespace Slang;
     SlangSession* session = spCreateSession(nullptr);
 
-    auto stdWriters = StdWriters::initDefaultSingleton();
+    auto stdWriters = GlobalWriters::initDefaultSingleton();
     
-    SlangResult res = innerMain(stdWriters, session, argc, argv);
+    SlangResult res = renderer_test::RenderTestTool::getSingleton()->run(stdWriters, session, argc, argv);
     spDestroySession(session);
 
 	return (int)TestToolUtil::getReturnCode(res);

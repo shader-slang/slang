@@ -5,6 +5,7 @@
 
 #include "../../slang-com-helper.h"
 #include "../../source/core/slang-writer.h"
+#include "../../source/core/slang-render-api-util.h"
 
 #include "render.h"
 
@@ -43,9 +44,9 @@ struct Options
 	ShaderProgramType shaderType = ShaderProgramType::Graphics;
 
         /// The renderer type inferred from the target language type. Used if a rendererType is not explicitly set.
-    RendererType targetLanguageRendererType = RendererType::Unknown;
+    Slang::RenderApiType targetLanguageRendererType = Slang::RenderApiType::Unknown;
         /// The set render type
-    RendererType rendererType = RendererType::Unknown;
+    Slang::RenderApiType rendererType = Slang::RenderApiType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
 
         /// Can be used for overriding the profile

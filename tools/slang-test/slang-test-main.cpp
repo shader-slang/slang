@@ -8,6 +8,7 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-byte-encode-util.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 using namespace Slang;
 
@@ -26,7 +27,6 @@ using namespace Slang;
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
 
 // Options for a particular test
 struct TestOptions
@@ -56,7 +56,7 @@ struct TestDetails
     {}
 
     TestOptions options;                    ///< The options for the test
-    TestRequirements requirements;          ///< The requirements for the test to work
+    Slang::TestRequirements requirements;          ///< The requirements for the test to work
 };
 
 // Information on tests to run for a particular file
@@ -430,8 +430,8 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         context->reporter->messageFormat(TestMessageType::Info, "%s\n", builder.begin());
     }
 
-    auto func = context->getInnerMainFunc(String(context->options.binDir), exeName);
-    if (func)
+    ITestTool* testTool = context->getTestTool(String(context->options.binDir), exeName);
+    if (testTool)
     {
         StringBuilder stdErrorString;
         StringBuilder stdOutString;
@@ -440,7 +440,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
         StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
-        StdWriters* prevStdWriters = StdWriters::getSingleton();
+        StdWriters* prevStdWriters = GlobalWriters::getSingleton();
 
         StdWriters stdWriters;
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
@@ -458,9 +458,9 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
             args.Add(spawner.argumentList_[i].Buffer());
         }
 
-        SlangResult res = func(&stdWriters, context->getSession(), int(args.Count()), args.begin());
+        SlangResult res = testTool->run(&stdWriters, context->getSession(), int(args.Count()), args.begin());
 
-        StdWriters::setSingleton(prevStdWriters);
+        GlobalWriters::setSingleton(prevStdWriters);
 
         spawner.standardError_ = stdErrorString;
         spawner.standardOutput_ = stdOutString;
@@ -473,278 +473,25 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
     return kOSError_OperationFailed;
 }
 
-
-static SlangResult _extractArg(const List<String>& args, const String& argName, String& outValue)
-{
-    SLANG_ASSERT(argName.Length() > 0 && argName[0] == '-');
-
-    const UInt count = args.Count();
-    for (UInt i = 0; i < count - 1; ++i)
-    {
-        if (args[i] == argName)
-        {
-            outValue = args[i + 1];
-            return SLANG_OK;
-        }
-    }
-    return SLANG_FAIL;
-}
-
-static bool _hasOption(const List<String>& args, const String& argName)
-{
-    return args.IndexOf(argName) != UInt(-1);
-}
-
-static BackendType _toBackendType(const UnownedStringSlice& slice)
-{
-    if (slice == "dxc")
-    {
-        return BackendType::Dxc;
-    }
-    else if (slice == "fxc")
-    {
-        return BackendType::Fxc;
-    }
-    else if (slice == "glslang")
-    {
-        return BackendType::Glslang;
-    }
-    return BackendType::Unknown;
-}
-
-static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
-{
-    switch (target)
-    {
-        case SLANG_TARGET_UNKNOWN:
-        case SLANG_HLSL:
-        case SLANG_GLSL:
-        {
-            return 0;
-        }
-        case SLANG_DXBC:
-        case SLANG_DXBC_ASM:
-        {
-            return BackendFlag::Fxc;
-        }
-        case SLANG_SPIRV:
-        case SLANG_SPIRV_ASM:
-        {
-            return BackendFlag::Glslang;
-        }
-        case SLANG_DXIL:
-        case SLANG_DXIL_ASM:
-        {
-            return BackendFlag::Dxc;
-        }
-        default:
-        {
-            SLANG_ASSERT(!"Unknown type");
-            return 0;
-        }
-    }
-}
-
-static BackendType _toBackendTypeFromPassThroughType(SlangPassThrough passThru)
-{
-    switch (passThru)
-    {
-        case SLANG_PASS_THROUGH_DXC: return BackendType::Dxc;
-        case SLANG_PASS_THROUGH_FXC: return BackendType::Fxc;
-        case SLANG_PASS_THROUGH_GLSLANG: return BackendType::Glslang;
-        default:                     return BackendType::Unknown;
-    }
-}
-
-static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
-{
-#define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
-
-    CASE("hlsl", HLSL)
-        CASE("glsl", GLSL)
-        CASE("dxbc", DXBC)
-        CASE("dxbc-assembly", DXBC_ASM)
-        CASE("dxbc-asm", DXBC_ASM)
-        CASE("spirv", SPIRV)
-        CASE("spirv-assembly", SPIRV_ASM)
-        CASE("spirv-asm", SPIRV_ASM)
-        CASE("dxil", DXIL)
-        CASE("dxil-assembly", DXIL_ASM)
-        CASE("dxil-asm", DXIL_ASM)
-#undef CASE
-
-        return SLANG_TARGET_UNKNOWN;
-}
-
-static SlangResult _extractRenderTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
-{
-    const auto& args = spawner.argumentList_;
-
-    // TODO(JS): 
-    // This is rather convoluted in that it has to work out from the command line parameters passed
-    // to render-test what renderer will be used. 
-    // That a similar logic has to be kept inside the implementation of render-test and both this
-    // and render-test will have to be kept in sync.
-   
-    bool useDxil = _hasOption(args, "-use-dxil");
-
-    bool usePassthru = false;
-
-    // Work out what kind of render will be used
-    RenderApiType renderApiType;
-    {
-        RenderApiType foundRenderApiType = RenderApiType::Unknown;
-        RenderApiType foundLanguageRenderType = RenderApiType::Unknown;
-
-        for (const auto& arg: args)
-        {
-            Slang::UnownedStringSlice argSlice = arg.getUnownedSlice();
-            if (argSlice.size() && argSlice[0] == '-')
-            {
-                // Look up the rendering API if set
-                UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
-                RenderApiType renderApiType = RenderApiUtil::findApiTypeByName(argName);
-
-                if (renderApiType != RenderApiType::Unknown)
-                {
-                    foundRenderApiType = renderApiType;
-
-                    // There should be only one explicit api
-                    SLANG_ASSERT(ioRequirements->explicitRenderApi == RenderApiType::Unknown || ioRequirements->explicitRenderApi == renderApiType);
-
-                    // Set the explicitly set render api
-                    ioRequirements->explicitRenderApi = renderApiType;
-                    continue;
-                }
-
-                // Lookup the target language type
-                RenderApiType languageRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
-                if (languageRenderType != RenderApiType::Unknown)
-                {
-                    foundLanguageRenderType = languageRenderType;
-
-                    // Use the pass thru compiler if these are the sources
-                    usePassthru |= (argName == "hlsl" || argName == "glsl");
-
-                    continue;
-                }
-            }
-        }
-
-        // If a render option isn't set use defaultRenderType 
-        renderApiType = (foundRenderApiType == RenderApiType::Unknown) ? foundLanguageRenderType : foundRenderApiType;
-    }
-
-    // The native language for the API
-    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
-    SlangCompileTarget target = SLANG_TARGET_NONE;
-    SlangPassThrough passThru = SLANG_PASS_THROUGH_NONE;
-
-    switch (renderApiType)
-    {
-        case RenderApiType::D3D11:
-            target = SLANG_DXBC;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-            passThru = SLANG_PASS_THROUGH_FXC;
-            break;
-        case RenderApiType::D3D12:
-            target = SLANG_DXBC;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-            passThru = SLANG_PASS_THROUGH_FXC;
-            if (useDxil)
-            {
-                target = SLANG_DXIL;
-                passThru = SLANG_PASS_THROUGH_DXC;
-            }
-            break;
-
-        case RenderApiType::OpenGl:
-            target = SLANG_GLSL;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            passThru = SLANG_PASS_THROUGH_GLSLANG;
-            break;
-        case RenderApiType::Vulkan:
-            target = SLANG_SPIRV;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            passThru = SLANG_PASS_THROUGH_GLSLANG;
-            break;
-    }
-
-    SlangSourceLanguage sourceLanguage = nativeLanguage;
-    if (!usePassthru)
-    {
-        sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
-        passThru = SLANG_PASS_THROUGH_NONE;
-    }
-
-    if (passThru == SLANG_PASS_THROUGH_NONE)
-    {
-        // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
-    }
-    else
-    {
-        ioRequirements->addUsed(_toBackendTypeFromPassThroughType(passThru));
-    }
-
-    // Add the render api used
-    ioRequirements->addUsed(renderApiType);
-
-    return SLANG_OK;
-}
-
-static SlangResult _extractSlangCTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
-{
-    // This determines what the requirements are for a slangc like command line
-    const auto& args = spawner.argumentList_;
-
-    // First check pass through
-    {
-        String passThrough;
-        if (SLANG_SUCCEEDED(_extractArg(args, "-pass-through", passThrough)))
-        {
-            ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
-        }
-    }
-
-    // The target if set will also imply a backend
-    {
-        String targetName;
-        if (SLANG_SUCCEEDED(_extractArg(args, "-target", targetName)))
-        {
-            const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
-            ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
-        }
-    }
-    return SLANG_OK;
-
-}
-
-static SlangResult _extractReflectionTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
-{
-    // There are no specialized constraints for a reflection test
-    return SLANG_OK;
-}
-
-static SlangResult _extractTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioInfo)
+static SlangResult _extractTestRequirements(TestContext* context, OSProcessSpawner& spawner, TestRequirements* ioRequirements)
 {
     String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+    ITestTool* testTool = context->getTestTool(context->options.binDir, exeName);
 
-    if (exeName == "render-test")
+    if (!testTool)
     {
-        return _extractRenderTestRequirements(spawner, ioInfo);
-    }
-    else if (exeName == "slangc")
-    {
-        return _extractSlangCTestRequirements(spawner, ioInfo);
-    }
-    else if (exeName == "slang-reflection-test")
-    {
-        return _extractReflectionTestRequirements(spawner, ioInfo);
+        return SLANG_FAIL;
     }
 
-    SLANG_ASSERT(!"Unknown tool type");
-    return SLANG_FAIL;
+    List<const char*> args;
+    for ( const auto& arg : spawner.argumentList_)
+    {
+        args.Add(arg.Buffer());
+    }
+
+    // Throw any errors text away
+    auto nullWriters = StdWriters::createNull();
+    return testTool->calcTestRequirements(nullWriters, context->getSession(), int(args.Count()), args.Buffer(), ioRequirements);
 }
 
 static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
@@ -801,7 +548,7 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
     if (context->isCollectingRequirements())
     {
         // If we just want info... don't bother running anything
-        const SlangResult res = _extractTestRequirements(spawner, context->testRequirements);
+        const SlangResult res = _extractTestRequirements(context, spawner, context->testRequirements);
         // Keep compiler happy on release
         SLANG_UNUSED(res);
         SLANG_ASSERT(SLANG_SUCCEEDED(res));
@@ -1101,14 +848,14 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     
     actualSpawner.pushArgument(filePath);
 
-    // TODO(JS): This should no longer be needed with TestInfo accumulated for a test
+    // TODO(JS): Ideally this would be refactored out 
 
     const auto& args = input.testOptions->args;
 
     const UInt targetIndex = args.IndexOf("-target");
     if (targetIndex != UInt(-1) && targetIndex + 1 < args.Count())
     {
-        SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
+        SlangCompileTarget target = TestToolUtil::toCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
         if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))
@@ -2262,7 +2009,7 @@ void runTestsInDirectory(
 
 SlangResult innerMain(int argc, char** argv)
 {
-    auto stdWriters = StdWriters::initDefaultSingleton();
+    auto stdWriters = GlobalWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
     TestContext context;
@@ -2321,30 +2068,27 @@ SlangResult innerMain(int argc, char** argv)
         {
             if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
             {
-                context.availableBackendFlags |= BackendFlags(1) << int(_toBackendTypeFromPassThroughType(passThru));
+                context.availableBackendFlags |= BackendFlags(1) << int(TestToolUtil::toBackendTypeFromPassThroughType(passThru));
             }
         }
     }
 
-    // Working out what renderApis is worked on on demand through
-    // _getAvailableRenderApiFlags()
-
     {
         // We can set the slangc command line tool, to just use the function defined here
-        context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
+        context.setTestTool("slangc", SlangCTestToolUtil::getTestTool());
     }
 
-    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
+    SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, GlobalWriters::getError(), &context.options));
     
     Options& options = context.options;
 
     if (options.subCommand.Length())
     {
         // Get the function from the tool
-        auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
-        if (!func)
+        auto testTool = context.getTestTool(options.binDir, options.subCommand);
+        if (!testTool)
         {
-            StdWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.Buffer());
+            GlobalWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.Buffer());
             return SLANG_FAIL;
         }
 
@@ -2357,7 +2101,7 @@ SlangResult innerMain(int argc, char** argv)
             args[i] = srcArgs[i].Buffer();
         }
 
-        return func(StdWriters::getSingleton(), context.getSession(), int(args.Count()), args.Buffer());
+        return testTool->run(GlobalWriters::getSingleton(), context.getSession(), int(args.Count()), args.Buffer());
     }
 
     if( options.includeCategories.Count() == 0 )

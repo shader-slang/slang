@@ -123,7 +123,7 @@ public:
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
-    virtual RendererType getRendererType() const override { return RendererType::OpenGl; }
+    virtual RenderApiType getRendererType() const override { return RenderApiType::OpenGl; }
 
     protected:
     enum

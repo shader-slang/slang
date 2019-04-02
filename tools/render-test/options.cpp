@@ -19,22 +19,9 @@ static const Options gDefaultOptions;
 
 Options gOptions;
 
-static gfx::RendererType _toRenderType(Slang::RenderApiType apiType)
+static SlangResult _setRendererType(RenderApiType type, const char* arg, Slang::WriterHelper stdError)
 {
-    using namespace Slang;
-    switch (apiType)
-    {
-    case RenderApiType::D3D11: return gfx::RendererType::DirectX11;
-    case RenderApiType::D3D12: return gfx::RendererType::DirectX12;
-    case RenderApiType::OpenGl: return gfx::RendererType::OpenGl;
-    case RenderApiType::Vulkan: return gfx::RendererType::Vulkan;
-    default: return gfx::RendererType::Unknown;
-    }
-}
-
-static SlangResult _setRendererType(RendererType type, const char* arg, Slang::WriterHelper stdError)
-{
-    if (gOptions.rendererType != RendererType::Unknown)
+    if (gOptions.rendererType != RenderApiType::Unknown)
     {
         stdError.print("Already has renderer option set. Found '%s'\n", arg);
         return SLANG_FAIL;
@@ -173,17 +160,17 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
-                RendererType rendererType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
+                RenderApiType rendererType = RenderApiUtil::findApiTypeByName(argName);
 
-                if (rendererType != RendererType::Unknown)
+                if (rendererType != RenderApiType::Unknown)
                 {
                     gOptions.rendererType = rendererType;
                     continue;
                 }
 
                 // Lookup the target language type
-                RendererType languageRenderType = _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
-                if (languageRenderType != RendererType::Unknown)
+                RenderApiType languageRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
+                if (languageRenderType != RenderApiType::Unknown)
                 {
                     gOptions.targetLanguageRendererType = languageRenderType;
                     gOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl") ?  InputLanguageID::Native : InputLanguageID::Slang;
@@ -197,7 +184,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
     }
 
     // If a render option isn't set use defaultRenderType 
-    gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? gOptions.targetLanguageRendererType : gOptions.rendererType;
+    gOptions.rendererType = (gOptions.rendererType == RenderApiType::Unknown) ? gOptions.targetLanguageRendererType : gOptions.rendererType;
 
     // first positional argument is source shader path
     if(positionalArgs.Count())
