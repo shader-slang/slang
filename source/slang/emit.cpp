@@ -6052,9 +6052,9 @@ struct EmitVisitor
 
         if( isShaderRecord )
         {
-            // TODO: A shader record in vk can be potentially read write. Currently slang does't support write access
-            // so for now we will assume readonly
-            emit("readonly buffer ");
+            // TODO: A shader record in vk can be potentially read-write. Currently slang doesn't support write access
+            // and readonly buffer generates SPIRV validation error.
+            emit("buffer ");
         }
         else if(as<IRGLSLShaderStorageBufferType>(type))
         {
