@@ -1604,11 +1604,6 @@ TestResult runHLSLAndGLSLRenderComparisonTest(TestContext* context, TestInput& i
     return runHLSLRenderComparisonTestImpl(context, input, "-hlsl-rewrite", "-glsl-rewrite");
 }
 
-TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
-{
-    return TestResult::Ignored;
-}
-
 // based on command name, dispatch to an appropriate callback
 struct TestCommandInfo
 {
@@ -1768,7 +1763,8 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
     }
 }
 
-static bool _canIgnore(TestContext* context,
+static bool _canIgnore(
+    TestContext* context,
     const TestRequirements& requirements)
 {
     // Work out what render api flags are available
