@@ -5,4 +5,4 @@
 // compilers don't support inferring the stage from
 // an attribute.
 
-//TEST:SIMPLE:-pass-through fxc -entry main
+//DIAGNOSTIC_TEST:SIMPLE:-pass-through fxc -entry main

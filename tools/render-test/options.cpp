@@ -151,6 +151,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             gOptions.useDXIL = true;
         }
+        else if (strcmp(arg, "-only-startup") == 0)
+        {
+            gOptions.onlyStartup = true;
+        }
         else if (strcmp(arg, "-adapter") == 0)
         {
             if (argCursor == argEnd)

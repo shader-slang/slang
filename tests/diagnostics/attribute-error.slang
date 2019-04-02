@@ -2,7 +2,7 @@
 
 // Tests reflection of user defined attributes.
 
-//TEST:REFLECTION:-stage compute -entry main -target hlsl
+//DIAGNOSTIC_TEST:REFLECTION:-stage compute -entry main -target hlsl
 
 [__AttributeUsage(_AttributeTargets.Struct)]
 struct MyStructAttribute

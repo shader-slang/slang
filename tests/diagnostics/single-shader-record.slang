@@ -1,5 +1,5 @@
 // single-shader-record.slang
-//TEST:SIMPLE: -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+//DIAGNOSTIC_TEST:SIMPLE: -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
 
 struct ReflectionRay
 {

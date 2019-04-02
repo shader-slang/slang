@@ -1,3 +1,3 @@
 // unknown-output-format.slang
 
-//TEST:SIMPLE:-o cookies.jar
+//DIAGNOSTIC_TEST:SIMPLE:-o cookies.jar

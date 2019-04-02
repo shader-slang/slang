@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 // variable with `void` type
 
 void foo()

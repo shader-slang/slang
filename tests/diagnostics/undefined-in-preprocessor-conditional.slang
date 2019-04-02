@@ -1,4 +1,4 @@
-//TEST(smoke):SIMPLE:
+//DIAGNOSTIC_TEST(smoke):SIMPLE:
 
 // Use an undefined identifier in a preprocessor conditional
 

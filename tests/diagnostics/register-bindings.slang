@@ -1,5 +1,5 @@
 // register-bindings.slang
-//TEST:SIMPLE:-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
 
 // Various bad forms for register bindings
 

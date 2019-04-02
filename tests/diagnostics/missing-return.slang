@@ -1,6 +1,6 @@
 // missing-return.slang
 
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Non-`void` function that fails to return
 

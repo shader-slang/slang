@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 // bad type for `while` predicate
 
 struct S {};

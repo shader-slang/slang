@@ -1,3 +1,3 @@
 // unknown-pass-through-target.slang
 
-//TEST:SIMPLE:-pass-through subcon
+//DIAGNOSTIC_TEST:SIMPLE:-pass-through subcon

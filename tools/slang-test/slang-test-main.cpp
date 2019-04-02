@@ -21,31 +21,48 @@ using namespace Slang;
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
-#ifdef _WIN32
-#define SLANG_TEST_SUPPORT_HLSL 1
-#include <d3dcompiler.h>
-#endif
-
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 
+
 // Options for a particular test
 struct TestOptions
 {
+    enum Type
+    {
+        Normal,             ///< A regular test
+        Diagnostic,         ///< Diagnostic tests will always run (as form of failure is being tested)  
+    };
+
+    Type type = Type::Normal;
+
     String command;
     List<String> args;
 
     // The categories that this test was assigned to
     List<TestCategory*> categories;
+
+    bool isSynthesized = false;
+};
+
+struct TestDetails
+{
+    TestDetails() {}
+    explicit TestDetails(const TestOptions& inOptions):
+        options(inOptions)
+    {}
+
+    TestOptions options;                    ///< The options for the test
+    TestRequirements requirements;          ///< The requirements for the test to work
 };
 
 // Information on tests to run for a particular file
 struct FileTestList
 {
-    List<TestOptions> tests;
+    List<TestDetails> tests;
 };
 
 enum class SpawnType
@@ -68,9 +85,6 @@ struct TestInput
     // as command line args)
     TestOptions const*  testOptions;
 
-    // The list of tests that will be run on this file
-    FileTestList const* testList;
-
     // Determines how the test will be spawned
     SpawnType spawnType;
 };
@@ -78,6 +92,9 @@ struct TestInput
 typedef TestResult(*TestCallback)(TestContext* context, TestInput& input);
 
 // Globals
+
+// Pre declare
+static void _addRenderTestOptions(const Options& options, OSProcessSpawner& spawner);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -165,15 +182,12 @@ String collectRestOfLine(char const** ioCursor)
 }
 
 
-
-TestResult gatherTestOptions(
+static TestResult _gatherTestOptions(
     TestCategorySet*    categorySet, 
     char const**    ioCursor,
-    FileTestList*   testList)
+    TestOptions&    outOptions)
 {
     char const* cursor = *ioCursor;
-
-    TestOptions testOptions;
 
     // Right after the `TEST` keyword, the user may specify
     // one or more categories for the test.
@@ -206,7 +220,7 @@ TestResult gatherTestOptions(
                     }
                     
 
-                    testOptions.categories.Add(category);
+                    outOptions.categories.Add(category);
 
                     if( *categoryEnd == ',' )
                     {
@@ -226,9 +240,9 @@ TestResult gatherTestOptions(
     }
 
     // If no categories were specified, then add the default category
-    if(testOptions.categories.Count() == 0)
+    if(outOptions.categories.Count() == 0)
     {
-        testOptions.categories.Add(categorySet->defaultCategory);
+        outOptions.categories.Add(categorySet->defaultCategory);
     }
 
     if(*cursor == ':')
@@ -259,7 +273,7 @@ TestResult gatherTestOptions(
     }
     char const* commandEnd = cursor;
 
-    testOptions.command = getString(commandStart, commandEnd);
+    outOptions.command = getString(commandStart, commandEnd);
 
     if(*cursor == ':')
         cursor++;
@@ -280,7 +294,6 @@ TestResult gatherTestOptions(
         {
         case 0: case '\r': case '\n':
             skipToEndOfLine(&cursor);
-            testList->tests.Add(testOptions);
             return TestResult::Pass;
 
         default:
@@ -306,7 +319,7 @@ TestResult gatherTestOptions(
         char const* argEnd = cursor;
         assert(argBegin != argEnd);
 
-        testOptions.args.Add(getString(argBegin, argEnd));
+        outOptions.args.Add(getString(argBegin, argEnd));
     }
 }
 
@@ -343,8 +356,23 @@ TestResult gatherTestsForFile(
         }
         else if(match(&cursor, "//TEST"))
         {
-            if(gatherTestOptions(categorySet, &cursor, testList) != TestResult::Pass)
+            TestDetails testDetails;
+
+            if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            testList->tests.Add(testDetails);
+        }
+        else if (match(&cursor, "//DIAGNOSTIC_TEST"))
+        {
+            TestDetails testDetails;
+            
+            if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
+                return TestResult::Fail;
+
+            // Mark that it is a diagnostic test
+            testDetails.options.type = TestOptions::Type::Diagnostic;
+            testList->tests.Add(testDetails);
         }
         else
         {
@@ -445,6 +473,324 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
     return kOSError_OperationFailed;
 }
 
+
+static SlangResult _extractArg(const List<String>& args, const String& argName, String& outValue)
+{
+    SLANG_ASSERT(argName.Length() > 0 && argName[0] == '-');
+
+    const UInt count = args.Count();
+    for (UInt i = 0; i < count - 1; ++i)
+    {
+        if (args[i] == argName)
+        {
+            outValue = args[i + 1];
+            return SLANG_OK;
+        }
+    }
+    return SLANG_FAIL;
+}
+
+static bool _hasOption(const List<String>& args, const String& argName)
+{
+    return args.IndexOf(argName) != UInt(-1);
+}
+
+static BackendType _toBackendType(const UnownedStringSlice& slice)
+{
+    if (slice == "dxc")
+    {
+        return BackendType::Dxc;
+    }
+    else if (slice == "fxc")
+    {
+        return BackendType::Fxc;
+    }
+    else if (slice == "glslang")
+    {
+        return BackendType::Glslang;
+    }
+    return BackendType::Unknown;
+}
+
+static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
+{
+    switch (target)
+    {
+        case SLANG_TARGET_UNKNOWN:
+        case SLANG_HLSL:
+        case SLANG_GLSL:
+        {
+            return 0;
+        }
+        case SLANG_DXBC:
+        case SLANG_DXBC_ASM:
+        {
+            return BackendFlag::Fxc;
+        }
+        case SLANG_SPIRV:
+        case SLANG_SPIRV_ASM:
+        {
+            return BackendFlag::Glslang;
+        }
+        case SLANG_DXIL:
+        case SLANG_DXIL_ASM:
+        {
+            return BackendFlag::Dxc;
+        }
+        default:
+        {
+            SLANG_ASSERT(!"Unknown type");
+            return 0;
+        }
+    }
+}
+
+static BackendType _toBackendTypeFromPassThroughType(SlangPassThrough passThru)
+{
+    switch (passThru)
+    {
+        case SLANG_PASS_THROUGH_DXC: return BackendType::Dxc;
+        case SLANG_PASS_THROUGH_FXC: return BackendType::Fxc;
+        case SLANG_PASS_THROUGH_GLSLANG: return BackendType::Glslang;
+        default:                     return BackendType::Unknown;
+    }
+}
+
+static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
+{
+#define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
+
+    CASE("hlsl", HLSL)
+        CASE("glsl", GLSL)
+        CASE("dxbc", DXBC)
+        CASE("dxbc-assembly", DXBC_ASM)
+        CASE("dxbc-asm", DXBC_ASM)
+        CASE("spirv", SPIRV)
+        CASE("spirv-assembly", SPIRV_ASM)
+        CASE("spirv-asm", SPIRV_ASM)
+        CASE("dxil", DXIL)
+        CASE("dxil-assembly", DXIL_ASM)
+        CASE("dxil-asm", DXIL_ASM)
+#undef CASE
+
+        return SLANG_TARGET_UNKNOWN;
+}
+
+static SlangResult _extractRenderTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
+{
+    const auto& args = spawner.argumentList_;
+
+    // TODO(JS): 
+    // This is rather convoluted in that it has to work out from the command line parameters passed
+    // to render-test what renderer will be used. 
+    // That a similar logic has to be kept inside the implementation of render-test and both this
+    // and render-test will have to be kept in sync.
+   
+    bool useDxil = _hasOption(args, "-use-dxil");
+
+    bool usePassthru = false;
+
+    // Work out what kind of render will be used
+    RenderApiType renderApiType;
+    {
+        RenderApiType foundRenderApiType = RenderApiType::Unknown;
+        RenderApiType foundLanguageRenderType = RenderApiType::Unknown;
+
+        for (const auto& arg: args)
+        {
+            Slang::UnownedStringSlice argSlice = arg.getUnownedSlice();
+            if (argSlice.size() && argSlice[0] == '-')
+            {
+                // Look up the rendering API if set
+                UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
+                RenderApiType renderApiType = RenderApiUtil::findApiTypeByName(argName);
+
+                if (renderApiType != RenderApiType::Unknown)
+                {
+                    foundRenderApiType = renderApiType;
+
+                    // There should be only one explicit api
+                    SLANG_ASSERT(ioRequirements->explicitRenderApi == RenderApiType::Unknown || ioRequirements->explicitRenderApi == renderApiType);
+
+                    // Set the explicitly set render api
+                    ioRequirements->explicitRenderApi = renderApiType;
+                    continue;
+                }
+
+                // Lookup the target language type
+                RenderApiType languageRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
+                if (languageRenderType != RenderApiType::Unknown)
+                {
+                    foundLanguageRenderType = languageRenderType;
+
+                    // Use the pass thru compiler if these are the sources
+                    usePassthru |= (argName == "hlsl" || argName == "glsl");
+
+                    continue;
+                }
+            }
+        }
+
+        // If a render option isn't set use defaultRenderType 
+        renderApiType = (foundRenderApiType == RenderApiType::Unknown) ? foundLanguageRenderType : foundRenderApiType;
+    }
+
+    // The native language for the API
+    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangCompileTarget target = SLANG_TARGET_NONE;
+    SlangPassThrough passThru = SLANG_PASS_THROUGH_NONE;
+
+    switch (renderApiType)
+    {
+        case RenderApiType::D3D11:
+            target = SLANG_DXBC;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            passThru = SLANG_PASS_THROUGH_FXC;
+            break;
+        case RenderApiType::D3D12:
+            target = SLANG_DXBC;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
+            passThru = SLANG_PASS_THROUGH_FXC;
+            if (useDxil)
+            {
+                target = SLANG_DXIL;
+                passThru = SLANG_PASS_THROUGH_DXC;
+            }
+            break;
+
+        case RenderApiType::OpenGl:
+            target = SLANG_GLSL;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            passThru = SLANG_PASS_THROUGH_GLSLANG;
+            break;
+        case RenderApiType::Vulkan:
+            target = SLANG_SPIRV;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
+            passThru = SLANG_PASS_THROUGH_GLSLANG;
+            break;
+    }
+
+    SlangSourceLanguage sourceLanguage = nativeLanguage;
+    if (!usePassthru)
+    {
+        sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+        passThru = SLANG_PASS_THROUGH_NONE;
+    }
+
+    if (passThru == SLANG_PASS_THROUGH_NONE)
+    {
+        // Work out backends needed based on the target
+        ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+    }
+    else
+    {
+        ioRequirements->addUsed(_toBackendTypeFromPassThroughType(passThru));
+    }
+
+    // Add the render api used
+    ioRequirements->addUsed(renderApiType);
+
+    return SLANG_OK;
+}
+
+static SlangResult _extractSlangCTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
+{
+    // This determines what the requirements are for a slangc like command line
+    const auto& args = spawner.argumentList_;
+
+    // First check pass through
+    {
+        String passThrough;
+        if (SLANG_SUCCEEDED(_extractArg(args, "-pass-through", passThrough)))
+        {
+            ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
+        }
+    }
+
+    // The target if set will also imply a backend
+    {
+        String targetName;
+        if (SLANG_SUCCEEDED(_extractArg(args, "-target", targetName)))
+        {
+            const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
+            ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+        }
+    }
+    return SLANG_OK;
+
+}
+
+static SlangResult _extractReflectionTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioRequirements)
+{
+    // There are no specialized constraints for a reflection test
+    return SLANG_OK;
+}
+
+static SlangResult _extractTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioInfo)
+{
+    String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+
+    if (exeName == "render-test")
+    {
+        return _extractRenderTestRequirements(spawner, ioInfo);
+    }
+    else if (exeName == "slangc")
+    {
+        return _extractSlangCTestRequirements(spawner, ioInfo);
+    }
+    else if (exeName == "slang-reflection-test")
+    {
+        return _extractReflectionTestRequirements(spawner, ioInfo);
+    }
+
+    SLANG_ASSERT(!"Unknown tool type");
+    return SLANG_FAIL;
+}
+
+static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
+{
+    // Only evaluate if it hasn't already been evaluated (the actual evaluation is slow...)
+    if (!context->isAvailableRenderApiFlagsValid)
+    {
+        // Call the render-test tool asking it only to startup a specified render api
+        // (taking into account adapter options)
+
+        RenderApiFlags availableRenderApiFlags = 0;
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // See if it's possible the api is available
+            if (RenderApiUtil::calcHasApi(apiType))
+            {
+                // Try starting up the device
+                OSProcessSpawner spawner;
+                spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
+                _addRenderTestOptions(context->options, spawner);
+                // We just want to see if the device can be started up
+                spawner.pushArgument("-only-startup");
+
+                // Select what api to use
+                StringBuilder builder;
+                builder << "-" << RenderApiUtil::getApiName(apiType);
+                spawner.pushArgument(builder);
+
+                // Run the render-test tool and see if the device could startup
+                if (spawnAndWaitSharedLibrary(context, "device-startup", spawner) == OSError::kOSError_None
+                    && TestToolUtil::getReturnCodeFromInt(spawner.resultCode_) == ToolReturnCode::Success)
+                {
+                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);   
+                }
+            }
+        }
+
+        context->availableRenderApiFlags = availableRenderApiFlags;
+        context->isAvailableRenderApiFlagsValid = true;
+    }
+
+    return context->availableRenderApiFlags;
+}
+
 ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 {
     return TestToolUtil::getReturnCodeFromInt(spawner.getResultCode());
@@ -452,6 +798,17 @@ ToolReturnCode getReturnCode(OSProcessSpawner& spawner)
 
 ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnType spawnType, OSProcessSpawner& spawner)
 {
+    if (context->isCollectingRequirements())
+    {
+        // If we just want info... don't bother running anything
+        const SlangResult res = _extractTestRequirements(spawner, context->testRequirements);
+        // Keep compiler happy on release
+        SLANG_UNUSED(res);
+        SLANG_ASSERT(SLANG_SUCCEEDED(res));
+
+        return ToolReturnCode::Success;
+    }
+
     const auto& options = context->options;
 
     OSError spawnResult = kOSError_OperationFailed;
@@ -581,8 +938,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         spawner.pushArgument(arg);
     }
-
+    
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     String actualOutput = getOutput(spawner);
 
@@ -655,6 +1017,11 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
     String actualOutput = getOutput(spawner);
 
     String expectedOutputPath = outputStem + ".expected";
@@ -718,28 +1085,6 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
-{
-#define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
-
-    CASE("hlsl", HLSL)
-    CASE("glsl", GLSL)
-    CASE("dxbc", DXBC)
-    CASE("dxbc-assembly", DXBC_ASM)
-    CASE("dxbc-asm", DXBC_ASM)
-    CASE("spirv", SPIRV)
-    CASE("spirv-assembly", SPIRV_ASM)
-    CASE("spirv-asm", SPIRV_ASM)
-    CASE("dxil", DXIL)
-    CASE("dxil-assembly", DXIL_ASM)
-    CASE("dxil-asm", DXIL_ASM)
-#undef CASE
-
-    return SLANG_TARGET_UNKNOWN;
-}
-
-
-
 TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file
@@ -755,7 +1100,9 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     _initSlangCompiler(context, expectedSpawner);
     
     actualSpawner.pushArgument(filePath);
-    
+
+    // TODO(JS): This should no longer be needed with TestInfo accumulated for a test
+
     const auto& args = input.testOptions->args;
 
     const UInt targetIndex = args.IndexOf("-target");
@@ -802,19 +1149,28 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     }
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, expectedSpawner));
-    
-    String expectedOutput = getOutput(expectedSpawner);
-    String expectedOutputPath = outputStem + ".expected";
-    try
+
+    String expectedOutput;
+    if (context->isExecuting())
     {
-        Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
-    }
-    catch (Slang::IOException)
-    {
-        return TestResult::Fail;
+        expectedOutput = getOutput(expectedSpawner);
+        String expectedOutputPath = outputStem + ".expected";
+        try
+        {
+            Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
+        }
+        catch (Slang::IOException)
+        {
+            return TestResult::Fail;
+        }
     }
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, actualSpawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     String actualOutput = getOutput(actualSpawner);
 
@@ -849,8 +1205,6 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-
-#ifdef SLANG_TEST_SUPPORT_HLSL
 TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
 {
     auto filePath999 = input.filePath;
@@ -872,6 +1226,11 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     spawner.pushArgument("fxc");
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     String expectedOutput = getOutput(spawner);
     String expectedOutputPath = outputStem + ".expected";
@@ -917,6 +1276,11 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     spawner.pushArgument("dxbc-assembly");
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     // We ignore output to stdout, and only worry about what the compiler
     // wrote to stderr.
@@ -985,7 +1349,6 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     return result;
 }
-#endif
 
 TestResult doGLSLComparisonTestRun(TestContext* context,
     TestInput& input,
@@ -1024,6 +1387,11 @@ TestResult doGLSLComparisonTestRun(TestContext* context,
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
 
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
     String standardOuptut = spawner.getStandardOutput();
@@ -1057,6 +1425,11 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
     TestResult hlslResult   =  doGLSLComparisonTestRun(context, input, "__GLSL__",  "glslang", ".expected",    &expectedOutput);
     TestResult slangResult  =  doGLSLComparisonTestRun(context, input, "__SLANG__", nullptr,   ".actual",      &actualOutput);
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     // If either is ignored, the whole test is
     if (hlslResult == TestResult::Ignored ||
@@ -1096,12 +1469,6 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	auto filePath999 = input.filePath;
 	auto outputStem = input.outputStem;
 
-    const String referenceOutput = findExpectedPath(input, ".expected.txt");
-    if (referenceOutput.Length() <= 0)
-    {
-        return TestResult::Fail;
-    }
-
 	OSProcessSpawner spawner;
 
 	spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
@@ -1122,10 +1489,24 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     auto actualOutputFile = outputStem + ".actual.txt";
 	spawner.pushArgument(actualOutputFile);
 
-    // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
-    File::WriteAllText(actualOutputFile, "");
+    if (context->isExecuting())
+    {
+        // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
+        File::WriteAllText(actualOutputFile, "");
+    }
 
 	TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    const String referenceOutput = findExpectedPath(input, ".expected.txt");
+    if (referenceOutput.Length() <= 0)
+    {
+        return TestResult::Fail;
+    }
 
     auto actualOutput = getOutput(spawner);
     auto expectedOutput = getExpectedOutput(outputStem);
@@ -1223,6 +1604,11 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     spawner.pushArgument(outputStem + outputKind + ".png");
 
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
 
     OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
@@ -1429,6 +1815,11 @@ TestResult runHLSLRenderComparisonTestImpl(
         return slangResult;
     }
 
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
     Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
     Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
 
@@ -1471,168 +1862,61 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
     return TestResult::Ignored;
 }
 
-static bool hasRenderOption(RenderApiType apiType, const List<String>& options)
+// based on command name, dispatch to an appropriate callback
+struct TestCommandInfo
 {
-    SLANG_ASSERT(apiType != RenderApiType::Unknown);
-    if (apiType == RenderApiType::Unknown)
-    {
-        return false;
-    }
+    char const*     name;
+    TestCallback    callback;
+};
 
-    const RenderApiUtil::Info& info = RenderApiUtil::getInfo(apiType);
-
-    List<UnownedStringSlice> namesList;
-
-    for (UInt i = 0; i < options.Count(); ++i)
-    {
-        const String& option = options[i];
-
-        if (option.StartsWith("-"))
-        {
-            const UnownedStringSlice parameter(option.Buffer() + 1, option.Buffer() + option.Length());
-            const RenderApiType paramType = RenderApiUtil::findApiTypeByName(parameter);
-
-            // Found it
-            if (apiType == paramType)
-            {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-bool hasRenderOption(RenderApiType apiType, const TestOptions& options)
+static const TestCommandInfo s_testCommandInfos[] =
 {
-    return hasRenderOption(apiType, options.args);
-}
-
-bool hasRenderOption(RenderApiType apiType, const FileTestList& testList)
-{
-    const int numTests = int(testList.tests.Count());
-    for (int i = 0; i < numTests; i++)
-    {
-        if (hasRenderOption(apiType, testList.tests[i].args))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isHLSLTest(const String& command)
-{
-    return command == "COMPARE_HLSL" || 
-        command == "COMPARE_HLSL_RENDER" || 
-        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" || 
-        command == "COMPARE_HLSL_GLSL_RENDER";
-}
-
-bool isRenderTest(const String& command)
-{
-    return command == "COMPARE_COMPUTE" ||
-        command == "COMPARE_COMPUTE_EX" ||
-        command == "HLSL_COMPUTE" ||
-        command == "COMPARE_RENDER_COMPUTE" ||
-        command == "COMPARE_HLSL_RENDER" ||
-        command == "COMPARE_HLSL_CROSS_COMPILE_RENDER" ||
-        command == "COMPARE_HLSL_GLSL_RENDER";
-}
-
-static bool canIgnoreTestWithDisabledRenderer(const TestOptions& testOptions, const Options& appOptions)
-{
-    for (int i = 0; i < int(RenderApiType::CountOf); ++i)
-    {
-        RenderApiType apiType = RenderApiType(i);
-        RenderApiFlag::Enum apiFlag = RenderApiFlag::Enum(1 << i);
-        
-        if (hasRenderOption(apiType, testOptions) && (appOptions.enabledApis & apiFlag) == 0)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
+    { "SIMPLE",                                 &runSimpleTest},
+    { "REFLECTION",                             &runReflectionTest},
+    { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},
+    { "COMPARE_HLSL",                           &runHLSLComparisonTest},
+    { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest},
+    { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest},
+    { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest},
+    { "COMPARE_COMPUTE",                        &runSlangComputeComparisonTest},
+    { "COMPARE_COMPUTE_EX",                     &runSlangComputeComparisonTestEx},
+    { "HLSL_COMPUTE",                           &runHLSLComputeTest},
+    { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
+    { "COMPARE_GLSL",                           &runGLSLComparisonTest},
+    { "CROSS_COMPILE",                          &runCrossCompilerTest},
+};
 
 TestResult runTest(
     TestContext*        context, 
     String const&       filePath,
     String const&       outputStem,
-    TestOptions const&  testOptions,
-    FileTestList const& testList)
+    String const&       testName,
+    TestOptions const&  testOptions)
 {
-    // If this test can be ignored
-    if (canIgnoreTestWithDisabledRenderer(testOptions, context->options))
+    // If we are collecting requirements and it's diagnostic test, we always run
+    // (ie no requirements need to be captured - effectively it has 'no requirements')
+    if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
     {
-        return TestResult::Ignored;
+        return TestResult::Pass;
     }
-    
-    // based on command name, dispatch to an appropriate callback
-    struct TestCommands
-    {
-        char const*     name;
-        TestCallback    callback;
-    };
-	
-	static const TestCommands kTestCommands[] = 
-	{
-        { "SIMPLE", &runSimpleTest},
-        { "REFLECTION", &runReflectionTest},
-        { "COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest}, 
-#if SLANG_TEST_SUPPORT_HLSL
-        { "COMPARE_HLSL", &runHLSLComparisonTest},
-        { "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest},
-        { "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest},
-        { "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest },
-        { "COMPARE_COMPUTE", runSlangComputeComparisonTest},
-        { "COMPARE_COMPUTE_EX", runSlangComputeComparisonTestEx},
-        { "HLSL_COMPUTE", runHLSLComputeTest},
-        { "COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest },
-
-#else
-        { "COMPARE_HLSL",                       &skipTest },
-        { "COMPARE_HLSL_RENDER",                &skipTest },
-        { "COMPARE_HLSL_CROSS_COMPILE_RENDER",  &skipTest},
-        { "COMPARE_HLSL_GLSL_RENDER",           &skipTest },
-        { "COMPARE_COMPUTE",                    &skipTest},
-        { "COMPARE_COMPUTE_EX",                 &skipTest},
-        { "HLSL_COMPUTE",                       &skipTest},
-        { "COMPARE_RENDER_COMPUTE",             &skipTest },
-#endif
-        { "COMPARE_GLSL", &runGLSLComparisonTest },
-        { "CROSS_COMPILE", &runCrossCompilerTest },
-        { nullptr, nullptr },
-    };
 
     const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
 
-    for( auto ii = kTestCommands; ii->name; ++ii )
+    for( const auto& command : s_testCommandInfos)
     {
-        if(testOptions.command != ii->name)
+        if(testOptions.command != command.name)
             continue;
 
         TestInput testInput;
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
-        testInput.testList = &testList;
         testInput.spawnType = defaultSpawnType;
 
-        {
-            TestReporter* reporter = context->reporter;
-            TestReporter::TestScope scope(reporter, outputStem);
-
-            TestResult testResult = ii->callback(context, testInput);
-            reporter->addResult(testResult);
-
-            return testResult;
-       }
+        return command.callback(context, testInput);
     }
 
     // No actual test runner found!
-
     return TestResult::Fail;
 }
 
@@ -1674,7 +1958,7 @@ bool testPassesCategoryMask(
             return false;
     }
 
-    // Otherwise inclue any test the user asked for
+    // Otherwise include any test the user asked for
     for( auto testCategory : test.categories )
     {
         if(testCategoryMatches(testCategory, context->options.includeCategories))
@@ -1685,72 +1969,77 @@ bool testPassesCategoryMask(
     return false;
 }
 
-static RenderApiType _findRenderApi(const List<String>& args, bool onlyExplicit)
+static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestDetails>& srcTests, List<TestDetails>& ioSynthTests)
 {
-    RenderApiType targetLanguageRenderer = RenderApiType::Unknown;
-   
-    for (const auto& arg: args)
+    // Add the explicit parameter
+    for (const auto& testDetails: srcTests)
     {
-        const UnownedStringSlice argSlice = arg.getUnownedSlice();
-        if (argSlice.size() && argSlice[0] == '-' && !argSlice.startsWith(UnownedStringSlice::fromLiteral("--")))
+        const auto& requirements = testDetails.requirements;
+
+        // Render tests use renderApis...
+        // If it's an explicit test, we don't synth from it now
+
+        // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
+        // although that may not always work.
+        if (requirements.usedRenderApiFlags == 0 ||
+            requirements.explicitRenderApi != RenderApiType::Unknown)
         {
-            UnownedStringSlice argName(argSlice.begin() + 1, argSlice.end());
+            continue;
+        }
 
-            RenderApiType renderType = RenderApiUtil::findRenderApiType(argName);
-            if (renderType != RenderApiType::Unknown)
-            {
-                return renderType;
-            }
+        TestDetails synthTestDetails(testDetails.options);
+        TestOptions& synthOptions = synthTestDetails.options;
 
-            if (!onlyExplicit)
+        // Mark as synthesized
+        synthOptions.isSynthesized = true;
+
+        StringBuilder builder;
+        builder << "-";
+        builder << RenderApiUtil::getApiName(synthRenderApiType);
+
+        synthOptions.args.Add(builder);
+
+        // If the target is vulkan remove the -hlsl option
+        if (synthRenderApiType == RenderApiType::Vulkan)
+        {
+            UInt index = synthOptions.args.IndexOf("-hlsl");
+            if (index != UInt(-1))
             {
-                RenderApiType implicitRenderType = RenderApiUtil::findImplicitLanguageRenderApiType(argName);
-                if (implicitRenderType != RenderApiType::Unknown)
-                {
-                    targetLanguageRenderer = implicitRenderType;
-                }
+                synthOptions.args.RemoveAt(index);
             }
         }
-    }
 
-    return targetLanguageRenderer;
+        // Work out the info about this tests
+        context->testRequirements = &synthTestDetails.requirements;
+        runTest(context, "", "", "", synthOptions);
+        context->testRequirements = nullptr;
+
+        // It does set the explicit render target
+        SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == synthRenderApiType);
+        // Add to the tests
+        ioSynthTests.Add(synthTestDetails);
+    }
 }
 
-static void _addSynthesizedTest(RenderApiType rendererType, const List<TestOptions>& renderTests, List<TestOptions>& outSynthesizedTests)
+static bool _canIgnore(TestContext* context,
+    const TestRequirements& requirements)
 {
-    for (const auto& test : renderTests)
+    // Work out what render api flags are available
+    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+
+    // Are all the required backends available?
+    if (((requirements.usedBackendFlags & context->availableBackendFlags) != requirements.usedBackendFlags))
     {
-        // If doesn't have an explicit render api, add one and add to the synthesized tests
-        RenderApiType explicitRenderer = _findRenderApi(test.args, true);
-
-        if (explicitRenderer == RenderApiType::Unknown)
-        {
-            // Add the explicit parameter
-
-            TestOptions options(test);
-
-            StringBuilder builder;
-            builder << "-";
-            builder << RenderApiUtil::getApiName(rendererType);
-
-            options.args.Add(builder);
-
-            // If the target is vulkan remove the -hlsl option
-            if (rendererType == RenderApiType::Vulkan)
-            {
-                UInt index = options.args.IndexOf("-hlsl");
-                if (index != UInt(-1))
-                {
-                    options.args.RemoveAt(index);
-                }
-            }
-
-            // Add to the tests
-            outSynthesizedTests.Add(options);
-
-            return;
-        }
+        return true;
     }
+
+    // Are all the required rendering apis available?
+    if ((requirements.usedRenderApiFlags & availableRenderApiFlags) != requirements.usedRenderApiFlags)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 void runTestsOnFile(
@@ -1773,73 +2062,132 @@ void runTestsOnFile(
         return;
     }
 
-    // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis)
+    RenderApiFlags apiUsedFlags = 0;
+    RenderApiFlags explictUsedApiFlags = 0;
+
     {
-        List<TestOptions> synthesizedTests;
-
-        // Lets find all tests which are render tests
-        RenderApiFlags apisUsed = 0;
-        List<TestOptions> renderTests;
-
-        const int numTests = int(testList.tests.Count());
-        for (int i = 0; i < numTests; i++)
+        // We can get the test info for each of them
+        for (auto& testDetails : testList.tests)
         {
-            const TestOptions& testOptions = testList.tests[i];
-            if (isRenderTest(testOptions.command))
-            {
-                RenderApiType renderType = _findRenderApi(testOptions.args, false);
-                if (renderType != RenderApiType::Unknown)
-                {
-                    apisUsed |= (1 << int(renderType));
-                }
-                renderTests.Add(testOptions);
-            }
+            auto& requirements = testDetails.requirements;
+
+            // Collect what the test needs (by setting restRequirements the test isn't actually run)
+            context->testRequirements = &requirements;
+            runTest(context, filePath, filePath, filePath, testDetails.options);
+
+            // 
+            apiUsedFlags |= requirements.usedRenderApiFlags;
+            explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown) ? (RenderApiFlags(1) << int(requirements.explicitRenderApi)) : 0;
         }
+        context->testRequirements = nullptr;
+    }
+
+    SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
+
+    const RenderApiFlags availableRenderApiFlags = apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
+
+    // If synthesized tests are wanted look into adding them
+    if (context->options.synthesizedTestApis  && availableRenderApiFlags)
+    {
+        List<TestDetails> synthesizedTests;
+
         // What render options do we want to synthesize
-        RenderApiFlags missingApis = (~apisUsed) & context->options.synthesizedTestApis;
-        
-        // We can only synthesize if if there isn't an explicit render option
+        RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
+
+        const UInt numInitialTests = testList.tests.Count();
 
         while (missingApis)
         {
             const int index = ByteEncodeUtil::calcMsb8(missingApis);
             SLANG_ASSERT(index >= 0 && index <= int(RenderApiType::CountOf));
 
-            _addSynthesizedTest(RenderApiType(index), renderTests, synthesizedTests); 
+            const RenderApiType synthRenderApiType = RenderApiType(index);
 
+            _calcSynthesizedTests(context, synthRenderApiType, testList.tests, synthesizedTests);
+            
             // Disable the bit
             missingApis &= ~(RenderApiFlags(1) << index);
         }
 
-        // Add any tests that were synthesized
-        for (UInt i = 0; i < synthesizedTests.Count(); ++i)
-        {
-            testList.tests.Add(synthesizedTests[i]);
-        }
+        // Add all the synthesized tests
+        testList.tests.AddRange(synthesizedTests);
     }
 
     // We have found a test to run!
     int subTestCount = 0;
-    for( auto& tt : testList.tests )
+    for( auto& testDetails : testList.tests )
     {
         int subTestIndex = subTestCount++;
 
         // Check that the test passes our current category mask
-        if(!testPassesCategoryMask(context, tt))
+        if(!testPassesCategoryMask(context, testDetails.options))
         {
             continue;
         }
 
-        String outputStem = filePath;
-        if(subTestIndex != 0)
+        // Work out the test stem
+
+        StringBuilder outputStem;
+        outputStem << filePath;
+        if (subTestIndex != 0)
         {
-            outputStem = outputStem + "." + String(subTestIndex);
+            outputStem << "." << subTestIndex;
         }
 
-        /* TestResult result = */ runTest(context, filePath, outputStem, tt, testList);
+        // Work out the test name - taking into account render api / if synthesized
+        StringBuilder testName(outputStem);
 
-        // Could determine if to continue or not here... based on result
+        if (testDetails.options.isSynthesized)
+        {
+            testName << " syn";
+        }
+
+        const auto& requirements = testDetails.requirements;
+
+        // Display list of used apis on render test
+        if (requirements.usedRenderApiFlags)
+        {
+            RenderApiFlags usedFlags = requirements.usedRenderApiFlags;
+            testName << " (";
+            bool isPrev = false;
+            while (usedFlags)
+            {
+                const int index = ByteEncodeUtil::calcMsb8(usedFlags);
+                const RenderApiType renderApiType = RenderApiType(index);
+                if (isPrev)
+                {
+                    testName << ",";
+                }
+                testName << RenderApiUtil::getApiName(renderApiType);
+
+                // Disable bit
+                usedFlags &= ~(RenderApiFlags(1) << index);
+                isPrev = true;
+            }
+            testName << ")";
+        }
+
+        // Report the test and run/ignore
+        {
+            auto reporter = context->reporter;
+            TestReporter::TestScope scope(reporter, testName);
+
+            TestResult testResult = TestResult::Fail;
+
+            // If this test can be ignored
+            if (_canIgnore(context, testDetails.requirements))
+            {
+                testResult = TestResult::Ignored;
+            }
+            else
+            {
+                testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
+            }
+
+            reporter->addResult(testResult);
+
+            // Could determine if to continue or not here... based on result
+        }        
     }
 }
 
@@ -1911,6 +2259,7 @@ void runTestsInDirectory(
     }
 }
 
+
 SlangResult innerMain(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
@@ -1963,6 +2312,22 @@ SlangResult innerMain(int argc, char** argv)
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
+
+    // Work out what backends are available
+    {
+        SlangSession* session = context.getSession();
+        const SlangPassThrough passThrus[] = { SLANG_PASS_THROUGH_DXC, SLANG_PASS_THROUGH_FXC, SLANG_PASS_THROUGH_GLSLANG };
+        for (auto passThru: passThrus)
+        {
+            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            {
+                context.availableBackendFlags |= BackendFlags(1) << int(_toBackendTypeFromPassThroughType(passThru));
+            }
+        }
+    }
+
+    // Working out what renderApis is worked on on demand through
+    // _getAvailableRenderApiFlags()
 
     {
         // We can set the slangc command line tool, to just use the function defined here

@@ -1,3 +1,3 @@
 // duplicate-target.slang
 
-//TEST:SIMPLE:-target hlsl -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE:-target hlsl -target hlsl

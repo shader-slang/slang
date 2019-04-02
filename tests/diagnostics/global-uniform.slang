@@ -1,6 +1,6 @@
 // global-uniform.slang
-//TEST:SIMPLE:-target hlsl
-//TEST:COMMAND_LINE_SIMPLE:-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
+//DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE:-target hlsl
 
 // Any attempt to declare a global variable that actually declares a
 // global uniform should be diagnosed as unsupported.
