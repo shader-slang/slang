@@ -21,7 +21,7 @@ struct SLANG_ParameterGroup_ShaderRecord_0
 };
 
 layout(shaderRecordNV)
-readonly buffer tmp_shaderrecord
+buffer tmp_shaderrecord
 {
     SLANG_ParameterGroup_ShaderRecord_0 _data;
 } ShaderRecord_0;
