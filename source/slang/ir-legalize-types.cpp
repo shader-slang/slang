@@ -11,6 +11,7 @@
 // that the concrete type of everything is known.
 
 #include "ir.h"
+#include "ir-clone.h"
 #include "ir-insts.h"
 #include "legalize-types.h"
 #include "mangle.h"
@@ -125,6 +126,7 @@ static LegalVal declareVars(
     TypeLayout*                 typeLayout,
     LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
+    IRInst*                     leafVar,
     IRGlobalNameInfo*           globalNameInfo);
 
     /// Unwrap a value with flavor `wrappedBuffer`
@@ -1309,7 +1311,7 @@ static LegalVal legalizeLocalVar(
 
         UnownedStringSlice nameHint = findNameHint(irLocalVar);
         context->builder->setInsertBefore(irLocalVar);
-        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, nullptr);
+        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, irLocalVar, nullptr);
 
         // Remove the old local var.
         irLocalVar->removeFromParent();
@@ -1343,7 +1345,7 @@ static LegalVal legalizeParam(
         UnownedStringSlice nameHint = findNameHint(originalParam);
 
         context->builder->setInsertBefore(originalParam);
-        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, nullptr);
+        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, originalParam, nullptr);
 
         originalParam->removeFromParent();
         context->replacedInstructions.Add(originalParam);
@@ -1586,6 +1588,7 @@ static LegalVal declareSimpleVar(
     TypeLayout*                 typeLayout,
     LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
+    IRInst*                     leafVar,
     IRGlobalNameInfo*           globalNameInfo)
 {
     SLANG_UNUSED(globalNameInfo);
@@ -1676,6 +1679,23 @@ static LegalVal declareSimpleVar(
         {
             context->builder->addNameHintDecoration(irVar, nameHint);
         }
+
+        if( leafVar )
+        {
+            for( auto decoration : leafVar->getDecorations() )
+            {
+                switch( decoration->op )
+                {
+                case kIROp_FormatDecoration:
+                    cloneDecoration(decoration, irVar);
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
+
     }
 
     return legalVarVal;
@@ -2202,6 +2222,7 @@ static LegalVal declareVars(
     TypeLayout*                 typeLayout,
     LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
+    IRInst*                     leafVar,
     IRGlobalNameInfo*           globalNameInfo)
 {
     switch (type.flavor)
@@ -2210,7 +2231,7 @@ static LegalVal declareVars(
         return LegalVal();
 
     case LegalType::Flavor::simple:
-        return declareSimpleVar(context, op, type.getSimple(), typeLayout, varChain, nameHint, globalNameInfo);
+        return declareSimpleVar(context, op, type.getSimple(), typeLayout, varChain, nameHint, leafVar, globalNameInfo);
         break;
 
     case LegalType::Flavor::implicitDeref:
@@ -2225,6 +2246,7 @@ static LegalVal declareVars(
                 typeLayout,
                 varChain,
                 nameHint,
+                leafVar,
                 globalNameInfo);
             return LegalVal::implicitDeref(val);
         }
@@ -2233,8 +2255,8 @@ static LegalVal declareVars(
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
-            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain, nameHint, globalNameInfo);
-            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain, nameHint, globalNameInfo);
+            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain, nameHint, leafVar, globalNameInfo);
+            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain, nameHint, leafVar, globalNameInfo);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
 
@@ -2282,6 +2304,7 @@ static LegalVal declareVars(
                     fieldTypeLayout,
                     newVarChain,
                     fieldNameHint,
+                    ee.key,
                     globalNameInfo);
 
                 TuplePseudoVal::Element element;
@@ -2307,6 +2330,7 @@ static LegalVal declareVars(
                 wrappedTypeLayout,
                 varChain,
                 nameHint,
+                leafVar,
                 globalNameInfo);
 
             return LegalVal::wrappedBuffer(innerVal, wrappedBuffer->elementInfo);
@@ -2349,7 +2373,7 @@ static LegalVal legalizeGlobalVar(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
             context->builder->setInsertBefore(irGlobalVar);
-            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, LegalVarChain(), nameHint, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalVar, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
@@ -2393,7 +2417,7 @@ static LegalVal legalizeGlobalConstant(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalConstant);
             context->builder->setInsertBefore(irGlobalConstant);
-            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalConstant, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalConstant, newVal);
@@ -2442,7 +2466,7 @@ static LegalVal legalizeGlobalParam(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalParam);
             context->builder->setInsertBefore(irGlobalParam);
-            LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, irGlobalParam, &globalNameInfo);
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalParam, newVal);

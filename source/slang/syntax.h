@@ -83,6 +83,15 @@ namespace Slang
         kConversionCost_Impossible = 0xFFFFFFFF,
     };
 
+    enum class ImageFormat
+    {
+#define FORMAT(NAME) NAME,
+#include "image-format-defs.h"
+    };
+
+    bool findImageFormatByName(char const* name, ImageFormat* outFormat);
+    char const* getGLSLNameForImageFormat(ImageFormat format);
+
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
     // types directly. The one major complication there

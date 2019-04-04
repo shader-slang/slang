@@ -239,6 +239,25 @@ IRInst* cloneInst(
     return newInst;
 }
 
+void cloneDecoration(
+    IRDecoration*   oldDecoration,
+    IRInst*         newParent)
+{
+    SharedIRBuilder sharedBuilder;
+    sharedBuilder.module = newParent->getModule();
+
+    IRBuilder builder;
+    builder.sharedBuilder = &sharedBuilder;
+
+    if(auto first = newParent->getFirstDecorationOrChild())
+        builder.setInsertBefore(first);
+    else
+        builder.setInsertInto(newParent);
+
+    IRCloneEnv env;
+    cloneInst(&env, &builder, oldDecoration);
+}
+
 bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& other) const
 {
     auto valCount = vals.Count();

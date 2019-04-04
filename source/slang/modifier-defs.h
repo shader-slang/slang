@@ -457,3 +457,7 @@ SYNTAX_CLASS(ImplicitConversionModifier, Modifier)
     // The conversion cost, used to rank conversions
     FIELD(ConversionCost, cost)
 END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(FormatAttribute, Attribute)
+    FIELD(ImageFormat, format)
+END_SYNTAX_CLASS()

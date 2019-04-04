@@ -125,6 +125,12 @@ IRInst* cloneInst(
     IRBuilder*      builder,
     IRInst*         oldInst);
 
+    /// Clone `oldDecoration` and attach the clone to `newParent`.
+    ///
+void cloneDecoration(
+    IRDecoration*   oldDecoration,
+    IRInst*         newParent);
+
 
     /// Find the "cloned" value to use for an operand.
     ///

@@ -414,6 +414,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
+        /// A `[format(f)]` decoration specifies that the format of an image should be `f`
+    INST(FormatDecoration, format, 1, 0)
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)

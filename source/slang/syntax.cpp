@@ -2723,5 +2723,41 @@ Module* getModule(Decl* decl)
     return nullptr;
 }
 
+bool findImageFormatByName(char const* name, ImageFormat* outFormat)
+{
+    static const struct
+    {
+        char const* name;
+        ImageFormat format;
+    } kFormats[] =
+    {
+#define FORMAT(NAME) { #NAME, ImageFormat::NAME },
+#include "image-format-defs.h"
+    };
+
+    for( auto item : kFormats )
+    {
+        if( strcmp(item.name, name) == 0 )
+        {
+            *outFormat = item.format;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+char const* getGLSLNameForImageFormat(ImageFormat format)
+{
+    switch( format )
+    {
+    default: return "unhandled";
+#define FORMAT(NAME) case ImageFormat::NAME: return #NAME;
+#include "image-format-defs.h"
+    }
+}
+
+
+
 
 } // namespace Slang

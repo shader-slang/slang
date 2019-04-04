@@ -773,6 +773,10 @@ struct OptionsParser
                 {
                     spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 }
+                else if( argStr == "-default-image-format-unknown" )
+                {
+                    requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,

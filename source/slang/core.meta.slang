@@ -1309,3 +1309,6 @@ enum _AttributeTargets
 };
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [format(format : String)] : FormatAttribute;
