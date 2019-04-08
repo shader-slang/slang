@@ -15,8 +15,8 @@ standard output = {
                               ExecutionMode 4 LocalSize 4 4 1
                               Source GLSL 450
                               SourceExtension  "GL_EXT_shader_16bit_storage"
+                              SourceExtension  "GL_EXT_shader_explicit_arithmetic_types"
                               SourceExtension  "GL_GOOGLE_cpp_style_line_directive"
-                              SourceExtension  "GL_KHX_shader_explicit_arithmetic_types"
                               Name 4  "main"
                               Name 9  "pos_0"
                               Name 13  "gl_GlobalInvocationID"

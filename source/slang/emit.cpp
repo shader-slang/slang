@@ -86,8 +86,7 @@ void requireGLSLHalfExtension(ExtensionUsageTracker* tracker)
         requireGLSLExtension(tracker, "GL_EXT_shader_16bit_storage");
 
         // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
-        // Use GL_KHX_shader_explicit_arithmetic_types because that is what appears defined in glslang 
-        requireGLSLExtension(tracker, "GL_KHX_shader_explicit_arithmetic_types");
+        requireGLSLExtension(tracker, "GL_EXT_shader_explicit_arithmetic_types");
         
         tracker->hasHalfExtension = true;
     }
