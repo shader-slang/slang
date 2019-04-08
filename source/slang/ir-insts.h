@@ -258,6 +258,19 @@ struct IRExportDecoration : IRLinkageDecoration
     IR_LEAF_ISA(ExportDecoration)
 };
 
+struct IRFormatDecoration : IRDecoration
+{
+    enum { kOp = kIROp_FormatDecoration };
+    IR_LEAF_ISA(FormatDecoration)
+
+    IRConstant* getFormatOperand() { return cast<IRConstant>(getOperand(0)); }
+
+    ImageFormat getFormat()
+    {
+        return ImageFormat(getFormatOperand()->value.intVal);
+    }
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -1256,6 +1269,16 @@ struct IRBuilder
     void addDependsOnDecoration(IRInst* inst, IRInst* dependency)
     {
         addDecoration(inst, kIROp_DependsOnDecoration, dependency);
+    }
+
+    void addFormatDecoration(IRInst* inst, ImageFormat format)
+    {
+        addFormatDecoration(inst, getIntValue(getIntType(), IRIntegerValue(format)));
+    }
+
+    void addFormatDecoration(IRInst* inst, IRInst* format)
+    {
+        addDecoration(inst, kIROp_FormatDecoration, format);
     }
 };
 

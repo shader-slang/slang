@@ -5678,6 +5678,178 @@ struct EmitVisitor
         return value;
     }
 
+    void emitGLSLImageFormatModifier(
+        IRInst*         var,
+        IRTextureType*  resourceType)
+    {
+        // If the user specified a format manually, using `[format(...)]`,
+        // then we will respect that format and emit a matching `layout` modifier.
+        //
+        if(auto formatDecoration = var->findDecoration<IRFormatDecoration>())
+        {
+            auto format = formatDecoration->getFormat();
+            if(format == ImageFormat::unknown)
+            {
+                // If the user explicitly opts out of having a format, then
+                // the output shader will require the extension to support
+                // load/store from format-less images.
+                //
+                // TODO: We should have a validation somewhere in the compiler
+                // that atomic operations are only allowed on images with
+                // explicit formats (and then only on specific formats).
+                // This is really an argument that format should be part of
+                // the image *type* (with a "base type" for images with
+                // unknown format).
+                //
+                requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+            }
+            else
+            {
+                // If there is an explicit format specified, then we
+                // should emit a `layout` modifier using the GLSL name
+                // for the format.
+                //
+                Emit("layout(");
+                Emit(getGLSLNameForImageFormat(format));
+                Emit(")\n");
+            }
+
+            // No matter what, if an explicit `[format(...)]` was given,
+            // then we don't need to emit anything else.
+            //
+            return;
+        }
+
+
+        // When no explicit format is specified, we need to either
+        // emit the image as having an unknown format, or else infer
+        // a format from the type.
+        //
+        // For now our default behavior is to infer (so that unmodified
+        // HLSL input is more likely to generate valid SPIR-V that
+        // runs anywhere), but we provide a flag to opt into
+        // treating images without explicit formats as having
+        // unknown format.
+        //
+        if(this->context->shared->compileRequest->useUnknownImageFormatAsDefault)
+        {
+            requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+            return;
+        }
+
+        // At this point we have a resource type like `RWTexture2D<X>`
+        // and we want to infer a reasonable format from the element
+        // type `X` that was specified.
+        //
+        // E.g., if `X` is `float` then we can infer a format like `r32f`,
+        // and so forth. The catch of course is that it is possible to
+        // specify a shader parameter with a type like `RWTexture2D<float4>` but
+        // provide an image at runtime with a format like `rgba8`, so
+        // this inference is never guaranteed to give perfect results.
+        //
+        // If users don't like our inferred result, they need to use a
+        // `[format(...)]` attribute to manually specify what they want.
+        //
+        // TODO: We should consider whether we can expand the space of
+        // allowed types for `X` in `RWTexture2D<X>` to include special
+        // pseudo-types that act just like, e.g., `float4`, but come
+        // with attached/implied format information.
+        //
+        auto elementType = resourceType->getElementType();
+        Int vectorWidth = 1;
+        if(auto elementVecType = as<IRVectorType>(elementType))
+        {
+            if(auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
+            {
+                vectorWidth = (Int) intLitVal->getValue();
+            }
+            else
+            {
+                vectorWidth = 0;
+            }
+            elementType = elementVecType->getElementType();
+        }
+        if(auto elementBasicType = as<IRBasicType>(elementType))
+        {
+            Emit("layout(");
+            switch(vectorWidth)
+            {
+            default: Emit("rgba");  break;
+
+            case 3:
+            {
+                // TODO: GLSL doesn't support 3-component formats so for now we are going to
+                // default to rgba
+                //
+                // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
+                // section 3.11 on Image Formats it does not list rgbf32.
+                //
+                // It seems SPIR-V can support having an image with an unknown-at-compile-time
+                // format, so long as the underlying API supports it. Ideally this would mean that we can
+                // just drop all these qualifiers when emitting GLSL for Vulkan targets.
+                //
+                // This raises the question of what to do more long term. For Vulkan hopefully we can just
+                // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
+                // for inferring the format (and just document that 3-component formats map to 4-component formats,
+                // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
+                // and add an attribute for specifying the format manually if you really want to override our
+                // inference (e.g., to specify r11fg11fb10f).
+
+                Emit("rgba");
+                //Emit("rgb");                                
+                break;
+            }
+
+            case 2:  Emit("rg");    break;
+            case 1:  Emit("r");     break;
+            }
+            switch(elementBasicType->getBaseType())
+            {
+            default:
+            case BaseType::Float:   Emit("32f");  break;
+            case BaseType::Half:    Emit("16f");  break;
+            case BaseType::UInt:    Emit("32ui"); break;
+            case BaseType::Int:     Emit("32i"); break;
+
+            // TODO: Here are formats that are available in GLSL,
+            // but that are not handled by the above cases.
+            //
+            // r11f_g11f_b10f
+            //
+            // rgba16
+            // rgb10_a2
+            // rgba8
+            // rg16
+            // rg8
+            // r16
+            // r8
+            //
+            // rgba16_snorm
+            // rgba8_snorm
+            // rg16_snorm
+            // rg8_snorm
+            // r16_snorm
+            // r8_snorm
+            //
+            // rgba16i
+            // rgba8i
+            // rg16i
+            // rg8i
+            // r16i
+            // r8i
+            //
+            // rgba16ui
+            // rgb10_a2ui
+            // rgba8ui
+            // rg16ui
+            // rg8ui
+            // r16ui
+            // r8ui
+            }
+            Emit(")\n");
+        }
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -5703,6 +5875,7 @@ struct EmitVisitor
             emit(")\n");
             emit("callableDataNV\n");
         }
+
         if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
         {
             emit("hitAttributeNV\n");
@@ -5741,110 +5914,7 @@ struct EmitVisitor
                 case SLANG_RESOURCE_ACCESS_READ_WRITE:
                 case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
                     {
-                        // We have a resource type like `RWTexture2D<X>` and when we emit
-                        // this as an image declaration in GLSL, we need to specify the
-                        // correct in-memory format for the image (e.g., `layout(rgba32f)`).
-                        //
-                        // TODO: There are modifiers in GLSL that can specify this information,
-                        // and we should support the same ones that dxc does (e.g.,
-                        // some kind of `[[vk::format(...)]]` or what-have-you.
-                        //
-                        // For now we will simply infer a reasonable format from the
-                        // element type that was specified.
-                        //
-                        auto elementType = resourceType->getElementType();
-                        Int vectorWidth = 1;
-                        if(auto elementVecType = as<IRVectorType>(elementType))
-                        {
-                            if(auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
-                            {
-                                vectorWidth = (Int) intLitVal->getValue();
-                            }
-                            else
-                            {
-                                vectorWidth = 0;
-                            }
-                            elementType = elementVecType->getElementType();
-                        }
-                        if(auto elementBasicType = as<IRBasicType>(elementType))
-                        {
-                            Emit("layout(");
-                            switch(vectorWidth)
-                            {
-                            default: Emit("rgba");  break;
-
-                            case 3:
-                            {
-                                // TODO: GLSL doesn't support 3-component formats so for now we are going to
-                                // default to rgba
-                                //
-                                // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
-                                // section 3.11 on Image Formats it does not list rgbf32.
-                                //
-                                // It seems SPIR-V can support having an image with an unknown-at-compile-time
-                                // format, so long as the underlying API supports it. Ideally this would mean that we can
-                                // just drop all these qualifiers when emitting GLSL for Vulkan targets.
-                                //
-                                // This raises the question of what to do more long term. For Vulkan hopefully we can just
-                                // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
-                                // for inferring the format (and just document that 3-component formats map to 4-component formats,
-                                // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
-                                // and add an attribute for specifying the format manually if you really want to override our
-                                // inference (e.g., to specify r11fg11fb10f).
-
-                                Emit("rgba");
-                                //Emit("rgb");                                
-                                break;
-                            }
-
-                            case 2:  Emit("rg");    break;
-                            case 1:  Emit("r");     break;
-                            }
-                            switch(elementBasicType->getBaseType())
-                            {
-                            default:
-                            case BaseType::Float:   Emit("32f");  break;
-                            case BaseType::Half:    Emit("16f");  break;
-                            case BaseType::UInt:    Emit("32ui"); break;
-                            case BaseType::Int:     Emit("32i"); break;
-
-                            // TODO: Here are formats that are available in GLSL,
-                            // but that are not handled by the above cases.
-                            //
-                            // r11f_g11f_b10f
-                            //
-                            // rgba16
-                            // rgb10_a2
-                            // rgba8
-                            // rg16
-                            // rg8
-                            // r16
-                            // r8
-                            //
-                            // rgba16_snorm
-                            // rgba8_snorm
-                            // rg16_snorm
-                            // rg8_snorm
-                            // r16_snorm
-                            // r8_snorm
-                            //
-                            // rgba16i
-                            // rgba8i
-                            // rg16i
-                            // rg8i
-                            // r16i
-                            // r8i
-                            //
-                            // rgba16ui
-                            // rgb10_a2ui
-                            // rgba8ui
-                            // rg16ui
-                            // rg8ui
-                            // r16ui
-                            // r8ui
-                            }
-                            Emit(")\n");
-                        }
+                        emitGLSLImageFormatModifier(varDecl, resourceType);
                     }
                     break;
 

@@ -1131,6 +1131,12 @@ namespace Slang
         Program* getProgram() { return m_program; }
         void setProgram(Program* program) { m_program = program; }
 
+        // Should R/W images without explicit formats be assumed to have "unknown" format?
+        //
+        // The default behavior is to make a best-effort guess as to what format is intended.
+        //
+        bool useUnknownImageFormatAsDefault = false;
+
     private:
         RefPtr<Program> m_program;
     };

@@ -181,6 +181,7 @@
     <ClInclude Include="expr-defs.h" />
     <ClInclude Include="glsl.meta.slang.h" />
     <ClInclude Include="hlsl.meta.slang.h" />
+    <ClInclude Include="image-format-defs.h" />
     <ClInclude Include="ir-bind-existentials.h" />
     <ClInclude Include="ir-clone.h" />
     <ClInclude Include="ir-constexpr.h" />

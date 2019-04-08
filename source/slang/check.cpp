@@ -2905,6 +2905,24 @@ namespace Slang
                         getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.Count(), params.Count());
                     }
                 }
+                else if (auto formatAttr = as<FormatAttribute>(attr))
+                {
+                    SLANG_ASSERT(attr->args.Count() == 1);
+
+                    String formatName;
+                    if(!checkLiteralStringVal(attr->args[0], &formatName))
+                    {
+                        return false;
+                    }
+
+                    ImageFormat format = ImageFormat::unknown;
+                    if(!findImageFormatByName(formatName.Buffer(), &format))
+                    {
+                        getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                    }
+
+                    formatAttr->format = format;
+                }
                 else
                 {
                     if(attr->args.Count() == 0)

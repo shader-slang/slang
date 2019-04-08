@@ -1680,6 +1680,10 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
+        else if(auto formatAttr = as<FormatAttribute>(mod))
+        {
+            builder->addFormatDecoration(inst, formatAttr->format);
+        }
 
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -5653,6 +5657,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         IRParam* irParamPtr = subBuilder->emitParam(irParamType);
                         if(auto paramDecl = paramInfo.decl)
                         {
+                            addVarDecorations(context, irParamPtr, paramDecl);
                             subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
                         }
                         addParamNameHint(irParamPtr, paramInfo);
@@ -5680,6 +5685,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         IRParam* irParam = subBuilder->emitParam(irParamType);
                         if( paramDecl )
                         {
+                            addVarDecorations(context, irParam, paramDecl);
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                         }
                         addParamNameHint(irParam, paramInfo);
