@@ -2784,6 +2784,13 @@ static TypeLayoutResult _createTypeLayout(
 
             return TypeLayoutResult(genParamTypeLayout, info);
         }
+        else if (auto assocTypeParam = declRef.as<AssocTypeDecl>())
+        {
+            return createSimpleTypeLayout(
+                SimpleLayoutInfo(),
+                type,
+                rules);
+        }
         else if( auto simpleGenericParam = declRef.as<GenericTypeParamDecl>() )
         {
             // A bare generic type parameter can come up during layout

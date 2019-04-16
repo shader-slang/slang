@@ -1736,6 +1736,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
             return genParamTypeLayout;
         }
+        else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
+        {
+            RefPtr<TypeLayout> assocTypeLayout = new TypeLayout();
+            assocTypeLayout->type = type;
+            return assocTypeLayout;
+        }
         else
         {
             SLANG_UNEXPECTED("unhandled type kind");
