@@ -15,6 +15,10 @@
 #   include <Windows.h>
 #endif
 
+#if defined(__linux__) || defined(__CYGWIN__)
+#   include <unistd.h>
+#endif
+
 #if SLANG_APPLE_FAMILY
 #   include <mach-o/dyld.h>
 //#   include <sys/utsname.h>
@@ -345,10 +349,10 @@ namespace Slang
         return SLANG_E_BUFFER_TOO_SMALL;
 #elif SLANG_LINUX_FAMILY
 
-#   if defined(linux) || defined(__CYGWIN__)
+#   if defined(__linux__) || defined(__CYGWIN__)
         // https://linux.die.net/man/2/readlink
         // Mark last byte with 0, so can check overrun
-        ssize_t resSize = readlink("/proc/self/exe", outPath, bufferSize);
+        ssize_t resSize = ::readlink("/proc/self/exe", outPath, bufferSize);
         if (resSize < 0)
         {
             return SLANG_FAIL;
@@ -368,13 +372,13 @@ namespace Slang
             return SLANG_FAIL;
         }
         UInt endIndex = text.IndexOf("\n", startIndex);
-        endIndex = (endIndex == UInt(-1)) ? path.Length() : endIndex;
+        endIndex = (endIndex == UInt(-1)) ? text.Length() : endIndex;
 
         auto path = text.SubString(startIndex, endIndex - startIndex);
 
-        if (path.Length() < bufferSize)
+        if (path.getLength() < bufferSize)
         {
-            strcpy(outPath, path.Buffer(), path.getLength());
+            ::memcpy(outPath, path.begin(), path.getLength());
             outPath[path.getLength()] = 0;
             return SLANG_OK;
         }
