@@ -13,11 +13,11 @@ The submodule update step is required to pull in dependencies used for testing i
 Building from source is really only well supported for Windows users with Visual Studio 2015 or later.
 If you are on Windows, then open `slang.sln` and build your desired platform/configuration. 
 
-The Visual Studio solution is actually just generated using [`premake5`](https://premake.github.io/). Please read the premake section for instructions on how to generate a new Visual Studio solution. 
-
+The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
+ 
 ## Linux
 
-For building on Linux it is first necessary to generate the `Makefile` for the project - we use [`premake5`](https://premake.github.io/) as the tool used for generating projects from the premake5.lua script found in the root of the project. 
+For building on Linux it is first necessary to generate the `Makefile` for the project - we use [`premake5`](https://premake.github.io/) as the tool used for generating projects from the premake5.lua script found in the root of the project. The section below describes how to use premake on linux. 
 
 ## Premake
 
@@ -29,9 +29,9 @@ Slang uses the tool [`premake5`](https://premake.github.io/) in order to generat
 
 ### Windows
 
-First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`). Assuming premake5 is in your `PATH` you can use the command lines below 
-
-For Visual Studio 2015 use
+First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
+ 
+Assuming premake5 is in your `PATH`, you can create a Visual Studio 2015 project for Slang with the following command line
 
 ```
 % premake5 vs2015
@@ -43,7 +43,7 @@ For Visual Studio 2017 use
 % premake5 vs2017
 ```
 
-These should create a slang.sln in the same directory which you can open in the appropriate Visual Studio. Building will build all of slang and it's test infrastructure.
+These should create a slang.sln in the same directory and which you can then open in the appropriate Visual Studio. Building will build all of slang and it's test infrastructure.
 
 ### Linux 
 
@@ -72,15 +72,15 @@ To actually build using make use one of the following
 
 ## Testing
 
-When slang is built from source it also builds tools to be able to test the compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. To run the tests on a release x64 build from the command line, in the root directory of slang source tree you can use...
+When slang is built from source it also builds tools to be able to test the Slang compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. To run the tests on a release x64 build from the command line, in the root directory of slang source tree you can use...
 
 ```
 % bin\windows-x64\release\slang-test
 ```
 
-Note that on windows if you want to run all of the tests from inside visual studio, it is necessary to set the `Working Directory` under "slang-test project" > "Configuration Properties" > "Debugging" > "Working Directory" to the root directory of the slang source tree. You can do this by setting it to (for all configurations) `$(ProjectDir)/../..`.
+Note that on windows if you want to run all of the tests from inside visual studio, it is necessary to set the `Working Directory` under "slang-test project" > "Configuration Properties" > "Debugging" > "Working Directory" to the root directory of the slang source tree. You can do this by setting it to `$(ProjectDir)/../..` for all configurations.
 
-If you only see 'unit-tests' being run - unit tests are prefixed with 'unit-tests/' then the working directory is not correctly set. Most tests are text files descripting the test held in the `tests` directory in the root of the slang project. 
+If you only see 'unit-tests' being run (unit tests are prefixed with 'unit-tests/') then the working directory is not correctly set. Most tests are text files describing the test held in the `tests` directory in the root of the slang project. 
 
-See the documentation on testing 
+See the [documentation on testing](../tools/slang-test/README.md) for more information.
  
