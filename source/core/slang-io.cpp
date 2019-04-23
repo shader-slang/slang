@@ -331,7 +331,12 @@ namespace Slang
 #endif
     }
 
-    /* static */SlangResult Path::CalcExectuablePath(char* outPath, size_t* ioSize)
+    /// Gets the path to the executable that was invoked that led to the current threads execution
+    /// If run from a shared library/dll will be the path of the executable that loaded said library
+    /// @param outPath Pointer to buffer to hold the path.
+    /// @param ioPathSize Size of the buffer to hold the path (including zero terminator). 
+    /// @return SLANG_OK on success, SLANG_E_BUFFER_TOO_SMALL if buffer is too small. If ioPathSize is changed it will be the required size
+    static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     {
         SLANG_ASSERT(ioSize);
         const size_t bufferSize = *ioSize;
@@ -416,7 +421,7 @@ namespace Slang
         {
             const size_t size = buffer.Count();
             size_t bufferSize = size;
-            SlangResult res = Path::CalcExectuablePath(buffer.Buffer(), &bufferSize);
+            SlangResult res = _calcExectuablePath(buffer.Buffer(), &bufferSize);
 
             if (SLANG_SUCCEEDED(res))
             {

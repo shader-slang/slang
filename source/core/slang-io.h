@@ -51,16 +51,8 @@ namespace Slang
 
         static SlangResult GetCanonical(const String & path, String& canonicalPathOut);
 
-            /// Gets the path to the executable that was invoked that led to the current threads execution
-            /// If run from a shared library/dll will be the path of the executable that loaded said library
-            /// @param outPath Pointer to buffer to hold the path.
-            /// @param ioPathSize Size of the buffer to hold the path (including zero terminator). 
-            /// @return SLANG_OK on success, SLANG_E_BUFFER_TOO_SMALL if buffer is too small. If ioPathSize is changed it will be the required size
-        static SlangResult CalcExectuablePath(char* outPath, size_t* ioPathSize);
-
             /// Returns the executable path
-            /// Implementation uses CalcExecutablePath, but handles all the cases around buffer resizing
-            /// @return The path in platform native format. Returns empty string if failed
+            /// @return The path in platform native format. Returns empty string if failed.
         static String GetExecutablePath();
 
 	};
