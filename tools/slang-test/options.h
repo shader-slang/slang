@@ -23,7 +23,7 @@ struct TestCategorySet
 {
 public:
         /// Find a category with the specified name. Returns nullptr if not found
-    TestCategory * find(Slang::String const& name);
+    TestCategory* find(Slang::String const& name);
         /// Adds a category with the specified name, and parent. Returns the category object.
         /// Parent can be nullptr
     TestCategory* add(Slang::String const& name, TestCategory* parent);
@@ -40,8 +40,8 @@ struct Options
 {
     char const* appName = "slang-test";
 
-    // Directory to use when looking for binaries to run
-    char const* binDir = "";
+    // Directory to use when looking for binaries to run. If empty it's not set.
+    Slang::String binDir;
 
     // only run test cases with names that have this prefix. 
     char const* testPrefix = nullptr;

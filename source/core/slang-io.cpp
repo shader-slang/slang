@@ -9,6 +9,15 @@
 
 #ifdef _WIN32
 #   include <direct.h>
+
+#   define WIN32_LEAN_AND_MEAN
+#   define VC_EXTRALEAN
+#   include <Windows.h>
+#endif
+
+#if SLANG_APPLE_FAMILY
+#   include <mach-o/dyld.h>
+//#   include <sys/utsname.h>
 #endif
 
 #include <limits.h> /* PATH_MAX */
@@ -17,6 +26,8 @@
 
 namespace Slang
 {
+    static String s_executablePath;
+
 	bool File::Exists(const String & fileName)
 	{
 #ifdef _WIN32
@@ -314,6 +325,116 @@ namespace Slang
         }
         return SLANG_FAIL;
 #endif
+    }
+
+    /* static */SlangResult Path::CalcExectuablePath(char* outPath, size_t* ioSize)
+    {
+        SLANG_ASSERT(ioSize);
+        const size_t bufferSize = *ioSize;
+        SLANG_ASSERT(bufferSize > 0);
+
+#if SLANG_WINDOWS_FAMILY
+        // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamea
+        
+        DWORD res = ::GetModuleFileNameA(::GetModuleHandle(nullptr), outPath, DWORD(bufferSize));
+        // If it fits it's the size not including terminator. So must be less than bufferSize
+        if (res < bufferSize)
+        {
+            return SLANG_OK;
+        }
+        return SLANG_E_BUFFER_TOO_SMALL;
+#elif SLANG_LINUX_FAMILY
+
+#   if defined(linux) || defined(__CYGWIN__)
+        // https://linux.die.net/man/2/readlink
+        // Mark last byte with 0, so can check overrun
+        ssize_t resSize = readlink("/proc/self/exe", outPath, bufferSize);
+        if (resSize < 0)
+        {
+            return SLANG_FAIL;
+        }
+        if (resSize >= bufferSize)
+        {
+            return SLANG_E_BUFFER_TOO_SMALL;
+        }
+        // Zero terminate
+        outPath[resSize - 1] = 0;
+        return SLANG_OK;
+#   else        
+        String text = Slang::File::ReadAllText("/proc/self/maps");
+        UInt startIndex = text.IndexOf('/');
+        if (startIndex == UInt(-1))
+        {
+            return SLANG_FAIL;
+        }
+        UInt endIndex = text.IndexOf("\n", startIndex);
+        endIndex = (endIndex == UInt(-1)) ? path.Length() : endIndex;
+
+        auto path = text.SubString(startIndex, endIndex - startIndex);
+
+        if (path.Length() < bufferSize)
+        {
+            strcpy(outPath, path.Buffer(), path.getLength());
+            outPath[path.getLength()] = 0;
+            return SLANG_OK;
+        }
+
+        *ioSize = path.getLength() + 1;
+        return SLANG_E_BUFFER_TOO_SMALL;
+#   endif
+
+#elif SLANG_APPLE_FAMILY
+        // https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/dyld.3.html
+        uint32_t size = uint32_t(*ioSize);
+        switch (_NSGetExecutablePath(outPath, &size))
+        {
+            case 0:           return SLANG_OK;
+            case -1:
+            {
+                *ioSize = size;
+                return SLANG_E_BUFFER_TOO_SMALL;
+            }
+            default: break;
+        }
+        return SLANG_FAIL;
+#else
+        return SLANG_E_NOT_IMPLEMENTED;
+#endif
+    }
+
+    static String _getExecutablePath()
+    {
+        List<char> buffer;
+        // Guess an initial buffer size
+        buffer.SetSize(1024);
+
+        while (true)
+        {
+            const size_t size = buffer.Count();
+            size_t bufferSize = size;
+            SlangResult res = Path::CalcExectuablePath(buffer.Buffer(), &bufferSize);
+
+            if (SLANG_SUCCEEDED(res))
+            {
+                return String(buffer.Buffer());
+            }
+
+            if (res != SLANG_E_BUFFER_TOO_SMALL)
+            {
+                // Couldn't determine the executable string
+                return String();
+            }
+
+            // If bufferSize changed it should be the exact fit size, else we just make the buffer bigger by a guess (50% bigger)
+            bufferSize = (bufferSize > size) ? bufferSize : (bufferSize + bufferSize / 2);
+            buffer.SetSize(bufferSize);
+        }
+    }
+
+    /* static */String Path::GetExecutablePath()
+    {
+        static String executablePath = _getExecutablePath();
+        return executablePath;
     }
 
 	Slang::String File::ReadAllText(const Slang::String & fileName)

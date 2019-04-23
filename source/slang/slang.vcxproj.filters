@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -40,6 +40,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hlsl.meta.slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="image-format-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ir-bind-existentials.h">
@@ -171,9 +174,6 @@
     <ClInclude Include="syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tmpC85.tmp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="token-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -193,9 +193,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="visitor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="image-format-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
