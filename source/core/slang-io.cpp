@@ -21,7 +21,6 @@
 
 #if SLANG_APPLE_FAMILY
 #   include <mach-o/dyld.h>
-//#   include <sys/utsname.h>
 #endif
 
 #include <limits.h> /* PATH_MAX */
@@ -30,8 +29,6 @@
 
 namespace Slang
 {
-    static String s_executablePath;
-
 	bool File::Exists(const String & fileName)
 	{
 #ifdef _WIN32

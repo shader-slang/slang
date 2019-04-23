@@ -17,11 +17,11 @@ The Visual Studio solution in the project is actually just generated using [`pre
  
 ## Linux
 
-For building on Linux it is first necessary to generate the `Makefile` for the project - we use [`premake5`](https://premake.github.io/) as the tool used for generating projects from the premake5.lua script found in the root of the project. The section below describes how to use premake on linux. 
+For building on Linux it is first necessary to generate the `Makefile` for the project - we use [`premake5`](https://premake.github.io/) as the tool used for generating projects from the premake5.lua script found in the root of the project. The section below describes how to use premake on Linux. 
 
 ## Premake
 
-Slang uses the tool [`premake5`](https://premake.github.io/) in order to generate projects that can be built on different targets. On linux premake will generate Makefile/s and on windows it will generate a Visual Studio solution. Information on invoking premake for different kinds of targets can be found [here](https://github.com/premake/premake-core/wiki/Using-Premake). You can also run with --help to see available command line options
+Slang uses the tool [`premake5`](https://premake.github.io/) in order to generate projects that can be built on different targets. On Linux premake will generate Makefile/s and on windows it will generate a Visual Studio solution. Information on invoking premake for different kinds of targets can be found [here](https://github.com/premake/premake-core/wiki/Using-Premake). You can also run with `--help` to see available command line options
 
 ```
 % premake5 --help
