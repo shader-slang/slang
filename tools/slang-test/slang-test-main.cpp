@@ -413,7 +413,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         builder << "slang-test";
 
-        if (options.binDir)
+        if (options.binDir.Length())
         {
             builder << " -bindir " << options.binDir;
         }
@@ -430,7 +430,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         context->reporter->messageFormat(TestMessageType::Info, "%s\n", builder.begin());
     }
 
-    auto func = context->getInnerMainFunc(String(context->options.binDir), exeName);
+    auto func = context->getInnerMainFunc(context->options.binDir, exeName);
     if (func)
     {
         StringBuilder stdErrorString;
@@ -765,7 +765,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
             {
                 // Try starting up the device
                 OSProcessSpawner spawner;
-                spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
+                spawner.pushExecutablePath(Path::Combine(context->options.binDir,  String("render-test") + osGetExecutableSuffix()));
                 _addRenderTestOptions(context->options, spawner);
                 // We just want to see if the device can be started up
                 spawner.pushArgument("-only-startup");
@@ -895,7 +895,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, OSProcessSpawner& spawnerOut)
 {
-    spawnerOut.pushExecutablePath(String(context->options.binDir) + "slangc" + osGetExecutableSuffix());
+    spawnerOut.pushExecutablePath(Path::Combine(context->options.binDir, String("slangc") + osGetExecutableSuffix()));
 
     if (context->options.verbosePaths)
     {
@@ -1007,7 +1007,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(options.binDir) + "slang-reflection-test" + osGetExecutableSuffix());
+    spawner.pushExecutablePath(Path::Combine(options.binDir, String("slang-reflection-test") + osGetExecutableSuffix()));
     spawner.pushArgument(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -1471,7 +1471,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	OSProcessSpawner spawner;
 
-	spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
+	spawner.pushExecutablePath(Path::Combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
 	spawner.pushArgument(filePath999);
 
     _addRenderTestOptions(context->options, spawner);
@@ -1589,7 +1589,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(String(context->options.binDir) + "render-test" + osGetExecutableSuffix());
+    spawner.pushExecutablePath(Path::Combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
     spawner.pushArgument(filePath);
 
     _addRenderTestOptions(context->options, spawner);

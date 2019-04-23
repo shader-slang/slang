@@ -225,7 +225,6 @@
     <ClInclude Include="syntax-defs.h" />
     <ClInclude Include="syntax-visitors.h" />
     <ClInclude Include="syntax.h" />
-    <ClInclude Include="tmpC85.tmp.h" />
     <ClInclude Include="token-defs.h" />
     <ClInclude Include="token.h" />
     <ClInclude Include="type-defs.h" />

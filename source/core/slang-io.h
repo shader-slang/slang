@@ -50,6 +50,11 @@ namespace Slang
         static SlangResult GetPathType(const String & path, SlangPathType* pathTypeOut);
 
         static SlangResult GetCanonical(const String & path, String& canonicalPathOut);
+
+            /// Returns the executable path
+            /// @return The path in platform native format. Returns empty string if failed.
+        static String GetExecutablePath();
+
 	};
 }
 
