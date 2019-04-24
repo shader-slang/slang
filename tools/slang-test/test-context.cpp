@@ -58,7 +58,7 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     StringBuilder builder;
     SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), builder);
-    String path = Path::Combine(dirPath, builder);
+    String path = Path::combine(dirPath, builder);
 
     SharedLibraryTool tool = {};
 

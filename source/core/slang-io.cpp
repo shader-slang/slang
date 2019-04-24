@@ -29,7 +29,7 @@
 
 namespace Slang
 {
-	bool File::Exists(const String & fileName)
+	bool File::exists(const String& fileName)
 	{
 #ifdef _WIN32
 		struct _stat32 statVar;
@@ -40,7 +40,7 @@ namespace Slang
 #endif
 	}
 
-	String Path::TruncateExt(const String & path)
+	String Path::truncateExt(const String& path)
 	{
 		UInt dotPos = path.LastIndexOf('.');
 		if (dotPos != -1)
@@ -48,7 +48,7 @@ namespace Slang
 		else
 			return path;
 	}
-	String Path::ReplaceExt(const String & path, const char * newExt)
+	String Path::replaceExt(const String& path, const char* newExt)
 	{
 		StringBuilder sb(path.Length()+10);
 		UInt dotPos = path.LastIndexOf('.');
@@ -75,7 +75,7 @@ namespace Slang
         return pos;
     }
 
-	String Path::GetFileName(const String & path)
+	String Path::getFileName(const String& path)
 	{
         UInt pos = findLastSeparator(path);
         if (pos != -1)
@@ -88,15 +88,15 @@ namespace Slang
             return path;
         }
 	}
-	String Path::GetFileNameWithoutEXT(const String & path)
+	String Path::getFileNameWithoutExt(const String& path)
 	{
-        String fileName = GetFileName(path);
+        String fileName = getFileName(path);
 		UInt dotPos = fileName.LastIndexOf('.');
 		if (dotPos == -1)
             return fileName;
 		return fileName.SubString(0, dotPos);
 	}
-	String Path::GetFileExt(const String & path)
+	String Path::getFileExt(const String& path)
 	{
 		UInt dotPos = path.LastIndexOf('.');
 		if (dotPos != -1)
@@ -104,7 +104,7 @@ namespace Slang
 		else
 			return "";
 	}
-	String Path::GetDirectoryName(const String & path)
+	String Path::getParentDirectory(const String& path)
 	{
         UInt pos = findLastSeparator(path);
 		if (pos != -1)
@@ -112,30 +112,30 @@ namespace Slang
 		else
 			return "";
 	}
-	String Path::Combine(const String & path1, const String & path2)
+	String Path::combine(const String& path1, const String& path2)
 	{
 		if (path1.Length() == 0) return path2;
 		StringBuilder sb(path1.Length()+path2.Length()+2);
 		sb.Append(path1);
 		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
-			sb.Append(PathDelimiter);
+			sb.Append(kPathDelimiter);
 		sb.Append(path2);
 		return sb.ProduceString();
 	}
-	String Path::Combine(const String & path1, const String & path2, const String & path3)
+	String Path::combine(const String& path1, const String& path2, const String& path3)
 	{
 		StringBuilder sb(path1.Length()+path2.Length()+path3.Length()+3);
 		sb.Append(path1);
 		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
-			sb.Append(PathDelimiter);
+			sb.Append(kPathDelimiter);
 		sb.Append(path2);
 		if (!path2.EndsWith('\\') && !path2.EndsWith('/'))
-			sb.Append(PathDelimiter);
+			sb.Append(kPathDelimiter);
 		sb.Append(path3);
 		return sb.ProduceString();
 	}
 
-    /* static */ bool Path::IsDriveSpecification(const UnownedStringSlice& element)
+    /* static */ bool Path::isDriveSpecification(const UnownedStringSlice& element)
     {
         switch (element.size())
         {
@@ -155,7 +155,7 @@ namespace Slang
         
     }
 
-    /* static */void Path::Split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
+    /* static */void Path::split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
     {
         splitOut.Clear();
 
@@ -166,7 +166,7 @@ namespace Slang
         {
             const char* cur = start;
             // Find the split
-            while (cur < end && !IsDelimiter(*cur)) cur++;
+            while (cur < end && !isDelimiter(*cur)) cur++;
 
             splitOut.Add(UnownedStringSlice(start, cur));
            
@@ -177,7 +177,7 @@ namespace Slang
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
         if (splitOut.Count() > 1 && splitOut.Last().size() == 0)
         {
-            if (splitOut.Count() == 2 && IsDriveSpecification(splitOut[0]))
+            if (splitOut.Count() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
@@ -186,12 +186,12 @@ namespace Slang
         }
     }
 
-    /* static */bool Path::IsRelative(const UnownedStringSlice& path)
+    /* static */bool Path::isRelative(const UnownedStringSlice& path)
     {
-        List<UnownedStringSlice> split;
-        Split(path, split);
+        List<UnownedStringSlice> splitPath;
+        split(path, splitPath);
 
-        for (const auto& cur : split)
+        for (const auto& cur : splitPath)
         {
             if (cur == "." || cur == "..")
             {
@@ -201,56 +201,56 @@ namespace Slang
         return false;
     }
 
-    /* static */String Path::Simplify(const UnownedStringSlice& path)
+    /* static */String Path::simplify(const UnownedStringSlice& path)
     {
-        List<UnownedStringSlice> split;
-        Split(path, split);
+        List<UnownedStringSlice> splitPath;
+        split(path, splitPath);
 
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (int i = 0; i < int(split.Count()); i++)
+        for (int i = 0; i < int(splitPath.Count()); i++)
         {
-            const UnownedStringSlice& cur = split[i];
-            if (cur == "." && split.Count() > 1)
+            const UnownedStringSlice& cur = splitPath[i];
+            if (cur == "." && splitPath.Count() > 1)
             {
                 // Just remove it 
-                split.RemoveAt(i);
+                splitPath.RemoveAt(i);
                 i--;
             }
             else if (cur == ".." && i > 0)
             {
                 // Can we remove this and the one before ?
-                UnownedStringSlice& before = split[i - 1];
-                if (before == ".." || (i == 1 && IsDriveSpecification(before)))
+                UnownedStringSlice& before = splitPath[i - 1];
+                if (before == ".." || (i == 1 && isDriveSpecification(before)))
                 {
                     // Can't do it
                     continue;
                 }
-                split.RemoveRange(i - 1, 2);
+                splitPath.RemoveRange(i - 1, 2);
                 i -= 2;
             }
         }
 
         // If its empty it must be .
-        if (split.Count() == 0)
+        if (splitPath.Count() == 0)
         {
-            split.Add(UnownedStringSlice::fromLiteral("."));
+            splitPath.Add(UnownedStringSlice::fromLiteral("."));
         }
    
         // Reconstruct the string
         StringBuilder builder;
-        for (int i = 0; i < int(split.Count()); i++)
+        for (int i = 0; i < int(splitPath.Count()); i++)
         {
             if (i > 0)
             {
-                builder.Append(PathDelimiter);
+                builder.Append(kPathDelimiter);
             }
-            builder.Append(split[i]);
+            builder.Append(splitPath[i]);
         }
 
         return builder;
     }
 
-	bool Path::CreateDir(const String & path)
+	bool Path::createDirectory(const String& path)
 	{
 #if defined(_WIN32)
 		return _wmkdir(path.ToWString()) == 0;
@@ -259,7 +259,7 @@ namespace Slang
 #endif
 	}
 
-    /* static */SlangResult Path::GetPathType(const String & path, SlangPathType* pathTypeOut)
+    /* static */SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
     {
 #ifdef _WIN32
         // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
@@ -302,7 +302,7 @@ namespace Slang
     }
 
 
-    /* static */SlangResult Path::GetCanonical(const String & path, String & canonicalPathOut)
+    /* static */SlangResult Path::getCanonical(const String& path, String& canonicalPathOut)
     {
 #if defined(_WIN32)
         // https://msdn.microsoft.com/en-us/library/506720ff.aspx
@@ -367,7 +367,7 @@ namespace Slang
         outPath[resSize - 1] = 0;
         return SLANG_OK;
 #   else        
-        String text = Slang::File::ReadAllText("/proc/self/maps");
+        String text = Slang::File::readAllText("/proc/self/maps");
         UInt startIndex = text.IndexOf('/');
         if (startIndex == UInt(-1))
         {
@@ -437,19 +437,19 @@ namespace Slang
         }
     }
 
-    /* static */String Path::GetExecutablePath()
+    /* static */String Path::getExecutablePath()
     {
         static String executablePath = _getExecutablePath();
         return executablePath;
     }
 
-	Slang::String File::ReadAllText(const Slang::String & fileName)
+	Slang::String File::readAllText(const Slang::String& fileName)
 	{
 		StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 		return reader.ReadToEnd();
 	}
 
-	Slang::List<unsigned char> File::ReadAllBytes(const Slang::String & fileName)
+	Slang::List<unsigned char> File::readAllBytes(const Slang::String& fileName)
 	{
 		RefPtr<FileStream> fs = new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 		List<unsigned char> buffer;
@@ -465,12 +465,11 @@ namespace Slang
 		return _Move(buffer);
 	}
 
-	void File::WriteAllText(const Slang::String & fileName, const Slang::String & text)
+	void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
 	{
 		StreamWriter writer(new FileStream(fileName, FileMode::Create));
 		writer.Write(text);
 	}
-
 
 }
 

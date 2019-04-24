@@ -294,10 +294,10 @@ static bool _isSubCommand(const char* arg)
     if (optionsOut->binDir.Length() == 0)
     {
         // If the binDir isn't set try using the path to the executable
-        String exePath = Path::GetExecutablePath();
+        String exePath = Path::getExecutablePath();
         if (exePath.Length())
         {
-            optionsOut->binDir = Path::GetDirectoryName(exePath);
+            optionsOut->binDir = Path::getParentDirectory(exePath);
         }
     }
 

@@ -22,12 +22,12 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
     {
         case SLANG_PATH_TYPE_FILE:
         {
-            relPath = Path::Combine(Path::GetDirectoryName(fromPath), path);
+            relPath = Path::combine(Path::getParentDirectory(fromPath), path);
             break;
         }
         case SLANG_PATH_TYPE_DIRECTORY:
         {
-            relPath = Path::Combine(fromPath, path);
+            relPath = Path::combine(fromPath, path);
             break;
         }
     }
@@ -58,7 +58,7 @@ static String _fixPathDelimiters(const char* pathIn)
 #else
     // To allow windows style \ delimiters on other platforms, we convert to our standard delimiter
     String path(pathIn);
-    return StringUtil::calcCharReplaced(pathIn, '\\', Path::PathDelimiter);
+    return StringUtil::calcCharReplaced(pathIn, '\\', Path::kPathDelimiter);
 #endif
 }
 
@@ -71,14 +71,14 @@ SlangResult OSFileSystem::getFileUniqueIdentity(const char* pathIn, ISlangBlob**
 SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     String canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::GetCanonical(_fixPathDelimiters(path), canonicalPath));
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(_fixPathDelimiters(path), canonicalPath));
     *outCanonicalPath = StringUtil::createStringBlob(canonicalPath).detach();
     return SLANG_OK;
 }
 
 SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
 {
-    String simplifiedPath = Path::Simplify(_fixPathDelimiters(pathIn));
+    String simplifiedPath = Path::simplify(_fixPathDelimiters(pathIn));
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
@@ -91,7 +91,7 @@ SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const cha
 
 SlangResult SLANG_MCALL OSFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
-    return Path::GetPathType(_fixPathDelimiters(pathIn), pathTypeOut);
+    return Path::getPathType(_fixPathDelimiters(pathIn), pathTypeOut);
 }
 
 SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
@@ -103,14 +103,14 @@ SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
     // filesystem calls.
 
     const String path = _fixPathDelimiters(pathIn);
-    if (!File::Exists(path))
+    if (!File::exists(path))
     {
         return SLANG_E_NOT_FOUND;
     }
 
     try
     {
-        String sourceString = File::ReadAllText(path);
+        String sourceString = File::readAllText(path);
         *outBlob = StringUtil::createStringBlob(sourceString).detach();
         return SLANG_OK;
     }
@@ -247,9 +247,9 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         }
         case UniqueIdentityMode::SimplifyPath:
         {
-            outUniqueIdentity = Path::Simplify(path);
+            outUniqueIdentity = Path::simplify(path);
             // If it still has relative elements can't uniquely identify, so give up
-            return Path::IsRelative(outUniqueIdentity) ? SLANG_FAIL : SLANG_OK;
+            return Path::isRelative(outUniqueIdentity) ? SLANG_FAIL : SLANG_OK;
         }
         case UniqueIdentityMode::SimplifyPathAndHash:
         case UniqueIdentityMode::Hash:
@@ -264,7 +264,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
             // Calculate the hash on the contents
             const uint64_t hash = GetHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
 
-            String hashString = Path::GetFileName(path);
+            String hashString = Path::getFileName(path);
             hashString = hashString.ToLower();
 
             hashString.append(':');
@@ -321,7 +321,7 @@ CacheFileSystem::PathInfo* CacheFileSystem::_resolveSimplifiedPathCacheInfo(cons
     // If we can simplify the path, try looking up in path cache with simplified path (as long as it's different!)
     if (_canSimplifyPath(m_uniqueIdentityMode))
     {
-        const String simplifiedPath = Path::Simplify(path);
+        const String simplifiedPath = Path::simplify(path);
         // Only lookup if the path is different - because otherwise will recurse forever...
         if (simplifiedPath != path)
         {
@@ -447,7 +447,7 @@ SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** ou
         {
             case PathStyle::Simplifiable:
             {
-                String simplifiedPath = Path::Simplify(_fixPathDelimiters(path));
+                String simplifiedPath = Path::simplify(_fixPathDelimiters(path));
                 *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
                 return SLANG_OK;
             }

@@ -11,48 +11,48 @@ static void pathUnitTest()
 {
     {
         String path;
-        SlangResult res = Path::GetCanonical(".", path);
+        SlangResult res = Path::getCanonical(".", path);
         SLANG_CHECK(SLANG_SUCCEEDED(res));
 
         String parentPath;
-        res = Path::GetCanonical("..", parentPath);
+        res = Path::getCanonical("..", parentPath);
         SLANG_CHECK(SLANG_SUCCEEDED(res));
 
-        String parentPath2 = Path::GetDirectoryName(path);
+        String parentPath2 = Path::getParentDirectory(path);
         SLANG_CHECK(parentPath == parentPath2);
     }
     // Test the paths
     {
-        SLANG_CHECK(Path::Simplify(".") == ".");
-        SLANG_CHECK(Path::Simplify("..") == "..");
-        SLANG_CHECK(Path::Simplify("blah/..") == ".");
+        SLANG_CHECK(Path::simplify(".") == ".");
+        SLANG_CHECK(Path::simplify("..") == "..");
+        SLANG_CHECK(Path::simplify("blah/..") == ".");
 
-        SLANG_CHECK(Path::Simplify("blah/.././a") == "a");
+        SLANG_CHECK(Path::simplify("blah/.././a") == "a");
 
-        SLANG_CHECK(Path::Simplify("a:/what/.././../is/./../this/.") == "a:/../this");
+        SLANG_CHECK(Path::simplify("a:/what/.././../is/./../this/.") == "a:/../this");
 
-        SLANG_CHECK(Path::Simplify("a:/what/.././../is/./../this/./") == "a:/../this");
+        SLANG_CHECK(Path::simplify("a:/what/.././../is/./../this/./") == "a:/../this");
 
-        SLANG_CHECK(Path::Simplify("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\") == "a:/../this");
+        SLANG_CHECK(Path::simplify("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\") == "a:/../this");
 
-        SLANG_CHECK(Path::Simplify("tests/preprocessor/.\\pragma-once-a.h") == "tests/preprocessor/pragma-once-a.h");
-
-
-        SLANG_CHECK(Path::IsRelative("."));
-        SLANG_CHECK(Path::IsRelative(".."));
-        SLANG_CHECK(Path::IsRelative("blah/.."));
-
-        SLANG_CHECK(Path::IsRelative("blah/.././a"));
-        SLANG_CHECK(Path::IsRelative("a") == false);
-        SLANG_CHECK(Path::IsRelative("blah/a") == false);
-        SLANG_CHECK(Path::IsRelative("a:\\blah/a") == false);
+        SLANG_CHECK(Path::simplify("tests/preprocessor/.\\pragma-once-a.h") == "tests/preprocessor/pragma-once-a.h");
 
 
-        SLANG_CHECK(Path::IsRelative("a:/what/.././../is/./../this/."));
+        SLANG_CHECK(Path::isRelative("."));
+        SLANG_CHECK(Path::isRelative(".."));
+        SLANG_CHECK(Path::isRelative("blah/.."));
 
-        SLANG_CHECK(Path::IsRelative("a:/what/.././../is/./../this/./"));
+        SLANG_CHECK(Path::isRelative("blah/.././a"));
+        SLANG_CHECK(Path::isRelative("a") == false);
+        SLANG_CHECK(Path::isRelative("blah/a") == false);
+        SLANG_CHECK(Path::isRelative("a:\\blah/a") == false);
 
-        SLANG_CHECK(Path::IsRelative("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
+
+        SLANG_CHECK(Path::isRelative("a:/what/.././../is/./../this/."));
+
+        SLANG_CHECK(Path::isRelative("a:/what/.././../is/./../this/./"));
+
+        SLANG_CHECK(Path::isRelative("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
 
 
     }

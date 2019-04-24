@@ -332,7 +332,7 @@ TestResult gatherTestsForFile(
     String fileContents;
     try
     {
-        fileContents = Slang::File::ReadAllText(filePath);
+        fileContents = Slang::File::readAllText(filePath);
     }
     catch (Slang::IOException)
     {
@@ -405,7 +405,7 @@ OSError spawnAndWaitExe(TestContext* context, const String& testPath, OSProcessS
 OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, OSProcessSpawner& spawner)
 {
     const auto& options = context->options;
-    String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+    String exeName = Path::getFileNameWithoutExt(spawner.executableName_);
 
     if (options.shouldBeVerbose)
     {
@@ -728,7 +728,7 @@ static SlangResult _extractReflectionTestRequirements(OSProcessSpawner& spawner,
 
 static SlangResult _extractTestRequirements(OSProcessSpawner& spawner, TestRequirements* ioInfo)
 {
-    String exeName = Path::GetFileNameWithoutEXT(spawner.executableName_);
+    String exeName = Path::getFileNameWithoutExt(spawner.executableName_);
 
     if (exeName == "render-test")
     {
@@ -765,7 +765,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
             {
                 // Try starting up the device
                 OSProcessSpawner spawner;
-                spawner.pushExecutablePath(Path::Combine(context->options.binDir,  String("render-test") + osGetExecutableSuffix()));
+                spawner.pushExecutablePath(Path::combine(context->options.binDir,  String("render-test") + osGetExecutableSuffix()));
                 _addRenderTestOptions(context->options, spawner);
                 // We just want to see if the device can be started up
                 spawner.pushArgument("-only-startup");
@@ -867,7 +867,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     {
         specializedBuf << postFix;
     }
-    if (File::Exists(specializedBuf))
+    if (File::exists(specializedBuf))
     {
         return specializedBuf;
     }
@@ -882,7 +882,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
         defaultBuf << postFix;
     }
 
-    if (File::Exists(defaultBuf))
+    if (File::exists(defaultBuf))
     {
         return defaultBuf;
     }
@@ -895,7 +895,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, OSProcessSpawner& spawnerOut)
 {
-    spawnerOut.pushExecutablePath(Path::Combine(context->options.binDir, String("slangc") + osGetExecutableSuffix()));
+    spawnerOut.pushExecutablePath(Path::combine(context->options.binDir, String("slangc") + osGetExecutableSuffix()));
 
     if (context->options.verbosePaths)
     {
@@ -952,7 +952,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     String expectedOutput;
     try
     {
-        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
     catch (Slang::IOException)
     {
@@ -980,7 +980,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     if (result == TestResult::Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
@@ -1007,7 +1007,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(Path::Combine(options.binDir, String("slang-reflection-test") + osGetExecutableSuffix()));
+    spawner.pushExecutablePath(Path::combine(options.binDir, String("slang-reflection-test") + osGetExecutableSuffix()));
     spawner.pushArgument(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -1028,7 +1028,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     String expectedOutput;
     try
     {
-        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
     catch (Slang::IOException)
     {
@@ -1055,7 +1055,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     if (result == TestResult::Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
@@ -1069,7 +1069,7 @@ String getExpectedOutput(String const& outputStem)
     String expectedOutput;
     try
     {
-        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
     catch (Slang::IOException)
     {
@@ -1157,7 +1157,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         String expectedOutputPath = outputStem + ".expected";
         try
         {
-            Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
+            Slang::File::writeAllText(expectedOutputPath, expectedOutput);
         }
         catch (Slang::IOException)
         {
@@ -1197,7 +1197,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     if (result == TestResult::Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
@@ -1236,7 +1236,7 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     String expectedOutputPath = outputStem + ".expected";
     try
     {
-        Slang::File::WriteAllText(expectedOutputPath, expectedOutput);
+        Slang::File::writeAllText(expectedOutputPath, expectedOutput);
     }
     catch (Slang::IOException)
     {
@@ -1305,7 +1305,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     String expectedOutput;
     try
     {
-        expectedOutput = Slang::File::ReadAllText(expectedOutputPath);
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
     catch (Slang::IOException)
     {
@@ -1342,7 +1342,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     if (result == TestResult::Fail)
     {
         String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
@@ -1438,8 +1438,8 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
         return TestResult::Ignored;
     }
 
-    Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
-    Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
+    Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
+    Slang::File::writeAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
@@ -1471,7 +1471,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	OSProcessSpawner spawner;
 
-	spawner.pushExecutablePath(Path::Combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
+	spawner.pushExecutablePath(Path::combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
 	spawner.pushArgument(filePath999);
 
     _addRenderTestOptions(context->options, spawner);
@@ -1492,7 +1492,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     if (context->isExecuting())
     {
         // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
-        File::WriteAllText(actualOutputFile, "");
+        File::writeAllText(actualOutputFile, "");
     }
 
 	TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, spawner));
@@ -1515,26 +1515,26 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
         String actualOutputPath = outputStem + ".actual";
-        Slang::File::WriteAllText(actualOutputPath, actualOutput);
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         return TestResult::Fail;
     }
 
 	// check against reference output
-    if (!File::Exists(actualOutputFile))
+    if (!File::exists(actualOutputFile))
     {
         printf("render-test not producing expected outputs.\n");
         printf("render-test output:\n%s\n", actualOutput.Buffer());
 		return TestResult::Fail;
     }
-    if (!File::Exists(referenceOutput))
+    if (!File::exists(referenceOutput))
     {
         printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
 		return TestResult::Fail;
     }
-    auto actualOutputContent = File::ReadAllText(actualOutputFile);
+    auto actualOutputContent = File::readAllText(actualOutputFile);
 	auto actualProgramOutput = Split(actualOutputContent, '\n');
-	auto referenceProgramOutput = Split(File::ReadAllText(referenceOutput), '\n');
+	auto referenceProgramOutput = Split(File::readAllText(referenceOutput), '\n');
     auto printOutput = [&]()
     {
         context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
@@ -1589,7 +1589,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     OSProcessSpawner spawner;
 
-    spawner.pushExecutablePath(Path::Combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
+    spawner.pushExecutablePath(Path::combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
     spawner.pushArgument(filePath);
 
     _addRenderTestOptions(context->options, spawner);
@@ -1820,8 +1820,8 @@ TestResult runHLSLRenderComparisonTestImpl(
         return TestResult::Pass;
     }
 
-    Slang::File::WriteAllText(outputStem + ".expected", expectedOutput);
-    Slang::File::WriteAllText(outputStem + ".actual",   actualOutput);
+    Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
+    Slang::File::writeAllText(outputStem + ".actual",   actualOutput);
 
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
