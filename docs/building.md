@@ -76,7 +76,7 @@ To actually build using make use one of the following
 
 Note that Cygwin isn't an official target. 
 
-One issue with building on cygwin, is that there isn't a binary version of premake5 currently available. It may be possible to make this work by building `premake5` from source, and then just doing `premake5 gmake`. Here we try another approach - using the windows `premake` to create a cygwin project. To do this use the command line...
+One issue with building on CygWin, is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a cygwin project. To do this use the command line...
 
 ```
 % premake5 --target-detail=cygwin gmake

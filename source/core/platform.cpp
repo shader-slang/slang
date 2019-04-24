@@ -155,6 +155,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     dst.Append(".dll");
 #else
     dst.Append("lib");
+    dst.Append(name);
     dst.Append(".so");
 #endif
 }
