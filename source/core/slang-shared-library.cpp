@@ -106,7 +106,7 @@ SlangResult ConfigurableSharedLibraryLoader::loadSharedLibrary(const char* path,
     // Okay we need to reconstruct the name and insert the path
     StringBuilder builder;
     SharedLibrary::appendPlatformFileName(UnownedStringSlice(pathIn), builder);
-    String path = Path::Combine(entryString, builder);
+    String path = Path::combine(entryString, builder);
 
     return SharedLibrary::loadWithPlatformFilename(path.begin(), handleOut);
 }

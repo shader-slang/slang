@@ -57,7 +57,7 @@ namespace Slang
 			}
 			break;
 		case Slang::FileMode::CreateNew:
-			if (File::Exists(fileName))
+			if (File::exists(fileName))
 			{
 				throw IOException("Failed opening '" + fileName + "', file already exists.");
 			}
