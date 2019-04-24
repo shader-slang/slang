@@ -150,9 +150,13 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
 {
-    dst.Append("lib");
+#if __CYGWIN__
     dst.Append(name);
+    dst.Append(".dll");
+#else
+    dst.Append("lib");
     dst.Append(".so");
+#endif
 }
 
 #endif // _WIN32

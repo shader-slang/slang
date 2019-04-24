@@ -45,9 +45,13 @@ namespace Slang
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
-            /// Returns true if a path contains a . or ..
-        static bool isRelative(const UnownedStringSlice& path);
-        static bool isRelative(const String& path) { return isRelative(path.getUnownedSlice()); }
+            /// Returns true if the path is absolute
+        static bool isAbsolute(const UnownedStringSlice& path);
+        static bool isAbsolute(const String& path) { return isAbsolute(path.getUnownedSlice()); }
+
+            /// Returns true if path contains contains an element of . or ..
+        static bool hasRelativeElement(const UnownedStringSlice& path);
+        static bool hasRelativeElement(const String& path) { return hasRelativeElement(path.getUnownedSlice()); }
 
             /// Determines the type of file at the path
             /// @param path The path to test
@@ -66,6 +70,11 @@ namespace Slang
             /// @return The path in platform native format. Returns empty string if failed.
         static String getExecutablePath();
 
+            /// Returns the first element of the path or an empty slice if there is none
+            /// This broadly equivalent to returning the first element of split
+            /// @param path Path to extract first element from
+            /// @return The first element of the path, or empty 
+        static UnownedStringSlice getFirstElement(const UnownedStringSlice& path);
 	};
 }
 

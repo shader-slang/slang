@@ -249,7 +249,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         {
             outUniqueIdentity = Path::simplify(path);
             // If it still has relative elements can't uniquely identify, so give up
-            return Path::isRelative(outUniqueIdentity) ? SLANG_FAIL : SLANG_OK;
+            return Path::hasRelativeElement(outUniqueIdentity) ? SLANG_FAIL : SLANG_OK;
         }
         case UniqueIdentityMode::SimplifyPathAndHash:
         case UniqueIdentityMode::Hash:
