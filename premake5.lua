@@ -538,6 +538,11 @@ tool "gfx"
          removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
     end
 
+	-- Remove VK from OSX gfx build
+	if os.target() == "macosx" then
+		removefiles { "tools/gfx/render-vk.cpp", "tools/gfx/vk-device-queue.cpp", "tools/gfx/vk-api.cpp", "tools/gfx/vk-module.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/vk-util.cpp" }
+	end
+    
 --
 -- The `slangc` command-line application is just a very thin wrapper
 -- around the Slang dynamic library, so its build is extermely simple.
