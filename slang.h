@@ -803,7 +803,7 @@ extern "C"
         uint32_t AddRef() { return addRef(); }
         uint32_t Release() { return release(); }
     };
-    #define SLANG_UUID_ISlangUnknown { 0x00000000, 0x0000, 0x0000, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 }
+    #define SLANG_UUID_ISlangUnknown { 0x00000000, 0x0000, 0x0000, { 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 } }
 
     /** A "blob" of binary data.
 
@@ -815,7 +815,7 @@ extern "C"
         virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() = 0;
         virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() = 0;
     };
-    #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 }
+    #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, { 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 } }
 
     /** A (real or virtual) file system.
 
@@ -845,7 +845,7 @@ extern "C"
             char const*     path,
             ISlangBlob** outBlob) = 0;
     };
-    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB }
+    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, { 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB } }
 
 
     typedef void(*SlangFuncPtr)(void);
@@ -871,7 +871,7 @@ extern "C"
             const char*     path,
             ISlangSharedLibrary** sharedLibraryOut) = 0;
     };
-    #define SLANG_UUID_ISlangSharedLibraryLoader { 0x6264ab2b, 0xa3e8, 0x4a06,{ 0x97, 0xf1, 0x49, 0xbc, 0x2d, 0x2a, 0xb1, 0x4d } };
+    #define SLANG_UUID_ISlangSharedLibraryLoader { 0x6264ab2b, 0xa3e8, 0x4a06, { 0x97, 0xf1, 0x49, 0xbc, 0x2d, 0x2a, 0xb1, 0x4d } };
     
     /* Type that identifies how a path should be interpreted */
     typedef unsigned int SlangPathType;
