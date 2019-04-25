@@ -13,6 +13,8 @@
 #include "../../source/core/list.h"
 #include "../../source/core/dictionary.h"
 
+#include "../../slang.h"
+
 namespace gfx {
 
 using Slang::RefObject;
@@ -25,8 +27,8 @@ using Slang::List;
 typedef SlangResult Result;
 
 // Had to move here, because Options needs types defined here
-typedef intptr_t Int;
-typedef uintptr_t UInt;
+typedef SlangInt Int;
+typedef SlangUInt UInt;
 
 // pre declare types
 class Surface;

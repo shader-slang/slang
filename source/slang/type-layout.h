@@ -10,9 +10,6 @@
 
 namespace Slang {
 
-typedef intptr_t Int;
-typedef uintptr_t UInt;
-
 // Forward declarations
 
 enum class BaseType;

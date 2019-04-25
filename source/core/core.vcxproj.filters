@@ -48,9 +48,6 @@
     <ClInclude Include="slang-byte-encode-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-cpu-defines.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>

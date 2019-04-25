@@ -3,7 +3,6 @@
 #include "ir-insts.h"
 
 #include "../core/basic.h"
-#include "../core/slang-cpu-defines.h"
 
 #include "mangle.h"
 
@@ -3008,7 +3007,7 @@ namespace Slang
         IRDumpContext*  context,
         UInt            val)
     {
-        context->builder->append(UnambigousUInt(val));
+        context->builder->append(val);
     }
     */
 
