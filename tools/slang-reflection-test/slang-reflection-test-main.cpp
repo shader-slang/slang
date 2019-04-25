@@ -95,6 +95,13 @@ static void write(PrettyWriter& writer, int32_t val)
     Slang::StdWriters::getOut().print("%d", int(val));
 }
 
+static void write(PrettyWriter& writer, uint32_t val)
+{
+    adjust(writer);
+    Slang::StdWriters::getOut().print("%u", (unsigned int)val);
+}
+
+
 static void write(PrettyWriter& writer, float val)
 {
     adjust(writer);
@@ -254,7 +261,7 @@ static void emitReflectionVarBindingInfoJSON(
         {
             write(writer, ",\n");
             write(writer,"\"semanticIndex\": ");
-            write(writer, semanticIndex);
+            write(writer, int(semanticIndex));
         }
     }
 }
@@ -545,7 +552,7 @@ static void emitReflectionTypeInfoJSON(
         write(writer, "\"kind\": \"vector\"");
         write(writer, ",\n");
         write(writer, "\"elementCount\": ");
-        write(writer, type->getElementCount());
+        write(writer, int(type->getElementCount()));
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
@@ -557,10 +564,10 @@ static void emitReflectionTypeInfoJSON(
         write(writer, "\"kind\": \"matrix\"");
         write(writer, ",\n");
         write(writer, "\"rowCount\": ");
-        write(writer, (SlangUInt)type->getRowCount());
+        write(writer, type->getRowCount());
         write(writer, ",\n");
         write(writer, "\"columnCount\": ");
-        write(writer, (SlangUInt)type->getColumnCount());
+        write(writer, type->getColumnCount());
         write(writer, ",\n");
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
@@ -574,7 +581,7 @@ static void emitReflectionTypeInfoJSON(
             write(writer, "\"kind\": \"array\"");
             write(writer, ",\n");
             write(writer, "\"elementCount\": ");
-            write(writer, arrayType->getElementCount());
+            write(writer, int(arrayType->getElementCount()));
             write(writer, ",\n");
             write(writer, "\"elementType\": ");
             emitReflectionTypeJSON(writer, arrayType->getElementType());
@@ -634,7 +641,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             write(writer, "\"kind\": \"array\"");
             write(writer, ",\n");
             write(writer, "\"elementCount\": ");
-            write(writer, arrayTypeLayout->getElementCount());
+            write(writer, int(arrayTypeLayout->getElementCount()));
             write(writer, ",\n");
             write(writer, "\"elementType\": ");
             emitReflectionTypeLayoutJSON(
@@ -644,7 +651,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             {
                 write(writer, ",\n");
                 write(writer, "\"uniformStride\": ");
-                write(writer, arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+                write(writer, int(arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM)));
             }
         }
         break;
