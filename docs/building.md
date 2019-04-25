@@ -21,7 +21,7 @@ Slang uses [`premake5`](https://premake.github.io/) to generate projects (such a
 
 For Linux and other targets the section below on `premake` describes the process. 
 
-Some targets below are described as 'unofficial'. In practice this means that they are not tested as part of our contiguous integration. In practice this means it is quite possible from time to time for them to become broken on the top of tree, but they have worked in the past, and it is likely only minor changes are needed to make them work again. 
+Some targets below are described as 'unofficial'. In practice this means that they are not tested as part of contiguous integration. Thus unfortunately it is quite possible from time to time for them to break on a merge of a PR. That said, if broken it is likely only very minor changes are needed to make them work again. 
 
 ## Premake
 
@@ -33,7 +33,7 @@ Slang uses the tool [`premake5`](https://premake.github.io/) in order to generat
 
 # Projects using `make`
 
-If building a Makefile based project, for example on Linux, OSX or CygWin, the configuration needs to be specified when invoking make, the following are typical...
+If building a Makefile based project, for example on Linux, OSX or [Cygwin](https://cygwin.com/), the configuration needs to be specified when invoking make, the following are typical...
 
 ```
 % make config=release_x64
@@ -90,7 +90,7 @@ To create a release build use
 
 ### Mac OSX
 
-Note that OSX isn't currently an official target.
+Note that OSX isn't an official target. 
 
 First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
  
@@ -114,11 +114,11 @@ Slang can also be built within the Xcode IDE. Invoke `premake` as follows
 
 Then open the `slang.xcworkspace` project inside of Xcode and build. 
 
-### CygWin
+### Cygwin
 
 Note that Cygwin isn't an official target. 
 
-One issue with building on CygWin, is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a cygwin project. To do this use the command line...
+One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a Cygwin project. To do this use the command line...
 
 ```
 % premake5 --target-detail=cygwin gmake
@@ -128,7 +128,9 @@ If you want to specify the toolset use `--cc=gcc` or `--cc=clang` on the command
 
 ## Testing
 
-When slang is built from source it also builds tools to be able to test the Slang compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. To run the tests on a release x64 build from the command line, in the root directory of slang source tree you can use...
+When slang is built from source it also builds tools to be able to test the Slang compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. It is important that you initiate the test binary from the root directory of the slang source tree, such that all tests can be correctly located.
+
+For example to run the tests on a windows release x64 build from the command line, in the root directory of slang source tree you can use...
 
 ```
 % bin\windows-x64\release\slang-test
