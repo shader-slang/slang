@@ -451,10 +451,9 @@ extern "C"
 
     typedef uint32_t    SlangUInt32;
 
-    // Use pointer size to determine SlangInt/SlangUInt types.
-    // This is used over say using size_t/ptrdiff_t/intptr_t/uintptr_t, because on some platforms, these types are distinct from
-    // their uint_t/int_t equivalents.  
-
+    // Use SLANG_PTR_ macros to determine SlangInt/SlangUInt types.
+    // This is used over say using size_t/ptrdiff_t/intptr_t/uintptr_t, because on some targets, these types are distinct from
+    // their uint_t/int_t equivalents and so produce ambiguity with function overloading.   
 #if SLANG_PTR_IS_64
     typedef int64_t    SlangInt;
     typedef uint64_t   SlangUInt;

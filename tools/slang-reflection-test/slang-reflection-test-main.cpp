@@ -77,16 +77,22 @@ static void write(PrettyWriter& writer, char const* text, size_t length = 0)
     }
 }
 
-static void write(PrettyWriter& writer, SlangUInt val)
+static void write(PrettyWriter& writer, uint64_t val)
 {
     adjust(writer);
     Slang::StdWriters::getOut().print("%llu", (unsigned long long)val);
 }
 
-static void write(PrettyWriter& writer, int val)
+static void write(PrettyWriter& writer, int64_t val)
 {
     adjust(writer);
-    Slang::StdWriters::getOut().print("%d", val);
+    Slang::StdWriters::getOut().print("%ll", (long long)val);
+}
+
+static void write(PrettyWriter& writer, int32_t val)
+{
+    adjust(writer);
+    Slang::StdWriters::getOut().print("%d", int(val));
 }
 
 static void write(PrettyWriter& writer, float val)
