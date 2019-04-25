@@ -1,4 +1,4 @@
-﻿#ifndef FUNDAMENTAL_LIB_LIST_H
+#ifndef FUNDAMENTAL_LIB_LIST_H
 #define FUNDAMENTAL_LIB_LIST_H
 
 #include "../../slang.h"
@@ -11,10 +11,11 @@
 #include <new>
 #include <type_traits>
 
-const int MIN_QSORT_SIZE = 32;
 
 namespace Slang
 {
+    const int MIN_QSORT_SIZE = 32;
+
 	template<typename T, int isPOD>
 	class Initializer
 	{
@@ -25,7 +26,7 @@ namespace Slang
 	class Initializer<T, 0>
 	{
 	public:
-		static void Initialize(T * buffer, int size)
+		static void Initialize(T* buffer, int size)
 		{
 			for (int i = 0; i<size; i++)
 				new (buffer + i) T();
@@ -35,7 +36,7 @@ namespace Slang
     class Initializer<T, 1>
     {
     public:
-        static void Initialize(T * buffer, int size)
+        static void Initialize(T* buffer, int size)
         {
             // It's pod so no initialization required
             //for (int i = 0; i < size; i++)
@@ -54,7 +55,7 @@ namespace Slang
 			Initializer<T, std::is_pod<T>::value>::Initialize(rs, size);
 			return rs;
 		}
-		static inline void Free(T * ptr, UInt bufferSize)
+		static inline void Free(T* ptr, UInt bufferSize)
 		{
 			TAllocator allocator;
 			if (!std::is_trivially_destructible<T>::value)
@@ -85,70 +86,68 @@ namespace Slang
 	class List
 	{
 	private:
-
-		inline T * Allocate(UInt size)
+		inline T* Allocate(UInt size)
 		{
-			return AllocateMethod<T, TAllocator>::Alloc(size);
-				
+			return AllocateMethod<T, TAllocator>::Alloc(size);				
 		}
 	private:
-		static const int InitialSize = 16;
-		TAllocator allocator;
+		static const Int kInitialSize = 16;
+		TAllocator m_allocator;
 	private:
-		T*      buffer;
-		UInt    _count;
-		UInt    bufferSize;
+		T*     m_buffer;
+        UInt    m_bufferSize;
+        UInt    m_count;
 		void FreeBuffer()
 		{
-			AllocateMethod<T, TAllocator>::Free(buffer, bufferSize);
-			buffer = 0;
+			AllocateMethod<T, TAllocator>::Free(m_buffer, m_bufferSize);
+			m_buffer = 0;
 		}
 		void Free()
 		{
-			if (buffer)
+			if (m_buffer)
 			{
 				FreeBuffer();
 			}
-			buffer = 0;
-			_count = bufferSize = 0;
+			m_buffer = 0;
+			m_count = m_bufferSize = 0;
 		}
 	public:
 		T* begin() const
 		{
-			return buffer;
+			return m_buffer;
 		}
 		T* end() const
 		{
-			return buffer+_count;
+			return m_buffer+m_count;
 		}
 	private:
 		template<typename... Args>
-		void Init(const T & val, Args... args)
+		void Init(const T& val, Args... args)
 		{
 			Add(val);
 			Init(args...);
 		}
 	public:
 		List()
-			: buffer(0), _count(0), bufferSize(0)
+			: m_buffer(nullptr), m_count(0), m_bufferSize(0)
 		{
 		}
 		template<typename... Args>
-		List(const T & val, Args... args)
+		List(const T& val, Args... args)
 		{
 			Init(val, args...);
 		}
 		List(const List<T> & list)
-			: buffer(0), _count(0), bufferSize(0)
+			: m_buffer(nullptr), m_count(0), m_bufferSize(0)
 		{
 			this->operator=(list);
 		}
 		List(List<T> && list)
-			: buffer(0), _count(0), bufferSize(0)
+			: m_buffer(nullptr), m_count(0), m_bufferSize(0)
 		{
 			this->operator=(static_cast<List<T>&&>(list));
 		}
-		static List<T> Create(const T & val, int count)
+		static List<T> Create(const T& val, int count)
 		{
 			List<T> rs;
 			rs.SetSize(count);
@@ -160,7 +159,7 @@ namespace Slang
 		{
 			Free();
 		}
-		List<T> & operator=(const List<T> & list)
+		List<T>& operator=(const List<T>& list)
 		{
 			Free();
 			AddRange(list);
@@ -168,142 +167,142 @@ namespace Slang
 			return *this;
 		}
 
-		List<T> & operator=(List<T> && list)
+		List<T>& operator=(List<T>&& list)
 		{
 			Free();
-			_count = list._count;
-			bufferSize = list.bufferSize;
-			buffer = list.buffer;
+			m_count = list.m_count;
+			m_bufferSize = list.m_bufferSize;
+			m_buffer = list.m_buffer;
 
-			list.buffer = 0;
-			list._count = 0;
-			list.bufferSize = 0;
+			list.m_buffer = 0;
+			list.m_count = 0;
+			list.m_bufferSize = 0;
 			return *this;
 		}
 
-		T & First() const
+		T& First() const
 		{
 #ifdef _DEBUG
-			if (_count == 0)
+			if (m_count == 0)
 				throw "Index out of range.";
 #endif
-			return buffer[0];
+			return m_buffer[0];
 		}
 
-		T & Last() const
+		T& Last() const
 		{
 #ifdef _DEBUG
-			if (_count == 0)
+			if (m_count == 0)
 				throw "Index out of range.";
 #endif
-			return buffer[_count-1];
+			return m_buffer[m_count-1];
 		}
 
         void RemoveLast()
         {
 #ifdef _DEBUG
-            if (_count == 0)
+            if (m_count == 0)
                 throw "Index out of range.";
 #endif        
-            _count--;
+            m_count--;
         }
 
-		inline void SwapWith(List<T, TAllocator> & other)
+		inline void SwapWith(List<T, TAllocator>& other)
 		{
-			T* tmpBuffer = this->buffer;
-			this->buffer = other.buffer;
-			other.buffer = tmpBuffer;
-			auto tmpBufferSize = this->bufferSize;
-			this->bufferSize = other.bufferSize;
-			other.bufferSize = tmpBufferSize;
-			auto tmpCount = this->_count;
-			this->_count = other._count;
-			other._count = tmpCount;
-			TAllocator tmpAlloc = _Move(this->allocator);
-			this->allocator = _Move(other.allocator);
-			other.allocator = _Move(tmpAlloc);
+			T* tmpBuffer = this->m_buffer;
+			this->m_buffer = other.m_buffer;
+			other.m_buffer = tmpBuffer;
+			auto tmpBufferSize = this->m_bufferSize;
+			this->m_bufferSize = other.m_bufferSize;
+			other.m_bufferSize = tmpBufferSize;
+			auto tmpCount = this->m_count;
+			this->m_count = other.m_count;
+			other.m_count = tmpCount;
+			TAllocator tmpAlloc = _Move(this->m_allocator);
+			this->m_allocator = _Move(other.m_allocator);
+			other.m_allocator = _Move(tmpAlloc);
 		}
 
 		T* ReleaseBuffer()
 		{
-			T* rs = buffer;
-			buffer = nullptr;
-			_count = 0;
-			bufferSize = 0;
+			T* rs = m_buffer;
+			m_buffer = nullptr;
+			m_count = 0;
+			m_bufferSize = 0;
 			return rs;
 		}
 
 		inline ArrayView<T> GetArrayView() const
 		{
-			return ArrayView<T>(buffer, _count);
+			return ArrayView<T>(m_buffer, m_count);
 		}
 
 		inline ArrayView<T> GetArrayView(int start, int count) const
 		{
 #ifdef _DEBUG
-			if (start + count > _count || start < 0 || count < 0)
+			if (start + count > m_count || start < 0 || count < 0)
 				throw "Index out of range.";
 #endif
-			return ArrayView<T>(buffer + start, count);
+			return ArrayView<T>(m_buffer + start, count);
 		}
 
-		void Add(T && obj)
+		void Add(T&& obj)
 		{
-			if (bufferSize < _count + 1)
+			if (m_bufferSize < m_count + 1)
 			{
-				UInt newBufferSize = InitialSize;
-				if (bufferSize)
-					newBufferSize = (bufferSize << 1);
+				UInt newBufferSize = kInitialSize;
+				if (m_bufferSize)
+					newBufferSize = (m_bufferSize << 1);
 
 				Reserve(newBufferSize);
 			}
-			buffer[_count++] = static_cast<T&&>(obj);
+			m_buffer[m_count++] = static_cast<T&&>(obj);
 		}
 
-		void Add(const T & obj)
+		void Add(const T& obj)
 		{
-			if (bufferSize < _count + 1)
+			if (m_bufferSize < m_count + 1)
 			{
-				UInt newBufferSize = InitialSize;
-				if (bufferSize)
-					newBufferSize = (bufferSize << 1);
+				UInt newBufferSize = kInitialSize;
+				if (m_bufferSize)
+					newBufferSize = (m_bufferSize << 1);
 
 				Reserve(newBufferSize);
 			}
-			buffer[_count++] = obj;
+			m_buffer[m_count++] = obj;
 
 		}
 
 		UInt Count() const
 		{
-			return _count;
+			return m_count;
 		}
 
-		T * Buffer() const
+		T* Buffer() const
 		{
-			return buffer;
+			return m_buffer;
 		}
 
 		UInt Capacity() const
 		{
-			return bufferSize;
+			return m_bufferSize;
 		}
 
-		void Insert(UInt id, const T & val)
+		void Insert(UInt id, const T& val)
 		{
 			InsertRange(id, &val, 1);
 		}
 
-		void InsertRange(UInt id, const T * vals, UInt n)
+		void InsertRange(UInt id, const T* vals, UInt n)
 		{
-			if (bufferSize < _count + n)
+			if (m_bufferSize < m_count + n)
 			{
-				UInt newBufferSize = InitialSize;
-				while (newBufferSize < _count + n)
+				UInt newBufferSize = kInitialSize;
+				while (newBufferSize < m_count + n)
 					newBufferSize = newBufferSize << 1;
 
 				T * newBuffer = Allocate(newBufferSize);
-				if (bufferSize)
+				if (m_bufferSize)
 				{
 					/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
 					{
@@ -313,14 +312,14 @@ namespace Slang
 					else*/
 					{
 						for (UInt i = 0; i < id; i++)
-							newBuffer[i] = buffer[i];
-						for (UInt i = id; i < _count; i++)
-							newBuffer[i + n] = T(static_cast<T&&>(buffer[i]));
+							newBuffer[i] = m_buffer[i];
+						for (UInt i = id; i < m_count; i++)
+							newBuffer[i + n] = T(static_cast<T&&>(m_buffer[i]));
 					}
 					FreeBuffer();
 				}
-				buffer = newBuffer;
-				bufferSize = newBufferSize;
+				m_buffer = newBuffer;
+				m_bufferSize = newBufferSize;
 			}
 			else
 			{
@@ -328,17 +327,17 @@ namespace Slang
 					memmove(buffer + id + n, buffer + id, sizeof(T) * (_count - id));
 				else*/
 				{
-					for (UInt i = _count; i > id; i--)
-						buffer[i + n - 1] = static_cast<T&&>(buffer[i - 1]);
+					for (UInt i = m_count; i > id; i--)
+						m_buffer[i + n - 1] = static_cast<T&&>(m_buffer[i - 1]);
 				}
 			}
 			/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
 				memcpy(buffer + id, vals, sizeof(T) * n);
 			else*/
 				for (UInt i = 0; i < n; i++)
-					buffer[id + i] = vals[i];
+					m_buffer[id + i] = vals[i];
 
-			_count += n;
+			m_count += n;
 		}
 
 		//slower than original edition
@@ -347,36 +346,36 @@ namespace Slang
 		//	InsertRange(_count, &val, 1);
 		//}
 
-		void InsertRange(int id, const List<T> & list)
+		void InsertRange(int id, const List<T>& list)
 		{
-			InsertRange(id, list.buffer, list._count);
+			InsertRange(id, list.m_buffer, list.m_count);
 		}
 
 		void AddRange(ArrayView<T> list)
 		{
-			InsertRange(_count, list.Buffer(), list.Count());
+			InsertRange(m_count, list.Buffer(), list.Count());
 		}
 
-		void AddRange(const T * vals, UInt n)
+		void AddRange(const T* vals, UInt n)
 		{
-			InsertRange(_count, vals, n);
+			InsertRange(m_count, vals, n);
 		}
 
-		void AddRange(const List<T> & list)
+		void AddRange(const List<T>& list)
 		{
-			InsertRange(_count, list.buffer, list._count);
+			InsertRange(m_count, list.m_buffer, list.m_count);
 		}
 
 		void RemoveRange(UInt id, UInt deleteCount)
 		{
 #if _DEBUG
-			if (id >= _count)
+			if (id >= m_count)
 				throw "Remove: Index out of range.";
 #endif
-			UInt actualDeleteCount = ((id + deleteCount) >= _count)? (_count - id) : deleteCount;
-			for (UInt i = id + actualDeleteCount; i < _count; i++)
-				buffer[i - actualDeleteCount] = static_cast<T&&>(buffer[i]);
-			_count -= actualDeleteCount;
+			UInt actualDeleteCount = ((id + deleteCount) >= m_count)? (m_count - id) : deleteCount;
+			for (UInt i = id + actualDeleteCount; i < m_count; i++)
+				m_buffer[i - actualDeleteCount] = static_cast<T&&>(m_buffer[i]);
+			m_count -= actualDeleteCount;
 		}
 
 		void RemoveAt(UInt id)
@@ -384,7 +383,7 @@ namespace Slang
 			RemoveRange(id, 1);
 		}
 
-		void Remove(const T & val)
+		void Remove(const T& val)
 		{
 			int idx = IndexOf(val);
 			if (idx != -1)
@@ -393,13 +392,13 @@ namespace Slang
 
 		void Reverse()
 		{
-			for (UInt i = 0; i < (_count >> 1); i++)
+			for (UInt i = 0; i < (m_count >> 1); i++)
 			{
-				Swap(buffer, i, _count - i - 1);
+				Swap(m_buffer, i, m_count - i - 1);
 			}
 		}
 
-		void FastRemove(const T & val)
+		void FastRemove(const T& val)
 		{
 			int idx = IndexOf(val);
 			FastRemoveAt(idx);
@@ -407,127 +406,127 @@ namespace Slang
 
 		void FastRemoveAt(UInt idx)
 		{
-			if (idx != -1 && _count - 1 != idx)
+			if (idx != -1 && m_count - 1 != idx)
 			{
-				buffer[idx] = _Move(buffer[_count - 1]);
+				m_buffer[idx] = _Move(m_buffer[m_count - 1]);
 			}
-			_count--;
+			m_count--;
 		}
 
 		void Clear()
 		{
-			_count = 0;
+			m_count = 0;
 		}
 
 		void Reserve(UInt size)
 		{
-			if(size > bufferSize)
+			if(size > m_bufferSize)
 			{
 				T * newBuffer = Allocate(size);
-				if (bufferSize)
+				if (m_bufferSize)
 				{
 					/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
 						memcpy(newBuffer, buffer, _count * sizeof(T));
 					else*/
 					{
-						for (UInt i = 0; i < _count; i++)
-							newBuffer[i] = static_cast<T&&>(buffer[i]);
+						for (UInt i = 0; i < m_count; i++)
+							newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 
                         // Default-initialize the remaining elements
-                        for(UInt i = _count; i < size; i++)
+                        for(UInt i = m_count; i < size; i++)
                         {
                             new(newBuffer + i) T();
                         }
 					}
 					FreeBuffer();
 				}
-				buffer = newBuffer;
-				bufferSize = size;
+				m_buffer = newBuffer;
+				m_bufferSize = size;
 			}
 		}
 
 		void GrowToSize(UInt size)
 		{
 			UInt newBufferSize = UInt(1) << Math::Log2Ceil(size);
-			if (bufferSize < newBufferSize)
+			if (m_bufferSize < newBufferSize)
 			{
 				Reserve(newBufferSize);
 			}
-			this->_count = size;
+			this->m_count = size;
 		}
 
 		void SetSize(UInt size)
 		{
 			Reserve(size);
-			_count = size;
+			m_count = size;
 		}
 
 		void UnsafeShrinkToSize(UInt size)
 		{
-			_count = size;
+			m_count = size;
 		}
 
 		void Compress()
 		{
-			if (bufferSize > _count && _count > 0)
+			if (m_bufferSize > m_count && m_count > 0)
 			{
-				T * newBuffer = Allocate(_count);
-				for (UInt i = 0; i < _count; i++)
-					newBuffer[i] = static_cast<T&&>(buffer[i]);
+				T * newBuffer = Allocate(m_count);
+				for (UInt i = 0; i < m_count; i++)
+					newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 				FreeBuffer();
-				buffer = newBuffer;
-				bufferSize = _count;
+				m_buffer = newBuffer;
+				m_bufferSize = m_count;
 			}
 		}
 
-		SLANG_FORCE_INLINE T & operator [](UInt id) const
+		SLANG_FORCE_INLINE T& operator [](UInt id) const
 		{
 #if _DEBUG
-			if(id >= _count)
+			if(id >= m_count)
 				throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
-			return buffer[id];
+			return m_buffer[id];
 		}
 
 		template<typename Func>
-		UInt FindFirst(const Func & predicate) const
+		UInt FindFirst(const Func& predicate) const
 		{
-			for (UInt i = 0; i < _count; i++)
+			for (UInt i = 0; i < m_count; i++)
 			{
-				if (predicate(buffer[i]))
+				if (predicate(m_buffer[i]))
 					return i;
 			}
 			return (UInt)-1;
 		}
 
 		template<typename Func>
-		UInt FindLast(const Func & predicate) const
+		UInt FindLast(const Func& predicate) const
 		{
-			for (UInt i = _count; i > 0; i--)
+			for (UInt i = m_count; i > 0; i--)
 			{
-				if (predicate(buffer[i-1]))
+				if (predicate(m_buffer[i-1]))
 					return i-1;
 			}
 			return (UInt)-1;
 		}
 
 		template<typename T2>
-		UInt IndexOf(const T2 & val) const
+		UInt IndexOf(const T2& val) const
 		{
-			for (UInt i = 0; i < _count; i++)
+			for (UInt i = 0; i < m_count; i++)
 			{
-				if (buffer[i] == val)
+				if (m_buffer[i] == val)
 					return i;
 			}
 			return (UInt)-1;
 		}
 
 		template<typename T2>
-		UInt LastIndexOf(const T2 & val) const
+		UInt LastIndexOf(const T2& val) const
 		{
-			for (int i = _count; i > 0; i--)
+			for (int i = m_count; i > 0; i--)
 			{
-				if(buffer[i-1] == val)
+				if(m_buffer[i-1] == val)
 					return i-1;
 			}
 			return (UInt)-1;
@@ -535,13 +534,13 @@ namespace Slang
 
 		void Sort()
 		{
-			Sort([](T const& t1, T const& t2){return t1<t2;});
+			Sort([](T const& t1, T const& t2){return t1 < t2;});
 		}
 
-		bool Contains(const T & val)
+		bool Contains(const T& val)
 		{
-			for (UInt i = 0; i<_count; i++)
-				if (buffer[i] == val)
+			for (UInt i = 0; i< m_count; i++)
+				if (m_buffer[i] == val)
 					return true;
 			return false;
 		}
@@ -551,14 +550,14 @@ namespace Slang
 		{
 			//InsertionSort(buffer, 0, _count - 1);
 			//QuickSort(buffer, 0, _count - 1, compare);
-			std::sort(buffer, buffer + _count, compare);
+			std::sort(m_buffer, m_buffer + m_count, compare);
 		}
 
 		template <typename IterateFunc>
 		void ForEach(IterateFunc f) const
 		{
-			for (int i = 0; i<_count; i++)
-				f(buffer[i]);
+			for (int i = 0; i<m_count; i++)
+				f(m_buffer[i]);
 		}
 
 		template<typename Comparer>
@@ -579,7 +578,7 @@ namespace Slang
 
 		}
 		template<typename Comparer>
-		int Partition(T * vals, int left, int right, int pivotIndex, Comparer comparer)
+		int Partition(T* vals, int left, int right, int pivotIndex, Comparer comparer)
 		{
 			T pivotValue = vals[pivotIndex];
 			Swap(vals, right, pivotIndex);
@@ -596,7 +595,7 @@ namespace Slang
 			return storeIndex;
 		}
 		template<typename Comparer>
-		void InsertionSort(T * vals, int startIndex, int endIndex, Comparer comparer)
+		void InsertionSort(T* vals, int startIndex, int endIndex, Comparer comparer)
 		{
 			for (int i = startIndex  + 1; i <= endIndex; i++)
 			{
@@ -611,7 +610,7 @@ namespace Slang
 			}
 		}
 
-		inline void Swap(T * vals, int index1, int index2)
+		inline void Swap(T* vals, int index1, int index2)
 		{
 			if (index1 != index2)
 			{
@@ -622,13 +621,13 @@ namespace Slang
 		}
 
 		template<typename T2, typename Comparer>
-		int BinarySearch(const T2 & obj, Comparer comparer)
+		int BinarySearch(const T2& obj, Comparer comparer)
 		{
-			int imin = 0, imax = _count - 1;
+			int imin = 0, imax = m_count - 1;
 			while (imax >= imin)
 			{
 				int imid = (imin + imax) >> 1;
-				int compareResult = comparer(buffer[imid], obj);
+				int compareResult = comparer(m_buffer[imid], obj);
 				if (compareResult == 0)
 					return imid;
 				else if (compareResult < 0)
@@ -640,7 +639,7 @@ namespace Slang
 		}
 
 		template<typename T2>
-		int BinarySearch(const T2 & obj)
+		int BinarySearch(const T2& obj)
 		{
 			return BinarySearch(obj, 
 				[](T & curObj, const T2 & thatObj)->int
@@ -656,7 +655,7 @@ namespace Slang
 	};
 
 	template<typename T>
-	T Min(const List<T> & list)
+	T Min(const List<T>& list)
 	{
 		T minVal = list.First();
 		for (int i = 1; i<list.Count(); i++)
@@ -666,7 +665,7 @@ namespace Slang
 	}
 
 	template<typename T>
-	T Max(const List<T> & list)
+	T Max(const List<T>& list)
 	{
 		T maxVal = list.First();
 		for (int i = 1; i<list.Count(); i++)
