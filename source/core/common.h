@@ -1,6 +1,8 @@
 #ifndef CORE_LIB_COMMON_H
 #define CORE_LIB_COMMON_H
 
+#include "../../slang.h"
+
 #include <cstdint>
 
 #ifdef __GNUC__
@@ -18,6 +20,10 @@ namespace Slang
 
 	typedef int64_t Int64;
 	typedef uint64_t UInt64;
+
+    // Define 
+    typedef SlangUInt UInt;
+    typedef SlangInt Int;
 
 //	typedef unsigned short Word;
 

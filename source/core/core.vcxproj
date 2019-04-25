@@ -183,7 +183,6 @@
     <ClInclude Include="platform.h" />
     <ClInclude Include="secure-crt.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
-    <ClInclude Include="slang-cpu-defines.h" />
     <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-math.h" />

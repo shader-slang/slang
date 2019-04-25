@@ -8,14 +8,6 @@
 
 namespace Slang {
 
-// TODO(tfoley): Need to move these somewhere universal
-
-typedef intptr_t    Int;
-typedef int64_t     Int64;
-
-typedef uintptr_t   UInt;
-typedef uint64_t    UInt64;
-
 class ProgramLayout;
 class TypeLayout;
 

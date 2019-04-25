@@ -3,8 +3,6 @@
 
 #include "list.h"
 
-#include "slang-cpu-defines.h"
-
 namespace Slang {
 
 struct ByteEncodeUtil
