@@ -1,6 +1,8 @@
 #include "slang-io.h"
 #include "exception.h"
 
+#include "../../slang-com-helper.h"
+
 #ifndef __STDC__
 #   define __STDC__ 1
 #endif
@@ -152,7 +154,39 @@ namespace Slang
             }
             default:    return false;
         }
-        
+    }
+
+    UnownedStringSlice Path::getFirstElement(const UnownedStringSlice& in)
+    {
+        const char* end = in.end();
+        const char* cur = in.begin();
+        // Find delimiter or the end
+        while (cur < end && !Path::isDelimiter(*cur)) ++cur;
+        return UnownedStringSlice(in.begin(), cur);
+    }
+
+    /* static */bool Path::isAbsolute(const UnownedStringSlice& path)
+    {
+        if (path.size() > 0 && isDelimiter(path[0]))
+        {
+            return true;
+        }
+
+#if SLANG_WINDOWS_FAMILY
+        // Check for the \\ network drive style
+        if (path.size() >= 2 && path[0] == '\\' && path[1] == '\\')
+        {
+            return true;
+        }
+
+        // Check for drive 
+        if (isDriveSpecification(getFirstElement(path)))
+        {
+            return true;
+        }
+#endif
+
+        return false;
     }
 
     /* static */void Path::split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
@@ -186,7 +220,7 @@ namespace Slang
         }
     }
 
-    /* static */bool Path::isRelative(const UnownedStringSlice& path)
+    /* static */bool Path::hasRelativeElement(const UnownedStringSlice& path)
     {
         List<UnownedStringSlice> splitPath;
         split(path, splitPath);
@@ -316,6 +350,8 @@ namespace Slang
         ::free(absPath);
         return SLANG_OK;
 #else
+#   if 1
+        
         // http://man7.org/linux/man-pages/man3/realpath.3.html
         char* canonicalPath = ::realpath(path.begin(), nullptr);
         if (canonicalPath)
@@ -325,6 +361,34 @@ namespace Slang
             return SLANG_OK;
         }
         return SLANG_FAIL;
+#   else
+        // This is a mechanism to get an approximation of canonical path if we don't have 'realpath'
+        // We only can get if the file exists. This checks that the ../. etc are really valid
+        SlangPathType pathType;
+        SLANG_RETURN_ON_FAIL(getPathType(path, &pathType));
+        if (isAbsolute(path))
+        {
+            // If it's absolute, we can just simplify as is
+            canonicalPathOut = Path::simplify(path);
+            return SLANG_OK;
+        }
+        else
+        {
+            char buffer[PATH_MAX];
+            // https://linux.die.net/man/3/getcwd
+            const char* getCwdPath = getcwd(buffer, SLANG_COUNT_OF(buffer));
+            if (!getCwdPath)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Okay combine the paths
+            String combinedPaths = Path::combine(String(getCwdPath), path);
+            // Simplify
+            canonicalPathOut = Path::simplify(combinedPaths);
+            return SLANG_OK;
+        }
+#   endif
 #endif
     }
 

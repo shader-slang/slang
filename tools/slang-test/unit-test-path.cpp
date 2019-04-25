@@ -38,21 +38,21 @@ static void pathUnitTest()
         SLANG_CHECK(Path::simplify("tests/preprocessor/.\\pragma-once-a.h") == "tests/preprocessor/pragma-once-a.h");
 
 
-        SLANG_CHECK(Path::isRelative("."));
-        SLANG_CHECK(Path::isRelative(".."));
-        SLANG_CHECK(Path::isRelative("blah/.."));
+        SLANG_CHECK(Path::hasRelativeElement("."));
+        SLANG_CHECK(Path::hasRelativeElement(".."));
+        SLANG_CHECK(Path::hasRelativeElement("blah/.."));
 
-        SLANG_CHECK(Path::isRelative("blah/.././a"));
-        SLANG_CHECK(Path::isRelative("a") == false);
-        SLANG_CHECK(Path::isRelative("blah/a") == false);
-        SLANG_CHECK(Path::isRelative("a:\\blah/a") == false);
+        SLANG_CHECK(Path::hasRelativeElement("blah/.././a"));
+        SLANG_CHECK(Path::hasRelativeElement("a") == false);
+        SLANG_CHECK(Path::hasRelativeElement("blah/a") == false);
+        SLANG_CHECK(Path::hasRelativeElement("a:\\blah/a") == false);
 
 
-        SLANG_CHECK(Path::isRelative("a:/what/.././../is/./../this/."));
+        SLANG_CHECK(Path::hasRelativeElement("a:/what/.././../is/./../this/."));
 
-        SLANG_CHECK(Path::isRelative("a:/what/.././../is/./../this/./"));
+        SLANG_CHECK(Path::hasRelativeElement("a:/what/.././../is/./../this/./"));
 
-        SLANG_CHECK(Path::isRelative("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
+        SLANG_CHECK(Path::hasRelativeElement("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
 
 
     }

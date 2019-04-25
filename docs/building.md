@@ -15,9 +15,11 @@ If you are on Windows, then open `slang.sln` and build your desired platform/con
 
 The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
  
-## Linux
+## Other Targets
 
-For building on Linux it is first necessary to generate the `Makefile` for the project - we use [`premake5`](https://premake.github.io/) as the tool used for generating projects from the premake5.lua script found in the root of the project. The section below describes how to use premake on Linux. 
+Slang uses [`premake5`](https://premake.github.io/) to generate projects (such as `Makefile`s) that can then be used to build Slang binaries from source. 
+
+For Linux and other targets the section below on `premake` describes the process.
 
 ## Premake
 
@@ -69,6 +71,18 @@ To actually build using make use one of the following
 % make config=release_aarch64
 % make config=debug_aarch64
 ```
+
+### CygWin
+
+Note that Cygwin isn't an official target. 
+
+One issue with building on CygWin, is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a cygwin project. To do this use the command line...
+
+```
+% premake5 --target-detail=cygwin gmake
+```
+
+If you want to specify the toolset use `--cc=gcc` or `--cc=clang` on the command line. To check what compiler is being used/command line options you can add `verbose=1` to `make` command line.
 
 ## Testing
 
