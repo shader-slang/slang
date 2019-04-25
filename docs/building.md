@@ -11,7 +11,7 @@ The submodule update step is required to pull in dependencies used for testing i
 ## Windows Using Visual Studio
 
 Building from source is really only well supported for Windows users with Visual Studio 2015 or later.
-If you are on Windows, then open `slang.sln` and build your desired platform/configuration. 
+If you are on Windows, then you can just open `slang.sln` and build your desired platform/configuration. 
 
 The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
  
@@ -19,7 +19,9 @@ The Visual Studio solution in the project is actually just generated using [`pre
 
 Slang uses [`premake5`](https://premake.github.io/) to generate projects (such as `Makefile`s) that can then be used to build Slang binaries from source. 
 
-For Linux and other targets the section below on `premake` describes the process.
+For Linux and other targets the section below on `premake` describes the process. 
+
+Some targets below are described as 'unofficial'. In practice this means that they are not tested as part of contiguous integration. Thus unfortunately it is quite possible from time to time for them to break on a merge of a PR. That said, if broken it is likely only very minor changes are needed to make them work again. 
 
 ## Premake
 
@@ -27,6 +29,25 @@ Slang uses the tool [`premake5`](https://premake.github.io/) in order to generat
 
 ```
 % premake5 --help
+```
+
+# Projects using `make`
+
+If building a Makefile based project, for example on Linux, OSX or [Cygwin](https://cygwin.com/), the configuration needs to be specified when invoking make, the following are typical...
+
+```
+% make config=release_x64
+% make config=debug_x64
+% make config=release_x86
+% make config=debug_x86
+% make config=release_aarch64
+% make config=debug_aarch64
+```
+
+To check what compiler is being used/command line options you can add `verbose=1` to `make` command line. For example
+
+```
+% make config=debug_x64 verbose=1
 ```
 
 ### Windows
@@ -61,32 +82,55 @@ You can vary the compiler to use via the --cc option with 'gcc' or 'clang' for e
 % premake5 gmake --cc=clang
 ```
 
-To actually build using make use one of the following
+To create a release build use
 
 ```
 % make config=release_x64
-% make config=debug_x64
-% make config=release_x86
-% make config=debug_x86
-% make config=release_aarch64
-% make config=debug_aarch64
 ```
 
-### CygWin
+### Mac OSX
+
+Note that OSX isn't an official target. 
+
+First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
+ 
+Assuming premake5 is in your `PATH`, you can create a `Makefile` to build slang and tests components with
+
+```
+% premake5 gmake 
+```
+
+To build with
+
+```
+% make config=release_x64
+```
+
+Slang can also be built within the Xcode IDE. Invoke `premake` as follows
+
+```
+% premake5 xcode4
+```
+
+Then open the `slang.xcworkspace` project inside of Xcode and build. 
+
+### Cygwin
 
 Note that Cygwin isn't an official target. 
 
-One issue with building on CygWin, is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a cygwin project. To do this use the command line...
+One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a Cygwin project. To do this use the command line...
 
 ```
 % premake5 --target-detail=cygwin gmake
 ```
 
-If you want to specify the toolset use `--cc=gcc` or `--cc=clang` on the command line. To check what compiler is being used/command line options you can add `verbose=1` to `make` command line.
+If you want to specify the toolset use `--cc=gcc` or `--cc=clang` on the command line. 
 
 ## Testing
 
-When slang is built from source it also builds tools to be able to test the Slang compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. To run the tests on a release x64 build from the command line, in the root directory of slang source tree you can use...
+When slang is built from source it also builds tools to be able to test the Slang compiler. Testing is achieved using the `slang-test` tool. The binaries are placed in the appropriate directory underneath `bin`. It is important that you initiate the test binary from the root directory of the slang source tree, such that all tests can be correctly located.
+
+For example to run the tests on a windows release x64 build from the command line, in the root directory of slang source tree you can use...
 
 ```
 % bin\windows-x64\release\slang-test
