@@ -11,7 +11,7 @@ The submodule update step is required to pull in dependencies used for testing i
 ## Windows Using Visual Studio
 
 Building from source is really only well supported for Windows users with Visual Studio 2015 or later.
-If you are on Windows, then open `slang.sln` and build your desired platform/configuration. 
+If you are on Windows, then you can just open `slang.sln` and build your desired platform/configuration. 
 
 The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
  
