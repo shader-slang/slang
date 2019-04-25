@@ -1,6 +1,6 @@
 # Building Slang From Source
 
-## Get the Source Code
+## Get the Source Code 
 
 Clone [this](https://github.com/shader-slang/slang) repository, and then run:
 
