@@ -174,7 +174,7 @@ namespace Slang
 			m_bufferSize = list.m_bufferSize;
 			m_buffer = list.m_buffer;
 
-			list.m_buffer = 0;
+			list.m_buffer = nullptr;
 			list.m_count = 0;
 			list.m_bufferSize = 0;
 			return *this;
@@ -182,44 +182,38 @@ namespace Slang
 
 		T& First() const
 		{
-#ifdef _DEBUG
-			if (m_count == 0)
-				throw "Index out of range.";
-#endif
+            SLANG_ASSERT(m_count > 0);
 			return m_buffer[0];
 		}
 
 		T& Last() const
 		{
-#ifdef _DEBUG
-			if (m_count == 0)
-				throw "Index out of range.";
-#endif
+            SLANG_ASSERT(m_count > 0);
 			return m_buffer[m_count-1];
 		}
 
         void RemoveLast()
         {
-#ifdef _DEBUG
-            if (m_count == 0)
-                throw "Index out of range.";
-#endif        
+            SLANG_ASSERT(m_count > 0);
             m_count--;
         }
 
 		inline void SwapWith(List<T, TAllocator>& other)
 		{
-			T* tmpBuffer = this->m_buffer;
-			this->m_buffer = other.m_buffer;
-			other.m_buffer = tmpBuffer;
-			auto tmpBufferSize = this->m_bufferSize;
-			this->m_bufferSize = other.m_bufferSize;
-			other.m_bufferSize = tmpBufferSize;
-			auto tmpCount = this->m_count;
-			this->m_count = other.m_count;
-			other.m_count = tmpCount;
-			TAllocator tmpAlloc = _Move(this->m_allocator);
-			this->m_allocator = _Move(other.m_allocator);
+			T* buffer = m_buffer;
+			m_buffer = other.m_buffer;
+			other.m_buffer = buffer;
+
+			auto bufferSize = m_bufferSize;
+			m_bufferSize = other.m_bufferSize;
+			other.m_bufferSize = bufferSize;
+
+			auto count = m_count;
+			m_count = other.m_count;
+			other.m_count = count;
+
+			TAllocator tmpAlloc = _Move(m_allocator);
+			m_allocator = _Move(other.m_allocator);
 			other.m_allocator = _Move(tmpAlloc);
 		}
 
@@ -239,10 +233,7 @@ namespace Slang
 
 		inline ArrayView<T> GetArrayView(int start, int count) const
 		{
-#ifdef _DEBUG
-			if (start + count > m_count || start < 0 || count < 0)
-				throw "Index out of range.";
-#endif
+            SLANG_ASSERT(start >= 0 && count >= 0 && start + count <= m_count);
 			return ArrayView<T>(m_buffer + start, count);
 		}
 
@@ -366,14 +357,12 @@ namespace Slang
 			InsertRange(m_count, list.m_buffer, list.m_count);
 		}
 
-		void RemoveRange(UInt id, UInt deleteCount)
+		void RemoveRange(UInt idx, UInt count)
 		{
-#if _DEBUG
-			if (id >= m_count)
-				throw "Remove: Index out of range.";
-#endif
-			UInt actualDeleteCount = ((id + deleteCount) >= m_count)? (m_count - id) : deleteCount;
-			for (UInt i = id + actualDeleteCount; i < m_count; i++)
+            SLANG_ASSERT(idx >= 0 && idx <= m_count);
+
+			const UInt actualDeleteCount = ((idx + count) >= m_count)? (m_count - idx) : count;
+			for (UInt i = idx + actualDeleteCount; i < m_count; i++)
 				m_buffer[i - actualDeleteCount] = static_cast<T&&>(m_buffer[i]);
 			m_count -= actualDeleteCount;
 		}
@@ -452,7 +441,7 @@ namespace Slang
 			{
 				Reserve(newBufferSize);
 			}
-			this->m_count = size;
+			m_count = size;
 		}
 
 		void SetSize(UInt size)
@@ -470,7 +459,7 @@ namespace Slang
 		{
 			if (m_bufferSize > m_count && m_count > 0)
 			{
-				T * newBuffer = Allocate(m_count);
+				T* newBuffer = Allocate(m_count);
 				for (UInt i = 0; i < m_count; i++)
 					newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 				FreeBuffer();
@@ -479,13 +468,10 @@ namespace Slang
 			}
 		}
 
-		SLANG_FORCE_INLINE T& operator [](UInt id) const
+		SLANG_FORCE_INLINE T& operator [](UInt idx) const
 		{
-#if _DEBUG
-			if(id >= m_count)
-				throw IndexOutofRangeException("Operator[]: Index out of Range.");
-#endif
-			return m_buffer[id];
+            SLANG_ASSERT(idx >= 0 && idx <= m_count);
+			return m_buffer[idx];
 		}
 
 		template<typename Func>
@@ -534,7 +520,7 @@ namespace Slang
 
 		void Sort()
 		{
-			Sort([](T const& t1, T const& t2){return t1 < t2;});
+			Sort([](const T& t1, const T& t2){return t1 < t2;});
 		}
 
 		bool Contains(const T& val)
@@ -556,12 +542,12 @@ namespace Slang
 		template <typename IterateFunc>
 		void ForEach(IterateFunc f) const
 		{
-			for (int i = 0; i<m_count; i++)
+			for (int i = 0; i< m_count; i++)
 				f(m_buffer[i]);
 		}
 
 		template<typename Comparer>
-		void QuickSort(T * vals, int startIndex, int endIndex, Comparer comparer)
+		void QuickSort(T* vals, int startIndex, int endIndex, Comparer comparer)
 		{
 			if(startIndex < endIndex)
 			{
@@ -658,7 +644,7 @@ namespace Slang
 	T Min(const List<T>& list)
 	{
 		T minVal = list.First();
-		for (int i = 1; i<list.Count(); i++)
+		for (int i = 1; i < list.Count(); i++)
 			if (list[i] < minVal)
 				minVal = list[i];
 		return minVal;
@@ -668,7 +654,7 @@ namespace Slang
 	T Max(const List<T>& list)
 	{
 		T maxVal = list.First();
-		for (int i = 1; i<list.Count(); i++)
+		for (int i = 1; i< list.Count(); i++)
 			if (list[i] > maxVal)
 				maxVal = list[i];
 		return maxVal;
