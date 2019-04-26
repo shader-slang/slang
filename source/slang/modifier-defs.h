@@ -275,7 +275,7 @@ SIMPLE_SYNTAX_CLASS(HLSLSampleModifier, InterpolationModeModifier)
 SIMPLE_SYNTAX_CLASS(HLSLCentroidModifier, InterpolationModeModifier)
 
 // HLSL `precise` modifier
-SIMPLE_SYNTAX_CLASS(HLSLPreciseModifier, Modifier)
+SIMPLE_SYNTAX_CLASS(PreciseModifier, Modifier)
 
 // HLSL `shared` modifier (which is used by the effect system,
 // and shouldn't be confused with `groupshared`)

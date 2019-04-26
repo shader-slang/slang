@@ -2554,6 +2554,14 @@ struct EmitVisitor
         if(inst->mightHaveSideEffects())
             return false;
 
+        // Don't fold instructions that are marked `[precise]`.
+        // This could in principle be extended to any other
+        // decorations that affect the semantics of an instruction
+        // in ways that require a temporary to be introduced.
+        //
+        if(inst->findDecoration<IRPreciseDecoration>())
+            return false;
+
         // Okay, at this point we know our instruction must have a single use.
         auto use = inst->firstUse;
         SLANG_ASSERT(use);
@@ -2706,6 +2714,8 @@ struct EmitVisitor
 
         if (as<IRVoidType>(type))
             return;
+
+        emitIRTempModifiers(ctx, inst);
 
         emitIRRateQualifiers(ctx, inst);
 
@@ -5141,6 +5151,7 @@ struct EmitVisitor
         {
             for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
             {
+                emitIRTempModifiers(ctx, pp);
                 emitIRType(ctx, pp->getFullType(), getIRName(pp));
                 emit(";\n");
             }
@@ -5849,6 +5860,19 @@ struct EmitVisitor
         }
     }
 
+        /// Emit modifiers that should apply even for a declaration of an SSA temporary.
+    void emitIRTempModifiers(
+        EmitContext*    ctx,
+        IRInst*         temp)
+    {
+        SLANG_UNUSED(ctx);
+
+        if(temp->findDecoration<IRPreciseDecoration>())
+        {
+            emit("precise ");
+        }
+    }
+
     void emitIRVarModifiers(
         EmitContext*    ctx,
         VarLayout*      layout,
@@ -5896,6 +5920,8 @@ struct EmitVisitor
                 break;
             }
         }
+
+        emitIRTempModifiers(ctx, varDecl);
 
         if (!layout)
             return;

@@ -2,6 +2,7 @@
 #include "ir-ssa.h"
 
 #include "ir.h"
+#include "ir-clone.h"
 #include "ir-insts.h"
 
 namespace Slang {
@@ -350,21 +351,36 @@ IRInst* readVar(
     SSABlockInfo*           blockInfo,
     IRVar*                  var);
 
-/// Try to take any name hint on `var` and apply it to `val`.
-///
-/// Doesn't do anything if `val` already has a name hint,
-/// or if `var` doesn't have one to transfer over.
-///
-void maybeApplyNameHint(
-    ConstructSSAContext*    context,
+    /// Try to copy any relevant decorations from `var` over to `val`.
+    ///
+static void cloneRelevantDecorations(
     IRVar*                  var,
     IRInst*                 val)
 {
-    if( auto nameHint = var->findDecoration<IRNameHintDecoration>() )
+    // Copy selected decorations over from the original
+    // variable to the SSA variable, when doing so is
+    // required for semantics.
+    //
+    for( auto decoration : var->getDecorations() )
     {
-        if( !val->findDecoration<IRNameHintDecoration>() )
+        switch(decoration->op)
         {
-            context->getBuilder()->addNameHintDecoration(val, nameHint->getName());
+        default:
+            // Ignore most decorations.
+            //
+            // TODO: Should we include or exclude by default?
+            break;
+
+        case kIROp_PreciseDecoration:
+        case kIROp_NameHintDecoration:
+            // Copy these decorations if the target doesn't already have them,
+            // but don't make duplicate decorations on the target.
+            //
+            if( !val->findDecorationImpl(decoration->op) )
+            {
+                cloneDecoration(decoration, val, var->getModule());
+            }
+            break;
         }
     }
 }
@@ -383,7 +399,7 @@ PhiInfo* addPhi(
         valueType = context->getBuilder()->getRateQualifiedType(rate, valueType);
     }
     IRParam* phi = builder->createParam(valueType);
-    maybeApplyNameHint(context, var, phi);
+    cloneRelevantDecorations(var, phi);
 
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.Add(phi, phiInfo);
@@ -808,7 +824,7 @@ void processBlock(
                     // block.
                     auto val = readVar(context, blockInfo, var);
 
-                    maybeApplyNameHint(context, var, val);
+                    cloneRelevantDecorations(var, val);
 
                     val = applyAccessChain(context, &blockInfo->builder, ptrArg, val);
 
