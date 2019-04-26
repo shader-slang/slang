@@ -512,7 +512,7 @@ Result IRSerialWriter::_calcDebugInfo()
     }
 
     // Sort them
-    instLocs.Sort();
+    instLocs.sort();
     m_debugFreeSourceLoc = 1;
 
     // Look for runs
@@ -1818,7 +1818,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             // Add regular lines
             lineInfos.addRange(m_serialData->m_debugLineInfos.Buffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
             // Put in sourceloc order
-            lineInfos.Sort();
+            lineInfos.sort();
 
             List<uint32_t> lineBreakOffsets;
 
@@ -1866,7 +1866,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 int numEntries = int(srcSourceInfo.m_numAdjustedLineInfos);
 
                 adjustedLineInfos.addRange(m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
-                adjustedLineInfos.Sort();
+                adjustedLineInfos.sort();
 
                 // Work out the views adjustments, and place in dstEntries
                 List<SourceView::Entry> dstEntries;
@@ -1895,7 +1895,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         {
             List<IRSerialData::SourceLocRun> sourceRuns(m_serialData->m_debugSourceLocRuns);
             // They are now in source location order
-            sourceRuns.Sort();
+            sourceRuns.sort();
 
             // Just guess initially 0 for the source file that contains the initial run
             SourceRange range;

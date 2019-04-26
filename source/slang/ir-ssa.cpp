@@ -261,7 +261,7 @@ IRVar* asPromotableVar(
         return nullptr;
 
     IRVar* var = (IRVar*)value;
-    if (!context->promotableVars.Contains(var))
+    if (!context->promotableVars.contains(var))
         return nullptr;
 
     return var;
@@ -311,7 +311,7 @@ IRInst* applyAccessChain(
 
     case kIROp_FieldAddress:
         {
-            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto fieldKey = accessChain->getOperand(1);
@@ -325,7 +325,7 @@ IRInst* applyAccessChain(
 
     case kIROp_getElementPtr:
         {
-            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto index = accessChain->getOperand(1);

@@ -92,7 +92,6 @@ namespace Slang
 		}
 	private:
 		static const Int kInitialSize = 16;
-		TAllocator m_allocator;
 	private:
 		T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
         UInt    m_capacity;         ///< The total capacity of elements
@@ -219,10 +218,6 @@ namespace Slang
 			auto count = m_size;
 			m_size = other.m_size;
 			other.m_size = count;
-
-			TAllocator tmpAlloc = _Move(m_allocator);
-			m_allocator = _Move(other.m_allocator);
-			other.m_allocator = _Move(tmpAlloc);
 		}
 
 		T* detachBuffer()
@@ -391,7 +386,7 @@ namespace Slang
 		{
 			for (UInt i = 0; i < (m_size >> 1); i++)
 			{
-				Swap(m_buffer, i, m_size - i - 1);
+				swapElements(m_buffer, i, m_size - i - 1);
 			}
 		}
 
@@ -533,18 +528,18 @@ namespace Slang
 			return (UInt)-1;
 		}
 
-		void Sort()
+		void sort()
 		{
-			Sort([](const T& t1, const T& t2){return t1 < t2;});
+			sort([](const T& t1, const T& t2){return t1 < t2;});
 		}
 
-		bool Contains(const T& val) const
+		bool contains(const T& val) const
 		{
             return IndexOf(val) != UInt(-1);
 		}
 
 		template<typename Comparer>
-		void Sort(Comparer compare)
+		void sort(Comparer compare)
 		{
 			//InsertionSort(buffer, 0, _count - 1);
 			//QuickSort(buffer, 0, _count - 1, compare);
@@ -552,48 +547,48 @@ namespace Slang
 		}
 
 		template <typename IterateFunc>
-		void ForEach(IterateFunc f) const
+		void forEach(IterateFunc f) const
 		{
 			for (int i = 0; i< m_size; i++)
 				f(m_buffer[i]);
 		}
 
 		template<typename Comparer>
-		void QuickSort(T* vals, int startIndex, int endIndex, Comparer comparer)
+		void quickSort(T* vals, int startIndex, int endIndex, Comparer comparer)
 		{
 			if(startIndex < endIndex)
 			{
 				if (endIndex - startIndex < MIN_QSORT_SIZE)
-					InsertionSort(vals, startIndex, endIndex, comparer);
+					insertionSort(vals, startIndex, endIndex, comparer);
 				else
 				{
 					int pivotIndex = (startIndex + endIndex) >> 1;
-					int pivotNewIndex = Partition(vals, startIndex, endIndex, pivotIndex, comparer);
-					QuickSort(vals, startIndex, pivotNewIndex - 1, comparer);
-					QuickSort(vals, pivotNewIndex + 1, endIndex, comparer);
+					int pivotNewIndex = partition(vals, startIndex, endIndex, pivotIndex, comparer);
+					quickSort(vals, startIndex, pivotNewIndex - 1, comparer);
+					quickSort(vals, pivotNewIndex + 1, endIndex, comparer);
 				}
 			}
 
 		}
 		template<typename Comparer>
-		int Partition(T* vals, int left, int right, int pivotIndex, Comparer comparer)
+		int partition(T* vals, int left, int right, int pivotIndex, Comparer comparer)
 		{
 			T pivotValue = vals[pivotIndex];
-			Swap(vals, right, pivotIndex);
+			swapElements(vals, right, pivotIndex);
 			int storeIndex = left;
 			for (int i = left; i < right; i++)
 			{
 				if (comparer(vals[i], pivotValue))
 				{
-					Swap(vals, i, storeIndex);
+					swapElements(vals, i, storeIndex);
 					storeIndex++;
 				}
 			}
-			Swap(vals, storeIndex, right);
+			swapElements(vals, storeIndex, right);
 			return storeIndex;
 		}
 		template<typename Comparer>
-		void InsertionSort(T* vals, int startIndex, int endIndex, Comparer comparer)
+		void insertionSort(T* vals, int startIndex, int endIndex, Comparer comparer)
 		{
 			for (int i = startIndex  + 1; i <= endIndex; i++)
 			{
@@ -608,7 +603,7 @@ namespace Slang
 			}
 		}
 
-		inline void Swap(T* vals, int index1, int index2)
+		inline void swapElements(T* vals, int index1, int index2)
 		{
 			if (index1 != index2)
 			{
@@ -619,7 +614,7 @@ namespace Slang
 		}
 
 		template<typename T2, typename Comparer>
-		int BinarySearch(const T2& obj, Comparer comparer)
+		int binarySearch(const T2& obj, Comparer comparer)
 		{
 			int imin = 0, imax = m_size - 1;
 			while (imax >= imin)
@@ -637,9 +632,9 @@ namespace Slang
 		}
 
 		template<typename T2>
-		int BinarySearch(const T2& obj)
+		int binarySearch(const T2& obj)
 		{
-			return BinarySearch(obj, 
+			return binarySearch(obj, 
 				[](T & curObj, const T2 & thatObj)->int
 				{
 					if (curObj < thatObj)
@@ -653,7 +648,7 @@ namespace Slang
 	};
 
 	template<typename T>
-	T Min(const List<T>& list)
+	T calcMin(const List<T>& list)
 	{
 		T minVal = list.getFirst();
 		for (int i = 1; i < list.getSize(); i++)
@@ -663,7 +658,7 @@ namespace Slang
 	}
 
 	template<typename T>
-	T Max(const List<T>& list)
+	T calcMax(const List<T>& list)
 	{
 		T maxVal = list.getFirst();
 		for (int i = 1; i< list.getSize(); i++)

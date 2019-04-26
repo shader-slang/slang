@@ -202,7 +202,7 @@ struct UsedRanges
         // be in the proper sorted order, so we'll need to
         // sort the array to restore our global invariant.
         //
-        ranges.Sort();
+        ranges.sort();
 
         // We end by returning an overlapping parameter that
         // we found along the way, if any.
