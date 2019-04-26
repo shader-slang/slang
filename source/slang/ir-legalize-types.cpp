@@ -22,7 +22,7 @@ namespace Slang
 
 LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
 {
-    SLANG_ASSERT(tupleVal->elements.getSize());
+    SLANG_ASSERT(tupleVal->elements.getCount());
 
     LegalVal result;
     result.flavor = LegalVal::Flavor::tuple;
@@ -259,8 +259,8 @@ static LegalVal legalizeCall(
     return LegalVal::simple(context->builder->emitCallInst(
         retIRType,
         callInst->getCallee(),
-        instArgs.getSize(),
-        instArgs.Buffer()));
+        instArgs.getCount(),
+        instArgs.getBuffer()));
 }
 
 static LegalVal legalizeRetVal(IRTypeLegalizationContext*    context,
@@ -382,9 +382,9 @@ static LegalVal legalizeStore(
             // the tuple.
             auto destTuple = legalPtrVal.getTuple();
             auto valTuple = legalVal.getTuple();
-            SLANG_ASSERT(destTuple->elements.getSize() == valTuple->elements.getSize());
+            SLANG_ASSERT(destTuple->elements.getCount() == valTuple->elements.getCount());
 
-            for (UInt i = 0; i < valTuple->elements.getSize(); i++)
+            for (UInt i = 0; i < valTuple->elements.getCount(); i++)
             {
                 legalizeStore(context, destTuple->elements[i].val, valTuple->elements[i].val);
             }
@@ -889,8 +889,8 @@ static LegalVal legalizeGetElement(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.getSize();
-            SLANG_ASSERT(elemCount == tupleType->elements.getSize());
+            auto elemCount = ptrTupleInfo->elements.getCount();
+            SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
             for(UInt ee = 0; ee < elemCount; ++ee)
             {
@@ -1000,8 +1000,8 @@ static LegalVal legalizeGetElementPtr(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.getSize();
-            SLANG_ASSERT(elemCount == tupleType->elements.getSize());
+            auto elemCount = ptrTupleInfo->elements.getCount();
+            SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
             for(UInt ee = 0; ee < elemCount; ++ee)
             {
@@ -1096,7 +1096,7 @@ static LegalVal legalizeMakeStruct(
                 builder->emitMakeStruct(
                     legalType.getSimple(),
                     argCount,
-                    args.Buffer()));
+                    args.getBuffer()));
         }
 
     case LegalType::Flavor::pair:
@@ -1136,14 +1136,14 @@ static LegalVal legalizeMakeStruct(
             LegalVal ordinaryVal = legalizeMakeStruct(
                 context,
                 ordinaryType,
-                ordinaryArgs.Buffer(),
-                ordinaryArgs.getSize());
+                ordinaryArgs.getBuffer(),
+                ordinaryArgs.getCount());
 
             LegalVal specialVal = legalizeMakeStruct(
                 context,
                 specialType,
-                specialArgs.Buffer(),
-                specialArgs.getSize());
+                specialArgs.getBuffer(),
+                specialArgs.getCount());
 
             return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
         }
@@ -1466,7 +1466,7 @@ static LegalVal legalizeInst(
         context,
         inst,
         legalType,
-        legalArgs.Buffer());
+        legalArgs.getBuffer());
 
     // After we are done, we will eliminate the
     // original instruction by removing it from
@@ -1571,8 +1571,8 @@ static LegalVal legalizeFunc(
     }
 
     auto newFuncType = context->builder->getFuncType(
-        newParamTypes.getSize(),
-        newParamTypes.Buffer(),
+        newParamTypes.getCount(),
+        newParamTypes.getBuffer(),
         newResultType);
 
     context->builder->setDataType(irFunc, newFuncType);

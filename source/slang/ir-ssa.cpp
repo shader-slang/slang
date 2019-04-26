@@ -517,8 +517,8 @@ IRInst* addPhiOperands(
     // list with its final size so that we can preserve the
     // required invariant.
 
-    UInt operandCount = operandValues.getSize();
-    phiInfo->operands.setSize(operandCount);
+    UInt operandCount = operandValues.getCount();
+    phiInfo->operands.setCount(operandCount);
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
         phiInfo->operands[ii].init(phiInfo->phi, operandValues[ii]);
@@ -561,7 +561,7 @@ void maybeSealBlock(
     // Note that we are doing the "inefficient" loop where we compute
     // the count on each iteration to account for the possibility that
     // new incomplete phis will get added while we are working.
-    for (UInt ii = 0; ii < blockInfo->phis.getSize(); ++ii)
+    for (UInt ii = 0; ii < blockInfo->phis.getCount(); ++ii)
     {
         auto incompletePhi = blockInfo->phis[ii];
         addPhiOperands(context, blockInfo, incompletePhi);
@@ -968,7 +968,7 @@ void constructSSA(ConstructSSAContext* context)
 
     // If none of the variables are promote-able,
     // then we can exit without making any changes
-    if (context->promotableVars.getSize() == 0)
+    if (context->promotableVars.getCount() == 0)
         return;
 
     // We are going to walk the blocks in order,
@@ -1037,7 +1037,7 @@ void constructSSA(ConstructSSAContext* context)
 
         // Don't do any work for blocks that don't need to pass along
         // values to the sucessor block.
-        auto addedArgCount = blockInfo->successorArgs.getSize();
+        auto addedArgCount = blockInfo->successorArgs.getCount();
         if (addedArgCount == 0)
             continue;
 
@@ -1066,7 +1066,7 @@ void constructSSA(ConstructSSAContext* context)
             oldTerminator->getFullType(),
             oldTerminator->op,
             newArgCount,
-            newArgs.Buffer());
+            newArgs.getBuffer());
 
         // Transfer decorations (a terminator should have no children) over to the new instruction.
         //

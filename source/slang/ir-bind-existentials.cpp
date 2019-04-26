@@ -294,7 +294,7 @@ struct BindExistentialSlots
         auto newType = builder.getBindExistentialsType(
             fullType,
             slotOperandCount,
-            slotOperands.Buffer());
+            slotOperands.getBuffer());
 
         // We will replace the type of the original parameter
         // with the new proxy type.
@@ -329,7 +329,7 @@ struct BindExistentialSlots
                 fullType,
                 inst,
                 slotOperandCount,
-                slotOperands.Buffer());
+                slotOperands.getBuffer());
 
             // Second we make the use site point at the new
             // value instead.

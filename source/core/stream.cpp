@@ -228,7 +228,7 @@ namespace Slang
             pos = offset;
             break;
         case Slang::SeekOrigin::End:
-            pos = Int64(m_contents.getSize()) + offset;
+            pos = Int64(m_contents.getCount()) + offset;
             break;
         case Slang::SeekOrigin::Current:
             pos = Int64(m_position) + offset;
@@ -242,7 +242,7 @@ namespace Slang
 
         // Clamp to the valid range
         pos = (pos < 0) ? 0 : pos;
-        pos = (pos > Int64(m_contents.getSize())) ? Int64(m_contents.getSize()) : pos;
+        pos = (pos > Int64(m_contents.getCount())) ? Int64(m_contents.getCount()) : pos;
 
         m_position = UInt(pos);
     }
@@ -254,7 +254,7 @@ namespace Slang
             throw IOException("Cannot read this stream.");
         }
 
-        const Int64 maxRead = Int64(m_contents.getSize() - m_position);
+        const Int64 maxRead = Int64(m_contents.getCount() - m_position);
         
         if (maxRead == 0 && length > 0)
         {
@@ -276,7 +276,7 @@ namespace Slang
             throw IOException("Cannot write this stream.");
         }
 
-        if (m_position == m_contents.getSize())
+        if (m_position == m_contents.getCount())
         {
             m_contents.addRange((const uint8_t*)buffer, UInt(length));
         }

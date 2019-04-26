@@ -13,8 +13,8 @@ using namespace Slang;
 
 static int _indexOf(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
 {
-    const int numFormats = int(formatsIn.getSize());
-    const VkSurfaceFormatKHR* formats = formatsIn.Buffer();
+    const int numFormats = int(formatsIn.getCount());
+    const VkSurfaceFormatKHR* formats = formatsIn.getBuffer();
 
     for (int i = 0; i < numFormats; ++i)
     {
@@ -66,8 +66,8 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, nullptr);
-    surfaceFormats.setSize(int(numSurfaceFormats));
-    m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
+    surfaceFormats.setCount(int(numSurfaceFormats));
+    m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.getBuffer());
 
     // Look for a suitable format
     List<VkFormat> formats;
@@ -78,7 +78,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
         formats.add(VK_FORMAT_B8G8R8A8_UNORM);
     }
 
-    for(int i = 0; i < int(formats.getSize()); ++i)
+    for(int i = 0; i < int(formats.getCount()); ++i)
     {
         VkFormat format = formats[i];
         if (_indexOf(surfaceFormats, format) >= 0)
@@ -125,7 +125,7 @@ SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
 {
     assert(renderPass != VK_NULL_HANDLE);
 
-    for (int i = 0; i < int(m_images.getSize()); ++i)
+    for (int i = 0; i < int(m_images.getCount()); ++i)
     {
         Image& image = m_images[i];
         VkImageView attachments[] =
@@ -150,7 +150,7 @@ SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
 
 void VulkanSwapChain::_destroyFrameBuffers()
 {
-    for (int i = 0; i < int(m_images.getSize()); ++i)
+    for (int i = 0; i < int(m_images.getCount()); ++i)
     {
         Image& image = m_images[i];
         if (image.m_frameBuffer != VK_NULL_HANDLE)
@@ -209,8 +209,8 @@ SlangResult VulkanSwapChain::_createSwapChain()
     List<VkPresentModeKHR> presentModes;
     uint32_t numPresentModes = 0;
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, nullptr);
-    presentModes.setSize(numPresentModes);
-    m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.Buffer());
+    presentModes.setCount(numPresentModes);
+    m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.getBuffer());
 
     {
         int numCheckPresentOptions = 3;
@@ -265,11 +265,11 @@ SlangResult VulkanSwapChain::_createSwapChain()
 
     {
         List<VkImage> images;
-        images.setSize(numSwapChainImages);
+        images.setCount(numSwapChainImages);
 
-        m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, images.Buffer());
+        m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, images.getBuffer());
 
-        m_images.setSize(numSwapChainImages);
+        m_images.setCount(numSwapChainImages);
         for (int i = 0; i < int(numSwapChainImages); ++i)
         {
             Image& dstImage = m_images[i];
@@ -328,7 +328,7 @@ void VulkanSwapChain::_destroySwapChain()
         _destroyFrameBuffers();
     }
 
-    for (int i = 0; i < int(m_images.getSize()); ++i)
+    for (int i = 0; i < int(m_images.getCount()); ++i)
     {
         Image& image = m_images[i];
 

@@ -66,9 +66,9 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     TextureResource::Data initData;
 
     List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.setSize(textureResourceDesc.numMipLevels);
+    mipRowStrides.setCount(textureResourceDesc.numMipLevels);
     List<const void*> subResources;
-    subResources.setSize(numSubResources);
+    subResources.setCount(numSubResources);
 
     // Set up the src row strides
     for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
@@ -80,19 +80,19 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     // Set up pointers the the data
     {
         int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.getSize());
+        const int numGen = int(texData.dataBuffer.getCount());
         for (int i = 0; i < numSubResources; i++)
         {
-            subResources[i] = texData.dataBuffer[subResourceIndex].Buffer();
+            subResources[i] = texData.dataBuffer[subResourceIndex].getBuffer();
             // Wrap around
             subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
         }
     }
 
-    initData.mipRowStrides = mipRowStrides.Buffer();
+    initData.mipRowStrides = mipRowStrides.getBuffer();
     initData.numMips = textureResourceDesc.numMipLevels;
     initData.numSubResources = numSubResources;
-    initData.subResources = subResources.Buffer();
+    initData.subResources = subResources.getBuffer();
 
     textureOut = renderer->createTextureResource(Resource::Usage::GenericRead, textureResourceDesc, &initData);
 
@@ -175,7 +175,7 @@ static RefPtr<SamplerState> _createSamplerState(
         }
         case BindingStyle::OpenGl:
         {
-            const int count = int(entry.glslBinding.getSize());
+            const int count = int(entry.glslBinding.getCount());
 
             if (count <= 0)
             {
@@ -184,7 +184,7 @@ static RefPtr<SamplerState> _createSamplerState(
 
             int baseIndex = entry.glslBinding[0];
             // Make sure they are contiguous
-            for (int i = 1; i < int(entry.glslBinding.getSize()); ++i)
+            for (int i = 1; i < int(entry.glslBinding.getCount()); ++i)
             {
                 if (baseIndex + i != entry.glslBinding[i])
                 {
@@ -205,8 +205,8 @@ static RefPtr<SamplerState> _createSamplerState(
 
 /* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
 {
-    auto srcEntries = layout.entries.Buffer();
-    auto numEntries = int(layout.entries.getSize());
+    auto srcEntries = layout.entries.getBuffer();
+    auto numEntries = int(layout.entries.getCount());
 
     const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
 
@@ -283,8 +283,8 @@ static RefPtr<SamplerState> _createSamplerState(
     }
 
     DescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getSize();
-    descriptorSetLayoutDesc.slotRanges = slotRangeDescs.Buffer();
+    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getCount();
+    descriptorSetLayoutDesc.slotRanges = slotRangeDescs.getBuffer();
 
     auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
@@ -294,8 +294,8 @@ static RefPtr<SamplerState> _createSamplerState(
 
     PipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = layout.numRenderTargets;
-    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getSize();
-    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.Buffer();
+    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
+    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 
     auto pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
     if(!pipelineLayout) return SLANG_FAIL;
@@ -320,10 +320,10 @@ static RefPtr<SamplerState> _createSamplerState(
             case ShaderInputType::Buffer:
                 {
                     const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
-                    const size_t bufferSize = srcEntry.bufferData.getSize() * sizeof(uint32_t);
+                    const size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(uint32_t);
 
                     RefPtr<BufferResource> bufferResource;
-                    SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
+                    SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.getBuffer(), renderer, bufferResource));
 
                     switch(srcBuffer.type)
                     {

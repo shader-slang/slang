@@ -94,7 +94,7 @@ namespace Slang
         }
         else if (appendTo == ResultFormat::Binary)
         {
-            outputBinary.addRange(result.outputBinary.Buffer(), result.outputBinary.getSize());
+            outputBinary.addRange(result.outputBinary.getBuffer(), result.outputBinary.getCount());
         }
     }
 
@@ -113,7 +113,7 @@ namespace Slang
                 break;
 
             case ResultFormat::Binary:
-                blob = createRawBlob(outputBinary.Buffer(), outputBinary.getSize());
+                blob = createRawBlob(outputBinary.getBuffer(), outputBinary.getCount());
                 break;
             }
         }
@@ -634,7 +634,7 @@ namespace Slang
 
         const auto& sourceFiles = translationUnitRequest->getSourceFiles();
 
-        const int numSourceFiles = int(sourceFiles.getSize());
+        const int numSourceFiles = int(sourceFiles.getCount());
 
         switch (numSourceFiles)
         {
@@ -718,7 +718,7 @@ namespace Slang
             D3D_SHADER_MACRO nullTerminator = { 0, 0 };
             dxMacrosStorage.add(nullTerminator);
 
-            dxMacros = dxMacrosStorage.Buffer();
+            dxMacros = dxMacrosStorage.getBuffer();
         }
 
         DWORD flags = 0;
@@ -853,11 +853,11 @@ namespace Slang
             targetReq,
             endToEndReq,
             dxbc));
-        if (!dxbc.getSize())
+        if (!dxbc.getCount())
         {
             return SLANG_FAIL;
         }
-        return dissassembleDXBC(compileRequest, dxbc.Buffer(), dxbc.getSize(), assemOut);
+        return dissassembleDXBC(compileRequest, dxbc.getBuffer(), dxbc.getCount(), assemOut);
     }
 #endif
 
@@ -1004,10 +1004,10 @@ SlangResult dissassembleDXILUsingDXC(
             endToEndReq,
             spirv));
 
-        if (spirv.getSize() == 0)
+        if (spirv.getCount() == 0)
             return SLANG_FAIL;
 
-        return dissassembleSPIRV(slangRequest, spirv.begin(), spirv.getSize(), assemblyOut);
+        return dissassembleSPIRV(slangRequest, spirv.begin(), spirv.getCount(), assemblyOut);
     }
 #endif
 
@@ -1063,7 +1063,7 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq,
                     code)))
                 {
-                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.getSize(), target);
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
                     result = CompileResult(code);
                 }
             }
@@ -1099,7 +1099,7 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq,
                     code)))
                 {
-                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.getSize(), target);
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
                     result = CompileResult(code);
                 }
             }
@@ -1119,8 +1119,8 @@ SlangResult dissassembleDXILUsingDXC(
                     String assembly; 
                     dissassembleDXILUsingDXC(
                         compileRequest,
-                        code.Buffer(),
-                        code.getSize(), 
+                        code.getBuffer(),
+                        code.getCount(), 
                         assembly);
 
                     maybeDumpIntermediate(compileRequest, assembly.Buffer(), target);
@@ -1142,7 +1142,7 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq,
                     code)))
                 {
-                    maybeDumpIntermediate(compileRequest, code.Buffer(), code.getSize(), target);
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
                     result = CompileResult(code);
                 }
             }

@@ -351,8 +351,8 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	fseek(sourceFile, 0, SEEK_SET);
 
     List<char> sourceText;
-    sourceText.setSize(sourceSize + 1);
-	fread(sourceText.Buffer(), sourceSize, 1, sourceFile);
+    sourceText.setCount(sourceSize + 1);
+	fread(sourceText.getBuffer(), sourceSize, 1, sourceFile);
 	fclose(sourceFile);
 	sourceText[sourceSize] = 0;
 
@@ -366,12 +366,12 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
         m_shaderInputLayout.numRenderTargets = 0;
         break;
     }
-	m_shaderInputLayout.Parse(sourceText.Buffer());
+	m_shaderInputLayout.Parse(sourceText.getBuffer());
 
 	ShaderCompileRequest::SourceInfo sourceInfo;
 	sourceInfo.path = sourcePath;
-	sourceInfo.dataBegin = sourceText.Buffer();
-	sourceInfo.dataEnd = sourceText.Buffer() + sourceSize;
+	sourceInfo.dataBegin = sourceText.getBuffer();
+	sourceInfo.dataEnd = sourceText.getBuffer() + sourceSize;
 
 	ShaderCompileRequest compileRequest;
 	compileRequest.source = sourceInfo;

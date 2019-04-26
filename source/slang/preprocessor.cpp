@@ -659,7 +659,7 @@ static void MaybeBeginMacroExpansion(
             expansion->environment = &expansion->argumentEnvironment;
 
             // Try to read any arguments present.
-            UInt paramCount = macro->params.getSize();
+            UInt paramCount = macro->params.getCount();
             UInt argIndex = 0;
 
             switch (PeekRawTokenType(preprocessor))

@@ -277,14 +277,14 @@ static bool _isSubCommand(const char* arg)
 
 
     // first positional argument is source shader path
-    if (positionalArgs.getSize())
+    if (positionalArgs.getCount())
     {
         optionsOut->testPrefix = positionalArgs[0];
         positionalArgs.removeAt(0);
     }
 
     // any remaining arguments represent an error
-    if (positionalArgs.getSize() != 0)
+    if (positionalArgs.getCount() != 0)
     {
         stdError.print("unexpected arguments\n");
         return SLANG_FAIL;

@@ -610,7 +610,7 @@ static int _findLineIndex(const List<const char*>& lineBreaks, const char* locat
 
     // Use a binary chop to find the associated line
     int lo = 0;
-    int hi = int(lineBreaks.getSize());
+    int hi = int(lineBreaks.getCount());
 
     while (lo + 1 < hi)
     {
@@ -867,7 +867,7 @@ int main(
         }
     }
 
-    if(inputPaths.getSize() == 0)
+    if(inputPaths.getCount() == 0)
     {
         usage(appName);
         exit(1);

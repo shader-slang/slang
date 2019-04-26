@@ -771,7 +771,7 @@ LoweredValInfo emitCallToDeclRef(
         {
             argTypes.add(args[ii]->getDataType());
         }
-        funcType = builder->getFuncType(argCount, argTypes.Buffer(), type);
+        funcType = builder->getFuncType(argCount, argTypes.getBuffer(), type);
     }
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
     return emitCallToVal(context, type, funcVal, argCount, args);
@@ -784,7 +784,7 @@ LoweredValInfo emitCallToDeclRef(
     IRType*                 funcType,
     List<IRInst*> const&    args)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getSize(), args.Buffer());
+    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getCount(), args.getBuffer());
 }
 
 IRInst* getFieldKey(
@@ -1156,7 +1156,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // We can turn each of those per-case witnesses into a witness
         // table value:
         //
-        auto caseCount = val->caseWitnesses.getSize();
+        auto caseCount = val->caseWitnesses.getCount();
         List<IRInst*> caseWitnessTables;
         for( auto caseWitness : val->caseWitnesses )
         {
@@ -1375,8 +1375,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     irTagVal,       // value to `switch` on
                     invalidLabel,   // `break` label (block after the `switch` statement ends)
                     defaultLabel,   // `default` label (where to go if no `case` matches)
-                    switchCaseOperands.getSize(),
-                    switchCaseOperands.Buffer());
+                    switchCaseOperands.getCount(),
+                    switchCaseOperands.getBuffer());
             }
             else
             {
@@ -1414,7 +1414,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         return getBuilder()->getFuncType(
             paramCount,
-            paramTypes.Buffer(),
+            paramTypes.getBuffer(),
             resultType);
     }
 
@@ -2069,7 +2069,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 args.add(irDefaultValue);
             }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeVector(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
@@ -2085,7 +2085,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 args.add(irDefaultValue);
             }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
@@ -2100,7 +2100,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeArray(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeArray(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -2118,7 +2118,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
 
                 return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getSize(), args.Buffer()));
+                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
             }
         }
 
@@ -2145,7 +2145,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         IRType* irType = lowerType(context, type);
         List<IRInst*> args;
 
-        UInt argCount = expr->args.getSize();
+        UInt argCount = expr->args.getCount();
 
         // If the initializer list was empty, then the user was
         // asking for default initialization, which should apply
@@ -2178,7 +2178,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeArray(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeArray(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
@@ -2200,7 +2200,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeVector(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
@@ -2224,7 +2224,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.getSize(), args.Buffer()));
+                getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -2252,7 +2252,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
 
                 return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getSize(), args.Buffer()));
+                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
             }
         }
 
@@ -2311,7 +2311,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        UInt argCount = expr->Arguments.getSize();
+        UInt argCount = expr->Arguments.getCount();
         UInt argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
@@ -3651,8 +3651,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             conditionVal,
             breakLabel,
             defaultLabel,
-            info.cases.getSize(),
-            info.cases.Buffer());
+            info.cases.getCount(),
+            info.cases.getBuffer());
 
         // Finally we insert the label that a `break` will jump to
         // (and that control flow will fall through to otherwise).
@@ -4574,7 +4574,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.getSize(), genericArgs.Buffer());
+        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.getCount(), genericArgs.getBuffer());
     }
 
     IRInst* defaultSpecializeOuterGenerics(
@@ -5612,8 +5612,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         auto irFuncType = subBuilder->getFuncType(
-            paramTypes.getSize(),
-            paramTypes.Buffer(),
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
             irResultType);
         irFunc->setFullType(irFuncType);
 
@@ -6095,8 +6095,8 @@ LoweredValInfo emitDeclRef(
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,
-            irArgs.getSize(),
-            irArgs.Buffer());
+            irArgs.getCount(),
+            irArgs.getBuffer());
 
         return LoweredValInfo::simple(irSpecializedVal);
     }
@@ -6233,7 +6233,7 @@ static void lowerProgramEntryPointToIR(
             existentialSlotArgs.add(irWitnessTable);
         }
 
-        builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());
+        builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getCount(), existentialSlotArgs.getBuffer());
     }
 
 
@@ -6463,7 +6463,7 @@ RefPtr<IRModule> generateIRForProgram(
             existentialSlotArgs.add(irWitnessTable);
         }
 
-        builder->emitBindGlobalExistentialSlots(existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());
+        builder->emitBindGlobalExistentialSlots(existentialSlotArgs.getCount(), existentialSlotArgs.getBuffer());
     }
 
 

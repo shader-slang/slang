@@ -223,14 +223,14 @@ namespace Slang
                 break;
             }
 
-            auto length = buf.getSize() / sizeof(wchar_t);
+            auto length = buf.getCount() / sizeof(wchar_t);
 			if (outLength)
 				*outLength = length;
 
             for(int ii = 0; ii < sizeof(wchar_t); ++ii)
     			buf.add(0);
 
-            wchar_t* beginData = (wchar_t*)buf.Buffer();
+            wchar_t* beginData = (wchar_t*)buf.getBuffer();
             wchar_t* endData = beginData + length;
 
 			buf.detachBuffer();

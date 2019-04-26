@@ -22,7 +22,7 @@ LegalType LegalType::implicitDeref(
 LegalType LegalType::tuple(
     RefPtr<TuplePseudoType>   tupleType)
 {
-    SLANG_ASSERT(tupleType->elements.getSize());
+    SLANG_ASSERT(tupleType->elements.getCount());
 
     LegalType result;
     result.flavor = Flavor::tuple;

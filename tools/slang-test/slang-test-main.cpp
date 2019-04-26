@@ -239,7 +239,7 @@ static TestResult _gatherTestOptions(
     }
 
     // If no categories were specified, then add the default category
-    if(outOptions.categories.getSize() == 0)
+    if(outOptions.categories.getCount() == 0)
     {
         outOptions.categories.add(categorySet->defaultCategory);
     }
@@ -421,7 +421,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         // TODO(js): Potentially this should handle escaping parameters for the command line if need be
         const auto& argList = spawner.argumentList_;
-        for (UInt i = 0; i < argList.getSize(); ++i)
+        for (UInt i = 0; i < argList.getCount(); ++i)
         {
             builder << " " << argList[i];
         }
@@ -452,12 +452,12 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         List<const char*> args;
         args.add(exeName.Buffer());
-        for (int i = 0; i < int(spawner.argumentList_.getSize()); ++i)
+        for (int i = 0; i < int(spawner.argumentList_.getCount()); ++i)
         {
             args.add(spawner.argumentList_[i].Buffer());
         }
 
-        SlangResult res = func(&stdWriters, context->getSession(), int(args.getSize()), args.begin());
+        SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
 
         StdWriters::setSingleton(prevStdWriters);
 
@@ -477,7 +477,7 @@ static SlangResult _extractArg(const List<String>& args, const String& argName, 
 {
     SLANG_ASSERT(argName.Length() > 0 && argName[0] == '-');
 
-    const UInt count = args.getSize();
+    const UInt count = args.getCount();
     for (UInt i = 0; i < count - 1; ++i)
     {
         if (args[i] == argName)
@@ -1105,7 +1105,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     const auto& args = input.testOptions->args;
 
     const UInt targetIndex = args.indexOf("-target");
-    if (targetIndex != UInt(-1) && targetIndex + 1 < args.getSize())
+    if (targetIndex != UInt(-1) && targetIndex + 1 < args.getCount())
     {
         SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
@@ -1538,12 +1538,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     {
         context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
     };
-    if (actualProgramOutput.getSize() < referenceProgramOutput.getSize())
+    if (actualProgramOutput.getCount() < referenceProgramOutput.getCount())
     {
         printOutput();
 		return TestResult::Fail;
     }
-	for (int i = 0; i < (int)referenceProgramOutput.getSize(); i++)
+	for (int i = 0; i < (int)referenceProgramOutput.getCount(); i++)
 	{
 		auto reference = String(referenceProgramOutput[i].Trim());
 		auto actual = String(actualProgramOutput[i].Trim());
@@ -2055,7 +2055,7 @@ void runTestsOnFile(
     }
 
     // Note cases where a test file exists, but we found nothing to run
-    if( testList.tests.getSize() == 0 )
+    if( testList.tests.getCount() == 0 )
     {
         context->reporter->addTest(filePath, TestResult::Ignored);
         return;
@@ -2093,7 +2093,7 @@ void runTestsOnFile(
         // What render options do we want to synthesize
         RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
 
-        const UInt numInitialTests = testList.tests.getSize();
+        const UInt numInitialTests = testList.tests.getCount();
 
         while (missingApis)
         {
@@ -2350,13 +2350,13 @@ SlangResult innerMain(int argc, char** argv)
         // Copy args to a char* list
         const auto& srcArgs = options.subCommandArgs;
         List<const char*> args;
-        args.setSize(srcArgs.getSize());
-        for (UInt i = 0; i < srcArgs.getSize(); ++i)
+        args.setCount(srcArgs.getCount());
+        for (UInt i = 0; i < srcArgs.getCount(); ++i)
         {
             args[i] = srcArgs[i].Buffer();
         }
 
-        return func(StdWriters::getSingleton(), context.getSession(), int(args.getSize()), args.Buffer());
+        return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());
     }
 
     if( options.includeCategories.Count() == 0 )

@@ -479,7 +479,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             {
                 List<ComPtr<IDXGIAdapter>> dxgiAdapters;
                 D3DUtil::findAdapters(deviceCheckFlags, desc.adapter.getUnownedSlice(), dxgiAdapters);
-                if (dxgiAdapters.getSize() == 0)
+                if (dxgiAdapters.getCount() == 0)
                 {
                     continue;
                 }
@@ -695,7 +695,7 @@ Result D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const 
     D3D11_SUBRESOURCE_DATA* subResourcesPtr = nullptr;
     if(initData)
     {
-        subRes.setSize(srcDesc.numMipLevels * effectiveArraySize);
+        subRes.setCount(srcDesc.numMipLevels * effectiveArraySize);
         {
             int subResourceIndex = 0;
             for (int i = 0; i < effectiveArraySize; i++)
@@ -715,7 +715,7 @@ Result D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const 
                 }
             }
         }
-        subResourcesPtr = subRes.Buffer();
+        subResourcesPtr = subRes.getBuffer();
     }
 
     const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
@@ -816,9 +816,9 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
     List<uint8_t> initDataBuffer;
     if (initData && alignedSizeInBytes > srcDesc.sizeInBytes)
     {
-        initDataBuffer.setSize(alignedSizeInBytes);
-        ::memcpy(initDataBuffer.Buffer(), initData, srcDesc.sizeInBytes);
-        initData = initDataBuffer.Buffer();
+        initDataBuffer.setCount(alignedSizeInBytes);
+        ::memcpy(initDataBuffer.getBuffer(), initData, srcDesc.sizeInBytes);
+        initData = initDataBuffer.getBuffer();
     }
 
     D3D11_BUFFER_DESC bufferDesc = { 0 };
@@ -1861,10 +1861,10 @@ Result D3D11Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     RefPtr<DescriptorSetImpl> descriptorSetImpl = new DescriptorSetImpl();
 
     descriptorSetImpl->m_layout = layoutImpl;
-    descriptorSetImpl->m_cbs     .setSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ConstantBuffer)]);
-    descriptorSetImpl->m_srvs    .setSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ShaderResourceView)]);
-    descriptorSetImpl->m_uavs    .setSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
-    descriptorSetImpl->m_samplers.setSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::Sampler)]);
+    descriptorSetImpl->m_cbs     .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ConstantBuffer)]);
+    descriptorSetImpl->m_srvs    .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ShaderResourceView)]);
+    descriptorSetImpl->m_uavs    .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
+    descriptorSetImpl->m_samplers.setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::Sampler)]);
 
     *outDescriptorSet = descriptorSetImpl.detach();
     return SLANG_OK;

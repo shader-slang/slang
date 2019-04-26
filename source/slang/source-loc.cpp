@@ -34,7 +34,7 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 
     const auto rawValue = sourceLoc.getRaw();
 
-    int hi = int(m_entries.getSize());    
+    int hi = int(m_entries.getCount());    
     // If there are no entries, or it is in front of the first entry, then there is no associated entry
     if (hi == 0 || 
         m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
@@ -69,7 +69,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Calculate the offset
     const int offset = m_range.getOffset(directiveLoc);
@@ -101,10 +101,10 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
-    if (m_entries.getSize() == 0 || (m_entries.getSize() && m_entries.getLast().isDefault()))
+    if (m_entries.getCount() == 0 || (m_entries.getCount() && m_entries.getLast().isDefault()))
     {
         return;
     }
@@ -209,7 +209,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     // We now have a raw input file that we can search for line breaks.
     // We obviously don't want to do a linear scan over and over, so we will
     // cache an array of line break locations in the file.
-    if (m_lineBreakOffsets.getSize() == 0)
+    if (m_lineBreakOffsets.getCount() == 0)
     {
         UnownedStringSlice content = getContent();
 
@@ -266,7 +266,7 @@ int SourceFile::calcLineIndexFromOffset(int offset)
     // We will use a binary search to find the line index that contains our
     // chosen offset.
     int lo = 0;
-    int hi = int(lineBreakOffsets.getSize());
+    int hi = int(lineBreakOffsets.getCount());
 
     while (lo + 1 < hi)
     {
@@ -458,7 +458,7 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
 
 SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
-    int hi = int(m_sourceViews.getSize());
+    int hi = int(m_sourceViews.getCount());
     // It must be in the range of this manager and have associated views for it to possibly be a hit
     if (!getSourceRange().contains(loc) || hi == 0)
     {

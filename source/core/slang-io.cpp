@@ -209,9 +209,9 @@ namespace Slang
         }
 
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
-        if (splitOut.getSize() > 1 && splitOut.getLast().size() == 0)
+        if (splitOut.getCount() > 1 && splitOut.getLast().size() == 0)
         {
-            if (splitOut.getSize() == 2 && isDriveSpecification(splitOut[0]))
+            if (splitOut.getCount() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
@@ -241,10 +241,10 @@ namespace Slang
         split(path, splitPath);
 
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (int i = 0; i < int(splitPath.getSize()); i++)
+        for (int i = 0; i < int(splitPath.getCount()); i++)
         {
             const UnownedStringSlice& cur = splitPath[i];
-            if (cur == "." && splitPath.getSize() > 1)
+            if (cur == "." && splitPath.getCount() > 1)
             {
                 // Just remove it 
                 splitPath.removeAt(i);
@@ -265,14 +265,14 @@ namespace Slang
         }
 
         // If its empty it must be .
-        if (splitPath.getSize() == 0)
+        if (splitPath.getCount() == 0)
         {
             splitPath.add(UnownedStringSlice::fromLiteral("."));
         }
    
         // Reconstruct the string
         StringBuilder builder;
-        for (int i = 0; i < int(splitPath.getSize()); i++)
+        for (int i = 0; i < int(splitPath.getCount()); i++)
         {
             if (i > 0)
             {
@@ -476,17 +476,17 @@ namespace Slang
     {
         List<char> buffer;
         // Guess an initial buffer size
-        buffer.setSize(1024);
+        buffer.setCount(1024);
 
         while (true)
         {
-            const size_t size = buffer.getSize();
+            const size_t size = buffer.getCount();
             size_t bufferSize = size;
-            SlangResult res = _calcExectuablePath(buffer.Buffer(), &bufferSize);
+            SlangResult res = _calcExectuablePath(buffer.getBuffer(), &bufferSize);
 
             if (SLANG_SUCCEEDED(res))
             {
-                return String(buffer.Buffer());
+                return String(buffer.getBuffer());
             }
 
             if (res != SLANG_E_BUFFER_TOO_SMALL)
@@ -497,7 +497,7 @@ namespace Slang
 
             // If bufferSize changed it should be the exact fit size, else we just make the buffer bigger by a guess (50% bigger)
             bufferSize = (bufferSize > size) ? bufferSize : (bufferSize + bufferSize / 2);
-            buffer.setSize(bufferSize);
+            buffer.setCount(bufferSize);
         }
     }
 

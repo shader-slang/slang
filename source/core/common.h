@@ -31,6 +31,9 @@ namespace Slang
 
 	typedef intptr_t PtrInt;
 
+    // Type used for indexing, in arrays/views etc
+    typedef UInt Index;
+
 	template <typename T>
 	inline T&& _Move(T & obj)
 	{

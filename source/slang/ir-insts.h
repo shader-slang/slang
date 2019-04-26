@@ -781,7 +781,7 @@ struct IRBuilder
         List<IRType*> const&    paramTypes,
         IRType*                 resultType)
     {
-        return getFuncType(paramTypes.getSize(), paramTypes.Buffer(), resultType);
+        return getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), resultType);
     }
 
     IRConstantBufferType* getConstantBufferType(
@@ -801,7 +801,7 @@ struct IRBuilder
     IRType* getTaggedUnionType(
         List<IRType*> const& caseTypes)
     {
-        return getTaggedUnionType(caseTypes.getSize(), caseTypes.Buffer());
+        return getTaggedUnionType(caseTypes.getCount(), caseTypes.getBuffer());
     }
 
     IRType* getBindExistentialsType(
@@ -853,7 +853,7 @@ struct IRBuilder
         IRInst*                 func,
         List<IRInst*> const&    args)
     {
-        return emitCallInst(type, func, args.getSize(), args.Buffer());
+        return emitCallInst(type, func, args.getCount(), args.getBuffer());
     }
 
     IRInst* createIntrinsicInst(
@@ -882,7 +882,7 @@ struct IRBuilder
         IRType*                 type,
         List<IRInst*> const&    args)
     {
-        return emitMakeVector(type, args.getSize(), args.Buffer());
+        return emitMakeVector(type, args.getCount(), args.getBuffer());
     }
 
     IRInst* emitMakeMatrix(
@@ -904,7 +904,7 @@ struct IRBuilder
         IRType*                 type,
         List<IRInst*> const&    args)
     {
-        return emitMakeStruct(type, args.getSize(), args.Buffer());
+        return emitMakeStruct(type, args.getCount(), args.getBuffer());
     }
 
     IRInst* emitMakeExistential(

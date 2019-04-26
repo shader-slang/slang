@@ -502,7 +502,7 @@ void OSProcessSpawner::pushArgument(
 
 Slang::String OSProcessSpawner::getCommandLine()
 {
-    Slang::UInt argCount = arguments_.getSize();
+    Slang::UInt argCount = arguments_.getCount();
 
     Slang::StringBuilder sb;
     for(Slang::UInt ii = 0; ii < argCount;  ++ii)

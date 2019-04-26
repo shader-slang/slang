@@ -260,8 +260,8 @@ void cloneDecoration(
 
 bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& other) const
 {
-    auto valCount = vals.getSize();
-    if(valCount != other.vals.getSize()) return false;
+    auto valCount = vals.getCount();
+    if(valCount != other.vals.getCount()) return false;
     for( UInt ii = 0; ii < valCount; ++ii )
     {
         if(vals[ii] != other.vals[ii]) return false;
@@ -271,7 +271,7 @@ bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& othe
 
 int IRSimpleSpecializationKey::GetHashCode() const
 {
-    auto valCount = vals.getSize();
+    auto valCount = vals.getCount();
     int hash = Slang::GetHashCode(valCount);
     for( UInt ii = 0; ii < valCount; ++ii )
     {

@@ -280,7 +280,7 @@ namespace Slang
                 return builder->getBindExistentialsType(
                     baseElementType,
                     existentialArgCount,
-                    existentialArgs.Buffer());
+                    existentialArgs.getBuffer());
             }
         }
 
@@ -1867,7 +1867,7 @@ namespace Slang
         return getBindExistentialsType(
             baseType,
             slotArgCount,
-            slotArgs.Buffer());
+            slotArgs.getBuffer());
     }
 
 

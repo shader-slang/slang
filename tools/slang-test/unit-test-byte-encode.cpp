@@ -78,12 +78,12 @@ static void byteEncodeUnitTest()
         const int blockSize = 1024;
 
         List<uint8_t> encodedBuffer;
-        encodedBuffer.setSize(ByteEncodeUtil::kMaxLiteEncodeUInt32 * blockSize);
+        encodedBuffer.setCount(ByteEncodeUtil::kMaxLiteEncodeUInt32 * blockSize);
 
         List<uint32_t> initialBuffer;
-        initialBuffer.setSize(blockSize);
+        initialBuffer.setCount(blockSize);
         List<uint32_t> decodeBuffer;
-        decodeBuffer.setSize(blockSize);
+        decodeBuffer.setCount(blockSize);
         // Put in cache?
         memset(decodeBuffer.begin(), 0, blockSize * sizeof(uint32_t));
 

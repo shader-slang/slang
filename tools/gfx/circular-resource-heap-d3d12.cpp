@@ -80,7 +80,7 @@ void D3D12CircularResourceHeap::updateCompleted()
 	}
 #else
 	// A more efficient implementation is m_pendingQueue is implemented as a vector like type
-	const int size = int(m_pendingQueue.getSize());
+	const int size = int(m_pendingQueue.getCount());
 	int end = 0;
 	while (end < size && m_pendingQueue[end].m_completedValue <= completedValue)
 	{

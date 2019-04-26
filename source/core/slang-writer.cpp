@@ -66,13 +66,13 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 
 SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
 {
-    m_appendBuffer.setSize(maxNumChars);
-    return m_appendBuffer.Buffer();
+    m_appendBuffer.setCount(maxNumChars);
+    return m_appendBuffer.getBuffer();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
 {
-    SLANG_ASSERT(m_appendBuffer.Buffer() == buffer && buffer + numChars <= m_appendBuffer.end());
+    SLANG_ASSERT(m_appendBuffer.getBuffer() == buffer && buffer + numChars <= m_appendBuffer.end());
     // Do the actual write
     SlangResult res = write(buffer, numChars);
     // Clear so that buffer can't be written from again without assert
@@ -85,17 +85,17 @@ SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char*
 SLANG_NO_THROW char* SLANG_MCALL CallbackWriter::beginAppendBuffer(size_t maxNumChars)
 {
     // Add one so there is always space for end termination, we need for the callback.
-    m_appendBuffer.setSize(maxNumChars + 1);
-    return m_appendBuffer.Buffer();
+    m_appendBuffer.setCount(maxNumChars + 1);
+    return m_appendBuffer.getBuffer();
 }
 
 SlangResult CallbackWriter::write(const char* chars, size_t numChars)
 {
     if (numChars > 0)
     {
-        char* appendBuffer = m_appendBuffer.Buffer();
+        char* appendBuffer = m_appendBuffer.getBuffer();
         // See if it's from an append buffer
-        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.getSize()))
+        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.getCount()))
         {
             // Set terminating 0
             appendBuffer[(chars + numChars) - appendBuffer] = 0;
@@ -105,11 +105,11 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
         else
         {
             // Use the append buffer to add the terminating 0
-            m_appendBuffer.setSize(numChars + 1);
-            ::memcpy(m_appendBuffer.Buffer(), chars, numChars);
+            m_appendBuffer.setCount(numChars + 1);
+            ::memcpy(m_appendBuffer.getBuffer(), chars, numChars);
             m_appendBuffer[numChars] = 0;
 
-            m_callback(m_appendBuffer.Buffer(), (void*)m_data);
+            m_callback(m_appendBuffer.getBuffer(), (void*)m_data);
         }
     }
 

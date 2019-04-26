@@ -472,7 +472,7 @@ void GLRenderer::flushStateForDraw()
 
     // Next bind the descriptor sets as required by the layout
     auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
-    auto descriptorSetCount = pipelineLayout->m_sets.getSize();
+    auto descriptorSetCount = pipelineLayout->m_sets.getCount();
     for(UInt ii = 0; ii < descriptorSetCount; ++ii)
     {
         auto descriptorSet = m_boundDescriptorSets[ii];
@@ -1383,15 +1383,15 @@ Result GLRenderer::createDescriptorSet(DescriptorSetLayout* layout, DescriptorSe
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::ConstantBuffer);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
-        descriptorSetImpl->m_constantBuffers.setSize(slotCount);
+        descriptorSetImpl->m_constantBuffers.setCount(slotCount);
     }
 
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::CombinedTextureSampler);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
 
-        descriptorSetImpl->m_textures.setSize(slotCount);
-        descriptorSetImpl->m_samplers.setSize(slotCount);
+        descriptorSetImpl->m_textures.setCount(slotCount);
+        descriptorSetImpl->m_samplers.setCount(slotCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();

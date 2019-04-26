@@ -839,7 +839,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // TODO: This logic should be moved into `options.cpp` or somewhere else
     // specific to the command-line tool.
     //
-    if (getLinkage()->targets.getSize() == 0)
+    if (getLinkage()->targets.getCount() == 0)
     {
         auto language = inferSourceLanguage(getFrontEndReq());
         switch (language)
@@ -938,7 +938,7 @@ SlangResult EndToEndCompileRequest::executeActions()
 
 int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* moduleName)
 {
-    UInt result = translationUnits.getSize();
+    UInt result = translationUnits.getCount();
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
@@ -959,7 +959,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language)
     // even when they are being compiled together.
     //
     String generatedName = "tu";
-    generatedName.append(translationUnits.getSize());
+    generatedName.append(translationUnits.getCount());
     return addTranslationUnit(language,  getNamePool()->getName(generatedName));
 }
 
@@ -1029,7 +1029,7 @@ int FrontEndCompileRequest::addEntryPoint(
 {
     auto translationUnitReq = translationUnits[translationUnitIndex];
 
-    UInt result = m_entryPointReqs.getSize();
+    UInt result = m_entryPointReqs.getCount();
 
     RefPtr<FrontEndEntryPointRequest> entryPointReq = new FrontEndEntryPointRequest(
         this,
@@ -1055,7 +1055,7 @@ int EndToEndCompileRequest::addEntryPoint(
     for (auto typeName : genericTypeNames)
         entryPointInfo.genericArgStrings.add(typeName);
 
-    UInt result = entryPoints.getSize();
+    UInt result = entryPoints.getCount();
     entryPoints.add(_Move(entryPointInfo));
     return (int) result;
 }
@@ -1067,7 +1067,7 @@ UInt Linkage::addTarget(
     targetReq->linkage = this;
     targetReq->target = target;
 
-    UInt result = targets.getSize();
+    UInt result = targets.getCount();
     targets.add(targetReq);
     return (int) result;
 }
@@ -1423,7 +1423,7 @@ TargetProgram::TargetProgram(
     : m_program(program)
     , m_targetReq(targetReq)
 {
-    m_entryPointResults.setSize(program->getEntryPoints().getSize());
+    m_entryPointResults.setCount(program->getEntryPoints().getCount());
 }
 
 //
@@ -1990,7 +1990,7 @@ SLANG_API void spAddTranslationUnitSourceFile(
     auto frontEndReq = req->getFrontEndReq();
     if(!path) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getSize()) return;
+    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     frontEndReq->addTranslationUnitSourceFile(
         translationUnitIndex,
@@ -2024,7 +2024,7 @@ SLANG_API void spAddTranslationUnitSourceStringSpan(
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBegin) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getSize()) return;
+    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
@@ -2045,7 +2045,7 @@ SLANG_API void spAddTranslationUnitSourceBlob(
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBlob) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getSize()) return;
+    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
@@ -2095,7 +2095,7 @@ SLANG_API int spAddEntryPointEx(
     auto frontEndReq = req->getFrontEndReq();
     if (!name) return -1;
     if (translationUnitIndex < 0) return -1;
-    if (Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getSize()) return -1;
+    if (Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return -1;
     Slang::List<Slang::String> typeNames;
     for (int i = 0; i < genericParamTypeNameCount; i++)
         typeNames.add(genericParamTypeNames[i]);
@@ -2133,8 +2133,8 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
 
     auto req = convert(request);
     auto& typeArgStrings = req->globalExistentialSlotArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.getSize())
-        typeArgStrings.setSize(slotIndex+1);
+    if(Slang::UInt(slotIndex) >= typeArgStrings.getCount())
+        typeArgStrings.setCount(slotIndex+1);
     typeArgStrings[slotIndex] = Slang::String(typeName);
     return SLANG_OK;
 }
@@ -2151,13 +2151,13 @@ SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     if(!typeName)           return SLANG_FAIL;
 
     auto req = convert(request);
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getSize())
+    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getCount())
         return SLANG_FAIL;
 
     auto& entryPointInfo = req->entryPoints[entryPointIndex];
     auto& typeArgStrings = entryPointInfo.existentialArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.getSize())
-        typeArgStrings.setSize(slotIndex+1);
+    if(Slang::UInt(slotIndex) >= typeArgStrings.getCount())
+        typeArgStrings.setCount(slotIndex+1);
     typeArgStrings[slotIndex] = Slang::String(typeName);
     return SLANG_OK;
 }
@@ -2224,7 +2224,7 @@ spGetDependencyFileCount(
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     auto program = frontEndReq->getProgram();
-    return (int) program->getFilePathDependencies().getSize();
+    return (int) program->getFilePathDependencies().getCount();
 }
 
 /** Get the path to a file this compilation dependend on.
@@ -2247,7 +2247,7 @@ spGetTranslationUnitCount(
 {
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
-    return (int) frontEndReq->translationUnits.getSize();
+    return (int) frontEndReq->translationUnits.getCount();
 }
 
 // Get the output code associated with a specific translation unit
@@ -2270,14 +2270,14 @@ SLANG_API void const* spGetEntryPointCode(
 
     // TODO: We should really accept a target index in this API
     Slang::UInt targetIndex = 0;
-    auto targetCount = linkage->targets.getSize();
+    auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;
     auto targetReq = linkage->targets[targetIndex];
 
 
     if(entryPointIndex < 0) return nullptr;
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getSize()) return nullptr;
+    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getCount()) return nullptr;
     auto entryPoint = program->getEntryPoint(entryPointIndex);
 
     auto targetProgram = program->getTargetProgram(targetReq);
@@ -2295,8 +2295,8 @@ SLANG_API void const* spGetEntryPointCode(
         break;
 
     case Slang::ResultFormat::Binary:
-        data = result.outputBinary.Buffer();
-        size = result.outputBinary.getSize();
+        data = result.outputBinary.getBuffer();
+        size = result.outputBinary.getCount();
         break;
 
     case Slang::ResultFormat::Text:
@@ -2322,14 +2322,14 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedProgram();
 
-    int targetCount = (int) linkage->targets.getSize();
+    int targetCount = (int) linkage->targets.getCount();
     if((targetIndex < 0) || (targetIndex >= targetCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
     }
     auto targetReq = linkage->targets[targetIndex];
 
-    int entryPointCount = (int) req->entryPoints.getSize();
+    int entryPointCount = (int) req->entryPoints.getCount();
     if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
@@ -2382,7 +2382,7 @@ SLANG_API SlangReflection* spGetReflection(
     // `spGetReflection()` is shorthand for `targetIndex == 0`.
     //
     Slang::UInt targetIndex = 0;
-    auto targetCount = linkage->targets.getSize();
+    auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;
 

@@ -2943,7 +2943,7 @@ namespace Slang
         }
         else if( auto declGroup = as<DeclGroup>(declBase) )
         {
-            if( declGroup->decls.getSize() == 1 )
+            if( declGroup->decls.getCount() == 1 )
             {
                 return declGroup->decls[0];
             }

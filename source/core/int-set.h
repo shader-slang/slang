@@ -48,7 +48,7 @@ namespace Slang
 		}
 		UInt Size() const
 		{
-			return buffer.getSize()*32;
+			return buffer.getCount()*32;
 		}
 		void SetMax(int val)
 		{
@@ -57,59 +57,59 @@ namespace Slang
 		}
 		void SetAll()
 		{
-			for (UInt i = 0; i<buffer.getSize(); i++)
+			for (UInt i = 0; i<buffer.getCount(); i++)
 				buffer[i] = 0xFFFFFFFF;
 		}
 		void Resize(UInt size)
 		{
-			UInt oldBufferSize = buffer.getSize();
-			buffer.setSize((size+31)>>5);
-			if (buffer.getSize() > oldBufferSize)
-				memset(buffer.Buffer()+oldBufferSize, 0, (buffer.getSize()-oldBufferSize) * sizeof(int));
+			UInt oldBufferSize = buffer.getCount();
+			buffer.setCount((size+31)>>5);
+			if (buffer.getCount() > oldBufferSize)
+				memset(buffer.getBuffer()+oldBufferSize, 0, (buffer.getCount()-oldBufferSize) * sizeof(int));
 		}
 		void Clear()
 		{
-			for (UInt i = 0; i<buffer.getSize(); i++)
+			for (UInt i = 0; i<buffer.getCount(); i++)
 				buffer[i] = 0;
 		}
 		void Add(UInt val)
 		{
 			UInt id = val>>5;
-			if (id < buffer.getSize())
+			if (id < buffer.getCount())
 				buffer[id] |= (1<<(val&31));
 			else
 			{
-				UInt oldSize = buffer.getSize();
-				buffer.setSize(id+1);
-				memset(buffer.Buffer() + oldSize, 0, (buffer.getSize()-oldSize)*sizeof(int));
+				UInt oldSize = buffer.getCount();
+				buffer.setCount(id+1);
+				memset(buffer.getBuffer() + oldSize, 0, (buffer.getCount()-oldSize)*sizeof(int));
 				buffer[id] |= (1<<(val&31));
 			}
 		}
 		void Remove(UInt val)
 		{
-			if ((val>>5) < buffer.getSize())
+			if ((val>>5) < buffer.getCount())
 				buffer[(val>>5)] &= ~(1<<(val&31));
 		}
 		bool Contains(UInt val) const
 		{
-			if ((val>>5) >= buffer.getSize())
+			if ((val>>5) >= buffer.getCount())
 				return false;
 			return (buffer[(val>>5)] & (1<<(val&31))) != 0;
 		}
 		void UnionWith(const IntSet & set)
 		{
-			for (UInt i = 0; i<Math::Min(set.buffer.getSize(), buffer.getSize()); i++)
+			for (UInt i = 0; i<Math::Min(set.buffer.getCount(), buffer.getCount()); i++)
 			{
 				buffer[i] |= set.buffer[i];
 			}
-			if (set.buffer.getSize() > buffer.getSize())
-				buffer.addRange(set.buffer.Buffer()+buffer.getSize(), set.buffer.getSize()-buffer.getSize());
+			if (set.buffer.getCount() > buffer.getCount())
+				buffer.addRange(set.buffer.getBuffer()+buffer.getCount(), set.buffer.getCount()-buffer.getCount());
 		}
 		bool operator == (const IntSet & set)
 		{
-			if (buffer.getSize() != set.buffer.getSize())
+			if (buffer.getCount() != set.buffer.getCount())
 				return false;
-			for (UInt i = 0; i<buffer.getSize(); i++)
+			for (UInt i = 0; i<buffer.getCount(); i++)
 				if (buffer[i] != set.buffer[i])
 					return false;
 			return true;
@@ -120,37 +120,37 @@ namespace Slang
 		}
 		void IntersectWith(const IntSet & set)
 		{
-			if (set.buffer.getSize() < buffer.getSize())
-				memset(buffer.Buffer() + set.buffer.getSize(), 0, (buffer.getSize()-set.buffer.getSize())*sizeof(int));
-			for (UInt i = 0; i<Math::Min(set.buffer.getSize(), buffer.getSize()); i++)
+			if (set.buffer.getCount() < buffer.getCount())
+				memset(buffer.getBuffer() + set.buffer.getCount(), 0, (buffer.getCount()-set.buffer.getCount())*sizeof(int));
+			for (UInt i = 0; i<Math::Min(set.buffer.getCount(), buffer.getCount()); i++)
 			{
 				buffer[i] &= set.buffer[i];
 			}
 		}
 		static void Union(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.setSize(Math::Max(set1.buffer.getSize(), set2.buffer.getSize()));
+			rs.buffer.setCount(Math::Max(set1.buffer.getCount(), set2.buffer.getCount()));
 			rs.Clear();
-			for (UInt i = 0; i<set1.buffer.getSize(); i++)
+			for (UInt i = 0; i<set1.buffer.getCount(); i++)
 				rs.buffer[i] |= set1.buffer[i];
-			for (UInt i = 0; i<set2.buffer.getSize(); i++)
+			for (UInt i = 0; i<set2.buffer.getCount(); i++)
 				rs.buffer[i] |= set2.buffer[i];
 		}
 		static void Intersect(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.setSize(Math::Min(set1.buffer.getSize(), set2.buffer.getSize()));
-			for (UInt i = 0; i<rs.buffer.getSize(); i++)
+			rs.buffer.setCount(Math::Min(set1.buffer.getCount(), set2.buffer.getCount()));
+			for (UInt i = 0; i<rs.buffer.getCount(); i++)
 				rs.buffer[i] = set1.buffer[i] & set2.buffer[i];
 		}
 		static void Subtract(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.setSize(set1.buffer.getSize());
-			for (UInt i = 0; i<Math::Min(set1.buffer.getSize(), set2.buffer.getSize()); i++)
+			rs.buffer.setCount(set1.buffer.getCount());
+			for (UInt i = 0; i<Math::Min(set1.buffer.getCount(), set2.buffer.getCount()); i++)
 				rs.buffer[i] = set1.buffer[i] & (~set2.buffer[i]);
 		}
 		static bool HasIntersection(const IntSet & set1, const IntSet & set2)
 		{
-			for (UInt i = 0; i<Math::Min(set1.buffer.getSize(), set2.buffer.getSize()); i++)
+			for (UInt i = 0; i<Math::Min(set1.buffer.getCount(), set2.buffer.getCount()); i++)
 			{
 				if (set1.buffer[i] & set2.buffer[i])
 					return true;

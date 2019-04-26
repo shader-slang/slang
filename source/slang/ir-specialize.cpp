@@ -568,7 +568,7 @@ struct SpecializationContext
 
         // We will then iterate until our work list goes dry.
         //
-        while(workList.getSize() != 0)
+        while(workList.getCount() != 0)
         {
             IRInst* inst = workList.getLast();
             workList.removeLast();
@@ -975,8 +975,8 @@ struct SpecializationContext
             newParamTypes.add(newParam->getFullType());
         }
         IRType* newFuncType = builder->getFuncType(
-            newParamTypes.getSize(),
-            newParamTypes.Buffer(),
+            newParamTypes.getCount(),
+            newParamTypes.getBuffer(),
             oldFunc->getResultType());
         IRFunc* newFunc = builder->createFunc();
         newFunc->setFullType(newFuncType);
@@ -1198,7 +1198,7 @@ struct SpecializationContext
                 resultType,
                 newLoadInst,
                 slotOperandCount,
-                slotOperands.Buffer());
+                slotOperands.getBuffer());
 
             addUsersToWorkList(inst);
 

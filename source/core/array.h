@@ -6,136 +6,128 @@
 
 namespace Slang
 {
-	template<typename T, int size>
+	template<typename T, int COUNT>
 	class Array
 	{
 	private:
-		T _buffer[size];
-		int _count = 0;
+		T m_buffer[COUNT];
+		int m_count = 0;
 	public:
-		T* begin() const
-		{
-			return (T*)_buffer;
-		}
-		T* end() const
-		{
-			return (T*)_buffer + _count;
-		}
+        T* begin() { return m_buffer; }
+        const T* begin() const { return m_buffer; }
+
+        const T* end() const { return m_buffer + m_count; }
+        T* end() { return m_buffer + m_count; }
+
 	public:
-		inline int GetCapacity() const
+		inline int getCapacity() const { return COUNT; }
+		inline int getCount() const { return m_count; }
+		inline const T& getFirst() const
 		{
-			return size;
+            SLANG_ASSERT(m_count > 0);
+			return m_buffer[0];
 		}
-		inline int Count() const
+        inline T& getFirst()
+        {
+            SLANG_ASSERT(m_count > 0);
+            return m_buffer[0];
+        }
+		inline const T& getLast() const
 		{
-			return _count;
+            SLANG_ASSERT(m_count > 0);
+			return m_buffer[m_count - 1];
 		}
-		inline T & First() const
+        inline T& getLast()
+        {
+            SLANG_ASSERT(m_count > 0);
+            return m_buffer[m_count - 1];
+        }
+		inline void setCount(int newCount)
 		{
-			return const_cast<T&>(_buffer[0]);
+            SLANG_ASSERT(newCount >= 0 && newCount <= COUNT);
+			m_count = newCount;
 		}
-		inline T & Last() const
+		inline void add(const T & item)
 		{
-			return const_cast<T&>(_buffer[_count - 1]);
+            SLANG_ASSERT(m_count < COUNT);
+			m_buffer[m_count++] = item;
 		}
-		inline void SetSize(int newSize)
+		inline void add(T && item)
 		{
-#ifdef _DEBUG
-			if (newSize > size)
-				throw IndexOutofRangeException("size too large.");
-#endif
-			_count = newSize;
-		}
-		inline void Add(const T & item)
-		{
-#ifdef _DEBUG
-			if (_count == size)
-				throw IndexOutofRangeException("out of range access to static array.");
-#endif
-			_buffer[_count++] = item;
-		}
-		inline void Add(T && item)
-		{
-#ifdef _DEBUG
-			if (_count == size)
-				throw IndexOutofRangeException("out of range access to static array.");
-#endif
-			_buffer[_count++] = _Move(item);
+            SLANG_ASSERT(m_count < COUNT);
+			m_buffer[m_count++] = _Move(item);
 		}
 
-		inline T & operator [](int id) const
+		inline const T& operator [](int idx) const
 		{
-#if _DEBUG
-			if (id >= _count || id < 0)
-				throw IndexOutofRangeException("Operator[]: Index out of Range.");
-#endif
-			return ((T*)_buffer)[id];
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
+			return m_buffer[idx];
 		}
+        inline T& operator [](int idx)
+        {
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
+            return m_buffer[idx];
+        }
 
-		inline T* Buffer() const
-		{
-			return (T*)_buffer;
-		}
+		inline const T* getBuffer() const { return m_buffer; }
+        inline T* getBuffer() { return m_buffer; }
 
-		inline void Clear()
-		{
-			_count = 0;
-		}
+		inline void clear() { m_count = 0; }
 
 		template<typename T2>
-		int IndexOf(const T2 & val) const
+		int indexOf(const T2& val) const
 		{
-			for (int i = 0; i < _count; i++)
+			for (int i = 0; i < m_count; i++)
 			{
-				if (_buffer[i] == val)
+				if (m_buffer[i] == val)
 					return i;
 			}
 			return -1;
 		}
 
 		template<typename T2>
-		int LastIndexOf(const T2 & val) const
+		int lastIndexOf(const T2& val) const
 		{
-			for (int i = _count - 1; i >= 0; i--)
+			for (int i = m_count - 1; i >= 0; i--)
 			{
-				if (_buffer[i] == val)
+				if (m_buffer[i] == val)
 					return i;
 			}
 			return -1;
 		}
 
-		inline ArrayView<T> GetArrayView() const
+		inline ArrayView<T> getArrayView() const
 		{
-			return ArrayView<T>((T*)_buffer, _count);
+			return ArrayView<T>((T*)m_buffer, m_count);
 		}
-		inline ArrayView<T> GetArrayView(int start, int count) const
+		inline ArrayView<T> getArrayView(int start, int count) const
 		{
-			return ArrayView<T>((T*)_buffer + start, count);
+			return ArrayView<T>((T*)m_buffer + start, count);
 		}
 	};
 
 	template<typename T, typename ...TArgs>
 	struct FirstType
 	{
-		typedef T type;
+		typedef T Type;
 	};
 
 
-	template<typename T, int size>
-	void InsertArray(Array<T, size> &) {}
+	template<typename T, int SIZE>
+	void insertArray(Array<T, SIZE>&) {}
 
-	template<typename T, typename ...TArgs, int size>
-	void InsertArray(Array<T, size> & arr, const T & val, TArgs... args)
+	template<typename T, typename ...TArgs, int SIZE>
+	void insertArray(Array<T, SIZE>& arr, const T& val, TArgs... args)
 	{
-		arr.Add(val);
-		InsertArray(arr, args...);
+		arr.add(val);
+		insertArray(arr, args...);
 	}
 
 	template<typename ...TArgs>
-	auto MakeArray(TArgs ...args) -> Array<typename FirstType<TArgs...>::type, sizeof...(args)>
+	auto makeArray(TArgs ...args) -> Array<typename FirstType<TArgs...>::Type, sizeof...(args)>
 	{
-		Array<typename FirstType<TArgs...>::type, sizeof...(args)> rs;
-		InsertArray(rs, args...);
+		Array<typename FirstType<TArgs...>::Type, sizeof...(args)> rs;
+		insertArray(rs, args...);
 		return rs;
 	}
 }

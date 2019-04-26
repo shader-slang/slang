@@ -100,7 +100,7 @@ namespace Slang {
 /* static */void ByteEncodeUtil::encodeLiteUInt32(const uint32_t* in, size_t num, List<uint8_t>& encodeArrayOut)
 {
     // Make sure there is at least enough space for all bytes
-    encodeArrayOut.setSize(num);
+    encodeArrayOut.setCount(num);
 
     uint8_t* encodeOut = encodeArrayOut.begin();
     uint8_t* encodeOutEnd = encodeArrayOut.end();
@@ -118,7 +118,7 @@ namespace Slang {
             encodeArrayOut.reserve(oldCapacity + (oldCapacity >> 1) + kMaxLiteEncodeUInt32);
             // Make the size the capacity
             const UInt capacity = encodeArrayOut.getCapacity();
-            encodeArrayOut.setSize(capacity);
+            encodeArrayOut.setCount(capacity);
 
             encodeOut = encodeArrayOut.begin() + offset;
             encodeOutEnd = encodeArrayOut.end();
@@ -152,7 +152,7 @@ namespace Slang {
         }
     }
 
-    encodeArrayOut.setSize(UInt(encodeOut - encodeArrayOut.begin()));
+    encodeArrayOut.setCount(UInt(encodeOut - encodeArrayOut.begin()));
     encodeArrayOut.compress();
 }
 

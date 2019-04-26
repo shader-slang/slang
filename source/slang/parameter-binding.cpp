@@ -99,7 +99,7 @@ struct UsedRanges
         // using indices, because we may actually modify
         // the array as we go.
         //
-        Int rangeCount = ranges.getSize();
+        Int rangeCount = ranges.getCount();
         for(Int rr = 0; rr < rangeCount; ++rr)
         {
             auto existingRange = ranges[rr];
@@ -250,7 +250,7 @@ struct UsedRanges
     {
         UInt begin = 0;
 
-        UInt rangeCount = ranges.getSize();
+        UInt rangeCount = ranges.getCount();
         for (UInt rr = 0; rr < rangeCount; ++rr)
         {
             // try to fit in before this range...
@@ -671,7 +671,7 @@ static void collectGlobalGenericParameter(
 {
     RefPtr<GenericParamLayout> layout = new GenericParamLayout();
     layout->decl = paramDecl;
-    layout->index = (int)context->shared->programLayout->globalGenericParams.getSize();
+    layout->index = (int)context->shared->programLayout->globalGenericParams.getCount();
     context->shared->programLayout->globalGenericParams.add(layout);
     context->shared->programLayout->globalGenericParamsMap[layout->decl->getName()->text] = layout.Ptr();
 }
@@ -1002,7 +1002,7 @@ void generateParameterBindings(
     RefPtr<ParameterInfo>       parameterInfo)
 {
     // There must be at least one declaration for the parameter.
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
 
     // Iterate over all declarations looking for explicit binding information.
     for( auto& varLayout : parameterInfo->varLayouts )
@@ -1246,7 +1246,7 @@ static void completeBindingsForParameter(
     // that earlier code has validated that the declarations
     // "match".
 
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
     auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
     completeBindingsForParameterImpl(
@@ -1934,7 +1934,7 @@ struct ScopeLayoutBuilder
     void addParameter(
         ParameterInfo* parameterInfo)
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
         auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         _addParameter(firstVarLayout, parameterInfo);
@@ -2337,7 +2337,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     bool needDefaultConstantBuffer = false;
     for( auto& parameterInfo : sharedContext.parameters )
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
         auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         // Does the field have any uniform data?
@@ -2366,7 +2366,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
         //
         for (auto& parameterInfo : sharedContext.parameters)
         {
-            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
+            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
             auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
             // For each parameter, we will look at each resource it consumes.

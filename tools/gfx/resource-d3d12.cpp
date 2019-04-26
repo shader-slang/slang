@@ -135,7 +135,7 @@ void D3D12CounterFence::nextSignalAndWait(ID3D12CommandQueue* commandQueue)
 	{
 		size_t len = ::strlen(name);
 		List<wchar_t> buf;
-		buf.setSize(len + 1);
+		buf.setCount(len + 1);
 
 		D3DUtil::appendWideChars(name, buf);
 		resource->SetName(buf.begin());

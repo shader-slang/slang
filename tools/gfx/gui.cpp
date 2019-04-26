@@ -166,8 +166,8 @@ GUI::GUI(Window* window, Renderer* inRenderer)
     descriptorSetRanges.add(DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::Sampler));
 
     DescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = descriptorSetRanges.getSize();
-    descriptorSetLayoutDesc.slotRanges = descriptorSetRanges.Buffer();
+    descriptorSetLayoutDesc.slotRangeCount = descriptorSetRanges.getCount();
+    descriptorSetLayoutDesc.slotRanges = descriptorSetRanges.getBuffer();
 
     descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
 
@@ -175,8 +175,8 @@ GUI::GUI(Window* window, Renderer* inRenderer)
     pipelineDescriptorSets.add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
 
     PipelineLayout::Desc pipelineLayoutDesc;
-    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getSize();
-    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.Buffer();
+    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
+    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
     pipelineLayoutDesc.renderTargetCount = 1;
 
     pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);

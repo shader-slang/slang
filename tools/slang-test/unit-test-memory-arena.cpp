@@ -155,7 +155,7 @@ static void memoryArenaUnitTest()
                 count++;
 
                 const int var = randGen.nextInt32() & 0x3ff;
-                if (var < 3 && blocks.getSize() > 0)
+                if (var < 3 && blocks.getCount() > 0)
                 {
                     if (var == 1)
                     {
@@ -176,11 +176,11 @@ static void memoryArenaUnitTest()
                     else if (var == 4)
                     {
                         // Rewind to a random position
-                        int rewindIndex = randGen.nextInt32UpTo(int32_t(blocks.getSize()));
+                        int rewindIndex = randGen.nextInt32UpTo(int32_t(blocks.getCount()));
                         // rewind to this block
                         arena.rewindToCursor(blocks[rewindIndex].m_data);
                         // All the blocks (includign this one) and now deallocated
-                        blocks.setSize(rewindIndex);
+                        blocks.setCount(rewindIndex);
 
                     }
                     else
@@ -251,7 +251,7 @@ static void memoryArenaUnitTest()
                 }
 
                 // Check the blocks
-                for (int j = 0; j < int(blocks.getSize()); ++j)
+                for (int j = 0; j < int(blocks.getCount()); ++j)
                 {
                     const Block& block = blocks[j];
 

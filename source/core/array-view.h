@@ -10,54 +10,51 @@ namespace Slang
 	{
 	private:
 		T* m_buffer;
-		int m_size;
+		int m_count;
 	public:
         const T* begin() const { return m_buffer; }
         T* begin() { return m_buffer; }
 
-        const T* end() const { return m_buffer + m_size; }
-        T* end() { return m_buffer + m_size; }
+        const T* end() const { return m_buffer + m_count; }
+        T* end() { return m_buffer + m_count; }
         
 	public:
 		ArrayView():
 			m_buffer(nullptr),
-			m_size(0)
+			m_count(0)
         {
 		}
 		ArrayView(T& singleObj):
             m_buffer(&singleObj),
-            m_size(1)
+            m_count(1)
         {
 		}
 		ArrayView(T* buffer, int size):
             m_buffer(buffer),
-            m_size(size)
+            m_count(size)
 		{
 		}
 		
-		inline int getSize() const
-		{
-			return m_size;
-		}
+		inline int getCount() const { return m_count; }
 
 		inline const T& operator [](int idx) const
 		{
-            SLANG_ASSERT(idx >= 0 && idx <= m_size);
+            SLANG_ASSERT(idx >= 0 && idx <= m_count);
             return m_buffer[idx];
 		}
         inline T& operator [](int idx)
         {
-            SLANG_ASSERT(idx >= 0 && idx <= m_size);
+            SLANG_ASSERT(idx >= 0 && idx <= m_count);
             return m_buffer[idx];
         }
 
-        inline const T* Buffer() const {return m_buffer; }
-        inline T* Buffer() { return m_buffer; }
+        inline const T* getBuffer() const { return m_buffer; }
+        inline T* getBuffer() { return m_buffer; }
 
 		template<typename T2>
 		int indexOf(const T2 & val) const
 		{
-			for (int i = 0; i < m_size; i++)
+			for (int i = 0; i < m_count; i++)
 			{
 				if (m_buffer[i] == val)
 					return i;
@@ -68,7 +65,7 @@ namespace Slang
 		template<typename T2>
 		int lastIndexOf(const T2 & val) const
 		{
-			for (int i = m_size - 1; i >= 0; i--)
+			for (int i = m_count - 1; i >= 0; i--)
 			{
 				if (m_buffer[i] == val)
 					return i;
@@ -79,7 +76,7 @@ namespace Slang
 		template<typename Func>
 		int findFirstIndex(const Func& predicate) const
 		{
-			for (int i = 0; i < m_size; i++)
+			for (int i = 0; i < m_count; i++)
 			{
 				if (predicate(m_buffer[i]))
 					return i;
@@ -90,7 +87,7 @@ namespace Slang
 		template<typename Func>
 		int findLastIndex(const Func& predicate) const
 		{
-			for (int i = m_size - 1; i >= 0; i--)
+			for (int i = m_count - 1; i >= 0; i--)
 			{
 				if (predicate(m_buffer[i]))
 					return i;
@@ -100,13 +97,13 @@ namespace Slang
 	};
 
 	template<typename T>
-	ArrayView<T> MakeArrayView(T& obj)
+	ArrayView<T> makeArrayView(T& obj)
 	{
 		return ArrayView<T>(obj);
 	}
 		
 	template<typename T>
-	ArrayView<T> MakeArrayView(T* buffer, int count)
+	ArrayView<T> makeArrayView(T* buffer, int count)
 	{
 		return ArrayView<T>(buffer, count);
 	}

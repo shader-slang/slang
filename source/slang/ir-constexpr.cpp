@@ -489,7 +489,7 @@ void propagateConstExpr(
 
     // We will iterate applying propagation to one global value at a time
     // until we run out.
-    while( context.workList.getSize() )
+    while( context.workList.getCount() )
     {
         auto gv = context.workList[0];
         context.workList.fastRemoveAt(0);

@@ -175,9 +175,9 @@ protected:
             {
                 case BackingStyle::MemoryBacked:
                 {
-                    const size_t bufferSize = m_memory.getSize();
+                    const size_t bufferSize = m_memory.getCount();
                     D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, m_memory.Buffer(), bufferSize);
+                    ::memcpy(cursor.m_position, m_memory.getBuffer(), bufferSize);
                     // Set the constant buffer
                     submitter->setRootConstantBufferView(index, circularHeap.getGpuHandle(cursor));
                     break;
@@ -1324,7 +1324,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     ComPtr<ID3D12Device> device;
     ComPtr<IDXGIAdapter> adapter;
 
-    for (int i = 0; i < int(dxgiAdapters.getSize()); ++i)
+    for (int i = 0; i < int(dxgiAdapters.getCount()); ++i)
     {
         IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
         if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
@@ -1965,11 +1965,11 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
 
     // Calculate the layout
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
-    layouts.setSize(numMipMaps);
+    layouts.setCount(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
-    mipRowSizeInBytes.setSize(numMipMaps);
+    mipRowSizeInBytes.setCount(numMipMaps);
     List<UInt32> mipNumRows;
-    mipNumRows.setSize(numMipMaps);
+    mipNumRows.setCount(numMipMaps);
 
     // Since textures are effectively immutable currently initData must be set
     assert(initData);
@@ -2119,11 +2119,11 @@ Result D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const B
         {
             // Assume the constant buffer will change every frame. We'll just keep a copy of the contents
             // in regular memory until it needed
-            buffer->m_memory.setSize(UInt(alignedSizeInBytes));
+            buffer->m_memory.setCount(UInt(alignedSizeInBytes));
             // Initialize
             if (initData)
             {
-                ::memcpy(buffer->m_memory.Buffer(), initData, srcDesc.sizeInBytes);
+                ::memcpy(buffer->m_memory.getBuffer(), initData, srcDesc.sizeInBytes);
             }
             break;
         }
@@ -2424,12 +2424,12 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
         const char* text = inputElements[i].semanticName;
         textSize += text ? (::strlen(text) + 1) : 0;
     }
-    layout->m_text.setSize(textSize);
-    char* textPos = layout->m_text.Buffer();
+    layout->m_text.setCount(textSize);
+    char* textPos = layout->m_text.getBuffer();
 
     //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
-    elements.setSize(inputElementCount);
+    elements.setCount(inputElementCount);
 
 
     for (UInt i = 0; i < inputElementCount; ++i)
@@ -2537,20 +2537,20 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
                         SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
                         // Copy to memory buffer
-                        buffer->m_memory.setSize(bufferSize);
-                        ::memcpy(buffer->m_memory.Buffer(), data, bufferSize);
+                        buffer->m_memory.setCount(bufferSize);
+                        ::memcpy(buffer->m_memory.getBuffer(), data, bufferSize);
 
                         stageBuf.getResource()->Unmap(0, nullptr);
                     }
 
-                    return buffer->m_memory.Buffer();
+                    return buffer->m_memory.getBuffer();
                 }
             }
             break;
         }
         case Style::MemoryBacked:
         {
-            return buffer->m_memory.Buffer();
+            return buffer->m_memory.getBuffer();
         }
         default: return nullptr;
     }
@@ -2637,9 +2637,9 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
 {
     {
         const UInt num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.getSize())
+        if (num > m_boundVertexBuffers.getCount())
         {
-            m_boundVertexBuffers.setSize(num);
+            m_boundVertexBuffers.setCount(num);
         }
     }
 
@@ -2739,7 +2739,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     {
         int numVertexViews = 0;
         D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-        for (int i = 0; i < int(m_boundVertexBuffers.getSize()); i++)
+        for (int i = 0; i < int(m_boundVertexBuffers.getCount()); i++)
         {
             const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
             BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
@@ -3221,7 +3221,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     // again based on totals that we can compute easily:
     //
     Int totalRangeCount = totalResourceRangeCount + totalSamplerRangeCount;
-    descriptorSetLayoutImpl->m_dxRanges.setSize(totalRangeCount);
+    descriptorSetLayoutImpl->m_dxRanges.setCount(totalRangeCount);
 
     // Now we will walk through the ranges in  the order they were
     // specified, so that we can fill in the "range info" required for
@@ -3584,7 +3584,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto resourceHeap = &m_cpuViewHeap;
         descriptorSetImpl->m_resourceHeap = resourceHeap;
         descriptorSetImpl->m_resourceTable = resourceHeap->allocate(int(resourceCount));
-        descriptorSetImpl->m_resourceObjects.setSize(resourceCount);
+        descriptorSetImpl->m_resourceObjects.setCount(resourceCount);
     }
 
     Int samplerCount = layoutImpl->m_samplerCount;
@@ -3593,7 +3593,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto samplerHeap = &m_cpuSamplerHeap;
         descriptorSetImpl->m_samplerHeap = samplerHeap;
         descriptorSetImpl->m_samplerTable = samplerHeap->allocate(int(samplerCount));
-        descriptorSetImpl->m_samplerObjects.setSize(samplerCount);
+        descriptorSetImpl->m_samplerObjects.setCount(samplerCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();
@@ -3611,10 +3611,10 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
 
     psoDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
 
-    psoDesc.VS = { programImpl->m_vertexShader.Buffer(), programImpl->m_vertexShader.getSize() };
-    psoDesc.PS = { programImpl->m_pixelShader .Buffer(), programImpl->m_pixelShader .getSize() };
+    psoDesc.VS = { programImpl->m_vertexShader.getBuffer(), programImpl->m_vertexShader.getCount() };
+    psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), programImpl->m_pixelShader .getCount() };
 
-    psoDesc.InputLayout = { inputLayoutImpl->m_elements.Buffer(), UINT(inputLayoutImpl->m_elements.getSize()) };
+    psoDesc.InputLayout = { inputLayoutImpl->m_elements.getBuffer(), UINT(inputLayoutImpl->m_elements.getCount()) };
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
     {
@@ -3706,7 +3706,7 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     // Describe and create the compute pipeline state object
     D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
     computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
-    computeDesc.CS = { programImpl->m_computeShader.Buffer(), programImpl->m_computeShader.getSize() };
+    computeDesc.CS = { programImpl->m_computeShader.getBuffer(), programImpl->m_computeShader.getCount() };
 
     ComPtr<ID3D12PipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));

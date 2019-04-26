@@ -294,15 +294,15 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
     if (outSize > 0)
     {
-        const UInt prevSize = out.getSize();
-        out.setSize(prevSize + len + 1);
+        const UInt prevSize = out.getCount();
+        out.setCount(prevSize + len + 1);
 
-        WCHAR* dst = out.Buffer() + prevSize;
+        WCHAR* dst = out.getBuffer() + prevSize;
         ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);
         // Make null terminated
         dst[outSize] = 0;
         // Remove terminating 0 from array
-        out.unsafeShrinkToSize(prevSize + outSize);
+        out.unsafeShrinkToCount(prevSize + outSize);
     }
 }
 

@@ -108,7 +108,7 @@ public:
     {
         // TODO: this allocator would take some work to make thread-safe
 
-        if(m_freeList.getSize() > 0)
+        if(m_freeList.getCount() > 0)
         {
             auto descriptor = m_freeList[0];
             m_freeList.fastRemoveAt(0);

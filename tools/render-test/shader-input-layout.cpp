@@ -302,17 +302,17 @@ namespace renderer_test
 
                 List<List<unsigned int>>& dstBuffer = output.dataBuffer;
 
-                int numMips = int(work.dataBuffer.getSize());
-                dstBuffer.setSize(numMips);
+                int numMips = int(work.dataBuffer.getCount());
+                dstBuffer.setCount(numMips);
 
                 for (int i = 0; i < numMips; ++i)
                 {
-                    const int numPixels = int(work.dataBuffer[i].getSize());
-                    const unsigned int* srcPixels = work.dataBuffer[i].Buffer();
+                    const int numPixels = int(work.dataBuffer[i].getCount());
+                    const unsigned int* srcPixels = work.dataBuffer[i].getBuffer();
 
-                    dstBuffer[i].setSize(numPixels);
+                    dstBuffer[i].setCount(numPixels);
 
-                    float* dstPixels = (float*)dstBuffer[i].Buffer();
+                    float* dstPixels = (float*)dstBuffer[i].getBuffer();
 
                     for (int j = 0; j < numPixels; ++j)
                     {
@@ -344,7 +344,7 @@ namespace renderer_test
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
         output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
-        output.dataBuffer.setSize(output.mipLevels * output.arraySize);
+        output.dataBuffer.setCount(output.mipLevels * output.arraySize);
         auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
         {
             if (dimension == 1)
@@ -372,9 +372,9 @@ namespace renderer_test
                     bufferLen *= size;
                 else if (inputDesc.dimension == 3)
                     bufferLen *= size*size;
-                dataBuffer[slice].setSize(bufferLen);
+                dataBuffer[slice].setCount(bufferLen);
 
-                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
+                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].getBuffer(), [&](int x, int y, int z) -> unsigned int
                 {
                     if (inputDesc.content == InputTextureContent::Zero)
                     {

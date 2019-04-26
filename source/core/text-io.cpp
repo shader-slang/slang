@@ -169,7 +169,7 @@ namespace Slang
 				sb << str[i];
 		}
 		encoding->GetBytes(encodingBuffer, sb.ProduceString());
-		stream->Write(encodingBuffer.Buffer(), encodingBuffer.getSize());
+		stream->Write(encodingBuffer.getBuffer(), encodingBuffer.getCount());
 	}
 	void StreamWriter::Write(const char * str)
 	{
@@ -207,17 +207,17 @@ namespace Slang
 
 	Encoding * StreamReader::DetermineEncoding()
 	{
-		if (buffer.getSize() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
+		if (buffer.getCount() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
 		{
 			ptr += 3;
 			return Encoding::UTF8;
 		}
-		else if (*((unsigned short*)(buffer.Buffer())) == 0xFEFF)
+		else if (*((unsigned short*)(buffer.getBuffer())) == 0xFEFF)
 		{
 			ptr += 2;
 			return Encoding::UTF16;
 		}
-		else if (*((unsigned short*)(buffer.Buffer())) == 0xFFFE)
+		else if (*((unsigned short*)(buffer.getBuffer())) == 0xFFFE)
 		{
 			ptr += 2;
 			return Encoding::UTF16Reversed;
@@ -225,7 +225,7 @@ namespace Slang
 		else
 		{
             // find null bytes
-            if (HasNullBytes(buffer.Buffer(), (int)buffer.getSize()))
+            if (HasNullBytes(buffer.getBuffer(), (int)buffer.getCount()))
             {
                 return Encoding::UTF16;
             }
@@ -235,22 +235,22 @@ namespace Slang
 		
 	void StreamReader::ReadBuffer()
 	{
-		buffer.setSize(4096);
-        memset(buffer.Buffer(), 0, buffer.getSize() * sizeof(buffer[0]));
-		auto len = stream->Read(buffer.Buffer(), buffer.getSize());
-		buffer.setSize((int)len);
+		buffer.setCount(4096);
+        memset(buffer.getBuffer(), 0, buffer.getCount() * sizeof(buffer[0]));
+		auto len = stream->Read(buffer.getBuffer(), buffer.getCount());
+		buffer.setCount((int)len);
 		ptr = 0;
 	}
 
 	char StreamReader::ReadBufferChar()
 	{
-		if (ptr<buffer.getSize())
+		if (ptr<buffer.getCount())
 		{
 			return buffer[ptr++];
 		}
 		if (!stream->IsEnd())
 			ReadBuffer();
-		if (ptr<buffer.getSize())
+		if (ptr<buffer.getCount())
 		{
 			return buffer[ptr++];
 		}

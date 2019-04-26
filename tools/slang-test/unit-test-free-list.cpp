@@ -33,11 +33,11 @@ static void freeListUnitTest()
         }
 
         int numDealloc = randGen.nextInt32UpTo(19);
-        numDealloc = int(allocs.getSize()) < numDealloc ? int(allocs.getSize()) : numDealloc;
+        numDealloc = int(allocs.getCount()) < numDealloc ? int(allocs.getCount()) : numDealloc;
 
         for (int j = 0; j < numDealloc; j++)
         {
-            const int index = randGen.nextInt32UpTo(int(allocs.getSize()));
+            const int index = randGen.nextInt32UpTo(int(allocs.getCount()));
 
             int* alloc = allocs[index];
 

@@ -998,11 +998,11 @@ namespace Slang
         // Was at least one result found?
         bool isValid() const { return item.declRef.getDecl() != nullptr; }
 
-        bool isOverloaded() const { return items.getSize() > 1; }
+        bool isOverloaded() const { return items.getCount() > 1; }
 
         Name* getName() const
         {
-            return items.getSize() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
+            return items.getCount() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
         }
         LookupResultItem* begin()
         {

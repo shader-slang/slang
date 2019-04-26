@@ -766,7 +766,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Vector")
             {
-                SLANG_ASSERT(subst && subst->args.getSize() == 2);
+                SLANG_ASSERT(subst && subst->args.getCount() == 2);
                 auto vecType = new VectorExpressionType();
                 vecType->setSession(session);
                 vecType->declRef = declRef;
@@ -776,7 +776,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Matrix")
             {
-                SLANG_ASSERT(subst && subst->args.getSize() == 3);
+                SLANG_ASSERT(subst && subst->args.getCount() == 3);
                 auto matType = new MatrixExpressionType();
                 matType->setSession(session);
                 matType->declRef = declRef;
@@ -784,7 +784,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Texture")
             {
-                SLANG_ASSERT(subst && subst->args.getSize() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new TextureType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -794,7 +794,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "TextureSampler")
             {
-                SLANG_ASSERT(subst && subst->args.getSize() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new TextureSamplerType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -804,7 +804,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "GLSLImageType")
             {
-                SLANG_ASSERT(subst && subst->args.getSize() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new GLSLImageType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -832,7 +832,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
-                    SLANG_ASSERT(subst && subst->args.getSize() == 1);			\
+                    SLANG_ASSERT(subst && subst->args.getCount() == 1);			\
                     auto type = new T();									    \
                     type->setSession(session);                                  \
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
@@ -1375,8 +1375,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (genericDecl != genericSubst->genericDecl)
             return false;
 
-        UInt argCount = args.getSize();
-        SLANG_RELEASE_ASSERT(args.getSize() == genericSubst->args.getSize());
+        UInt argCount = args.getCount();
+        SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
         for (UInt aa = 0; aa < argCount; ++aa)
         {
             if (!args[aa]->EqualsVal(genericSubst->args[aa].Ptr()))
@@ -1476,9 +1476,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 return false;
             if (!actualType->EqualsVal(genSubst->actualType))
                 return false;
-            if (constraintArgs.getSize() != genSubst->constraintArgs.getSize())
+            if (constraintArgs.getCount() != genSubst->constraintArgs.getCount())
                 return false;
-            for (UInt i = 0; i < constraintArgs.getSize(); i++)
+            for (UInt i = 0; i < constraintArgs.getCount(); i++)
             {
                 if (!constraintArgs[i].val->EqualsVal(genSubst->constraintArgs[i].val))
                     return false;
@@ -2256,7 +2256,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         (*ioDiff)++;
                         auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
                             genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
-                        SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getSize());
+                        SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
                         return genericSubst->args[index + ordinaryParamCount];
                     }
                 }
@@ -2583,8 +2583,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if(!taggedUnion)
             return false;
 
-        auto caseCount = caseTypes.getSize();
-        if(caseCount != taggedUnion->caseTypes.getSize())
+        auto caseCount = caseTypes.getCount();
+        if(caseCount != taggedUnion->caseTypes.getCount())
             return false;
 
         for( UInt ii = 0; ii < caseCount; ++ii )
@@ -2650,8 +2650,8 @@ bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
     if(!taggedUnionWitness)
         return false;
 
-    auto caseCount = caseWitnesses.getSize();
-    if(caseCount != taggedUnionWitness->caseWitnesses.getSize())
+    auto caseCount = caseWitnesses.getCount();
+    if(caseCount != taggedUnionWitness->caseWitnesses.getCount())
         return false;
 
     for(UInt ii = 0; ii < caseCount; ++ii)
