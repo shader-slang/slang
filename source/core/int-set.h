@@ -10,153 +10,199 @@
 
 namespace Slang
 {
+    /* The set works by storing as a bit per integer */
 	class IntSet
 	{
 	private:
-		List<int> buffer;
+        typedef uint32_t Element;                           ///< Type that holds the bits
+        enum
+        {
+            ELEMENT_SHIFT = 5,                              ///< How many bits to shift to get Element index from an index
+            ELEMENT_SIZE = sizeof(Element) * 8,             ///< The number of bits in an element
+            ELEMENT_MASK = ELEMENT_SIZE - 1,                ///< Mask to get shift from an index
+        };
+
+        // Make sure they are correct for the Element type
+        SLANG_COMPILE_TIME_ASSERT( (1 << ELEMENT_SHIFT) == ELEMENT_SIZE);
+
+		List<Element> m_buffer;
+
 	public:
 		IntSet()
 		{}
-		IntSet(const IntSet & other)
+		IntSet(const IntSet& other)
 		{
-			buffer = other.buffer;
+			m_buffer = other.m_buffer;
 		}
 		IntSet(IntSet && other)
 		{
 			*this = (_Move(other));
 		}
-		IntSet & operator = (IntSet && other)
+		IntSet& operator=(IntSet&& other)
 		{
-			buffer = _Move(other.buffer);
+			m_buffer = _Move(other.m_buffer);
 			return *this;
 		}
-		IntSet & operator = (const IntSet & other)
+		IntSet& operator=(const IntSet& other)
 		{
-			buffer = other.buffer;
+			m_buffer = other.m_buffer;
 			return *this;
 		}
 		int GetHashCode()
 		{
 			int rs = 0;
-			for (auto val : buffer)
+			for (auto val : m_buffer)
 				rs ^= val;
 			return rs;
 		}
-		IntSet(int maxVal)
+		IntSet(Int maxVal)
 		{
-			SetMax(maxVal);
+			setMax(maxVal);
 		}
-		UInt Size() const
+		Int getCount() const
 		{
-			return buffer.getCount()*32;
+			return Int(m_buffer.getCount()) * ELEMENT_SIZE;
 		}
-		void SetMax(int val)
+		void setMax(Int val)
 		{
-			Resize(val);
-			Clear();
+			resize(val);
+			clear();
 		}
-		void SetAll()
+		void setAll()
 		{
-			for (UInt i = 0; i<buffer.getCount(); i++)
-				buffer[i] = 0xFFFFFFFF;
+			for (Index i = 0; i < m_buffer.getCount(); i++)
+				m_buffer[i] = ~Element(0); 
 		}
-		void Resize(UInt size)
+		void resize(Int size)
 		{
-			UInt oldBufferSize = buffer.getCount();
-			buffer.setCount((size+31)>>5);
-			if (buffer.getCount() > oldBufferSize)
-				memset(buffer.getBuffer()+oldBufferSize, 0, (buffer.getCount()-oldBufferSize) * sizeof(int));
+            const Index oldBufferSize = m_buffer.getCount();
+            const Index newCount = Index((size + ELEMENT_MASK) >> ELEMENT_SHIFT);
+			m_buffer.setCount(newCount);
+
+			if (newCount > oldBufferSize)
+				memset(m_buffer.getBuffer() + oldBufferSize, 0, (newCount - oldBufferSize) * sizeof(Element));
 		}
-		void Clear()
+		void clear()
 		{
-			for (UInt i = 0; i<buffer.getCount(); i++)
-				buffer[i] = 0;
+			for (Index i = 0; i < m_buffer.getCount(); i++)
+				m_buffer[i] = 0;
 		}
-		void Add(UInt val)
+        void clearAndDeallocate()
+        {
+            m_buffer.clearAndDeallocate();
+        }
+		void add(Int val)
 		{
-			UInt id = val>>5;
-			if (id < buffer.getCount())
-				buffer[id] |= (1<<(val&31));
+			Index id = Index(val >> 5);
+			if (id < m_buffer.getCount())
+				m_buffer[id] |= Element(1) << (val & ELEMENT_MASK);
 			else
 			{
-				UInt oldSize = buffer.getCount();
-				buffer.setCount(id+1);
-				memset(buffer.getBuffer() + oldSize, 0, (buffer.getCount()-oldSize)*sizeof(int));
-				buffer[id] |= (1<<(val&31));
+				Index oldCount = m_buffer.getCount();
+				m_buffer.setCount(id + 1);
+				memset(m_buffer.getBuffer() + oldCount, 0, (m_buffer.getCount() - oldCount) * sizeof(Element));
+				m_buffer[id] |= Element(1) << (val & ELEMENT_MASK);
 			}
 		}
-		void Remove(UInt val)
+		void remove(Int val)
 		{
-			if ((val>>5) < buffer.getCount())
-				buffer[(val>>5)] &= ~(1<<(val&31));
+            const Index idx = Index(val >> ELEMENT_SHIFT);
+			if (idx < m_buffer.getCount())
+				m_buffer[idx] &= ~(Element(1) << (val & ELEMENT_MASK));
 		}
-		bool Contains(UInt val) const
+		bool contains(Int val) const
 		{
-			if ((val>>5) >= buffer.getCount())
+            const Index idx = Index(val >> ELEMENT_SHIFT);
+			if (idx >= m_buffer.getCount())
 				return false;
-			return (buffer[(val>>5)] & (1<<(val&31))) != 0;
+			return (m_buffer[idx] & (Element(1) << (val & ELEMENT_MASK))) != 0;
 		}
-		void UnionWith(const IntSet & set)
+		void unionWith(const IntSet& set)
 		{
-			for (UInt i = 0; i<Math::Min(set.buffer.getCount(), buffer.getCount()); i++)
+            const Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
+			for (Index i = 0; i < minCount; i++)
 			{
-				buffer[i] |= set.buffer[i];
+				m_buffer[i] |= set.m_buffer[i];
 			}
-			if (set.buffer.getCount() > buffer.getCount())
-				buffer.addRange(set.buffer.getBuffer()+buffer.getCount(), set.buffer.getCount()-buffer.getCount());
+			if (set.m_buffer.getCount() > m_buffer.getCount())
+				m_buffer.addRange(set.m_buffer.getBuffer()+m_buffer.getCount(), set.m_buffer.getCount()-m_buffer.getCount());
 		}
-		bool operator == (const IntSet & set)
+		bool operator==(const IntSet& set) const
 		{
-			if (buffer.getCount() != set.buffer.getCount())
-				return false;
-			for (UInt i = 0; i<buffer.getCount(); i++)
-				if (buffer[i] != set.buffer[i])
-					return false;
-			return true;
+            Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
+            if (::memcmp(m_buffer.getBuffer(), set.m_buffer.getBuffer(), minCount * sizeof(Element)) != 0)
+            {
+                return false;
+            }
+            return m_buffer.getCount() == set.m_buffer.getCount() || (_areRemainingZeros(m_buffer, minCount) && _areRemainingZeros(set.m_buffer, minCount));
 		}
-		bool operator != (const IntSet & set)
+		bool operator!=(const IntSet& set) const
 		{
 			return !(*this == set);
 		}
-		void IntersectWith(const IntSet & set)
+		void intersectWith(const IntSet& set)
 		{
-			if (set.buffer.getCount() < buffer.getCount())
-				memset(buffer.getBuffer() + set.buffer.getCount(), 0, (buffer.getCount()-set.buffer.getCount())*sizeof(int));
-			for (UInt i = 0; i<Math::Min(set.buffer.getCount(), buffer.getCount()); i++)
+			if (set.m_buffer.getCount() < m_buffer.getCount())
+				memset(m_buffer.getBuffer() + set.m_buffer.getCount(), 0, (m_buffer.getCount() - set.m_buffer.getCount()) * sizeof(Element));
+
+            const Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
+			for (Index i = 0; i < minCount; i++)
 			{
-				buffer[i] &= set.buffer[i];
+				m_buffer[i] &= set.m_buffer[i];
 			}
 		}
-		static void Union(IntSet & rs, const IntSet & set1, const IntSet & set2)
+		static void calcUnion(IntSet& outRs, const IntSet& set1, const IntSet& set2)
 		{
-			rs.buffer.setCount(Math::Max(set1.buffer.getCount(), set2.buffer.getCount()));
-			rs.Clear();
-			for (UInt i = 0; i<set1.buffer.getCount(); i++)
-				rs.buffer[i] |= set1.buffer[i];
-			for (UInt i = 0; i<set2.buffer.getCount(); i++)
-				rs.buffer[i] |= set2.buffer[i];
+			outRs.m_buffer.setCount(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
+			outRs.clear();
+			for (Index i = 0; i < set1.m_buffer.getCount(); i++)
+				outRs.m_buffer[i] |= set1.m_buffer[i];
+			for (Index i = 0; i < set2.m_buffer.getCount(); i++)
+				outRs.m_buffer[i] |= set2.m_buffer[i];
 		}
-		static void Intersect(IntSet & rs, const IntSet & set1, const IntSet & set2)
+		static void calcIntersection(IntSet& outRs, const IntSet& set1, const IntSet& set2)
 		{
-			rs.buffer.setCount(Math::Min(set1.buffer.getCount(), set2.buffer.getCount()));
-			for (UInt i = 0; i<rs.buffer.getCount(); i++)
-				rs.buffer[i] = set1.buffer[i] & set2.buffer[i];
+            const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
+			outRs.m_buffer.setCount(minCount);
+
+			for (Index i = 0; i < minCount; i++)
+				outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
 		}
-		static void Subtract(IntSet & rs, const IntSet & set1, const IntSet & set2)
+		static void calcSubtract(IntSet& outRs, const IntSet& set1, const IntSet& set2)
 		{
-			rs.buffer.setCount(set1.buffer.getCount());
-			for (UInt i = 0; i<Math::Min(set1.buffer.getCount(), set2.buffer.getCount()); i++)
-				rs.buffer[i] = set1.buffer[i] & (~set2.buffer[i]);
+			outRs.m_buffer.setCount(set1.m_buffer.getCount());
+
+            const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
+			for (Index i = 0; i < minCount; i++)
+				outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
 		}
-		static bool HasIntersection(const IntSet & set1, const IntSet & set2)
+		static bool hasIntersection(const IntSet& set1, const IntSet& set2)
 		{
-			for (UInt i = 0; i<Math::Min(set1.buffer.getCount(), set2.buffer.getCount()); i++)
+            const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
+			for (Index i = 0; i < minCount; i++)
 			{
-				if (set1.buffer[i] & set2.buffer[i])
+				if (set1.m_buffer[i] & set2.m_buffer[i])
 					return true;
 			}
 			return false;
 		}
+
+    private:
+        static bool _areRemainingZeros(const List<Element>& elems, Index minCount)
+        {
+            const Index count = elems.getCount();
+            const Element* base = elems.getBuffer();
+
+            for (Index i = minCount; i < count; ++i)
+            {
+                if (base[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
 	};
 }
 

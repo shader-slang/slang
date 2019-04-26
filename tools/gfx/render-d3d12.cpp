@@ -2636,7 +2636,7 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
-        const UInt num = startSlot + slotCount;
+        const Index num = startSlot + slotCount;
         if (num > m_boundVertexBuffers.getCount())
         {
             m_boundVertexBuffers.setCount(num);

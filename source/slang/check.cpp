@@ -233,7 +233,7 @@ namespace Slang
             if (opExpr->Arguments.getCount() > 2)
                 return false;
 
-            for (UInt i = 0; i < opExpr->Arguments.getCount(); i++)
+            for (Index i = 0; i < opExpr->Arguments.getCount(); i++)
             {
                 if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
                     return false;
