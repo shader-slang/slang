@@ -112,12 +112,12 @@ namespace Slang {
         {
             const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
 
-            const UInt oldCapacity = encodeArrayOut.Capacity();
+            const UInt oldCapacity = encodeArrayOut.getCapacity();
            
             // Make some more space
             encodeArrayOut.Reserve(oldCapacity + (oldCapacity >> 1) + kMaxLiteEncodeUInt32);
             // Make the size the capacity
-            const UInt capacity = encodeArrayOut.Capacity();
+            const UInt capacity = encodeArrayOut.getCapacity();
             encodeArrayOut.SetSize(capacity);
 
             encodeOut = encodeArrayOut.begin() + offset;

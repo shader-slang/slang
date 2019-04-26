@@ -203,7 +203,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
     if(positionalArgs.getSize())
     {
         gOptions.sourcePath = positionalArgs[0];
-        positionalArgs.RemoveAt(0);
+        positionalArgs.removeAt(0);
     }
 
     // any remaining arguments represent an error

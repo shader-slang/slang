@@ -345,7 +345,7 @@ void VulkanSwapChain::_destroySwapChain()
     }
 
     // Mark that it is no longer used
-    m_images.Clear();
+    m_images.clear();
 }
 
 VulkanSwapChain::~VulkanSwapChain()

@@ -162,17 +162,17 @@ static void memoryArenaUnitTest()
                     {
                         // Deallocate everything
                         arena.deallocateAll();
-                        blocks.Clear();
+                        blocks.clear();
                     }   
                     else if (var == 2)
                     {
                         arena.reset();
-                        blocks.Clear();
+                        blocks.clear();
                     }
                     else if (var == 3)
                     {
                         arena.rewindToCursor(nullptr);
-                        blocks.Clear();
+                        blocks.clear();
                     }
                     else if (var == 4)
                     {

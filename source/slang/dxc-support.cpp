@@ -248,7 +248,7 @@ namespace Slang
         ComPtr<IDxcBlob> dxcResultBlob;
         SLANG_RETURN_ON_FAIL(dxcResult->GetResult(dxcResultBlob.writeRef()));
         
-        outCode.AddRange(
+        outCode.addRange(
             (uint8_t const*)dxcResultBlob->GetBufferPointer(),
             (int)           dxcResultBlob->GetBufferSize());
 

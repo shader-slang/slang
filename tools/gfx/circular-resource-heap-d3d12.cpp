@@ -93,11 +93,11 @@ void D3D12CircularResourceHeap::updateCompleted()
 		m_back = m_pendingQueue[end - 1].m_cursor;
 		if (end == size)
 		{
-			m_pendingQueue.Clear();
+			m_pendingQueue.clear();
 		}
 		else
 		{
-			m_pendingQueue.RemoveRange(0, size);
+			m_pendingQueue.removeRange(0, size);
 		}
 	}
 #endif

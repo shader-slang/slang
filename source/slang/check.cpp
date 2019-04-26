@@ -2181,7 +2181,7 @@ namespace Slang
                     // because we don't allow nested implicit conversions,
                     // but I'd rather play it safe.
                     //
-                    castExpr->Arguments.Clear();
+                    castExpr->Arguments.clear();
                     castExpr->Arguments.add(fromExpr);
                 }
 
@@ -4882,7 +4882,7 @@ namespace Slang
 
         void PopOuterStmt(Stmt* /*stmt*/)
         {
-            outerStmts.RemoveAt(outerStmts.getSize() - 1);
+            outerStmts.removeAt(outerStmts.getSize() - 1);
         }
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr)
@@ -7304,7 +7304,7 @@ namespace Slang
                         // our new candidate is better!
 
                         // remove it from the list (by swapping in a later one)
-                        context.bestCandidates.FastRemoveAt(cc);
+                        context.bestCandidates.fastRemoveAt(cc);
                         // and then reduce our index so that we re-visit the same index
                         --cc;
 

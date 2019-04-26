@@ -103,7 +103,7 @@ namespace Slang
 				buffer[i] |= set.buffer[i];
 			}
 			if (set.buffer.getSize() > buffer.getSize())
-				buffer.AddRange(set.buffer.Buffer()+buffer.getSize(), set.buffer.getSize()-buffer.getSize());
+				buffer.addRange(set.buffer.Buffer()+buffer.getSize(), set.buffer.getSize()-buffer.getSize());
 		}
 		bool operator == (const IntSet & set)
 		{

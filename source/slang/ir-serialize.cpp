@@ -209,7 +209,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
     
 /* static */void SerialStringTableUtil::encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable)
 {
-    stringTable.Clear();
+    stringTable.clear();
     for (size_t i = 0; i < numSlices; ++i)
     {
         const UnownedStringSlice slice = slices[i];
@@ -309,18 +309,18 @@ void IRSerialData::clear()
     m_insts.SetSize(1);
     memset(&m_insts[0], 0, sizeof(Inst));
 
-    m_childRuns.Clear();
-    m_externalOperands.Clear();
-    m_rawSourceLocs.Clear();
+    m_childRuns.clear();
+    m_externalOperands.clear();
+    m_rawSourceLocs.clear();
 
-    m_stringTable.Clear();
+    m_stringTable.clear();
     
     // Debug data
-    m_debugLineInfos.Clear();
-    m_debugAdjustedLineInfos.Clear();
-    m_debugSourceInfos.Clear();
-    m_debugSourceLocRuns.Clear();
-    m_debugStringTable.Clear();
+    m_debugLineInfos.clear();
+    m_debugAdjustedLineInfos.clear();
+    m_debugSourceInfos.clear();
+    m_debugSourceLocRuns.clear();
+    m_debugStringTable.clear();
 }
 
 template <typename T>
@@ -563,8 +563,8 @@ Result IRSerialWriter::_calcDebugInfo()
         sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.getSize());
 
         // Add the line infos
-        m_serialData->m_debugLineInfos.AddRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getSize());
-        m_serialData->m_debugAdjustedLineInfos.AddRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getSize());
+        m_serialData->m_debugLineInfos.addRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getSize());
+        m_serialData->m_debugAdjustedLineInfos.addRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getSize());
 
         // Add the source info
         m_serialData->m_debugSourceInfos.add(sourceInfo);
@@ -586,12 +586,12 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     serialData->clear();
 
     // We reserve 0 for null
-    m_insts.Clear();
+    m_insts.clear();
     m_insts.add(nullptr);
 
     // Reset
     m_instMap.Clear();
-    m_decorations.Clear();
+    m_decorations.clear();
     
     // Stack for parentInst
     List<IRInst*> parentInstStack;
@@ -905,7 +905,7 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
     {
         return SLANG_FAIL;
     }
-    encodeArrayOut.Clear();
+    encodeArrayOut.clear();
     
     const size_t numInsts = size_t(instsIn.getSize());
     const IRSerialData::Inst* insts = instsIn.begin();
@@ -927,10 +927,10 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
         {
             const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
             
-            const UInt oldCapacity = encodeArrayOut.Capacity();
+            const UInt oldCapacity = encodeArrayOut.getCapacity();
 
             encodeArrayOut.Reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
-            const UInt capacity = encodeArrayOut.Capacity();
+            const UInt capacity = encodeArrayOut.getCapacity();
             encodeArrayOut.SetSize(capacity);
 
             encodeOut = encodeArrayOut.begin() + offset;
@@ -1816,7 +1816,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 }
             }
             // Add regular lines
-            lineInfos.AddRange(m_serialData->m_debugLineInfos.Buffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
+            lineInfos.addRange(m_serialData->m_debugLineInfos.Buffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
             // Put in sourceloc order
             lineInfos.Sort();
 
@@ -1865,7 +1865,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
                 int numEntries = int(srcSourceInfo.m_numAdjustedLineInfos);
 
-                adjustedLineInfos.AddRange(m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
+                adjustedLineInfos.addRange(m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
                 adjustedLineInfos.Sort();
 
                 // Work out the views adjustments, and place in dstEntries

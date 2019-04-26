@@ -162,7 +162,7 @@ namespace Slang
 		List<T>& operator=(const List<T>& list)
 		{
 			Free();
-			AddRange(list);
+			addRange(list);
 
 			return *this;
 		}
@@ -286,17 +286,17 @@ namespace Slang
 			return m_buffer;
 		}
 
-		UInt Capacity() const
+		UInt getCapacity() const
 		{
 			return m_capacity;
 		}
 
-		void Insert(UInt id, const T& val)
+		void insert(UInt id, const T& val)
 		{
-			InsertRange(id, &val, 1);
+			insertRange(id, &val, 1);
 		}
 
-		void InsertRange(UInt id, const T* vals, UInt n)
+		void insertRange(UInt id, const T* vals, UInt n)
 		{
 			if (m_capacity < m_size + n)
 			{
@@ -349,27 +349,27 @@ namespace Slang
 		//	InsertRange(_count, &val, 1);
 		//}
 
-		void InsertRange(int id, const List<T>& list)
+		void insertRange(int id, const List<T>& list)
 		{
-			InsertRange(id, list.m_buffer, list.m_size);
+			insertRange(id, list.m_buffer, list.m_size);
 		}
 
-		void AddRange(ArrayView<T> list)
+		void addRange(ArrayView<T> list)
 		{
-			InsertRange(m_size, list.Buffer(), list.Count());
+			insertRange(m_size, list.Buffer(), list.Count());
 		}
 
-		void AddRange(const T* vals, UInt n)
+		void addRange(const T* vals, UInt n)
 		{
-			InsertRange(m_size, vals, n);
+			insertRange(m_size, vals, n);
 		}
 
-		void AddRange(const List<T>& list)
+		void addRange(const List<T>& list)
 		{
-			InsertRange(m_size, list.m_buffer, list.m_size);
+			insertRange(m_size, list.m_buffer, list.m_size);
 		}
 
-		void RemoveRange(UInt idx, UInt count)
+		void removeRange(UInt idx, UInt count)
 		{
             SLANG_ASSERT(idx >= 0 && idx <= m_size);
 
@@ -379,19 +379,19 @@ namespace Slang
 			m_size -= actualDeleteCount;
 		}
 
-		void RemoveAt(UInt id)
+		void removeAt(UInt id)
 		{
-			RemoveRange(id, 1);
+			removeRange(id, 1);
 		}
 
-		void Remove(const T& val)
+		void remove(const T& val)
 		{
 			int idx = IndexOf(val);
 			if (idx != -1)
-				RemoveAt(idx);
+				removeAt(idx);
 		}
 
-		void Reverse()
+		void reverse()
 		{
 			for (UInt i = 0; i < (m_size >> 1); i++)
 			{
@@ -399,13 +399,13 @@ namespace Slang
 			}
 		}
 
-		void FastRemove(const T& val)
+		void fastRemove(const T& val)
 		{
 			int idx = IndexOf(val);
-			FastRemoveAt(idx);
+			fastRemoveAt(idx);
 		}
 
-		void FastRemoveAt(UInt idx)
+		void fastRemoveAt(UInt idx)
 		{
 			if (idx != -1 && m_size - 1 != idx)
 			{
@@ -414,7 +414,7 @@ namespace Slang
 			m_size--;
 		}
 
-		void Clear()
+		void clear()
 		{
 			m_size = 0;
 		}

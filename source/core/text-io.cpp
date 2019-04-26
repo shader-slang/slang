@@ -15,7 +15,7 @@ namespace Slang
 	public:
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			result.AddRange(str.Buffer(), str.Length());
+			result.addRange(str.Buffer(), str.Length());
 		}
 		virtual String ToString(const char * bytes, int /*length*/) override
 		{
@@ -38,7 +38,7 @@ namespace Slang
 					else
 						return '\0';
 				});
-				result.AddRange((char*)&codePoint, 4);
+				result.addRange((char*)&codePoint, 4);
 			}
 		}
 		virtual String ToString(const char * bytes, int length) override
@@ -82,7 +82,7 @@ namespace Slang
 					count = EncodeUnicodePointToUTF16(buffer, codePoint);
 				else
 					count = EncodeUnicodePointToUTF16Reversed(buffer, codePoint);
-				result.AddRange((char*)buffer, count * 2);
+				result.addRange((char*)buffer, count * 2);
 			}
 		}
 		virtual String ToString(const char * bytes, int length) override
@@ -148,7 +148,7 @@ namespace Slang
 	}
 	void StreamWriter::Write(const String & str)
 	{
-		encodingBuffer.Clear();
+		encodingBuffer.clear();
 		StringBuilder sb;
 		String newLine;
 #ifdef _WIN32

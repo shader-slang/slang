@@ -677,7 +677,7 @@ LoweredValInfo emitCallToDeclRef(
             RefPtr<BoundSubscriptInfo> boundSubscript = new BoundSubscriptInfo();
             boundSubscript->declRef = subscriptDeclRef;
             boundSubscript->type = type;
-            boundSubscript->args.AddRange(args, argCount);
+            boundSubscript->args.addRange(args, argCount);
 
             context->shared->extValues.add(boundSubscript);
 

@@ -278,11 +278,11 @@ namespace Slang
 
         if (m_position == m_contents.getSize())
         {
-            m_contents.AddRange((const uint8_t*)buffer, UInt(length));
+            m_contents.addRange((const uint8_t*)buffer, UInt(length));
         }
         else
         {
-            m_contents.InsertRange(m_position, (const uint8_t*)buffer, UInt(length));
+            m_contents.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
         }
 
         m_atEnd = false;

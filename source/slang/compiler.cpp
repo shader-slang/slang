@@ -94,7 +94,7 @@ namespace Slang
         }
         else if (appendTo == ResultFormat::Binary)
         {
-            outputBinary.AddRange(result.outputBinary.Buffer(), result.outputBinary.getSize());
+            outputBinary.addRange(result.outputBinary.Buffer(), result.outputBinary.getSize());
         }
     }
 
@@ -675,7 +675,7 @@ namespace Slang
         EndToEndCompileRequest* endToEndReq,
         List<uint8_t>&          byteCodeOut)
     {
-        byteCodeOut.Clear();
+        byteCodeOut.clear();
 
         auto session = compileRequest->getSession();
         auto sink = compileRequest->getSink();
@@ -787,7 +787,7 @@ namespace Slang
 
         if (codeBlob && SLANG_SUCCEEDED(hr))
         {
-            byteCodeOut.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
+            byteCodeOut.addRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
         }
 
         if (FAILED(hr))
@@ -955,7 +955,7 @@ SlangResult dissassembleDXILUsingDXC(
         EndToEndCompileRequest* endToEndReq,
         List<uint8_t>&          spirvOut)
     {
-        spirvOut.Clear();
+        spirvOut.clear();
 
         String rawGLSL = emitGLSLForEntryPoint(
             slangRequest,
@@ -967,7 +967,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
-            ((List<uint8_t>*)userData)->AddRange((uint8_t*)data, size);
+            ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
         };
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);

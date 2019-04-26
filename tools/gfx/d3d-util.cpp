@@ -399,7 +399,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
 {
     String lowerAdapterName = String(adapterName).ToLower();
 
-    outDxgiAdapters.Clear();
+    outDxgiAdapters.clear();
 
     ComPtr<IDXGIAdapter> warpAdapter;
     if ((flags & DeviceCheckFlag::UseHardwareDevice) == 0)

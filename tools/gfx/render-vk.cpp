@@ -862,7 +862,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
     // will free the memory after a compile request is closed.
     size_t codeSize = dataEnd - dataBegin;
 
-	bufferOut.InsertRange(0, dataBegin, codeSize);
+	bufferOut.insertRange(0, dataBegin, codeSize);
 
     char* codeBegin = bufferOut.Buffer();
 
@@ -2441,7 +2441,7 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
             }
             else
             {
-                m_bindings.RemoveAt(i);
+                m_bindings.removeAt(i);
             }
 
             return;

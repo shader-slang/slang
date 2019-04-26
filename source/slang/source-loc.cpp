@@ -200,8 +200,8 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 
 void SourceFile::setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets)
 {
-    m_lineBreakOffsets.Clear();
-    m_lineBreakOffsets.AddRange(offsets, numOffsets);
+    m_lineBreakOffsets.clear();
+    m_lineBreakOffsets.addRange(offsets, numOffsets);
 }
 
 const List<uint32_t>& SourceFile::getLineBreakOffsets()

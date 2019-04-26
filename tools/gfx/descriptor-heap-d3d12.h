@@ -111,7 +111,7 @@ public:
         if(m_freeList.getSize() > 0)
         {
             auto descriptor = m_freeList[0];
-            m_freeList.FastRemoveAt(0);
+            m_freeList.fastRemoveAt(0);
 
             *outDescriptor = descriptor;
             return SLANG_OK;

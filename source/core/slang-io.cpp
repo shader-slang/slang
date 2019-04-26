@@ -191,7 +191,7 @@ namespace Slang
 
     /* static */void Path::split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
     {
-        splitOut.Clear();
+        splitOut.clear();
 
         const char* start = path.begin();
         const char* end = path.end();
@@ -247,7 +247,7 @@ namespace Slang
             if (cur == "." && splitPath.getSize() > 1)
             {
                 // Just remove it 
-                splitPath.RemoveAt(i);
+                splitPath.removeAt(i);
                 i--;
             }
             else if (cur == ".." && i > 0)
@@ -259,7 +259,7 @@ namespace Slang
                     // Can't do it
                     continue;
                 }
-                splitPath.RemoveRange(i - 1, 2);
+                splitPath.removeRange(i - 1, 2);
                 i -= 2;
             }
         }

@@ -281,7 +281,7 @@ static bool _isSubCommand(const char* arg)
     if (positionalArgs.getSize())
     {
         optionsOut->testPrefix = positionalArgs[0];
-        positionalArgs.RemoveAt(0);
+        positionalArgs.removeAt(0);
     }
 
     // any remaining arguments represent an error

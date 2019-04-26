@@ -47,7 +47,7 @@ static void freeListUnitTest()
 
             freeList.deallocate(alloc);
 
-            allocs.FastRemoveAt(index);
+            allocs.fastRemoveAt(index);
         }
     }
 }

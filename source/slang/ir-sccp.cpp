@@ -612,7 +612,7 @@ struct SCCPContext
                 // We pop one block off of the work list.
                 //
                 auto block = cfgWorkList[0];
-                cfgWorkList.FastRemoveAt(0);
+                cfgWorkList.fastRemoveAt(0);
 
                 // We only want to process blocks that haven't
                 // already been marked as executed, so that we
@@ -649,7 +649,7 @@ struct SCCPContext
                 // We pop one instruction that needs an update.
                 //
                 auto inst = ssaWorkList[0];
-                ssaWorkList.FastRemoveAt(0);
+                ssaWorkList.fastRemoveAt(0);
 
                 // Before updating the instruction, we will check if
                 // the parent block of the instructin is marked as

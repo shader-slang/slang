@@ -3116,15 +3116,15 @@ Result D3D12Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgr
     if (desc.pipelineType == PipelineType::Compute)
     {
         auto computeKernel = desc.findKernel(StageType::Compute);
-        program->m_computeShader.InsertRange(0, (const uint8_t*) computeKernel->codeBegin, computeKernel->getCodeSize());
+        program->m_computeShader.insertRange(0, (const uint8_t*) computeKernel->codeBegin, computeKernel->getCodeSize());
     }
     else
     {
         auto vertexKernel = desc.findKernel(StageType::Vertex);
         auto fragmentKernel = desc.findKernel(StageType::Fragment);
 
-        program->m_vertexShader.InsertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
-        program->m_pixelShader.InsertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
+        program->m_vertexShader.insertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
+        program->m_pixelShader.insertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
     }
 
     *outProgram = program.detach();

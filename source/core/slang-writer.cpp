@@ -76,7 +76,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char*
     // Do the actual write
     SlangResult res = write(buffer, numChars);
     // Clear so that buffer can't be written from again without assert
-    m_appendBuffer.Clear();
+    m_appendBuffer.clear();
     return res;
 }
 

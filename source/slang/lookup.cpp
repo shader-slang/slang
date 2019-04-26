@@ -42,7 +42,7 @@ void buildMemberDictionary(ContainerDecl* decl)
         return;
 
     decl->memberDictionary.Clear();
-    decl->transparentMembers.Clear();
+    decl->transparentMembers.clear();
 
     // are we a generic?
     GenericDecl* genericDecl = as<GenericDecl>(decl);

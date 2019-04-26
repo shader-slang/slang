@@ -8,11 +8,11 @@ namespace renderer_test
     using namespace Slang;
     void ShaderInputLayout::Parse(const char * source)
     {
-        entries.Clear();
-        globalGenericTypeArguments.Clear();
-        entryPointGenericTypeArguments.Clear();
-        globalExistentialTypeArguments.Clear();
-        entryPointExistentialTypeArguments.Clear();
+        entries.clear();
+        globalGenericTypeArguments.clear();
+        entryPointGenericTypeArguments.clear();
+        globalExistentialTypeArguments.clear();
+        entryPointExistentialTypeArguments.clear();
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {

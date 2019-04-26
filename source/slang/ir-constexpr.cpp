@@ -492,7 +492,7 @@ void propagateConstExpr(
     while( context.workList.getSize() )
     {
         auto gv = context.workList[0];
-        context.workList.FastRemoveAt(0);
+        context.workList.fastRemoveAt(0);
         context.onWorkList.Remove(gv);
 
         switch( gv->op )

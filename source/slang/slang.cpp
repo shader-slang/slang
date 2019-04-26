@@ -1770,7 +1770,7 @@ SLANG_API void spSetCodeGenTarget(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->targets.Clear();
+    linkage->targets.clear();
     linkage->addTarget(Slang::CodeGenTarget(target));
 }
 
@@ -2115,7 +2115,7 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     auto req = convert(request);
 
     auto& genericArgStrings = req->globalGenericArgStrings;
-    genericArgStrings.Clear();
+    genericArgStrings.clear();
     for (int i = 0; i < genericArgCount; i++)
         genericArgStrings.add(genericArgs[i]);
 

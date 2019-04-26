@@ -2005,7 +2005,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
             UInt index = synthOptions.args.IndexOf("-hlsl");
             if (index != UInt(-1))
             {
-                synthOptions.args.RemoveAt(index);
+                synthOptions.args.removeAt(index);
             }
         }
 
@@ -2110,7 +2110,7 @@ void runTestsOnFile(
         }
 
         // Add all the synthesized tests
-        testList.tests.AddRange(synthesizedTests);
+        testList.tests.addRange(synthesizedTests);
     }
 
     // We have found a test to run!

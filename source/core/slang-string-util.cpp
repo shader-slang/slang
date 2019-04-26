@@ -17,7 +17,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
 
 /* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut)
 {
-    slicesOut.Clear();
+    slicesOut.clear();
 
     const char* start = in.begin();
     const char* end = in.end();

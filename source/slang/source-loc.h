@@ -264,7 +264,7 @@ class SourceView
         /// Get the entries
     const List<Entry>& getEntries() const { return m_entries; }
         /// Set the entries list
-    void setEntries(const Entry* entries, UInt numEntries) { m_entries.Clear(); m_entries.AddRange(entries, numEntries); }
+    void setEntries(const Entry* entries, UInt numEntries) { m_entries.clear(); m_entries.addRange(entries, numEntries); }
 
         /// Get the source file holds the contents this view 
     SourceFile* getSourceFile() const { return m_sourceFile; }
