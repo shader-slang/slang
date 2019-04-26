@@ -6542,6 +6542,25 @@ struct EmitVisitor
                     return;
                 }
             }
+
+            // When emitting unbounded-size resource arrays with GLSL we need
+            // to use the `GL_EXT_nonuniform_qualifier` extension to ensure
+            // that they are not treated as "implicitly-sized arrays" which
+            // are arrays that have a fixed size that just isn't specified
+            // at the declaration site (instead being inferred from use sites).
+            //
+            // While the extension primarily introduces the `nonuniformEXT`
+            // qualifier that we use to implement `NonUniformResourceIndex`,
+            // it also changes the GLSL language semantics around (resource) array
+            // declarations that don't specify a size.
+            //
+            if( as<IRUnsizedArrayType>(varType) )
+            {
+                if(isResourceType(unwrapArray(varType)))
+                {
+                    requireGLSLExtension("GL_EXT_nonuniform_qualifier");
+                }
+            }
         }
 
         // Need to emit appropriate modifiers here.
