@@ -145,7 +145,7 @@ namespace Slang
 		static List<T> Create(const T& val, int count)
 		{
 			List<T> rs;
-			rs.SetSize(count);
+			rs.setSize(count);
 			for (int i = 0; i < count; i++)
 				rs[i] = val;
 			return rs;
@@ -253,7 +253,7 @@ namespace Slang
 				if (m_capacity)
 					newBufferSize = (m_capacity << 1);
 
-				Reserve(newBufferSize);
+				reserve(newBufferSize);
 			}
 			m_buffer[m_size++] = static_cast<T&&>(obj);
 		}
@@ -266,7 +266,7 @@ namespace Slang
 				if (m_capacity)
 					newBufferSize = (m_capacity << 1);
 
-				Reserve(newBufferSize);
+				reserve(newBufferSize);
 			}
 			m_buffer[m_size++] = obj;
 
@@ -421,7 +421,7 @@ namespace Slang
             m_size = m_capacity = 0;
         }
 
-		void Reserve(UInt size)
+		void reserve(UInt size)
 		{
 			if(size > m_capacity)
 			{
@@ -448,19 +448,19 @@ namespace Slang
 			}
 		}
 
-		void GrowToSize(UInt size)
+		void growToSize(UInt size)
 		{
 			UInt newBufferSize = UInt(1) << Math::Log2Ceil(size);
 			if (m_capacity < newBufferSize)
 			{
-				Reserve(newBufferSize);
+				reserve(newBufferSize);
 			}
 			m_size = size;
 		}
 
-		void SetSize(UInt size)
+		void setSize(UInt size)
 		{
-			Reserve(size);
+			reserve(size);
 			m_size = size;
 		}
 

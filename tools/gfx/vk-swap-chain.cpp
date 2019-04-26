@@ -66,7 +66,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, nullptr);
-    surfaceFormats.SetSize(int(numSurfaceFormats));
+    surfaceFormats.setSize(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.Buffer());
 
     // Look for a suitable format
@@ -209,7 +209,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
     List<VkPresentModeKHR> presentModes;
     uint32_t numPresentModes = 0;
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, nullptr);
-    presentModes.SetSize(numPresentModes);
+    presentModes.setSize(numPresentModes);
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.Buffer());
 
     {
@@ -265,11 +265,11 @@ SlangResult VulkanSwapChain::_createSwapChain()
 
     {
         List<VkImage> images;
-        images.SetSize(numSwapChainImages);
+        images.setSize(numSwapChainImages);
 
         m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, images.Buffer());
 
-        m_images.SetSize(numSwapChainImages);
+        m_images.setSize(numSwapChainImages);
         for (int i = 0; i < int(numSwapChainImages); ++i)
         {
             Image& dstImage = m_images[i];

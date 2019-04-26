@@ -351,7 +351,7 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	fseek(sourceFile, 0, SEEK_SET);
 
     List<char> sourceText;
-    sourceText.SetSize(sourceSize + 1);
+    sourceText.setSize(sourceSize + 1);
 	fread(sourceText.Buffer(), sourceSize, 1, sourceFile);
 	fclose(sourceFile);
 	sourceText[sourceSize] = 0;

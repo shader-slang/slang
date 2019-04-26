@@ -322,7 +322,7 @@ struct DominatorTreeComputationContext
 
         // Next we initialize the `doms` array that we will iteratively turn
         // into an encoding of the dominator tree.
-        doms.SetSize(blockCount);
+        doms.setSize(blockCount);
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
             doms[bb] = kUndefined;
@@ -626,7 +626,7 @@ struct DominatorTreeComputationContext
         //
         RefPtr<IRDominatorTree> dominatorTree = new IRDominatorTree();
         dominatorTree->code = code;
-        dominatorTree->nodes.SetSize(blockCount);
+        dominatorTree->nodes.setSize(blockCount);
 
         // We will iterate over all of the blocks, and fill in the corresponding
         // dominator tree node for each.

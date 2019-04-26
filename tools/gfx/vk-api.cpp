@@ -121,7 +121,7 @@ int VulkanApi::findQueue(VkQueueFlags reqFlags) const
     vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, nullptr);
 
     Slang::List<VkQueueFamilyProperties> queueFamilies;
-    queueFamilies.SetSize(numQueueFamilies);
+    queueFamilies.setSize(numQueueFamilies);
     vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, queueFamilies.Buffer());
 
     // Find a queue that can service our needs

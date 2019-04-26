@@ -63,7 +63,7 @@ namespace Slang
 		void Resize(UInt size)
 		{
 			UInt oldBufferSize = buffer.getSize();
-			buffer.SetSize((size+31)>>5);
+			buffer.setSize((size+31)>>5);
 			if (buffer.getSize() > oldBufferSize)
 				memset(buffer.Buffer()+oldBufferSize, 0, (buffer.getSize()-oldBufferSize) * sizeof(int));
 		}
@@ -80,7 +80,7 @@ namespace Slang
 			else
 			{
 				UInt oldSize = buffer.getSize();
-				buffer.SetSize(id+1);
+				buffer.setSize(id+1);
 				memset(buffer.Buffer() + oldSize, 0, (buffer.getSize()-oldSize)*sizeof(int));
 				buffer[id] |= (1<<(val&31));
 			}
@@ -129,7 +129,7 @@ namespace Slang
 		}
 		static void Union(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.SetSize(Math::Max(set1.buffer.getSize(), set2.buffer.getSize()));
+			rs.buffer.setSize(Math::Max(set1.buffer.getSize(), set2.buffer.getSize()));
 			rs.Clear();
 			for (UInt i = 0; i<set1.buffer.getSize(); i++)
 				rs.buffer[i] |= set1.buffer[i];
@@ -138,13 +138,13 @@ namespace Slang
 		}
 		static void Intersect(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.SetSize(Math::Min(set1.buffer.getSize(), set2.buffer.getSize()));
+			rs.buffer.setSize(Math::Min(set1.buffer.getSize(), set2.buffer.getSize()));
 			for (UInt i = 0; i<rs.buffer.getSize(); i++)
 				rs.buffer[i] = set1.buffer[i] & set2.buffer[i];
 		}
 		static void Subtract(IntSet & rs, const IntSet & set1, const IntSet & set2)
 		{
-			rs.buffer.SetSize(set1.buffer.getSize());
+			rs.buffer.setSize(set1.buffer.getSize());
 			for (UInt i = 0; i<Math::Min(set1.buffer.getSize(), set2.buffer.getSize()); i++)
 				rs.buffer[i] = set1.buffer[i] & (~set2.buffer[i]);
 		}

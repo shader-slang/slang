@@ -16,7 +16,7 @@ StringSlicePool::StringSlicePool() :
 
 void StringSlicePool::clear()
 {
-    m_slices.SetSize(2);
+    m_slices.setSize(2);
 
     m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
     m_slices[1] = UnownedStringSlice::fromLiteral("");

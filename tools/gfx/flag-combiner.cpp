@@ -24,7 +24,7 @@ void FlagCombiner::add(uint32_t flags, ChangeType type)
 void FlagCombiner::calcCombinations(List<uint32_t>& outCombinations) const
 {
     const int numCombinations = getNumCombinations();
-    outCombinations.SetSize(numCombinations);
+    outCombinations.setSize(numCombinations);
     uint32_t* dstCombinations = outCombinations.Buffer();
     for (int i = 0; i < numCombinations; ++i)
     {

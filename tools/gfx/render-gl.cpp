@@ -1384,15 +1384,15 @@ Result GLRenderer::createDescriptorSet(DescriptorSetLayout* layout, DescriptorSe
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::ConstantBuffer);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
-        descriptorSetImpl->m_constantBuffers.SetSize(slotCount);
+        descriptorSetImpl->m_constantBuffers.setSize(slotCount);
     }
 
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::CombinedTextureSampler);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
 
-        descriptorSetImpl->m_textures.SetSize(slotCount);
-        descriptorSetImpl->m_samplers.SetSize(slotCount);
+        descriptorSetImpl->m_textures.setSize(slotCount);
+        descriptorSetImpl->m_samplers.setSize(slotCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();

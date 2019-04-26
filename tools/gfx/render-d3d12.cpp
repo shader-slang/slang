@@ -1965,11 +1965,11 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
 
     // Calculate the layout
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
-    layouts.SetSize(numMipMaps);
+    layouts.setSize(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
-    mipRowSizeInBytes.SetSize(numMipMaps);
+    mipRowSizeInBytes.setSize(numMipMaps);
     List<UInt32> mipNumRows;
-    mipNumRows.SetSize(numMipMaps);
+    mipNumRows.setSize(numMipMaps);
 
     // Since textures are effectively immutable currently initData must be set
     assert(initData);
@@ -2119,7 +2119,7 @@ Result D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const B
         {
             // Assume the constant buffer will change every frame. We'll just keep a copy of the contents
             // in regular memory until it needed
-            buffer->m_memory.SetSize(UInt(alignedSizeInBytes));
+            buffer->m_memory.setSize(UInt(alignedSizeInBytes));
             // Initialize
             if (initData)
             {
@@ -2424,12 +2424,12 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
         const char* text = inputElements[i].semanticName;
         textSize += text ? (::strlen(text) + 1) : 0;
     }
-    layout->m_text.SetSize(textSize);
+    layout->m_text.setSize(textSize);
     char* textPos = layout->m_text.Buffer();
 
     //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
-    elements.SetSize(inputElementCount);
+    elements.setSize(inputElementCount);
 
 
     for (UInt i = 0; i < inputElementCount; ++i)
@@ -2537,7 +2537,7 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
                         SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
                         // Copy to memory buffer
-                        buffer->m_memory.SetSize(bufferSize);
+                        buffer->m_memory.setSize(bufferSize);
                         ::memcpy(buffer->m_memory.Buffer(), data, bufferSize);
 
                         stageBuf.getResource()->Unmap(0, nullptr);
@@ -2639,7 +2639,7 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
         const UInt num = startSlot + slotCount;
         if (num > m_boundVertexBuffers.getSize())
         {
-            m_boundVertexBuffers.SetSize(num);
+            m_boundVertexBuffers.setSize(num);
         }
     }
 
@@ -3221,7 +3221,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     // again based on totals that we can compute easily:
     //
     Int totalRangeCount = totalResourceRangeCount + totalSamplerRangeCount;
-    descriptorSetLayoutImpl->m_dxRanges.SetSize(totalRangeCount);
+    descriptorSetLayoutImpl->m_dxRanges.setSize(totalRangeCount);
 
     // Now we will walk through the ranges in  the order they were
     // specified, so that we can fill in the "range info" required for
@@ -3584,7 +3584,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto resourceHeap = &m_cpuViewHeap;
         descriptorSetImpl->m_resourceHeap = resourceHeap;
         descriptorSetImpl->m_resourceTable = resourceHeap->allocate(int(resourceCount));
-        descriptorSetImpl->m_resourceObjects.SetSize(resourceCount);
+        descriptorSetImpl->m_resourceObjects.setSize(resourceCount);
     }
 
     Int samplerCount = layoutImpl->m_samplerCount;
@@ -3593,7 +3593,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto samplerHeap = &m_cpuSamplerHeap;
         descriptorSetImpl->m_samplerHeap = samplerHeap;
         descriptorSetImpl->m_samplerTable = samplerHeap->allocate(int(samplerCount));
-        descriptorSetImpl->m_samplerObjects.SetSize(samplerCount);
+        descriptorSetImpl->m_samplerObjects.setSize(samplerCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();

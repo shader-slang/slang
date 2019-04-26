@@ -2351,7 +2351,7 @@ SlangResult innerMain(int argc, char** argv)
         // Copy args to a char* list
         const auto& srcArgs = options.subCommandArgs;
         List<const char*> args;
-        args.SetSize(srcArgs.getSize());
+        args.setSize(srcArgs.getSize());
         for (UInt i = 0; i < srcArgs.getSize(); ++i)
         {
             args[i] = srcArgs[i].Buffer();

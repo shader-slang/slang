@@ -181,7 +181,7 @@ static void memoryArenaUnitTest()
                         // rewind to this block
                         arena.rewindToCursor(blocks[rewindIndex].m_data);
                         // All the blocks (includign this one) and now deallocated
-                        blocks.SetSize(rewindIndex);
+                        blocks.setSize(rewindIndex);
 
                     }
                     else

@@ -295,7 +295,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     if (outSize > 0)
     {
         const UInt prevSize = out.getSize();
-        out.SetSize(prevSize + len + 1);
+        out.setSize(prevSize + len + 1);
 
         WCHAR* dst = out.Buffer() + prevSize;
         ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);

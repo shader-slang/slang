@@ -303,14 +303,14 @@ namespace renderer_test
                 List<List<unsigned int>>& dstBuffer = output.dataBuffer;
 
                 int numMips = int(work.dataBuffer.getSize());
-                dstBuffer.SetSize(numMips);
+                dstBuffer.setSize(numMips);
 
                 for (int i = 0; i < numMips; ++i)
                 {
                     const int numPixels = int(work.dataBuffer[i].getSize());
                     const unsigned int* srcPixels = work.dataBuffer[i].Buffer();
 
-                    dstBuffer[i].SetSize(numPixels);
+                    dstBuffer[i].setSize(numPixels);
 
                     float* dstPixels = (float*)dstBuffer[i].Buffer();
 
@@ -344,7 +344,7 @@ namespace renderer_test
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
         output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
-        output.dataBuffer.SetSize(output.mipLevels * output.arraySize);
+        output.dataBuffer.setSize(output.mipLevels * output.arraySize);
         auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
         {
             if (dimension == 1)
@@ -372,7 +372,7 @@ namespace renderer_test
                     bufferLen *= size;
                 else if (inputDesc.dimension == 3)
                     bufferLen *= size*size;
-                dataBuffer[slice].SetSize(bufferLen);
+                dataBuffer[slice].setSize(bufferLen);
 
                 iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
                 {

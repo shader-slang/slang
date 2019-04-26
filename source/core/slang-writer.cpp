@@ -66,7 +66,7 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 
 SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
 {
-    m_appendBuffer.SetSize(maxNumChars);
+    m_appendBuffer.setSize(maxNumChars);
     return m_appendBuffer.Buffer();
 }
 
@@ -85,7 +85,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char*
 SLANG_NO_THROW char* SLANG_MCALL CallbackWriter::beginAppendBuffer(size_t maxNumChars)
 {
     // Add one so there is always space for end termination, we need for the callback.
-    m_appendBuffer.SetSize(maxNumChars + 1);
+    m_appendBuffer.setSize(maxNumChars + 1);
     return m_appendBuffer.Buffer();
 }
 
@@ -105,7 +105,7 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
         else
         {
             // Use the append buffer to add the terminating 0
-            m_appendBuffer.SetSize(numChars + 1);
+            m_appendBuffer.setSize(numChars + 1);
             ::memcpy(m_appendBuffer.Buffer(), chars, numChars);
             m_appendBuffer[numChars] = 0;
 

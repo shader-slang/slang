@@ -81,7 +81,7 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
     m_scopeManager = scopeManager;
 
     // Decode the table
-    m_entries.SetSize(StringSlicePool::kNumDefaultHandles);
+    m_entries.setSize(StringSlicePool::kNumDefaultHandles);
     SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kNumDefaultHandles == 2);
 
     {
@@ -220,7 +220,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
         const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
         const int baseIndex = int(stringTable.getSize());
 
-        stringTable.SetSize(baseIndex + numPrefixBytes + len);
+        stringTable.setSize(baseIndex + numPrefixBytes + len);
 
         char* dst = stringTable.begin() + baseIndex;
 
@@ -246,7 +246,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
 
 /* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut)
 {
-    slicesOut.SetSize(2);
+    slicesOut.setSize(2);
     slicesOut[0] = UnownedStringSlice(nullptr, size_t(0));
     slicesOut[1] = UnownedStringSlice("", size_t(0));
 
@@ -259,7 +259,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
     SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
     SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
 
-    indexMapOut.SetSize(slices.getSize());
+    indexMapOut.setSize(slices.getSize());
     // Set up all of the defaults
     for (int i = 0; i < StringSlicePool::kNumDefaultHandles; ++i)
     {
@@ -306,7 +306,7 @@ IRSerialData::IRSerialData()
 void IRSerialData::clear()
 {
     // First Instruction is null
-    m_insts.SetSize(1);
+    m_insts.setSize(1);
     memset(&m_insts[0], 0, sizeof(Inst));
 
     m_childRuns.clear();
@@ -650,7 +650,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 #endif
 
     // Set to the right size
-    m_serialData->m_insts.SetSize(m_insts.getSize());
+    m_serialData->m_insts.setSize(m_insts.getSize());
     // Clear all instructions
     memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.getSize());
 
@@ -745,7 +745,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
                 dstInst.m_payloadType = PayloadType::OperandExternal;
 
                 int operandArrayBaseIndex = int(m_serialData->m_externalOperands.getSize());
-                m_serialData->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
+                m_serialData->m_externalOperands.setSize(operandArrayBaseIndex + numOperands);
 
                 dstOperands = m_serialData->m_externalOperands.begin() + operandArrayBaseIndex; 
 
@@ -771,7 +771,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     if (options & OptionFlag::RawSourceLocation)
     {
         const int numInsts = int(m_insts.getSize());
-        serialData->m_rawSourceLocs.SetSize(numInsts);
+        serialData->m_rawSourceLocs.setSize(numInsts);
 
         Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
         // 0 is null, just mark as no location
@@ -929,9 +929,9 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
             
             const UInt oldCapacity = encodeArrayOut.getCapacity();
 
-            encodeArrayOut.Reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
+            encodeArrayOut.reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
             const UInt capacity = encodeArrayOut.getCapacity();
-            encodeArrayOut.SetSize(capacity);
+            encodeArrayOut.setSize(capacity);
 
             encodeOut = encodeArrayOut.begin() + offset;
             encodeEnd = encodeArrayOut.end();
@@ -982,7 +982,7 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
     }
 
     // Fix the size 
-    encodeArrayOut.SetSize(UInt(encodeOut - encodeArrayOut.begin()));
+    encodeArrayOut.setSize(UInt(encodeOut - encodeArrayOut.begin()));
     return SLANG_OK;
 }
 
@@ -1184,7 +1184,7 @@ class ListResizerForType: public ListResizer
     
     virtual void* setSize(size_t newSize) SLANG_OVERRIDE
     {
-        m_list.SetSize(UInt(newSize));
+        m_list.setSize(UInt(newSize));
         return (void*)m_list.begin();
     }
 
@@ -1215,7 +1215,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
 
             List<uint8_t> compressedPayload;
-            compressedPayload.SetSize(payloadSize);
+            compressedPayload.setSize(payloadSize);
 
             stream->Read(compressedPayload.begin(), payloadSize);
             *numReadInOut += payloadSize;
@@ -1381,12 +1381,12 @@ Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const
             size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
 
             List<uint8_t> compressedPayload;
-            compressedPayload.SetSize(payloadSize);
+            compressedPayload.setSize(payloadSize);
 
             stream->Read(compressedPayload.begin(), payloadSize);
             *numReadInOut += payloadSize;
 
-            arrayOut.SetSize(header.m_numEntries);
+            arrayOut.setSize(header.m_numEntries);
 
             SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, compressedPayload, arrayOut));
             break;
@@ -1602,7 +1602,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
     SLANG_ASSERT(numInsts > 0);
 
-    insts.SetSize(numInsts);
+    insts.setSize(numInsts);
     insts[0] = nullptr;
 
     // 0 holds null
@@ -1790,7 +1790,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
         // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
         List<SourceView*> sourceViews;
-        sourceViews.SetSize(numSourceFiles);
+        sourceViews.setSize(numSourceFiles);
 
         for (int i = 0; i < numSourceFiles; ++i)
         {
@@ -1807,7 +1807,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             List<IRSerialData::DebugLineInfo> lineInfos;
             // Add the adjusted lines
             {
-                lineInfos.SetSize(srcSourceInfo.m_numAdjustedLineInfos);
+                lineInfos.setSize(srcSourceInfo.m_numAdjustedLineInfos);
                 IRSerialData::DebugAdjustedLineInfo* srcAdjustedLineInfos = m_serialData->m_debugAdjustedLineInfos.Buffer() + srcSourceInfo.m_adjustedLineInfosStartIndex;
                 const int numAdjustedLines = int(srcSourceInfo.m_numAdjustedLineInfos);
                 for (int j = 0; j < numAdjustedLines; ++j)
@@ -1824,7 +1824,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
             // We can now set up the line breaks array
             const int numLines = int(srcSourceInfo.m_numLines);
-            lineBreakOffsets.SetSize(numLines);
+            lineBreakOffsets.setSize(numLines);
 
             {
                 const int numLineInfos = int(lineInfos.getSize());
@@ -1870,7 +1870,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
                 // Work out the views adjustments, and place in dstEntries
                 List<SourceView::Entry> dstEntries;
-                dstEntries.SetSize(numEntries);
+                dstEntries.setSize(numEntries);
 
                 const uint32_t sourceLocOffset = uint32_t(sourceView->getRange().begin.getRaw());
 
@@ -1942,7 +1942,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 /* static */void IRSerialUtil::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
 {
     // We reserve 0 for null
-    instsOut.SetSize(1);
+    instsOut.setSize(1);
     instsOut[0] = nullptr;
 
     // Stack for parentInst

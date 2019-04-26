@@ -464,7 +464,7 @@ protected:
             const auto numLineIndices = lineOffsets.getSize();
 
             // Set none as being used initially
-            m_lineIndexUsed.SetSize(numLineIndices);
+            m_lineIndexUsed.setSize(numLineIndices);
             ::memset(m_lineIndexUsed.begin(), 0, numLineIndices * sizeof(uint8_t));
         }
             /// True if we have information on that line index

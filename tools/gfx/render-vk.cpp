@@ -825,7 +825,7 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     // Use a dynamic buffer to store
     size_t bufferSize = strlen(pMsg) + 1 + 1024;
     List<char> bufferArray;
-    bufferArray.SetSize(bufferSize);
+    bufferArray.setSize(bufferSize);
     char* buffer = bufferArray.Buffer();
 
     sprintf_s(buffer,
@@ -945,7 +945,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
     List<VkPhysicalDevice> physicalDevices;
-    physicalDevices.SetSize(numPhysicalDevices);
+    physicalDevices.setSize(numPhysicalDevices);
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.Buffer()));
 
     int32_t selectedDeviceIndex = 0;
@@ -1829,7 +1829,7 @@ Result VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numE
     List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
 
     size_t vertexSize = 0;
-    dstVertexDescs.SetSize(numElements);
+    dstVertexDescs.setSize(numElements);
 
     for (UInt i = 0; i <  numElements; ++i)
     {
@@ -1887,7 +1887,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
         case MapFlavor::HostRead:
         {
             // Make sure there is space in the read buffer
-            buffer->m_readBuffer.SetSize(bufferSize);
+            buffer->m_readBuffer.setSize(bufferSize);
 
             // create staging buffer
             Buffer staging;
@@ -1962,7 +1962,7 @@ void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource
         const UInt num = startSlot + slotCount;
         if (num > m_boundVertexBuffers.getSize())
         {
-            m_boundVertexBuffers.SetSize(num);
+            m_boundVertexBuffers.setSize(num);
         }
     }
 

@@ -66,9 +66,9 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     TextureResource::Data initData;
 
     List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.SetSize(textureResourceDesc.numMipLevels);
+    mipRowStrides.setSize(textureResourceDesc.numMipLevels);
     List<const void*> subResources;
-    subResources.SetSize(numSubResources);
+    subResources.setSize(numSubResources);
 
     // Set up the src row strides
     for (int i = 0; i < textureResourceDesc.numMipLevels; i++)

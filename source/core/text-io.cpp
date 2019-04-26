@@ -235,10 +235,10 @@ namespace Slang
 		
 	void StreamReader::ReadBuffer()
 	{
-		buffer.SetSize(4096);
+		buffer.setSize(4096);
         memset(buffer.Buffer(), 0, buffer.getSize() * sizeof(buffer[0]));
 		auto len = stream->Read(buffer.Buffer(), buffer.getSize());
-		buffer.SetSize((int)len);
+		buffer.setSize((int)len);
 		ptr = 0;
 	}
 

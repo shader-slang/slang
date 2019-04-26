@@ -11053,7 +11053,7 @@ static bool doesParameterMatch(
         if( entryPointCount == 0 )
         {
             entryPointCount = unspecializedProgram->getEntryPointCount();
-            endToEndReq->entryPoints.SetSize(entryPointCount);
+            endToEndReq->entryPoints.setSize(entryPointCount);
         }
 
         for( UInt ii = 0; ii < entryPointCount; ++ii )

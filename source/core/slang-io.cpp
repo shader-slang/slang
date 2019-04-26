@@ -476,7 +476,7 @@ namespace Slang
     {
         List<char> buffer;
         // Guess an initial buffer size
-        buffer.SetSize(1024);
+        buffer.setSize(1024);
 
         while (true)
         {
@@ -497,7 +497,7 @@ namespace Slang
 
             // If bufferSize changed it should be the exact fit size, else we just make the buffer bigger by a guess (50% bigger)
             bufferSize = (bufferSize > size) ? bufferSize : (bufferSize + bufferSize / 2);
-            buffer.SetSize(bufferSize);
+            buffer.setSize(bufferSize);
         }
     }
 

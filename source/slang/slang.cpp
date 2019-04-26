@@ -1423,7 +1423,7 @@ TargetProgram::TargetProgram(
     : m_program(program)
     , m_targetReq(targetReq)
 {
-    m_entryPointResults.SetSize(program->getEntryPoints().getSize());
+    m_entryPointResults.setSize(program->getEntryPoints().getSize());
 }
 
 //
@@ -2134,7 +2134,7 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
     auto req = convert(request);
     auto& typeArgStrings = req->globalExistentialSlotArgStrings;
     if(Slang::UInt(slotIndex) >= typeArgStrings.getSize())
-        typeArgStrings.SetSize(slotIndex+1);
+        typeArgStrings.setSize(slotIndex+1);
     typeArgStrings[slotIndex] = Slang::String(typeName);
     return SLANG_OK;
 }
@@ -2157,7 +2157,7 @@ SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     auto& entryPointInfo = req->entryPoints[entryPointIndex];
     auto& typeArgStrings = entryPointInfo.existentialArgStrings;
     if(Slang::UInt(slotIndex) >= typeArgStrings.getSize())
-        typeArgStrings.SetSize(slotIndex+1);
+        typeArgStrings.setSize(slotIndex+1);
     typeArgStrings[slotIndex] = Slang::String(typeName);
     return SLANG_OK;
 }

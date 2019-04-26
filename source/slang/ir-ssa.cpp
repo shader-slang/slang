@@ -518,7 +518,7 @@ IRInst* addPhiOperands(
     // required invariant.
 
     UInt operandCount = operandValues.getSize();
-    phiInfo->operands.SetSize(operandCount);
+    phiInfo->operands.setSize(operandCount);
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
         phiInfo->operands[ii].init(phiInfo->phi, operandValues[ii]);
