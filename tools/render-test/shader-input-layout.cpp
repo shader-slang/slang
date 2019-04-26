@@ -302,12 +302,12 @@ namespace renderer_test
 
                 List<List<unsigned int>>& dstBuffer = output.dataBuffer;
 
-                int numMips = int(work.dataBuffer.Count());
+                int numMips = int(work.dataBuffer.getSize());
                 dstBuffer.SetSize(numMips);
 
                 for (int i = 0; i < numMips; ++i)
                 {
-                    const int numPixels = int(work.dataBuffer[i].Count());
+                    const int numPixels = int(work.dataBuffer[i].getSize());
                     const unsigned int* srcPixels = work.dataBuffer[i].Buffer();
 
                     dstBuffer[i].SetSize(numPixels);

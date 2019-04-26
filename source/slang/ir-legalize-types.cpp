@@ -22,7 +22,7 @@ namespace Slang
 
 LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
 {
-    SLANG_ASSERT(tupleVal->elements.Count());
+    SLANG_ASSERT(tupleVal->elements.getSize());
 
     LegalVal result;
     result.flavor = LegalVal::Flavor::tuple;
@@ -259,7 +259,7 @@ static LegalVal legalizeCall(
     return LegalVal::simple(context->builder->emitCallInst(
         retIRType,
         callInst->getCallee(),
-        instArgs.Count(),
+        instArgs.getSize(),
         instArgs.Buffer()));
 }
 
@@ -382,9 +382,9 @@ static LegalVal legalizeStore(
             // the tuple.
             auto destTuple = legalPtrVal.getTuple();
             auto valTuple = legalVal.getTuple();
-            SLANG_ASSERT(destTuple->elements.Count() == valTuple->elements.Count());
+            SLANG_ASSERT(destTuple->elements.getSize() == valTuple->elements.getSize());
 
-            for (UInt i = 0; i < valTuple->elements.Count(); i++)
+            for (UInt i = 0; i < valTuple->elements.getSize(); i++)
             {
                 legalizeStore(context, destTuple->elements[i].val, valTuple->elements[i].val);
             }
@@ -889,8 +889,8 @@ static LegalVal legalizeGetElement(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.Count();
-            SLANG_ASSERT(elemCount == tupleType->elements.Count());
+            auto elemCount = ptrTupleInfo->elements.getSize();
+            SLANG_ASSERT(elemCount == tupleType->elements.getSize());
 
             for(UInt ee = 0; ee < elemCount; ++ee)
             {
@@ -1000,8 +1000,8 @@ static LegalVal legalizeGetElementPtr(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.Count();
-            SLANG_ASSERT(elemCount == tupleType->elements.Count());
+            auto elemCount = ptrTupleInfo->elements.getSize();
+            SLANG_ASSERT(elemCount == tupleType->elements.getSize());
 
             for(UInt ee = 0; ee < elemCount; ++ee)
             {
@@ -1137,13 +1137,13 @@ static LegalVal legalizeMakeStruct(
                 context,
                 ordinaryType,
                 ordinaryArgs.Buffer(),
-                ordinaryArgs.Count());
+                ordinaryArgs.getSize());
 
             LegalVal specialVal = legalizeMakeStruct(
                 context,
                 specialType,
                 specialArgs.Buffer(),
-                specialArgs.Count());
+                specialArgs.getSize());
 
             return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
         }
@@ -1571,7 +1571,7 @@ static LegalVal legalizeFunc(
     }
 
     auto newFuncType = context->builder->getFuncType(
-        newParamTypes.Count(),
+        newParamTypes.getSize(),
         newParamTypes.Buffer(),
         newResultType);
 

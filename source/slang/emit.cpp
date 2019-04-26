@@ -4806,8 +4806,8 @@ struct EmitVisitor
     {
         assert(attrib);
 
-        attrib->args.Count();
-        if (attrib->args.Count() != 1)
+        attrib->args.getSize();
+        if (attrib->args.getSize() != 1)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
             return;
@@ -4833,8 +4833,8 @@ struct EmitVisitor
     {
         assert(attrib);
 
-        attrib->args.Count();
-        if (attrib->args.Count() != 1)
+        attrib->args.getSize();
+        if (attrib->args.getSize() != 1)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
             return;

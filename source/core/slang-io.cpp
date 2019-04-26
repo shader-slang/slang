@@ -209,9 +209,9 @@ namespace Slang
         }
 
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
-        if (splitOut.Count() > 1 && splitOut.Last().size() == 0)
+        if (splitOut.getSize() > 1 && splitOut.Last().size() == 0)
         {
-            if (splitOut.Count() == 2 && isDriveSpecification(splitOut[0]))
+            if (splitOut.getSize() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
@@ -241,10 +241,10 @@ namespace Slang
         split(path, splitPath);
 
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (int i = 0; i < int(splitPath.Count()); i++)
+        for (int i = 0; i < int(splitPath.getSize()); i++)
         {
             const UnownedStringSlice& cur = splitPath[i];
-            if (cur == "." && splitPath.Count() > 1)
+            if (cur == "." && splitPath.getSize() > 1)
             {
                 // Just remove it 
                 splitPath.RemoveAt(i);
@@ -265,14 +265,14 @@ namespace Slang
         }
 
         // If its empty it must be .
-        if (splitPath.Count() == 0)
+        if (splitPath.getSize() == 0)
         {
             splitPath.Add(UnownedStringSlice::fromLiteral("."));
         }
    
         // Reconstruct the string
         StringBuilder builder;
-        for (int i = 0; i < int(splitPath.Count()); i++)
+        for (int i = 0; i < int(splitPath.getSize()); i++)
         {
             if (i > 0)
             {
@@ -480,7 +480,7 @@ namespace Slang
 
         while (true)
         {
-            const size_t size = buffer.Count();
+            const size_t size = buffer.getSize();
             size_t bufferSize = size;
             SlangResult res = _calcExectuablePath(buffer.Buffer(), &bufferSize);
 

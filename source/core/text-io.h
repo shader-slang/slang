@@ -300,7 +300,7 @@ namespace Slang
 		virtual String ReadToEnd();
 		virtual bool IsEnd()
 		{
-			return ptr == buffer.Count() && stream->IsEnd();
+			return ptr == buffer.getSize() && stream->IsEnd();
 		}
 		virtual void Close()
 		{

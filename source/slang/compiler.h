@@ -321,7 +321,7 @@ namespace Slang
             Profile     profile);
 
             /// Get the number of existential type parameters for the entry point.
-        UInt getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.Count(); }
+        UInt getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.getSize(); }
 
             /// Get the existential type parameter at `index`.
         Type* getExistentialTypeParam(UInt index) { return m_existentialSlots.paramTypes[index]; }
@@ -330,7 +330,7 @@ namespace Slang
             ///
             /// Note that the number of arguments may not match the number of parameters.
             /// In particular, an unspecialized entry point may have many parameters, but zero arguments.
-        UInt getExistentialTypeArgCount() { return m_existentialSlots.args.Count(); }
+        UInt getExistentialTypeArgCount() { return m_existentialSlots.args.getSize(); }
 
             /// Get the existential type argument (type and witness table) at `index`.
         ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_existentialSlots.args[index]; }
@@ -827,7 +827,7 @@ namespace Slang
         List<RefPtr<FrontEndEntryPointRequest>> m_entryPointReqs;
 
         List<RefPtr<FrontEndEntryPointRequest>> const& getEntryPointReqs() { return m_entryPointReqs; }
-        UInt getEntryPointReqCount() { return m_entryPointReqs.Count(); }
+        UInt getEntryPointReqCount() { return m_entryPointReqs.getSize(); }
         FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
 
         // Directories to search for `#include` files or `import`ed modules
@@ -913,7 +913,7 @@ namespace Slang
         Linkage* getLinkage() { return m_linkage; }
 
             /// Get the number of entry points added to the program
-        UInt getEntryPointCount() { return m_entryPoints.Count(); }
+        UInt getEntryPointCount() { return m_entryPoints.getSize(); }
 
             /// Get the entry point at the given `index`.
         RefPtr<EntryPoint> getEntryPoint(UInt index) { return m_entryPoints[index]; }
@@ -980,7 +980,7 @@ namespace Slang
         RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
 
             /// Get the number of existential type parameters for the program.
-        UInt getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.Count(); }
+        UInt getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.getSize(); }
 
             /// Get the existential type parameter at `index`.
         Type* getExistentialTypeParam(UInt index) { return m_globalExistentialSlots.paramTypes[index]; }
@@ -989,7 +989,7 @@ namespace Slang
             ///
             /// Note that the number of arguments may not match the number of parameters.
             /// In particular, an unspecialized program may have many parameters, but zero arguments.
-        UInt getExistentialTypeArgCount() { return m_globalExistentialSlots.args.Count(); }
+        UInt getExistentialTypeArgCount() { return m_globalExistentialSlots.args.getSize(); }
 
             /// Get the existential type argument (type and witness table) at `index`.
         ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_globalExistentialSlots.args[index]; }

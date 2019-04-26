@@ -95,7 +95,7 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
     {
         char* appendBuffer = m_appendBuffer.Buffer();
         // See if it's from an append buffer
-        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.Count()))
+        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.getSize()))
         {
             // Set terminating 0
             appendBuffer[(chars + numChars) - appendBuffer] = 0;

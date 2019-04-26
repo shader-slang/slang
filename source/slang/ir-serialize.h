@@ -461,7 +461,7 @@ protected:
             // Need to know how many lines there are
             const List<uint32_t>& lineOffsets = sourceFile->getLineBreakOffsets();
 
-            const auto numLineIndices = lineOffsets.Count();
+            const auto numLineIndices = lineOffsets.getSize();
 
             // Set none as being used initially
             m_lineIndexUsed.SetSize(numLineIndices);

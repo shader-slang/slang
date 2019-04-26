@@ -169,7 +169,7 @@ namespace Slang
 				sb << str[i];
 		}
 		encoding->GetBytes(encodingBuffer, sb.ProduceString());
-		stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
+		stream->Write(encodingBuffer.Buffer(), encodingBuffer.getSize());
 	}
 	void StreamWriter::Write(const char * str)
 	{
@@ -207,7 +207,7 @@ namespace Slang
 
 	Encoding * StreamReader::DetermineEncoding()
 	{
-		if (buffer.Count() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
+		if (buffer.getSize() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
 		{
 			ptr += 3;
 			return Encoding::UTF8;
@@ -225,7 +225,7 @@ namespace Slang
 		else
 		{
             // find null bytes
-            if (HasNullBytes(buffer.Buffer(), (int)buffer.Count()))
+            if (HasNullBytes(buffer.Buffer(), (int)buffer.getSize()))
             {
                 return Encoding::UTF16;
             }
@@ -236,21 +236,21 @@ namespace Slang
 	void StreamReader::ReadBuffer()
 	{
 		buffer.SetSize(4096);
-        memset(buffer.Buffer(), 0, buffer.Count() * sizeof(buffer[0]));
-		auto len = stream->Read(buffer.Buffer(), buffer.Count());
+        memset(buffer.Buffer(), 0, buffer.getSize() * sizeof(buffer[0]));
+		auto len = stream->Read(buffer.Buffer(), buffer.getSize());
 		buffer.SetSize((int)len);
 		ptr = 0;
 	}
 
 	char StreamReader::ReadBufferChar()
 	{
-		if (ptr<buffer.Count())
+		if (ptr<buffer.getSize())
 		{
 			return buffer[ptr++];
 		}
 		if (!stream->IsEnd())
 			ReadBuffer();
-		if (ptr<buffer.Count())
+		if (ptr<buffer.getSize())
 		{
 			return buffer[ptr++];
 		}

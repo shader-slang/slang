@@ -473,7 +473,7 @@ void GLRenderer::flushStateForDraw()
 
     // Next bind the descriptor sets as required by the layout
     auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
-    auto descriptorSetCount = pipelineLayout->m_sets.Count();
+    auto descriptorSetCount = pipelineLayout->m_sets.getSize();
     for(UInt ii = 0; ii < descriptorSetCount; ++ii)
     {
         auto descriptorSet = m_boundDescriptorSets[ii];

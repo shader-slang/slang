@@ -218,7 +218,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
         // We need to write into the the string array
         char prefixBytes[6];
         const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
-        const int baseIndex = int(stringTable.Count());
+        const int baseIndex = int(stringTable.getSize());
 
         stringTable.SetSize(baseIndex + numPrefixBytes + len);
 
@@ -255,18 +255,18 @@ char* StringRepresentationCache::getCStr(Handle handle)
 
 /* static */void SerialStringTableUtil::calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMapOut)
 {
-    SLANG_ASSERT(slices.Count() >= StringSlicePool::kNumDefaultHandles);
+    SLANG_ASSERT(slices.getSize() >= StringSlicePool::kNumDefaultHandles);
     SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
     SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
 
-    indexMapOut.SetSize(slices.Count());
+    indexMapOut.SetSize(slices.getSize());
     // Set up all of the defaults
     for (int i = 0; i < StringSlicePool::kNumDefaultHandles; ++i)
     {
         indexMapOut[i] = StringSlicePool::Handle(i);
     }
 
-    const int numSlices = int(slices.Count());
+    const int numSlices = int(slices.getSize());
     for (int i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
     {
         indexMapOut[i] = pool.add(slices[i]);
@@ -278,7 +278,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
 template<typename T>
 static size_t _calcArraySize(const List<T>& list)
 {
-    return list.Count() * sizeof(T);
+    return list.getSize() * sizeof(T);
 }
 
 size_t IRSerialData::calcSizeInBytes() const
@@ -326,12 +326,12 @@ void IRSerialData::clear()
 template <typename T>
 static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
 {
-    if (aIn.Count() != bIn.Count())
+    if (aIn.getSize() != bIn.getSize())
     {
         return false;
     }
 
-    size_t size = size_t(aIn.Count());
+    size_t size = size_t(aIn.getSize());
 
     const T* a = aIn.begin();
     const T* b = bIn.begin();
@@ -376,7 +376,7 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     SLANG_ASSERT(!m_instMap.ContainsKey(inst));
 
     // Add to the map
-    m_instMap.Add(inst, Ser::InstIndex(m_insts.Count()));
+    m_instMap.Add(inst, Ser::InstIndex(m_insts.getSize()));
     m_insts.Add(inst);
 }
 
@@ -497,7 +497,7 @@ Result IRSerialWriter::_calcDebugInfo()
 
     // Find all of the source locations and their associated instructions
     List<InstLoc> instLocs;
-    const int numInsts = int(m_insts.Count());
+    const int numInsts = int(m_insts.getSize());
     for (int i = 1; i < numInsts; i++)
     {
         IRInst* srcInst = m_insts[i];
@@ -549,22 +549,22 @@ Result IRSerialWriter::_calcDebugInfo()
 
         IRSerialData::DebugSourceInfo sourceInfo;
 
-        sourceInfo.m_numLines = uint32_t(debugSourceFile->m_sourceFile->getLineBreakOffsets().Count());
+        sourceInfo.m_numLines = uint32_t(debugSourceFile->m_sourceFile->getLineBreakOffsets().getSize());
 
         sourceInfo.m_startSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc);
         sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->getContentSize());
 
         sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->getPathInfo().foundPath));
 
-        sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.Count());
-        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(m_serialData->m_debugAdjustedLineInfos.Count());
+        sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.getSize());
+        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(m_serialData->m_debugAdjustedLineInfos.getSize());
 
-        sourceInfo.m_numLineInfos = uint32_t(debugSourceFile->m_lineInfos.Count());
-        sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.Count());
+        sourceInfo.m_numLineInfos = uint32_t(debugSourceFile->m_lineInfos.getSize());
+        sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.getSize());
 
         // Add the line infos
-        m_serialData->m_debugLineInfos.AddRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.Count());
-        m_serialData->m_debugAdjustedLineInfos.AddRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.Count());
+        m_serialData->m_debugLineInfos.AddRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getSize());
+        m_serialData->m_debugAdjustedLineInfos.AddRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getSize());
 
         // Add the source info
         m_serialData->m_debugSourceInfos.Add(sourceInfo);
@@ -603,7 +603,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     _addInstruction(moduleInst);
 
     // Traverse all of the instructions
-    while (parentInstStack.Count())
+    while (parentInstStack.getSize())
     {
         // If it's in the stack it is assumed it is already in the inst map
         IRInst* parentInst = parentInstStack.Last();
@@ -612,7 +612,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
         // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
         // cos we want breadth first so the order of children is the same as their index order, meaning we don't need to store explicit indices
-        const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.Count());
+        const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.getSize());
         
         IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
         for (IRInst* child : childrenList)
@@ -626,12 +626,12 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
 
         // If it had any children, then store the information about it
-        if (Ser::InstIndex(m_insts.Count()) != startChildInstIndex)
+        if (Ser::InstIndex(m_insts.getSize()) != startChildInstIndex)
         {
             Ser::InstRun run;
             run.m_parentIndex = m_instMap[parentInst];
             run.m_startInstIndex = startChildInstIndex;
-            run.m_numChildren = Ser::SizeType(m_insts.Count() - int(startChildInstIndex));
+            run.m_numChildren = Ser::SizeType(m_insts.getSize() - int(startChildInstIndex));
 
             m_serialData->m_childRuns.Add(run);
         }
@@ -650,13 +650,13 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 #endif
 
     // Set to the right size
-    m_serialData->m_insts.SetSize(m_insts.Count());
+    m_serialData->m_insts.SetSize(m_insts.getSize());
     // Clear all instructions
-    memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.Count());
+    memset(m_serialData->m_insts.begin(), 0, sizeof(Ser::Inst) * m_serialData->m_insts.getSize());
 
     // Need to set up the actual instructions
     {
-        const int numInsts = int(m_insts.Count());
+        const int numInsts = int(m_insts.getSize());
 
         for (int i = 1; i < numInsts; ++i)
         {
@@ -744,7 +744,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             {
                 dstInst.m_payloadType = PayloadType::OperandExternal;
 
-                int operandArrayBaseIndex = int(m_serialData->m_externalOperands.Count());
+                int operandArrayBaseIndex = int(m_serialData->m_externalOperands.getSize());
                 m_serialData->m_externalOperands.SetSize(operandArrayBaseIndex + numOperands);
 
                 dstOperands = m_serialData->m_externalOperands.begin() + operandArrayBaseIndex; 
@@ -770,7 +770,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     // If the option to use RawSourceLocations is enabled, serialize out as is
     if (options & OptionFlag::RawSourceLocation)
     {
-        const int numInsts = int(m_insts.Count());
+        const int numInsts = int(m_insts.getSize());
         serialData->m_rawSourceLocs.SetSize(numInsts);
 
         Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
@@ -797,18 +797,18 @@ static size_t _calcChunkSize(IRSerialBinary::CompressionType compressionType, co
 {
     typedef IRSerialBinary Bin;
 
-    if (array.Count())
+    if (array.getSize())
     {
         switch (compressionType)
         {
             case Bin::CompressionType::None:
             {
-                const size_t size = sizeof(Bin::ArrayHeader) + sizeof(T) * array.Count();
+                const size_t size = sizeof(Bin::ArrayHeader) + sizeof(T) * array.getSize();
                 return (size + 3) & ~size_t(3);
             }
             case Bin::CompressionType::VariableByteLite:
             {
-                const size_t payloadSize = ByteEncodeUtil::calcEncodeLiteSizeUInt32((const uint32_t*)array.begin(), (array.Count() * sizeof(T)) / sizeof(uint32_t));
+                const size_t payloadSize = ByteEncodeUtil::calcEncodeLiteSizeUInt32((const uint32_t*)array.begin(), (array.getSize() * sizeof(T)) / sizeof(uint32_t));
                 const size_t size = sizeof(Bin::CompressedArrayHeader) + payloadSize;
                 return (size + 3) & ~size_t(3);
             }
@@ -860,7 +860,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
 
             ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
 
-            payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.Count();
+            payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.getSize();
 
             Bin::CompressedArrayHeader header;
             header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
@@ -870,7 +870,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
 
             stream->Write(&header, sizeof(header));
 
-            stream->Write(compressedPayload.begin(), compressedPayload.Count());
+            stream->Write(compressedPayload.begin(), compressedPayload.getSize());
             break;
         }
         default:
@@ -893,7 +893,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
 template <typename T>
 Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<T>& array, Stream* stream)
 {
-    return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.Count()), sizeof(T), stream);
+    return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.getSize()), sizeof(T), stream);
 }
 
 Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
@@ -907,7 +907,7 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
     }
     encodeArrayOut.Clear();
     
-    const size_t numInsts = size_t(instsIn.Count());
+    const size_t numInsts = size_t(instsIn.getSize());
     const IRSerialData::Inst* insts = instsIn.begin();
         
     uint8_t* encodeOut = encodeArrayOut.begin();
@@ -989,7 +989,7 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
 Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<IRSerialData::Inst>& array, Stream* stream)
 {
     typedef IRSerialBinary Bin;
-    if (array.Count() == 0)
+    if (array.getSize() == 0)
     {
         return SLANG_OK;
     }
@@ -1005,16 +1005,16 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             List<uint8_t> compressedPayload;
             SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
             
-            size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.Count();
+            size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.getSize();
 
             Bin::CompressedArrayHeader header;
             header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
             header.m_chunk.m_size = uint32_t(payloadSize);
-            header.m_numEntries = uint32_t(array.Count());
+            header.m_numEntries = uint32_t(array.getSize());
             header.m_numCompressedEntries = 0;          
 
             stream->Write(&header, sizeof(header));
-            stream->Write(compressedPayload.begin(), compressedPayload.Count());
+            stream->Write(compressedPayload.begin(), compressedPayload.getSize());
     
             // All chunks have sizes rounded to dword size
             if (payloadSize & 3)
@@ -1046,7 +1046,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         {
             size_t size = sizeof(Bin::CompressedArrayHeader);
 
-            size_t numInsts = size_t(instsIn.Count());
+            size_t numInsts = size_t(instsIn.getSize());
             size += numInsts * 2;           // op and payload
 
             IRSerialData::Inst* insts = instsIn.begin();
@@ -1114,7 +1114,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         _calcChunkSize(Bin::CompressionType::None, data.m_stringTable) +
         _calcChunkSize(Bin::CompressionType::None, data.m_rawSourceLocs);
 
-    if (data.m_debugSourceInfos.Count())
+    if (data.m_debugSourceInfos.getSize())
     {
         totalSize += _calcChunkSize(Bin::CompressionType::None, data.m_debugStringTable) +
             _calcChunkSize(Bin::CompressionType::None, data.m_debugLineInfos) +
@@ -1146,7 +1146,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
 
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, stream));
 
-    if (data.m_debugSourceInfos.Count())
+    if (data.m_debugSourceInfos.getSize())
     {
         _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugStringFourCc, data.m_debugStringTable, stream);
         _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugLineInfoFourCc, data.m_debugLineInfos, stream);
@@ -1294,7 +1294,7 @@ static Result _decodeInsts(IRSerialBinary::CompressionType compressionType, cons
         return SLANG_FAIL;
     }
 
-    const size_t numInsts = size_t(instsOut.Count());
+    const size_t numInsts = size_t(instsOut.getSize());
     IRSerialData::Inst* insts = instsOut.begin();
 
     const uint8_t* encodeCur = encodeIn.begin();
@@ -1561,7 +1561,7 @@ static SourceRange _toSourceRange(const IRSerialData::DebugSourceInfo& info)
 
 static int _findIndex(const List<IRSerialData::DebugSourceInfo>& infos, SourceLoc sourceLoc)
 {
-    const int numInfos = int(infos.Count());
+    const int numInfos = int(infos.getSize());
     for (int i = 0; i < numInfos; ++i)
     {
         if (_toSourceRange(infos[i]).contains(sourceLoc))
@@ -1598,7 +1598,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
     List<IRInst*> insts;
 
-    const int numInsts = int(data.m_insts.Count());
+    const int numInsts = int(data.m_insts.getSize());
 
     SLANG_ASSERT(numInsts > 0);
 
@@ -1746,7 +1746,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     
     // Patch up the children
     {
-        const int numChildRuns = int(data.m_childRuns.Count());
+        const int numChildRuns = int(data.m_childRuns.getSize());
         for (int i = 0; i < numChildRuns; i++)
         {
             const auto& run = data.m_childRuns[i];
@@ -1763,7 +1763,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     }
 
     // Re-add source locations, if they are defined
-    if (int(m_serialData->m_rawSourceLocs.Count()) == numInsts)
+    if (int(m_serialData->m_rawSourceLocs.getSize()) == numInsts)
     {
         const Ser::RawSourceLoc* srcLocs = m_serialData->m_rawSourceLocs.begin();
         for (int i = 1; i < numInsts; ++i)
@@ -1774,7 +1774,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         }
     }
 
-    if (sourceManager && m_serialData->m_debugSourceInfos.Count())
+    if (sourceManager && m_serialData->m_debugSourceInfos.getSize())
     {
         List<UnownedStringSlice> debugStringSlices;
         SerialStringTableUtil::decodeStringTable(m_serialData->m_debugStringTable, debugStringSlices);
@@ -1786,7 +1786,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         const List<IRSerialData::DebugSourceInfo>& sourceInfos = m_serialData->m_debugSourceInfos;
 
         // Construct the source files
-        int numSourceFiles = int(sourceInfos.Count());
+        int numSourceFiles = int(sourceInfos.getSize());
 
         // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
         List<SourceView*> sourceViews;
@@ -1827,7 +1827,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             lineBreakOffsets.SetSize(numLines);
 
             {
-                const int numLineInfos = int(lineInfos.Count());
+                const int numLineInfos = int(lineInfos.getSize());
                 int lineIndex = 0;
                 
                 // Every line up and including should hold the same offset
@@ -1857,7 +1857,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 }
             }
 
-            sourceFile->setLineBreakOffsets(lineBreakOffsets.Buffer(), lineBreakOffsets.Count());
+            sourceFile->setLineBreakOffsets(lineBreakOffsets.Buffer(), lineBreakOffsets.getSize());
 
             if (srcSourceInfo.m_numAdjustedLineInfos)
             {
@@ -1885,7 +1885,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 }
 
                 // Set the adjustments on the view
-                sourceView->setEntries(dstEntries.Buffer(), dstEntries.Count());
+                sourceView->setEntries(dstEntries.Buffer(), dstEntries.getSize());
             }
 
             sourceViews[i] = sourceView;
@@ -1901,7 +1901,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             SourceRange range;
             int fixSourceLoc = _calcFixSourceLoc(sourceInfos[0], sourceViews[0], range);
 
-            const int numRuns = int(sourceRuns.Count());
+            const int numRuns = int(sourceRuns.getSize());
             for (int i = 0; i < numRuns; ++i)
             {
                 const auto& run = sourceRuns[i];
@@ -1922,7 +1922,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 // Work out the fixed source location
                 SourceLoc sourceLoc = SourceLoc::fromRaw(int(run.m_sourceLoc) + fixSourceLoc); 
 
-                SLANG_ASSERT(uint32_t(run.m_startInstIndex) + run.m_numInst <= insts.Count());
+                SLANG_ASSERT(uint32_t(run.m_startInstIndex) + run.m_numInst <= insts.getSize());
                 IRInst** dstInsts = insts.Buffer() + int(run.m_startInstIndex);
 
                 const int runSize = int(run.m_numInst);
@@ -1955,7 +1955,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     instsOut.Add(moduleInst);
 
     // Traverse all of the instructions
-    while (parentInstStack.Count())
+    while (parentInstStack.getSize())
     {
         // If it's in the stack it is assumed it is already in the inst map
         IRInst* parentInst = parentInstStack.Last();
@@ -2015,7 +2015,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     List<IRInst*> readInsts;
     calcInstructionList(irReadModule, readInsts);
 
-    if (readInsts.Count() != originalInsts.Count())
+    if (readInsts.getSize() != originalInsts.getSize())
     {
         SLANG_ASSERT(!"Instruction counts don't match");
         return SLANG_FAIL;
@@ -2025,7 +2025,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     {
         SLANG_ASSERT(readInsts[0] == originalInsts[0]);
         // All the source locs should be identical
-        for (UInt i = 1; i < readInsts.Count(); ++i)
+        for (UInt i = 1; i < readInsts.getSize(); ++i)
         {
             IRInst* origInst = originalInsts[i];
             IRInst* readInst = readInsts[i];
@@ -2040,7 +2040,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     else if (optionFlags & IRSerialWriter::OptionFlag::DebugInfo)
     {
         // They should be on the same line nos
-        for (UInt i = 1; i < readInsts.Count(); ++i)
+        for (UInt i = 1; i < readInsts.getSize(); ++i)
         {
             IRInst* origInst = originalInsts[i];
             IRInst* readInst = readInsts[i];

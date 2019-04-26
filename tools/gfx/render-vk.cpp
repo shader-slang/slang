@@ -956,7 +956,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
         String lowerAdapter = desc.adapter.ToLower();
 
-        for (int i = 0; i < int(physicalDevices.Count()); ++i)
+        for (int i = 0; i < int(physicalDevices.getSize()); ++i)
         {
             auto physicalDevice = physicalDevices[i];
 
@@ -1056,7 +1056,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 
-    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.Count());
+    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getSize());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.Buffer();
 
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
@@ -1491,7 +1491,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
         Buffer uploadBuffer;
         SLANG_RETURN_ON_FAIL(uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
-        assert(mipSizes.Count() == numMipMaps);
+        assert(mipSizes.getSize() == numMipMaps);
 
         // Copy into upload buffer
         {
@@ -1502,7 +1502,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
 
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                for (int j = 0; j < int(mipSizes.getSize()); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1536,7 +1536,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
             size_t srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                for (int j = 0; j < int(mipSizes.getSize()); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1960,7 +1960,7 @@ void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource
 {
     {
         const UInt num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.Count())
+        if (num > m_boundVertexBuffers.getSize())
         {
             m_boundVertexBuffers.SetSize(num);
         }
@@ -2061,7 +2061,7 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
         0, nullptr);
 
     // Bind the vertex buffer
-    if (m_boundVertexBuffers.Count() > 0 && m_boundVertexBuffers[0].m_buffer)
+    if (m_boundVertexBuffers.getSize() > 0 && m_boundVertexBuffers[0].m_buffer)
     {
         const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
 
@@ -2322,7 +2322,7 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.getSize());
     descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
 
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
@@ -2428,7 +2428,7 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
 {
     SLANG_ASSERT(ptr == nullptr || _getBindingType(ptr) == type);
 
-    const int numBindings = int(m_bindings.Count());
+    const int numBindings = int(m_bindings.getSize());
     for (int i = 0; i < numBindings; ++i)
     {
         Binding& binding = m_bindings[i];
@@ -2654,7 +2654,7 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
         vertexInputInfo.vertexBindingDescriptionCount = 1;
         vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
 
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.getSize());
         vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
     }
 

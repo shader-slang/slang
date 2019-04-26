@@ -1,4 +1,4 @@
-﻿// d3d-util.cpp
+// d3d-util.cpp
 #include "d3d-util.h"
 
 #include <d3dcompiler.h>
@@ -294,7 +294,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
     if (outSize > 0)
     {
-        const UInt prevSize = out.Count();
+        const UInt prevSize = out.getSize();
         out.SetSize(prevSize + len + 1);
 
         WCHAR* dst = out.Buffer() + prevSize;

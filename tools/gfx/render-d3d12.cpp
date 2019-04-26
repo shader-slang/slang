@@ -175,7 +175,7 @@ protected:
             {
                 case BackingStyle::MemoryBacked:
                 {
-                    const size_t bufferSize = m_memory.Count();
+                    const size_t bufferSize = m_memory.getSize();
                     D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
                     ::memcpy(cursor.m_position, m_memory.Buffer(), bufferSize);
                     // Set the constant buffer
@@ -1324,7 +1324,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     ComPtr<ID3D12Device> device;
     ComPtr<IDXGIAdapter> adapter;
 
-    for (int i = 0; i < int(dxgiAdapters.Count()); ++i)
+    for (int i = 0; i < int(dxgiAdapters.getSize()); ++i)
     {
         IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
         if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
@@ -2637,7 +2637,7 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
 {
     {
         const UInt num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.Count())
+        if (num > m_boundVertexBuffers.getSize())
         {
             m_boundVertexBuffers.SetSize(num);
         }
@@ -2739,7 +2739,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     {
         int numVertexViews = 0;
         D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-        for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
+        for (int i = 0; i < int(m_boundVertexBuffers.getSize()); i++)
         {
             const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
             BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
@@ -3611,10 +3611,10 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
 
     psoDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
 
-    psoDesc.VS = { programImpl->m_vertexShader.Buffer(), programImpl->m_vertexShader.Count() };
-    psoDesc.PS = { programImpl->m_pixelShader .Buffer(), programImpl->m_pixelShader .Count() };
+    psoDesc.VS = { programImpl->m_vertexShader.Buffer(), programImpl->m_vertexShader.getSize() };
+    psoDesc.PS = { programImpl->m_pixelShader .Buffer(), programImpl->m_pixelShader .getSize() };
 
-    psoDesc.InputLayout = { inputLayoutImpl->m_elements.Buffer(), UINT(inputLayoutImpl->m_elements.Count()) };
+    psoDesc.InputLayout = { inputLayoutImpl->m_elements.Buffer(), UINT(inputLayoutImpl->m_elements.getSize()) };
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
     {
@@ -3706,7 +3706,7 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     // Describe and create the compute pipeline state object
     D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
     computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
-    computeDesc.CS = { programImpl->m_computeShader.Buffer(), programImpl->m_computeShader.Count() };
+    computeDesc.CS = { programImpl->m_computeShader.Buffer(), programImpl->m_computeShader.getSize() };
 
     ComPtr<ID3D12PipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));

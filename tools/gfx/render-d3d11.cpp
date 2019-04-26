@@ -479,7 +479,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             {
                 List<ComPtr<IDXGIAdapter>> dxgiAdapters;
                 D3DUtil::findAdapters(deviceCheckFlags, desc.adapter.getUnownedSlice(), dxgiAdapters);
-                if (dxgiAdapters.Count() == 0)
+                if (dxgiAdapters.getSize() == 0)
                 {
                     continue;
                 }

@@ -1999,7 +1999,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     }
     else if(auto originalStructTypeLayout = originalTypeLayout.as<StructTypeLayout>() )
     {
-        UInt fieldCount = originalStructTypeLayout->fields.Count();
+        UInt fieldCount = originalStructTypeLayout->fields.getSize();
 
         // Empty struct? Bail out.
         if(fieldCount == 0)
@@ -2119,7 +2119,7 @@ TypeLayoutResult makeTypeLayoutResult(RefPtr<TypeLayout> typeLayout)
     // If the type only consumes a single kind of non-uniform resource,
     // we can fill in the `info` field directly.
     //
-    if( typeLayout->resourceInfos.Count() == 1 )
+    if( typeLayout->resourceInfos.getSize() == 1 )
     {
         auto resInfo = typeLayout->resourceInfos[0];
         if( resInfo.kind != LayoutResourceKind::Uniform )

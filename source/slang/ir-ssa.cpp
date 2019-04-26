@@ -517,7 +517,7 @@ IRInst* addPhiOperands(
     // list with its final size so that we can preserve the
     // required invariant.
 
-    UInt operandCount = operandValues.Count();
+    UInt operandCount = operandValues.getSize();
     phiInfo->operands.SetSize(operandCount);
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
@@ -561,7 +561,7 @@ void maybeSealBlock(
     // Note that we are doing the "inefficient" loop where we compute
     // the count on each iteration to account for the possibility that
     // new incomplete phis will get added while we are working.
-    for (UInt ii = 0; ii < blockInfo->phis.Count(); ++ii)
+    for (UInt ii = 0; ii < blockInfo->phis.getSize(); ++ii)
     {
         auto incompletePhi = blockInfo->phis[ii];
         addPhiOperands(context, blockInfo, incompletePhi);
@@ -968,7 +968,7 @@ void constructSSA(ConstructSSAContext* context)
 
     // If none of the variables are promote-able,
     // then we can exit without making any changes
-    if (context->promotableVars.Count() == 0)
+    if (context->promotableVars.getSize() == 0)
         return;
 
     // We are going to walk the blocks in order,
@@ -1037,7 +1037,7 @@ void constructSSA(ConstructSSAContext* context)
 
         // Don't do any work for blocks that don't need to pass along
         // values to the sucessor block.
-        auto addedArgCount = blockInfo->successorArgs.Count();
+        auto addedArgCount = blockInfo->successorArgs.getSize();
         if (addedArgCount == 0)
             continue;
 

@@ -72,7 +72,7 @@ struct VulkanSwapChain
     const Desc& getDesc() const { return m_desc; }
 
         /// True if the swap chain is available
-    bool hasValidSwapChain() const { return m_images.Count() > 0; }
+    bool hasValidSwapChain() const { return m_images.getSize() > 0; }
 
         /// Present to the display
     void present(bool vsync);

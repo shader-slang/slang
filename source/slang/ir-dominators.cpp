@@ -314,7 +314,7 @@ struct DominatorTreeComputationContext
 
         // We will initialize our map from the block objects to their "name"
         // (index in the traversal order), before moving on.
-        BlockName blockCount = BlockName(postorder.Count());
+        BlockName blockCount = BlockName(postorder.getSize());
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
             mapBlockToName[postorder[bb]] = bb;
@@ -524,7 +524,7 @@ struct DominatorTreeComputationContext
 
         // We will build some intermediate information on each
         // block to help us fill out the tree.
-        BlockName blockCount = BlockName(doms.Count());
+        BlockName blockCount = BlockName(doms.getSize());
         List<BlockInfo> blockInfos;
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {

@@ -835,7 +835,7 @@ void assign(
                 // that is not a tuple. We will perform assignment
                 // element-by-element.
                 auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
-                UInt elementCount = rightTupleVal->elements.Count();
+                UInt elementCount = rightTupleVal->elements.getSize();
 
                 for( UInt ee = 0; ee < elementCount; ++ee )
                 {
@@ -861,7 +861,7 @@ void assign(
             // We have a tuple, so we are going to need to try and assign
             // to each of its constituent fields.
             auto leftTupleVal = as<ScalarizedTupleValImpl>(left.impl);
-            UInt elementCount = leftTupleVal->elements.Count();
+            UInt elementCount = leftTupleVal->elements.getSize();
 
             for( UInt ee = 0; ee < elementCount; ++ee )
             {
@@ -923,7 +923,7 @@ ScalarizedVal getSubscriptVal(
             RefPtr<ScalarizedTupleValImpl> resultTuple = new ScalarizedTupleValImpl();
             resultTuple->type = elementType;
 
-            UInt elementCount = inputTuple->elements.Count();
+            UInt elementCount = inputTuple->elements.getSize();
             UInt elementCounter = 0;
 
             auto structType = as<IRStructType>(elementType);
@@ -983,7 +983,7 @@ IRInst* materializeTupleValue(
     auto tupleVal = val.impl.as<ScalarizedTupleValImpl>();
     SLANG_ASSERT(tupleVal);
 
-    UInt elementCount = tupleVal->elements.Count();
+    UInt elementCount = tupleVal->elements.getSize();
     auto type = tupleVal->type;
 
     if( auto arrayType = as<IRArrayType>(type))
@@ -1014,7 +1014,7 @@ IRInst* materializeTupleValue(
 
         return builder->emitMakeArray(
             arrayType,
-            arrayElementVals.Count(),
+            arrayElementVals.getSize(),
             arrayElementVals.Buffer());
     }
     else
@@ -1034,7 +1034,7 @@ IRInst* materializeTupleValue(
 
         return builder->emitConstructorInst(
             tupleVal->type,
-            elementVals.Count(),
+            elementVals.getSize(),
             elementVals.Buffer());
     }
 }

@@ -269,7 +269,7 @@ struct DesugarUnionTypesContext
                 // for fields, etc.).
                 //
                 auto taggedUnionTypeLayout = taggedUnionInfo->taggedUnionTypeLayout;
-                SLANG_ASSERT(caseTagIndex < taggedUnionTypeLayout->caseTypeLayouts.Count());
+                SLANG_ASSERT(caseTagIndex < taggedUnionTypeLayout->caseTypeLayouts.getSize());
                 auto caseTypeLayout = taggedUnionTypeLayout->caseTypeLayouts[caseTagIndex];
 
                 // At this point we know the type we are trying to extract, as well

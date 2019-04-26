@@ -46,7 +46,7 @@ public:
     const List<UnownedStringSlice>& getSlices() const { return m_slices; }
 
         /// Get the number of slices
-    int getNumSlices() const { return int(m_slices.Count()); }
+    int getNumSlices() const { return int(m_slices.getSize()); }
 
         /// Convert a handle to and index. (A handle is just an index!) 
     static int asIndex(Handle handle) { return int(handle); }

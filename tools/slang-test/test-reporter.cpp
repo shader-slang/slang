@@ -110,7 +110,7 @@ bool TestReporter::canWriteStdError() const
 void TestReporter::startTest(const String& testName)
 {
     // Must be in a suite
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getSize());
     assert(!m_inTest);
 
     m_inTest = true;
@@ -125,7 +125,7 @@ void TestReporter::startTest(const String& testName)
 
 void TestReporter::endTest()
 {
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getSize());
     assert(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
@@ -595,7 +595,7 @@ void TestReporter::startSuite(const String& name)
 
 void TestReporter::endSuite()
 {
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getSize());
 
     switch (m_outputMode)
     {

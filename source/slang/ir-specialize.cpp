@@ -568,7 +568,7 @@ struct SpecializationContext
 
         // We will then iterate until our work list goes dry.
         //
-        while(workList.Count() != 0)
+        while(workList.getSize() != 0)
         {
             IRInst* inst = workList.Last();
             workList.RemoveLast();
@@ -975,7 +975,7 @@ struct SpecializationContext
             newParamTypes.Add(newParam->getFullType());
         }
         IRType* newFuncType = builder->getFuncType(
-            newParamTypes.Count(),
+            newParamTypes.getSize(),
             newParamTypes.Buffer(),
             oldFunc->getResultType());
         IRFunc* newFunc = builder->createFunc();

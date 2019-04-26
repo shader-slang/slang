@@ -223,7 +223,7 @@ namespace Slang
                 break;
             }
 
-            auto length = buf.Count() / sizeof(wchar_t);
+            auto length = buf.getSize() / sizeof(wchar_t);
 			if (outLength)
 				*outLength = length;
 

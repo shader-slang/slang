@@ -597,7 +597,7 @@ struct SCCPContext
 
         // Now we will iterate until both of our work lists go dry.
         //
-        while(cfgWorkList.Count() || ssaWorkList.Count())
+        while(cfgWorkList.getSize() || ssaWorkList.getSize())
         {
             // Note: there is a design choice to be had here
             // around whether we do `if if` or `while while`
@@ -607,7 +607,7 @@ struct SCCPContext
             // We will start by processing any blocks that we
             // have determined are potentially reachable.
             //
-            while( cfgWorkList.Count() )
+            while( cfgWorkList.getSize() )
             {
                 // We pop one block off of the work list.
                 //
@@ -644,7 +644,7 @@ struct SCCPContext
             // will start looking at individual instructions that
             // need to be updated.
             //
-            while( ssaWorkList.Count() )
+            while( ssaWorkList.getSize() )
             {
                 // We pop one instruction that needs an update.
                 //

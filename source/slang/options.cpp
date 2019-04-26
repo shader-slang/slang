@@ -173,7 +173,7 @@ struct OptionsParser
         SlangSourceLanguage language,
         Stage               impliedStage)
     {
-        auto translationUnitIndex = rawTranslationUnits.Count();
+        auto translationUnitIndex = rawTranslationUnits.getSize();
         auto translationUnitID = spAddTranslationUnit(compileRequest, language, nullptr);
 
         // As a sanity check: the API should be returning the same translation
@@ -377,7 +377,7 @@ struct OptionsParser
 
     RawEntryPoint* getCurrentEntryPoint()
     {
-        auto rawEntryPointCount = rawEntryPoints.Count();
+        auto rawEntryPointCount = rawEntryPoints.getSize();
         return rawEntryPointCount ? &rawEntryPoints[rawEntryPointCount-1] : &defaultEntryPoint;
     }
 
@@ -396,7 +396,7 @@ struct OptionsParser
 
     RawTarget* getCurrentTarget()
     {
-        auto rawTargetCount = rawTargets.Count();
+        auto rawTargetCount = rawTargets.getSize();
         return rawTargetCount ? &rawTargets[rawTargetCount-1] : &defaultTarget;
     }
 
@@ -808,8 +808,8 @@ struct OptionsParser
         // of the translation unit, then we assume they wanted to compile a single
         // entry point named `main`.
         //
-        if(rawEntryPoints.Count() == 0
-           && rawTranslationUnits.Count() == 1
+        if(rawEntryPoints.getSize() == 0
+           && rawTranslationUnits.getSize() == 1
            && (defaultEntryPoint.stage != Stage::Unknown
                 || rawTranslationUnits[0].impliedStage != Stage::Unknown))
         {
@@ -825,7 +825,7 @@ struct OptionsParser
         // to the "default" entry point, we should copy it over to the
         // explicit one.
         //
-        if( rawEntryPoints.Count() == 1 )
+        if( rawEntryPoints.getSize() == 1 )
         {
             if(defaultEntryPoint.stage != Stage::Unknown)
             {
@@ -848,7 +848,7 @@ struct OptionsParser
             //
             if( defaultEntryPoint.stage != Stage::Unknown )
             {
-                if( rawEntryPoints.Count() == 0 )
+                if( rawEntryPoints.getSize() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::stageSpecificationIgnoredBecauseNoEntryPoints);
                 }
@@ -988,7 +988,7 @@ struct OptionsParser
         // If there was no explicit `-target` specified, then we will look
         // at the `-o` options to see what we can infer.
         //
-        if(rawTargets.Count() == 0)
+        if(rawTargets.getSize() == 0)
         {
             for(auto& rawOutput : rawOutputs)
             {
@@ -1000,7 +1000,7 @@ struct OptionsParser
                 int targetIndex = 0;
                 if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
                 {
-                    targetIndex = (int) rawTargets.Count();
+                    targetIndex = (int) rawTargets.getSize();
 
                     RawTarget rawTarget;
                     rawTarget.format = impliedFormat;
@@ -1019,7 +1019,7 @@ struct OptionsParser
             // is specified more than once (just because of the ambiguities
             // it will create).
             //
-            int targetCount = (int) rawTargets.Count();
+            int targetCount = (int) rawTargets.getSize();
             for(int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
             {
                 auto format = rawTargets[targetIndex].format;
@@ -1039,7 +1039,7 @@ struct OptionsParser
         // because there were no output paths), but there was a profile specified,
         // then we can try to infer a target from the profile.
         //
-        if( rawTargets.Count() == 0
+        if( rawTargets.getSize() == 0
             && defaultTarget.profileVersion != ProfileVersion::Unknown
             && !defaultTarget.conflictingProfilesSet)
         {
@@ -1092,7 +1092,7 @@ struct OptionsParser
         // Similar to the case for entry points, if there is a single target,
         // then we allow some of its options to come from the "default"
         // target state.
-        if(rawTargets.Count() == 1)
+        if(rawTargets.getSize() == 1)
         {
             if(defaultTarget.profileVersion != ProfileVersion::Unknown)
             {
@@ -1114,7 +1114,7 @@ struct OptionsParser
             //
             if( defaultTarget.profileVersion != ProfileVersion::Unknown )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getSize() == 0 )
                 {
                     // This should only happen if there were multiple `-profile` options,
                     // so we didn't try to infer a target, or if the `-profile` option
@@ -1130,7 +1130,7 @@ struct OptionsParser
 
             if( defaultTarget.targetFlags )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getSize() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
                 }
@@ -1142,7 +1142,7 @@ struct OptionsParser
 
             if( defaultTarget.floatingPointMode != FloatingPointMode::Default )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getSize() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
                 }
@@ -1204,7 +1204,7 @@ struct OptionsParser
         // If there is only a single entry point, then that is automatically
         // the entry point that should be associated with all outputs.
         //
-        if( rawEntryPoints.Count() == 1 )
+        if( rawEntryPoints.getSize() == 1 )
         {
             for( auto& rawOutput : rawOutputs )
             {
@@ -1215,7 +1215,7 @@ struct OptionsParser
         // Similarly, if there is only one target, then all outputs must
         // implicitly appertain to that target.
         //
-        if( rawTargets.Count() == 1 )
+        if( rawTargets.getSize() == 1 )
         {
             for( auto& rawOutput : rawOutputs )
             {

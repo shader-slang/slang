@@ -775,7 +775,7 @@ IRFunc* specializeIRForEntryPoint(
     if( auto firstBlock = clonedFunc->getFirstBlock() )
     {
         auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
-        UInt paramLayoutCount = paramsStructLayout->fields.Count();
+        UInt paramLayoutCount = paramsStructLayout->fields.getSize();
         UInt paramCounter = 0;
         for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
         {

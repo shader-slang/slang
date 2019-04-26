@@ -784,7 +784,7 @@ LoweredValInfo emitCallToDeclRef(
     IRType*                 funcType,
     List<IRInst*> const&    args)
 {
-    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.Count(), args.Buffer());
+    return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getSize(), args.Buffer());
 }
 
 IRInst* getFieldKey(
@@ -1156,7 +1156,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // We can turn each of those per-case witnesses into a witness
         // table value:
         //
-        auto caseCount = val->caseWitnesses.Count();
+        auto caseCount = val->caseWitnesses.getSize();
         List<IRInst*> caseWitnessTables;
         for( auto caseWitness : val->caseWitnesses )
         {
@@ -1375,7 +1375,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     irTagVal,       // value to `switch` on
                     invalidLabel,   // `break` label (block after the `switch` statement ends)
                     defaultLabel,   // `default` label (where to go if no `case` matches)
-                    switchCaseOperands.Count(),
+                    switchCaseOperands.getSize(),
                     switchCaseOperands.Buffer());
             }
             else
@@ -2069,7 +2069,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 args.Add(irDefaultValue);
             }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeVector(irType, args.getSize(), args.Buffer()));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
@@ -2085,7 +2085,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 args.Add(irDefaultValue);
             }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeMatrix(irType, args.getSize(), args.Buffer()));
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
@@ -2100,7 +2100,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeArray(irType, args.getSize(), args.Buffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -2118,7 +2118,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
 
                 return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.Count(), args.Buffer()));
+                    getBuilder()->emitMakeStruct(irType, args.getSize(), args.Buffer()));
             }
         }
 
@@ -2145,7 +2145,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         IRType* irType = lowerType(context, type);
         List<IRInst*> args;
 
-        UInt argCount = expr->args.Count();
+        UInt argCount = expr->args.getSize();
 
         // If the initializer list was empty, then the user was
         // asking for default initialization, which should apply
@@ -2178,7 +2178,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeArray(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeArray(irType, args.getSize(), args.Buffer()));
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
@@ -2200,7 +2200,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeVector(irType, args.getSize(), args.Buffer()));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
@@ -2224,7 +2224,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             }
 
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.Count(), args.Buffer()));
+                getBuilder()->emitMakeMatrix(irType, args.getSize(), args.Buffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -2252,7 +2252,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 }
 
                 return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.Count(), args.Buffer()));
+                    getBuilder()->emitMakeStruct(irType, args.getSize(), args.Buffer()));
             }
         }
 
@@ -2311,7 +2311,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        UInt argCount = expr->Arguments.Count();
+        UInt argCount = expr->Arguments.getSize();
         UInt argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
@@ -3651,7 +3651,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             conditionVal,
             breakLabel,
             defaultLabel,
-            info.cases.Count(),
+            info.cases.getSize(),
             info.cases.Buffer());
 
         // Finally we insert the label that a `break` will jump to
@@ -4574,7 +4574,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.Count(), genericArgs.Buffer());
+        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.getSize(), genericArgs.Buffer());
     }
 
     IRInst* defaultSpecializeOuterGenerics(
@@ -5612,7 +5612,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         auto irFuncType = subBuilder->getFuncType(
-            paramTypes.Count(),
+            paramTypes.getSize(),
             paramTypes.Buffer(),
             irResultType);
         irFunc->setFullType(irFuncType);
@@ -6095,7 +6095,7 @@ LoweredValInfo emitDeclRef(
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,
-            irArgs.Count(),
+            irArgs.getSize(),
             irArgs.Buffer());
 
         return LoweredValInfo::simple(irSpecializedVal);
@@ -6233,7 +6233,7 @@ static void lowerProgramEntryPointToIR(
             existentialSlotArgs.Add(irWitnessTable);
         }
 
-        builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.Count(), existentialSlotArgs.Buffer());
+        builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());
     }
 
 
@@ -6463,7 +6463,7 @@ RefPtr<IRModule> generateIRForProgram(
             existentialSlotArgs.Add(irWitnessTable);
         }
 
-        builder->emitBindGlobalExistentialSlots(existentialSlotArgs.Count(), existentialSlotArgs.Buffer());
+        builder->emitBindGlobalExistentialSlots(existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());
     }
 
 

@@ -189,7 +189,7 @@ namespace Slang
         }
         Token ReadToken()
         {
-            if (tokenPtr < (int)tokens.Count())
+            if (tokenPtr < (int)tokens.getSize())
             {
                 auto &rs = tokens[tokenPtr];
                 tokenPtr++;
@@ -199,7 +199,7 @@ namespace Slang
         }
         Token NextToken(int offset = 0)
         {
-            if (tokenPtr + offset < (int)tokens.Count())
+            if (tokenPtr + offset < (int)tokens.getSize())
                 return tokens[tokenPtr + offset];
             else
             {
@@ -210,7 +210,7 @@ namespace Slang
         }
         bool LookAhead(String token)
         {
-            if (tokenPtr < (int)tokens.Count())
+            if (tokenPtr < (int)tokens.getSize())
             {
                 auto next = NextToken();
                 return next.Content == token;
@@ -222,7 +222,7 @@ namespace Slang
         }
         bool IsEnd()
         {
-            return tokenPtr == (int)tokens.Count();
+            return tokenPtr == (int)tokens.getSize();
         }
     public:
         bool IsLegalText()

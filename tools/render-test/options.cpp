@@ -200,14 +200,14 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
     gOptions.rendererType = (gOptions.rendererType == RendererType::Unknown) ? gOptions.targetLanguageRendererType : gOptions.rendererType;
 
     // first positional argument is source shader path
-    if(positionalArgs.Count())
+    if(positionalArgs.getSize())
     {
         gOptions.sourcePath = positionalArgs[0];
         positionalArgs.RemoveAt(0);
     }
 
     // any remaining arguments represent an error
-    if(positionalArgs.Count() != 0)
+    if(positionalArgs.getSize() != 0)
     {
         stdError.print("unexpected arguments\n");
         return SLANG_FAIL;

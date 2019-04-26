@@ -95,7 +95,7 @@ struct DeadCodeEliminationContext
         // processing entries off of our work list
         // until it goes dry.
         //
-        while( workList.Count() )
+        while( workList.getSize() )
         {
             auto inst = workList.Last();
             workList.RemoveLast();

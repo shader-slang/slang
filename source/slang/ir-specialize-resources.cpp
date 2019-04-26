@@ -57,7 +57,7 @@ struct ResourceParameterSpecializationContext
         // We will process the work list until it goes dry,
         // treating it like a stack of work items.
         //
-        while( workList.Count() )
+        while( workList.getSize() )
         {
             auto call = workList.Last();
             workList.RemoveLast();
@@ -395,7 +395,7 @@ struct ResourceParameterSpecializationContext
         auto newCall = getBuilder()->emitCallInst(
             oldCall->getFullType(),
             newFunc,
-            callInfo.newArgs.Count(),
+            callInfo.newArgs.getSize(),
             callInfo.newArgs.Buffer());
 
         newCall->insertBefore(oldCall);
@@ -778,7 +778,7 @@ struct ResourceParameterSpecializationContext
 
         auto builder = getBuilder();
         IRType* funcType = builder->getFuncType(
-            paramTypes.Count(),
+            paramTypes.getSize(),
             paramTypes.Buffer(),
             oldFunc->getResultType());
 

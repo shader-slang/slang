@@ -80,7 +80,7 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     // Set up pointers the the data
     {
         int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.Count());
+        const int numGen = int(texData.dataBuffer.getSize());
         for (int i = 0; i < numSubResources; i++)
         {
             subResources[i] = texData.dataBuffer[subResourceIndex].Buffer();
@@ -175,7 +175,7 @@ static RefPtr<SamplerState> _createSamplerState(
         }
         case BindingStyle::OpenGl:
         {
-            const int count = int(entry.glslBinding.Count());
+            const int count = int(entry.glslBinding.getSize());
 
             if (count <= 0)
             {
@@ -184,7 +184,7 @@ static RefPtr<SamplerState> _createSamplerState(
 
             int baseIndex = entry.glslBinding[0];
             // Make sure they are contiguous
-            for (int i = 1; i < int(entry.glslBinding.Count()); ++i)
+            for (int i = 1; i < int(entry.glslBinding.getSize()); ++i)
             {
                 if (baseIndex + i != entry.glslBinding[i])
                 {
@@ -206,7 +206,7 @@ static RefPtr<SamplerState> _createSamplerState(
 /* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
 {
     auto srcEntries = layout.entries.Buffer();
-    auto numEntries = int(layout.entries.Count());
+    auto numEntries = int(layout.entries.getSize());
 
     const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
 
@@ -283,7 +283,7 @@ static RefPtr<SamplerState> _createSamplerState(
     }
 
     DescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.Count();
+    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getSize();
     descriptorSetLayoutDesc.slotRanges = slotRangeDescs.Buffer();
 
     auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
@@ -294,7 +294,7 @@ static RefPtr<SamplerState> _createSamplerState(
 
     PipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = layout.numRenderTargets;
-    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.Count();
+    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getSize();
     pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.Buffer();
 
     auto pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
@@ -320,7 +320,7 @@ static RefPtr<SamplerState> _createSamplerState(
             case ShaderInputType::Buffer:
                 {
                     const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
-                    const size_t bufferSize = srcEntry.bufferData.Count() * sizeof(uint32_t);
+                    const size_t bufferSize = srcEntry.bufferData.getSize() * sizeof(uint32_t);
 
                     RefPtr<BufferResource> bufferResource;
                     SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
