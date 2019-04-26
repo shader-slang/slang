@@ -564,7 +564,7 @@ static void AddEndOfStreamToken(
 {
     Token token = PeekRawToken(preprocessor);
     token.type = TokenType::EndOfFile;
-    macro->tokens.mTokens.Add(token);
+    macro->tokens.mTokens.add(token);
 }
 
 static SimpleTokenInputStream* createSimpleInputStream(
@@ -574,13 +574,13 @@ static SimpleTokenInputStream* createSimpleInputStream(
     SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
     initializeInputStream(preprocessor, inputStream);
 
-    inputStream->lexedTokens.mTokens.Add(token);
+    inputStream->lexedTokens.mTokens.add(token);
 
     Token eofToken;
     eofToken.type = TokenType::EndOfFile;
     eofToken.loc = token.loc;
     eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
-    inputStream->lexedTokens.mTokens.Add(eofToken);
+    inputStream->lexedTokens.mTokens.add(eofToken);
 
     inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
 
@@ -740,7 +740,7 @@ static void MaybeBeginMacroExpansion(
                         }
 
                         // Add the token and continue parsing.
-                        arg->tokens.mTokens.Add(AdvanceRawToken(preprocessor));
+                        arg->tokens.mTokens.add(AdvanceRawToken(preprocessor));
                     }
                 doneWithArgument: {}
                     // We've parsed an argument and should move onto
@@ -1732,7 +1732,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                     // are not allowed to be used as macros or parameters).
 
                     // Add the parameter to the macro being deifned
-                    macro->params.Add(paramToken);
+                    macro->params.add(paramToken);
 
                     // If we see `)` then we are done with arguments
                     if (PeekRawTokenType(context) == TokenType::RParent)
@@ -1755,12 +1755,12 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             // Last token on line will be turned into a conceptual end-of-file
             // token for the sub-stream that the macro expands into.
             token.type = TokenType::EndOfFile;
-            macro->tokens.mTokens.Add(token);
+            macro->tokens.mTokens.add(token);
             break;
         }
 
         // In the ordinary case, we just add the token to the definition
-        macro->tokens.mTokens.Add(token);
+        macro->tokens.mTokens.add(token);
     }
 }
 
@@ -2236,7 +2236,7 @@ static TokenList ReadAllTokens(
     {
         Token token = ReadToken(preprocessor);
 
-        tokens.mTokens.Add(token);
+        tokens.mTokens.add(token);
 
         // Note: we include the EOF token in the list,
         // since that is expected by the `TokenList` type.

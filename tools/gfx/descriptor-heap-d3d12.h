@@ -121,7 +121,7 @@ public:
         if(index < 0)
         {
             // Allocate a new heap and try again.
-            m_heaps.Add(m_heap);
+            m_heaps.add(m_heap);
             SLANG_RETURN_ON_FAIL(m_heap.init(m_device, m_chunkSize, m_type, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
 
             int index = m_heap.allocate();
@@ -141,7 +141,7 @@ public:
 
     void free(D3D12HostVisibleDescriptor descriptor)
     {
-        m_freeList.Add(descriptor);
+        m_freeList.add(descriptor);
     }
 };
 

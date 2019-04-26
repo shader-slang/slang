@@ -124,7 +124,7 @@ namespace Slang
 		template<typename... Args>
 		void Init(const T& val, Args... args)
 		{
-			Add(val);
+			add(val);
 			Init(args...);
 		}
 	public:
@@ -180,19 +180,31 @@ namespace Slang
 			return *this;
 		}
 
-		T& First() const
+		const T& getFirst() const
 		{
             SLANG_ASSERT(m_size > 0);
 			return m_buffer[0];
 		}
 
-		T& Last() const
+		const T& getLast() const
 		{
             SLANG_ASSERT(m_size > 0);
 			return m_buffer[m_size-1];
 		}
 
-        void RemoveLast()
+        T& getFirst()
+        {
+            SLANG_ASSERT(m_size > 0);
+            return m_buffer[0];
+        }
+
+        T& getLast() 
+        {
+            SLANG_ASSERT(m_size > 0);
+            return m_buffer[m_size - 1];
+        }
+
+        void removeLast()
         {
             SLANG_ASSERT(m_size > 0);
             m_size--;
@@ -217,7 +229,7 @@ namespace Slang
 			other.m_allocator = _Move(tmpAlloc);
 		}
 
-		T* ReleaseBuffer()
+		T* detachBuffer()
 		{
 			T* rs = m_buffer;
 			m_buffer = nullptr;
@@ -226,18 +238,18 @@ namespace Slang
 			return rs;
 		}
 
-		inline ArrayView<T> GetArrayView() const
+		inline ArrayView<T> getArrayView() const
 		{
 			return ArrayView<T>(m_buffer, m_size);
 		}
 
-		inline ArrayView<T> GetArrayView(int start, int count) const
+		inline ArrayView<T> getArrayView(int start, int count) const
 		{
             SLANG_ASSERT(start >= 0 && count >= 0 && start + count <= m_size);
 			return ArrayView<T>(m_buffer + start, count);
 		}
 
-		void Add(T&& obj)
+		void add(T&& obj)
 		{
 			if (m_capacity < m_size + 1)
 			{
@@ -250,7 +262,7 @@ namespace Slang
 			m_buffer[m_size++] = static_cast<T&&>(obj);
 		}
 
-		void Add(const T& obj)
+		void add(const T& obj)
 		{
 			if (m_capacity < m_size + 1)
 			{
@@ -643,7 +655,7 @@ namespace Slang
 	template<typename T>
 	T Min(const List<T>& list)
 	{
-		T minVal = list.First();
+		T minVal = list.getFirst();
 		for (int i = 1; i < list.getSize(); i++)
 			if (list[i] < minVal)
 				minVal = list[i];
@@ -653,7 +665,7 @@ namespace Slang
 	template<typename T>
 	T Max(const List<T>& list)
 	{
-		T maxVal = list.First();
+		T maxVal = list.getFirst();
 		for (int i = 1; i< list.getSize(); i++)
 			if (list[i] > maxVal)
 				maxVal = list[i];

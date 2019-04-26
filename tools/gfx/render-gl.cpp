@@ -1329,7 +1329,7 @@ Result GLRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
         rangeInfo.arrayIndex = counts[int(glSlotType)];
         counts[int(glSlotType)] += rangeDesc.count;
 
-        layoutImpl->m_ranges.Add(rangeInfo);
+        layoutImpl->m_ranges.add(rangeInfo);
     }
 
     for( Int ii = 0; ii < int(GLDescriptorSlotType::CountOf); ++ii )
@@ -1362,7 +1362,7 @@ Result GLRenderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pipeli
             counts[ii] += setLayout->m_counts[ii];
         }
 
-        layoutImpl->m_sets.Add(setInfo);
+        layoutImpl->m_sets.add(setInfo);
     }
 
     *outLayout = layoutImpl.detach();

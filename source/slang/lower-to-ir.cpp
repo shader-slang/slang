@@ -679,7 +679,7 @@ LoweredValInfo emitCallToDeclRef(
             boundSubscript->type = type;
             boundSubscript->args.AddRange(args, argCount);
 
-            context->shared->extValues.Add(boundSubscript);
+            context->shared->extValues.add(boundSubscript);
 
             return LoweredValInfo::boundSubscript(boundSubscript);
         }
@@ -769,7 +769,7 @@ LoweredValInfo emitCallToDeclRef(
         List<IRType*> argTypes;
         for(UInt ii = 0; ii < argCount; ++ii)
         {
-            argTypes.Add(args[ii]->getDataType());
+            argTypes.add(args[ii]->getDataType());
         }
         funcType = builder->getFuncType(argCount, argTypes.Buffer(), type);
     }
@@ -826,7 +826,7 @@ LoweredValInfo extractField(
             boundMemberInfo->base = base;
             boundMemberInfo->declRef = field;
 
-            context->shared->extValues.Add(boundMemberInfo);
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         break;
@@ -1161,7 +1161,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         for( auto caseWitness : val->caseWitnesses )
         {
             auto caseWitnessTable = lowerSimpleVal(context, caseWitness);
-            caseWitnessTables.Add(caseWitnessTable);
+            caseWitnessTables.add(caseWitnessTable);
         }
 
         // Now we need to synthesize a witness table for the tagged union
@@ -1244,7 +1244,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto irThisParam = subBuilder->emitParam(irThisType);
 
                 List<IRType*> irParamTypes;
-                irParamTypes.Add(irThisType);
+                irParamTypes.add(irThisType);
 
                 // Create the remaining parameters of the callable,
                 // using a decl-ref specialized to the tagged union
@@ -1262,8 +1262,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     auto irParamType = lowerType(context, GetType(paramDeclRef));
                     auto irParam = subBuilder->emitParam(irParamType);
 
-                    irParams.Add(irParam);
-                    irParamTypes.Add(irParamType);
+                    irParams.add(irParam);
+                    irParamTypes.add(irParamType);
                 }
 
                 auto irResultType = lowerType(context, GetResultType(callableDeclRef));
@@ -1296,8 +1296,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     if(!defaultLabel)
                         defaultLabel = caseLabel;
 
-                    switchCaseOperands.Add(caseTag);
-                    switchCaseOperands.Add(caseLabel);
+                    switchCaseOperands.add(caseTag);
+                    switchCaseOperands.add(caseLabel);
 
                     subBuilder->setInsertInto(caseLabel);
 
@@ -1332,7 +1332,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     auto caseThisArg = subBuilder->emitExtractTaggedUnionPayload(
                         caseThisType,
                         irThisParam, caseTag);
-                    caseArgs.Add(caseThisArg);
+                    caseArgs.add(caseThisArg);
 
                     // The remaining arguments to the call will just be forwarded from
                     // the parameters of the wrapper function.
@@ -1343,7 +1343,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     //
                     for( auto param : irParams )
                     {
-                        caseArgs.Add(param);
+                        caseArgs.add(param);
                     }
 
                     auto caseCall = subBuilder->emitCallInst(caseResultType, caseFunc, caseArgs);
@@ -1410,7 +1410,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (UInt pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.Add(lowerType(context, type->getParamType(pp)));
+            paramTypes.add(lowerType(context, type->getParamType(pp)));
         }
         return getBuilder()->getFuncType(
             paramCount,
@@ -1592,7 +1592,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         for(auto caseType : type->caseTypes)
         {
             auto irCaseType = lowerType(context, caseType);
-            irCaseTypes.Add(irCaseType);
+            irCaseTypes.add(irCaseType);
         }
 
         auto irType = getBuilder()->getTaggedUnionType(irCaseTypes);
@@ -1842,7 +1842,7 @@ void addArgs(
     case LoweredValInfo::Flavor::SwizzledLValue:
     case LoweredValInfo::Flavor::BoundSubscript:
     case LoweredValInfo::Flavor::BoundMember:
-        args.Add(getSimpleVal(context, argInfo));
+        args.add(getSimpleVal(context, argInfo));
         break;
 
     default:
@@ -2066,7 +2066,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             List<IRInst*> args;
             for(UInt ee = 0; ee < elementCount; ++ee)
             {
-                args.Add(irDefaultValue);
+                args.add(irDefaultValue);
             }
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeVector(irType, args.getSize(), args.Buffer()));
@@ -2082,7 +2082,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             List<IRInst*> args;
             for(UInt rr = 0; rr < rowCount; ++rr)
             {
-                args.Add(irDefaultValue);
+                args.add(irDefaultValue);
             }
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.getSize(), args.Buffer()));
@@ -2096,7 +2096,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             List<IRInst*> args;
             for(UInt ee = 0; ee < elementCount; ++ee)
             {
-                args.Add(irDefaultElement);
+                args.add(irDefaultElement);
             }
 
             return LoweredValInfo::simple(
@@ -2114,7 +2114,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                         continue;
 
                     auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
-                    args.Add(irFieldVal);
+                    args.add(irFieldVal);
                 }
 
                 return LoweredValInfo::simple(
@@ -2166,14 +2166,14 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             {
                 auto argExpr = expr->args[ee];
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                args.Add(getSimpleVal(context, argVal));
+                args.add(getSimpleVal(context, argVal));
             }
             if(elementCount > argCount)
             {
                 auto irDefaultValue = getSimpleVal(context, getDefaultVal(arrayType->baseType));
                 for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
-                    args.Add(irDefaultValue);
+                    args.add(irDefaultValue);
                 }
             }
 
@@ -2188,14 +2188,14 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             {
                 auto argExpr = expr->args[ee];
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                args.Add(getSimpleVal(context, argVal));
+                args.add(getSimpleVal(context, argVal));
             }
             if(elementCount > argCount)
             {
                 auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
                 for(UInt ee = argCount; ee < elementCount; ++ee)
                 {
-                    args.Add(irDefaultValue);
+                    args.add(irDefaultValue);
                 }
             }
 
@@ -2210,7 +2210,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             {
                 auto argExpr = expr->args[rr];
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                args.Add(getSimpleVal(context, argVal));
+                args.add(getSimpleVal(context, argVal));
             }
             if(rowCount > argCount)
             {
@@ -2219,7 +2219,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
                 for(UInt rr = argCount; rr < rowCount; ++rr)
                 {
-                    args.Add(irDefaultValue);
+                    args.add(irDefaultValue);
                 }
             }
 
@@ -2242,12 +2242,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                     {
                         auto argExpr = expr->args[argIndex];
                         LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
-                        args.Add(getSimpleVal(context, argVal));
+                        args.add(getSimpleVal(context, argVal));
                     }
                     else
                     {
                         auto irDefaultValue = getSimpleVal(context, getDefaultVal(ff));
-                        args.Add(irDefaultValue);
+                        args.add(irDefaultValue);
                     }
                 }
 
@@ -2366,7 +2366,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // pass in the actual pointer.
                 //
                 IRInst* argPtr = getAddress(context, loweredArg, argExpr->loc);
-                (*ioArgs).Add(argPtr);
+                (*ioArgs).add(argPtr);
             }
             else if (paramDecl->HasModifier<OutModifier>()
                 || paramDecl->HasModifier<InOutModifier>())
@@ -2410,7 +2410,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // Now we can pass the address of the temporary variable
                 // to the callee as the actual argument for the `in out`
                 SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                (*ioArgs).Add(tempVar.val);
+                (*ioArgs).add(tempVar.val);
 
                 // Finally, after the call we will need
                 // to copy in the other direction: from our
@@ -2419,7 +2419,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 fixup.src = tempVar;
                 fixup.dst = loweredArg;
 
-                (*ioFixups).Add(fixup);
+                (*ioFixups).add(fixup);
 
             }
             else
@@ -2819,7 +2819,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             }
         }
 
-        context->shared->extValues.Add(swizzledLValue);
+        context->shared->extValues.add(swizzledLValue);
         return LoweredValInfo::swizzledLValue(swizzledLValue);
     }
 };
@@ -3513,8 +3513,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto label = getLabelForCase(info);
 
             // Add this `case` to the list for the enclosing `switch`.
-            info->cases.Add(caseVal);
-            info->cases.Add(label);
+            info->cases.add(caseVal);
+            info->cases.add(label);
         }
         else if(auto defaultStmt = as<DefaultStmt>(stmt))
         {
@@ -3791,7 +3791,7 @@ LoweredValInfo tryGetAddress(
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
-            context->shared->extValues.Add(newSwizzleInfo);
+            context->shared->extValues.add(newSwizzleInfo);
 
             newSwizzleInfo->base = newBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
@@ -4557,11 +4557,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
-                genericArgs.Add(getSimpleVal(context, ensureDecl(context, typeParamDecl)));
+                genericArgs.add(getSimpleVal(context, ensureDecl(context, typeParamDecl)));
             }
             else if (auto valDecl = as<GenericValueParamDecl>(member))
             {
-                genericArgs.Add(getSimpleVal(context, ensureDecl(context, valDecl)));
+                genericArgs.add(getSimpleVal(context, ensureDecl(context, valDecl)));
             }
         }
         // Then we emit constraint parameters, again in
@@ -4570,7 +4570,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
-                genericArgs.Add(getSimpleVal(context, ensureDecl(context, constraintDecl)));
+                genericArgs.add(getSimpleVal(context, ensureDecl(context, constraintDecl)));
             }
         }
 
@@ -5235,7 +5235,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         info.direction = direction;
         info.isThisParam = true;
 
-        ioParameterLists->params.Add(info);
+        ioParameterLists->params.add(info);
     }
     void addThisParameter(
         ParameterDirection  direction,
@@ -5317,7 +5317,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 for( auto paramDecl : callableDecl->GetParameters() )
                 {
-                    ioParameterLists->params.Add(getParameterInfo(paramDecl));
+                    ioParameterLists->params.add(getParameterInfo(paramDecl));
                 }
             }
         }
@@ -5584,7 +5584,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 irParamType = maybeGetConstExprType(irParamType, paramInfo.decl);
             }
 
-            paramTypes.Add(irParamType);
+            paramTypes.add(irParamType);
         }
 
         auto irResultType = lowerType(subContext, declForReturnType->ReturnType);
@@ -5597,7 +5597,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // it as a parameter.
             //
             IRType* irParamType = irResultType;
-            paramTypes.Add(irParamType);
+            paramTypes.add(irParamType);
 
             // Instead, a setter always returns `void`
             //
@@ -6086,7 +6086,7 @@ LoweredValInfo emitDeclRef(
         {
             auto irArgVal = lowerSimpleVal(context, argVal);
             SLANG_ASSERT(irArgVal);
-            irArgs.Add(irArgVal);
+            irArgs.add(irArgVal);
         }
 
         // Once we have both the generic and its arguments,
@@ -6229,8 +6229,8 @@ static void lowerProgramEntryPointToIR(
             auto irArgType = lowerType(context, arg.type);
             auto irWitnessTable = lowerSimpleVal(context, arg.witness);
 
-            existentialSlotArgs.Add(irArgType);
-            existentialSlotArgs.Add(irWitnessTable);
+            existentialSlotArgs.add(irArgType);
+            existentialSlotArgs.add(irWitnessTable);
         }
 
         builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());
@@ -6459,8 +6459,8 @@ RefPtr<IRModule> generateIRForProgram(
             auto irArgType = lowerType(context, arg.type);
             auto irWitnessTable = lowerSimpleVal(context, arg.witness);
 
-            existentialSlotArgs.Add(irArgType);
-            existentialSlotArgs.Add(irWitnessTable);
+            existentialSlotArgs.add(irArgType);
+            existentialSlotArgs.add(irWitnessTable);
         }
 
         builder->emitBindGlobalExistentialSlots(existentialSlotArgs.getSize(), existentialSlotArgs.Buffer());

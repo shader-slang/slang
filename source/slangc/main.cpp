@@ -102,12 +102,12 @@ int wmain(int argc, wchar_t** argv)
         List<String> args;
         for(int ii = 0; ii < argc; ++ii)
         {
-            args.Add(String::FromWString(argv[ii]));
+            args.add(String::FromWString(argv[ii]));
         }
         List<char const*> argBuffers;
         for(int ii = 0; ii < argc; ++ii)
         {
-            argBuffers.Add(args[ii].Buffer());
+            argBuffers.add(args[ii].Buffer());
         }
 
         result = MAIN(argc, (char**) &argBuffers[0]);

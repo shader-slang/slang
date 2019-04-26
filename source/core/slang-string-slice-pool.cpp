@@ -40,7 +40,7 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 
     const int index = int(m_slices.getSize());
 
-    m_slices.Add(scopePath);
+    m_slices.add(scopePath);
     m_map.Add(scopePath, Handle(index));
     return Handle(index);
 }

@@ -112,7 +112,7 @@ struct SpecializationContext
                 return;
         }
 
-        workList.Add(inst);
+        workList.add(inst);
     }
 
     // When a transformation makes a change to an instruction,
@@ -192,11 +192,11 @@ struct SpecializationContext
         // the array `[g, a, b, c]`.
         //
         Key key;
-        key.vals.Add(specializeInst->getBase());
+        key.vals.add(specializeInst->getBase());
         UInt argCount = specializeInst->getArgCount();
         for( UInt ii = 0; ii < argCount; ++ii )
         {
-            key.vals.Add(specializeInst->getArg(ii));
+            key.vals.add(specializeInst->getArg(ii));
         }
 
         {
@@ -570,8 +570,8 @@ struct SpecializationContext
         //
         while(workList.getSize() != 0)
         {
-            IRInst* inst = workList.Last();
-            workList.RemoveLast();
+            IRInst* inst = workList.getLast();
+            workList.removeLast();
 
             // For each instruction we process, we want to perform
             // a few steps.
@@ -677,7 +677,7 @@ struct SpecializationContext
         // The specialized callee will always depend on the unspecialized
         // function from which it is generated, so we add that to our key.
         //
-        key.vals.Add(calleeFunc);
+        key.vals.add(calleeFunc);
 
         // Also, for any parameter that has an existential type, the
         // specialized function will depend on the concrete type of the
@@ -700,7 +700,7 @@ struct SpecializationContext
                 //
                 auto val = makeExistential->getWrappedValue();
                 auto valType = val->getFullType();
-                key.vals.Add(valType);
+                key.vals.add(valType);
 
                 // We are also including the witness table in the key.
                 // This isn't required with our current language model,
@@ -717,7 +717,7 @@ struct SpecializationContext
                 // table even if it is redundant.
                 //
                 auto witnessTable = makeExistential->getWitnessTable();
-                key.vals.Add(witnessTable);
+                key.vals.add(witnessTable);
             }
             else
             {
@@ -757,7 +757,7 @@ struct SpecializationContext
                 // If the parameter doesn't have an existential type, then we
                 // don't want to change up the argument we pass at all.
                 //
-                newArgs.Add(arg);
+                newArgs.add(arg);
             }
             else
             {
@@ -768,7 +768,7 @@ struct SpecializationContext
                 if( auto makeExistential = as<IRMakeExistential>(arg) )
                 {
                     auto val = makeExistential->getWrappedValue();
-                    newArgs.Add(val);
+                    newArgs.add(val);
                 }
                 else
                 {
@@ -912,7 +912,7 @@ struct SpecializationContext
                 // and we'll use that instead of the original parameter.
                 //
                 auto newParam = builder->createParam(oldParam->getFullType());
-                newParams.Add(newParam);
+                newParams.add(newParam);
                 replacementVal = newParam;
             }
             else
@@ -936,7 +936,7 @@ struct SpecializationContext
                     //
                     auto valType = val->getFullType();
                     auto newParam = builder->createParam(valType);
-                    newParams.Add(newParam);
+                    newParams.add(newParam);
 
                     // Within the body of the function we cannot just use `val`
                     // directly, because the existing code expects an existential
@@ -948,7 +948,7 @@ struct SpecializationContext
                     // correct existential type, and stores the right witness table).
                     //
                     auto newMakeExistential = builder->emitMakeExistential(oldParam->getFullType(), newParam, witnessTable);
-                    newBodyInsts.Add(newMakeExistential);
+                    newBodyInsts.add(newMakeExistential);
                     replacementVal = newMakeExistential;
                 }
                 else
@@ -972,7 +972,7 @@ struct SpecializationContext
         List<IRType*> newParamTypes;
         for( auto newParam : newParams )
         {
-            newParamTypes.Add(newParam->getFullType());
+            newParamTypes.add(newParam->getFullType());
         }
         IRType* newFuncType = builder->getFuncType(
             newParamTypes.getSize(),
@@ -1190,7 +1190,7 @@ struct SpecializationContext
             UInt slotOperandCount = wrapInst->getSlotOperandCount();
             for( UInt ii = 0; ii < slotOperandCount; ++ii )
             {
-                slotOperands.Add(wrapInst->getSlotOperand(ii));
+                slotOperands.add(wrapInst->getSlotOperand(ii));
             }
 
             auto newLoadInst = builder.emitLoad(elementType, val);

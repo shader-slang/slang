@@ -202,21 +202,21 @@ namespace Slang
             // Find the split
             while (cur < end && !isDelimiter(*cur)) cur++;
 
-            splitOut.Add(UnownedStringSlice(start, cur));
+            splitOut.add(UnownedStringSlice(start, cur));
            
             // Next
             start = cur + 1;
         }
 
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
-        if (splitOut.getSize() > 1 && splitOut.Last().size() == 0)
+        if (splitOut.getSize() > 1 && splitOut.getLast().size() == 0)
         {
             if (splitOut.getSize() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
             // Remove the last 
-            splitOut.RemoveLast();
+            splitOut.removeLast();
         }
     }
 
@@ -267,7 +267,7 @@ namespace Slang
         // If its empty it must be .
         if (splitPath.getSize() == 0)
         {
-            splitPath.Add(UnownedStringSlice::fromLiteral("."));
+            splitPath.add(UnownedStringSlice::fromLiteral("."));
         }
    
         // Reconstruct the string
@@ -522,7 +522,7 @@ namespace Slang
 			unsigned char ch;
 			int read = (int)fs->Read(&ch, 1);
 			if (read)
-				buffer.Add(ch);
+				buffer.add(ch);
 			else
 				break;
 		}

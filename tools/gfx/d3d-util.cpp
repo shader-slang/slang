@@ -410,7 +410,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
             dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
             if (_isMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
             {
-                outDxgiAdapters.Add(warpAdapter);
+                outDxgiAdapters.add(warpAdapter);
             }
         }
     }
@@ -444,7 +444,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
         // If the right type then add it
         if ((deviceFlags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 && (flags & DeviceCheckFlag::UseHardwareDevice) != 0)
         {
-            outDxgiAdapters.Add(dxgiAdapter);
+            outDxgiAdapters.add(dxgiAdapter);
         }
     }
 

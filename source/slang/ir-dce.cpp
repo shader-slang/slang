@@ -74,7 +74,7 @@ struct DeadCodeEliminationContext
         if(liveInsts.Contains(inst))
             return;
         liveInsts.Add(inst);
-        workList.Add(inst);
+        workList.add(inst);
     }
 
     // Given the basic infrastructrure above, let's
@@ -97,8 +97,8 @@ struct DeadCodeEliminationContext
         //
         while( workList.getSize() )
         {
-            auto inst = workList.Last();
-            workList.RemoveLast();
+            auto inst = workList.getLast();
+            workList.removeLast();
 
             // At this point we know that `inst` is live,
             // and we want to start considering which other

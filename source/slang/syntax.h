@@ -662,7 +662,7 @@ namespace Slang
             List<RefPtr<T>> result;
             for (auto element : (*this))
             {
-                result.Add(element);
+                result.add(element);
             }
             return result;
         }
@@ -702,7 +702,7 @@ namespace Slang
         {
             List<DeclRef<T>> result;
             for (auto d : *this)
-                result.Add(d);
+                result.add(d);
             return result;
         }
 
@@ -1217,14 +1217,14 @@ namespace Slang
     {
         List<DeclRef<T>> rs;
         for (auto d : getMembersOfType<T>(declRef))
-            rs.Add(d);
+            rs.add(d);
         if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {
                 auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions));
                 for (auto mbr : extMembers)
-                    rs.Add(mbr);
+                    rs.add(mbr);
             }
         }
         return rs;

@@ -217,7 +217,7 @@ static RefPtr<SamplerState> _createSamplerState(
         DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
         slotRangeDesc.type = DescriptorSlotType::UniformBuffer;
 
-        slotRangeDescs.Add(slotRangeDesc);
+        slotRangeDescs.add(slotRangeDesc);
     }
 
     for (int i = 0; i < numEntries; i++)
@@ -279,7 +279,7 @@ static RefPtr<SamplerState> _createSamplerState(
                 assert(!"Unhandled type");
                 return SLANG_FAIL;
         }
-        slotRangeDescs.Add(slotRangeDesc);
+        slotRangeDescs.add(slotRangeDesc);
     }
 
     DescriptorSetLayout::Desc descriptorSetLayoutDesc;
@@ -290,7 +290,7 @@ static RefPtr<SamplerState> _createSamplerState(
     if(!descriptorSetLayout) return SLANG_FAIL;
 
     List<PipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
-    pipelineDescriptorSets.Add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
+    pipelineDescriptorSets.add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
 
     PipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = layout.numRenderTargets;
@@ -349,7 +349,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = bufferResource;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;
@@ -374,7 +374,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = texture;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;
@@ -404,7 +404,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = texture;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;

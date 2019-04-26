@@ -92,18 +92,18 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->subCommand = arg;
                 // Make the first arg the command name
-                optionsOut->subCommandArgs.Add(optionsOut->subCommand);
+                optionsOut->subCommandArgs.add(optionsOut->subCommand);
 
                 // Add all the remaining commands to subCommands
                 for (; argCursor != argEnd; ++argCursor)
                 {
-                    optionsOut->subCommandArgs.Add(*argCursor);
+                    optionsOut->subCommandArgs.add(*argCursor);
                 }
                 // Done
                 return SLANG_OK;
             }
 
-            positionalArgs.Add(arg);
+            positionalArgs.add(arg);
             continue;
         }
 
@@ -112,7 +112,7 @@ static bool _isSubCommand(const char* arg)
             // Add all positional args at the end
             while (argCursor != argEnd)
             {
-                positionalArgs.Add(*argCursor++);
+                positionalArgs.add(*argCursor++);
             }
             break;
         }

@@ -981,7 +981,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
 
     List<const char*> deviceExtensions;
-    deviceExtensions.Add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
@@ -1038,10 +1038,10 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
             deviceCreateInfo.pNext = &float16Features;
 
             // Add the Float16 extension
-            deviceExtensions.Add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+            deviceExtensions.add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
 
             // We have half support
-            m_features.Add("half");
+            m_features.add("half");
         }   
     }
 
@@ -1479,7 +1479,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
             const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
             const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
 
-            mipSizes.Add(mipSize);
+            mipSizes.add(mipSize);
 
             bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
         }
@@ -2314,11 +2314,11 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
 
         descriptorCountForTypes[dstDescriptorType] += uint32_t(srcRange.count);
 
-        dstBindings.Add(dstBinding);
+        dstBindings.add(dstBinding);
 
         DescriptorSetLayoutImpl::RangeInfo rangeInfo;
         rangeInfo.descriptorType = dstDescriptorType;
-        descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+        descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
@@ -2457,7 +2457,7 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
         binding.index = uint32_t(index);
         binding.obj = ptr;
 
-        m_bindings.Add(binding);
+        m_bindings.add(binding);
     }
 }
 

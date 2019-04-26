@@ -278,7 +278,7 @@ void TestReporter::_addResult(const TestInfo& info)
             break;
     }
 
-    m_testInfos.Add(info);
+    m_testInfos.add(info);
 
     //    printf("OUTPUT_MODE: %d\n", options.outputMode);
     switch (m_outputMode)
@@ -578,7 +578,7 @@ void TestReporter::outputSummary()
 
 void TestReporter::startSuite(const String& name)
 {
-    m_suiteStack.Add(name);
+    m_suiteStack.add(name);
 
     switch (m_outputMode)
     {
@@ -601,7 +601,7 @@ void TestReporter::endSuite()
     {
         case TestOutputMode::TeamCity:
         {
-            const String& name = m_suiteStack.Last();
+            const String& name = m_suiteStack.getLast();
             StringBuilder escapedSuiteName;
             _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
             printf("##teamcity[testSuiteFinished name='%s']\n", escapedSuiteName.begin());
@@ -610,5 +610,5 @@ void TestReporter::endSuite()
         default: break;
     }
     
-    m_suiteStack.RemoveLast();
+    m_suiteStack.removeLast();
 }

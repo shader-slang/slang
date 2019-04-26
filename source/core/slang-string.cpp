@@ -228,12 +228,12 @@ namespace Slang
 				*outLength = length;
 
             for(int ii = 0; ii < sizeof(wchar_t); ++ii)
-    			buf.Add(0);
+    			buf.add(0);
 
             wchar_t* beginData = (wchar_t*)buf.Buffer();
             wchar_t* endData = beginData + length;
 
-			buf.ReleaseBuffer();
+			buf.detachBuffer();
 
             return OSString(beginData, endData);
 		}

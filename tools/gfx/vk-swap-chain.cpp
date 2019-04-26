@@ -71,11 +71,11 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 
     // Look for a suitable format
     List<VkFormat> formats;
-    formats.Add(VulkanUtil::getVkFormat(desc.m_format));
+    formats.add(VulkanUtil::getVkFormat(desc.m_format));
     // HACK! To check for a different format if couldn't be found
     if (descIn.m_format == Format::RGBA_Unorm_UInt8)
     {
-        formats.Add(VK_FORMAT_B8G8R8A8_UNORM);
+        formats.add(VK_FORMAT_B8G8R8A8_UNORM);
     }
 
     for(int i = 0; i < int(formats.getSize()); ++i)

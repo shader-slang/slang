@@ -1501,7 +1501,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
                 featureShaderModel.HighestShaderModel >= 0x62)
             {
                 // With sm_6_2 we have half
-                m_features.Add("half");
+                m_features.add("half");
             }
         }
         // Check what min precision support we have
@@ -3207,14 +3207,14 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalResourceRangeCount);
-        descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
+        descriptorSetLayoutImpl->m_dxRootParameters.add(dxRootParameter);
     }
     if( totalSamplerRangeCount )
     {
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalSamplerRangeCount);
-        descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
+        descriptorSetLayoutImpl->m_dxRootParameters.add(dxRootParameter);
     }
 
     // Next we can allocate space for all the D3D register ranges we need,
@@ -3272,7 +3272,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                 break;
             }
 
-            descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+            descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
         }
     }
 

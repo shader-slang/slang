@@ -1119,7 +1119,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 }
             }
 
-            newStructTypeLayout->fields.Add(newField);
+            newStructTypeLayout->fields.add(newField);
 
             mapOldFieldToNew.Add(oldField.Ptr(), newField.Ptr());
         }
@@ -2072,7 +2072,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                 }
             }
 
-            adjustedStructTypeLayout->fields.Add(adjustedField);
+            adjustedStructTypeLayout->fields.add(adjustedField);
 
             mapOriginalFieldToAdjusted.Add(originalField, adjustedField);
         }
@@ -2209,7 +2209,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     RefPtr<VarLayout> fieldLayout = new VarLayout();
     fieldLayout->varDecl = field;
     fieldLayout->typeLayout = fieldTypeLayout;
-    m_typeLayout->fields.Add(fieldLayout);
+    m_typeLayout->fields.add(fieldLayout);
     m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
 
     // Set up uniform offset information, if there is any uniform data in the field
@@ -2906,7 +2906,7 @@ static TypeLayoutResult _createTypeLayout(
             // We need to remember the layout of the case type
             // on the final `TaggedUnionTypeLayout`.
             //
-            taggedUnionLayout->caseTypeLayouts.Add(caseTypeLayout);
+            taggedUnionLayout->caseTypeLayouts.add(caseTypeLayout);
 
             // We also need to consider contributions for other
             // resource kinds beyond uniform data.

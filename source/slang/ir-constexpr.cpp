@@ -162,7 +162,7 @@ void maybeAddToWorkList(
 {
     if( !context->onWorkList.Contains(gv) )
     {
-        context->workList.Add(gv);
+        context->workList.add(gv);
         context->onWorkList.Add(gv);
     }
 }

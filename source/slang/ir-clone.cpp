@@ -176,7 +176,7 @@ static void _cloneInstDecorationsAndChildren(
             IRCloningOldNewPair pair;
             pair.oldInst = oldChild;
             pair.newInst = newChild;
-            pairs.Add(pair);
+            pairs.add(pair);
         }
     }
 

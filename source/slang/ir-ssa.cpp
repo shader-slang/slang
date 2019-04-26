@@ -246,7 +246,7 @@ void identifyPromotableVars(
 
             if (isPromotableVar(context, var))
             {
-                context->promotableVars.Add(var);
+                context->promotableVars.add(var);
             }
         }
     }
@@ -391,7 +391,7 @@ PhiInfo* addPhi(
     phiInfo->phi = phi;
     phiInfo->var = var;
 
-    blockInfo->phis.Add(phiInfo);
+    blockInfo->phis.add(phiInfo);
 
     return phiInfo;
 }
@@ -458,7 +458,7 @@ IRInst* tryRemoveTrivialPhi(
             auto maybeOtherPhi = (IRParam*) user;
             if( auto otherPhiInfo = context->getPhiInfo(maybeOtherPhi) )
             {
-                otherPhis.Add(otherPhiInfo);
+                otherPhis.add(otherPhiInfo);
             }
         }
     }
@@ -509,7 +509,7 @@ IRInst* addPhiOperands(
 
         auto phiOperand = readVar(context, predInfo, var);
 
-        operandValues.Add(phiOperand);
+        operandValues.add(phiOperand);
     }
 
     // The `IRUse`  type needs to stay at a stable location
@@ -829,7 +829,7 @@ void processBlock(
                 auto  ptrArg = ii->getOperand(0);
                 if (auto var = asPromotableVarAccessChain(context, ptrArg))
                 {
-                    context->instsToRemove.Add(ii);
+                    context->instsToRemove.add(ii);
                 }
             }
             break;
@@ -913,7 +913,7 @@ static void breakCriticalEdges(
             // Furthermore, the `IRUse` embedded in `succIter` represents
             // that edge directly.
             auto edgeUse = succIter.use;
-            criticalEdges.Add(edgeUse);
+            criticalEdges.add(edgeUse);
         }
     }
 
@@ -1020,7 +1020,7 @@ void constructSSA(ConstructSSAContext* context)
 
                 phiInfo->operands[predIndex].clear();
 
-                predInfo->successorArgs.Add(operandVal);
+                predInfo->successorArgs.add(operandVal);
             }
         }
     }
@@ -1055,11 +1055,11 @@ void constructSSA(ConstructSSAContext* context)
         List<IRInst*> newArgs;
         for (UInt aa = 0; aa < oldArgCount; ++aa)
         {
-            newArgs.Add(oldTerminator->getOperand(aa));
+            newArgs.add(oldTerminator->getOperand(aa));
         }
         for (UInt aa = 0; aa < addedArgCount; ++aa)
         {
-            newArgs.Add(blockInfo->successorArgs[aa]);
+            newArgs.add(blockInfo->successorArgs[aa]);
         }
 
         IRTerminatorInst* newTerminator = (IRTerminatorInst*)blockInfo->builder.emitIntrinsicInst(

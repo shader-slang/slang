@@ -28,7 +28,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointGenericTypeArguments.Add(typeExp);
+                        entryPointGenericTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("global_type"))
                     {
@@ -36,7 +36,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalGenericTypeArguments.Add(typeExp);
+                        globalGenericTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("globalExistentialType"))
                     {
@@ -44,7 +44,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalExistentialTypeArguments.Add(typeExp);
+                        globalExistentialTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("entryPointExistentialType"))
                     {
@@ -52,7 +52,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointExistentialTypeArguments.Add(typeExp);
+                        entryPointExistentialTypeArguments.add(typeExp);
                     }
                     else
                     {
@@ -183,12 +183,12 @@ namespace renderer_test
                                     {
                                         if (parser.NextToken().Type == TokenType::IntLiteral)
                                         {
-                                            entry.bufferData.Add(parser.ReadUInt());
+                                            entry.bufferData.add(parser.ReadUInt());
                                         }
                                         else
                                         {
                                             auto floatNum = parser.ReadFloat();
-                                            entry.bufferData.Add(*(unsigned int*)&floatNum);
+                                            entry.bufferData.add(*(unsigned int*)&floatNum);
                                         }
                                     }
                                     parser.Read("]");
@@ -254,7 +254,7 @@ namespace renderer_test
                                     parser.Read("(");
                                     while (!parser.IsEnd() && !parser.LookAhead(")"))
                                     {
-                                        entry.glslBinding.Add(parser.ReadInt());
+                                        entry.glslBinding.add(parser.ReadInt());
                                         if (parser.LookAhead(","))
                                             parser.Read(",");
                                         else
@@ -271,7 +271,7 @@ namespace renderer_test
                                     parser.Read(",");
                             }
                         }
-                        entries.Add(entry);
+                        entries.add(entry);
                     }
                 }
                 catch (TextFormatException)

@@ -1023,7 +1023,7 @@ namespace Slang
 
             for (auto argExpr : args)
             {
-                subst->args.Add(ExtractGenericArgVal(argExpr));
+                subst->args.add(ExtractGenericArgVal(argExpr));
             }
 
             DeclRef<Decl> innerDeclRef;
@@ -1219,7 +1219,7 @@ namespace Slang
 
                         // TODO: this is one place where syntax should get cloned!
                         if (outProperType)
-                            args.Add(typeParam->initType.exp);
+                            args.add(typeParam->initType.exp);
                     }
                     else if (auto valParam = as<GenericValueParamDecl>(member))
                     {
@@ -1235,7 +1235,7 @@ namespace Slang
 
                         // TODO: this is one place where syntax should get cloned!
                         if (outProperType)
-                            args.Add(valParam->initExpr);
+                            args.add(valParam->initExpr);
                     }
                     else
                     {
@@ -1637,7 +1637,7 @@ namespace Slang
 
                     if( coercedArg )
                     {
-                        coercedArgs.Add(coercedArg);
+                        coercedArgs.add(coercedArg);
                     }
                 }
             }
@@ -1685,7 +1685,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
                 }
@@ -1713,7 +1713,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
 
@@ -1775,7 +1775,7 @@ namespace Slang
 
                     if( coercedArg )
                     {
-                        coercedArgs.Add(coercedArg);
+                        coercedArgs.add(coercedArg);
                     }
                 }
             }
@@ -1803,7 +1803,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
                 }
@@ -2159,7 +2159,7 @@ namespace Slang
                     //
                     auto castExpr = createImplicitCastExpr();
                     castExpr->loc = fromExpr->loc;
-                    castExpr->Arguments.Add(fromExpr);
+                    castExpr->Arguments.add(fromExpr);
                     //
                     // Next we need to set our cast expression as the "original"
                     // expression and then complete the overload process.
@@ -2182,7 +2182,7 @@ namespace Slang
                     // but I'd rather play it safe.
                     //
                     castExpr->Arguments.Clear();
-                    castExpr->Arguments.Add(fromExpr);
+                    castExpr->Arguments.add(fromExpr);
                 }
 
                 return true;
@@ -2275,7 +2275,7 @@ namespace Slang
             castExpr->loc = fromExpr->loc;
             castExpr->FunctionExpr = typeExpr;
             castExpr->type = QualType(toType);
-            castExpr->Arguments.Add(fromExpr);
+            castExpr->Arguments.add(fromExpr);
             return castExpr;
         }
 
@@ -2663,11 +2663,11 @@ namespace Slang
                     param->nameAndLoc = member->nameAndLoc;
                     param->type = varMember->type;
                     param->loc = member->loc;
-                    attribDecl->Members.Add(param);
+                    attribDecl->Members.add(param);
                 }
             }
             // add the attribute class definition to the syntax tree, so it can be found
-            structAttribDef->ParentDecl->Members.Add(attribDecl.Ptr());
+            structAttribDef->ParentDecl->Members.add(attribDecl.Ptr());
             structAttribDef->ParentDecl->memberDictionaryIsValid = false;
             // do necessary checks on this newly constructed node
             checkDecl(attribDecl.Ptr());
@@ -3008,7 +3008,7 @@ namespace Slang
                         // default arguments as needed.
                         // For now just copy the expression over.
 
-                        attr->args.Add(paramDecl->initExpr);
+                        attr->args.add(paramDecl->initExpr);
                     }
                     else
                     {
@@ -4049,7 +4049,7 @@ namespace Slang
                     enumConformanceDecl->ParentDecl = decl;
                     enumConformanceDecl->loc = decl->loc;
                     enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-                    decl->Members.Add(enumConformanceDecl);
+                    decl->Members.add(enumConformanceDecl);
 
                     // The `__EnumType` interface has one required member, the `__Tag` type.
                     // We need to satisfy this requirement automatically, rather than require
@@ -4329,11 +4329,11 @@ namespace Slang
                     continue;
 
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(dd))
-                    outParams.Add(typeParamDecl);
+                    outParams.add(typeParamDecl);
                 else if (auto valueParamDecl = as<GenericValueParamDecl>(dd))
-                    outParams.Add(valueParamDecl);
+                    outParams.add(valueParamDecl);
                 else if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
-                    outConstraints.Add(constraintDecl);
+                    outConstraints.add(constraintDecl);
             }
         }
 
@@ -4495,13 +4495,13 @@ namespace Slang
                 {
                     auto type = DeclRefType::Create(getSession(),
                         makeDeclRef(typeParam));
-                    subst->args.Add(type);
+                    subst->args.add(type);
                 }
                 else if (auto valueParam = as<GenericValueParamDecl>(dd))
                 {
                     auto val = new GenericParamIntVal(
                         makeDeclRef(valueParam));
-                    subst->args.Add(val);
+                    subst->args.add(val);
                 }
                 // TODO: need to handle constraints here?
             }
@@ -4877,7 +4877,7 @@ namespace Slang
 
         void PushOuterStmt(Stmt* stmt)
         {
-            outerStmts.Add(stmt);
+            outerStmts.add(stmt);
         }
 
         void PopOuterStmt(Stmt* /*stmt*/)
@@ -5483,8 +5483,8 @@ namespace Slang
 
             auto substitutions = new GenericSubstitution();
             substitutions->genericDecl = vectorGenericDecl.Ptr();
-            substitutions->args.Add(elementType);
-            substitutions->args.Add(elementCount);
+            substitutions->args.add(elementType);
+            substitutions->args.add(elementCount);
 
             auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
@@ -5588,7 +5588,7 @@ namespace Slang
                 subscriptCallExpr->FunctionExpr = subscriptFuncExpr;
 
                 // TODO(tfoley): This path can support multiple arguments easily
-                subscriptCallExpr->Arguments.Add(subscriptExpr->IndexExpression);
+                subscriptCallExpr->Arguments.add(subscriptExpr->IndexExpression);
 
                 return CheckInvokeExprWithCheckedOperands(subscriptCallExpr.Ptr());
             }
@@ -5832,7 +5832,7 @@ namespace Slang
                 getterDecl->loc = decl->loc;
 
                 getterDecl->ParentDecl = decl;
-                decl->Members.Add(getterDecl);
+                decl->Members.add(getterDecl);
             }
 
             for(auto mm : decl->Members)
@@ -6221,7 +6221,7 @@ namespace Slang
 
                     if(outWitness)
                     {
-                        caseWitnesses.Add(caseWitness);
+                        caseWitnesses.add(caseWitness);
                     }
                 }
 
@@ -6556,7 +6556,7 @@ namespace Slang
                         // failure!
                         return SubstitutionSet();
                     }
-                    args.Add(type);
+                    args.add(type);
                 }
                 else if (auto valParam = m.as<GenericValueParamDecl>())
                 {
@@ -6593,7 +6593,7 @@ namespace Slang
                         // failure!
                         return SubstitutionSet();
                     }
-                    args.Add(val);
+                    args.add(val);
                 }
                 else
                 {
@@ -6638,7 +6638,7 @@ namespace Slang
                 if(subTypeWitness)
                 {
                     // We found a witness, so it will become an (implicit) argument.
-                    solvedSubst->args.Add(subTypeWitness);
+                    solvedSubst->args.add(subTypeWitness);
                 }
                 else
                 {
@@ -6899,7 +6899,7 @@ namespace Slang
                     {
                         typeExp = CoerceToProperType(TypeExp(arg));
                     }
-                    checkedArgs.Add(typeExp.type);
+                    checkedArgs.add(typeExp.type);
                 }
                 else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
                 {
@@ -6917,7 +6917,7 @@ namespace Slang
 
                     arg = coerce(GetType(valParamRef), arg);
                     auto val = ExtractGenericArgInteger(arg);
-                    checkedArgs.Add(val);
+                    checkedArgs.add(val);
                 }
                 else
                 {
@@ -7072,7 +7072,7 @@ namespace Slang
                 auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
                 if(subTypeWitness)
                 {
-                    subst->args.Add(subTypeWitness);
+                    subst->args.add(subTypeWitness);
                 }
                 else
                 {
@@ -7207,7 +7207,7 @@ namespace Slang
                             callExpr->loc = context.loc;
 
                             for(UInt aa = 0; aa < context.argCount; ++aa)
-                                callExpr->Arguments.Add(context.getArg(aa));
+                                callExpr->Arguments.add(context.getArg(aa));
                         }
 
 
@@ -7347,13 +7347,13 @@ namespace Slang
             if (context.bestCandidates.getSize() > 0)
             {
                 // There were already multiple candidates, and we are adding one more
-                context.bestCandidates.Add(candidate);
+                context.bestCandidates.add(candidate);
             }
             else if (context.bestCandidate)
             {
                 // There was a unique best candidate, but now we are ambiguous
-                context.bestCandidates.Add(*context.bestCandidate);
-                context.bestCandidates.Add(candidate);
+                context.bestCandidates.add(*context.bestCandidate);
+                context.bestCandidates.add(candidate);
                 context.bestCandidate = nullptr;
             }
             else
@@ -7612,7 +7612,7 @@ namespace Slang
             constraint.decl = typeParamDecl.Ptr();
             constraint.val = type;
 
-            constraints.constraints.Add(constraint);
+            constraints.constraints.add(constraint);
 
             return true;
         }
@@ -7635,7 +7635,7 @@ namespace Slang
             constraint.decl = paramDecl.Ptr();
             constraint.val = val;
 
-            constraints.constraints.Add(constraint);
+            constraints.constraints.add(constraint);
 
             return true;
         }
@@ -8666,7 +8666,7 @@ namespace Slang
                     for (auto candidate : context.bestCandidates)
                     {
                         auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                        overloadedExpr->candidiateExprs.Add(candidateExpr);
+                        overloadedExpr->candidiateExprs.add(candidateExpr);
                     }
                     return overloadedExpr;
                 }
@@ -8708,7 +8708,7 @@ namespace Slang
             for( auto& caseTypeExpr : expr->caseTypes )
             {
                 caseTypeExpr = CheckProperType(caseTypeExpr);
-                type->caseTypes.Add(caseTypeExpr.type);
+                type->caseTypes.add(caseTypeExpr.type);
             }
 
             return expr;
@@ -9121,7 +9121,7 @@ namespace Slang
                         if (isUsableAsStaticMember(item))
                         {
                             // If yes, then it will be part of the output.
-                            staticItems.Add(item);
+                            staticItems.add(item);
                         }
                         else
                         {
@@ -9585,7 +9585,7 @@ namespace Slang
             {
                 // Each leaf parameter of interface type adds one slot.
                 //
-                ioSlots.paramTypes.Add(type);
+                ioSlots.paramTypes.add(type);
             }
             else if( auto structDeclRef = typeDeclRef.as<StructDecl>() )
             {
@@ -9652,7 +9652,7 @@ namespace Slang
                     m_existentialSlots,
                     paramDeclRef);
 
-                m_shaderParams.Add(shaderParamInfo);
+                m_shaderParams.add(shaderParamInfo);
             }
         }
     }
@@ -10033,7 +10033,7 @@ static void collectFields(
         if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
             continue;
 
-        outFields.Add(fieldDeclRef);
+        outFields.add(fieldDeclRef);
     }
 }
 
@@ -10399,7 +10399,7 @@ static bool doesParameterMatch(
                         // consider the new variable to be a redclaration of
                         // the existing one.
 
-                        existingParam.additionalParamDeclRefs.Add(
+                        existingParam.additionalParamDeclRefs.add(
                             makeDeclRef(globalVar.Ptr()));
                         continue;
                     }
@@ -10416,7 +10416,7 @@ static bool doesParameterMatch(
                     m_globalExistentialSlots,
                     makeDeclRef(globalVar.Ptr()));
 
-                m_shaderParams.Add(shaderParamInfo);
+                m_shaderParams.add(shaderParamInfo);
             }
         }
     }
@@ -10476,7 +10476,7 @@ static bool doesParameterMatch(
                 if( entryPoint )
                 {
                     program->addEntryPoint(entryPoint);
-                    entryPointReq->getTranslationUnit()->entryPoints.Add(entryPoint);
+                    entryPointReq->getTranslationUnit()->entryPoints.add(entryPoint);
                 }
             }
 
@@ -10542,7 +10542,7 @@ static bool doesParameterMatch(
                     validateEntryPoint(entryPoint, sink);
 
                     program->addEntryPoint(entryPoint);
-                    translationUnit->entryPoints.Add(entryPoint);
+                    translationUnit->entryPoints.add(entryPoint);
                 }
             }
         }
@@ -10597,7 +10597,7 @@ static bool doesParameterMatch(
             ExistentialTypeSlots::Arg arg;
             arg.type = argType;
             arg.witness = witness;
-            ioSlots.args.Add(arg);
+            ioSlots.args.add(arg);
         }
     }
 
@@ -10722,7 +10722,7 @@ static bool doesParameterMatch(
         //
         List<RefPtr<Scope>> scopesToTry;
         for( auto module : unspecialiedProgram->getModuleDependencies() )
-            scopesToTry.Add(module->getModuleDecl()->scope);
+            scopesToTry.add(module->getModuleDecl()->scope);
 
         // We are going to do some semantic checking, so we need to
         // set up a `SemanticsVistitor` that we can use.
@@ -10753,7 +10753,7 @@ static bool doesParameterMatch(
                 }
             }
 
-            outGenericArgs.Add(argExpr);
+            outGenericArgs.add(argExpr);
         }
     }
 
@@ -10802,7 +10802,7 @@ static bool doesParameterMatch(
         for(auto module : unspecializedProgram->getModuleDependencies())
         {
             for(auto param : module->getModuleDecl()->getMembersOfType<GlobalGenericParamDecl>())
-                globalGenericParams.Add(param);
+                globalGenericParams.add(param);
         }
 
         // Next, we will check whether the supplied arguments can
@@ -10919,7 +10919,7 @@ static bool doesParameterMatch(
                 GlobalGenericParamSubstitution::ConstraintArg constraintArg;
                 constraintArg.decl = constraint;
                 constraintArg.val = witness;
-                subst->constraintArgs.Add(constraintArg);
+                subst->constraintArgs.add(constraintArg);
             }
 
             // Add the substitution for this parameter to the global substitution
@@ -11228,11 +11228,11 @@ static bool doesParameterMatch(
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
-                genericSubst->args.Add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
+                genericSubst->args.add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
-                genericSubst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
+                genericSubst->args.add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
             }
         }
 
@@ -11245,7 +11245,7 @@ static bool doesParameterMatch(
                 witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl, outerSubst);
                 witness->sub = genericTypeConstraintDecl->sub.type;
                 witness->sup = genericTypeConstraintDecl->sup.type;
-                genericSubst->args.Add(witness);
+                genericSubst->args.add(witness);
             }
         }
 

@@ -57,7 +57,7 @@ void D3D12CircularResourceHeap::addSync(uint64_t signalValue)
 	PendingEntry entry;
 	entry.m_completedValue = signalValue;
 	entry.m_cursor = m_front;
-	m_pendingQueue.Add(entry);
+	m_pendingQueue.add(entry);
 }
 
 void D3D12CircularResourceHeap::updateCompleted()

@@ -112,7 +112,7 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
             entry.m_numChars = len;
             entry.m_object = nullptr;
 
-            m_entries.Add(entry);
+            m_entries.add(entry);
 
             cur = reader.m_pos + len;
         }
@@ -239,7 +239,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
     {
         CharReader reader(cur);
         const int len = GetUnicodePointFromUTF8(reader);
-        slicesOut.Add(UnownedStringSlice(reader.m_pos, len));
+        slicesOut.add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
     }
 }
@@ -377,7 +377,7 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
 
     // Add to the map
     m_instMap.Add(inst, Ser::InstIndex(m_insts.getSize()));
-    m_insts.Add(inst);
+    m_insts.add(inst);
 }
 
 #if 0
@@ -444,7 +444,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
         int entryIndex = sourceView->findEntryIndex(sourceLoc);
         if (entryIndex < 0)
         {
-            debugSourceFile->m_lineInfos.Add(lineInfo);
+            debugSourceFile->m_lineInfos.add(lineInfo);
         }
         else
         {
@@ -463,7 +463,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
 
             adjustedLineInfo.m_adjustedLineIndex = lineIndex + entry.m_lineAdjust;
 
-            debugSourceFile->m_adjustedLineInfos.Add(adjustedLineInfo);
+            debugSourceFile->m_adjustedLineInfos.add(adjustedLineInfo);
         }
 
         debugSourceFile->setHasLineIndex(lineIndex);
@@ -475,7 +475,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
     sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstIndex);
     sourceLocRun.m_sourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + offset);
 
-    m_serialData->m_debugSourceLocRuns.Add(sourceLocRun);
+    m_serialData->m_debugSourceLocRuns.add(sourceLocRun);
 }
 
 Result IRSerialWriter::_calcDebugInfo()
@@ -508,7 +508,7 @@ Result IRSerialWriter::_calcDebugInfo()
         InstLoc instLoc;
         instLoc.instIndex = uint32_t(i);
         instLoc.sourceLoc = uint32_t(srcInst->sourceLoc.getRaw());
-        instLocs.Add(instLoc);
+        instLocs.add(instLoc);
     }
 
     // Sort them
@@ -567,7 +567,7 @@ Result IRSerialWriter::_calcDebugInfo()
         m_serialData->m_debugAdjustedLineInfos.AddRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getSize());
 
         // Add the source info
-        m_serialData->m_debugSourceInfos.Add(sourceInfo);
+        m_serialData->m_debugSourceInfos.add(sourceInfo);
     }
 
     // Convert the string pool
@@ -587,7 +587,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
     // We reserve 0 for null
     m_insts.Clear();
-    m_insts.Add(nullptr);
+    m_insts.add(nullptr);
 
     // Reset
     m_instMap.Clear();
@@ -597,7 +597,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     List<IRInst*> parentInstStack;
   
     IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.Add(moduleInst);
+    parentInstStack.add(moduleInst);
 
     // Add to the map
     _addInstruction(moduleInst);
@@ -606,8 +606,8 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     while (parentInstStack.getSize())
     {
         // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.Last();
-        parentInstStack.RemoveLast();
+        IRInst* parentInst = parentInstStack.getLast();
+        parentInstStack.removeLast();
         SLANG_ASSERT(m_instMap.ContainsKey(parentInst));
 
         // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
@@ -622,7 +622,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
             _addInstruction(child);
             
-            parentInstStack.Add(child);
+            parentInstStack.add(child);
         }
 
         // If it had any children, then store the information about it
@@ -633,7 +633,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
             run.m_startInstIndex = startChildInstIndex;
             run.m_numChildren = Ser::SizeType(m_insts.getSize() - int(startChildInstIndex));
 
-            m_serialData->m_childRuns.Add(run);
+            m_serialData->m_childRuns.add(run);
         }
     }
 
@@ -1949,23 +1949,23 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     List<IRInst*> parentInstStack;
 
     IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.Add(moduleInst);
+    parentInstStack.add(moduleInst);
 
     // Add to list
-    instsOut.Add(moduleInst);
+    instsOut.add(moduleInst);
 
     // Traverse all of the instructions
     while (parentInstStack.getSize())
     {
         // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.Last();
-        parentInstStack.RemoveLast();
+        IRInst* parentInst = parentInstStack.getLast();
+        parentInstStack.removeLast();
 
         IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
         for (IRInst* child : childrenList)
         {
-            instsOut.Add(child);
-            parentInstStack.Add(child);
+            instsOut.add(child);
+            parentInstStack.add(child);
         }
     }
 }

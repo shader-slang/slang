@@ -514,14 +514,14 @@ namespace Slang
                         caseIndex++;
 
                         RefPtr<SwitchRegion::Case> currentCase = new SwitchRegion::Case();
-                        switchRegion->cases.Add(currentCase);
+                        switchRegion->cases.add(currentCase);
 
                         // Add the case value for this case, and any
                         // others that share the same label
                         //
                         for(;;)
                         {
-                            currentCase->values.Add(caseVal);
+                            currentCase->values.add(caseVal);
 
                             // Are there any more `case`s left?
                             //
@@ -586,7 +586,7 @@ namespace Slang
                     if(!defaultLabelHandled)
                     {
                         RefPtr<SwitchRegion::Case> defaultCase = new SwitchRegion::Case();
-                        switchRegion->cases.Add(defaultCase);
+                        switchRegion->cases.add(defaultCase);
 
                         // Note: we use `null` instead of `breakLabel` as the end block
                         // here, to ensure that the `default` region will end with an

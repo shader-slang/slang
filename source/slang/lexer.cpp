@@ -1325,7 +1325,7 @@ namespace Slang
         for(;;)
         {
             Token token = lexToken();
-            tokenList.mTokens.Add(token);
+            tokenList.mTokens.add(token);
 
             if(token.type == TokenType::EndOfFile)
                 return tokenList;

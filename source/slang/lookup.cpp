@@ -56,7 +56,7 @@ void buildMemberDictionary(ContainerDecl* decl)
         {
             TransparentMemberInfo info;
             info.decl = m.Ptr();
-            decl->transparentMembers.Add(info);
+            decl->transparentMembers.add(info);
         }
 
         // Ignore members with no name
@@ -121,13 +121,13 @@ void AddToLookupResult(
     else if (!result.isOverloaded())
     {
         // We are about to make this overloaded
-        result.items.Add(result.item);
-        result.items.Add(item);
+        result.items.add(result.item);
+        result.items.add(item);
     }
     else
     {
         // The result was already overloaded, so we pile on
-        result.items.Add(item);
+        result.items.add(item);
     }
 }
 

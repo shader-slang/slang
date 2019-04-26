@@ -30,7 +30,7 @@ static void freeListUnitTest()
         {
             int* ptr = (int*)freeList.allocate();
             *ptr = i;
-            allocs.Add(ptr);
+            allocs.add(ptr);
         }
 
         int numDealloc = randGen.nextInt32UpTo(19);

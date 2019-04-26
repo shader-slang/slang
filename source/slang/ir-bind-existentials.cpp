@@ -285,7 +285,7 @@ struct BindExistentialSlots
         UInt slotOperandCount = slotCount*2;
         List<IRInst*> slotOperands;
         for(UInt ii = 0; ii < slotOperandCount; ++ii)
-            slotOperands.Add(slotArgs[ii].get());
+            slotOperands.add(slotArgs[ii].get());
 
         // We are going to create a proxy type that represents
         // the results of plugging all the information
@@ -315,7 +315,7 @@ struct BindExistentialSlots
         //
         List<IRUse*> usesToReplace;
         for(auto use = inst->firstUse; use; use = use->nextUse )
-            usesToReplace.Add(use);
+            usesToReplace.add(use);
 
         // Now we can loop over our list of uses and replace each.
         //

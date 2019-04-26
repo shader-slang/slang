@@ -52,7 +52,7 @@ namespace Slang
             wchar_t nextNextChar = (pos < (int)str.Length() - 2) ? str[pos + 2] : '\0';
             auto InsertToken = [&](TokenType type, const String & ct)
             {
-                tokens.Add(Token(type, ct, line, col + pos, pos + startPos, fileName, tokenFlags));
+                tokens.add(Token(type, ct, line, col + pos, pos + startPos, fileName, tokenFlags));
                 tokenFlags = 0;
             };
             switch (curChar)
@@ -335,7 +335,7 @@ namespace Slang
         auto InsertToken = [&](TokenType type)
         {
             derivative = LexDerivative::None;
-            tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file, tokenFlags));
+            tokenList.add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file, tokenFlags));
             tokenFlags = 0;
             tokenBuilder.Clear();
         };

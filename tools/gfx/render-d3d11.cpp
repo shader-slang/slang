@@ -1813,7 +1813,7 @@ Result D3D11Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
             rangeInfo.arrayIndex = counts[typeIndex];
             counts[typeIndex] += rangeDesc.count;
         }
-        descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+        descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
     }
 
     for(int ii = 0; ii < int(D3D11DescriptorSlotType::CountOf); ++ii)
@@ -1845,7 +1845,7 @@ Result D3D11Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
             counts[jj] += setInfo.layout->m_counts[jj];
         }
 
-        pipelineLayoutImpl->m_descriptorSets.Add(setInfo);
+        pipelineLayoutImpl->m_descriptorSets.add(setInfo);
     }
 
     pipelineLayoutImpl->m_uavCount = UINT(counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);

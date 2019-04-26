@@ -32,7 +32,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
         }
 
         // Add to output
-        slicesOut.Add(UnownedStringSlice(start, cur));
+        slicesOut.add(UnownedStringSlice(start, cur));
 
         // Skip the split character, if at end we are okay anyway
         start = cur + 1;

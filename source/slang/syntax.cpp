@@ -299,7 +299,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto substitutions = new GenericSubstitution();
         substitutions->genericDecl = genericDecl;
-        substitutions->args.Add(valueType);
+        substitutions->args.add(valueType);
 
         auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
         auto rsType = DeclRefType::Create(
@@ -1074,7 +1074,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.Add(pp->SubstituteImpl(subst, &diff).as<Type>());
+            substParamTypes.add(pp->SubstituteImpl(subst, &diff).as<Type>());
         }
 
         // early exit for no change...
@@ -1098,7 +1098,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> canParamTypes;
         for( auto pp : paramTypes )
         {
-            canParamTypes.Add(pp->GetCanonicalType());
+            canParamTypes.add(pp->GetCanonicalType());
         }
 
         RefPtr<FuncType> canType = new FuncType();
@@ -1256,8 +1256,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto substitutions = new GenericSubstitution();
         substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.Add(elementType);
-        substitutions->args.Add(elementCount);
+        substitutions->args.add(elementType);
+        substitutions->args.add(elementCount);
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
@@ -1348,7 +1348,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Val>> substArgs;
         for (auto a : args)
         {
-            substArgs.Add(a->SubstituteImpl(substSet, &diff));
+            substArgs.add(a->SubstituteImpl(substSet, &diff));
         }
 
         if (!diff) return this;
@@ -1447,7 +1447,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             substConstraintArg.decl = constraintArg.decl;
             substConstraintArg.val = constraintArg.val->SubstituteImpl(substSet, &diff);
 
-            substConstraintArgs.Add(substConstraintArg);
+            substConstraintArgs.add(substConstraintArg);
         }
 
         if(!diff)
@@ -2139,7 +2139,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     paramType = session->getOutType(paramType);
                 }
             }
-            funcType->paramTypes.Add(paramType);
+            funcType->paramTypes.add(paramType);
         }
 
         return funcType;
@@ -2613,7 +2613,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         for( auto caseType : caseTypes )
         {
             auto canCaseType = caseType->GetCanonicalType();
-            canType->caseTypes.Add(canCaseType);
+            canType->caseTypes.add(canCaseType);
         }
 
         return canType;
@@ -2626,7 +2626,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.Add(caseType->SubstituteImpl(subst, &diff).as<Type>());
+            substCaseTypes.add(caseType->SubstituteImpl(subst, &diff).as<Type>());
         }
         if(!diff)
             return this;
@@ -2698,7 +2698,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )
     {
-        substCaseWitnesses.Add(caseWitness->SubstituteImpl(subst, &diff));
+        substCaseWitnesses.add(caseWitness->SubstituteImpl(subst, &diff));
     }
 
     if(!diff)

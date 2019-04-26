@@ -72,7 +72,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         char const* arg = *argCursor++;
         if( arg[0] != '-' )
         {
-            positionalArgs.Add(arg);
+            positionalArgs.add(arg);
             continue;
         }
 
@@ -80,7 +80,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             while(argCursor != argEnd)
             {
-                positionalArgs.Add(*argCursor++);
+                positionalArgs.add(*argCursor++);
             }
             break;
         }
@@ -116,7 +116,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
 
             for (const auto& value : values)
             {
-                gOptions.renderFeatures.Add(value);
+                gOptions.renderFeatures.add(value);
             }
         }
         else if( strcmp(arg, "-xslang") == 0 )

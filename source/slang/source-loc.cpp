@@ -69,7 +69,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Calculate the offset
     const int offset = m_range.getOffset(directiveLoc);
@@ -88,7 +88,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     // Taking both into account means +2 is correct 'fix'
     entry.m_lineAdjust = line - (lineIndex + 2);
 
-    m_entries.Add(entry);
+    m_entries.add(entry);
 }
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
@@ -101,10 +101,10 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getSize() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
-    if (m_entries.getSize() == 0 || (m_entries.getSize() && m_entries.Last().isDefault()))
+    if (m_entries.getSize() == 0 || (m_entries.getSize() && m_entries.getLast().isDefault()))
     {
         return;
     }
@@ -116,7 +116,7 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 
     SLANG_ASSERT(entry.isDefault());
 
-    m_entries.Add(entry);
+    m_entries.add(entry);
 }
 
 HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
@@ -219,7 +219,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
         char const* cursor = begin;
 
         // Treat the beginning of the file as a line break
-        m_lineBreakOffsets.Add(0);
+        m_lineBreakOffsets.add(0);
 
         while (cursor != end)
         {
@@ -238,7 +238,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
                     if ((c^d) == ('\r' ^ '\n'))
                         cursor++;
 
-                    m_lineBreakOffsets.Add(uint32_t(cursor - begin));
+                    m_lineBreakOffsets.add(uint32_t(cursor - begin));
                     break;
                 }
                 default:
@@ -416,14 +416,14 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, contentSize);
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
     return sourceFile;
 }
 
 SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.Length());
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
     sourceFile->setContents(contents);
     return sourceFile;
 }
@@ -431,7 +431,7 @@ SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, 
 SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, blob->getBufferSize());
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
     sourceFile->setContents(blob);
     return sourceFile;
 }
@@ -451,7 +451,7 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
         sourceView = new SourceView(sourceFile, range, nullptr);
     }
 
-    m_sourceViews.Add(sourceView);
+    m_sourceViews.add(sourceView);
 
     return sourceView;
 }

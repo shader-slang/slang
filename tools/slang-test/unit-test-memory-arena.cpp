@@ -117,15 +117,15 @@ static void memoryArenaUnitTest()
 
         List<void*> blocks;
 
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
-        blocks.Add(arena.allocate(100));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
 
         arena.deallocateAll();
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
 
         arena.reset();
 
@@ -248,7 +248,7 @@ static void memoryArenaUnitTest()
                     block.m_size = sizeInBytes;
                     block.m_value = value;
 
-                    blocks.Add(block);
+                    blocks.add(block);
                 }
 
                 // Check the blocks

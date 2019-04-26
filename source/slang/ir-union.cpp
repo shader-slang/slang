@@ -230,7 +230,7 @@ struct DesugarUnionTypesContext
                 // list for later removal.
                 //
                 inst->replaceUsesWith(replacement);
-                instsToRemove.Add(inst);
+                instsToRemove.add(inst);
             }
             break;
 
@@ -321,7 +321,7 @@ struct DesugarUnionTypesContext
                 // this instruction, and schedule the original instruction for removal.
                 //
                 inst->replaceUsesWith(payloadVal);
-                instsToRemove.Add(inst);
+                instsToRemove.add(inst);
             }
             break;
         }
@@ -403,7 +403,7 @@ struct DesugarUnionTypesContext
                     fieldType,
                     fieldTypeLayout,
                     fieldOffset);
-                fieldVals.Add(fieldVal);
+                fieldVals.add(fieldVal);
             }
 
             // The final value is then just a new struct constructed from
@@ -447,7 +447,7 @@ struct DesugarUnionTypesContext
                     elementType,
                     elementTypeLayout,
                     payloadOffset + ii*elementSize);
-                elementVals.Add(elementVal);
+                elementVals.add(elementVal);
             }
             return builder->emitMakeVector(vecType, elementVals);
         }
@@ -625,7 +625,7 @@ struct DesugarUnionTypesContext
         //
         auto info = createTaggedUnionInfo(type);
         mapIRTypeToTaggedUnionInfo.Add(type, info.Ptr());
-        taggedUnionInfos.Add(info);
+        taggedUnionInfos.add(info);
 
         return info;
     }

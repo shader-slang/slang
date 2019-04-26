@@ -6769,7 +6769,7 @@ struct EmitVisitor
         }
 
         ctx->mapInstToLevel[inst] = requiredLevel;
-        ctx->actions->Add(action);
+        ctx->actions->add(action);
     }
 
     void computeIREmitActions(

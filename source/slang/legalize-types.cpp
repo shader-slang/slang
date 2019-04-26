@@ -363,7 +363,7 @@ struct TupleTypeBuilder
                 SLANG_UNEXPECTED("unexpected ordinary field type");
             }
         }
-        ordinaryElements.Add(ordinaryElement);
+        ordinaryElements.add(ordinaryElement);
 
         if (specialType.flavor != LegalType::Flavor::none)
         {
@@ -374,11 +374,11 @@ struct TupleTypeBuilder
             TuplePseudoType::Element specialElement;
             specialElement.key = fieldKey;
             specialElement.type = specialType;
-            specialElements.Add(specialElement);
+            specialElements.add(specialElement);
         }
 
         pairElement.type = LegalType::pair(ordinaryType, specialType, elementPairInfo);
-        pairElements.Add(pairElement);
+        pairElements.add(pairElement);
     }
 
     // Add a field to the (pseudo-)type we are building
@@ -452,7 +452,7 @@ struct TupleTypeBuilder
             // collide.
             //
             // (Also, the original type wasn't legal - that was the whole point...)
-            context->replacedInstructions.Add(originalStructType);
+            context->replacedInstructions.add(originalStructType);
 
             for(auto ee : ordinaryElements)
             {
@@ -681,7 +681,7 @@ LegalType createLegalUniformBufferTypeForResources(
                 newElement.key = ee.key;
                 newElement.type = LegalType::implicitDeref(ee.type);
 
-                bufferPseudoTupleType->elements.Add(newElement);
+                bufferPseudoTupleType->elements.add(newElement);
             }
 
             return LegalType::tuple(bufferPseudoTupleType);
@@ -808,7 +808,7 @@ LegalElementWrapping declareStructFields(
                 TupleLegalElementWrappingObj::Element element;
                 element.key = ee.key;
                 element.field = declareStructFields(context, structType, ee.type);
-                obj->elements.Add(element);
+                obj->elements.add(element);
             }
             return LegalElementWrapping::makeTuple(obj);
         }
@@ -952,7 +952,7 @@ static LegalType createLegalPtrType(
                     op,
                     ee.type);
 
-                ptrPseudoTupleType->elements.Add(newElement);
+                ptrPseudoTupleType->elements.add(newElement);
             }
 
             return LegalType::tuple(ptrPseudoTupleType);
@@ -1072,7 +1072,7 @@ static LegalType wrapLegalType(
                     ordinaryWrapper,
                     specialWrapper);
 
-                resultTupleType->elements.Add(element);
+                resultTupleType->elements.add(element);
             }
 
             return LegalType::tuple(resultTupleType);

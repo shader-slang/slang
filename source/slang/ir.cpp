@@ -275,7 +275,7 @@ namespace Slang
                 List<IRInst*> existentialArgs;
                 for( UInt ii = 0; ii < existentialArgCount; ++ii )
                 {
-                    existentialArgs.Add(bindExistentials->getExistentialArg(ii));
+                    existentialArgs.add(bindExistentials->getExistentialArg(ii));
                 }
                 return builder->getBindExistentialsType(
                     baseElementType,
@@ -1862,7 +1862,7 @@ namespace Slang
         List<IRInst*> slotArgs;
         for( UInt ii = 0; ii < slotArgCount; ++ii )
         {
-            slotArgs.Add(slotArgUses[ii].get());
+            slotArgs.add(slotArgUses[ii].get());
         }
         return getBindExistentialsType(
             baseType,

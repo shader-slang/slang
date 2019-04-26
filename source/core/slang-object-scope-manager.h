@@ -1,4 +1,4 @@
-﻿#ifndef SLANG_OBJECT_SCOPE_MANAGER_H
+#ifndef SLANG_OBJECT_SCOPE_MANAGER_H
 #define SLANG_OBJECT_SCOPE_MANAGER_H
 
 #include "smart-pointer.h"
@@ -48,7 +48,7 @@ RefObject* ObjectScopeManager::addMaybeNull(RefObject* obj)
     if (obj)
     {
         obj->addReference();
-        m_objs.Add(obj);
+        m_objs.add(obj);
     }
     return obj;
 }
@@ -58,7 +58,7 @@ RefObject* ObjectScopeManager::add(RefObject* obj)
 {
     SLANG_ASSERT(obj);
     obj->addReference();
-    m_objs.Add(obj);
+    m_objs.add(obj);
     return obj;
 }
 

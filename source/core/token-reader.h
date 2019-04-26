@@ -241,7 +241,7 @@ namespace Slang
             {
                 auto str = sb.ToString();
                 if (str.Length() != 0)
-                    result.Add(str);
+                    result.add(str);
                 sb.Clear();
             }
             else
@@ -249,7 +249,7 @@ namespace Slang
         }
         auto lastStr = sb.ToString();
         if (lastStr.Length())
-            result.Add(lastStr);
+            result.add(lastStr);
         return result;
     }
 }

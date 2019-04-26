@@ -220,7 +220,7 @@ static TestResult _gatherTestOptions(
                     }
                     
 
-                    outOptions.categories.Add(category);
+                    outOptions.categories.add(category);
 
                     if( *categoryEnd == ',' )
                     {
@@ -242,7 +242,7 @@ static TestResult _gatherTestOptions(
     // If no categories were specified, then add the default category
     if(outOptions.categories.getSize() == 0)
     {
-        outOptions.categories.Add(categorySet->defaultCategory);
+        outOptions.categories.add(categorySet->defaultCategory);
     }
 
     if(*cursor == ':')
@@ -319,7 +319,7 @@ static TestResult _gatherTestOptions(
         char const* argEnd = cursor;
         assert(argBegin != argEnd);
 
-        outOptions.args.Add(getString(argBegin, argEnd));
+        outOptions.args.add(getString(argBegin, argEnd));
     }
 }
 
@@ -361,7 +361,7 @@ TestResult gatherTestsForFile(
             if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
 
-            testList->tests.Add(testDetails);
+            testList->tests.add(testDetails);
         }
         else if (match(&cursor, "//DIAGNOSTIC_TEST"))
         {
@@ -372,7 +372,7 @@ TestResult gatherTestsForFile(
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            testList->tests.Add(testDetails);
+            testList->tests.add(testDetails);
         }
         else
         {
@@ -452,10 +452,10 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         }
 
         List<const char*> args;
-        args.Add(exeName.Buffer());
+        args.add(exeName.Buffer());
         for (int i = 0; i < int(spawner.argumentList_.getSize()); ++i)
         {
-            args.Add(spawner.argumentList_[i].Buffer());
+            args.add(spawner.argumentList_[i].Buffer());
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getSize()), args.begin());
@@ -1997,7 +1997,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         builder << "-";
         builder << RenderApiUtil::getApiName(synthRenderApiType);
 
-        synthOptions.args.Add(builder);
+        synthOptions.args.add(builder);
 
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
@@ -2017,7 +2017,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // It does set the explicit render target
         SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == synthRenderApiType);
         // Add to the tests
-        ioSynthTests.Add(synthTestDetails);
+        ioSynthTests.add(synthTestDetails);
     }
 }
 
@@ -2406,7 +2406,7 @@ SlangResult innerMain(int argc, char** argv)
                 filePath << "unit-tests/" << cur->m_name << ".internal";
 
                 TestOptions testOptions;
-                testOptions.categories.Add(unitTestCatagory);
+                testOptions.categories.add(unitTestCatagory);
                 testOptions.command = filePath;
 
                 if (shouldRunTest(&context, testOptions.command))

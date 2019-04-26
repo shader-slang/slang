@@ -223,7 +223,7 @@ void OSProcessSpawner::pushArgument(
     commandLine_.Append(" ");
     commandLine_.Append(argument);
 
-    argumentList_.Add(argument);
+    argumentList_.add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -482,7 +482,7 @@ void OSProcessSpawner::pushExecutableName(
     Slang::String executableName)
 {
     executableName_ = executableName;
-    arguments_.Add(executableName);
+    arguments_.add(executableName);
     isExecutablePath_ = false;
 }
 
@@ -490,15 +490,15 @@ void OSProcessSpawner::pushExecutablePath(
     Slang::String executablePath)
 {
     executableName_ = executablePath;
-    arguments_.Add(executablePath);
+    arguments_.add(executablePath);
     isExecutablePath_ = true;
 }
 
 void OSProcessSpawner::pushArgument(
     Slang::String argument)
 {
-    arguments_.Add(argument);
-    argumentList_.Add(argument);
+    arguments_.add(argument);
+    argumentList_.add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -519,9 +519,9 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
     List<char const*> argPtrs;
     for(auto arg : arguments_)
     {
-        argPtrs.Add(arg.Buffer());
+        argPtrs.add(arg.Buffer());
     }
-    argPtrs.Add(NULL);
+    argPtrs.add(NULL);
 
     int stdoutPipe[2];
     int stderrPipe[2];

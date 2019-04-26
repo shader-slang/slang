@@ -221,7 +221,7 @@ namespace Slang
                 {
                     if( auto taggedUnionType = as<TaggedUnionType>(arg) )
                     {
-                        m_taggedUnionTypes.Add(taggedUnionType);
+                        m_taggedUnionTypes.add(taggedUnionType);
                     }
                 }
             }
@@ -706,17 +706,17 @@ namespace Slang
                 D3D_SHADER_MACRO dxMacro;
                 dxMacro.Name = define.Key.Buffer();
                 dxMacro.Definition = define.Value.Buffer();
-                dxMacrosStorage.Add(dxMacro);
+                dxMacrosStorage.add(dxMacro);
             }
             for( auto& define : translationUnit->preprocessorDefinitions )
             {
                 D3D_SHADER_MACRO dxMacro;
                 dxMacro.Name = define.Key.Buffer();
                 dxMacro.Definition = define.Value.Buffer();
-                dxMacrosStorage.Add(dxMacro);
+                dxMacrosStorage.add(dxMacro);
             }
             D3D_SHADER_MACRO nullTerminator = { 0, 0 };
-            dxMacrosStorage.Add(nullTerminator);
+            dxMacrosStorage.add(nullTerminator);
 
             dxMacros = dxMacrosStorage.Buffer();
         }

@@ -638,7 +638,7 @@ static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>
     char const* cursor = begin;
 
     // Treat the beginning of the file as a line break
-    outLineStarts.Add(cursor);
+    outLineStarts.add(cursor);
 
     while (cursor != end)
     {
@@ -657,7 +657,7 @@ static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>
             if ((c^d) == ('\r' ^ '\n'))
                 cursor++;
 
-            outLineStarts.Add(cursor);
+            outLineStarts.add(cursor);
             break;
         }
         default:
@@ -864,7 +864,7 @@ int main(
         // Copy the input paths
         for (; argCursor != argEnd; ++argCursor)
         {
-            inputPaths.Add(*argCursor);
+            inputPaths.add(*argCursor);
         }
     }
 
@@ -881,7 +881,7 @@ int main(
         SourceFile* sourceFile = parseSourceFile(inputPath);
         if (sourceFile)
         {
-            gSourceFiles.Add(sourceFile);
+            gSourceFiles.add(sourceFile);
         }
     }
 

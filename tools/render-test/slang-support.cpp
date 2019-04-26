@@ -95,7 +95,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
     Slang::List<const char*> rawGlobalTypeNames;
     for (auto typeName : request.globalGenericTypeArguments)
-        rawGlobalTypeNames.Add(typeName.Buffer());
+        rawGlobalTypeNames.add(typeName.Buffer());
     spSetGlobalGenericArgs(
         slangRequest,
         (int)rawGlobalTypeNames.getSize(),
@@ -103,7 +103,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
     Slang::List<const char*> rawEntryPointTypeNames;
     for (auto typeName : request.entryPointGenericTypeArguments)
-        rawEntryPointTypeNames.Add(typeName.Buffer());
+        rawEntryPointTypeNames.add(typeName.Buffer());
 
     const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.getSize());
     for(int ii = 0; ii < globalExistentialTypeCount; ++ii )

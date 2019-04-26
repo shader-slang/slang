@@ -188,7 +188,7 @@ struct OptionsParser
         rawTranslationUnit.translationUnitID = translationUnitID;
         rawTranslationUnit.impliedStage = impliedStage;
 
-        rawTranslationUnits.Add(rawTranslationUnit);
+        rawTranslationUnits.add(rawTranslationUnit);
 
         return int(translationUnitIndex);
     }
@@ -329,7 +329,7 @@ struct OptionsParser
         RawOutput rawOutput;
         rawOutput.path = path;
         rawOutput.impliedFormat = impliedFormat;
-        rawOutputs.Add(rawOutput);
+        rawOutputs.add(rawOutput);
     }
 
     void addOutputPath(char const* inPath)
@@ -510,7 +510,7 @@ struct OptionsParser
                     RawTarget rawTarget;
                     rawTarget.format = CodeGenTarget(format);
 
-                    rawTargets.Add(rawTarget);
+                    rawTargets.add(rawTarget);
                 }
                 // A "profile" can specify both a general capability level for
                 // a target, and also (as a legacy/compatibility feature) a
@@ -566,7 +566,7 @@ struct OptionsParser
                     rawEntryPoint.name = name;
                     rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
-                    rawEntryPoints.Add(rawEntryPoint);
+                    rawEntryPoints.add(rawEntryPoint);
                 }
                 else if (argStr == "-pass-through")
                 {
@@ -816,7 +816,7 @@ struct OptionsParser
             RawEntryPoint entry;
             entry.name = "main";
             entry.translationUnitIndex = 0;
-            rawEntryPoints.Add(entry);
+            rawEntryPoints.add(entry);
         }
 
         // If the user (manually or implicitly) specified only a single entry point,
@@ -1004,7 +1004,7 @@ struct OptionsParser
 
                     RawTarget rawTarget;
                     rawTarget.format = impliedFormat;
-                    rawTargets.Add(rawTarget);
+                    rawTargets.add(rawTarget);
 
                     mapFormatToTargetIndex[impliedFormat] = targetIndex;
                 }
@@ -1085,7 +1085,7 @@ struct OptionsParser
             {
                 RawTarget rawTarget;
                 rawTarget.format = inferredFormat;
-                rawTargets.Add(rawTarget);
+                rawTargets.add(rawTarget);
             }
         }
 

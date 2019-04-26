@@ -75,7 +75,7 @@ Session::Session()
     auto baseModuleDecl = populateBaseLanguageModule(
         this,
         baseLanguageScope);
-    loadedModuleCode.Add(baseModuleDecl);
+    loadedModuleCode.add(baseModuleDecl);
 
     coreLanguageScope = new Scope();
     coreLanguageScope->nextSibling = baseLanguageScope;
@@ -422,7 +422,7 @@ SourceManager* TranslationUnitRequest::getSourceManager()
 
 void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
 {
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
 
     // We want to record that the compiled module has a dependency
     // on the path of the source file, but we also need to account
@@ -549,7 +549,7 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
     //
     List<RefPtr<Scope>> scopesToTry;
     for(auto module : getModuleDependencies())
-        scopesToTry.Add(module->getModuleDecl()->scope);
+        scopesToTry.add(module->getModuleDecl()->scope);
 
     auto linkage = getLinkage();
     for(auto& s : scopesToTry)
@@ -946,7 +946,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
 
     translationUnit->moduleName = moduleName;
 
-    translationUnits.Add(translationUnit);
+    translationUnits.add(translationUnit);
 
     return (int) result;
 }
@@ -1037,7 +1037,7 @@ int FrontEndCompileRequest::addEntryPoint(
         getNamePool()->getName(name),
         entryPointProfile);
 
-    m_entryPointReqs.Add(entryPointReq);
+    m_entryPointReqs.add(entryPointReq);
 //    translationUnitReq->entryPoints.Add(entryPointReq);
 
     return int(result);
@@ -1053,10 +1053,10 @@ int EndToEndCompileRequest::addEntryPoint(
 
     EntryPointInfo entryPointInfo;
     for (auto typeName : genericTypeNames)
-        entryPointInfo.genericArgStrings.Add(typeName);
+        entryPointInfo.genericArgStrings.add(typeName);
 
     UInt result = entryPoints.getSize();
-    entryPoints.Add(_Move(entryPointInfo));
+    entryPoints.add(_Move(entryPointInfo));
     return (int) result;
 }
 
@@ -1068,7 +1068,7 @@ UInt Linkage::addTarget(
     targetReq->target = target;
 
     UInt result = targets.getSize();
-    targets.Add(targetReq);
+    targets.add(targetReq);
     return (int) result;
 }
 
@@ -1107,7 +1107,7 @@ void Linkage::loadParsedModule(
         SLANG_ASSERT(errorCountAfter == 0);
         loadedModule->setIRModule(generateIRForTranslationUnit(translationUnit));
     }
-    loadedModulesList.Add(loadedModule);
+    loadedModulesList.add(loadedModule);
 }
 
 Module* Linkage::loadModule(String const& name)
@@ -1314,7 +1314,7 @@ void ModuleDependencyList::_addDependency(Module* module)
     if(m_moduleSet.Contains(module))
         return;
 
-    m_moduleList.Add(module);
+    m_moduleList.add(module);
     m_moduleSet.Add(module);
 }
 
@@ -1327,7 +1327,7 @@ void FilePathDependencyList::addDependency(String const& path)
     if(m_filePathSet.Contains(path))
         return;
 
-    m_filePathList.Add(path);
+    m_filePathList.add(path);
     m_filePathSet.Add(path);
 }
 
@@ -1381,7 +1381,7 @@ void Program::addReferencedLeafModule(Module* module)
 
 void Program::addEntryPoint(EntryPoint* entryPoint)
 {
-    m_entryPoints.Add(entryPoint);
+    m_entryPoints.add(entryPoint);
 
     for(auto module : entryPoint->getModuleDependencies())
     {
@@ -1556,7 +1556,7 @@ void Session::addBuiltinSource(
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    loadedModuleCode.Add(syntax);
+    loadedModuleCode.add(syntax);
 }
 
 Session::~Session()
@@ -1912,7 +1912,7 @@ SLANG_API void spAddSearchPath(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->searchDirectories.searchDirectories.Add(Slang::SearchDirectory(path));
+    linkage->searchDirectories.searchDirectories.add(Slang::SearchDirectory(path));
 }
 
 SLANG_API void spAddPreprocessorDefine(
@@ -2098,7 +2098,7 @@ SLANG_API int spAddEntryPointEx(
     if (Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getSize()) return -1;
     Slang::List<Slang::String> typeNames;
     for (int i = 0; i < genericParamTypeNameCount; i++)
-        typeNames.Add(genericParamTypeNames[i]);
+        typeNames.add(genericParamTypeNames[i]);
     return req->addEntryPoint(
         translationUnitIndex,
         name,
@@ -2117,7 +2117,7 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     auto& genericArgStrings = req->globalGenericArgStrings;
     genericArgStrings.Clear();
     for (int i = 0; i < genericArgCount; i++)
-        genericArgStrings.Add(genericArgs[i]);
+        genericArgStrings.add(genericArgs[i]);
 
     return SLANG_OK;
 }

@@ -698,7 +698,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 element.val = fieldVal;
                 element.key = field->getKey();
 
-                tupleValImpl->elements.Add(element);
+                tupleValImpl->elements.add(element);
             }
         }
 
@@ -944,7 +944,7 @@ ScalarizedVal getSubscriptVal(
                     inputElement.val,
                     indexVal);
 
-                resultTuple->elements.Add(resultElement);
+                resultTuple->elements.add(resultElement);
             }
             SLANG_RELEASE_ASSERT(elementCounter == elementCount);
 
@@ -1009,7 +1009,7 @@ IRInst* materializeTupleValue(
                 builder,
                 arrayElementPseudoVal);
 
-            arrayElementVals.Add(arrayElementVal);
+            arrayElementVals.add(arrayElementVal);
         }
 
         return builder->emitMakeArray(
@@ -1029,7 +1029,7 @@ IRInst* materializeTupleValue(
         for( UInt ee = 0; ee < elementCount; ++ee )
         {
             auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
-            elementVals.Add(elementVal);
+            elementVals.add(elementVal);
         }
 
         return builder->emitConstructorInst(

@@ -161,7 +161,7 @@ struct UsedRanges
                 prefix.begin = range.begin;
                 prefix.end = existingRange.begin;
                 prefix.parameter = range.parameter;
-                ranges.Add(prefix);
+                ranges.add(prefix);
             }
             //
             // Now we know that the interval `[range.begin, existingRange.begin)`
@@ -195,7 +195,7 @@ struct UsedRanges
         //
         if(range.begin < range.end)
         {
-            ranges.Add(range);
+            ranges.add(range);
         }
 
         // Any ranges that got added along the way might not
@@ -672,7 +672,7 @@ static void collectGlobalGenericParameter(
     RefPtr<GenericParamLayout> layout = new GenericParamLayout();
     layout->decl = paramDecl;
     layout->index = (int)context->shared->programLayout->globalGenericParams.getSize();
-    context->shared->programLayout->globalGenericParams.Add(layout);
+    context->shared->programLayout->globalGenericParams.add(layout);
     context->shared->programLayout->globalGenericParamsMap[layout->decl->getName()->text] = layout.Ptr();
 }
 
@@ -716,10 +716,10 @@ static void collectGlobalScopeParameter(
     // TODO: `ParameterInfo` should probably become `LayoutParamInfo`.
     //
     ParameterInfo* parameterInfo = new ParameterInfo();
-    context->shared->parameters.Add(parameterInfo);
+    context->shared->parameters.add(parameterInfo);
 
     // Add the first variable declaration to the list of declarations for the parameter
-    parameterInfo->varLayouts.Add(varLayout);
+    parameterInfo->varLayouts.add(varLayout);
 
     // Add any additional variables to the list of declarations
     for( auto additionalVarDeclRef : shaderParamInfo.additionalParamDeclRefs )
@@ -739,7 +739,7 @@ static void collectGlobalScopeParameter(
         additionalVarLayout->typeLayout = typeLayout;
         additionalVarLayout->varDecl = additionalVarDeclRef;
 
-        parameterInfo->varLayouts.Add(additionalVarLayout);
+        parameterInfo->varLayouts.add(additionalVarLayout);
     }
 }
 
@@ -1247,7 +1247,7 @@ static void completeBindingsForParameter(
     // "match".
 
     SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
-    auto firstVarLayout = parameterInfo->varLayouts.First();
+    auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
     completeBindingsForParameterImpl(
         context,
@@ -1720,7 +1720,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     }
                 }
 
-                structLayout->fields.Add(fieldVarLayout);
+                structLayout->fields.add(fieldVarLayout);
                 structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
             }
 
@@ -1883,7 +1883,7 @@ struct ScopeLayoutBuilder
             }
         }
 
-        m_structLayout->fields.Add(firstVarLayout);
+        m_structLayout->fields.add(firstVarLayout);
 
         if( parameterInfo )
         {
@@ -1935,7 +1935,7 @@ struct ScopeLayoutBuilder
         ParameterInfo* parameterInfo)
     {
         SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.First();
+        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         _addParameter(firstVarLayout, parameterInfo);
     }
@@ -2024,7 +2024,7 @@ static void collectEntryPointParameters(
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
     //
-    context->shared->programLayout->entryPoints.Add(entryPointLayout);
+    context->shared->programLayout->entryPoints.add(entryPointLayout);
 
     // For the duration of our parameter collection work we will
     // establish this entry point as the current one in the context.
@@ -2041,7 +2041,7 @@ static void collectEntryPointParameters(
         SLANG_ASSERT(taggedUnionType);
         auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
         auto typeLayout = createTypeLayout(context->layoutContext, substType);
-        entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
+        entryPointLayout->taggedUnionTypeLayouts.add(typeLayout);
     }
 
     // We are going to iterate over the entry-point parameters,
@@ -2338,7 +2338,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     for( auto& parameterInfo : sharedContext.parameters )
     {
         SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.First();
+        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         // Does the field have any uniform data?
         if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
@@ -2367,7 +2367,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
         for (auto& parameterInfo : sharedContext.parameters)
         {
             SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getSize() != 0);
-            auto firstVarLayout = parameterInfo->varLayouts.First();
+            auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
             // For each parameter, we will look at each resource it consumes.
             //

@@ -245,7 +245,7 @@ struct PostorderComputationContext : public DepthFirstSearchContext
 
     virtual void postVisit(IRBlock* block) SLANG_OVERRIDE
     {
-        order->Add(block);
+        order->add(block);
     }
 };
 
@@ -528,7 +528,7 @@ struct DominatorTreeComputationContext
         List<BlockInfo> blockInfos;
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
-            blockInfos.Add(BlockInfo());
+            blockInfos.add(BlockInfo());
         }
 
         // We will propagate layout information in two passes over the tree.

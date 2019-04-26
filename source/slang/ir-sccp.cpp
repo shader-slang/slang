@@ -357,7 +357,7 @@ struct SCCPContext
                 // executed. We do this by adding the target to our CFG work list.
                 //
                 auto target = unconditionalBranch->getTargetBlock();
-                cfgWorkList.Add(target);
+                cfgWorkList.add(target);
 
                 // Besides transferring control to another block, the other
                 // thing our unconditional branch instructions do is provide
@@ -408,7 +408,7 @@ struct SCCPContext
                         setLatticeVal(param, newVal);
                         for( auto use = param->firstUse; use; use = use->nextUse )
                         {
-                            ssaWorkList.Add(use->getUser());
+                            ssaWorkList.add(use->getUser());
                         }
                     }
                 }
@@ -448,7 +448,7 @@ struct SCCPContext
                         // bail out now.
                         //
                         auto target = boolConst->getValue() ? conditionalBranch->getTrueBlock() : conditionalBranch->getFalseBlock();
-                        cfgWorkList.Add(target);
+                        cfgWorkList.add(target);
                         return;
                     }
                 }
@@ -459,8 +459,8 @@ struct SCCPContext
                 // taken, so that both of the target blocks are
                 // potentially executed.
                 //
-                cfgWorkList.Add(conditionalBranch->getTrueBlock());
-                cfgWorkList.Add(conditionalBranch->getFalseBlock());
+                cfgWorkList.add(conditionalBranch->getTrueBlock());
+                cfgWorkList.add(conditionalBranch->getFalseBlock());
             }
             else if( auto switchInst = as<IRSwitch>(inst) )
             {
@@ -497,7 +497,7 @@ struct SCCPContext
                         // Whatever single block we decided will get executed,
                         // we need to make sure it gets processed and then bail.
                         //
-                        cfgWorkList.Add(target);
+                        cfgWorkList.add(target);
                         return;
                     }
                 }
@@ -507,9 +507,9 @@ struct SCCPContext
                 //
                 for( UInt cc = 0; cc < caseCount; ++cc )
                 {
-                    cfgWorkList.Add(switchInst->getCaseLabel(cc));
+                    cfgWorkList.add(switchInst->getCaseLabel(cc));
                 }
-                cfgWorkList.Add(switchInst->getDefaultLabel());
+                cfgWorkList.add(switchInst->getDefaultLabel());
             }
 
             // There are other cases of terminator instructions not handled
@@ -563,7 +563,7 @@ struct SCCPContext
         //
         for( auto use = inst->firstUse; use; use = use->nextUse )
         {
-            ssaWorkList.Add(use->getUser());
+            ssaWorkList.add(use->getUser());
         }
     }
 
@@ -584,7 +584,7 @@ struct SCCPContext
         // The entry block is always going to be executed when the
         // function gets called, so we will process it right away.
         //
-        cfgWorkList.Add(firstBlock);
+        cfgWorkList.add(firstBlock);
 
         // The parameters of the first block are our function parameters,
         // and we want to operate on the assumption that they could have
@@ -728,7 +728,7 @@ struct SCCPContext
                 inst->replaceUsesWith(constantVal);
                 if( !inst->mightHaveSideEffects() )
                 {
-                    instsToRemove.Add(inst);
+                    instsToRemove.add(inst);
                 }
             }
         }
@@ -817,7 +817,7 @@ struct SCCPContext
         {
             if( !isMarkedAsExecuted(block) )
             {
-                unreachableBlocks.Add(block);
+                unreachableBlocks.add(block);
             }
         }
         //
