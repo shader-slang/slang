@@ -94,23 +94,18 @@ namespace Slang
 		static const Int kInitialSize = 16;
 		TAllocator m_allocator;
 	private:
-		T*     m_buffer;            ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
+		T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
         UInt    m_capacity;         ///< The total capacity of elements
         UInt    m_size;             ///< The amount of elements
-		void FreeBuffer()
+		void _deallocateBuffer()
 		{
-			AllocateMethod<T, TAllocator>::Free(m_buffer, m_capacity);
-			m_buffer = 0;
+            if (m_buffer)
+            {
+			    AllocateMethod<T, TAllocator>::Free(m_buffer, m_capacity);
+			    m_buffer = nullptr;
+            }
 		}
-		void Free()
-		{
-			if (m_buffer)
-			{
-				FreeBuffer();
-			}
-			m_buffer = 0;
-			m_size = m_capacity = 0;
-		}
+		
 	public:
 		T* begin() const
 		{
@@ -137,12 +132,12 @@ namespace Slang
 		{
 			Init(val, args...);
 		}
-		List(const List<T> & list)
+		List(const List<T>& list)
 			: m_buffer(nullptr), m_size(0), m_capacity(0)
 		{
 			this->operator=(list);
 		}
-		List(List<T> && list)
+		List(List<T>&& list)
 			: m_buffer(nullptr), m_size(0), m_capacity(0)
 		{
 			this->operator=(static_cast<List<T>&&>(list));
@@ -157,19 +152,20 @@ namespace Slang
 		}
 		~List()
 		{
-			Free();
+            _deallocateBuffer();
 		}
 		List<T>& operator=(const List<T>& list)
 		{
-			Free();
+			clearAndDeallocate();
 			addRange(list);
-
 			return *this;
 		}
 
 		List<T>& operator=(List<T>&& list)
 		{
-			Free();
+            // Could just do a swap here, and memory would be freed on rhs dtor
+
+            _deallocateBuffer();
 			m_size = list.m_size;
 			m_capacity = list.m_capacity;
 			m_buffer = list.m_buffer;
@@ -210,7 +206,7 @@ namespace Slang
             m_size--;
         }
 
-		inline void SwapWith(List<T, TAllocator>& other)
+		inline void swapWith(List<T, TAllocator>& other)
 		{
 			T* buffer = m_buffer;
 			m_buffer = other.m_buffer;
@@ -319,7 +315,7 @@ namespace Slang
 						for (UInt i = id; i < m_size; i++)
 							newBuffer[i + n] = T(static_cast<T&&>(m_buffer[i]));
 					}
-					FreeBuffer();
+					_deallocateBuffer();
 				}
 				m_buffer = newBuffer;
 				m_capacity = newBufferSize;
@@ -419,6 +415,12 @@ namespace Slang
 			m_size = 0;
 		}
 
+        void clearAndDeallocate()
+        {
+            _deallocateBuffer();
+            m_size = m_capacity = 0;
+        }
+
 		void Reserve(UInt size)
 		{
 			if(size > m_capacity)
@@ -439,7 +441,7 @@ namespace Slang
                             new(newBuffer + i) T();
                         }
 					}
-					FreeBuffer();
+					_deallocateBuffer();
 				}
 				m_buffer = newBuffer;
 				m_capacity = size;
@@ -474,7 +476,8 @@ namespace Slang
 				T* newBuffer = Allocate(m_size);
 				for (UInt i = 0; i < m_size; i++)
 					newBuffer[i] = static_cast<T&&>(m_buffer[i]);
-				FreeBuffer();
+
+				_deallocateBuffer();
 				m_buffer = newBuffer;
 				m_capacity = m_size;
 			}

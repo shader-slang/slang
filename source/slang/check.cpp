@@ -6249,7 +6249,7 @@ namespace Slang
                     RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = new TaggedUnionSubtypeWitness();
                     taggedUnionWitness->sub = taggedUnionType;
                     taggedUnionWitness->sup = DeclRefType::Create(getSession(), interfaceDeclRef);
-                    taggedUnionWitness->caseWitnesses.SwapWith(caseWitnesses);
+                    taggedUnionWitness->caseWitnesses.swapWith(caseWitnesses);
 
                     *outWitness = taggedUnionWitness;
                 }

@@ -2635,7 +2635,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         RefPtr<TaggedUnionType> substType = new TaggedUnionType();
         substType->setSession(getSession());
-        substType->caseTypes.SwapWith(substCaseTypes);
+        substType->caseTypes.swapWith(substCaseTypes);
         return substType;
     }
 
@@ -2709,7 +2709,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
     RefPtr<TaggedUnionSubtypeWitness> substWitness = new TaggedUnionSubtypeWitness();
     substWitness->sub = substSub;
     substWitness->sup = substSup;
-    substWitness->caseWitnesses.SwapWith(substCaseWitnesses);
+    substWitness->caseWitnesses.swapWith(substCaseWitnesses);
     return substWitness;
 }
 
