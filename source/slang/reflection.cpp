@@ -1272,14 +1272,14 @@ SLANG_API unsigned int spReflectionTypeParameter_GetConstraintCount(SlangReflect
 {
     auto typeParam = convert(inTypeParam);
     auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
-    return (unsigned int)constraints.Count();
+    return (unsigned int)constraints.getCount();
 }
 
 SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(SlangReflectionTypeParameter * inTypeParam, unsigned index)
 {
     auto typeParam = convert(inTypeParam);
     auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
-    return (SlangReflectionType*)constraints.ToArray()[index]->sup.Ptr();
+    return (SlangReflectionType*)constraints.toArray()[index]->sup.Ptr();
 }
 
 // Shader Reflection

@@ -3611,8 +3611,8 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
 
     psoDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
 
-    psoDesc.VS = { programImpl->m_vertexShader.getBuffer(), programImpl->m_vertexShader.getCount() };
-    psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), programImpl->m_pixelShader .getCount() };
+    psoDesc.VS = { programImpl->m_vertexShader.getBuffer(), SIZE_T(programImpl->m_vertexShader.getCount()) };
+    psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), SIZE_T(programImpl->m_pixelShader .getCount()) };
 
     psoDesc.InputLayout = { inputLayoutImpl->m_elements.getBuffer(), UINT(inputLayoutImpl->m_elements.getCount()) };
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
@@ -3706,7 +3706,7 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     // Describe and create the compute pipeline state object
     D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
     computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
-    computeDesc.CS = { programImpl->m_computeShader.getBuffer(), programImpl->m_computeShader.getCount() };
+    computeDesc.CS = { programImpl->m_computeShader.getBuffer(), SIZE_T(programImpl->m_computeShader.getCount()) };
 
     ComPtr<ID3D12PipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));

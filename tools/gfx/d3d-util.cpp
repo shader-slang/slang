@@ -378,7 +378,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
 
     String descName = String::FromWString(desc.Description).ToLower();
 
-    return descName.IndexOf(lowerAdapaterName) != UInt(-1);
+    return descName.IndexOf(lowerAdapaterName) != Index(-1);
 }
 
 /* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)

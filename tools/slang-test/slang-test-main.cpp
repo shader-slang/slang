@@ -421,7 +421,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         // TODO(js): Potentially this should handle escaping parameters for the command line if need be
         const auto& argList = spawner.argumentList_;
-        for (UInt i = 0; i < argList.getCount(); ++i)
+        for (Index i = 0; i < argList.getCount(); ++i)
         {
             builder << " " << argList[i];
         }
@@ -491,7 +491,7 @@ static SlangResult _extractArg(const List<String>& args, const String& argName, 
 
 static bool _hasOption(const List<String>& args, const String& argName)
 {
-    return args.indexOf(argName) != UInt(-1);
+    return args.indexOf(argName) != Index(-1);
 }
 
 static BackendType _toBackendType(const UnownedStringSlice& slice)
@@ -1104,8 +1104,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     const auto& args = input.testOptions->args;
 
-    const UInt targetIndex = args.indexOf("-target");
-    if (targetIndex != UInt(-1) && targetIndex + 1 < args.getCount())
+    const Index targetIndex = args.indexOf("-target");
+    if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
     {
         SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
@@ -2001,8 +2001,8 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            UInt index = synthOptions.args.indexOf("-hlsl");
-            if (index != UInt(-1))
+            Index index = synthOptions.args.indexOf("-hlsl");
+            if (index != Index(-1))
             {
                 synthOptions.args.removeAt(index);
             }
@@ -2351,7 +2351,7 @@ SlangResult innerMain(int argc, char** argv)
         const auto& srcArgs = options.subCommandArgs;
         List<const char*> args;
         args.setCount(srcArgs.getCount());
-        for (UInt i = 0; i < srcArgs.getCount(); ++i)
+        for (Index i = 0; i < srcArgs.getCount(); ++i)
         {
             args[i] = srcArgs[i].Buffer();
         }

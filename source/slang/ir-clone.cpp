@@ -262,7 +262,7 @@ bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& othe
 {
     auto valCount = vals.getCount();
     if(valCount != other.vals.getCount()) return false;
-    for( UInt ii = 0; ii < valCount; ++ii )
+    for( Index ii = 0; ii < valCount; ++ii )
     {
         if(vals[ii] != other.vals[ii]) return false;
     }
@@ -273,7 +273,7 @@ int IRSimpleSpecializationKey::GetHashCode() const
 {
     auto valCount = vals.getCount();
     int hash = Slang::GetHashCode(valCount);
-    for( UInt ii = 0; ii < valCount; ++ii )
+    for( Index ii = 0; ii < valCount; ++ii )
     {
         hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
     }

@@ -1478,7 +1478,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 return false;
             if (constraintArgs.getCount() != genSubst->constraintArgs.getCount())
                 return false;
-            for (UInt i = 0; i < constraintArgs.getCount(); i++)
+            for (Index i = 0; i < constraintArgs.getCount(); i++)
             {
                 if (!constraintArgs[i].val->EqualsVal(genSubst->constraintArgs[i].val))
                     return false;
@@ -2254,8 +2254,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     if (found)
                     {
                         (*ioDiff)++;
-                        auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
-                            genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
+                        auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
+                            genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
                         SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
                         return genericSubst->args[index + ordinaryParamCount];
                     }
@@ -2587,7 +2587,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if(caseCount != taggedUnion->caseTypes.getCount())
             return false;
 
-        for( UInt ii = 0; ii < caseCount; ++ii )
+        for( Index ii = 0; ii < caseCount; ++ii )
         {
             if(!caseTypes[ii]->Equals(taggedUnion->caseTypes[ii]))
                 return false;
@@ -2654,7 +2654,7 @@ bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
     if(caseCount != taggedUnionWitness->caseWitnesses.getCount())
         return false;
 
-    for(UInt ii = 0; ii < caseCount; ++ii)
+    for(Index ii = 0; ii < caseCount; ++ii)
     {
         if(!caseWitnesses[ii]->EqualsVal(taggedUnionWitness->caseWitnesses[ii]))
             return false;

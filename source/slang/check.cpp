@@ -2896,13 +2896,13 @@ namespace Slang
                         }
                         paramIndex++;
                     }
-                    if (params.Count() < attr->args.getCount())
+                    if (params.getCount() < attr->args.getCount())
                     {
-                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), params.Count());
+                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), params.getCount());
                     }
-                    else if (params.Count() > attr->args.getCount())
+                    else if (params.getCount() > attr->args.getCount())
                     {
-                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.Count());
+                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.getCount());
                     }
                 }
                 else if (auto formatAttr = as<FormatAttribute>(attr))
@@ -3319,7 +3319,7 @@ namespace Slang
         {
             if (genDecl.getDecl()->Members.getCount() != requirementGenDecl.getDecl()->Members.getCount())
                 return false;
-            for (UInt i = 0; i < genDecl.getDecl()->Members.getCount(); i++)
+            for (Index i = 0; i < genDecl.getDecl()->Members.getCount(); i++)
             {
                 auto genMbr = genDecl.getDecl()->Members[i];
                 auto requiredGenMbr = genDecl.getDecl()->Members[i];
@@ -4358,12 +4358,12 @@ namespace Slang
 
             // For there to be any hope of a match, the
             // two need to have the same number of parameters.
-            UInt paramCount = fstParams.getCount();
+            Index paramCount = fstParams.getCount();
             if (paramCount != sndParams.getCount())
                 return false;
 
             // Now we'll walk through the parameters.
-            for (UInt pp = 0; pp < paramCount; ++pp)
+            for (Index pp = 0; pp < paramCount; ++pp)
             {
                 Decl* fstParam = fstParams[pp];
                 Decl* sndParam = sndParams[pp];
@@ -4416,11 +4416,11 @@ namespace Slang
             //
             // For now I'm going to assume/require that all declarations must
             // declare the signature in a way that matches exactly.
-            UInt constraintCount = fstConstraints.getCount();
+            Index constraintCount = fstConstraints.getCount();
             if(constraintCount != sndConstraints.getCount())
                 return false;
 
-            for (UInt cc = 0; cc < constraintCount; ++cc)
+            for (Index cc = 0; cc < constraintCount; ++cc)
             {
                 //auto fstConstraint = fstConstraints[cc];
                 //auto sndConstraint = sndConstraints[cc];
@@ -4453,7 +4453,7 @@ namespace Slang
             if (fstParamCount != sndParamCount)
                 return false;
 
-            for (UInt ii = 0; ii < fstParamCount; ++ii)
+            for (Index ii = 0; ii < fstParamCount; ++ii)
             {
                 auto fstParam = fstParams[ii];
                 auto sndParam = sndParams[ii];
@@ -5602,9 +5602,9 @@ namespace Slang
 
         bool MatchArguments(FuncDecl * functionNode, List <RefPtr<Expr>> &args)
         {
-            if (functionNode->GetParameters().Count() != args.getCount())
+            if (functionNode->GetParameters().getCount() != args.getCount())
                 return false;
-            int i = 0;
+            Index i = 0;
             for (auto param : functionNode->GetParameters())
             {
                 if (!param->type.Equals(args[i]->type.Ptr()))
@@ -6933,7 +6933,7 @@ namespace Slang
             OverloadResolveContext&	context,
             OverloadCandidate&		candidate)
         {
-            UInt argCount = context.getArgCount();
+            Index argCount = context.getArgCount();
 
             List<DeclRef<ParamDecl>> params;
             switch (candidate.flavor)
@@ -6954,7 +6954,7 @@ namespace Slang
             // case where one or more parameters had defaults.
             SLANG_RELEASE_ASSERT(argCount <= params.getCount());
 
-            for (UInt ii = 0; ii < argCount; ++ii)
+            for (Index ii = 0; ii < argCount; ++ii)
             {
                 auto& arg = context.getArg(ii);
                 auto argType = context.getArgType(ii);
@@ -7296,7 +7296,7 @@ namespace Slang
                 bool anyFiltered = false;
                 // Note that we are querying the list length on every iteration,
                 // because we might remove things.
-                for (UInt cc = 0; cc < context.bestCandidates.getCount(); ++cc)
+                for (Index cc = 0; cc < context.bestCandidates.getCount(); ++cc)
                 {
                     int cmp = CompareOverloadCandidates(&candidate, &context.bestCandidates[cc]);
                     if (cmp < 0)
@@ -8735,8 +8735,8 @@ namespace Slang
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
                 if(auto funcType = as<FuncType>(invoke->FunctionExpr->type))
                 {
-                    UInt paramCount = funcType->getParamCount();
-                    for (UInt pp = 0; pp < paramCount; ++pp)
+                    Index paramCount = funcType->getParamCount();
+                    for (Index pp = 0; pp < paramCount; ++pp)
                     {
                         auto paramType = funcType->getParamType(pp);
                         if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
@@ -8945,7 +8945,7 @@ namespace Slang
 
             auto swizzleText = getText(memberRefExpr->name);
 
-            for (UInt i = 0; i < swizzleText.Length(); i++)
+            for (Index i = 0; i < swizzleText.Length(); i++)
             {
                 auto ch = swizzleText[i];
                 int elementIndex = -1;
@@ -10112,14 +10112,14 @@ static bool validateGenericSubstitutionsMatch(
 
 
 
-    UInt argCount = left->args.getCount();
+    Index argCount = left->args.getCount();
     if( argCount != right->args.getCount() )
     {
         diagnoseTypeMismatch(sink, stack);
         return false;
     }
 
-    for( UInt aa = 0; aa < argCount; ++aa )
+    for( Index aa = 0; aa < argCount; ++aa )
     {
         auto leftArg = left->args[aa];
         auto rightArg = right->args[aa];

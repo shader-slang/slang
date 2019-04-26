@@ -23,15 +23,24 @@ void printDiagnosticArg(StringBuilder& sb, char const* str)
     sb << str;
 }
 
-void printDiagnosticArg(StringBuilder& sb, int str)
+void printDiagnosticArg(StringBuilder& sb, int32_t val)
 {
-    sb << str;
+    sb << val;
 }
 
-void printDiagnosticArg(StringBuilder& sb, UInt val)
+void printDiagnosticArg(StringBuilder& sb, uint32_t val)
 {
-    // TODO: make this robust
-    sb << (int) val;
+    sb << val;
+}
+
+void printDiagnosticArg(StringBuilder& sb, int64_t val)
+{
+    sb << val;
+}
+
+void printDiagnosticArg(StringBuilder& sb, uint64_t val)
+{
+    sb << val;
 }
 
 void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)

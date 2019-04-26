@@ -432,13 +432,13 @@ namespace Slang
         return SLANG_OK;
 #   else        
         String text = Slang::File::readAllText("/proc/self/maps");
-        UInt startIndex = text.IndexOf('/');
-        if (startIndex == UInt(-1))
+        Index startIndex = text.IndexOf('/');
+        if (startIndex == Index(-1))
         {
             return SLANG_FAIL;
         }
-        UInt endIndex = text.IndexOf("\n", startIndex);
-        endIndex = (endIndex == UInt(-1)) ? text.Length() : endIndex;
+        Index endIndex = text.IndexOf("\n", startIndex);
+        endIndex = (endIndex == Index(-1)) ? text.Length() : endIndex;
 
         auto path = text.SubString(startIndex, endIndex - startIndex);
 

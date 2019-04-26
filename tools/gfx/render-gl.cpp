@@ -473,7 +473,7 @@ void GLRenderer::flushStateForDraw()
     // Next bind the descriptor sets as required by the layout
     auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
     auto descriptorSetCount = pipelineLayout->m_sets.getCount();
-    for(UInt ii = 0; ii < descriptorSetCount; ++ii)
+    for(Index ii = 0; ii < descriptorSetCount; ++ii)
     {
         auto descriptorSet = m_boundDescriptorSets[ii];
         auto descriptorSetInfo = pipelineLayout->m_sets[ii];
@@ -683,7 +683,7 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
         String lowerRenderer = String((const char*)renderer).ToLower();
 
         // The adapter is not available
-        if (lowerRenderer.IndexOf(lowerAdapter) == UInt(-1))
+        if (lowerRenderer.IndexOf(lowerAdapter) == Index(-1))
         {
             return SLANG_E_NOT_AVAILABLE;
         }

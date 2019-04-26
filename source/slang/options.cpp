@@ -181,7 +181,7 @@ struct OptionsParser
         // be broken if we decide to support a mix of translation units specified
         // via API, and ones specified via command-line arguments.
         //
-        SLANG_RELEASE_ASSERT(UInt(translationUnitID) == translationUnitIndex);
+        SLANG_RELEASE_ASSERT(Index(translationUnitID) == translationUnitIndex);
 
         RawTranslationUnit rawTranslationUnit;
         rawTranslationUnit.sourceLanguage = language;

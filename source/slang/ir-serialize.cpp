@@ -2025,7 +2025,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     {
         SLANG_ASSERT(readInsts[0] == originalInsts[0]);
         // All the source locs should be identical
-        for (UInt i = 1; i < readInsts.getCount(); ++i)
+        for (Index i = 1; i < readInsts.getCount(); ++i)
         {
             IRInst* origInst = originalInsts[i];
             IRInst* readInst = readInsts[i];
@@ -2040,7 +2040,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     else if (optionFlags & IRSerialWriter::OptionFlag::DebugInfo)
     {
         // They should be on the same line nos
-        for (UInt i = 1; i < readInsts.getCount(); ++i)
+        for (Index i = 1; i < readInsts.getCount(); ++i)
         {
             IRInst* origInst = originalInsts[i];
             IRInst* readInst = readInsts[i];

@@ -1990,7 +1990,7 @@ SLANG_API void spAddTranslationUnitSourceFile(
     auto frontEndReq = req->getFrontEndReq();
     if(!path) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
+    if(Slang::Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     frontEndReq->addTranslationUnitSourceFile(
         translationUnitIndex,
@@ -2019,19 +2019,20 @@ SLANG_API void spAddTranslationUnitSourceStringSpan(
     char const*             sourceBegin,
     char const*             sourceEnd)
 {
+    using namespace Slang;
     if(!request) return;
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBegin) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
+    if(Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
     frontEndReq->addTranslationUnitSourceString(
         translationUnitIndex,
         path,
-        Slang::UnownedStringSlice(sourceBegin, sourceEnd));
+        UnownedStringSlice(sourceBegin, sourceEnd));
 }
 
 SLANG_API void spAddTranslationUnitSourceBlob(
@@ -2045,7 +2046,7 @@ SLANG_API void spAddTranslationUnitSourceBlob(
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBlob) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
+    if(Slang::Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
@@ -2090,19 +2091,20 @@ SLANG_API int spAddEntryPointEx(
     int                     genericParamTypeNameCount,
     char const **           genericParamTypeNames)
 {
+    using namespace Slang;
     if (!request) return -1;
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     if (!name) return -1;
     if (translationUnitIndex < 0) return -1;
-    if (Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return -1;
-    Slang::List<Slang::String> typeNames;
+    if (Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return -1;
+    List<String> typeNames;
     for (int i = 0; i < genericParamTypeNameCount; i++)
         typeNames.add(genericParamTypeNames[i]);
     return req->addEntryPoint(
         translationUnitIndex,
         name,
-        Slang::Profile(Slang::Stage(stage)),
+        Profile(Stage(stage)),
         typeNames);
 }
 
@@ -2127,15 +2129,16 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
     int                     slotIndex,
     char const*             typeName)
 {
+    using namespace Slang;
     if(!request)        return SLANG_FAIL;
     if(slotIndex < 0)   return SLANG_FAIL;
     if(!typeName)       return SLANG_FAIL;
 
     auto req = convert(request);
     auto& typeArgStrings = req->globalExistentialSlotArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.getCount())
+    if(Index(slotIndex) >= typeArgStrings.getCount())
         typeArgStrings.setCount(slotIndex+1);
-    typeArgStrings[slotIndex] = Slang::String(typeName);
+    typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
 }
 
@@ -2145,20 +2148,21 @@ SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     int                     slotIndex,
     char const*             typeName)
 {
+    using namespace Slang;
     if(!request)            return SLANG_FAIL;
     if(entryPointIndex < 0) return SLANG_FAIL;
     if(slotIndex < 0)       return SLANG_FAIL;
     if(!typeName)           return SLANG_FAIL;
 
     auto req = convert(request);
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getCount())
+    if(Index(entryPointIndex) >= req->entryPoints.getCount())
         return SLANG_FAIL;
 
     auto& entryPointInfo = req->entryPoints[entryPointIndex];
     auto& typeArgStrings = entryPointInfo.existentialArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.getCount())
+    if(Index(slotIndex) >= typeArgStrings.getCount())
         typeArgStrings.setCount(slotIndex+1);
-    typeArgStrings[slotIndex] = Slang::String(typeName);
+    typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
 }
 
@@ -2264,12 +2268,13 @@ SLANG_API void const* spGetEntryPointCode(
     int                     entryPointIndex,
     size_t*                 outSize)
 {
+    using namespace Slang;
     auto req = convert(request);
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedProgram();
 
     // TODO: We should really accept a target index in this API
-    Slang::UInt targetIndex = 0;
+    Index targetIndex = 0;
     auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;
@@ -2277,29 +2282,29 @@ SLANG_API void const* spGetEntryPointCode(
 
 
     if(entryPointIndex < 0) return nullptr;
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.getCount()) return nullptr;
+    if(Index(entryPointIndex) >= req->entryPoints.getCount()) return nullptr;
     auto entryPoint = program->getEntryPoint(entryPointIndex);
 
     auto targetProgram = program->getTargetProgram(targetReq);
     if(!targetProgram)
         return nullptr;
-    Slang::CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
     void const* data = nullptr;
     size_t size = 0;
 
     switch (result.format)
     {
-    case Slang::ResultFormat::None:
+    case ResultFormat::None:
     default:
         break;
 
-    case Slang::ResultFormat::Binary:
+    case ResultFormat::Binary:
         data = result.outputBinary.getBuffer();
         size = result.outputBinary.getCount();
         break;
 
-    case Slang::ResultFormat::Text:
+    case ResultFormat::Text:
         data = result.outputString.Buffer();
         size = result.outputString.Length();
         break;
@@ -2315,6 +2320,7 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
         int                     targetIndex,
         ISlangBlob**            outBlob)
 {
+    using namespace Slang;
     if(!request) return SLANG_ERROR_INVALID_PARAMETER;
     if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
 
@@ -2322,14 +2328,14 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedProgram();
 
-    int targetCount = (int) linkage->targets.getCount();
+    Index targetCount = linkage->targets.getCount();
     if((targetIndex < 0) || (targetIndex >= targetCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
     }
     auto targetReq = linkage->targets[targetIndex];
 
-    int entryPointCount = (int) req->entryPoints.getCount();
+    Index entryPointCount = req->entryPoints.getCount();
     if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
@@ -2381,7 +2387,7 @@ SLANG_API SlangReflection* spGetReflection(
     // so that we can do this better, and make it clear that
     // `spGetReflection()` is shorthand for `targetIndex == 0`.
     //
-    Slang::UInt targetIndex = 0;
+    Slang::Index targetIndex = 0;
     auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;

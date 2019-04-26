@@ -561,7 +561,7 @@ void maybeSealBlock(
     // Note that we are doing the "inefficient" loop where we compute
     // the count on each iteration to account for the possibility that
     // new incomplete phis will get added while we are working.
-    for (UInt ii = 0; ii < blockInfo->phis.getCount(); ++ii)
+    for (Index ii = 0; ii < blockInfo->phis.getCount(); ++ii)
     {
         auto incompletePhi = blockInfo->phis[ii];
         addPhiOperands(context, blockInfo, incompletePhi);
@@ -1057,7 +1057,7 @@ void constructSSA(ConstructSSAContext* context)
         {
             newArgs.add(oldTerminator->getOperand(aa));
         }
-        for (UInt aa = 0; aa < addedArgCount; ++aa)
+        for (Index aa = 0; aa < addedArgCount; ++aa)
         {
             newArgs.add(blockInfo->successorArgs[aa]);
         }

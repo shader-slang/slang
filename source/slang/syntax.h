@@ -589,50 +589,50 @@ namespace Slang
         typedef RefPtr<Decl> Element;
 
         FilteredMemberList()
-            : mBegin(NULL)
-            , mEnd(NULL)
+            : m_begin(nullptr)
+            , m_end(nullptr)
         {}
 
         explicit FilteredMemberList(
             List<Element> const& list)
-            : mBegin(Adjust(list.begin(), list.end()))
-            , mEnd(list.end())
+            : m_begin(adjust(list.begin(), list.end()))
+            , m_end(list.end())
         {}
 
         struct Iterator
         {
-            Element* mCursor;
-            Element* mEnd;
+            Element* m_cursor;
+            Element* m_end;
 
             bool operator!=(Iterator const& other)
             {
-                return mCursor != other.mCursor;
+                return m_cursor != other.m_cursor;
             }
 
             void operator++()
             {
-                mCursor = Adjust(mCursor + 1, mEnd);
+                m_cursor = adjust(m_cursor + 1, m_end);
             }
 
             RefPtr<T>& operator*()
             {
-                return *(RefPtr<T>*)mCursor;
+                return *(RefPtr<T>*)m_cursor;
             }
         };
 
         Iterator begin()
         {
-            Iterator iter = { mBegin, mEnd };
+            Iterator iter = { m_begin, m_end };
             return iter;
         }
 
         Iterator end()
         {
-            Iterator iter = { mEnd, mEnd };
+            Iterator iter = { m_end, m_end };
             return iter;
         }
 
-        static Element* Adjust(Element* cursor, Element* end)
+        static Element* adjust(Element* cursor, Element* end)
         {
             while (cursor != end)
             {
@@ -645,10 +645,10 @@ namespace Slang
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
-        RefPtr<T>& First() { return *begin(); }
-        UInt Count()
+        RefPtr<T>& getFirst() { return *begin(); }
+        Index getCount()
         {
-            UInt count = 0;
+            Index count = 0;
             for (auto iter : (*this))
             {
                 (void)iter;
@@ -657,7 +657,7 @@ namespace Slang
             return count;
         }
 
-        List<RefPtr<T>> ToArray()
+        List<RefPtr<T>> toArray()
         {
             List<RefPtr<T>> result;
             for (auto element : (*this))
@@ -667,8 +667,8 @@ namespace Slang
             return result;
         }
 
-        Element* mBegin;
-        Element* mEnd;
+        Element* m_begin;
+        Element* m_end;
     };
 
     struct TransparentMemberInfo

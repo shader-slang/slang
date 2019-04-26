@@ -965,7 +965,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
             String lowerName = String(basicProps.deviceName).ToLower();
 
-            if (lowerName.IndexOf(lowerAdapter) != UInt(-1))
+            if (lowerName.IndexOf(lowerAdapter) != Index(-1))
             {
                 selectedDeviceIndex = i;
                 break;
@@ -1959,14 +1959,14 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
-        const UInt num = startSlot + slotCount;
+        const Index num = Index(startSlot + slotCount);
         if (num > m_boundVertexBuffers.getCount())
         {
             m_boundVertexBuffers.setCount(num);
         }
     }
 
-    for (UInt i = 0; i < slotCount; i++)
+    for (Index i = 0; i < Index(slotCount); i++)
     {
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)

@@ -384,7 +384,7 @@ static LegalVal legalizeStore(
             auto valTuple = legalVal.getTuple();
             SLANG_ASSERT(destTuple->elements.getCount() == valTuple->elements.getCount());
 
-            for (UInt i = 0; i < valTuple->elements.getCount(); i++)
+            for (Index i = 0; i < valTuple->elements.getCount(); i++)
             {
                 legalizeStore(context, destTuple->elements[i].val, valTuple->elements[i].val);
             }
@@ -892,7 +892,7 @@ static LegalVal legalizeGetElement(
             auto elemCount = ptrTupleInfo->elements.getCount();
             SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
-            for(UInt ee = 0; ee < elemCount; ++ee)
+            for(Index ee = 0; ee < elemCount; ++ee)
             {
                 auto ptrElem = ptrTupleInfo->elements[ee];
                 auto elemType = tupleType->elements[ee].type;
@@ -1003,7 +1003,7 @@ static LegalVal legalizeGetElementPtr(
             auto elemCount = ptrTupleInfo->elements.getCount();
             SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
-            for(UInt ee = 0; ee < elemCount; ++ee)
+            for(Index ee = 0; ee < elemCount; ++ee)
             {
                 auto ptrElem = ptrTupleInfo->elements[ee];
                 auto elemType = tupleType->elements[ee].type;

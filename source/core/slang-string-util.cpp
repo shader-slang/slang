@@ -196,7 +196,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
 
 /* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)
 {
-    return (fromChar == toChar || string.IndexOf(fromChar) == UInt(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
+    return (fromChar == toChar || string.IndexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
 

@@ -1286,7 +1286,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
                 IRBlock* defaultLabel = nullptr;
 
-                for( UInt ii = 0; ii < caseCount; ++ii )
+                for( Index ii = 0; ii < caseCount; ++ii )
                 {
                     auto caseTag = subBuilder->getIntValue(irTagVal->getDataType(), ii);
 
