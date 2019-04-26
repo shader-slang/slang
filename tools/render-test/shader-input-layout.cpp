@@ -302,19 +302,19 @@ namespace renderer_test
 
                 List<List<unsigned int>>& dstBuffer = output.dataBuffer;
 
-                int numMips = int(work.dataBuffer.getCount());
+                Index numMips = work.dataBuffer.getCount();
                 dstBuffer.setCount(numMips);
 
                 for (int i = 0; i < numMips; ++i)
                 {
-                    const int numPixels = int(work.dataBuffer[i].getCount());
+                    const Index numPixels = work.dataBuffer[i].getCount();
                     const unsigned int* srcPixels = work.dataBuffer[i].getBuffer();
 
                     dstBuffer[i].setCount(numPixels);
 
                     float* dstPixels = (float*)dstBuffer[i].getBuffer();
 
-                    for (int j = 0; j < numPixels; ++j)
+                    for (Index j = 0; j < numPixels; ++j)
                     {
                         // Copy out red
                         const unsigned int srcPixel = srcPixels[j];

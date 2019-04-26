@@ -38,7 +38,7 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     // Create a scoped copy
     UnownedStringSlice scopePath(m_arena.allocateString(slice.begin(), slice.size()), slice.size());
 
-    const int index = int(m_slices.getCount());
+    const auto index = m_slices.getCount();
 
     m_slices.add(scopePath);
     m_map.Add(scopePath, Handle(index));

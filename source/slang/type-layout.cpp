@@ -1999,7 +1999,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     }
     else if(auto originalStructTypeLayout = originalTypeLayout.as<StructTypeLayout>() )
     {
-        UInt fieldCount = originalStructTypeLayout->fields.getCount();
+        Index fieldCount = originalStructTypeLayout->fields.getCount();
 
         // Empty struct? Bail out.
         if(fieldCount == 0)

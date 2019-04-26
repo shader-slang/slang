@@ -938,7 +938,7 @@ SlangResult EndToEndCompileRequest::executeActions()
 
 int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* moduleName)
 {
-    UInt result = translationUnits.getCount();
+    Index result = translationUnits.getCount();
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
@@ -1029,7 +1029,7 @@ int FrontEndCompileRequest::addEntryPoint(
 {
     auto translationUnitReq = translationUnits[translationUnitIndex];
 
-    UInt result = m_entryPointReqs.getCount();
+    Index result = m_entryPointReqs.getCount();
 
     RefPtr<FrontEndEntryPointRequest> entryPointReq = new FrontEndEntryPointRequest(
         this,
@@ -1055,7 +1055,7 @@ int EndToEndCompileRequest::addEntryPoint(
     for (auto typeName : genericTypeNames)
         entryPointInfo.genericArgStrings.add(typeName);
 
-    UInt result = entryPoints.getCount();
+    Index result = entryPoints.getCount();
     entryPoints.add(_Move(entryPointInfo));
     return (int) result;
 }
@@ -1067,7 +1067,7 @@ UInt Linkage::addTarget(
     targetReq->linkage = this;
     targetReq->target = target;
 
-    UInt result = targets.getCount();
+    Index result = targets.getCount();
     targets.add(targetReq);
     return (int) result;
 }

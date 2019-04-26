@@ -218,7 +218,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
         // We need to write into the the string array
         char prefixBytes[6];
         const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
-        const int baseIndex = int(stringTable.getCount());
+        const Index baseIndex = stringTable.getCount();
 
         stringTable.setCount(baseIndex + numPrefixBytes + len);
 
@@ -266,8 +266,8 @@ char* StringRepresentationCache::getCStr(Handle handle)
         indexMapOut[i] = StringSlicePool::Handle(i);
     }
 
-    const int numSlices = int(slices.getCount());
-    for (int i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
+    const Index numSlices = slices.getCount();
+    for (Index i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
     {
         indexMapOut[i] = pool.add(slices[i]);
     }
@@ -497,8 +497,8 @@ Result IRSerialWriter::_calcDebugInfo()
 
     // Find all of the source locations and their associated instructions
     List<InstLoc> instLocs;
-    const int numInsts = int(m_insts.getCount());
-    for (int i = 1; i < numInsts; i++)
+    const Index numInsts = m_insts.getCount();
+    for (Index i = 1; i < numInsts; i++)
     {
         IRInst* srcInst = m_insts[i];
         if (!srcInst->sourceLoc.isValid())
@@ -656,9 +656,9 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
 
     // Need to set up the actual instructions
     {
-        const int numInsts = int(m_insts.getCount());
+        const Index numInsts = m_insts.getCount();
 
-        for (int i = 1; i < numInsts; ++i)
+        for (Index i = 1; i < numInsts; ++i)
         {
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
@@ -770,13 +770,13 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     // If the option to use RawSourceLocations is enabled, serialize out as is
     if (options & OptionFlag::RawSourceLocation)
     {
-        const int numInsts = int(m_insts.getCount());
+        const Index numInsts = m_insts.getCount();
         serialData->m_rawSourceLocs.setCount(numInsts);
 
         Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
         // 0 is null, just mark as no location
         dstLocs[0] = Ser::RawSourceLoc(0);
-        for (int i = 1; i < numInsts; ++i)
+        for (Index i = 1; i < numInsts; ++i)
         {
             IRInst* srcInst = m_insts[i];
             dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
@@ -1598,7 +1598,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
     List<IRInst*> insts;
 
-    const int numInsts = int(data.m_insts.getCount());
+    const Index numInsts = data.m_insts.getCount();
 
     SLANG_ASSERT(numInsts > 0);
 
@@ -1622,7 +1622,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         insts[1] = moduleInst; 
     }
 
-    for (int i = 2; i < numInsts; ++i)
+    for (Index i = 2; i < numInsts; ++i)
     {
         const Ser::Inst& srcInst = data.m_insts[i];
 
@@ -1714,7 +1714,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     }
 
     // Patch up the operands
-    for (int i = 1; i < numInsts; ++i)
+    for (Index i = 1; i < numInsts; ++i)
     {
         const Ser::Inst& srcInst = data.m_insts[i];
         const IROp op((IROp)srcInst.m_op);
@@ -1746,8 +1746,8 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     
     // Patch up the children
     {
-        const int numChildRuns = int(data.m_childRuns.getCount());
-        for (int i = 0; i < numChildRuns; i++)
+        const Index numChildRuns = data.m_childRuns.getCount();
+        for (Index i = 0; i < numChildRuns; i++)
         {
             const auto& run = data.m_childRuns[i];
 
@@ -1763,10 +1763,10 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     }
 
     // Re-add source locations, if they are defined
-    if (int(m_serialData->m_rawSourceLocs.getCount()) == numInsts)
+    if (m_serialData->m_rawSourceLocs.getCount() == numInsts)
     {
         const Ser::RawSourceLoc* srcLocs = m_serialData->m_rawSourceLocs.begin();
-        for (int i = 1; i < numInsts; ++i)
+        for (Index i = 1; i < numInsts; ++i)
         {
             IRInst* dstInst = insts[i];
             
@@ -1786,13 +1786,13 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         const List<IRSerialData::DebugSourceInfo>& sourceInfos = m_serialData->m_debugSourceInfos;
 
         // Construct the source files
-        int numSourceFiles = int(sourceInfos.getCount());
+        Index numSourceFiles = sourceInfos.getCount();
 
         // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
         List<SourceView*> sourceViews;
         sourceViews.setCount(numSourceFiles);
 
-        for (int i = 0; i < numSourceFiles; ++i)
+        for (Index i = 0; i < numSourceFiles; ++i)
         {
             const IRSerialData::DebugSourceInfo& srcSourceInfo = sourceInfos[i];
 
@@ -1827,11 +1827,11 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             lineBreakOffsets.setCount(numLines);
 
             {
-                const int numLineInfos = int(lineInfos.getCount());
-                int lineIndex = 0;
+                const Index numLineInfos = lineInfos.getCount();
+                Index lineIndex = 0;
                 
                 // Every line up and including should hold the same offset
-                for (int lineInfoIndex = 0; lineInfoIndex < numLineInfos; ++lineInfoIndex)
+                for (Index lineInfoIndex = 0; lineInfoIndex < numLineInfos; ++lineInfoIndex)
                 {
                     const auto& lineInfo = lineInfos[lineInfoIndex];
 
@@ -1901,8 +1901,8 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             SourceRange range;
             int fixSourceLoc = _calcFixSourceLoc(sourceInfos[0], sourceViews[0], range);
 
-            const int numRuns = int(sourceRuns.getCount());
-            for (int i = 0; i < numRuns; ++i)
+            const Index numRuns = sourceRuns.getCount();
+            for (Index i = 0; i < numRuns; ++i)
             {
                 const auto& run = sourceRuns[i];
                 const SourceLoc srcSourceLoc = SourceLoc::fromRaw(run.m_sourceLoc);

@@ -634,7 +634,7 @@ namespace Slang
 
         const auto& sourceFiles = translationUnitRequest->getSourceFiles();
 
-        const int numSourceFiles = int(sourceFiles.getCount());
+        const Index numSourceFiles = sourceFiles.getCount();
 
         switch (numSourceFiles)
         {
@@ -1425,7 +1425,7 @@ SlangResult dissassembleDXILUsingDXC(
         // Generate target code any entry points that
         // have been requested for compilation.
         auto entryPointCount = program->getEntryPointCount();
-        for(UInt ii = 0; ii < entryPointCount; ++ii)
+        for(Index ii = 0; ii < entryPointCount; ++ii)
         {
             auto entryPoint = program->getEntryPoint(ii);
             CompileResult entryPointResult = emitEntryPoint(
@@ -1472,8 +1472,8 @@ SlangResult dissassembleDXILUsingDXC(
             auto program = compileRequest->getSpecializedProgram();
             for (auto targetReq : linkage->targets)
             {
-                UInt entryPointCount = program->getEntryPointCount();
-                for (UInt ee = 0; ee < entryPointCount; ++ee)
+                Index entryPointCount = program->getEntryPointCount();
+                for (Index ee = 0; ee < entryPointCount; ++ee)
                 {
                     writeEntryPointResult(
                         compileRequest,

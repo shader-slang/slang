@@ -948,7 +948,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     physicalDevices.setCount(numPhysicalDevices);
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
 
-    int32_t selectedDeviceIndex = 0;
+    Index selectedDeviceIndex = 0;
 
     if (desc.adapter.getLength())
     {
@@ -956,7 +956,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
         String lowerAdapter = desc.adapter.toLower();
 
-        for (int i = 0; i < int(physicalDevices.getCount()); ++i)
+        for (Index i = 0; i < physicalDevices.getCount(); ++i)
         {
             auto physicalDevice = physicalDevices[i];
 
@@ -1502,7 +1502,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
 
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.getCount()); ++j)
+                for (Index j = 0; j < mipSizes.getCount(); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1536,7 +1536,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
             size_t srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.getCount()); ++j)
+                for (Index j = 0; j < mipSizes.getCount(); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1555,7 +1555,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
                     region.bufferImageHeight = 0;
 
                     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                    region.imageSubresource.mipLevel = j;
+                    region.imageSubresource.mipLevel = uint32_t(j);
                     region.imageSubresource.baseArrayLayer = i;
                     region.imageSubresource.layerCount = 1;
                     region.imageOffset = { 0, 0, 0 };
@@ -2428,8 +2428,8 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
 {
     SLANG_ASSERT(ptr == nullptr || _getBindingType(ptr) == type);
 
-    const int numBindings = int(m_bindings.getCount());
-    for (int i = 0; i < numBindings; ++i)
+    const Index numBindings = m_bindings.getCount();
+    for (Index i = 0; i < numBindings; ++i)
     {
         Binding& binding = m_bindings[i];
 

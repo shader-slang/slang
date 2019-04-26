@@ -446,8 +446,8 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 void GLRenderer::flushStateForDraw()
 {
     auto inputLayout = m_currentPipelineState->m_inputLayout.Ptr();
-    auto attrCount = inputLayout->m_attributeCount;
-    for (UInt ii = 0; ii < attrCount; ++ii)
+    auto attrCount = Index(inputLayout->m_attributeCount);
+    for (Index ii = 0; ii < attrCount; ++ii)
     {
         auto& attr = inputLayout->m_attributes[ii];
 
@@ -465,7 +465,7 @@ void GLRenderer::flushStateForDraw()
 
         glEnableVertexAttribArray((GLuint)ii);
     }
-    for (UInt ii = attrCount; ii < kMaxVertexStreams; ++ii)
+    for (Index ii = attrCount; ii < kMaxVertexStreams; ++ii)
     {
         glDisableVertexAttribArray((GLuint)ii);
     }

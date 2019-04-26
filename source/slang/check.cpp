@@ -4845,8 +4845,8 @@ namespace Slang
         template<typename T>
         T* FindOuterStmt()
         {
-            UInt outerStmtCount = outerStmts.getCount();
-            for (UInt ii = outerStmtCount; ii > 0; --ii)
+            const Index outerStmtCount = outerStmts.getCount();
+            for (Index ii = outerStmtCount; ii > 0; --ii)
             {
                 auto outerStmt = outerStmts[ii-1];
                 auto found = as<T>(outerStmt);
@@ -6690,13 +6690,13 @@ namespace Slang
             SourceLoc       funcLoc;
 
             // The original arguments to the call
-            UInt argCount = 0;
+            Index argCount = 0;
             RefPtr<Expr>* args = nullptr;
             RefPtr<Type>* argTypes = nullptr;
 
-            UInt getArgCount() { return argCount; }
-            RefPtr<Expr>& getArg(UInt index) { return args[index]; }
-            RefPtr<Type>& getArgType(UInt index)
+            Index getArgCount() { return argCount; }
+            RefPtr<Expr>& getArg(Index index) { return args[index]; }
+            RefPtr<Type>& getArgType(Index index)
             {
                 if(argTypes)
                     return argTypes[index];
@@ -7206,7 +7206,7 @@ namespace Slang
                             callExpr = new InvokeExpr();
                             callExpr->loc = context.loc;
 
-                            for(UInt aa = 0; aa < context.argCount; ++aa)
+                            for(Index aa = 0; aa < context.argCount; ++aa)
                                 callExpr->Arguments.add(context.getArg(aa));
                         }
 
@@ -7582,9 +7582,9 @@ namespace Slang
 
             // Their arguments must unify
             SLANG_RELEASE_ASSERT(fstGen->args.getCount() == sndGen->args.getCount());
-            UInt argCount = fstGen->args.getCount();
+            Index argCount = fstGen->args.getCount();
             bool okay = true;
-            for (UInt aa = 0; aa < argCount; ++aa)
+            for (Index aa = 0; aa < argCount; ++aa)
             {
                 if (!TryUnifyVals(constraints, fstGen->args[aa], sndGen->args[aa]))
                 {
@@ -7925,8 +7925,8 @@ namespace Slang
             {
                 auto params = GetParameters(funcDeclRef).ToArray();
 
-                UInt argCount = context.getArgCount();
-                UInt paramCount = params.getCount();
+                Index argCount = context.getArgCount();
+                Index paramCount = params.getCount();
 
                 // Bail out on mismatch.
                 // TODO(tfoley): need more nuance here
@@ -7935,7 +7935,7 @@ namespace Slang
                     return DeclRef<Decl>(nullptr, nullptr);
                 }
 
-                for (UInt aa = 0; aa < argCount; ++aa)
+                for (Index aa = 0; aa < argCount; ++aa)
                 {
 #if 0
                     if (!TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]))
@@ -8495,9 +8495,9 @@ namespace Slang
                 }
 
                 {
-                    UInt candidateCount = context.bestCandidates.getCount();
-                    UInt maxCandidatesToPrint = 10; // don't show too many candidates at once...
-                    UInt candidateIndex = 0;
+                    Index candidateCount = context.bestCandidates.getCount();
+                    Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    Index candidateIndex = 0;
                     for (auto candidate : context.bestCandidates)
                     {
                         String declString = getDeclSignatureString(candidate.item);
@@ -9621,13 +9621,12 @@ namespace Slang
         ExistentialTypeSlots&       ioSlots,
         DeclRef<VarDeclBase>    paramDeclRef)
     {
-        UInt startSlot = ioSlots.paramTypes.getCount();
+        Index startSlot = ioSlots.paramTypes.getCount();
         _collectExistentialTypeParamsRec(ioSlots, paramDeclRef);
-        UInt endSlot = ioSlots.paramTypes.getCount();
-        UInt slotCount = endSlot - startSlot;
-
-        ioParamInfo.firstExistentialTypeSlot = startSlot;
-        ioParamInfo.existentialTypeSlotCount = slotCount;
+        Index endSlot = ioSlots.paramTypes.getCount();
+        
+        ioParamInfo.firstExistentialTypeSlot = UInt(startSlot);
+        ioParamInfo.existentialTypeSlotCount = UInt(endSlot - startSlot);;
     }
 
         /// Enumerate the existential-type parameters of an `EntryPoint`.
@@ -10256,8 +10255,8 @@ static bool validateTypesMatch(
                         collectFields(leftStructDeclRef, leftFields);
                         collectFields(rightStructDeclRef, rightFields);
 
-                        UInt leftFieldCount = leftFields.getCount();
-                        UInt rightFieldCount = rightFields.getCount();
+                        Index leftFieldCount = leftFields.getCount();
+                        Index rightFieldCount = rightFields.getCount();
 
                         if( leftFieldCount != rightFieldCount )
                         {
@@ -10265,7 +10264,7 @@ static bool validateTypesMatch(
                             return false;
                         }
 
-                        for( UInt ii = 0; ii < leftFieldCount; ++ii )
+                        for( Index ii = 0; ii < leftFieldCount; ++ii )
                         {
                             auto leftField = leftFields[ii];
                             auto rightField = rightFields[ii];
@@ -10501,8 +10500,8 @@ static bool doesParameterMatch(
             // For now we'll start with an extremely basic approach that
             // should work for typical HLSL code.
             //
-            UInt translationUnitCount = compileRequest->translationUnits.getCount();
-            for(UInt tt = 0; tt < translationUnitCount; ++tt)
+            Index translationUnitCount = compileRequest->translationUnits.getCount();
+            for(Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = compileRequest->translationUnits[tt];
                 for( auto globalDecl : translationUnit->getModuleDecl()->Members )
@@ -10558,8 +10557,8 @@ static bool doesParameterMatch(
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        UInt slotCount = ioSlots.paramTypes.getCount();
-        UInt argCount = args.getCount();
+        Index slotCount = ioSlots.paramTypes.getCount();
+        Index argCount = args.getCount();
 
         if( slotCount != argCount )
         {
@@ -10569,7 +10568,7 @@ static bool doesParameterMatch(
 
         SemanticsVisitor visitor(linkage, sink);
 
-        for( UInt ii = 0; ii < slotCount; ++ii )
+        for( Index ii = 0; ii < slotCount; ++ii )
         {
             auto slotType = ioSlots.paramTypes[ii];
             auto argExpr = args[ii];
@@ -11049,14 +11048,14 @@ static bool doesParameterMatch(
         // ahead and consider all the entry points that were found
         // by the front-end.
         //
-        UInt entryPointCount = endToEndReq->entryPoints.getCount();
+        Index entryPointCount = endToEndReq->entryPoints.getCount();
         if( entryPointCount == 0 )
         {
             entryPointCount = unspecializedProgram->getEntryPointCount();
             endToEndReq->entryPoints.setCount(entryPointCount);
         }
 
-        for( UInt ii = 0; ii < entryPointCount; ++ii )
+        for( Index ii = 0; ii < entryPointCount; ++ii )
         {
             auto unspecializedEntryPoint = unspecializedProgram->getEntryPoint(ii);
             auto& entryPointInfo = endToEndReq->entryPoints[ii];

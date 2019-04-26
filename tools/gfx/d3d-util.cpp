@@ -294,7 +294,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
     if (outSize > 0)
     {
-        const UInt prevSize = out.getCount();
+        const Index prevSize = out.getCount();
         out.setCount(prevSize + len + 1);
 
         WCHAR* dst = out.getBuffer() + prevSize;

@@ -241,7 +241,7 @@ namespace Slang
         split(path, splitPath);
 
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (int i = 0; i < int(splitPath.getCount()); i++)
+        for (Index i = 0; i < splitPath.getCount(); i++)
         {
             const UnownedStringSlice& cur = splitPath[i];
             if (cur == "." && splitPath.getCount() > 1)
@@ -272,7 +272,7 @@ namespace Slang
    
         // Reconstruct the string
         StringBuilder builder;
-        for (int i = 0; i < int(splitPath.getCount()); i++)
+        for (Index i = 0; i < splitPath.getCount(); i++)
         {
             if (i > 0)
             {
@@ -480,7 +480,7 @@ namespace Slang
 
         while (true)
         {
-            const size_t size = buffer.getCount();
+            const size_t size = size_t(buffer.getCount());
             size_t bufferSize = size;
             SlangResult res = _calcExectuablePath(buffer.getBuffer(), &bufferSize);
 
@@ -497,7 +497,7 @@ namespace Slang
 
             // If bufferSize changed it should be the exact fit size, else we just make the buffer bigger by a guess (50% bigger)
             bufferSize = (bufferSize > size) ? bufferSize : (bufferSize + bufferSize / 2);
-            buffer.setCount(bufferSize);
+            buffer.setCount(Index(bufferSize));
         }
     }
 

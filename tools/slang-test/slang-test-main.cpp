@@ -452,7 +452,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         List<const char*> args;
         args.add(exeName.getBuffer());
-        for (int i = 0; i < int(spawner.argumentList_.getCount()); ++i)
+        for (Index i = 0; i < spawner.argumentList_.getCount(); ++i)
         {
             args.add(spawner.argumentList_[i].getBuffer());
         }
@@ -477,8 +477,8 @@ static SlangResult _extractArg(const List<String>& args, const String& argName, 
 {
     SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
 
-    const UInt count = args.getCount();
-    for (UInt i = 0; i < count - 1; ++i)
+    const Index count = args.getCount();
+    for (Index i = 0; i < count - 1; ++i)
     {
         if (args[i] == argName)
         {
@@ -1543,7 +1543,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         printOutput();
 		return TestResult::Fail;
     }
-	for (int i = 0; i < (int)referenceProgramOutput.getCount(); i++)
+	for (Index i = 0; i < referenceProgramOutput.getCount(); i++)
 	{
 		auto reference = String(referenceProgramOutput[i].trim());
 		auto actual = String(actualProgramOutput[i].trim());
@@ -2093,7 +2093,7 @@ void runTestsOnFile(
         // What render options do we want to synthesize
         RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
 
-        const UInt numInitialTests = testList.tests.getCount();
+        //const Index numInitialTests = testList.tests.getCount();
 
         while (missingApis)
         {

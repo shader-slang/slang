@@ -13,10 +13,10 @@ using namespace Slang;
 
 static int _indexOf(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
 {
-    const int numFormats = int(formatsIn.getCount());
+    const Index numFormats = formatsIn.getCount();
     const VkSurfaceFormatKHR* formats = formatsIn.getBuffer();
 
-    for (int i = 0; i < numFormats; ++i)
+    for (Index i = 0; i < numFormats; ++i)
     {
         if (formats[i].format == format)
         {
@@ -78,7 +78,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
         formats.add(VK_FORMAT_B8G8R8A8_UNORM);
     }
 
-    for(int i = 0; i < int(formats.getCount()); ++i)
+    for(Index i = 0; i < formats.getCount(); ++i)
     {
         VkFormat format = formats[i];
         if (_indexOf(surfaceFormats, format) >= 0)
@@ -125,7 +125,7 @@ SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
 {
     assert(renderPass != VK_NULL_HANDLE);
 
-    for (int i = 0; i < int(m_images.getCount()); ++i)
+    for (Index i = 0; i < m_images.getCount(); ++i)
     {
         Image& image = m_images[i];
         VkImageView attachments[] =
@@ -150,7 +150,7 @@ SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
 
 void VulkanSwapChain::_destroyFrameBuffers()
 {
-    for (int i = 0; i < int(m_images.getCount()); ++i)
+    for (Index i = 0; i < m_images.getCount(); ++i)
     {
         Image& image = m_images[i];
         if (image.m_frameBuffer != VK_NULL_HANDLE)
@@ -328,7 +328,7 @@ void VulkanSwapChain::_destroySwapChain()
         _destroyFrameBuffers();
     }
 
-    for (int i = 0; i < int(m_images.getCount()); ++i)
+    for (Index i = 0; i < m_images.getCount(); ++i)
     {
         Image& image = m_images[i];
 

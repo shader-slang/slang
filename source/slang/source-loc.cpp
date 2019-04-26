@@ -34,7 +34,7 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 
     const auto rawValue = sourceLoc.getRaw();
 
-    int hi = int(m_entries.getCount());    
+    Index hi = m_entries.getCount();    
     // If there are no entries, or it is in front of the first entry, then there is no associated entry
     if (hi == 0 || 
         m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
@@ -42,10 +42,10 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
         return -1;
     }
 
-    int lo = 0;
+    Index lo = 0;
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1;
+        const Index mid = (hi + lo) >> 1;
         const Entry& midEntry = m_entries[mid];
         SourceLoc::RawValue midValue = midEntry.m_startLoc.getRaw();
         if (midValue <= rawValue)
@@ -60,7 +60,7 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
         }
     }
 
-    return lo;
+    return int(lo);
 }
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
@@ -265,12 +265,12 @@ int SourceFile::calcLineIndexFromOffset(int offset)
     // At this point we can assume the `lineBreakOffsets` array has been filled in.
     // We will use a binary search to find the line index that contains our
     // chosen offset.
-    int lo = 0;
-    int hi = int(lineBreakOffsets.getCount());
+    Index lo = 0;
+    Index hi = lineBreakOffsets.getCount();
 
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1; 
+        const Index mid = (hi + lo) >> 1; 
         const uint32_t midOffset = lineBreakOffsets[mid];
         if (midOffset <= uint32_t(offset))
         {
@@ -282,7 +282,7 @@ int SourceFile::calcLineIndexFromOffset(int offset)
         }
     }
 
-    return lo;
+    return int(lo);
 }
 
 int SourceFile::calcColumnIndex(int lineIndex, int offset)
@@ -458,7 +458,7 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
 
 SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
-    int hi = int(m_sourceViews.getCount());
+    Index hi = m_sourceViews.getCount();
     // It must be in the range of this manager and have associated views for it to possibly be a hit
     if (!getSourceRange().contains(loc) || hi == 0)
     {
@@ -482,10 +482,10 @@ SourceView* SourceManager::findSourceView(SourceLoc loc) const
     const SourceLoc::RawValue rawLoc = loc.getRaw();
 
     // Binary chop to see if we can find the associated SourceUnit
-    int lo = 0;
+    Index lo = 0;
     while (lo + 1 < hi)
     {
-        int mid = (hi + lo) >> 1;
+        Index mid = (hi + lo) >> 1;
 
         SourceView* midView = m_sourceViews[mid];
         if (midView->getRange().contains(loc))

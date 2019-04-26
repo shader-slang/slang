@@ -251,7 +251,7 @@ static void memoryArenaUnitTest()
                 }
 
                 // Check the blocks
-                for (int j = 0; j < int(blocks.getCount()); ++j)
+                for (Index j = 0; j < blocks.getCount(); ++j)
                 {
                     const Block& block = blocks[j];
 

@@ -1324,7 +1324,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     ComPtr<ID3D12Device> device;
     ComPtr<IDXGIAdapter> adapter;
 
-    for (int i = 0; i < int(dxgiAdapters.getCount()); ++i)
+    for (Index i = 0; i < dxgiAdapters.getCount(); ++i)
     {
         IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
         if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
@@ -2739,7 +2739,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     {
         int numVertexViews = 0;
         D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-        for (int i = 0; i < int(m_boundVertexBuffers.getCount()); i++)
+        for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
         {
             const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
             BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;

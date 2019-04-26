@@ -6222,7 +6222,7 @@ static void lowerProgramEntryPointToIR(
     if( existentialTypeArgCount )
     {
         List<IRInst*> existentialSlotArgs;
-        for( UInt ii = 0; ii < existentialTypeArgCount; ++ii )
+        for( Index ii = 0; ii < existentialTypeArgCount; ++ii )
         {
             auto arg = entryPoint->getExistentialTypeArg(ii);
 
@@ -6452,7 +6452,7 @@ RefPtr<IRModule> generateIRForProgram(
     if( existentialTypeArgCount )
     {
         List<IRInst*> existentialSlotArgs;
-        for( UInt ii = 0; ii < existentialTypeArgCount; ++ii )
+        for( Index ii = 0; ii < existentialTypeArgCount; ++ii )
         {
             auto arg = program->getExistentialTypeArg(ii);
 

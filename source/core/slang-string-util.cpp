@@ -178,13 +178,13 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         return slice;
     }
 
-    const UInt numChars = slice.size();
+    const Index numChars = slice.size();
     const char* srcChars = slice.begin();
 
     StringBuilder builder;
     char* dstChars = builder.prepareForAppend(numChars);
 
-    for (UInt i = 0; i < numChars; ++i)
+    for (Index i = 0; i < numChars; ++i)
     {
         char c = srcChars[i];
         dstChars[i] = (c == fromChar) ? toChar : c;

@@ -1375,9 +1375,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (genericDecl != genericSubst->genericDecl)
             return false;
 
-        UInt argCount = args.getCount();
+        Index argCount = args.getCount();
         SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
-        for (UInt aa = 0; aa < argCount; ++aa)
+        for (Index aa = 0; aa < argCount; ++aa)
         {
             if (!args[aa]->EqualsVal(genericSubst->args[aa].Ptr()))
                 return false;

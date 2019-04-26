@@ -184,7 +184,7 @@ static RefPtr<SamplerState> _createSamplerState(
 
             int baseIndex = entry.glslBinding[0];
             // Make sure they are contiguous
-            for (int i = 1; i < int(entry.glslBinding.getCount()); ++i)
+            for (Index i = 1; i < int(entry.glslBinding.getCount()); ++i)
             {
                 if (baseIndex + i != entry.glslBinding[i])
                 {
@@ -206,7 +206,7 @@ static RefPtr<SamplerState> _createSamplerState(
 /* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
 {
     auto srcEntries = layout.entries.getBuffer();
-    auto numEntries = int(layout.entries.getCount());
+    auto numEntries = layout.entries.getCount();
 
     const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
 
@@ -220,7 +220,7 @@ static RefPtr<SamplerState> _createSamplerState(
         slotRangeDescs.add(slotRangeDesc);
     }
 
-    for (int i = 0; i < numEntries; i++)
+    for (Index i = 0; i < numEntries; i++)
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 

@@ -3027,7 +3027,7 @@ struct EmitVisitor
         auto outerPrec = inOuterPrec;
 
         IRUse* args = inst->getOperands();
-        UInt argCount = inst->getOperandCount();
+        Index argCount = inst->getOperandCount();
 
         // First operand was the function to be called
         args++;
@@ -3043,7 +3043,7 @@ struct EmitVisitor
 
             emit(name);
             Emit("(");
-            for (UInt aa = 0; aa < argCount; ++aa)
+            for (Index aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) Emit(", ");
                 emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
@@ -3090,7 +3090,7 @@ struct EmitVisitor
                 case '5': case '6': case '7': case '8': case '9':
                     {
                         // Simple case: emit one of the direct arguments to the call
-                        UInt argIndex = d - '0';
+                        Index argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                         Emit("(");
                         emitIROperand(ctx, args[argIndex].get(), mode, kEOp_General);
@@ -3213,7 +3213,7 @@ struct EmitVisitor
                         // we can use it in the constructed expression.
 
                         SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                        UInt argIndex = (*cursor++) - '0';
+                        Index argIndex = (*cursor++) - '0';
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto vectorArg = args[argIndex].get();
@@ -3236,7 +3236,7 @@ struct EmitVisitor
                         // (this is the inverse of `$z`).
                         //
                         SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                        UInt argIndex = (*cursor++) - '0';
+                        Index argIndex = (*cursor++) - '0';
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3293,7 +3293,7 @@ struct EmitVisitor
                         // with the front-end picking the right overload
                         // based on the "address space" of the argument.
 
-                        UInt argIndex = 0;
+                        Index argIndex = 0;
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3318,7 +3318,7 @@ struct EmitVisitor
                         // to the `imageAtomic*` function.
                         //
 
-                        UInt argIndex = 0;
+                        Index argIndex = 0;
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3401,7 +3401,7 @@ struct EmitVisitor
                                 // used as the argument ray payload at a
                                 // trace call site.
 
-                                UInt argIndex = 0;
+                                Index argIndex = 0;
                                 SLANG_RELEASE_ASSERT(argCount > argIndex);
                                 auto arg = args[argIndex].get();
                                 auto argLoad = as<IRLoad>(arg);
@@ -3418,7 +3418,7 @@ struct EmitVisitor
                                 // used as the argument callable payload at a
                                 // call site.
 
-                                UInt argIndex = 0;
+                            Index argIndex = 0;
                                 SLANG_RELEASE_ASSERT(argCount > argIndex);
                                 auto arg = args[argIndex].get();
                                 auto argLoad = as<IRLoad>(arg);
@@ -4095,8 +4095,8 @@ struct EmitVisitor
                 auto ii = (IRSwizzle*)inst;
                 emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
                 emit(".");
-                UInt elementCount = ii->getElementCount();
-                for (UInt ee = 0; ee < elementCount; ++ee)
+                const Index elementCount = Index(ii->getElementCount());
+                for (Index ee = 0; ee < elementCount; ++ee)
                 {
                     IRInst* irElementIndex = ii->getElementIndex(ee);
                     SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);

@@ -601,7 +601,7 @@ void emitCodeNodes(
 }
 
 // Given line starts and a location, find the line number. Returns -1 if not found
-static int _findLineIndex(const List<const char*>& lineBreaks, const char* location)
+static Index _findLineIndex(const List<const char*>& lineBreaks, const char* location)
 {
     if (location == nullptr)
     {
@@ -609,12 +609,12 @@ static int _findLineIndex(const List<const char*>& lineBreaks, const char* locat
     }
 
     // Use a binary chop to find the associated line
-    int lo = 0;
-    int hi = int(lineBreaks.getCount());
+    Index lo = 0;
+    Index hi = lineBreaks.getCount();
 
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1;
+        const auto mid = (hi + lo) >> 1;
         const auto midOffset = lineBreaks[mid];
         if (midOffset <= location)
         {
@@ -682,7 +682,7 @@ void emitTemplateNodes(
         if (enable && prev && prev->flavor == Node::Flavor::escape && nn->flavor == Node::Flavor::text)
         {
             // Find the line
-            int lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
+            Index lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
             // If found, output the directive
             if (lineIndex >= 0)
             {
