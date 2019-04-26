@@ -14,8 +14,7 @@
 
 namespace Slang
 {
-    const int MIN_QSORT_SIZE = 32;
-
+    
 	template<typename T, int isPOD>
 	class Initializer
 	{
@@ -48,22 +47,22 @@ namespace Slang
 	class AllocateMethod
 	{
 	public:
-		static inline T* allocateArray(UInt size)
+		static inline T* allocateArray(Index count)
 		{
 			TAllocator allocator;
-			T * rs = (T*)allocator.Alloc(size*sizeof(T));
-			Initializer<T, std::is_pod<T>::value>::initialize(rs, size);
+			T * rs = (T*)allocator.allocate(count * sizeof(T));
+			Initializer<T, std::is_pod<T>::value>::initialize(rs, count);
 			return rs;
 		}
-		static inline void deallocateArray(T* ptr, UInt bufferSize)
+		static inline void deallocateArray(T* ptr, Index count)
 		{
 			TAllocator allocator;
 			if (!std::is_trivially_destructible<T>::value)
 			{
-				for (UInt i = 0; i<bufferSize; i++)
+				for (Index i = 0; i < count; i++)
 					ptr[i].~T();
 			}
-			allocator.Free(ptr);
+			allocator.deallocate(ptr);
 		}
 	};
 
@@ -71,11 +70,11 @@ namespace Slang
 	class AllocateMethod<T, StandardAllocator>
 	{
 	public:
-		static inline T* allocateArray(UInt size)
+		static inline T* allocateArray(Index count)
 		{
-			return new T[size];
+			return new T[count];
 		}
-		static inline void deallocateArray(T* ptr, UInt /*bufferSize*/)
+		static inline void deallocateArray(T* ptr, Index /*bufferSize*/)
 		{
 			delete [] ptr;
 		}
@@ -86,7 +85,7 @@ namespace Slang
 	class List
 	{
     private:
-        static const Int kInitialCount = 16;
+        static const Index kInitialCount = 16;
 
 	public:
 		List()
@@ -108,11 +107,11 @@ namespace Slang
 		{
 			this->operator=(static_cast<List<T>&&>(list));
 		}
-		static List<T> makeRepeated(const T& val, int count)
+		static List<T> makeRepeated(const T& val, Index count)
 		{
 			List<T> rs;
 			rs.setCount(count);
-			for (int i = 0; i < count; i++)
+			for (Index i = 0; i < count; i++)
 				rs[i] = val;
 			return rs;
 		}
@@ -205,7 +204,7 @@ namespace Slang
 			return ArrayView<T>(m_buffer, m_count);
 		}
 
-		inline ArrayView<T> getArrayView(int start, int count) const
+		inline ArrayView<T> getArrayView(Index start, Index count) const
 		{
             SLANG_ASSERT(start >= 0 && count >= 0 && start + count <= m_count);
 			return ArrayView<T>(m_buffer + start, count);
@@ -215,7 +214,7 @@ namespace Slang
 		{
 			if (m_capacity < m_count + 1)
 			{
-				UInt newBufferSize = kInitialCount;
+				Index newBufferSize = kInitialCount;
 				if (m_capacity)
 					newBufferSize = (m_capacity << 1);
 
@@ -228,7 +227,7 @@ namespace Slang
 		{
 			if (m_capacity < m_count + 1)
 			{
-				UInt newBufferSize = kInitialCount;
+				Index newBufferSize = kInitialCount;
 				if (m_capacity)
 					newBufferSize = (m_capacity << 1);
 
@@ -238,23 +237,23 @@ namespace Slang
 
 		}
 
-		UInt getCount() const { return m_count; }
-        UInt getCapacity() const { return m_capacity; }
+        Index getCount() const { return m_count; }
+        Index getCapacity() const { return m_capacity; }
 
 		const T* getBuffer() const { return m_buffer; }
         T* getBuffer() { return m_buffer; }
 
-		void insert(UInt id, const T& val) { insertRange(id, &val, 1); }
+		void insert(Index idx, const T& val) { insertRange(idx, &val, 1); }
 
-		void insertRange(UInt id, const T* vals, UInt n)
+		void insertRange(Index idx, const T* vals, Index n)
 		{
 			if (m_capacity < m_count + n)
 			{
-				UInt newBufferCount = kInitialCount;
+                Index newBufferCount = kInitialCount;
 				while (newBufferCount < m_count + n)
 					newBufferCount = newBufferCount << 1;
 
-				T * newBuffer = _allocate(newBufferCount);
+				T* newBuffer = _allocate(newBufferCount);
 				if (m_capacity)
 				{
 					/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
@@ -264,9 +263,9 @@ namespace Slang
 					}
 					else*/
 					{
-						for (UInt i = 0; i < id; i++)
+						for (Index i = 0; i < idx; i++)
 							newBuffer[i] = m_buffer[i];
-						for (UInt i = id; i < m_count; i++)
+						for (Index i = idx; i < m_count; i++)
 							newBuffer[i + n] = T(static_cast<T&&>(m_buffer[i]));
 					}
 					_deallocateBuffer();
@@ -280,15 +279,15 @@ namespace Slang
 					memmove(buffer + id + n, buffer + id, sizeof(T) * (_count - id));
 				else*/
 				{
-					for (UInt i = m_count; i > id; i--)
+					for (Index i = m_count; i > idx; i--)
 						m_buffer[i + n - 1] = static_cast<T&&>(m_buffer[i - 1]);
 				}
 			}
 			/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
 				memcpy(buffer + id, vals, sizeof(T) * n);
 			else*/
-				for (UInt i = 0; i < n; i++)
-					m_buffer[id + i] = vals[i];
+				for (Index i = 0; i < n; i++)
+					m_buffer[idx + i] = vals[i];
 
 			m_count += n;
 		}
@@ -299,36 +298,36 @@ namespace Slang
 		//	InsertRange(_count, &val, 1);
 		//}
 
-		void insertRange(int id, const List<T>& list) {	insertRange(id, list.m_buffer, list.m_count); }
+		void insertRange(Index id, const List<T>& list) {	insertRange(id, list.m_buffer, list.m_count); }
 
 		void addRange(ArrayView<T> list) { insertRange(m_count, list.getBuffer(), list.Count()); }
 
-        void addRange(const T* vals, UInt n) { insertRange(m_count, vals, n); }
+        void addRange(const T* vals, Index n) { insertRange(m_count, vals, n); }
 
 		void addRange(const List<T>& list) { insertRange(m_count, list.m_buffer, list.m_count); }
 
-		void removeRange(UInt idx, UInt count)
+		void removeRange(Index idx, Index count)
 		{
             SLANG_ASSERT(idx >= 0 && idx <= m_count);
 
-			const UInt actualDeleteCount = ((idx + count) >= m_count)? (m_count - idx) : count;
-			for (UInt i = idx + actualDeleteCount; i < m_count; i++)
+			const Index actualDeleteCount = ((idx + count) >= m_count)? (m_count - idx) : count;
+			for (Index i = idx + actualDeleteCount; i < m_count; i++)
 				m_buffer[i - actualDeleteCount] = static_cast<T&&>(m_buffer[i]);
 			m_count -= actualDeleteCount;
 		}
 
-		void removeAt(UInt id) { removeRange(id, 1); }
+		void removeAt(Index id) { removeRange(id, 1); }
 
 		void remove(const T& val)
 		{
-			int idx = indexOf(val);
+            Index idx = indexOf(val);
 			if (idx != -1)
 				removeAt(idx);
 		}
 
 		void reverse()
 		{
-			for (UInt i = 0; i < (m_count >> 1); i++)
+			for (Index i = 0; i < (m_count >> 1); i++)
 			{
 				swapElements(m_buffer, i, m_count - i - 1);
 			}
@@ -336,11 +335,11 @@ namespace Slang
 
 		void fastRemove(const T& val)
 		{
-			int idx = indexOf(val);
+            Index idx = indexOf(val);
 			fastRemoveAt(idx);
 		}
 
-		void fastRemoveAt(UInt idx)
+		void fastRemoveAt(Index idx)
 		{
 			if (idx != -1 && m_count - 1 != idx)
 			{
@@ -357,7 +356,7 @@ namespace Slang
             m_count = m_capacity = 0;
         }
 
-		void reserve(UInt size)
+		void reserve(Index size)
 		{
 			if(size > m_capacity)
 			{
@@ -368,11 +367,11 @@ namespace Slang
 						memcpy(newBuffer, buffer, _count * sizeof(T));
 					else*/
 					{
-						for (UInt i = 0; i < m_count; i++)
+						for (Index i = 0; i < m_count; i++)
 							newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 
                         // Default-initialize the remaining elements
-                        for(UInt i = m_count; i < size; i++)
+                        for(Index i = m_count; i < size; i++)
                         {
                             new(newBuffer + i) T();
                         }
@@ -384,9 +383,9 @@ namespace Slang
 			}
 		}
 
-		void growToCount(UInt count)
+		void growToCount(Index count)
 		{
-			UInt newBufferCount = UInt(1) << Math::Log2Ceil(count);
+            Index newBufferCount = Index(1) << Math::Log2Ceil(count);
 			if (m_capacity < newBufferCount)
 			{
 				reserve(newBufferCount);
@@ -394,20 +393,20 @@ namespace Slang
 			m_count = count;
 		}
 
-		void setCount(UInt count)
+		void setCount(Index count)
 		{
 			reserve(count);
 			m_count = count;
 		}
 
-		void unsafeShrinkToCount(UInt count) { m_count = count; }
+		void unsafeShrinkToCount(Index count) { m_count = count; }
 
 		void compress()
 		{
 			if (m_capacity > m_count && m_count > 0)
 			{
 				T* newBuffer = _allocate(m_count);
-				for (UInt i = 0; i < m_count; i++)
+				for (Index i = 0; i < m_count; i++)
 					newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 
 				_deallocateBuffer();
@@ -416,54 +415,54 @@ namespace Slang
 			}
 		}
 
-		SLANG_FORCE_INLINE T& operator [](UInt idx) const
+		SLANG_FORCE_INLINE T& operator [](Index idx) const
 		{
             SLANG_ASSERT(idx >= 0 && idx <= m_count);
 			return m_buffer[idx];
 		}
 
 		template<typename Func>
-		UInt findFirstIndex(const Func& predicate) const
+        Index findFirstIndex(const Func& predicate) const
 		{
-			for (UInt i = 0; i < m_count; i++)
+			for (Index i = 0; i < m_count; i++)
 			{
 				if (predicate(m_buffer[i]))
 					return i;
 			}
-			return (UInt)-1;
+			return (Index)-1;
 		}
 
 		template<typename Func>
-		UInt findLastIndex(const Func& predicate) const
+        Index findLastIndex(const Func& predicate) const
 		{
-			for (UInt i = m_count; i > 0; i--)
+			for (Index i = m_count; i > 0; i--)
 			{
 				if (predicate(m_buffer[i-1]))
 					return i-1;
 			}
-			return (UInt)-1;
+			return (Index)-1;
 		}
 
 		template<typename T2>
-		UInt indexOf(const T2& val) const
+        Index indexOf(const T2& val) const
 		{
-			for (UInt i = 0; i < m_count; i++)
+			for (Index i = 0; i < m_count; i++)
 			{
 				if (m_buffer[i] == val)
 					return i;
 			}
-			return (UInt)-1;
+			return (Index)-1;
 		}
 
 		template<typename T2>
-		UInt lastIndexOf(const T2& val) const
+        Index lastIndexOf(const T2& val) const
 		{
-			for (int i = m_count; i > 0; i--)
+			for (Index i = m_count; i > 0; i--)
 			{
 				if(m_buffer[i-1] == val)
 					return i-1;
 			}
-			return (UInt)-1;
+			return (Index)-1;
 		}
 
 		void sort()
@@ -471,7 +470,7 @@ namespace Slang
 			sort([](const T& t1, const T& t2){return t1 < t2;});
 		}
 
-        bool contains(const T& val) const { return indexOf(val) != UInt(-1); }
+        bool contains(const T& val) const { return indexOf(val) != Index(-1); }
 
 		template<typename Comparer>
 		void sort(Comparer compare)
@@ -484,21 +483,23 @@ namespace Slang
 		template <typename IterateFunc>
 		void forEach(IterateFunc f) const
 		{
-			for (int i = 0; i< m_count; i++)
+			for (Index i = 0; i< m_count; i++)
 				f(m_buffer[i]);
 		}
 
 		template<typename Comparer>
-		void quickSort(T* vals, int startIndex, int endIndex, Comparer comparer)
+		void quickSort(T* vals, Index startIndex, Index endIndex, Comparer comparer)
 		{
+            static const Index kMinQSortSize = 32;
+
 			if(startIndex < endIndex)
 			{
-				if (endIndex - startIndex < MIN_QSORT_SIZE)
+				if (endIndex - startIndex < kMinQSortSize)
 					insertionSort(vals, startIndex, endIndex, comparer);
 				else
 				{
-					int pivotIndex = (startIndex + endIndex) >> 1;
-					int pivotNewIndex = partition(vals, startIndex, endIndex, pivotIndex, comparer);
+                    Index pivotIndex = (startIndex + endIndex) >> 1;
+                    Index pivotNewIndex = partition(vals, startIndex, endIndex, pivotIndex, comparer);
 					quickSort(vals, startIndex, pivotNewIndex - 1, comparer);
 					quickSort(vals, pivotNewIndex + 1, endIndex, comparer);
 				}
@@ -506,12 +507,12 @@ namespace Slang
 
 		}
 		template<typename Comparer>
-		int partition(T* vals, int left, int right, int pivotIndex, Comparer comparer)
+        Index partition(T* vals, Index left, Index right, Index pivotIndex, Comparer comparer)
 		{
 			T pivotValue = vals[pivotIndex];
 			swapElements(vals, right, pivotIndex);
-			int storeIndex = left;
-			for (int i = left; i < right; i++)
+            Index storeIndex = left;
+			for (Index i = left; i < right; i++)
 			{
 				if (comparer(vals[i], pivotValue))
 				{
@@ -523,12 +524,12 @@ namespace Slang
 			return storeIndex;
 		}
 		template<typename Comparer>
-		void insertionSort(T* vals, int startIndex, int endIndex, Comparer comparer)
+		void insertionSort(T* vals, Index startIndex, Index endIndex, Comparer comparer)
 		{
-			for (int i = startIndex  + 1; i <= endIndex; i++)
+			for (Index i = startIndex  + 1; i <= endIndex; i++)
 			{
 				T insertValue = static_cast<T&&>(vals[i]);
-				int insertIndex = i - 1;
+                Index insertIndex = i - 1;
 				while (insertIndex >= startIndex && comparer(insertValue, vals[insertIndex]))
 				{
 					vals[insertIndex + 1] = static_cast<T&&>(vals[insertIndex]);
@@ -538,7 +539,7 @@ namespace Slang
 			}
 		}
 
-		inline void swapElements(T* vals, int index1, int index2)
+		inline void swapElements(T* vals, Index index1, Index index2)
 		{
 			if (index1 != index2)
 			{
@@ -549,12 +550,12 @@ namespace Slang
 		}
 
 		template<typename T2, typename Comparer>
-		int binarySearch(const T2& obj, Comparer comparer)
+        Index binarySearch(const T2& obj, Comparer comparer)
 		{
-			int imin = 0, imax = m_count - 1;
+            Index imin = 0, imax = m_count - 1;
 			while (imax >= imin)
 			{
-				int imid = (imin + imax) >> 1;
+                Index imid = (imin + imax) >> 1;
 				int compareResult = comparer(m_buffer[imid], obj);
 				if (compareResult == 0)
 					return imid;
@@ -582,8 +583,8 @@ namespace Slang
 		}
     private:
         T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
-        UInt    m_capacity;         ///< The total capacity of elements
-        UInt    m_count;            ///< The amount of elements
+        Index    m_capacity;         ///< The total capacity of elements
+        Index    m_count;            ///< The amount of elements
 
         void _deallocateBuffer()
         {
@@ -593,9 +594,9 @@ namespace Slang
                 m_buffer = nullptr;
             }
         }
-        static inline T* _allocate(UInt size)
+        static inline T* _allocate(Index count)
         {
-            return AllocateMethod<T, TAllocator>::allocateArray(size);
+            return AllocateMethod<T, TAllocator>::allocateArray(count);
         }
 
         template<typename... Args>
@@ -610,7 +611,7 @@ namespace Slang
 	T calcMin(const List<T>& list)
 	{
 		T minVal = list.getFirst();
-		for (int i = 1; i < list.getCount(); i++)
+		for (Index i = 1; i < list.getCount(); i++)
 			if (list[i] < minVal)
 				minVal = list[i];
 		return minVal;
@@ -620,7 +621,7 @@ namespace Slang
 	T calcMax(const List<T>& list)
 	{
 		T maxVal = list.getFirst();
-		for (int i = 1; i< list.getCount(); i++)
+		for (Index i = 1; i< list.getCount(); i++)
 			if (list[i] > maxVal)
 				maxVal = list[i];
 		return maxVal;
