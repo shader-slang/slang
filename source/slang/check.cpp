@@ -2869,7 +2869,7 @@ namespace Slang
                 else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
                 {
                     // check arguments against attribute parameters defined in attribClassDecl
-                    uint32_t paramIndex = 0;
+                    Index paramIndex = 0;
                     auto params = attribClassDecl->getMembersOfType<ParamDecl>();
                     for (auto paramDecl : params)
                     {
@@ -6875,7 +6875,7 @@ namespace Slang
             candidate.subst = genSubst;
             auto& checkedArgs = genSubst->args;
 
-            uint32_t aa = 0;
+            Index aa = 0;
             for (auto memberRef : getMembers(genericDeclRef))
             {
                 if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())

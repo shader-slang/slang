@@ -1922,7 +1922,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 // Work out the fixed source location
                 SourceLoc sourceLoc = SourceLoc::fromRaw(int(run.m_sourceLoc) + fixSourceLoc); 
 
-                SLANG_ASSERT(uint32_t(run.m_startInstIndex) + run.m_numInst <= insts.getCount());
+                SLANG_ASSERT(Index(uint32_t(run.m_startInstIndex) + run.m_numInst) <= insts.getCount());
                 IRInst** dstInsts = insts.getBuffer() + int(run.m_startInstIndex);
 
                 const int runSize = int(run.m_numInst);
