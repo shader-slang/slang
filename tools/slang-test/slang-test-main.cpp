@@ -2248,7 +2248,7 @@ void runTestsInDirectory(
     {
         if( shouldRunTest(context, file) )
         {
-//            fprintf(stderr, "slang-test: found '%s'\n", file.Buffer());
+//            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
             runTestsOnFile(context, file);
         }
     }

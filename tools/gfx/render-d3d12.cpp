@@ -1000,7 +1000,7 @@ Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& sign
         // Describe and create the compute pipeline state object
         D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
         computeDesc.pRootSignature = rootSignature;
-        computeDesc.CS = { m_boundShaderProgram->m_computeShader.Buffer(), m_boundShaderProgram->m_computeShader.Count() };
+        computeDesc.CS = { m_boundShaderProgram->m_computeShader.getBuffer(), m_boundShaderProgram->m_computeShader.Count() };
         SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
     }
 
@@ -2052,7 +2052,7 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
                     }
                 }
 
-                //assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
+                //assert(srcRow == (const uint8_t*)(srcMip.getBuffer() + srcMip.getCount()));
             }
             uploadResource->Unmap(0, nullptr);
 

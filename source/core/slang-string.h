@@ -490,8 +490,9 @@ namespace Slang
 			if (!m_buffer)
 				return StringSlice();
 			Index startIndex = 0;
+            const char*const data = getData();
 			while (startIndex < getLength() &&
-				(getData()[startIndex] == ' ' || getData()[startIndex] == '\t' || getData()[startIndex] == '\r' || getData()[startIndex] == '\n'))
+				(data[startIndex] == ' ' || data[startIndex] == '\t' || data[startIndex] == '\r' || data[startIndex] == '\n'))
 				startIndex++;
             return StringSlice(m_buffer, startIndex, getLength());
 		}
@@ -502,8 +503,9 @@ namespace Slang
 				return StringSlice();
 
 			Index endIndex = getLength();
+            const char*const data = getData();
 			while (endIndex > 0 &&
-				(getData()[endIndex-1] == ' ' || getData()[endIndex-1] == '\t' || getData()[endIndex-1] == '\r' || getData()[endIndex-1] == '\n'))
+				(data[endIndex-1] == ' ' || data[endIndex-1] == '\t' || data[endIndex-1] == '\r' || data[endIndex-1] == '\n'))
 				endIndex--;
 
             return StringSlice(m_buffer, 0, endIndex);
@@ -515,12 +517,13 @@ namespace Slang
 				return StringSlice();
 
 			Index startIndex = 0;
+            const char*const data = getData();
 			while (startIndex < getLength() &&
-				(getData()[startIndex] == ' ' || getData()[startIndex] == '\t'))
+				(data[startIndex] == ' ' || data[startIndex] == '\t'))
 				startIndex++;
             Index endIndex = getLength();
 			while (endIndex > startIndex &&
-				(getData()[endIndex-1] == ' ' || getData()[endIndex-1] == '\t'))
+				(data[endIndex-1] == ' ' || data[endIndex-1] == '\t'))
 				endIndex--;
 
             return StringSlice(m_buffer, startIndex, endIndex);
@@ -549,7 +552,7 @@ namespace Slang
 
         OSString toWString(Index* len = 0) const;
 
-		bool Equals(const String & str, bool caseSensitive = true)
+		bool equals(const String & str, bool caseSensitive = true)
 		{
 			if (caseSensitive)
 				return (strcmp(begin(), str.begin()) == 0);
@@ -623,7 +626,7 @@ namespace Slang
 			if (id >= getLength())
 				return Index(-1);
 			auto findRs = strstr(begin() + id, str);
-			UInt res = findRs ? findRs - begin() : -1;
+			Index res = findRs ? findRs - begin() : Index(-1);
 			return res;
 		}
 
@@ -682,7 +685,8 @@ namespace Slang
             Index strLen = Index(::strlen(str));
 			if (strLen > getLength())
 				return false;
-            const char* data = getData();
+
+            const char*const data = getData();
 
 			for (Index i = 0; i < strLen; i++)
 				if (str[i] != data[i])
@@ -699,12 +703,15 @@ namespace Slang
 		{
 			if (!m_buffer)
 				return false;
-			Index strLen = Index(::strlen(str));
-			if (strLen > getLength())
+
+			const Index strLen = Index(::strlen(str));
+            const Index len = getLength();
+
+			if (strLen > len)
 				return false;
             const char* data = getData();
 			for (Index i = strLen; i > 0; i--)
-				if (str[i-1] != data[getLength() - strLen + i-1])
+				if (str[i-1] != data[len - strLen + i-1])
 					return false;
 			return true;
 		}

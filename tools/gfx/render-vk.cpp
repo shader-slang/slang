@@ -619,7 +619,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
             vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
 
             vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
-            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
+            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.getBuffer();
         }
 
         //

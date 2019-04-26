@@ -404,7 +404,7 @@ static bool checkValidResult(OSFindFilesResult& result)
     String path = result.directoryPath_
         + String(result.entry_->d_name);
 
-//    fprintf(stderr, "stat(%s)\n", path.Buffer());
+//    fprintf(stderr, "stat(%s)\n", path.getBuffer());
     struct stat fileInfo;
     if(stat(path.getBuffer(), &fileInfo) != 0)
         return false;
@@ -442,7 +442,7 @@ OSFindFilesResult osFindFilesInDirectory(
 {
     OSFindFilesResult result;
 
-//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.Buffer());
+//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
 
     result.directory_ = opendir(directoryPath.getBuffer());
     if(!result.directory_)
@@ -518,7 +518,7 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
     List<char const*> argPtrs;
     for(auto arg : arguments_)
     {
-        argPtrs.add(arg.Buffer());
+        argPtrs.add(arg.getBuffer());
     }
     argPtrs.add(NULL);
 

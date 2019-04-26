@@ -2097,7 +2097,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                     else
                         context->OMSetRenderTargetsAndUnorderedAccessViews(
                             m_currentBindings->getDesc().m_numRenderTargets,
-                            m_renderTargetViews.Buffer()->readRef(),
+                            m_renderTargetViews.getBuffer()->readRef(),
                             m_depthStencilView,
                             bindingIndex,
                             1,

@@ -392,7 +392,7 @@ void TestReporter::_addResult(const TestInfo& info)
                 messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.toWString().begin());
 
 #if 0
-                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
+                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.getBuffer(),
                     spawner.getResultCode(),
                     spawner.getStandardOutput().begin(),
                     spawner.getStandardError().begin());
