@@ -118,7 +118,7 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
         }
     }
 
-    m_entries.Compress();
+    m_entries.compress();
 }
 
 Name* StringRepresentationCache::getName(Handle handle)

@@ -153,7 +153,7 @@ namespace Slang {
     }
 
     encodeArrayOut.setSize(UInt(encodeOut - encodeArrayOut.begin()));
-    encodeArrayOut.Compress();
+    encodeArrayOut.compress();
 }
 
 /* static */int ByteEncodeUtil::encodeLiteUInt32(uint32_t in, uint8_t out[kMaxLiteEncodeUInt32])

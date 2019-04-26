@@ -302,7 +302,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
         // Make null terminated
         dst[outSize] = 0;
         // Remove terminating 0 from array
-        out.UnsafeShrinkToSize(prevSize + outSize);
+        out.unsafeShrinkToSize(prevSize + outSize);
     }
 }
 

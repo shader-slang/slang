@@ -464,12 +464,12 @@ namespace Slang
 			m_size = size;
 		}
 
-		void UnsafeShrinkToSize(UInt size)
+		void unsafeShrinkToSize(UInt size)
 		{
 			m_size = size;
 		}
 
-		void Compress()
+		void compress()
 		{
 			if (m_capacity > m_size && m_size > 0)
 			{
@@ -490,7 +490,7 @@ namespace Slang
 		}
 
 		template<typename Func>
-		UInt FindFirst(const Func& predicate) const
+		UInt findFirstIndex(const Func& predicate) const
 		{
 			for (UInt i = 0; i < m_size; i++)
 			{
@@ -501,7 +501,7 @@ namespace Slang
 		}
 
 		template<typename Func>
-		UInt FindLast(const Func& predicate) const
+		UInt findLastIndex(const Func& predicate) const
 		{
 			for (UInt i = m_size; i > 0; i--)
 			{
@@ -538,12 +538,9 @@ namespace Slang
 			Sort([](const T& t1, const T& t2){return t1 < t2;});
 		}
 
-		bool Contains(const T& val)
+		bool Contains(const T& val) const
 		{
-			for (UInt i = 0; i< m_size; i++)
-				if (m_buffer[i] == val)
-					return true;
-			return false;
+            return IndexOf(val) != UInt(-1);
 		}
 
 		template<typename Comparer>

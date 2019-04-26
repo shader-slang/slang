@@ -1843,7 +1843,7 @@ static TypeLayoutResult _createTypeLayout(
 
 int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
 {
-    return (int)genericParameters.FindFirst([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
+    return (int)genericParameters.findFirstIndex([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
 }
 
 // When constructing a new var layout from an existing one,
