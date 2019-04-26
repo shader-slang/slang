@@ -3,6 +3,8 @@
 
 #include "../../slang.h"
 
+#include <assert.h>
+
 #include <cstdint>
 
 #ifdef __GNUC__

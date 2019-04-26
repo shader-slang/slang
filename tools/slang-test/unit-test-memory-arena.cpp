@@ -2,7 +2,6 @@
 
 #include "../../source/core/slang-memory-arena.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 

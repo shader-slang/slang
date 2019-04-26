@@ -4,7 +4,6 @@
 #include "os.h"
 #include "../../source/core/slang-string-util.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 

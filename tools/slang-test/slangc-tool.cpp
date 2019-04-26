@@ -1,6 +1,8 @@
 // test-context.cpp
 #include "slangc-tool.h"
 
+#include "../../source/core/exception.h"
+
 using namespace Slang;
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);

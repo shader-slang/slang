@@ -4,7 +4,6 @@
 //WORKING:#include "options.h"
 #include "render.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "core/basic.h"

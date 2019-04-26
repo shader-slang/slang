@@ -1,7 +1,6 @@
 // os.cpp
 #include "os.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 

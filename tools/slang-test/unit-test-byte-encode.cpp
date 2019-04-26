@@ -2,7 +2,6 @@
 
 #include "../../source/core/slang-byte-encode-util.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
