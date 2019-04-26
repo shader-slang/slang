@@ -896,7 +896,7 @@ int main(
         outputPath << inputPath << ".temp.h";
 
         FILE* outputStream;
-        fopen_s(&outputStream, outputPath.Buffer(), "w");
+        fopen_s(&outputStream, outputPath.getBuffer(), "w");
 
         emitTemplateNodes(sourceFile, outputStream, node);
 
@@ -907,13 +907,13 @@ int main(
         outputPathFinal << inputPath << ".h";
 
         String allTextOld, allTextNew;
-        readAllText(outputPathFinal.Buffer(), allTextOld);
-        readAllText(outputPath.Buffer(), allTextNew);
+        readAllText(outputPathFinal.getBuffer(), allTextOld);
+        readAllText(outputPath.getBuffer(), allTextNew);
         if (allTextOld != allTextNew)
         {
-            writeAllText(inputPath, outputPathFinal.Buffer(), allTextNew.Buffer());
+            writeAllText(inputPath, outputPathFinal.getBuffer(), allTextNew.getBuffer());
         }
-        remove(outputPath.Buffer());
+        remove(outputPath.getBuffer());
     }
 
     return 0;

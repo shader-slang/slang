@@ -675,7 +675,7 @@ namespace Slang
         StringBuilder sb;
         sb << "\"";
         const Index length = str.getLength();
-        const char*const data = str.Buffer();
+        const char*const data = str.getBuffer();
         for (Index i = 0; i < length; i++)
         {
             switch (data[i])
@@ -717,7 +717,7 @@ namespace Slang
     {
         StringBuilder sb;
         const Index length = str.getLength();
-        const char*const data = str.Buffer();
+        const char*const data = str.getBuffer();
         for (Index i = 0; i < length; i++)
         {
             if (data[i] == '\\' && i < length - 1)

@@ -35,10 +35,10 @@ namespace Slang
 	{
 #ifdef _WIN32
 		struct _stat32 statVar;
-		return ::_wstat32(((String)fileName).ToWString(), &statVar) != -1;
+		return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
 #else
 		struct stat statVar;
-		return ::stat(fileName.Buffer(), &statVar) == 0;
+		return ::stat(fileName.getBuffer(), &statVar) == 0;
 #endif
 	}
 
@@ -56,7 +56,7 @@ namespace Slang
 		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos == -1)
 			dotPos = path.getLength();
-		sb.Append(path.Buffer(), dotPos);
+		sb.Append(path.getBuffer(), dotPos);
 		sb.Append('.');
 		sb.Append(newExt);
 		return sb.ProduceString();
@@ -287,9 +287,9 @@ namespace Slang
 	bool Path::createDirectory(const String& path)
 	{
 #if defined(_WIN32)
-		return _wmkdir(path.ToWString()) == 0;
+		return _wmkdir(path.toWString()) == 0;
 #else 
-		return mkdir(path.Buffer(), 0777) == 0;
+		return mkdir(path.getBuffer(), 0777) == 0;
 #endif
 	}
 
@@ -298,7 +298,7 @@ namespace Slang
 #ifdef _WIN32
         // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
         struct _stat32 statVar;
-        if (::_wstat32(String(path).ToWString(), &statVar) == 0)
+        if (::_wstat32(String(path).toWString(), &statVar) == 0)
         {
             if (statVar.st_mode & _S_IFDIR)
             {
@@ -316,7 +316,7 @@ namespace Slang
         return SLANG_E_NOT_FOUND;
 #else
         struct stat statVar;
-        if (::stat(path.Buffer(), &statVar) == 0)
+        if (::stat(path.getBuffer(), &statVar) == 0)
         {
             if (S_ISDIR(statVar.st_mode))
             {
@@ -340,7 +340,7 @@ namespace Slang
     {
 #if defined(_WIN32)
         // https://msdn.microsoft.com/en-us/library/506720ff.aspx
-        wchar_t* absPath = ::_wfullpath(nullptr, path.ToWString(), 0);
+        wchar_t* absPath = ::_wfullpath(nullptr, path.toWString(), 0);
         if (!absPath)
         {
             return SLANG_FAIL;

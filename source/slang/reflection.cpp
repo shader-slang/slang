@@ -137,7 +137,7 @@ SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttri
 {
     auto userAttr = convert(attrib);
     if (!userAttr) return nullptr;
-    return userAttr->getName()->text.Buffer();
+    return userAttr->getName()->text.getBuffer();
 }
 SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib)
 {
@@ -871,9 +871,9 @@ SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVa
     // If the variable is one that has an "external" name that is supposed
     // to be exposed for reflection, then report it here
     if(auto reflectionNameMod = var->FindModifier<ParameterGroupReflectionName>())
-        return getText(reflectionNameMod->nameAndLoc.name).Buffer();
+        return getText(reflectionNameMod->nameAndLoc.name).getBuffer();
 
-    return getText(var->getName()).Buffer();
+    return getText(var->getName()).getBuffer();
 }
 
 SLANG_API SlangReflectionType* spReflectionVariable_GetType(SlangReflectionVariable* inVar)
@@ -1046,7 +1046,7 @@ SLANG_API char const* spReflectionVariableLayout_GetSemanticName(SlangReflection
     if (!(varLayout->flags & Slang::VarLayoutFlag::HasSemantic))
         return 0;
 
-    return varLayout->semanticName.Buffer();
+    return varLayout->semanticName.getBuffer();
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetSemanticIndex(SlangReflectionVariableLayout* inVarLayout)
@@ -1259,7 +1259,7 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
 SLANG_API char const* spReflectionTypeParameter_GetName(SlangReflectionTypeParameter * inTypeParam)
 {
     auto typeParam = convert(inTypeParam);
-    return typeParam->decl->getName()->text.Buffer();
+    return typeParam->decl->getName()->text.getBuffer();
 }
 
 SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParameter * inTypeParam)

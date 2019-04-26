@@ -3766,7 +3766,7 @@ namespace Slang
 
         dumpInst(&context, globalVal);
 
-        writer->write(sb.Buffer(), sb.getLength());
+        writer->write(sb.getBuffer(), sb.getLength());
         writer->flush();
     }
 
@@ -3780,7 +3780,7 @@ namespace Slang
     void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode)
     {
         String ir = getSlangIRAssembly(module, mode);
-        writer->write(ir.Buffer(), ir.getLength());
+        writer->write(ir.getBuffer(), ir.getLength());
         writer->flush();
     }
 

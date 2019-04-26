@@ -188,7 +188,7 @@ struct IncludeHandlerImpl : IncludeHandler
     {
         ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
         ComPtr<ISlangBlob> simplifiedPath;
-        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.Buffer(), simplifiedPath.writeRef())))
+        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
         {
             return path;
         }
@@ -472,7 +472,7 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
 
 SlangResult Linkage::loadFile(String const& path, ISlangBlob** outBlob)
 {
-    return fileSystemExt->loadFile(path.Buffer(), outBlob);
+    return fileSystemExt->loadFile(path.getBuffer(), outBlob);
 }
 
 RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
@@ -1263,7 +1263,7 @@ RefPtr<Module> Linkage::findOrImportModule(
 
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
-    if(SLANG_FAILED(getFileSystemExt()->loadFile(filePathInfo.foundPath.Buffer(), fileContents.writeRef())))
+    if(SLANG_FAILED(getFileSystemExt()->loadFile(filePathInfo.foundPath.getBuffer(), fileContents.writeRef())))
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -1516,7 +1516,7 @@ void Session::addBuiltinSource(
     SlangResult res = compileRequest->executeActionsInner();
     if (SLANG_FAILED(res))
     {
-        char const* diagnostics = sink.outputBuffer.Buffer();
+        char const* diagnostics = sink.outputBuffer.getBuffer();
         fprintf(stderr, "%s", diagnostics);
 
 #ifdef _WIN32
@@ -2305,7 +2305,7 @@ SLANG_API void const* spGetEntryPointCode(
         break;
 
     case ResultFormat::Text:
-        data = result.outputString.Buffer();
+        data = result.outputString.getBuffer();
         size = result.outputString.getLength();
         break;
     }

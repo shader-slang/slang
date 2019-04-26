@@ -129,24 +129,24 @@ namespace Slang
 	int StringToInt(const String & str, int radix)
 	{
 		if (str.startsWith("0x"))
-			return (int)strtoll(str.Buffer(), NULL, 16);
+			return (int)strtoll(str.getBuffer(), NULL, 16);
 		else
-			return (int)strtoll(str.Buffer(), NULL, radix);
+			return (int)strtoll(str.getBuffer(), NULL, radix);
 	}
 	unsigned int StringToUInt(const String & str, int radix)
 	{
 		if (str.startsWith("0x"))
-			return (unsigned int)strtoull(str.Buffer(), NULL, 16);
+			return (unsigned int)strtoull(str.getBuffer(), NULL, 16);
 		else
-			return (unsigned int)strtoull(str.Buffer(), NULL, radix);
+			return (unsigned int)strtoull(str.getBuffer(), NULL, radix);
 	}
 	double StringToDouble(const String & str)
 	{
-		return (double)strtod(str.Buffer(), NULL);
+		return (double)strtod(str.getBuffer(), NULL);
 	}
 	float StringToFloat(const String & str)
 	{
-		return strtof(str.Buffer(), NULL);
+		return strtof(str.getBuffer(), NULL);
 	}
 
 #if 0
@@ -200,7 +200,7 @@ namespace Slang
 		return String(buf);
 	}
 
-	OSString String::ToWString(Index* outLength) const
+	OSString String::toWString(Index* outLength) const
 	{
 		if (!m_buffer)
 		{

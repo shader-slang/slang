@@ -113,11 +113,11 @@ namespace Slang
 		}
         if (share == Slang::FileShare::None)
 #pragma warning(suppress:4996)
-            handle = _wfopen(fileName.ToWString(), mode);
+            handle = _wfopen(fileName.toWString(), mode);
         else
-			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
+			handle = _wfsopen(fileName.toWString(), mode, shFlag);
 #else
-		handle = fopen(fileName.Buffer(), modeMBCS);
+		handle = fopen(fileName.getBuffer(), modeMBCS);
 #endif
 		if (!handle)
 		{

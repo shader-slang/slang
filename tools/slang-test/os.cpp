@@ -62,7 +62,7 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
-        searchPath.ToWString(),
+        searchPath.toWString(),
         &result.fileData_);
 
     result.directoryPath_ = directoryPath;
@@ -100,7 +100,7 @@ OSFindFilesResult osFindChildDirectories(
 
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
-        searchPath.ToWString(),
+        searchPath.toWString(),
         &result.fileData_);
 
     result.directoryPath_ = directoryPath;
@@ -320,8 +320,8 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
 
     // `CreateProcess` requires write access to this, for some reason...
     BOOL success = CreateProcessW(
-        isExecutablePath_ ? executableName_.ToWString().begin() : nullptr,
-        (LPWSTR)commandLine_.ToString().ToWString().begin(),
+        isExecutablePath_ ? executableName_.toWString().begin() : nullptr,
+        (LPWSTR)commandLine_.ToString().toWString().begin(),
         nullptr,
         nullptr,
         true,
@@ -406,7 +406,7 @@ static bool checkValidResult(OSFindFilesResult& result)
 
 //    fprintf(stderr, "stat(%s)\n", path.Buffer());
     struct stat fileInfo;
-    if(stat(path.Buffer(), &fileInfo) != 0)
+    if(stat(path.getBuffer(), &fileInfo) != 0)
         return false;
 
     if(S_ISDIR(fileInfo.st_mode))
@@ -444,7 +444,7 @@ OSFindFilesResult osFindFilesInDirectory(
 
 //    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.Buffer());
 
-    result.directory_ = opendir(directoryPath.Buffer());
+    result.directory_ = opendir(directoryPath.getBuffer());
     if(!result.directory_)
     {
         result.entry_ = NULL;
@@ -461,7 +461,7 @@ OSFindFilesResult osFindChildDirectories(
 {
     OSFindFilesResult result;
 
-    result.directory_ = opendir(directoryPath.Buffer());
+    result.directory_ = opendir(directoryPath.getBuffer());
     if(!result.directory_)
     {
         result.entry_ = NULL;

@@ -287,7 +287,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& in
         StringBuilder messageBuilder;
         formatDiagnostic(this, diagnostic, messageBuilder);
 
-        writer->write(messageBuilder.Buffer(), messageBuilder.getLength());
+        writer->write(messageBuilder.getBuffer(), messageBuilder.getLength());
     }
     else
     {

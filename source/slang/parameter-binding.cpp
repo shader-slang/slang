@@ -584,7 +584,7 @@ static bool findLayoutArg(
     {
         if( modifier )
         {
-            *outVal = (UInt) strtoull(String(modifier->valToken.Content).Buffer(), nullptr, 10);
+            *outVal = (UInt) strtoull(String(modifier->valToken.Content).getBuffer(), nullptr, 10);
             return true;
         }
     }

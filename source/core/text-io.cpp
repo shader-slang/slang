@@ -15,7 +15,7 @@ namespace Slang
 	public:
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			result.addRange(str.Buffer(), str.getLength());
+			result.addRange(str.getBuffer(), str.getLength());
 		}
 		virtual String ToString(const char * bytes, int /*length*/) override
 		{

@@ -568,7 +568,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     {
         if (!gOptions.onlyStartup)
         {
-            fprintf(stderr, "Unable to create renderer %s\n", rendererName.Buffer());
+            fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
         }
         return SLANG_FAIL;
     }
@@ -584,7 +584,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         {
             if (!gOptions.onlyStartup)
             {
-                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.Buffer());
+                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.getBuffer());
             }
             return res;
         }

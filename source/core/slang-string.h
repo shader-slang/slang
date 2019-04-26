@@ -542,12 +542,12 @@ namespace Slang
             return StringSlice(m_buffer, id, id + len);
 		}
 
-		char const* Buffer() const
+		char const* getBuffer() const
 		{
             return getData();
 		}
 
-        OSString ToWString(Index* len = 0) const;
+        OSString toWString(Index* len = 0) const;
 
 		bool Equals(const String & str, bool caseSensitive = true)
 		{
@@ -851,7 +851,7 @@ namespace Slang
 		}
 		void Append(const String & str)
 		{
-			Append(str.Buffer(), str.getLength());
+			Append(str.getBuffer(), str.getLength());
 		}
 		void Append(const char * str)
 		{

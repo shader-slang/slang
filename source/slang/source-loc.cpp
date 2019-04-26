@@ -331,7 +331,7 @@ String SourceFile::calcVerbosePath() const
     {
         String canonicalPath;
         ComPtr<ISlangBlob> canonicalPathBlob;
-        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.Buffer(), canonicalPathBlob.writeRef())))
+        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.getBuffer(), canonicalPathBlob.writeRef())))
         {
             canonicalPath = StringUtil::getString(canonicalPathBlob);
         }

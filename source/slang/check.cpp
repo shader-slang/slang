@@ -2916,7 +2916,7 @@ namespace Slang
                     }
 
                     ImageFormat format = ImageFormat::unknown;
-                    if(!findImageFormatByName(formatName.Buffer(), &format))
+                    if(!findImageFormatByName(formatName.getBuffer(), &format))
                     {
                         getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
                     }

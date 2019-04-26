@@ -396,7 +396,7 @@ OSError spawnAndWaitExe(TestContext* context, const String& testPath, OSProcessS
     if (err != kOSError_None)
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.ToWString().begin());
+        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
     }
     return err;
 }
@@ -451,10 +451,10 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         }
 
         List<const char*> args;
-        args.add(exeName.Buffer());
+        args.add(exeName.getBuffer());
         for (int i = 0; i < int(spawner.argumentList_.getCount()); ++i)
         {
-            args.add(spawner.argumentList_[i].Buffer());
+            args.add(spawner.argumentList_[i].getBuffer());
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
@@ -887,7 +887,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     }
 
     // Couldn't find either 
-    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.Buffer(), specializedBuf.Buffer());
+    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
 
     return "";
 }
@@ -1523,12 +1523,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     if (!File::exists(actualOutputFile))
     {
         printf("render-test not producing expected outputs.\n");
-        printf("render-test output:\n%s\n", actualOutput.Buffer());
+        printf("render-test output:\n%s\n", actualOutput.getBuffer());
 		return TestResult::Fail;
     }
     if (!File::exists(referenceOutput))
     {
-        printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
+        printf("referenceOutput %s not found.\n", referenceOutput.getBuffer());
 		return TestResult::Fail;
     }
     auto actualOutputContent = File::readAllText(actualOutputFile);
@@ -1536,7 +1536,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	auto referenceProgramOutput = Split(File::readAllText(referenceOutput), '\n');
     auto printOutput = [&]()
     {
-        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
+        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.getBuffer(), actualOutput.getBuffer());
     };
     if (actualProgramOutput.getCount() < referenceProgramOutput.getCount())
     {
@@ -1709,22 +1709,22 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     String actualPath = filePath + ".actual.png";
 
     STBImage expectedImage;
-    if (SLANG_FAILED(expectedImage.read(expectedPath.Buffer())))
+    if (SLANG_FAILED(expectedImage.read(expectedPath.getBuffer())))
     {
-        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.Buffer());
+        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.getBuffer());
         return TestResult::Fail;
     }
 
     STBImage actualImage;
-    if (SLANG_FAILED(actualImage.read(actualPath.Buffer())))
+    if (SLANG_FAILED(actualImage.read(actualPath.getBuffer())))
     {
-        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.Buffer());
+        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.getBuffer());
         return TestResult::Fail;
     }
 
     if (!expectedImage.isComparable(actualImage))
     {
-        reporter->messageFormat(TestMessageType::TestFailure, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
+        reporter->messageFormat(TestMessageType::TestFailure, "Images are different sizes '%s' '%s'", actualPath.getBuffer(), expectedPath.getBuffer());
         return TestResult::Fail;
     }
 
@@ -2343,7 +2343,7 @@ SlangResult innerMain(int argc, char** argv)
         auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
         if (!func)
         {
-            StdWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.Buffer());
+            StdWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.getBuffer());
             return SLANG_FAIL;
         }
 
@@ -2353,7 +2353,7 @@ SlangResult innerMain(int argc, char** argv)
         args.setCount(srcArgs.getCount());
         for (Index i = 0; i < srcArgs.getCount(); ++i)
         {
-            args[i] = srcArgs[i].Buffer();
+            args[i] = srcArgs[i].getBuffer();
         }
 
         return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());

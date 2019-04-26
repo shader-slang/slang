@@ -1586,7 +1586,7 @@ static SlangResult readFile(
     //
     auto linkage = context->preprocessor->linkage;
     auto fileSystemExt = linkage->getFileSystemExt();
-    SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.Buffer(), outBlob));
+    SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
 
     // If we are running the preprocessor as part of compiling a
     // specific module, then we must keep track of the file we've
@@ -1939,7 +1939,7 @@ static const PragmaDirective kUnknownPragmaDirective = {
 // Look up the `#pragma` directive with the given name.
 static PragmaDirective const* findPragmaDirective(String const& name)
 {
-    char const* nameStr = name.Buffer();
+    char const* nameStr = name.getBuffer();
     for (int ii = 0; kPragmaDirectives[ii].name; ++ii)
     {
         if (strcmp(kPragmaDirectives[ii].name, nameStr) != 0)
@@ -2037,7 +2037,7 @@ static const PreprocessorDirective kInvalidDirective = {
 // Look up the directive with the given name.
 static PreprocessorDirective const* FindDirective(String const& name)
 {
-    char const* nameStr = name.Buffer();
+    char const* nameStr = name.getBuffer();
     for (int ii = 0; kDirectives[ii].name; ++ii)
     {
         if (strcmp(kDirectives[ii].name, nameStr) != 0)

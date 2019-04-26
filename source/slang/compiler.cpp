@@ -90,7 +90,7 @@ namespace Slang
 
         if (appendTo == ResultFormat::Text)
         {
-            outputString.append(result.outputString.Buffer());
+            outputString.append(result.outputString.getBuffer());
         }
         else if (appendTo == ResultFormat::Binary)
         {
@@ -687,7 +687,7 @@ namespace Slang
         }
 
         auto hlslCode = emitHLSLForEntryPoint(compileRequest, entryPoint, entryPointIndex, targetReq, endToEndReq);
-        maybeDumpIntermediate(compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
+        maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
 
@@ -704,15 +704,15 @@ namespace Slang
             for( auto& define :  translationUnit->compileRequest->preprocessorDefinitions )
             {
                 D3D_SHADER_MACRO dxMacro;
-                dxMacro.Name = define.Key.Buffer();
-                dxMacro.Definition = define.Value.Buffer();
+                dxMacro.Name = define.Key.getBuffer();
+                dxMacro.Definition = define.Value.getBuffer();
                 dxMacrosStorage.add(dxMacro);
             }
             for( auto& define : translationUnit->preprocessorDefinitions )
             {
                 D3D_SHADER_MACRO dxMacro;
-                dxMacro.Name = define.Key.Buffer();
-                dxMacro.Definition = define.Value.Buffer();
+                dxMacro.Name = define.Key.getBuffer();
+                dxMacro.Definition = define.Value.getBuffer();
                 dxMacrosStorage.add(dxMacro);
             }
             D3D_SHADER_MACRO nullTerminator = { 0, 0 };
@@ -775,11 +775,11 @@ namespace Slang
         HRESULT hr = compileFunc(
             hlslCode.begin(),
             hlslCode.getLength(),
-            sourcePath.Buffer(),
+            sourcePath.getBuffer(),
             dxMacros,
             nullptr,
             getText(entryPoint->getName()).begin(),
-            GetHLSLProfileName(profile).Buffer(),
+            GetHLSLProfileName(profile).getBuffer(),
             flags,
             0, // unused: effect flags
             codeBlob.writeRef(),
@@ -963,7 +963,7 @@ SlangResult dissassembleDXILUsingDXC(
             entryPointIndex,
             targetReq,
             endToEndReq);
-        maybeDumpIntermediate(slangRequest, rawGLSL.Buffer(), CodeGenTarget::GLSL);
+        maybeDumpIntermediate(slangRequest, rawGLSL.getBuffer(), CodeGenTarget::GLSL);
 
         auto outputFunc = [](void const* data, size_t size, void* userData)
         {
@@ -974,7 +974,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         glslang_CompileRequest request;
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-        request.sourcePath = sourcePath.Buffer();
+        request.sourcePath = sourcePath.getBuffer();
         request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin  = rawGLSL.begin();
@@ -1033,7 +1033,7 @@ SlangResult dissassembleDXILUsingDXC(
                     entryPointIndex,
                     targetReq,
                     endToEndReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -1046,7 +1046,7 @@ SlangResult dissassembleDXILUsingDXC(
                     entryPointIndex,
                     targetReq,
                     endToEndReq);
-                maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }
             break;
@@ -1080,7 +1080,7 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq,
                     code)))
                 {
-                    maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                     result = CompileResult(code);
                 }
             }
@@ -1123,7 +1123,7 @@ SlangResult dissassembleDXILUsingDXC(
                         code.getCount(), 
                         assembly);
 
-                    maybeDumpIntermediate(compileRequest, assembly.Buffer(), target);
+                    maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
 
                     result = CompileResult(assembly);
                 }
@@ -1159,7 +1159,7 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq,
                     code)))
                 {
-                    maybeDumpIntermediate(compileRequest, code.Buffer(), target);
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                     result = CompileResult(code);
                 }
             }
@@ -1229,7 +1229,7 @@ SlangResult dissassembleDXILUsingDXC(
         OutputFileKind          kind)
     {
         FILE* file = fopen(
-            path.Buffer(),
+            path.getBuffer(),
             kind == OutputFileKind::Binary ? "wb" : "w");
         if (!file)
         {
@@ -1287,7 +1287,7 @@ SlangResult dissassembleDXILUsingDXC(
         ISlangWriter* writer,
         String const&   text)
     {
-        writer->write(text.Buffer(), text.getLength());
+        writer->write(text.getBuffer(), text.getLength());
     }
 
     static void writeEntryPointResultToStandardOutput(
@@ -1516,7 +1516,7 @@ SlangResult dissassembleDXILUsingDXC(
         path.append(id);
         path.append(ext);
 
-        FILE* file = fopen(path.Buffer(), isBinary ? "wb" : "w");
+        FILE* file = fopen(path.getBuffer(), isBinary ? "wb" : "w");
         if (!file) return;
 
         fwrite(data, size, 1, file);

@@ -95,7 +95,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
     Slang::List<const char*> rawGlobalTypeNames;
     for (auto typeName : request.globalGenericTypeArguments)
-        rawGlobalTypeNames.add(typeName.Buffer());
+        rawGlobalTypeNames.add(typeName.getBuffer());
     spSetGlobalGenericArgs(
         slangRequest,
         (int)rawGlobalTypeNames.getCount(),
@@ -103,12 +103,12 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
     Slang::List<const char*> rawEntryPointTypeNames;
     for (auto typeName : request.entryPointGenericTypeArguments)
-        rawEntryPointTypeNames.add(typeName.Buffer());
+        rawEntryPointTypeNames.add(typeName.getBuffer());
 
     const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.getCount());
     for(int ii = 0; ii < globalExistentialTypeCount; ++ii )
     {
-        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
+        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].getBuffer());
     }
 
     const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.getCount());
@@ -116,7 +116,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     {
         for( int ii = 0; ii < entryPointExistentialTypeCount; ++ii )
         {
-            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
+            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].getBuffer());
         }
     };
 
