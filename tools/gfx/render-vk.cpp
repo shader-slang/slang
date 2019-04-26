@@ -950,11 +950,11 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     int32_t selectedDeviceIndex = 0;
 
-    if (desc.adapter.Length())
+    if (desc.adapter.getLength())
     {
         selectedDeviceIndex = -1;
 
-        String lowerAdapter = desc.adapter.ToLower();
+        String lowerAdapter = desc.adapter.toLower();
 
         for (int i = 0; i < int(physicalDevices.getCount()); ++i)
         {
@@ -963,9 +963,9 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
             VkPhysicalDeviceProperties basicProps = {};
             m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
 
-            String lowerName = String(basicProps.deviceName).ToLower();
+            String lowerName = String(basicProps.deviceName).toLower();
 
-            if (lowerName.IndexOf(lowerAdapter) != Index(-1))
+            if (lowerName.indexOf(lowerAdapter) != Index(-1))
             {
                 selectedDeviceIndex = i;
                 break;

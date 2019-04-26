@@ -44,15 +44,15 @@ namespace Slang
 
     void ParseOperators(const String & str, List<Token> & tokens, TokenFlags& tokenFlags, int line, int col, int startPos, String fileName)
     {
-        int pos = 0;
-        while (pos < (int)str.Length())
+        Index pos = 0;
+        while (pos < str.getLength())
         {
             wchar_t curChar = str[pos];
-            wchar_t nextChar = (pos < (int)str.Length() - 1) ? str[pos + 1] : '\0';
-            wchar_t nextNextChar = (pos < (int)str.Length() - 2) ? str[pos + 2] : '\0';
+            wchar_t nextChar = (pos < str.getLength() - 1) ? str[pos + 1] : '\0';
+            wchar_t nextNextChar = (pos < str.getLength() - 2) ? str[pos + 2] : '\0';
             auto InsertToken = [&](TokenType type, const String & ct)
             {
-                tokens.add(Token(type, ct, line, col + pos, pos + startPos, fileName, tokenFlags));
+                tokens.add(Token(type, ct, line, int(col + pos), int(pos + startPos), fileName, tokenFlags));
                 tokenFlags = 0;
             };
             switch (curChar)
@@ -323,7 +323,7 @@ namespace Slang
 
     List<Token> TokenizeText(const String & fileName, const String & text)
     {
-        int lastPos = 0, pos = 0;
+        Index lastPos = 0, pos = 0;
         int line = 1, col = 0;
         String file = fileName;
         State state = State::Start;
@@ -335,7 +335,7 @@ namespace Slang
         auto InsertToken = [&](TokenType type)
         {
             derivative = LexDerivative::None;
-            tokenList.add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file, tokenFlags));
+            tokenList.add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, int(pos), file, tokenFlags));
             tokenFlags = 0;
             tokenBuilder.Clear();
         };
@@ -365,10 +365,10 @@ namespace Slang
                 break;
             }
         };
-        while (pos <= (int)text.Length())
+        while (pos <= text.getLength())
         {
-            char curChar = (pos < (int)text.Length() ? text[pos] : ' ');
-            char nextChar = (pos < (int)text.Length() - 1) ? text[pos + 1] : '\0';
+            char curChar = (pos < text.getLength() ? text[pos] : ' ');
+            char nextChar = (pos < text.getLength() - 1) ? text[pos + 1] : '\0';
             if (lastPos != pos)
             {
                 if (curChar == '\n')
@@ -490,7 +490,7 @@ namespace Slang
                 else
                 {
                     //do token analyze
-                    ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.Length()), file);
+                    ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.getLength()), file);
                     tokenBuilder.Clear();
                     state = State::Start;
                 }
@@ -674,9 +674,11 @@ namespace Slang
     {
         StringBuilder sb;
         sb << "\"";
-        for (int i = 0; i < (int)str.Length(); i++)
+        const Index length = str.getLength();
+        const char*const data = str.Buffer();
+        for (Index i = 0; i < length; i++)
         {
-            switch (str[i])
+            switch (data[i])
             {
             case ' ':
                 sb << "\\s";
@@ -703,7 +705,7 @@ namespace Slang
                 sb << "\\\\";
                 break;
             default:
-                sb << str[i];
+                sb << data[i];
                 break;
             }
         }
@@ -714,11 +716,13 @@ namespace Slang
     String UnescapeStringLiteral(String str)
     {
         StringBuilder sb;
-        for (int i = 0; i < (int)str.Length(); i++)
+        const Index length = str.getLength();
+        const char*const data = str.Buffer();
+        for (Index i = 0; i < length; i++)
         {
-            if (str[i] == '\\' && i < (int)str.Length() - 1)
+            if (data[i] == '\\' && i < length - 1)
             {
-                switch (str[i + 1])
+                switch (data[i + 1])
                 {
                 case 's':
                     sb << " ";
@@ -746,12 +750,12 @@ namespace Slang
                     break;
                 default:
                     i = i - 1;
-                    sb << str[i];
+                    sb << data[i];
                 }
                 i++;
             }
             else
-                sb << str[i];
+                sb << data[i];
         }
         return sb.ProduceString();
     }

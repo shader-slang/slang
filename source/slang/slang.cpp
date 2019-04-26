@@ -108,7 +108,7 @@ struct IncludeHandlerImpl : IncludeHandler
         ComPtr<ISlangBlob> combinedPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
         String combinedPath(StringUtil::getString(combinedPathBlob));
-        if (combinedPath.Length() <= 0)
+        if (combinedPath.getLength() <= 0)
         {
             return SLANG_FAIL;
         }
@@ -126,7 +126,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
         // If the rel path exists -> a uniqueIdentity MUST exists too
         String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
-        if (uniqueIdentity.Length() <= 0)
+        if (uniqueIdentity.getLength() <= 0)
         {   
             // Unique identity can't be empty
             return SLANG_FAIL;
@@ -1085,7 +1085,7 @@ void Linkage::loadParsedModule(
 
     // Get a path
     String mostUniqueIdentity = pathInfo.getMostUniqueIdentity();
-    SLANG_ASSERT(mostUniqueIdentity.Length() > 0);
+    SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
     mapPathToLoadedModule.Add(mostUniqueIdentity, loadedModule);
     mapNameToLoadedModules.Add(name, loadedModule);
@@ -2306,7 +2306,7 @@ SLANG_API void const* spGetEntryPointCode(
 
     case ResultFormat::Text:
         data = result.outputString.Buffer();
-        size = result.outputString.Length();
+        size = result.outputString.getLength();
         break;
     }
 

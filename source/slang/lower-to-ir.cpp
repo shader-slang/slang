@@ -1724,7 +1724,7 @@ static String getNameForNameHint(
     // or with an empty name
     if(!leafName)
         return String();
-    if(leafName->text.Length() == 0)
+    if(leafName->text.getLength() == 0)
         return String();
 
 
@@ -1769,7 +1769,7 @@ static String getNameForNameHint(
     }
 
     auto parentName = getNameForNameHint(context, parentDecl);
-    if(parentName.Length() == 0)
+    if(parentName.getLength() == 0)
     {
         return leafName->text;
     }
@@ -1793,7 +1793,7 @@ static void addNameHint(
     Decl*           decl)
 {
     String name = getNameForNameHint(context, decl);
-    if(name.Length() == 0)
+    if(name.getLength() == 0)
         return;
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }

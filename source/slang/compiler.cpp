@@ -774,7 +774,7 @@ namespace Slang
         ComPtr<ID3DBlob> diagnosticsBlob;
         HRESULT hr = compileFunc(
             hlslCode.begin(),
-            hlslCode.Length(),
+            hlslCode.getLength(),
             sourcePath.Buffer(),
             dxMacros,
             nullptr,
@@ -1287,7 +1287,7 @@ SlangResult dissassembleDXILUsingDXC(
         ISlangWriter* writer,
         String const&   text)
     {
-        writer->write(text.Buffer(), text.Length());
+        writer->write(text.Buffer(), text.getLength());
     }
 
     static void writeEntryPointResultToStandardOutput(
@@ -1578,7 +1578,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String spirvAssembly;
                 dissassembleSPIRV(compileRequest, data, size, spirvAssembly);
-                dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.Length(), ".spv.asm");
+                dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.getLength(), ".spv.asm");
             }
             break;
 
@@ -1592,7 +1592,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String dxbcAssembly;
                 dissassembleDXBC(compileRequest, data, size, dxbcAssembly);
-                dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.Length(), ".dxbc.asm");
+                dumpIntermediateText(compileRequest, dxbcAssembly.begin(), dxbcAssembly.getLength(), ".dxbc.asm");
             }
             break;
     #endif
@@ -1607,7 +1607,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String dxilAssembly;
                 dissassembleDXILUsingDXC(compileRequest, data, size, dxilAssembly);
-                dumpIntermediateText(compileRequest, dxilAssembly.begin(), dxilAssembly.Length(), ".dxil.asm");
+                dumpIntermediateText(compileRequest, dxilAssembly.begin(), dxilAssembly.getLength(), ".dxil.asm");
             }
             break;
     #endif

@@ -2238,7 +2238,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         continue;
 
                     bool found = false;
-                    UInt index = 0;
+                    Index index = 0;
                     for (auto m : genericDecl->Members)
                     {
                         if (auto constraintParam = as<GenericTypeConstraintDecl>(m))

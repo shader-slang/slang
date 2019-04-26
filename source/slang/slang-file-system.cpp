@@ -265,7 +265,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
             const uint64_t hash = GetHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
 
             String hashString = Path::getFileName(path);
-            hashString = hashString.ToLower();
+            hashString = hashString.toLower();
 
             hashString.append(':');
 
@@ -482,7 +482,7 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
         {
             // Get the path as a string
             String canonicalPath = StringUtil::getString(canonicalPathBlob);
-            if (canonicalPath.Length() > 0)
+            if (canonicalPath.getLength() > 0)
             {
                 info->m_canonicalPath = new StringBlob(canonicalPath);
             }

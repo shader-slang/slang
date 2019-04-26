@@ -290,11 +290,11 @@ static bool _isSubCommand(const char* arg)
         return SLANG_FAIL;
     }
 
-    if (optionsOut->binDir.Length() == 0)
+    if (optionsOut->binDir.getLength() == 0)
     {
         // If the binDir isn't set try using the path to the executable
         String exePath = Path::getExecutablePath();
-        if (exePath.Length())
+        if (exePath.getLength())
         {
             optionsOut->binDir = Path::getParentDirectory(exePath);
         }

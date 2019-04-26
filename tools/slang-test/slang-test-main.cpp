@@ -412,7 +412,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         builder << "slang-test";
 
-        if (options.binDir.Length())
+        if (options.binDir.getLength())
         {
             builder << " -bindir " << options.binDir;
         }
@@ -475,7 +475,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
 static SlangResult _extractArg(const List<String>& args, const String& argName, String& outValue)
 {
-    SLANG_ASSERT(argName.Length() > 0 && argName[0] == '-');
+    SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
 
     const UInt count = args.getCount();
     for (UInt i = 0; i < count - 1; ++i)
@@ -959,7 +959,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1035,7 +1035,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1076,7 +1076,7 @@ String getExpectedOutput(String const& outputStem)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1314,11 +1314,11 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         if (resultCode != 0)				result = TestResult::Fail;
-        if (standardError.Length() != 0)	result = TestResult::Fail;
-        if (standardOutput.Length() != 0)	result = TestResult::Fail;
+        if (standardError.getLength() != 0)	result = TestResult::Fail;
+        if (standardOutput.getLength() != 0)	result = TestResult::Fail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
@@ -1455,7 +1455,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
 static void _addRenderTestOptions(const Options& options, OSProcessSpawner& spawner)
 {
-    if (options.adapter.Length())
+    if (options.adapter.getLength())
     {
         spawner.pushArgument("-adapter");
         spawner.pushArgument(options.adapter);
@@ -1502,7 +1502,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     }
 
     const String referenceOutput = findExpectedPath(input, ".expected.txt");
-    if (referenceOutput.Length() <= 0)
+    if (referenceOutput.getLength() <= 0)
     {
         return TestResult::Fail;
     }
@@ -1545,8 +1545,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     }
 	for (int i = 0; i < (int)referenceProgramOutput.getCount(); i++)
 	{
-		auto reference = String(referenceProgramOutput[i].Trim());
-		auto actual = String(actualProgramOutput[i].Trim());
+		auto reference = String(referenceProgramOutput[i].trim());
+		auto actual = String(actualProgramOutput[i].trim());
         if (actual != reference)
         {
             printOutput();
@@ -2215,7 +2215,7 @@ static bool endsWithAllowedExtension(
 
     for( auto ii = allowedExtensions; *ii; ++ii )
     {
-        if(filePath.EndsWith(*ii))
+        if(filePath.endsWith(*ii))
             return true;
     }
 
@@ -2337,7 +2337,7 @@ SlangResult innerMain(int argc, char** argv)
     
     Options& options = context.options;
 
-    if (options.subCommand.Length())
+    if (options.subCommand.getLength())
     {
         // Get the function from the tool
         auto func = context.getInnerMainFunc(options.binDir, options.subCommand);

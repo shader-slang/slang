@@ -1490,7 +1490,7 @@ struct EmitVisitor
 
         // If no target name was specified, then the modifier implicitly
         // applies to all targets.
-        if(targetName.Length() == 0)
+        if(targetName.getLength() == 0)
             return true;
 
         return isTargetIntrinsicModifierApplicable(targetName);
@@ -2105,7 +2105,7 @@ struct EmitVisitor
         char const* dummyChar = "U";
 
         // Special case a name that is the empty string, just in case.
-        if(name.Length() == 0)
+        if(name.getLength() == 0)
             return dummyChar;
 
         // Otherwise, we are going to walk over the name byte by byte
@@ -2117,7 +2117,7 @@ struct EmitVisitor
             // GLSL reserverse all names that start with `gl_`,
             // so if we are in danger of collision, then make
             // our name start with a dummy character instead.
-            if(name.StartsWith("gl_"))
+            if(name.startsWith("gl_"))
             {
                 sb.append(dummyChar);
             }
@@ -2126,7 +2126,7 @@ struct EmitVisitor
         // We will also detect user-defined names that
         // might overlap with our convention for mangled names,
         // to avoid an possible collision.
-        if(name.StartsWith("_S"))
+        if(name.startsWith("_S"))
         {
             sb.Append(dummyChar);
         }
@@ -2259,7 +2259,7 @@ struct EmitVisitor
             sb.append(nameHint);
 
             // Avoid introducing a double underscore
-            if(!nameHint.EndsWith("_"))
+            if(!nameHint.endsWith("_"))
             {
                 sb.append("_");
             }

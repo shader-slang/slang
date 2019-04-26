@@ -44,18 +44,18 @@ namespace Slang
 
 	String Path::truncateExt(const String& path)
 	{
-		UInt dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos != -1)
-			return path.SubString(0, dotPos);
+			return path.subString(0, dotPos);
 		else
 			return path;
 	}
 	String Path::replaceExt(const String& path, const char* newExt)
 	{
-		StringBuilder sb(path.Length()+10);
-		UInt dotPos = path.LastIndexOf('.');
+		StringBuilder sb(path.getLength()+10);
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos == -1)
-			dotPos = path.Length();
+			dotPos = path.getLength();
 		sb.Append(path.Buffer(), dotPos);
 		sb.Append('.');
 		sb.Append(newExt);
@@ -64,8 +64,8 @@ namespace Slang
 
     static UInt findLastSeparator(String const& path)
     {
-		UInt slashPos = path.LastIndexOf('/');
-        UInt backslashPos = path.LastIndexOf('\\');
+		UInt slashPos = path.lastIndexOf('/');
+        UInt backslashPos = path.lastIndexOf('\\');
 
         if (slashPos == -1) return backslashPos;
         if (backslashPos == -1) return slashPos;
@@ -83,7 +83,7 @@ namespace Slang
         if (pos != -1)
         {
             pos = pos + 1;
-            return path.SubString(pos, path.Length() - pos);
+            return path.subString(pos, path.getLength() - pos);
         }
         else
         {
@@ -93,16 +93,16 @@ namespace Slang
 	String Path::getFileNameWithoutExt(const String& path)
 	{
         String fileName = getFileName(path);
-		UInt dotPos = fileName.LastIndexOf('.');
+		UInt dotPos = fileName.lastIndexOf('.');
 		if (dotPos == -1)
             return fileName;
-		return fileName.SubString(0, dotPos);
+		return fileName.subString(0, dotPos);
 	}
 	String Path::getFileExt(const String& path)
 	{
-		UInt dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos != -1)
-			return path.SubString(dotPos+1, path.Length()-dotPos-1);
+			return path.subString(dotPos+1, path.getLength()-dotPos-1);
 		else
 			return "";
 	}
@@ -110,28 +110,28 @@ namespace Slang
 	{
         UInt pos = findLastSeparator(path);
 		if (pos != -1)
-			return path.SubString(0, pos);
+			return path.subString(0, pos);
 		else
 			return "";
 	}
 	String Path::combine(const String& path1, const String& path2)
 	{
-		if (path1.Length() == 0) return path2;
-		StringBuilder sb(path1.Length()+path2.Length()+2);
+		if (path1.getLength() == 0) return path2;
+		StringBuilder sb(path1.getLength()+path2.getLength()+2);
 		sb.Append(path1);
-		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
+		if (!path1.endsWith('\\') && !path1.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path2);
 		return sb.ProduceString();
 	}
 	String Path::combine(const String& path1, const String& path2, const String& path3)
 	{
-		StringBuilder sb(path1.Length()+path2.Length()+path3.Length()+3);
+		StringBuilder sb(path1.getLength()+path2.getLength()+path3.getLength()+3);
 		sb.Append(path1);
-		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
+		if (!path1.endsWith('\\') && !path1.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path2);
-		if (!path2.EndsWith('\\') && !path2.EndsWith('/'))
+		if (!path2.endsWith('\\') && !path2.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path3);
 		return sb.ProduceString();
@@ -346,7 +346,7 @@ namespace Slang
             return SLANG_FAIL;
         }  
 
-        canonicalPathOut =  String::FromWString(absPath);
+        canonicalPathOut =  String::fromWString(absPath);
         ::free(absPath);
         return SLANG_OK;
 #else
@@ -432,15 +432,15 @@ namespace Slang
         return SLANG_OK;
 #   else        
         String text = Slang::File::readAllText("/proc/self/maps");
-        Index startIndex = text.IndexOf('/');
+        Index startIndex = text.indexOf('/');
         if (startIndex == Index(-1))
         {
             return SLANG_FAIL;
         }
-        Index endIndex = text.IndexOf("\n", startIndex);
-        endIndex = (endIndex == Index(-1)) ? text.Length() : endIndex;
+        Index endIndex = text.indexOf("\n", startIndex);
+        endIndex = (endIndex == Index(-1)) ? text.getLength() : endIndex;
 
-        auto path = text.SubString(startIndex, endIndex - startIndex);
+        auto path = text.subString(startIndex, endIndex - startIndex);
 
         if (path.getLength() < bufferSize)
         {

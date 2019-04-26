@@ -12,7 +12,7 @@ namespace Slang
 {
     String Session::getStdlibPath()
     {
-        if(stdlibPath.Length() != 0)
+        if(stdlibPath.getLength() != 0)
             return stdlibPath;
 
         StringBuilder pathBuilder;
@@ -244,7 +244,7 @@ namespace Slang
 
     String Session::getCoreLibraryCode()
     {
-        if (coreLibraryCode.Length() > 0)
+        if (coreLibraryCode.getLength() > 0)
             return coreLibraryCode;
 
         StringBuilder sb;
@@ -264,7 +264,7 @@ namespace Slang
 
     String Session::getHLSLLibraryCode()
     {
-        if (hlslLibraryCode.Length() > 0)
+        if (hlslLibraryCode.getLength() > 0)
             return hlslLibraryCode;
 
         StringBuilder sb;

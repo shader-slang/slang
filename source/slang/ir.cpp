@@ -3069,7 +3069,7 @@ namespace Slang
 
         // Allow an empty nam
         // Special case a name that is the empty string, just in case.
-        if(name.Length() == 0)
+        if(name.getLength() == 0)
         {
             sb.append('_');
         }
@@ -3766,7 +3766,7 @@ namespace Slang
 
         dumpInst(&context, globalVal);
 
-        writer->write(sb.Buffer(), sb.Length());
+        writer->write(sb.Buffer(), sb.getLength());
         writer->flush();
     }
 
@@ -3780,7 +3780,7 @@ namespace Slang
     void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode)
     {
         String ir = getSlangIRAssembly(module, mode);
-        writer->write(ir.Buffer(), ir.Length());
+        writer->write(ir.Buffer(), ir.getLength());
         writer->flush();
     }
 

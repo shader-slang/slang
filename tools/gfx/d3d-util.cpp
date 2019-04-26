@@ -376,9 +376,9 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
     DXGI_ADAPTER_DESC desc;
     adapter->GetDesc(&desc);
 
-    String descName = String::FromWString(desc.Description).ToLower();
+    String descName = String::fromWString(desc.Description).toLower();
 
-    return descName.IndexOf(lowerAdapaterName) != Index(-1);
+    return descName.indexOf(lowerAdapaterName) != Index(-1);
 }
 
 /* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
@@ -397,7 +397,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
 
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
-    String lowerAdapterName = String(adapterName).ToLower();
+    String lowerAdapterName = String(adapterName).toLower();
 
     outDxgiAdapters.clear();
 

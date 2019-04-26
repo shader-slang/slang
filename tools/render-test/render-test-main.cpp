@@ -558,7 +558,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     
     StringBuilder rendererName;
     rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
-    if (gOptions.adapter.Length())
+    if (gOptions.adapter.getLength())
     {
         rendererName << "'" << gOptions.adapter << "'";
     }

@@ -475,7 +475,7 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
             // If we have an adapter set on the desc, look it up. We only need to do so for hardware
             ComPtr<IDXGIAdapter> adapter;
-            if (desc.adapter.Length() &&  (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
+            if (desc.adapter.getLength() &&  (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
             {
                 List<ComPtr<IDXGIAdapter>> dxgiAdapters;
                 D3DUtil::findAdapters(deviceCheckFlags, desc.adapter.getUnownedSlice(), dxgiAdapters);

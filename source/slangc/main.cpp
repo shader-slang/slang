@@ -102,7 +102,7 @@ int wmain(int argc, wchar_t** argv)
         List<String> args;
         for(int ii = 0; ii < argc; ++ii)
         {
-            args.add(String::FromWString(argv[ii]));
+            args.add(String::fromWString(argv[ii]));
         }
         List<char const*> argBuffers;
         for(int ii = 0; ii < argc; ++ii)

@@ -33,7 +33,7 @@ static bool adjustToValidResult(OSFindFilesResult& result)
         if (wcscmp(result.fileData_.cFileName, L"..") == 0)
             goto skip;
 
-        result.filePath_ = result.directoryPath_ + String::FromWString(result.fileData_.cFileName);
+        result.filePath_ = result.directoryPath_ + String::fromWString(result.fileData_.cFileName);
         if (result.fileData_.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             result.filePath_ = result.filePath_ + "/";
 

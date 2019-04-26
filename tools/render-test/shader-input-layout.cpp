@@ -16,9 +16,9 @@ namespace renderer_test
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {
-            if (line.StartsWith("//TEST_INPUT:"))
+            if (line.startsWith("//TEST_INPUT:"))
             {
-                auto lineContent = line.SubString(13, line.Length() - 13);
+                auto lineContent = line.subString(13, line.getLength() - 13);
                 TokenReader parser(lineContent);
                 try
                 {

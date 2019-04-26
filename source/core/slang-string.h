@@ -325,11 +325,7 @@ namespace Slang
             return m_buffer ? m_buffer->getData() : (char*)"";
         }
 
-        Index getLength() const
-        {
-            return m_buffer ? m_buffer->getLength() : 0;
-        }
-
+     
         void ensureUniqueStorageWithCapacity(Index capacity);
      
         RefPtr<StringRepresentation> m_buffer;
@@ -340,10 +336,10 @@ namespace Slang
             : m_buffer(buffer)
         {}
 
-		static String FromWString(const wchar_t * wstr);
-		static String FromWString(const wchar_t * wstr, const wchar_t * wend);
-		static String FromWChar(const wchar_t ch);
-		static String FromUnicodePoint(unsigned int codePoint);
+		static String fromWString(const wchar_t * wstr);
+		static String fromWString(const wchar_t * wstr, const wchar_t * wend);
+		static String fromWChar(const wchar_t ch);
+		static String fromUnicodePoint(unsigned int codePoint);
 		String()
 		{
 		}
@@ -480,11 +476,16 @@ namespace Slang
 			return begin()[id];
 		}
 
+        Index getLength() const
+        {
+            return m_buffer ? m_buffer->getLength() : 0;
+        }
+
 		friend String operator+(const char*op1, const String & op2);
 		friend String operator+(const String & op1, const char * op2);
 		friend String operator+(const String & op1, const String & op2);
 
-		StringSlice TrimStart() const
+		StringSlice trimStart() const
 		{
 			if (!m_buffer)
 				return StringSlice();
@@ -495,7 +496,7 @@ namespace Slang
             return StringSlice(m_buffer, startIndex, getLength());
 		}
 
-		StringSlice TrimEnd() const
+		StringSlice trimEnd() const
 		{
 			if (!m_buffer)
 				return StringSlice();
@@ -508,7 +509,7 @@ namespace Slang
             return StringSlice(m_buffer, 0, endIndex);
 		}
 
-		StringSlice Trim() const
+		StringSlice trim() const
 		{
 			if (!m_buffer)
 				return StringSlice();
@@ -525,7 +526,7 @@ namespace Slang
             return StringSlice(m_buffer, startIndex, endIndex);
 		}
 
-		StringSlice SubString(Index id, Index len) const
+		StringSlice subString(Index id, Index len) const
 		{
 			if (len == 0)
 				return StringSlice();
@@ -595,7 +596,7 @@ namespace Slang
 			return (strcmp(begin(), str.begin()) <= 0);
 		}
 
-		String ToUpper() const
+		String toUpper() const
 		{
             String result;
             for (auto c : *this)
@@ -606,7 +607,7 @@ namespace Slang
             return result;
 		}
 
-		String ToLower() const
+		String toLower() const
 		{
             String result;
             for (auto c : *this)
@@ -617,12 +618,7 @@ namespace Slang
             return result;
 		}
 
-		Index Length() const
-		{
-			return getLength();
-		}
-
-        Index IndexOf(const char * str, Index id) const // String str
+        Index indexOf(const char * str, Index id) const // String str
 		{
 			if (id >= getLength())
 				return Index(-1);
@@ -631,22 +627,22 @@ namespace Slang
 			return res;
 		}
 
-        Index IndexOf(const String & str, Index id) const
+        Index indexOf(const String & str, Index id) const
 		{
-			return IndexOf(str.begin(), id);
+			return indexOf(str.begin(), id);
 		}
 
-        Index IndexOf(const char * str) const
+        Index indexOf(const char * str) const
 		{
-			return IndexOf(str, 0);
+			return indexOf(str, 0);
 		}
 
-        Index IndexOf(const String & str) const
+        Index indexOf(const String & str) const
 		{
-			return IndexOf(str.begin(), 0);
+			return indexOf(str.begin(), 0);
 		}
 
-        Index IndexOf(char ch, UInt id) const
+        Index indexOf(char ch, Index id) const
 		{
             const Index length = getLength();
             SLANG_ASSERT(id >= 0 && id <= length);
@@ -661,12 +657,12 @@ namespace Slang
 			return Index(-1);
 		}
 
-        Index IndexOf(char ch) const
+        Index indexOf(char ch) const
 		{
-			return IndexOf(ch, 0);
+			return indexOf(ch, 0);
 		}
 
-        Index LastIndexOf(char ch) const
+        Index lastIndexOf(char ch) const
 		{            
             const Index length = getLength();
             const char* data = getData();
@@ -679,7 +675,7 @@ namespace Slang
 			return Index(-1);
 		}
 
-		bool StartsWith(const char * str) const // String str
+		bool startsWith(const char * str) const // String str
 		{
 			if (!m_buffer)
 				return false;
@@ -694,12 +690,12 @@ namespace Slang
 			return true;
 		}
 
-		bool StartsWith(const String& str) const
+		bool startsWith(const String& str) const
 		{
-			return StartsWith(str.begin());
+			return startsWith(str.begin());
 		}
 
-		bool EndsWith(char const * str)  const // String str
+		bool endsWith(char const * str)  const // String str
 		{
 			if (!m_buffer)
 				return false;
@@ -713,21 +709,19 @@ namespace Slang
 			return true;
 		}
 
-		bool EndsWith(const String & str) const
+		bool endsWith(const String & str) const
 		{
-			return EndsWith(str.begin());
+			return endsWith(str.begin());
 		}
 
-		bool Contains(const char * str) const // String str
+		bool contains(const char * str) const // String str
 		{
-			if (!m_buffer)
-				return false;
-			return (IndexOf(str) != Index(-1)) ? true : false;
+			return m_buffer && indexOf(str) != Index(-1); 
 		}
 
-		bool Contains(const String & str) const
+		bool contains(const String & str) const
 		{
-			return Contains(str.begin());
+			return contains(str.begin());
 		}
 
 		int GetHashCode() const
@@ -857,7 +851,7 @@ namespace Slang
 		}
 		void Append(const String & str)
 		{
-			Append(str.Buffer(), str.Length());
+			Append(str.Buffer(), str.getLength());
 		}
 		void Append(const char * str)
 		{

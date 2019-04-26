@@ -46,7 +46,7 @@ namespace Slang
 
         // We prefix the string with its byte length, so that
         // decoding doesn't have to worry about finding a terminator.
-        UInt length = str.Length();
+        Index length = str.getLength();
         emit(context, length);
         context->sb.append(str);
     }

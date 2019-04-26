@@ -91,7 +91,7 @@ namespace Slang
     StringSlice::StringSlice(String const& str)
         : representation(str.m_buffer)
         , beginIndex(0)
-        , endIndex(str.Length())
+        , endIndex(str.getLength())
     {}
 
     StringSlice::StringSlice(String const& str, UInt beginIndex, UInt endIndex)
@@ -128,14 +128,14 @@ namespace Slang
 
 	int StringToInt(const String & str, int radix)
 	{
-		if (str.StartsWith("0x"))
+		if (str.startsWith("0x"))
 			return (int)strtoll(str.Buffer(), NULL, 16);
 		else
 			return (int)strtoll(str.Buffer(), NULL, radix);
 	}
 	unsigned int StringToUInt(const String & str, int radix)
 	{
-		if (str.StartsWith("0x"))
+		if (str.startsWith("0x"))
 			return (unsigned int)strtoull(str.Buffer(), NULL, 16);
 		else
 			return (unsigned int)strtoull(str.Buffer(), NULL, radix);
@@ -165,7 +165,7 @@ namespace Slang
 	}
 #endif
 
-	String String::FromWString(const wchar_t * wstr)
+	String String::fromWString(const wchar_t * wstr)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
@@ -174,7 +174,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromWString(const wchar_t * wstr, const wchar_t * wend)
+	String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
@@ -183,7 +183,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromWChar(const wchar_t ch)
+	String String::fromWChar(const wchar_t ch)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
@@ -192,7 +192,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromUnicodePoint(unsigned int codePoint)
+	String String::fromUnicodePoint(unsigned int codePoint)
 	{
 		char buf[6];
 		int len = Slang::EncodeUnicodePointToUTF8(buf, (int)codePoint);

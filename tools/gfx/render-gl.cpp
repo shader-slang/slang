@@ -677,13 +677,13 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     auto renderer = glGetString(GL_RENDERER);
 
-    if (renderer && desc.adapter.Length() > 0)
+    if (renderer && desc.adapter.getLength() > 0)
     {
-        String lowerAdapter = desc.adapter.ToLower();
-        String lowerRenderer = String((const char*)renderer).ToLower();
+        String lowerAdapter = desc.adapter.toLower();
+        String lowerRenderer = String((const char*)renderer).toLower();
 
         // The adapter is not available
-        if (lowerRenderer.IndexOf(lowerAdapter) == Index(-1))
+        if (lowerRenderer.indexOf(lowerAdapter) == Index(-1))
         {
             return SLANG_E_NOT_AVAILABLE;
         }

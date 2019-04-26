@@ -107,7 +107,7 @@ namespace Slang
         ComPtr<IDxcBlobEncoding> dxcSourceBlob;
         SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
             (LPBYTE)hlslCode.Buffer(),
-            (UINT32)hlslCode.Length(),
+            (UINT32)hlslCode.getLength(),
             0,
             dxcSourceBlob.writeRef()));
 

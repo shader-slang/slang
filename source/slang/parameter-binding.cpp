@@ -1342,7 +1342,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
         // The name is everything before the digits
         String stringComposedName(composedName);
 
-        info.name = stringComposedName.SubString(0, indexLoc);
+        info.name = stringComposedName.subString(0, indexLoc);
         info.index = strtol(stringComposedName.begin() + indexLoc, nullptr, 10);
     }
     return info;
@@ -1362,11 +1362,11 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     auto semanticIndex      = *state.ioSemanticIndex;
 
     String semanticName = optSemanticName ? *optSemanticName : "";
-    String sn = semanticName.ToLower();
+    String sn = semanticName.toLower();
 
     RefPtr<TypeLayout> typeLayout;
-    if (sn.StartsWith("sv_")
-        || sn.StartsWith("nv_"))
+    if (sn.startsWith("sv_")
+        || sn.startsWith("nv_"))
     {
         // System-value semantic.
 
@@ -1626,7 +1626,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // supposed to be case-insensitive and
         // upper-case is the dominant convention.
         String semanticName = *optSemanticName;
-        String sn = semanticName.ToUpper();
+        String sn = semanticName.toUpper();
 
         auto semanticIndex      = *state.ioSemanticIndex;
 

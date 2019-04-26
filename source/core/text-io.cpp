@@ -15,7 +15,7 @@ namespace Slang
 	public:
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			result.addRange(str.Buffer(), str.Length());
+			result.addRange(str.Buffer(), str.getLength());
 		}
 		virtual String ToString(const char * bytes, int /*length*/) override
 		{
@@ -29,11 +29,11 @@ namespace Slang
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
 			Index ptr = 0;
-			while (ptr < str.Length())
+			while (ptr < str.getLength())
 			{
 				int codePoint = GetUnicodePointFromUTF8([&](int)
 				{
-					if (ptr < str.Length())
+					if (ptr < str.getLength())
 						return str[ptr++];
 					else
 						return '\0';
@@ -67,11 +67,11 @@ namespace Slang
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
 			Index ptr = 0;
-			while (ptr < str.Length())
+			while (ptr < str.getLength())
 			{
 				int codePoint = GetUnicodePointFromUTF8([&](int)
 				{
-					if (ptr < str.Length())
+					if (ptr < str.getLength())
 						return str[ptr++];
 					else
 						return '\0';
@@ -156,7 +156,7 @@ namespace Slang
 #else
 		newLine = "\n";
 #endif
-		for (Index i = 0; i < str.Length(); i++)
+		for (Index i = 0; i < str.getLength(); i++)
 		{
 			if (str[i] == '\r')
 				sb << newLine;

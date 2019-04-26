@@ -160,7 +160,7 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 PathInfo SourceView::_getPathInfo() const
 {
-    if (m_viewPath.Length())
+    if (m_viewPath.getLength())
     {
         PathInfo pathInfo(m_sourceFile->getPathInfo());
         pathInfo.foundPath = m_viewPath;
@@ -335,7 +335,7 @@ String SourceFile::calcVerbosePath() const
         {
             canonicalPath = StringUtil::getString(canonicalPathBlob);
         }
-        if (canonicalPath.Length() > 0)
+        if (canonicalPath.getLength() > 0)
         {
             return canonicalPath;
         }
@@ -422,7 +422,7 @@ SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, si
 
 SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
-    SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.Length());
+    SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.getLength());
     m_sourceFiles.add(sourceFile);
     sourceFile->setContents(contents);
     return sourceFile;
@@ -442,7 +442,7 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
 
     SourceView* sourceView = nullptr;
     if (pathInfo &&
-        (pathInfo->foundPath.Length() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
+        (pathInfo->foundPath.getLength() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
     {
         sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath);
     }

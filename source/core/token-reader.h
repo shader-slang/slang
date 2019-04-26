@@ -235,12 +235,12 @@ namespace Slang
     {
         List<String> result;
         StringBuilder sb;
-        for (int i = 0; i < (int)text.Length(); i++)
+        for (Index i = 0; i < text.getLength(); i++)
         {
             if (text[i] == c)
             {
                 auto str = sb.ToString();
-                if (str.Length() != 0)
+                if (str.getLength() != 0)
                     result.add(str);
                 sb.Clear();
             }
@@ -248,7 +248,7 @@ namespace Slang
                 sb << text[i];
         }
         auto lastStr = sb.ToString();
-        if (lastStr.Length())
+        if (lastStr.getLength())
             result.add(lastStr);
         return result;
     }

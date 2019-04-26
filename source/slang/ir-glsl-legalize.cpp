@@ -224,10 +224,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     char const* outerArrayName = nullptr;
 
     auto semanticNameSpelling = varLayout->systemValueSemantic;
-    if(semanticNameSpelling.Length() == 0)
+    if(semanticNameSpelling.getLength() == 0)
         return nullptr;
 
-    auto semanticName = semanticNameSpelling.ToLower();
+    auto semanticName = semanticNameSpelling.toLower();
 
     IRType* requiredType = nullptr;
 

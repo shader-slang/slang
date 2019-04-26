@@ -42,7 +42,7 @@ static bool isXmlEncodeChar(char c)
 static void appendXmlEncode(const String& in, StringBuilder& out)
 {
     const char* cur = in.Buffer();
-    const char* end = cur + in.Length();
+    const char* end = cur + in.getLength();
 
     while (cur < end)
     {
@@ -308,7 +308,7 @@ void TestReporter::_addResult(const TestInfo& info)
             {
                 case TestResult::Fail:      
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);            
@@ -322,7 +322,7 @@ void TestReporter::_addResult(const TestInfo& info)
                 }
                 case TestResult::Pass:     
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
@@ -332,7 +332,7 @@ void TestReporter::_addResult(const TestInfo& info)
                 }
                 case TestResult::Ignored:  
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
@@ -442,7 +442,7 @@ void TestReporter::message(TestMessageType type, const String& message)
         }
     }
 
-    if (m_currentMessage.Length() > 0)
+    if (m_currentMessage.getLength() > 0)
     {
         m_currentMessage << "\n";
     }

@@ -8945,7 +8945,7 @@ namespace Slang
 
             auto swizzleText = getText(memberRefExpr->name);
 
-            for (Index i = 0; i < swizzleText.Length(); i++)
+            for (Index i = 0; i < swizzleText.getLength(); i++)
             {
                 auto ch = swizzleText[i];
                 int elementIndex = -1;
@@ -9764,7 +9764,7 @@ namespace Slang
                 {
                     const auto& semanticToken = semantic->name;
 
-                    String lowerName = String(semanticToken.Content).ToLower();
+                    String lowerName = String(semanticToken.Content).toLower();
 
                     if(lowerName == "sv_dispatchthreadid")
                     {
@@ -10847,11 +10847,11 @@ static bool doesParameterMatch(
         //
         // We will punt on this for now, and just check each constraint in isolation.
         //
-        UInt argCounter = 0;
+        Index argCounter = 0;
         for(auto& globalGenericParam : globalGenericParams)
         {
             // Get the argument that matches this parameter.
-            UInt argIndex = argCounter++;
+            Index argIndex = argCounter++;
             SLANG_ASSERT(argIndex < globalGenericArgs.getCount());
             auto globalGenericArg = checkProperType(linkage, TypeExp(globalGenericArgs[argIndex]), sink);
             if (!globalGenericArg)

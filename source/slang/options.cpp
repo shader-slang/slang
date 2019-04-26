@@ -247,7 +247,7 @@ struct OptionsParser
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
-            if (path.EndsWith(entry.ext))
+            if (path.endsWith(entry.ext))
             {
                 return entry.profileId;
             }
@@ -283,7 +283,7 @@ struct OptionsParser
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
-            if (path.EndsWith(entry.ext))
+            if (path.endsWith(entry.ext))
             {
                 outImpliedStage = Stage(entry.impliedStage);
                 return entry.sourceLanguage;
@@ -301,7 +301,7 @@ struct OptionsParser
         // how we should handle it.
         String path = String(inPath);
 
-        if( path.EndsWith(".slang") )
+        if( path.endsWith(".slang") )
         {
             // Plain old slang code
             addInputSlangPath(path);
@@ -338,7 +338,7 @@ struct OptionsParser
 
         if (!inPath) {}
 #define CASE(EXT, TARGET)   \
-        else if(path.EndsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
+        else if(path.endsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
 
         CASE(".hlsl", HLSL);
         CASE(".fx",   HLSL);
@@ -362,7 +362,7 @@ struct OptionsParser
 
 #undef CASE
 
-        else if (path.EndsWith(".slang-module"))
+        else if (path.endsWith(".slang-module"))
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->containerOutputPath = path;
