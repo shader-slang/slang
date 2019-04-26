@@ -492,7 +492,7 @@ static SlangResult _extractArg(const List<String>& args, const String& argName, 
 
 static bool _hasOption(const List<String>& args, const String& argName)
 {
-    return args.IndexOf(argName) != UInt(-1);
+    return args.indexOf(argName) != UInt(-1);
 }
 
 static BackendType _toBackendType(const UnownedStringSlice& slice)
@@ -1105,7 +1105,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     const auto& args = input.testOptions->args;
 
-    const UInt targetIndex = args.IndexOf("-target");
+    const UInt targetIndex = args.indexOf("-target");
     if (targetIndex != UInt(-1) && targetIndex + 1 < args.getSize())
     {
         SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
@@ -2002,7 +2002,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            UInt index = synthOptions.args.IndexOf("-hlsl");
+            UInt index = synthOptions.args.indexOf("-hlsl");
             if (index != UInt(-1))
             {
                 synthOptions.args.removeAt(index);

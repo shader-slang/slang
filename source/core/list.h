@@ -26,7 +26,7 @@ namespace Slang
 	class Initializer<T, 0>
 	{
 	public:
-		static void Initialize(T* buffer, int size)
+		static void initialize(T* buffer, int size)
 		{
 			for (int i = 0; i<size; i++)
 				new (buffer + i) T();
@@ -36,7 +36,7 @@ namespace Slang
     class Initializer<T, 1>
     {
     public:
-        static void Initialize(T* buffer, int size)
+        static void initialize(T* buffer, int size)
         {
             // It's pod so no initialization required
             //for (int i = 0; i < size; i++)
@@ -52,7 +52,7 @@ namespace Slang
 		{
 			TAllocator allocator;
 			T * rs = (T*)allocator.Alloc(size*sizeof(T));
-			Initializer<T, std::is_pod<T>::value>::Initialize(rs, size);
+			Initializer<T, std::is_pod<T>::value>::initialize(rs, size);
 			return rs;
 		}
 		static inline void Free(T* ptr, UInt bufferSize)
@@ -85,42 +85,6 @@ namespace Slang
 	template<typename T, typename TAllocator = StandardAllocator>
 	class List
 	{
-	private:
-		inline T* Allocate(UInt size)
-		{
-			return AllocateMethod<T, TAllocator>::Alloc(size);				
-		}
-	private:
-		static const Int kInitialSize = 16;
-	private:
-		T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
-        UInt    m_capacity;         ///< The total capacity of elements
-        UInt    m_size;             ///< The amount of elements
-		void _deallocateBuffer()
-		{
-            if (m_buffer)
-            {
-			    AllocateMethod<T, TAllocator>::Free(m_buffer, m_capacity);
-			    m_buffer = nullptr;
-            }
-		}
-		
-	public:
-		T* begin() const
-		{
-			return m_buffer;
-		}
-		T* end() const
-		{
-			return m_buffer + m_size;
-		}
-	private:
-		template<typename... Args>
-		void Init(const T& val, Args... args)
-		{
-			add(val);
-			Init(args...);
-		}
 	public:
 		List()
 			: m_buffer(nullptr), m_size(0), m_capacity(0)
@@ -129,7 +93,7 @@ namespace Slang
 		template<typename... Args>
 		List(const T& val, Args... args)
 		{
-			Init(val, args...);
+			_init(val, args...);
 		}
 		List(const List<T>& list)
 			: m_buffer(nullptr), m_size(0), m_capacity(0)
@@ -141,7 +105,7 @@ namespace Slang
 		{
 			this->operator=(static_cast<List<T>&&>(list));
 		}
-		static List<T> Create(const T& val, int count)
+		static List<T> makeRepeated(const T& val, int count)
 		{
 			List<T> rs;
 			rs.setSize(count);
@@ -174,6 +138,15 @@ namespace Slang
 			list.m_capacity = 0;
 			return *this;
 		}
+
+        T* begin() const
+        {
+            return m_buffer;
+        }
+        T* end() const
+        {
+            return m_buffer + m_size;
+        }
 
 		const T& getFirst() const
 		{
@@ -295,7 +268,7 @@ namespace Slang
 				while (newBufferSize < m_size + n)
 					newBufferSize = newBufferSize << 1;
 
-				T * newBuffer = Allocate(newBufferSize);
+				T * newBuffer = _allocate(newBufferSize);
 				if (m_capacity)
 				{
 					/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
@@ -377,7 +350,7 @@ namespace Slang
 
 		void remove(const T& val)
 		{
-			int idx = IndexOf(val);
+			int idx = indexOf(val);
 			if (idx != -1)
 				removeAt(idx);
 		}
@@ -392,7 +365,7 @@ namespace Slang
 
 		void fastRemove(const T& val)
 		{
-			int idx = IndexOf(val);
+			int idx = indexOf(val);
 			fastRemoveAt(idx);
 		}
 
@@ -420,7 +393,7 @@ namespace Slang
 		{
 			if(size > m_capacity)
 			{
-				T * newBuffer = Allocate(size);
+				T* newBuffer = _allocate(size);
 				if (m_capacity)
 				{
 					/*if (std::has_trivial_copy_assign<T>::value && std::has_trivial_destructor<T>::value)
@@ -468,7 +441,7 @@ namespace Slang
 		{
 			if (m_capacity > m_size && m_size > 0)
 			{
-				T* newBuffer = Allocate(m_size);
+				T* newBuffer = _allocate(m_size);
 				for (UInt i = 0; i < m_size; i++)
 					newBuffer[i] = static_cast<T&&>(m_buffer[i]);
 
@@ -507,7 +480,7 @@ namespace Slang
 		}
 
 		template<typename T2>
-		UInt IndexOf(const T2& val) const
+		UInt indexOf(const T2& val) const
 		{
 			for (UInt i = 0; i < m_size; i++)
 			{
@@ -518,7 +491,7 @@ namespace Slang
 		}
 
 		template<typename T2>
-		UInt LastIndexOf(const T2& val) const
+		UInt lastIndexOf(const T2& val) const
 		{
 			for (int i = m_size; i > 0; i--)
 			{
@@ -535,14 +508,14 @@ namespace Slang
 
 		bool contains(const T& val) const
 		{
-            return IndexOf(val) != UInt(-1);
+            return indexOf(val) != UInt(-1);
 		}
 
 		template<typename Comparer>
 		void sort(Comparer compare)
 		{
-			//InsertionSort(buffer, 0, _count - 1);
-			//QuickSort(buffer, 0, _count - 1, compare);
+			//insertionSort(buffer, 0, _count - 1);
+			//quickSort(buffer, 0, _count - 1, compare);
 			std::sort(m_buffer, m_buffer + m_size, compare);
 		}
 
@@ -645,6 +618,32 @@ namespace Slang
 						return 1;
 				});
 		}
+    private:
+        static const Int kInitialSize = 16;
+
+        T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
+        UInt    m_capacity;         ///< The total capacity of elements
+        UInt    m_size;             ///< The amount of elements
+
+        void _deallocateBuffer()
+        {
+            if (m_buffer)
+            {
+                AllocateMethod<T, TAllocator>::Free(m_buffer, m_capacity);
+                m_buffer = nullptr;
+            }
+        }
+        static inline T* _allocate(UInt size)
+        {
+            return AllocateMethod<T, TAllocator>::Alloc(size);
+        }
+
+        template<typename... Args>
+        void _init(const T& val, Args... args)
+        {
+            add(val);
+            _init(args...);
+        }
 	};
 
 	template<typename T>

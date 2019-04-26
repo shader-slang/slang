@@ -227,7 +227,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
         // Find the first option that's available on the device
         for (int j = 0; j < numCheckPresentOptions; j++)
         {
-            if (presentModes.IndexOf(presentOptions[j]) != UInt(-1))
+            if (presentModes.indexOf(presentOptions[j]) != UInt(-1))
             {
                 m_presentMode = presentOptions[j];
                 break;
