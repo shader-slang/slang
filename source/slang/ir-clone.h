@@ -127,6 +127,19 @@ IRInst* cloneInst(
 
     /// Clone `oldDecoration` and attach the clone to `newParent`.
     ///
+    /// Uses `module` to allocate any new instructions.
+    ///
+void cloneDecoration(
+    IRDecoration*   oldDecoration,
+    IRInst*         newParent,
+    IRModule*       module);
+
+    /// Clone `oldDecoration` and attach the clone to `newParent`.
+    ///
+    /// Uses the module of `newParent` to allocate any new instructions,
+    /// so that `newParent` must already be installed somewhere
+    /// in the ownership hierarchy of an existing module.
+    ///
 void cloneDecoration(
     IRDecoration*   oldDecoration,
     IRInst*         newParent);
