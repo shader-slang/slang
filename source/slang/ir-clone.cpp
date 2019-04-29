@@ -241,10 +241,11 @@ IRInst* cloneInst(
 
 void cloneDecoration(
     IRDecoration*   oldDecoration,
-    IRInst*         newParent)
+    IRInst*         newParent,
+    IRModule*       module)
 {
     SharedIRBuilder sharedBuilder;
-    sharedBuilder.module = newParent->getModule();
+    sharedBuilder.module = module;
 
     IRBuilder builder;
     builder.sharedBuilder = &sharedBuilder;
@@ -256,6 +257,16 @@ void cloneDecoration(
 
     IRCloneEnv env;
     cloneInst(&env, &builder, oldDecoration);
+}
+
+void cloneDecoration(
+    IRDecoration*   oldDecoration,
+    IRInst*         newParent)
+{
+    cloneDecoration(
+        oldDecoration,
+        newParent,
+        newParent->getModule());
 }
 
 bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& other) const

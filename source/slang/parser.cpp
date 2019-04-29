@@ -4663,7 +4663,7 @@ namespace Slang
         MODIFIER(linear,            HLSLLinearModifier);
         MODIFIER(sample,            HLSLSampleModifier);
         MODIFIER(centroid,          HLSLCentroidModifier);
-        MODIFIER(precise,           HLSLPreciseModifier);
+        MODIFIER(precise,           PreciseModifier);
         MODIFIER(shared,            HLSLEffectSharedModifier);
         MODIFIER(groupshared,       HLSLGroupSharedModifier);
         MODIFIER(static,            HLSLStaticModifier);

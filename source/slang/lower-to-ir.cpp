@@ -1680,6 +1680,10 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRGloballyCoherentDecoration>(inst);
         }
+        else if(as<PreciseModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRPreciseDecoration>(inst);
+        }
         else if(auto formatAttr = as<FormatAttribute>(mod))
         {
             builder->addFormatDecoration(inst, formatAttr->format);

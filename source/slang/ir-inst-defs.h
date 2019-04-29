@@ -400,6 +400,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(EarlyDepthStencilDecoration,       earlyDepthStencil,      0, 0)
     INST(GloballyCoherentDecoration,        globallyCoherent,       0, 0)
+    INST(PreciseDecoration,                 precise,       0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point.

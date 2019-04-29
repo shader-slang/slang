@@ -226,6 +226,7 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
 IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
+IR_SIMPLE_DECORATION(PreciseDecoration)
 
     /// A decoration that marks a value as having linkage.
     ///
