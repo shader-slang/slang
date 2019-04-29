@@ -15,7 +15,7 @@ namespace Slang
 	public:
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			result.AddRange(str.Buffer(), str.Length());
+			result.addRange(str.getBuffer(), str.getLength());
 		}
 		virtual String ToString(const char * bytes, int /*length*/) override
 		{
@@ -28,17 +28,17 @@ namespace Slang
 	public:
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			UInt ptr = 0;
-			while (ptr < str.Length())
+			Index ptr = 0;
+			while (ptr < str.getLength())
 			{
 				int codePoint = GetUnicodePointFromUTF8([&](int)
 				{
-					if (ptr < str.Length())
+					if (ptr < str.getLength())
 						return str[ptr++];
 					else
 						return '\0';
 				});
-				result.AddRange((char*)&codePoint, 4);
+				result.addRange((char*)&codePoint, 4);
 			}
 		}
 		virtual String ToString(const char * bytes, int length) override
@@ -66,12 +66,12 @@ namespace Slang
 		{}
 		virtual void GetBytes(List<char> & result, const String & str) override
 		{
-			UInt ptr = 0;
-			while (ptr < str.Length())
+			Index ptr = 0;
+			while (ptr < str.getLength())
 			{
 				int codePoint = GetUnicodePointFromUTF8([&](int)
 				{
-					if (ptr < str.Length())
+					if (ptr < str.getLength())
 						return str[ptr++];
 					else
 						return '\0';
@@ -82,7 +82,7 @@ namespace Slang
 					count = EncodeUnicodePointToUTF16(buffer, codePoint);
 				else
 					count = EncodeUnicodePointToUTF16Reversed(buffer, codePoint);
-				result.AddRange((char*)buffer, count * 2);
+				result.addRange((char*)buffer, count * 2);
 			}
 		}
 		virtual String ToString(const char * bytes, int length) override
@@ -148,7 +148,7 @@ namespace Slang
 	}
 	void StreamWriter::Write(const String & str)
 	{
-		encodingBuffer.Clear();
+		encodingBuffer.clear();
 		StringBuilder sb;
 		String newLine;
 #ifdef _WIN32
@@ -156,7 +156,7 @@ namespace Slang
 #else
 		newLine = "\n";
 #endif
-		for (UInt i = 0; i < str.Length(); i++)
+		for (Index i = 0; i < str.getLength(); i++)
 		{
 			if (str[i] == '\r')
 				sb << newLine;
@@ -169,7 +169,7 @@ namespace Slang
 				sb << str[i];
 		}
 		encoding->GetBytes(encodingBuffer, sb.ProduceString());
-		stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
+		stream->Write(encodingBuffer.getBuffer(), encodingBuffer.getCount());
 	}
 	void StreamWriter::Write(const char * str)
 	{
@@ -207,17 +207,17 @@ namespace Slang
 
 	Encoding * StreamReader::DetermineEncoding()
 	{
-		if (buffer.Count() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
+		if (buffer.getCount() >= 3 && (unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB && (unsigned char)(buffer[2]) == 0xBF)
 		{
 			ptr += 3;
 			return Encoding::UTF8;
 		}
-		else if (*((unsigned short*)(buffer.Buffer())) == 0xFEFF)
+		else if (*((unsigned short*)(buffer.getBuffer())) == 0xFEFF)
 		{
 			ptr += 2;
 			return Encoding::UTF16;
 		}
-		else if (*((unsigned short*)(buffer.Buffer())) == 0xFFFE)
+		else if (*((unsigned short*)(buffer.getBuffer())) == 0xFFFE)
 		{
 			ptr += 2;
 			return Encoding::UTF16Reversed;
@@ -225,7 +225,7 @@ namespace Slang
 		else
 		{
             // find null bytes
-            if (HasNullBytes(buffer.Buffer(), (int)buffer.Count()))
+            if (HasNullBytes(buffer.getBuffer(), (int)buffer.getCount()))
             {
                 return Encoding::UTF16;
             }
@@ -235,22 +235,22 @@ namespace Slang
 		
 	void StreamReader::ReadBuffer()
 	{
-		buffer.SetSize(4096);
-        memset(buffer.Buffer(), 0, buffer.Count() * sizeof(buffer[0]));
-		auto len = stream->Read(buffer.Buffer(), buffer.Count());
-		buffer.SetSize((int)len);
+		buffer.setCount(4096);
+        memset(buffer.getBuffer(), 0, buffer.getCount() * sizeof(buffer[0]));
+		auto len = stream->Read(buffer.getBuffer(), buffer.getCount());
+		buffer.setCount((int)len);
 		ptr = 0;
 	}
 
 	char StreamReader::ReadBufferChar()
 	{
-		if (ptr<buffer.Count())
+		if (ptr<buffer.getCount())
 		{
 			return buffer[ptr++];
 		}
 		if (!stream->IsEnd())
 			ReadBuffer();
-		if (ptr<buffer.Count())
+		if (ptr<buffer.getCount())
 		{
 			return buffer[ptr++];
 		}

@@ -1,6 +1,8 @@
 // test-context.cpp
 #include "slangc-tool.h"
 
+#include "../../source/core/exception.h"
+
 using namespace Slang;
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
@@ -45,7 +47,7 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session,
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
         res = SLANG_FAIL;
     }
 #endif

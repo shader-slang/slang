@@ -4,7 +4,6 @@
 #include "os.h"
 #include "../../source/core/slang-string-util.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -42,8 +41,8 @@ static bool isXmlEncodeChar(char c)
 
 static void appendXmlEncode(const String& in, StringBuilder& out)
 {
-    const char* cur = in.Buffer();
-    const char* end = cur + in.Length();
+    const char* cur = in.getBuffer();
+    const char* end = cur + in.getLength();
 
     while (cur < end)
     {
@@ -110,7 +109,7 @@ bool TestReporter::canWriteStdError() const
 void TestReporter::startTest(const String& testName)
 {
     // Must be in a suite
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getCount());
     assert(!m_inTest);
 
     m_inTest = true;
@@ -125,7 +124,7 @@ void TestReporter::startTest(const String& testName)
 
 void TestReporter::endTest()
 {
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getCount());
     assert(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
@@ -196,13 +195,13 @@ void TestReporter::dumpOutputDifference(const String& expectedOutput, const Stri
         "ERROR:\n"
         "EXPECTED{{{\n%s}}}\n"
         "ACTUAL{{{\n%s}}}\n",
-        expectedOutput.Buffer(),
-        actualOutput.Buffer());
+        expectedOutput.getBuffer(),
+        actualOutput.getBuffer());
 
 
     if (m_dumpOutputOnFailure && canWriteStdError())
     {
-        fprintf(stderr, "%s", builder.Buffer());
+        fprintf(stderr, "%s", builder.getBuffer());
         fflush(stderr);
     }
 
@@ -278,7 +277,7 @@ void TestReporter::_addResult(const TestInfo& info)
             break;
     }
 
-    m_testInfos.Add(info);
+    m_testInfos.add(info);
 
     //    printf("OUTPUT_MODE: %d\n", options.outputMode);
     switch (m_outputMode)
@@ -295,7 +294,7 @@ void TestReporter::_addResult(const TestInfo& info)
                     assert(!"unexpected");
                     break;
             }
-            printf("%s test: '%S'\n", resultString, info.name.ToWString().begin());
+            printf("%s test: '%S'\n", resultString, info.name.toWString().begin());
             break;
         }
         case TestOutputMode::TeamCity:
@@ -309,7 +308,7 @@ void TestReporter::_addResult(const TestInfo& info)
             {
                 case TestResult::Fail:      
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);            
@@ -323,7 +322,7 @@ void TestReporter::_addResult(const TestInfo& info)
                 }
                 case TestResult::Pass:     
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
@@ -333,7 +332,7 @@ void TestReporter::_addResult(const TestInfo& info)
                 }
                 case TestResult::Ignored:  
                 {
-                    if (info.message.Length())
+                    if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
@@ -390,10 +389,10 @@ void TestReporter::_addResult(const TestInfo& info)
 
             if (err != kOSError_None)
             {
-                messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.ToWString().begin());
+                messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.toWString().begin());
 
 #if 0
-                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.Buffer(),
+                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.getBuffer(),
                     spawner.getResultCode(),
                     spawner.getStandardOutput().begin(),
                     spawner.getStandardError().begin());
@@ -422,7 +421,7 @@ void TestReporter::message(TestMessageType type, const String& message)
     {
         if (m_isVerbose && canWriteStdError())
         {
-            fputs(message.Buffer(), stderr);
+            fputs(message.getBuffer(), stderr);
         }
 
         // Just dump out if can dump out
@@ -434,16 +433,16 @@ void TestReporter::message(TestMessageType type, const String& message)
         if (type == TestMessageType::RunError || type == TestMessageType::TestFailure)
         {
             fprintf(stderr, "error: ");
-            fputs(message.Buffer(), stderr);
+            fputs(message.getBuffer(), stderr);
             fprintf(stderr, "\n");
         }
         else
         {
-            fputs(message.Buffer(), stderr);
+            fputs(message.getBuffer(), stderr);
         }
     }
 
-    if (m_currentMessage.Length() > 0)
+    if (m_currentMessage.getLength() > 0)
     {
         m_currentMessage << "\n";
     }
@@ -506,7 +505,7 @@ void TestReporter::outputSummary()
                 {
                     if (testInfo.testResult == TestResult::Fail)
                     {
-                        printf("%s\n", testInfo.name.Buffer());
+                        printf("%s\n", testInfo.name.getBuffer());
                     }
                 }
                 printf("---\n");
@@ -530,11 +529,11 @@ void TestReporter::outputSummary()
 
                 if (testInfo.testResult == TestResult::Pass)
                 {
-                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.Buffer());
+                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.getBuffer());
                 }
                 else
                 {
-                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.Buffer());
+                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.getBuffer());
                     switch (testInfo.testResult)
                     {
                         case TestResult::Fail:
@@ -543,7 +542,7 @@ void TestReporter::outputSummary()
                             appendXmlEncode(testInfo.message, buf);
 
                             printf("      <error>\n");
-                            printf("%s", buf.Buffer());
+                            printf("%s", buf.getBuffer());
                             printf("      </error>\n");
                             break;
                         }
@@ -578,7 +577,7 @@ void TestReporter::outputSummary()
 
 void TestReporter::startSuite(const String& name)
 {
-    m_suiteStack.Add(name);
+    m_suiteStack.add(name);
 
     switch (m_outputMode)
     {
@@ -595,13 +594,13 @@ void TestReporter::startSuite(const String& name)
 
 void TestReporter::endSuite()
 {
-    assert(m_suiteStack.Count());
+    assert(m_suiteStack.getCount());
 
     switch (m_outputMode)
     {
         case TestOutputMode::TeamCity:
         {
-            const String& name = m_suiteStack.Last();
+            const String& name = m_suiteStack.getLast();
             StringBuilder escapedSuiteName;
             _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
             printf("##teamcity[testSuiteFinished name='%s']\n", escapedSuiteName.begin());
@@ -610,5 +609,5 @@ void TestReporter::endSuite()
         default: break;
     }
     
-    m_suiteStack.RemoveLast();
+    m_suiteStack.removeLast();
 }

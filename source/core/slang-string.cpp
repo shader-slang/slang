@@ -14,20 +14,20 @@ namespace Slang
     // OSString
 
     OSString::OSString()
-        : beginData(0)
-        , endData(0)
+        : m_begin(0)
+        , m_end(0)
     {}
 
     OSString::OSString(wchar_t* begin, wchar_t* end)
-        : beginData(begin)
-        , endData(end)
+        : m_begin(begin)
+        , m_end(end)
     {}
 
     OSString::~OSString()
     {
-        if (beginData)
+        if (m_begin)
         {
-            delete[] beginData;
+            delete[] m_begin;
         }
     }
 
@@ -35,12 +35,12 @@ namespace Slang
 
     wchar_t const* OSString::begin() const
     {
-        return beginData ? beginData : kEmptyOSString;
+        return m_begin ? m_begin : kEmptyOSString;
     }
 
     wchar_t const* OSString::end() const
     {
-        return endData ? endData : kEmptyOSString;
+        return m_end ? m_end : kEmptyOSString;
     }
 
     // UnownedStringSlice
@@ -89,13 +89,13 @@ namespace Slang
     {}
 
     StringSlice::StringSlice(String const& str)
-        : representation(str.buffer)
+        : representation(str.m_buffer)
         , beginIndex(0)
-        , endIndex(str.Length())
+        , endIndex(str.getLength())
     {}
 
     StringSlice::StringSlice(String const& str, UInt beginIndex, UInt endIndex)
-        : representation(str.buffer)
+        : representation(str.m_buffer)
         , beginIndex(beginIndex)
         , endIndex(endIndex)
     {}
@@ -128,25 +128,25 @@ namespace Slang
 
 	int StringToInt(const String & str, int radix)
 	{
-		if (str.StartsWith("0x"))
-			return (int)strtoll(str.Buffer(), NULL, 16);
+		if (str.startsWith("0x"))
+			return (int)strtoll(str.getBuffer(), NULL, 16);
 		else
-			return (int)strtoll(str.Buffer(), NULL, radix);
+			return (int)strtoll(str.getBuffer(), NULL, radix);
 	}
 	unsigned int StringToUInt(const String & str, int radix)
 	{
-		if (str.StartsWith("0x"))
-			return (unsigned int)strtoull(str.Buffer(), NULL, 16);
+		if (str.startsWith("0x"))
+			return (unsigned int)strtoull(str.getBuffer(), NULL, 16);
 		else
-			return (unsigned int)strtoull(str.Buffer(), NULL, radix);
+			return (unsigned int)strtoull(str.getBuffer(), NULL, radix);
 	}
 	double StringToDouble(const String & str)
 	{
-		return (double)strtod(str.Buffer(), NULL);
+		return (double)strtod(str.getBuffer(), NULL);
 	}
 	float StringToFloat(const String & str)
 	{
-		return strtof(str.Buffer(), NULL);
+		return strtof(str.getBuffer(), NULL);
 	}
 
 #if 0
@@ -165,7 +165,7 @@ namespace Slang
 	}
 #endif
 
-	String String::FromWString(const wchar_t * wstr)
+	String String::fromWString(const wchar_t * wstr)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
@@ -174,7 +174,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromWString(const wchar_t * wstr, const wchar_t * wend)
+	String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
@@ -183,7 +183,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromWChar(const wchar_t ch)
+	String String::fromWChar(const wchar_t ch)
 	{
 #ifdef _WIN32
 		return Slang::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
@@ -192,7 +192,7 @@ namespace Slang
 #endif
 	}
 
-	String String::FromUnicodePoint(unsigned int codePoint)
+	String String::fromUnicodePoint(unsigned int codePoint)
 	{
 		char buf[6];
 		int len = Slang::EncodeUnicodePointToUTF8(buf, (int)codePoint);
@@ -200,9 +200,9 @@ namespace Slang
 		return String(buf);
 	}
 
-	OSString String::ToWString(UInt* outLength) const
+	OSString String::toWString(Index* outLength) const
 	{
-		if (!buffer)
+		if (!m_buffer)
 		{
             return OSString();
 		}
@@ -223,17 +223,17 @@ namespace Slang
                 break;
             }
 
-            auto length = buf.Count() / sizeof(wchar_t);
+            auto length = Index(buf.getCount() / sizeof(wchar_t));
 			if (outLength)
 				*outLength = length;
 
             for(int ii = 0; ii < sizeof(wchar_t); ++ii)
-    			buf.Add(0);
+    			buf.add(0);
 
-            wchar_t* beginData = (wchar_t*)buf.Buffer();
+            wchar_t* beginData = (wchar_t*)buf.getBuffer();
             wchar_t* endData = beginData + length;
 
-			buf.ReleaseBuffer();
+			buf.detachBuffer();
 
             return OSString(beginData, endData);
 		}
@@ -241,55 +241,55 @@ namespace Slang
 
     //
 
-    void String::ensureUniqueStorageWithCapacity(UInt requiredCapacity)
+    void String::ensureUniqueStorageWithCapacity(Index requiredCapacity)
     {
-        if (buffer && buffer->isUniquelyReferenced() && buffer->capacity >= requiredCapacity)
+        if (m_buffer && m_buffer->isUniquelyReferenced() && m_buffer->capacity >= requiredCapacity)
             return;
 
-        UInt newCapacity = buffer ? 2*buffer->capacity : 16;
+        Index newCapacity = m_buffer ? 2 * m_buffer->capacity : 16;
         if (newCapacity < requiredCapacity)
         {
             newCapacity = requiredCapacity;
         }
 
-        UInt length = getLength();
+        Index length = getLength();
         StringRepresentation* newRepresentation = StringRepresentation::createWithCapacityAndLength(newCapacity, length);
 
-        if (buffer)
+        if (m_buffer)
         {
-            memcpy(newRepresentation->getData(), buffer->getData(), length + 1);
+            memcpy(newRepresentation->getData(), m_buffer->getData(), length + 1);
         }
 
-        buffer = newRepresentation;
+        m_buffer = newRepresentation;
     }
 
-    char* String::prepareForAppend(UInt count)
+    char* String::prepareForAppend(Index count)
     {
         auto oldLength = getLength();
         auto newLength = oldLength + count;
         ensureUniqueStorageWithCapacity(newLength);
         return getData() + oldLength;
     }
-    void String::appendInPlace(const char* chars, UInt count)
+    void String::appendInPlace(const char* chars, Index count)
     {
         SLANG_UNUSED(chars);
 
         if (count > 0)
         {
-            SLANG_ASSERT(buffer && buffer->isUniquelyReferenced());
+            SLANG_ASSERT(m_buffer && m_buffer->isUniquelyReferenced());
 
             auto oldLength = getLength();
             auto newLength = oldLength + count;
 
-            char* dst = buffer->getData();
+            char* dst = m_buffer->getData();
 
             // Make sure the input buffer is the same one returned from prepareForAppend
             SLANG_ASSERT(chars == dst + oldLength);
             // It has to fit within the capacity
-            SLANG_ASSERT(newLength <= buffer->capacity);
+            SLANG_ASSERT(newLength <= m_buffer->capacity);
 
             // We just need to modify the length
-            buffer->length = newLength;
+            m_buffer->length = newLength;
 
             // And mark with a terminating 0
             dst[newLength] = 0;
@@ -307,7 +307,7 @@ namespace Slang
 
         memcpy(getData() + oldLength, textBegin, textLength);
         getData()[newLength] = 0;
-        buffer->length = newLength;
+        m_buffer->length = newLength;
     }
 
     void String::append(char const* str)
@@ -325,9 +325,9 @@ namespace Slang
 
     void String::append(String const& str)
     {
-        if (!buffer)
+        if (!m_buffer)
         {
-            buffer = str.buffer;
+            m_buffer = str.m_buffer;
             return;
         }
 
@@ -350,7 +350,7 @@ namespace Slang
         char* data = prepareForAppend(kCount);
         auto count = IntToAscii(data, value, radix);
         ReverseInternalAscii(data, count);
-        buffer->length += count;
+        m_buffer->length += count;
     }
 
     void String::append(uint32_t value, int radix)
@@ -359,7 +359,7 @@ namespace Slang
         char* data = prepareForAppend(kCount);
         auto count = IntToAscii(data, value, radix);
         ReverseInternalAscii(data, count);
-        buffer->length += count;
+        m_buffer->length += count;
     }
 
     void String::append(int64_t value, int radix)
@@ -368,7 +368,7 @@ namespace Slang
         char* data = prepareForAppend(kCount);
         auto count = IntToAscii(data, value, radix);
         ReverseInternalAscii(data, count);
-        buffer->length += count;
+        m_buffer->length += count;
     }
 
     void String::append(uint64_t value, int radix)
@@ -377,7 +377,7 @@ namespace Slang
         char* data = prepareForAppend(kCount);
         auto count = IntToAscii(data, value, radix);
         ReverseInternalAscii(data, count);
-        buffer->length += count;
+        m_buffer->length += count;
     }
 
     void String::append(float val, const char * format)
@@ -385,7 +385,7 @@ namespace Slang
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);
         sprintf_s(data, kCount, format, val);
-        buffer->length += strnlen_s(data, kCount);
+        m_buffer->length += strnlen_s(data, kCount);
     }
 
     void String::append(double val, const char * format)
@@ -393,6 +393,6 @@ namespace Slang
         enum { kCount = 128 };
         char* data = prepareForAppend(kCount);
         sprintf_s(data, kCount, format, val);
-        buffer->length += strnlen_s(data, kCount);
+        m_buffer->length += strnlen_s(data, kCount);
     }
 }

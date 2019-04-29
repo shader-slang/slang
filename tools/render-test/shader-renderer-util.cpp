@@ -66,9 +66,9 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     TextureResource::Data initData;
 
     List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.SetSize(textureResourceDesc.numMipLevels);
+    mipRowStrides.setCount(textureResourceDesc.numMipLevels);
     List<const void*> subResources;
-    subResources.SetSize(numSubResources);
+    subResources.setCount(numSubResources);
 
     // Set up the src row strides
     for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
@@ -80,19 +80,19 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     // Set up pointers the the data
     {
         int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.Count());
+        const int numGen = int(texData.dataBuffer.getCount());
         for (int i = 0; i < numSubResources; i++)
         {
-            subResources[i] = texData.dataBuffer[subResourceIndex].Buffer();
+            subResources[i] = texData.dataBuffer[subResourceIndex].getBuffer();
             // Wrap around
             subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
         }
     }
 
-    initData.mipRowStrides = mipRowStrides.Buffer();
+    initData.mipRowStrides = mipRowStrides.getBuffer();
     initData.numMips = textureResourceDesc.numMipLevels;
     initData.numSubResources = numSubResources;
-    initData.subResources = subResources.Buffer();
+    initData.subResources = subResources.getBuffer();
 
     textureOut = renderer->createTextureResource(Resource::Usage::GenericRead, textureResourceDesc, &initData);
 
@@ -175,7 +175,7 @@ static RefPtr<SamplerState> _createSamplerState(
         }
         case BindingStyle::OpenGl:
         {
-            const int count = int(entry.glslBinding.Count());
+            const int count = int(entry.glslBinding.getCount());
 
             if (count <= 0)
             {
@@ -184,7 +184,7 @@ static RefPtr<SamplerState> _createSamplerState(
 
             int baseIndex = entry.glslBinding[0];
             // Make sure they are contiguous
-            for (int i = 1; i < int(entry.glslBinding.Count()); ++i)
+            for (Index i = 1; i < int(entry.glslBinding.getCount()); ++i)
             {
                 if (baseIndex + i != entry.glslBinding[i])
                 {
@@ -205,8 +205,8 @@ static RefPtr<SamplerState> _createSamplerState(
 
 /* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
 {
-    auto srcEntries = layout.entries.Buffer();
-    auto numEntries = int(layout.entries.Count());
+    auto srcEntries = layout.entries.getBuffer();
+    auto numEntries = layout.entries.getCount();
 
     const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
 
@@ -217,10 +217,10 @@ static RefPtr<SamplerState> _createSamplerState(
         DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
         slotRangeDesc.type = DescriptorSlotType::UniformBuffer;
 
-        slotRangeDescs.Add(slotRangeDesc);
+        slotRangeDescs.add(slotRangeDesc);
     }
 
-    for (int i = 0; i < numEntries; i++)
+    for (Index i = 0; i < numEntries; i++)
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
@@ -279,23 +279,23 @@ static RefPtr<SamplerState> _createSamplerState(
                 assert(!"Unhandled type");
                 return SLANG_FAIL;
         }
-        slotRangeDescs.Add(slotRangeDesc);
+        slotRangeDescs.add(slotRangeDesc);
     }
 
     DescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.Count();
-    descriptorSetLayoutDesc.slotRanges = slotRangeDescs.Buffer();
+    descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getCount();
+    descriptorSetLayoutDesc.slotRanges = slotRangeDescs.getBuffer();
 
     auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
     List<PipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
-    pipelineDescriptorSets.Add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
+    pipelineDescriptorSets.add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
 
     PipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = layout.numRenderTargets;
-    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.Count();
-    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.Buffer();
+    pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
+    pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 
     auto pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
     if(!pipelineLayout) return SLANG_FAIL;
@@ -320,10 +320,10 @@ static RefPtr<SamplerState> _createSamplerState(
             case ShaderInputType::Buffer:
                 {
                     const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
-                    const size_t bufferSize = srcEntry.bufferData.Count() * sizeof(uint32_t);
+                    const size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(uint32_t);
 
                     RefPtr<BufferResource> bufferResource;
-                    SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.Buffer(), renderer, bufferResource));
+                    SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.getBuffer(), renderer, bufferResource));
 
                     switch(srcBuffer.type)
                     {
@@ -349,7 +349,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = bufferResource;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;
@@ -374,7 +374,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = texture;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;
@@ -404,7 +404,7 @@ static RefPtr<SamplerState> _createSamplerState(
                         BindingStateImpl::OutputBinding binding;
                         binding.entryIndex = i;
                         binding.resource = texture;
-                        outputBindings.Add(binding);
+                        outputBindings.add(binding);
                     }
                 }
                 break;

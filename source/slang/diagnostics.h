@@ -80,8 +80,13 @@ namespace Slang
     enum class ProfileVersion;
 
     void printDiagnosticArg(StringBuilder& sb, char const* str);
-    void printDiagnosticArg(StringBuilder& sb, int val);
-    void printDiagnosticArg(StringBuilder& sb, UInt val);
+
+    void printDiagnosticArg(StringBuilder& sb, int32_t val);
+    void printDiagnosticArg(StringBuilder& sb, uint32_t val);
+
+    void printDiagnosticArg(StringBuilder& sb, int64_t val);
+    void printDiagnosticArg(StringBuilder& sb, uint64_t val);
+
     void printDiagnosticArg(StringBuilder& sb, Slang::String const& str);
     void printDiagnosticArg(StringBuilder& sb, Slang::UnownedStringSlice const& str);
     void printDiagnosticArg(StringBuilder& sb, Name* name);

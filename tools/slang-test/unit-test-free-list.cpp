@@ -2,7 +2,6 @@
 
 #include "../../source/core/slang-free-list.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -30,15 +29,15 @@ static void freeListUnitTest()
         {
             int* ptr = (int*)freeList.allocate();
             *ptr = i;
-            allocs.Add(ptr);
+            allocs.add(ptr);
         }
 
         int numDealloc = randGen.nextInt32UpTo(19);
-        numDealloc = int(allocs.Count()) < numDealloc ? int(allocs.Count()) : numDealloc;
+        numDealloc = int(allocs.getCount()) < numDealloc ? int(allocs.getCount()) : numDealloc;
 
         for (int j = 0; j < numDealloc; j++)
         {
-            const int index = randGen.nextInt32UpTo(int(allocs.Count()));
+            const int index = randGen.nextInt32UpTo(int(allocs.getCount()));
 
             int* alloc = allocs[index];
 
@@ -47,7 +46,7 @@ static void freeListUnitTest()
 
             freeList.deallocate(alloc);
 
-            allocs.FastRemoveAt(index);
+            allocs.fastRemoveAt(index);
         }
     }
 }

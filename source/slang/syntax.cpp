@@ -299,7 +299,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto substitutions = new GenericSubstitution();
         substitutions->genericDecl = genericDecl;
-        substitutions->args.Add(valueType);
+        substitutions->args.add(valueType);
 
         auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
         auto rsType = DeclRefType::Create(
@@ -766,7 +766,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Vector")
             {
-                SLANG_ASSERT(subst && subst->args.Count() == 2);
+                SLANG_ASSERT(subst && subst->args.getCount() == 2);
                 auto vecType = new VectorExpressionType();
                 vecType->setSession(session);
                 vecType->declRef = declRef;
@@ -776,7 +776,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Matrix")
             {
-                SLANG_ASSERT(subst && subst->args.Count() == 3);
+                SLANG_ASSERT(subst && subst->args.getCount() == 3);
                 auto matType = new MatrixExpressionType();
                 matType->setSession(session);
                 matType->declRef = declRef;
@@ -784,7 +784,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "Texture")
             {
-                SLANG_ASSERT(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new TextureType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -794,7 +794,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "TextureSampler")
             {
-                SLANG_ASSERT(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new TextureSamplerType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -804,7 +804,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             }
             else if (magicMod->name == "GLSLImageType")
             {
-                SLANG_ASSERT(subst && subst->args.Count() >= 1);
+                SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = new GLSLImageType(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
@@ -832,7 +832,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
-                    SLANG_ASSERT(subst && subst->args.Count() == 1);			\
+                    SLANG_ASSERT(subst && subst->args.getCount() == 1);			\
                     auto type = new T();									    \
                     type->setSession(session);                                  \
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
@@ -1074,7 +1074,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.Add(pp->SubstituteImpl(subst, &diff).as<Type>());
+            substParamTypes.add(pp->SubstituteImpl(subst, &diff).as<Type>());
         }
 
         // early exit for no change...
@@ -1098,7 +1098,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> canParamTypes;
         for( auto pp : paramTypes )
         {
-            canParamTypes.Add(pp->GetCanonicalType());
+            canParamTypes.add(pp->GetCanonicalType());
         }
 
         RefPtr<FuncType> canType = new FuncType();
@@ -1256,8 +1256,8 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         auto substitutions = new GenericSubstitution();
         substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.Add(elementType);
-        substitutions->args.Add(elementCount);
+        substitutions->args.add(elementType);
+        substitutions->args.add(elementCount);
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
@@ -1348,7 +1348,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Val>> substArgs;
         for (auto a : args)
         {
-            substArgs.Add(a->SubstituteImpl(substSet, &diff));
+            substArgs.add(a->SubstituteImpl(substSet, &diff));
         }
 
         if (!diff) return this;
@@ -1375,9 +1375,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if (genericDecl != genericSubst->genericDecl)
             return false;
 
-        UInt argCount = args.Count();
-        SLANG_RELEASE_ASSERT(args.Count() == genericSubst->args.Count());
-        for (UInt aa = 0; aa < argCount; ++aa)
+        Index argCount = args.getCount();
+        SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
+        for (Index aa = 0; aa < argCount; ++aa)
         {
             if (!args[aa]->EqualsVal(genericSubst->args[aa].Ptr()))
                 return false;
@@ -1447,7 +1447,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
             substConstraintArg.decl = constraintArg.decl;
             substConstraintArg.val = constraintArg.val->SubstituteImpl(substSet, &diff);
 
-            substConstraintArgs.Add(substConstraintArg);
+            substConstraintArgs.add(substConstraintArg);
         }
 
         if(!diff)
@@ -1476,9 +1476,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
                 return false;
             if (!actualType->EqualsVal(genSubst->actualType))
                 return false;
-            if (constraintArgs.Count() != genSubst->constraintArgs.Count())
+            if (constraintArgs.getCount() != genSubst->constraintArgs.getCount())
                 return false;
-            for (UInt i = 0; i < constraintArgs.Count(); i++)
+            for (Index i = 0; i < constraintArgs.getCount(); i++)
             {
                 if (!constraintArgs[i].val->EqualsVal(genSubst->constraintArgs[i].val))
                     return false;
@@ -2139,7 +2139,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     paramType = session->getOutType(paramType);
                 }
             }
-            funcType->paramTypes.Add(paramType);
+            funcType->paramTypes.add(paramType);
         }
 
         return funcType;
@@ -2238,7 +2238,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
                         continue;
 
                     bool found = false;
-                    UInt index = 0;
+                    Index index = 0;
                     for (auto m : genericDecl->Members)
                     {
                         if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
@@ -2254,9 +2254,9 @@ void Type::accept(IValVisitor* visitor, void* extra)
                     if (found)
                     {
                         (*ioDiff)++;
-                        auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().Count() +
-                            genericDecl->getMembersOfType<GenericValueParamDecl>().Count();
-                        SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.Count());
+                        auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
+                            genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
+                        SLANG_ASSERT(index + ordinaryParamCount < genericSubst->args.getCount());
                         return genericSubst->args[index + ordinaryParamCount];
                     }
                 }
@@ -2583,11 +2583,11 @@ void Type::accept(IValVisitor* visitor, void* extra)
         if(!taggedUnion)
             return false;
 
-        auto caseCount = caseTypes.Count();
-        if(caseCount != taggedUnion->caseTypes.Count())
+        auto caseCount = caseTypes.getCount();
+        if(caseCount != taggedUnion->caseTypes.getCount())
             return false;
 
-        for( UInt ii = 0; ii < caseCount; ++ii )
+        for( Index ii = 0; ii < caseCount; ++ii )
         {
             if(!caseTypes[ii]->Equals(taggedUnion->caseTypes[ii]))
                 return false;
@@ -2613,7 +2613,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         for( auto caseType : caseTypes )
         {
             auto canCaseType = caseType->GetCanonicalType();
-            canType->caseTypes.Add(canCaseType);
+            canType->caseTypes.add(canCaseType);
         }
 
         return canType;
@@ -2626,7 +2626,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.Add(caseType->SubstituteImpl(subst, &diff).as<Type>());
+            substCaseTypes.add(caseType->SubstituteImpl(subst, &diff).as<Type>());
         }
         if(!diff)
             return this;
@@ -2635,7 +2635,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         RefPtr<TaggedUnionType> substType = new TaggedUnionType();
         substType->setSession(getSession());
-        substType->caseTypes.SwapWith(substCaseTypes);
+        substType->caseTypes.swapWith(substCaseTypes);
         return substType;
     }
 
@@ -2650,11 +2650,11 @@ bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
     if(!taggedUnionWitness)
         return false;
 
-    auto caseCount = caseWitnesses.Count();
-    if(caseCount != taggedUnionWitness->caseWitnesses.Count())
+    auto caseCount = caseWitnesses.getCount();
+    if(caseCount != taggedUnionWitness->caseWitnesses.getCount())
         return false;
 
-    for(UInt ii = 0; ii < caseCount; ++ii)
+    for(Index ii = 0; ii < caseCount; ++ii)
     {
         if(!caseWitnesses[ii]->EqualsVal(taggedUnionWitness->caseWitnesses[ii]))
             return false;
@@ -2698,7 +2698,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )
     {
-        substCaseWitnesses.Add(caseWitness->SubstituteImpl(subst, &diff));
+        substCaseWitnesses.add(caseWitness->SubstituteImpl(subst, &diff));
     }
 
     if(!diff)
@@ -2709,7 +2709,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
     RefPtr<TaggedUnionSubtypeWitness> substWitness = new TaggedUnionSubtypeWitness();
     substWitness->sub = substSub;
     substWitness->sup = substSup;
-    substWitness->caseWitnesses.SwapWith(substCaseWitnesses);
+    substWitness->caseWitnesses.swapWith(substCaseWitnesses);
     return substWitness;
 }
 

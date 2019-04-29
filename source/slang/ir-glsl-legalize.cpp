@@ -224,10 +224,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     char const* outerArrayName = nullptr;
 
     auto semanticNameSpelling = varLayout->systemValueSemantic;
-    if(semanticNameSpelling.Length() == 0)
+    if(semanticNameSpelling.getLength() == 0)
         return nullptr;
 
-    auto semanticName = semanticNameSpelling.ToLower();
+    auto semanticName = semanticNameSpelling.toLower();
 
     IRType* requiredType = nullptr;
 
@@ -698,7 +698,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 element.val = fieldVal;
                 element.key = field->getKey();
 
-                tupleValImpl->elements.Add(element);
+                tupleValImpl->elements.add(element);
             }
         }
 
@@ -835,9 +835,9 @@ void assign(
                 // that is not a tuple. We will perform assignment
                 // element-by-element.
                 auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
-                UInt elementCount = rightTupleVal->elements.Count();
+                Index elementCount = rightTupleVal->elements.getCount();
 
-                for( UInt ee = 0; ee < elementCount; ++ee )
+                for( Index ee = 0; ee < elementCount; ++ee )
                 {
                     auto rightElement = rightTupleVal->elements[ee];
                     auto leftElementVal = extractField(
@@ -861,9 +861,9 @@ void assign(
             // We have a tuple, so we are going to need to try and assign
             // to each of its constituent fields.
             auto leftTupleVal = as<ScalarizedTupleValImpl>(left.impl);
-            UInt elementCount = leftTupleVal->elements.Count();
+            Index elementCount = leftTupleVal->elements.getCount();
 
-            for( UInt ee = 0; ee < elementCount; ++ee )
+            for( Index ee = 0; ee < elementCount; ++ee )
             {
                 auto rightElementVal = extractField(
                     builder,
@@ -923,15 +923,15 @@ ScalarizedVal getSubscriptVal(
             RefPtr<ScalarizedTupleValImpl> resultTuple = new ScalarizedTupleValImpl();
             resultTuple->type = elementType;
 
-            UInt elementCount = inputTuple->elements.Count();
-            UInt elementCounter = 0;
+            Index elementCount = inputTuple->elements.getCount();
+            Index elementCounter = 0;
 
             auto structType = as<IRStructType>(elementType);
             for(auto field : structType->getFields())
             {
                 auto tupleElementType = field->getFieldType();
 
-                UInt elementIndex = elementCounter++;
+                Index elementIndex = elementCounter++;
 
                 SLANG_RELEASE_ASSERT(elementIndex < elementCount);
                 auto inputElement = inputTuple->elements[elementIndex];
@@ -944,7 +944,7 @@ ScalarizedVal getSubscriptVal(
                     inputElement.val,
                     indexVal);
 
-                resultTuple->elements.Add(resultElement);
+                resultTuple->elements.add(resultElement);
             }
             SLANG_RELEASE_ASSERT(elementCounter == elementCount);
 
@@ -983,7 +983,7 @@ IRInst* materializeTupleValue(
     auto tupleVal = val.impl.as<ScalarizedTupleValImpl>();
     SLANG_ASSERT(tupleVal);
 
-    UInt elementCount = tupleVal->elements.Count();
+    Index elementCount = tupleVal->elements.getCount();
     auto type = tupleVal->type;
 
     if( auto arrayType = as<IRArrayType>(type))
@@ -1009,13 +1009,13 @@ IRInst* materializeTupleValue(
                 builder,
                 arrayElementPseudoVal);
 
-            arrayElementVals.Add(arrayElementVal);
+            arrayElementVals.add(arrayElementVal);
         }
 
         return builder->emitMakeArray(
             arrayType,
-            arrayElementVals.Count(),
-            arrayElementVals.Buffer());
+            arrayElementVals.getCount(),
+            arrayElementVals.getBuffer());
     }
     else
     {
@@ -1026,16 +1026,16 @@ IRInst* materializeTupleValue(
         // TODO: this should be using a `makeStruct` instruction.
 
         List<IRInst*> elementVals;
-        for( UInt ee = 0; ee < elementCount; ++ee )
+        for( Index ee = 0; ee < elementCount; ++ee )
         {
             auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
-            elementVals.Add(elementVal);
+            elementVals.add(elementVal);
         }
 
         return builder->emitConstructorInst(
             tupleVal->type,
-            elementVals.Count(),
-            elementVals.Buffer());
+            elementVals.getCount(),
+            elementVals.getBuffer());
     }
 }
 

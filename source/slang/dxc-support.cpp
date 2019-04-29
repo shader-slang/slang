@@ -99,15 +99,15 @@ namespace Slang
             entryPointIndex,
             targetReq,
             endToEndReq);
-        maybeDumpIntermediate(compileRequest, hlslCode.Buffer(), CodeGenTarget::HLSL);
+        maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         // Wrap the 
 
         // Create blob from the string
         ComPtr<IDxcBlobEncoding> dxcSourceBlob;
         SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
-            (LPBYTE)hlslCode.Buffer(),
-            (UINT32)hlslCode.Length(),
+            (LPBYTE)hlslCode.getBuffer(),
+            (UINT32)hlslCode.getLength(),
             0,
             dxcSourceBlob.writeRef()));
 
@@ -181,11 +181,11 @@ namespace Slang
         args[argCount++] = L"-no-warnings";
 
         String entryPointName = getText(entryPoint->getName());
-        OSString wideEntryPointName = entryPointName.ToWString();
+        OSString wideEntryPointName = entryPointName.toWString();
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
         String profileName = GetHLSLProfileName(profile);
-        OSString wideProfileName = profileName.ToWString();
+        OSString wideProfileName = profileName.toWString();
 
         // We will enable the flag to generate proper code for 16-bit types
         // by default, as long as the user is requesting a sufficiently
@@ -207,7 +207,7 @@ namespace Slang
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
-            sourcePath.ToWString().begin(),
+            sourcePath.toWString().begin(),
             profile.GetStage() == Stage::Unknown ? L"" : wideEntryPointName.begin(),
             wideProfileName.begin(),
             args,
@@ -248,7 +248,7 @@ namespace Slang
         ComPtr<IDxcBlob> dxcResultBlob;
         SLANG_RETURN_ON_FAIL(dxcResult->GetResult(dxcResultBlob.writeRef()));
         
-        outCode.AddRange(
+        outCode.addRange(
             (uint8_t const*)dxcResultBlob->GetBufferPointer(),
             (int)           dxcResultBlob->GetBufferSize());
 

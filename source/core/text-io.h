@@ -273,7 +273,7 @@ namespace Slang
 		RefPtr<Stream> stream;
 		List<char> buffer;
 		Encoding * encoding;
-		UInt ptr;
+		Index ptr;
 		char ReadBufferChar();
 		void ReadBuffer();
 			
@@ -300,7 +300,7 @@ namespace Slang
 		virtual String ReadToEnd();
 		virtual bool IsEnd()
 		{
-			return ptr == buffer.Count() && stream->IsEnd();
+			return ptr == buffer.getCount() && stream->IsEnd();
 		}
 		virtual void Close()
 		{

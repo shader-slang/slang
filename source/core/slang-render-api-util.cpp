@@ -62,7 +62,7 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
         if (names.indexOf(',') >= 0)
         {
             StringUtil::split(names, ',', namesList);
-            if (namesList.IndexOf(name) != UInt(-1))
+            if (namesList.indexOf(name) != Index(-1))
             {
                 return apiInfo.type;
             }

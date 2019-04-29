@@ -373,7 +373,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // Note: an empty `struct` parameter would also show up the same way, but
         // we should eliminate any such parameters later on during type legalization.
         //
-        if(layout->resourceInfos.Count() == 0)
+        if(layout->resourceInfos.getCount() == 0)
             return true;
 
         // if none of the above tests determined that the

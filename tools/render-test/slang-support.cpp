@@ -95,28 +95,28 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
 
     Slang::List<const char*> rawGlobalTypeNames;
     for (auto typeName : request.globalGenericTypeArguments)
-        rawGlobalTypeNames.Add(typeName.Buffer());
+        rawGlobalTypeNames.add(typeName.getBuffer());
     spSetGlobalGenericArgs(
         slangRequest,
-        (int)rawGlobalTypeNames.Count(),
-        rawGlobalTypeNames.Buffer());
+        (int)rawGlobalTypeNames.getCount(),
+        rawGlobalTypeNames.getBuffer());
 
     Slang::List<const char*> rawEntryPointTypeNames;
     for (auto typeName : request.entryPointGenericTypeArguments)
-        rawEntryPointTypeNames.Add(typeName.Buffer());
+        rawEntryPointTypeNames.add(typeName.getBuffer());
 
-    const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.Count());
+    const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.getCount());
     for(int ii = 0; ii < globalExistentialTypeCount; ++ii )
     {
-        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].Buffer());
+        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].getBuffer());
     }
 
-    const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.Count());
+    const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.getCount());
     auto setEntryPointExistentialTypeArgs = [&](int entryPoint)
     {
         for( int ii = 0; ii < entryPointExistentialTypeCount; ++ii )
         {
-            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].Buffer());
+            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].getBuffer());
         }
     };
 
@@ -125,8 +125,8 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
         int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
             computeEntryPointName,
             SLANG_STAGE_COMPUTE,
-            (int)rawEntryPointTypeNames.Count(),
-            rawEntryPointTypeNames.Buffer());
+            (int)rawEntryPointTypeNames.getCount(),
+            rawEntryPointTypeNames.getBuffer());
 
         setEntryPointExistentialTypeArgs(computeEntryPoint);
 
@@ -156,8 +156,8 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     }
     else
     {
-        int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
-        int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.Count(), rawEntryPointTypeNames.Buffer());
+        int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
+        int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
 
         setEntryPointExistentialTypeArgs(vertexEntryPoint);
         setEntryPointExistentialTypeArgs(fragmentEntryPoint);

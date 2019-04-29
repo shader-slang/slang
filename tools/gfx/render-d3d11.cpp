@@ -475,11 +475,11 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
             // If we have an adapter set on the desc, look it up. We only need to do so for hardware
             ComPtr<IDXGIAdapter> adapter;
-            if (desc.adapter.Length() &&  (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
+            if (desc.adapter.getLength() &&  (deviceCheckFlags & DeviceCheckFlag::UseHardwareDevice))
             {
                 List<ComPtr<IDXGIAdapter>> dxgiAdapters;
                 D3DUtil::findAdapters(deviceCheckFlags, desc.adapter.getUnownedSlice(), dxgiAdapters);
-                if (dxgiAdapters.Count() == 0)
+                if (dxgiAdapters.getCount() == 0)
                 {
                     continue;
                 }
@@ -695,7 +695,7 @@ Result D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const 
     D3D11_SUBRESOURCE_DATA* subResourcesPtr = nullptr;
     if(initData)
     {
-        subRes.SetSize(srcDesc.numMipLevels * effectiveArraySize);
+        subRes.setCount(srcDesc.numMipLevels * effectiveArraySize);
         {
             int subResourceIndex = 0;
             for (int i = 0; i < effectiveArraySize; i++)
@@ -715,7 +715,7 @@ Result D3D11Renderer::createTextureResource(Resource::Usage initialUsage, const 
                 }
             }
         }
-        subResourcesPtr = subRes.Buffer();
+        subResourcesPtr = subRes.getBuffer();
     }
 
     const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
@@ -816,9 +816,9 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
     List<uint8_t> initDataBuffer;
     if (initData && alignedSizeInBytes > srcDesc.sizeInBytes)
     {
-        initDataBuffer.SetSize(alignedSizeInBytes);
-        ::memcpy(initDataBuffer.Buffer(), initData, srcDesc.sizeInBytes);
-        initData = initDataBuffer.Buffer();
+        initDataBuffer.setCount(alignedSizeInBytes);
+        ::memcpy(initDataBuffer.getBuffer(), initData, srcDesc.sizeInBytes);
+        initData = initDataBuffer.getBuffer();
     }
 
     D3D11_BUFFER_DESC bufferDesc = { 0 };
@@ -1813,7 +1813,7 @@ Result D3D11Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
             rangeInfo.arrayIndex = counts[typeIndex];
             counts[typeIndex] += rangeDesc.count;
         }
-        descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+        descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
     }
 
     for(int ii = 0; ii < int(D3D11DescriptorSlotType::CountOf); ++ii)
@@ -1845,7 +1845,7 @@ Result D3D11Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
             counts[jj] += setInfo.layout->m_counts[jj];
         }
 
-        pipelineLayoutImpl->m_descriptorSets.Add(setInfo);
+        pipelineLayoutImpl->m_descriptorSets.add(setInfo);
     }
 
     pipelineLayoutImpl->m_uavCount = UINT(counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
@@ -1861,10 +1861,10 @@ Result D3D11Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     RefPtr<DescriptorSetImpl> descriptorSetImpl = new DescriptorSetImpl();
 
     descriptorSetImpl->m_layout = layoutImpl;
-    descriptorSetImpl->m_cbs     .SetSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ConstantBuffer)]);
-    descriptorSetImpl->m_srvs    .SetSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ShaderResourceView)]);
-    descriptorSetImpl->m_uavs    .SetSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
-    descriptorSetImpl->m_samplers.SetSize(layoutImpl->m_counts[int(D3D11DescriptorSlotType::Sampler)]);
+    descriptorSetImpl->m_cbs     .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ConstantBuffer)]);
+    descriptorSetImpl->m_srvs    .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::ShaderResourceView)]);
+    descriptorSetImpl->m_uavs    .setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::UnorderedAccessView)]);
+    descriptorSetImpl->m_samplers.setCount(layoutImpl->m_counts[int(D3D11DescriptorSlotType::Sampler)]);
 
     *outDescriptorSet = descriptorSetImpl.detach();
     return SLANG_OK;
@@ -2097,7 +2097,7 @@ void D3D11Renderer::_applyBindingState(bool isCompute)
                     else
                         context->OMSetRenderTargetsAndUnorderedAccessViews(
                             m_currentBindings->getDesc().m_numRenderTargets,
-                            m_renderTargetViews.Buffer()->readRef(),
+                            m_renderTargetViews.getBuffer()->readRef(),
                             m_depthStencilView,
                             bindingIndex,
                             1,

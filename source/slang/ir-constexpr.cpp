@@ -162,7 +162,7 @@ void maybeAddToWorkList(
 {
     if( !context->onWorkList.Contains(gv) )
     {
-        context->workList.Add(gv);
+        context->workList.add(gv);
         context->onWorkList.Add(gv);
     }
 }
@@ -489,10 +489,10 @@ void propagateConstExpr(
 
     // We will iterate applying propagation to one global value at a time
     // until we run out.
-    while( context.workList.Count() )
+    while( context.workList.getCount() )
     {
         auto gv = context.workList[0];
-        context.workList.FastRemoveAt(0);
+        context.workList.fastRemoveAt(0);
         context.onWorkList.Remove(gv);
 
         switch( gv->op )

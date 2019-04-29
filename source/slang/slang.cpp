@@ -75,7 +75,7 @@ Session::Session()
     auto baseModuleDecl = populateBaseLanguageModule(
         this,
         baseLanguageScope);
-    loadedModuleCode.Add(baseModuleDecl);
+    loadedModuleCode.add(baseModuleDecl);
 
     coreLanguageScope = new Scope();
     coreLanguageScope->nextSibling = baseLanguageScope;
@@ -108,7 +108,7 @@ struct IncludeHandlerImpl : IncludeHandler
         ComPtr<ISlangBlob> combinedPathBlob;
         SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
         String combinedPath(StringUtil::getString(combinedPathBlob));
-        if (combinedPath.Length() <= 0)
+        if (combinedPath.getLength() <= 0)
         {
             return SLANG_FAIL;
         }
@@ -126,7 +126,7 @@ struct IncludeHandlerImpl : IncludeHandler
 
         // If the rel path exists -> a uniqueIdentity MUST exists too
         String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
-        if (uniqueIdentity.Length() <= 0)
+        if (uniqueIdentity.getLength() <= 0)
         {   
             // Unique identity can't be empty
             return SLANG_FAIL;
@@ -188,7 +188,7 @@ struct IncludeHandlerImpl : IncludeHandler
     {
         ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
         ComPtr<ISlangBlob> simplifiedPath;
-        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.Buffer(), simplifiedPath.writeRef())))
+        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
         {
             return path;
         }
@@ -422,7 +422,7 @@ SourceManager* TranslationUnitRequest::getSourceManager()
 
 void TranslationUnitRequest::addSourceFile(SourceFile* sourceFile)
 {
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
 
     // We want to record that the compiled module has a dependency
     // on the path of the source file, but we also need to account
@@ -472,7 +472,7 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
 
 SlangResult Linkage::loadFile(String const& path, ISlangBlob** outBlob)
 {
-    return fileSystemExt->loadFile(path.Buffer(), outBlob);
+    return fileSystemExt->loadFile(path.getBuffer(), outBlob);
 }
 
 RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
@@ -549,7 +549,7 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
     //
     List<RefPtr<Scope>> scopesToTry;
     for(auto module : getModuleDependencies())
-        scopesToTry.Add(module->getModuleDecl()->scope);
+        scopesToTry.add(module->getModuleDecl()->scope);
 
     auto linkage = getLinkage();
     for(auto& s : scopesToTry)
@@ -839,7 +839,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // TODO: This logic should be moved into `options.cpp` or somewhere else
     // specific to the command-line tool.
     //
-    if (getLinkage()->targets.Count() == 0)
+    if (getLinkage()->targets.getCount() == 0)
     {
         auto language = inferSourceLanguage(getFrontEndReq());
         switch (language)
@@ -938,7 +938,7 @@ SlangResult EndToEndCompileRequest::executeActions()
 
 int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* moduleName)
 {
-    UInt result = translationUnits.Count();
+    Index result = translationUnits.getCount();
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
@@ -946,7 +946,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
 
     translationUnit->moduleName = moduleName;
 
-    translationUnits.Add(translationUnit);
+    translationUnits.add(translationUnit);
 
     return (int) result;
 }
@@ -959,7 +959,7 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language)
     // even when they are being compiled together.
     //
     String generatedName = "tu";
-    generatedName.append(translationUnits.Count());
+    generatedName.append(translationUnits.getCount());
     return addTranslationUnit(language,  getNamePool()->getName(generatedName));
 }
 
@@ -1029,7 +1029,7 @@ int FrontEndCompileRequest::addEntryPoint(
 {
     auto translationUnitReq = translationUnits[translationUnitIndex];
 
-    UInt result = m_entryPointReqs.Count();
+    Index result = m_entryPointReqs.getCount();
 
     RefPtr<FrontEndEntryPointRequest> entryPointReq = new FrontEndEntryPointRequest(
         this,
@@ -1037,7 +1037,7 @@ int FrontEndCompileRequest::addEntryPoint(
         getNamePool()->getName(name),
         entryPointProfile);
 
-    m_entryPointReqs.Add(entryPointReq);
+    m_entryPointReqs.add(entryPointReq);
 //    translationUnitReq->entryPoints.Add(entryPointReq);
 
     return int(result);
@@ -1053,10 +1053,10 @@ int EndToEndCompileRequest::addEntryPoint(
 
     EntryPointInfo entryPointInfo;
     for (auto typeName : genericTypeNames)
-        entryPointInfo.genericArgStrings.Add(typeName);
+        entryPointInfo.genericArgStrings.add(typeName);
 
-    UInt result = entryPoints.Count();
-    entryPoints.Add(_Move(entryPointInfo));
+    Index result = entryPoints.getCount();
+    entryPoints.add(_Move(entryPointInfo));
     return (int) result;
 }
 
@@ -1067,8 +1067,8 @@ UInt Linkage::addTarget(
     targetReq->linkage = this;
     targetReq->target = target;
 
-    UInt result = targets.Count();
-    targets.Add(targetReq);
+    Index result = targets.getCount();
+    targets.add(targetReq);
     return (int) result;
 }
 
@@ -1085,7 +1085,7 @@ void Linkage::loadParsedModule(
 
     // Get a path
     String mostUniqueIdentity = pathInfo.getMostUniqueIdentity();
-    SLANG_ASSERT(mostUniqueIdentity.Length() > 0);
+    SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
     mapPathToLoadedModule.Add(mostUniqueIdentity, loadedModule);
     mapNameToLoadedModules.Add(name, loadedModule);
@@ -1107,7 +1107,7 @@ void Linkage::loadParsedModule(
         SLANG_ASSERT(errorCountAfter == 0);
         loadedModule->setIRModule(generateIRForTranslationUnit(translationUnit));
     }
-    loadedModulesList.Add(loadedModule);
+    loadedModulesList.add(loadedModule);
 }
 
 Module* Linkage::loadModule(String const& name)
@@ -1263,7 +1263,7 @@ RefPtr<Module> Linkage::findOrImportModule(
 
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
-    if(SLANG_FAILED(getFileSystemExt()->loadFile(filePathInfo.foundPath.Buffer(), fileContents.writeRef())))
+    if(SLANG_FAILED(getFileSystemExt()->loadFile(filePathInfo.foundPath.getBuffer(), fileContents.writeRef())))
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -1314,7 +1314,7 @@ void ModuleDependencyList::_addDependency(Module* module)
     if(m_moduleSet.Contains(module))
         return;
 
-    m_moduleList.Add(module);
+    m_moduleList.add(module);
     m_moduleSet.Add(module);
 }
 
@@ -1327,7 +1327,7 @@ void FilePathDependencyList::addDependency(String const& path)
     if(m_filePathSet.Contains(path))
         return;
 
-    m_filePathList.Add(path);
+    m_filePathList.add(path);
     m_filePathSet.Add(path);
 }
 
@@ -1381,7 +1381,7 @@ void Program::addReferencedLeafModule(Module* module)
 
 void Program::addEntryPoint(EntryPoint* entryPoint)
 {
-    m_entryPoints.Add(entryPoint);
+    m_entryPoints.add(entryPoint);
 
     for(auto module : entryPoint->getModuleDependencies())
     {
@@ -1423,7 +1423,7 @@ TargetProgram::TargetProgram(
     : m_program(program)
     , m_targetReq(targetReq)
 {
-    m_entryPointResults.SetSize(program->getEntryPoints().Count());
+    m_entryPointResults.setCount(program->getEntryPoints().getCount());
 }
 
 //
@@ -1516,7 +1516,7 @@ void Session::addBuiltinSource(
     SlangResult res = compileRequest->executeActionsInner();
     if (SLANG_FAILED(res))
     {
-        char const* diagnostics = sink.outputBuffer.Buffer();
+        char const* diagnostics = sink.outputBuffer.getBuffer();
         fprintf(stderr, "%s", diagnostics);
 
 #ifdef _WIN32
@@ -1556,7 +1556,7 @@ void Session::addBuiltinSource(
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    loadedModuleCode.Add(syntax);
+    loadedModuleCode.add(syntax);
 }
 
 Session::~Session()
@@ -1770,7 +1770,7 @@ SLANG_API void spSetCodeGenTarget(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->targets.Clear();
+    linkage->targets.clear();
     linkage->addTarget(Slang::CodeGenTarget(target));
 }
 
@@ -1912,7 +1912,7 @@ SLANG_API void spAddSearchPath(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->searchDirectories.searchDirectories.Add(Slang::SearchDirectory(path));
+    linkage->searchDirectories.searchDirectories.add(Slang::SearchDirectory(path));
 }
 
 SLANG_API void spAddPreprocessorDefine(
@@ -1990,7 +1990,7 @@ SLANG_API void spAddTranslationUnitSourceFile(
     auto frontEndReq = req->getFrontEndReq();
     if(!path) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.Count()) return;
+    if(Slang::Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     frontEndReq->addTranslationUnitSourceFile(
         translationUnitIndex,
@@ -2019,19 +2019,20 @@ SLANG_API void spAddTranslationUnitSourceStringSpan(
     char const*             sourceBegin,
     char const*             sourceEnd)
 {
+    using namespace Slang;
     if(!request) return;
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBegin) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.Count()) return;
+    if(Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
     frontEndReq->addTranslationUnitSourceString(
         translationUnitIndex,
         path,
-        Slang::UnownedStringSlice(sourceBegin, sourceEnd));
+        UnownedStringSlice(sourceBegin, sourceEnd));
 }
 
 SLANG_API void spAddTranslationUnitSourceBlob(
@@ -2045,7 +2046,7 @@ SLANG_API void spAddTranslationUnitSourceBlob(
     auto frontEndReq = req->getFrontEndReq();
     if(!sourceBlob) return;
     if(translationUnitIndex < 0) return;
-    if(Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.Count()) return;
+    if(Slang::Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return;
 
     if(!path) path = "";
 
@@ -2090,19 +2091,20 @@ SLANG_API int spAddEntryPointEx(
     int                     genericParamTypeNameCount,
     char const **           genericParamTypeNames)
 {
+    using namespace Slang;
     if (!request) return -1;
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     if (!name) return -1;
     if (translationUnitIndex < 0) return -1;
-    if (Slang::UInt(translationUnitIndex) >= frontEndReq->translationUnits.Count()) return -1;
-    Slang::List<Slang::String> typeNames;
+    if (Index(translationUnitIndex) >= frontEndReq->translationUnits.getCount()) return -1;
+    List<String> typeNames;
     for (int i = 0; i < genericParamTypeNameCount; i++)
-        typeNames.Add(genericParamTypeNames[i]);
+        typeNames.add(genericParamTypeNames[i]);
     return req->addEntryPoint(
         translationUnitIndex,
         name,
-        Slang::Profile(Slang::Stage(stage)),
+        Profile(Stage(stage)),
         typeNames);
 }
 
@@ -2115,9 +2117,9 @@ SLANG_API SlangResult spSetGlobalGenericArgs(
     auto req = convert(request);
 
     auto& genericArgStrings = req->globalGenericArgStrings;
-    genericArgStrings.Clear();
+    genericArgStrings.clear();
     for (int i = 0; i < genericArgCount; i++)
-        genericArgStrings.Add(genericArgs[i]);
+        genericArgStrings.add(genericArgs[i]);
 
     return SLANG_OK;
 }
@@ -2127,15 +2129,16 @@ SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
     int                     slotIndex,
     char const*             typeName)
 {
+    using namespace Slang;
     if(!request)        return SLANG_FAIL;
     if(slotIndex < 0)   return SLANG_FAIL;
     if(!typeName)       return SLANG_FAIL;
 
     auto req = convert(request);
     auto& typeArgStrings = req->globalExistentialSlotArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.Count())
-        typeArgStrings.SetSize(slotIndex+1);
-    typeArgStrings[slotIndex] = Slang::String(typeName);
+    if(Index(slotIndex) >= typeArgStrings.getCount())
+        typeArgStrings.setCount(slotIndex+1);
+    typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
 }
 
@@ -2145,20 +2148,21 @@ SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
     int                     slotIndex,
     char const*             typeName)
 {
+    using namespace Slang;
     if(!request)            return SLANG_FAIL;
     if(entryPointIndex < 0) return SLANG_FAIL;
     if(slotIndex < 0)       return SLANG_FAIL;
     if(!typeName)           return SLANG_FAIL;
 
     auto req = convert(request);
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.Count())
+    if(Index(entryPointIndex) >= req->entryPoints.getCount())
         return SLANG_FAIL;
 
     auto& entryPointInfo = req->entryPoints[entryPointIndex];
     auto& typeArgStrings = entryPointInfo.existentialArgStrings;
-    if(Slang::UInt(slotIndex) >= typeArgStrings.Count())
-        typeArgStrings.SetSize(slotIndex+1);
-    typeArgStrings[slotIndex] = Slang::String(typeName);
+    if(Index(slotIndex) >= typeArgStrings.getCount())
+        typeArgStrings.setCount(slotIndex+1);
+    typeArgStrings[slotIndex] = String(typeName);
     return SLANG_OK;
 }
 
@@ -2224,7 +2228,7 @@ spGetDependencyFileCount(
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
     auto program = frontEndReq->getProgram();
-    return (int) program->getFilePathDependencies().Count();
+    return (int) program->getFilePathDependencies().getCount();
 }
 
 /** Get the path to a file this compilation dependend on.
@@ -2247,7 +2251,7 @@ spGetTranslationUnitCount(
 {
     auto req = convert(request);
     auto frontEndReq = req->getFrontEndReq();
-    return (int) frontEndReq->translationUnits.Count();
+    return (int) frontEndReq->translationUnits.getCount();
 }
 
 // Get the output code associated with a specific translation unit
@@ -2264,44 +2268,45 @@ SLANG_API void const* spGetEntryPointCode(
     int                     entryPointIndex,
     size_t*                 outSize)
 {
+    using namespace Slang;
     auto req = convert(request);
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedProgram();
 
     // TODO: We should really accept a target index in this API
-    Slang::UInt targetIndex = 0;
-    auto targetCount = linkage->targets.Count();
+    Index targetIndex = 0;
+    auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;
     auto targetReq = linkage->targets[targetIndex];
 
 
     if(entryPointIndex < 0) return nullptr;
-    if(Slang::UInt(entryPointIndex) >= req->entryPoints.Count()) return nullptr;
+    if(Index(entryPointIndex) >= req->entryPoints.getCount()) return nullptr;
     auto entryPoint = program->getEntryPoint(entryPointIndex);
 
     auto targetProgram = program->getTargetProgram(targetReq);
     if(!targetProgram)
         return nullptr;
-    Slang::CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
     void const* data = nullptr;
     size_t size = 0;
 
     switch (result.format)
     {
-    case Slang::ResultFormat::None:
+    case ResultFormat::None:
     default:
         break;
 
-    case Slang::ResultFormat::Binary:
-        data = result.outputBinary.Buffer();
-        size = result.outputBinary.Count();
+    case ResultFormat::Binary:
+        data = result.outputBinary.getBuffer();
+        size = result.outputBinary.getCount();
         break;
 
-    case Slang::ResultFormat::Text:
-        data = result.outputString.Buffer();
-        size = result.outputString.Length();
+    case ResultFormat::Text:
+        data = result.outputString.getBuffer();
+        size = result.outputString.getLength();
         break;
     }
 
@@ -2315,6 +2320,7 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
         int                     targetIndex,
         ISlangBlob**            outBlob)
 {
+    using namespace Slang;
     if(!request) return SLANG_ERROR_INVALID_PARAMETER;
     if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
 
@@ -2322,14 +2328,14 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedProgram();
 
-    int targetCount = (int) linkage->targets.Count();
+    Index targetCount = linkage->targets.getCount();
     if((targetIndex < 0) || (targetIndex >= targetCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
     }
     auto targetReq = linkage->targets[targetIndex];
 
-    int entryPointCount = (int) req->entryPoints.Count();
+    Index entryPointCount = req->entryPoints.getCount();
     if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
@@ -2381,8 +2387,8 @@ SLANG_API SlangReflection* spGetReflection(
     // so that we can do this better, and make it clear that
     // `spGetReflection()` is shorthand for `targetIndex == 0`.
     //
-    Slang::UInt targetIndex = 0;
-    auto targetCount = linkage->targets.Count();
+    Slang::Index targetIndex = 0;
+    auto targetCount = linkage->targets.getCount();
     if (targetIndex >= targetCount)
         return nullptr;
 

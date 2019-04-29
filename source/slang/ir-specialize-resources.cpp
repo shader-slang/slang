@@ -57,10 +57,10 @@ struct ResourceParameterSpecializationContext
         // We will process the work list until it goes dry,
         // treating it like a stack of work items.
         //
-        while( workList.Count() )
+        while( workList.getCount() )
         {
-            auto call = workList.Last();
-            workList.RemoveLast();
+            auto call = workList.getLast();
+            workList.removeLast();
 
             // At each call site we first check whether it
             // is something we can (and should) specialize,
@@ -84,7 +84,7 @@ struct ResourceParameterSpecializationContext
         //
         if( auto call = as<IRCall>(inst) )
         {
-            workList.Add(call);
+            workList.add(call);
         }
 
         // Recursively walk through any children, to
@@ -395,8 +395,8 @@ struct ResourceParameterSpecializationContext
         auto newCall = getBuilder()->emitCallInst(
             oldCall->getFullType(),
             newFunc,
-            callInfo.newArgs.Count(),
-            callInfo.newArgs.Buffer());
+            callInfo.newArgs.getCount(),
+            callInfo.newArgs.getBuffer());
 
         newCall->insertBefore(oldCall);
         oldCall->replaceUsesWith(newCall);
@@ -477,7 +477,7 @@ struct ResourceParameterSpecializationContext
         // the original function, since different functions
         // will always yield different specializations.
         //
-        callInfo.key.vals.Add(oldFunc);
+        callInfo.key.vals.add(oldFunc);
 
         // The rest of the information is gathered by looking
         // at parameter and argument pairs.
@@ -507,7 +507,7 @@ struct ResourceParameterSpecializationContext
             // to add any information to distinguish the
             // specialized callee based on this paramter.
             //
-            ioInfo.newArgs.Add(oldArg);
+            ioInfo.newArgs.add(oldArg);
         }
         else
         {
@@ -537,7 +537,7 @@ struct ResourceParameterSpecializationContext
             // callee reflects that we are specializing
             // to the chosen parameter.
             //
-            ioInfo.key.vals.Add(oldGlobalParam);
+            ioInfo.key.vals.add(oldGlobalParam);
         }
         else if( oldArg->op == kIROp_getElement )
         {
@@ -563,7 +563,7 @@ struct ResourceParameterSpecializationContext
             // the arguments at the new call site, and
             // don't add anything to the specialization key.
             //
-            ioInfo.newArgs.Add(oldIndex);
+            ioInfo.newArgs.add(oldIndex);
         }
         else
         {
@@ -601,7 +601,7 @@ struct ResourceParameterSpecializationContext
             // We will collect the replacement value to use
             // for each of the original parameters in an array.
             //
-            funcInfo.replacementsForOldParameters.Add(newVal);
+            funcInfo.replacementsForOldParameters.add(newVal);
         }
     }
 
@@ -620,7 +620,7 @@ struct ResourceParameterSpecializationContext
             // create it here.
             //
             auto newParam = getBuilder()->createParam(oldParam->getFullType());
-            ioInfo.newParams.Add(newParam);
+            ioInfo.newParams.add(newParam);
 
             // The new parameter will be used as the replacement
             // for the old one in the specialized function.
@@ -683,7 +683,7 @@ struct ResourceParameterSpecializationContext
             //
             auto builder = getBuilder();
             auto newIndex = builder->createParam(oldIndex->getFullType());
-            ioInfo.newParams.Add(newIndex);
+            ioInfo.newParams.add(newIndex);
 
             // Finally, we need to compute a value that
             // can stand in for `oldArg` (which was
@@ -714,7 +714,7 @@ struct ResourceParameterSpecializationContext
             // that should be inserted into the body of
             // the specialized callee.
             //
-            ioInfo.newBodyInsts.Add(newVal);
+            ioInfo.newBodyInsts.add(newVal);
 
             return newVal;
         }
@@ -773,13 +773,13 @@ struct ResourceParameterSpecializationContext
         List<IRType*> paramTypes;
         for( auto param : funcInfo.newParams )
         {
-            paramTypes.Add(param->getFullType());
+            paramTypes.add(param->getFullType());
         }
 
         auto builder = getBuilder();
         IRType* funcType = builder->getFuncType(
-            paramTypes.Count(),
-            paramTypes.Buffer(),
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
             oldFunc->getResultType());
 
         IRFunc* newFunc = builder->createFunc();

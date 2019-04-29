@@ -57,7 +57,7 @@ void D3D12CircularResourceHeap::addSync(uint64_t signalValue)
 	PendingEntry entry;
 	entry.m_completedValue = signalValue;
 	entry.m_cursor = m_front;
-	m_pendingQueue.Add(entry);
+	m_pendingQueue.add(entry);
 }
 
 void D3D12CircularResourceHeap::updateCompleted()
@@ -65,13 +65,13 @@ void D3D12CircularResourceHeap::updateCompleted()
 	const uint64_t completedValue = m_fence->getCompletedValue();
 
 #if 0
-	while (m_pendingQueue.Count() != 0)
+	while (m_pendingQueue.getCount() != 0)
 	{
 		const PendingEntry& entry = m_pendingQueue[0];
 		if (entry.m_completedValue <= completedValue)
 		{
 			m_back = entry.m_cursor;
-			m_pendingQueue.RemoveAt(0);
+			m_pendingQueue.removeAt(0);
 		}
 		else
 		{
@@ -80,8 +80,8 @@ void D3D12CircularResourceHeap::updateCompleted()
 	}
 #else
 	// A more efficient implementation is m_pendingQueue is implemented as a vector like type
-	const int size = int(m_pendingQueue.Count());
-	int end = 0;
+	const Index size = m_pendingQueue.getCount();
+	Index end = 0;
 	while (end < size && m_pendingQueue[end].m_completedValue <= completedValue)
 	{
 		end++;
@@ -93,11 +93,11 @@ void D3D12CircularResourceHeap::updateCompleted()
 		m_back = m_pendingQueue[end - 1].m_cursor;
 		if (end == size)
 		{
-			m_pendingQueue.Clear();
+			m_pendingQueue.clear();
 		}
 		else
 		{
-			m_pendingQueue.RemoveRange(0, size);
+			m_pendingQueue.removeRange(0, size);
 		}
 	}
 #endif

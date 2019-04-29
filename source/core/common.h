@@ -3,6 +3,8 @@
 
 #include "../../slang.h"
 
+#include <assert.h>
+
 #include <cstdint>
 
 #ifdef __GNUC__
@@ -28,6 +30,9 @@ namespace Slang
 //	typedef unsigned short Word;
 
 	typedef intptr_t PtrInt;
+
+    // Type used for indexing, in arrays/views etc
+    typedef Int Index;
 
 	template <typename T>
 	inline T&& _Move(T & obj)

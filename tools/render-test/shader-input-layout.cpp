@@ -8,17 +8,17 @@ namespace renderer_test
     using namespace Slang;
     void ShaderInputLayout::Parse(const char * source)
     {
-        entries.Clear();
-        globalGenericTypeArguments.Clear();
-        entryPointGenericTypeArguments.Clear();
-        globalExistentialTypeArguments.Clear();
-        entryPointExistentialTypeArguments.Clear();
+        entries.clear();
+        globalGenericTypeArguments.clear();
+        entryPointGenericTypeArguments.clear();
+        globalExistentialTypeArguments.clear();
+        entryPointExistentialTypeArguments.clear();
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {
-            if (line.StartsWith("//TEST_INPUT:"))
+            if (line.startsWith("//TEST_INPUT:"))
             {
-                auto lineContent = line.SubString(13, line.Length() - 13);
+                auto lineContent = line.subString(13, line.getLength() - 13);
                 TokenReader parser(lineContent);
                 try
                 {
@@ -28,7 +28,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointGenericTypeArguments.Add(typeExp);
+                        entryPointGenericTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("global_type"))
                     {
@@ -36,7 +36,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalGenericTypeArguments.Add(typeExp);
+                        globalGenericTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("globalExistentialType"))
                     {
@@ -44,7 +44,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalExistentialTypeArguments.Add(typeExp);
+                        globalExistentialTypeArguments.add(typeExp);
                     }
                     else if (parser.LookAhead("entryPointExistentialType"))
                     {
@@ -52,7 +52,7 @@ namespace renderer_test
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointExistentialTypeArguments.Add(typeExp);
+                        entryPointExistentialTypeArguments.add(typeExp);
                     }
                     else
                     {
@@ -183,12 +183,12 @@ namespace renderer_test
                                     {
                                         if (parser.NextToken().Type == TokenType::IntLiteral)
                                         {
-                                            entry.bufferData.Add(parser.ReadUInt());
+                                            entry.bufferData.add(parser.ReadUInt());
                                         }
                                         else
                                         {
                                             auto floatNum = parser.ReadFloat();
-                                            entry.bufferData.Add(*(unsigned int*)&floatNum);
+                                            entry.bufferData.add(*(unsigned int*)&floatNum);
                                         }
                                     }
                                     parser.Read("]");
@@ -254,7 +254,7 @@ namespace renderer_test
                                     parser.Read("(");
                                     while (!parser.IsEnd() && !parser.LookAhead(")"))
                                     {
-                                        entry.glslBinding.Add(parser.ReadInt());
+                                        entry.glslBinding.add(parser.ReadInt());
                                         if (parser.LookAhead(","))
                                             parser.Read(",");
                                         else
@@ -271,7 +271,7 @@ namespace renderer_test
                                     parser.Read(",");
                             }
                         }
-                        entries.Add(entry);
+                        entries.add(entry);
                     }
                 }
                 catch (TextFormatException)
@@ -302,19 +302,19 @@ namespace renderer_test
 
                 List<List<unsigned int>>& dstBuffer = output.dataBuffer;
 
-                int numMips = int(work.dataBuffer.Count());
-                dstBuffer.SetSize(numMips);
+                Index numMips = work.dataBuffer.getCount();
+                dstBuffer.setCount(numMips);
 
                 for (int i = 0; i < numMips; ++i)
                 {
-                    const int numPixels = int(work.dataBuffer[i].Count());
-                    const unsigned int* srcPixels = work.dataBuffer[i].Buffer();
+                    const Index numPixels = work.dataBuffer[i].getCount();
+                    const unsigned int* srcPixels = work.dataBuffer[i].getBuffer();
 
-                    dstBuffer[i].SetSize(numPixels);
+                    dstBuffer[i].setCount(numPixels);
 
-                    float* dstPixels = (float*)dstBuffer[i].Buffer();
+                    float* dstPixels = (float*)dstBuffer[i].getBuffer();
 
-                    for (int j = 0; j < numPixels; ++j)
+                    for (Index j = 0; j < numPixels; ++j)
                     {
                         // Copy out red
                         const unsigned int srcPixel = srcPixels[j];
@@ -344,7 +344,7 @@ namespace renderer_test
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
         output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
-        output.dataBuffer.SetSize(output.mipLevels * output.arraySize);
+        output.dataBuffer.setCount(output.mipLevels * output.arraySize);
         auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
         {
             if (dimension == 1)
@@ -372,9 +372,9 @@ namespace renderer_test
                     bufferLen *= size;
                 else if (inputDesc.dimension == 3)
                     bufferLen *= size*size;
-                dataBuffer[slice].SetSize(bufferLen);
+                dataBuffer[slice].setCount(bufferLen);
 
-                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].Buffer(), [&](int x, int y, int z) -> unsigned int
+                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].getBuffer(), [&](int x, int y, int z) -> unsigned int
                 {
                     if (inputDesc.content == InputTextureContent::Zero)
                     {

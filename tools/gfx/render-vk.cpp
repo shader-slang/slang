@@ -619,7 +619,7 @@ Slang::Result VKRenderer::_createPipeline(RefPtr<Pipeline>& pipelineOut)
             vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
 
             vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
-            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
+            vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.getBuffer();
         }
 
         //
@@ -825,8 +825,8 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     // Use a dynamic buffer to store
     size_t bufferSize = strlen(pMsg) + 1 + 1024;
     List<char> bufferArray;
-    bufferArray.SetSize(bufferSize);
-    char* buffer = bufferArray.Buffer();
+    bufferArray.setCount(bufferSize);
+    char* buffer = bufferArray.getBuffer();
 
     sprintf_s(buffer,
         bufferSize,
@@ -862,9 +862,9 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
     // will free the memory after a compile request is closed.
     size_t codeSize = dataEnd - dataBegin;
 
-	bufferOut.InsertRange(0, dataBegin, codeSize);
+	bufferOut.insertRange(0, dataBegin, codeSize);
 
-    char* codeBegin = bufferOut.Buffer();
+    char* codeBegin = bufferOut.getBuffer();
 
     VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     moduleCreateInfo.pCode = (uint32_t*)codeBegin;
@@ -945,27 +945,27 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
     List<VkPhysicalDevice> physicalDevices;
-    physicalDevices.SetSize(numPhysicalDevices);
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.Buffer()));
+    physicalDevices.setCount(numPhysicalDevices);
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
 
-    int32_t selectedDeviceIndex = 0;
+    Index selectedDeviceIndex = 0;
 
-    if (desc.adapter.Length())
+    if (desc.adapter.getLength())
     {
         selectedDeviceIndex = -1;
 
-        String lowerAdapter = desc.adapter.ToLower();
+        String lowerAdapter = desc.adapter.toLower();
 
-        for (int i = 0; i < int(physicalDevices.Count()); ++i)
+        for (Index i = 0; i < physicalDevices.getCount(); ++i)
         {
             auto physicalDevice = physicalDevices[i];
 
             VkPhysicalDeviceProperties basicProps = {};
             m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
 
-            String lowerName = String(basicProps.deviceName).ToLower();
+            String lowerName = String(basicProps.deviceName).toLower();
 
-            if (lowerName.IndexOf(lowerAdapter) != UInt(-1))
+            if (lowerName.indexOf(lowerAdapter) != Index(-1))
             {
                 selectedDeviceIndex = i;
                 break;
@@ -981,7 +981,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
 
     List<const char*> deviceExtensions;
-    deviceExtensions.Add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
@@ -1038,10 +1038,10 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
             deviceCreateInfo.pNext = &float16Features;
 
             // Add the Float16 extension
-            deviceExtensions.Add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+            deviceExtensions.add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
 
             // We have half support
-            m_features.Add("half");
+            m_features.add("half");
         }   
     }
 
@@ -1056,8 +1056,8 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 
-    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.Count());
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.Buffer();
+    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
 
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
@@ -1479,7 +1479,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
             const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
             const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
 
-            mipSizes.Add(mipSize);
+            mipSizes.add(mipSize);
 
             bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
         }
@@ -1491,7 +1491,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
         Buffer uploadBuffer;
         SLANG_RETURN_ON_FAIL(uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
-        assert(mipSizes.Count() == numMipMaps);
+        assert(mipSizes.getCount() == numMipMaps);
 
         // Copy into upload buffer
         {
@@ -1502,7 +1502,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
 
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                for (Index j = 0; j < mipSizes.getCount(); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1536,7 +1536,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
             size_t srcOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
-                for (int j = 0; j < int(mipSizes.Count()); ++j)
+                for (Index j = 0; j < mipSizes.getCount(); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
@@ -1555,7 +1555,7 @@ Result VKRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
                     region.bufferImageHeight = 0;
 
                     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                    region.imageSubresource.mipLevel = j;
+                    region.imageSubresource.mipLevel = uint32_t(j);
                     region.imageSubresource.baseArrayLayer = i;
                     region.imageSubresource.layerCount = 1;
                     region.imageOffset = { 0, 0, 0 };
@@ -1829,7 +1829,7 @@ Result VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numE
     List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
 
     size_t vertexSize = 0;
-    dstVertexDescs.SetSize(numElements);
+    dstVertexDescs.setCount(numElements);
 
     for (UInt i = 0; i <  numElements; ++i)
     {
@@ -1887,7 +1887,7 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
         case MapFlavor::HostRead:
         {
             // Make sure there is space in the read buffer
-            buffer->m_readBuffer.SetSize(bufferSize);
+            buffer->m_readBuffer.setCount(bufferSize);
 
             // create staging buffer
             Buffer staging;
@@ -1907,12 +1907,12 @@ void* VKRenderer::map(BufferResource* bufferIn, MapFlavor flavor)
             void* mappedData = nullptr;
             SLANG_VK_CHECK(m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
 
-            ::memcpy(buffer->m_readBuffer.Buffer(), mappedData, bufferSize);
+            ::memcpy(buffer->m_readBuffer.getBuffer(), mappedData, bufferSize);
             m_api.vkUnmapMemory(m_device, staging.m_memory);
 
             buffer->m_mapFlavor = flavor;
 
-            return buffer->m_readBuffer.Buffer();
+            return buffer->m_readBuffer.getBuffer();
         }
         default:
             return nullptr;
@@ -1959,14 +1959,14 @@ void VKRenderer::setPrimitiveTopology(PrimitiveTopology topology)
 void VKRenderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.Count())
+        const Index num = Index(startSlot + slotCount);
+        if (num > m_boundVertexBuffers.getCount())
         {
-            m_boundVertexBuffers.SetSize(num);
+            m_boundVertexBuffers.setCount(num);
         }
     }
 
-    for (UInt i = 0; i < slotCount; i++)
+    for (Index i = 0; i < Index(slotCount); i++)
     {
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
@@ -2061,7 +2061,7 @@ void VKRenderer::draw(UInt vertexCount, UInt startVertex = 0)
         0, nullptr);
 
     // Bind the vertex buffer
-    if (m_boundVertexBuffers.Count() > 0 && m_boundVertexBuffers[0].m_buffer)
+    if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
     {
         const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
 
@@ -2314,16 +2314,16 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
 
         descriptorCountForTypes[dstDescriptorType] += uint32_t(srcRange.count);
 
-        dstBindings.Add(dstBinding);
+        dstBindings.add(dstBinding);
 
         DescriptorSetLayoutImpl::RangeInfo rangeInfo;
         rangeInfo.descriptorType = dstDescriptorType;
-        descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+        descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.Count());
-    descriptorSetLayoutInfo.pBindings = dstBindings.Buffer();
+    descriptorSetLayoutInfo.bindingCount = uint32_t(dstBindings.getCount());
+    descriptorSetLayoutInfo.pBindings = dstBindings.getBuffer();
 
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api.vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
@@ -2428,8 +2428,8 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
 {
     SLANG_ASSERT(ptr == nullptr || _getBindingType(ptr) == type);
 
-    const int numBindings = int(m_bindings.Count());
-    for (int i = 0; i < numBindings; ++i)
+    const Index numBindings = m_bindings.getCount();
+    for (Index i = 0; i < numBindings; ++i)
     {
         Binding& binding = m_bindings[i];
 
@@ -2441,7 +2441,7 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
             }
             else
             {
-                m_bindings.RemoveAt(i);
+                m_bindings.removeAt(i);
             }
 
             return;
@@ -2457,7 +2457,7 @@ void VKRenderer::DescriptorSetImpl::_setBinding(Binding::Type type, UInt range, 
         binding.index = uint32_t(index);
         binding.obj = ptr;
 
-        m_bindings.Add(binding);
+        m_bindings.add(binding);
     }
 }
 
@@ -2654,8 +2654,8 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
         vertexInputInfo.vertexBindingDescriptionCount = 1;
         vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
 
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.Count());
-        vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.Buffer();
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.getCount());
+        vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.getBuffer();
     }
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};

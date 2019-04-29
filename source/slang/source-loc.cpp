@@ -34,7 +34,7 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 
     const auto rawValue = sourceLoc.getRaw();
 
-    int hi = int(m_entries.Count());    
+    Index hi = m_entries.getCount();    
     // If there are no entries, or it is in front of the first entry, then there is no associated entry
     if (hi == 0 || 
         m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
@@ -42,10 +42,10 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
         return -1;
     }
 
-    int lo = 0;
+    Index lo = 0;
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1;
+        const Index mid = (hi + lo) >> 1;
         const Entry& midEntry = m_entries[mid];
         SourceLoc::RawValue midValue = midEntry.m_startLoc.getRaw();
         if (midValue <= rawValue)
@@ -60,7 +60,7 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
         }
     }
 
-    return lo;
+    return int(lo);
 }
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
@@ -69,7 +69,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Calculate the offset
     const int offset = m_range.getOffset(directiveLoc);
@@ -88,7 +88,7 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
     // Taking both into account means +2 is correct 'fix'
     entry.m_lineAdjust = line - (lineIndex + 2);
 
-    m_entries.Add(entry);
+    m_entries.add(entry);
 }
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
@@ -101,10 +101,10 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.Count() == 0 || (m_entries.Last().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
-    if (m_entries.Count() == 0 || (m_entries.Count() && m_entries.Last().isDefault()))
+    if (m_entries.getCount() == 0 || (m_entries.getCount() && m_entries.getLast().isDefault()))
     {
         return;
     }
@@ -116,7 +116,7 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 
     SLANG_ASSERT(entry.isDefault());
 
-    m_entries.Add(entry);
+    m_entries.add(entry);
 }
 
 HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
@@ -160,7 +160,7 @@ HumaneSourceLoc SourceView::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 PathInfo SourceView::_getPathInfo() const
 {
-    if (m_viewPath.Length())
+    if (m_viewPath.getLength())
     {
         PathInfo pathInfo(m_sourceFile->getPathInfo());
         pathInfo.foundPath = m_viewPath;
@@ -200,8 +200,8 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 
 void SourceFile::setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets)
 {
-    m_lineBreakOffsets.Clear();
-    m_lineBreakOffsets.AddRange(offsets, numOffsets);
+    m_lineBreakOffsets.clear();
+    m_lineBreakOffsets.addRange(offsets, numOffsets);
 }
 
 const List<uint32_t>& SourceFile::getLineBreakOffsets()
@@ -209,7 +209,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     // We now have a raw input file that we can search for line breaks.
     // We obviously don't want to do a linear scan over and over, so we will
     // cache an array of line break locations in the file.
-    if (m_lineBreakOffsets.Count() == 0)
+    if (m_lineBreakOffsets.getCount() == 0)
     {
         UnownedStringSlice content = getContent();
 
@@ -219,7 +219,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
         char const* cursor = begin;
 
         // Treat the beginning of the file as a line break
-        m_lineBreakOffsets.Add(0);
+        m_lineBreakOffsets.add(0);
 
         while (cursor != end)
         {
@@ -238,7 +238,7 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
                     if ((c^d) == ('\r' ^ '\n'))
                         cursor++;
 
-                    m_lineBreakOffsets.Add(uint32_t(cursor - begin));
+                    m_lineBreakOffsets.add(uint32_t(cursor - begin));
                     break;
                 }
                 default:
@@ -265,12 +265,12 @@ int SourceFile::calcLineIndexFromOffset(int offset)
     // At this point we can assume the `lineBreakOffsets` array has been filled in.
     // We will use a binary search to find the line index that contains our
     // chosen offset.
-    int lo = 0;
-    int hi = int(lineBreakOffsets.Count());
+    Index lo = 0;
+    Index hi = lineBreakOffsets.getCount();
 
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1; 
+        const Index mid = (hi + lo) >> 1; 
         const uint32_t midOffset = lineBreakOffsets[mid];
         if (midOffset <= uint32_t(offset))
         {
@@ -282,7 +282,7 @@ int SourceFile::calcLineIndexFromOffset(int offset)
         }
     }
 
-    return lo;
+    return int(lo);
 }
 
 int SourceFile::calcColumnIndex(int lineIndex, int offset)
@@ -331,11 +331,11 @@ String SourceFile::calcVerbosePath() const
     {
         String canonicalPath;
         ComPtr<ISlangBlob> canonicalPathBlob;
-        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.Buffer(), canonicalPathBlob.writeRef())))
+        if (SLANG_SUCCEEDED(fileSystemExt->getCanonicalPath(m_pathInfo.foundPath.getBuffer(), canonicalPathBlob.writeRef())))
         {
             canonicalPath = StringUtil::getString(canonicalPathBlob);
         }
-        if (canonicalPath.Length() > 0)
+        if (canonicalPath.getLength() > 0)
         {
             return canonicalPath;
         }
@@ -416,14 +416,14 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, contentSize);
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
     return sourceFile;
 }
 
 SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
 {
-    SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.Length());
-    m_sourceFiles.Add(sourceFile);
+    SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.getLength());
+    m_sourceFiles.add(sourceFile);
     sourceFile->setContents(contents);
     return sourceFile;
 }
@@ -431,7 +431,7 @@ SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, 
 SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, blob->getBufferSize());
-    m_sourceFiles.Add(sourceFile);
+    m_sourceFiles.add(sourceFile);
     sourceFile->setContents(blob);
     return sourceFile;
 }
@@ -442,7 +442,7 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
 
     SourceView* sourceView = nullptr;
     if (pathInfo &&
-        (pathInfo->foundPath.Length() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
+        (pathInfo->foundPath.getLength() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
     {
         sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath);
     }
@@ -451,14 +451,14 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
         sourceView = new SourceView(sourceFile, range, nullptr);
     }
 
-    m_sourceViews.Add(sourceView);
+    m_sourceViews.add(sourceView);
 
     return sourceView;
 }
 
 SourceView* SourceManager::findSourceView(SourceLoc loc) const
 {
-    int hi = int(m_sourceViews.Count());
+    Index hi = m_sourceViews.getCount();
     // It must be in the range of this manager and have associated views for it to possibly be a hit
     if (!getSourceRange().contains(loc) || hi == 0)
     {
@@ -482,10 +482,10 @@ SourceView* SourceManager::findSourceView(SourceLoc loc) const
     const SourceLoc::RawValue rawLoc = loc.getRaw();
 
     // Binary chop to see if we can find the associated SourceUnit
-    int lo = 0;
+    Index lo = 0;
     while (lo + 1 < hi)
     {
-        int mid = (hi + lo) >> 1;
+        Index mid = (hi + lo) >> 1;
 
         SourceView* midView = m_sourceViews[mid];
         if (midView->getRange().contains(loc))

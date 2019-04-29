@@ -230,10 +230,10 @@ namespace Slang
             // that we can encode in our space of keys.
             args[0].aggVal = 0;
             args[1].aggVal = 0;
-            if (opExpr->Arguments.Count() > 2)
+            if (opExpr->Arguments.getCount() > 2)
                 return false;
 
-            for (UInt i = 0; i < opExpr->Arguments.Count(); i++)
+            for (Index i = 0; i < opExpr->Arguments.getCount(); i++)
             {
                 if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
                     return false;
@@ -1023,7 +1023,7 @@ namespace Slang
 
             for (auto argExpr : args)
             {
-                subst->args.Add(ExtractGenericArgVal(argExpr));
+                subst->args.add(ExtractGenericArgVal(argExpr));
             }
 
             DeclRef<Decl> innerDeclRef;
@@ -1219,7 +1219,7 @@ namespace Slang
 
                         // TODO: this is one place where syntax should get cloned!
                         if (outProperType)
-                            args.Add(typeParam->initType.exp);
+                            args.add(typeParam->initType.exp);
                     }
                     else if (auto valParam = as<GenericValueParamDecl>(member))
                     {
@@ -1235,7 +1235,7 @@ namespace Slang
 
                         // TODO: this is one place where syntax should get cloned!
                         if (outProperType)
-                            args.Add(valParam->initExpr);
+                            args.add(valParam->initExpr);
                     }
                     else
                     {
@@ -1487,7 +1487,7 @@ namespace Slang
             // First, we will check if we have run out of arguments
             // on the initializer list.
             //
-            UInt initArgCount = fromInitializerListExpr->args.Count();
+            UInt initArgCount = fromInitializerListExpr->args.getCount();
             if(ioInitArgIndex >= initArgCount)
             {
                 // If we are at the end of the initializer list,
@@ -1567,7 +1567,7 @@ namespace Slang
             UInt                       &ioArgIndex)
         {
             auto toType = inToType;
-            UInt argCount = fromInitializerListExpr->args.Count();
+            UInt argCount = fromInitializerListExpr->args.getCount();
 
             // In the case where we need to build a result expression,
             // we will collect the new arguments here
@@ -1637,7 +1637,7 @@ namespace Slang
 
                     if( coercedArg )
                     {
-                        coercedArgs.Add(coercedArg);
+                        coercedArgs.add(coercedArg);
                     }
                 }
             }
@@ -1685,7 +1685,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
                 }
@@ -1713,7 +1713,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
 
@@ -1775,7 +1775,7 @@ namespace Slang
 
                     if( coercedArg )
                     {
-                        coercedArgs.Add(coercedArg);
+                        coercedArgs.add(coercedArg);
                     }
                 }
             }
@@ -1803,7 +1803,7 @@ namespace Slang
 
                         if( coercedArg )
                         {
-                            coercedArgs.Add(coercedArg);
+                            coercedArgs.add(coercedArg);
                         }
                     }
                 }
@@ -1862,7 +1862,7 @@ namespace Slang
             RefPtr<Expr>*               outToExpr,
             RefPtr<InitializerListExpr> fromInitializerListExpr)
         {
-            UInt argCount = fromInitializerListExpr->args.Count();
+            UInt argCount = fromInitializerListExpr->args.getCount();
             UInt argIndex = 0;
 
             // TODO: we should handle the special case of `{0}` as an initializer
@@ -2062,7 +2062,7 @@ namespace Slang
             // to the context and processed, we need to see whether
             // there was one best overload or not.
             //
-            if(overloadContext.bestCandidates.Count() != 0)
+            if(overloadContext.bestCandidates.getCount() != 0)
             {
                 // In this case there were multiple equally-good candidates to call.
                 //
@@ -2159,7 +2159,7 @@ namespace Slang
                     //
                     auto castExpr = createImplicitCastExpr();
                     castExpr->loc = fromExpr->loc;
-                    castExpr->Arguments.Add(fromExpr);
+                    castExpr->Arguments.add(fromExpr);
                     //
                     // Next we need to set our cast expression as the "original"
                     // expression and then complete the overload process.
@@ -2181,8 +2181,8 @@ namespace Slang
                     // because we don't allow nested implicit conversions,
                     // but I'd rather play it safe.
                     //
-                    castExpr->Arguments.Clear();
-                    castExpr->Arguments.Add(fromExpr);
+                    castExpr->Arguments.clear();
+                    castExpr->Arguments.add(fromExpr);
                 }
 
                 return true;
@@ -2275,7 +2275,7 @@ namespace Slang
             castExpr->loc = fromExpr->loc;
             castExpr->FunctionExpr = typeExpr;
             castExpr->type = QualType(toType);
-            castExpr->Arguments.Add(fromExpr);
+            castExpr->Arguments.add(fromExpr);
             return castExpr;
         }
 
@@ -2663,11 +2663,11 @@ namespace Slang
                     param->nameAndLoc = member->nameAndLoc;
                     param->type = varMember->type;
                     param->loc = member->loc;
-                    attribDecl->Members.Add(param);
+                    attribDecl->Members.add(param);
                 }
             }
             // add the attribute class definition to the syntax tree, so it can be found
-            structAttribDef->ParentDecl->Members.Add(attribDecl.Ptr());
+            structAttribDef->ParentDecl->Members.add(attribDecl.Ptr());
             structAttribDef->ParentDecl->memberDictionaryIsValid = false;
             // do necessary checks on this newly constructed node
             checkDecl(attribDecl.Ptr());
@@ -2676,7 +2676,7 @@ namespace Slang
 
         bool hasIntArgs(Attribute* attr, int numArgs)
         {
-            if (int(attr->args.Count()) != numArgs)
+            if (int(attr->args.getCount()) != numArgs)
             {
                 return false;
             }
@@ -2692,7 +2692,7 @@ namespace Slang
 
         bool hasStringArgs(Attribute* attr, int numArgs)
         {
-            if (int(attr->args.Count()) != numArgs)
+            if (int(attr->args.getCount()) != numArgs)
             {
                 return false;
             }
@@ -2730,7 +2730,7 @@ namespace Slang
         {
                 if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 3);
+                    SLANG_ASSERT(attr->args.getCount() == 3);
                     auto xVal = checkConstantIntVal(attr->args[0]);
                     auto yVal = checkConstantIntVal(attr->args[1]);
                     auto zVal = checkConstantIntVal(attr->args[2]);
@@ -2748,7 +2748,7 @@ namespace Slang
                     // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
                     // Must have 2 int parameters. Ideally this would all be checked from the specification
                     // in core.meta.slang, but that's not completely implemented. So for now we check here.
-                    if (attr->args.Count() != 2)
+                    if (attr->args.getCount() != 2)
                     {
                         return false;
                     }
@@ -2768,7 +2768,7 @@ namespace Slang
                 }
                 else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 1);
+                    SLANG_ASSERT(attr->args.getCount() == 1);
                     auto val = checkConstantIntVal(attr->args[0]);
 
                     if(!val) return false;
@@ -2777,7 +2777,7 @@ namespace Slang
                 }
                 else if(auto instanceAttr = as<InstanceAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 1);
+                    SLANG_ASSERT(attr->args.getCount() == 1);
                     auto val = checkConstantIntVal(attr->args[0]);
 
                     if(!val) return false;
@@ -2786,7 +2786,7 @@ namespace Slang
                 }
                 else if(auto entryPointAttr = as<EntryPointAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 1);
+                    SLANG_ASSERT(attr->args.getCount() == 1);
 
                     String stageName;
                     if(!checkLiteralStringVal(attr->args[0], &stageName))
@@ -2825,22 +2825,22 @@ namespace Slang
                 else if (as<PushConstantAttribute>(attr))
                 {
                     // Has no args
-                    SLANG_ASSERT(attr->args.Count() == 0);
+                    SLANG_ASSERT(attr->args.getCount() == 0);
                 }
                 else if (as<ShaderRecordAttribute>(attr))
                 {
                     // Has no args
-                    SLANG_ASSERT(attr->args.Count() == 0);
+                    SLANG_ASSERT(attr->args.getCount() == 0);
                 }
                 else if (as<EarlyDepthStencilAttribute>(attr))
                 {
                     // Has no args
-                    SLANG_ASSERT(attr->args.Count() == 0);
+                    SLANG_ASSERT(attr->args.getCount() == 0);
                 }
                 else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
                 {
                     uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
-                    if (attr->args.Count() == 1)
+                    if (attr->args.getCount() == 1)
                     {
                         RefPtr<IntVal> outIntVal;
                         if (auto cInt = checkConstantEnumVal(attr->args[0]))
@@ -2864,16 +2864,16 @@ namespace Slang
                     // Check has an argument. We need this because default behavior is to give an error
                     // if an attribute has arguments, but not handled explicitly (and the default param will come through
                     // as 1 arg if nothing is specified)
-                    SLANG_ASSERT(attr->args.Count() == 1);
+                    SLANG_ASSERT(attr->args.getCount() == 1);
                 }
                 else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
                 {
                     // check arguments against attribute parameters defined in attribClassDecl
-                    uint32_t paramIndex = 0;
+                    Index paramIndex = 0;
                     auto params = attribClassDecl->getMembersOfType<ParamDecl>();
                     for (auto paramDecl : params)
                     {
-                        if (paramIndex < attr->args.Count())
+                        if (paramIndex < attr->args.getCount())
                         {
                             auto & arg = attr->args[paramIndex];
                             bool typeChecked = false;
@@ -2896,18 +2896,18 @@ namespace Slang
                         }
                         paramIndex++;
                     }
-                    if (params.Count() < attr->args.Count())
+                    if (params.getCount() < attr->args.getCount())
                     {
-                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.Count(), params.Count());
+                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), params.getCount());
                     }
-                    else if (params.Count() > attr->args.Count())
+                    else if (params.getCount() > attr->args.getCount())
                     {
-                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.Count(), params.Count());
+                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.getCount());
                     }
                 }
                 else if (auto formatAttr = as<FormatAttribute>(attr))
                 {
-                    SLANG_ASSERT(attr->args.Count() == 1);
+                    SLANG_ASSERT(attr->args.getCount() == 1);
 
                     String formatName;
                     if(!checkLiteralStringVal(attr->args[0], &formatName))
@@ -2916,7 +2916,7 @@ namespace Slang
                     }
 
                     ImageFormat format = ImageFormat::unknown;
-                    if(!findImageFormatByName(formatName.Buffer(), &format))
+                    if(!findImageFormatByName(formatName.getBuffer(), &format))
                     {
                         getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
                     }
@@ -2925,7 +2925,7 @@ namespace Slang
                 }
                 else
                 {
-                    if(attr->args.Count() == 0)
+                    if(attr->args.getCount() == 0)
                     {
                         // If the attribute took no arguments, then we will
                         // assume it is valid as written.
@@ -2984,7 +2984,7 @@ namespace Slang
             // us to look at the attribute declaration itself.
             //
             // Start by doing argument/parameter matching
-            UInt argCount = attr->args.Count();
+            UInt argCount = attr->args.getCount();
             UInt paramCounter = 0;
             bool mismatch = false;
             for(auto paramDecl : attrDecl->getMembersOfType<ParamDecl>())
@@ -3008,7 +3008,7 @@ namespace Slang
                         // default arguments as needed.
                         // For now just copy the expression over.
 
-                        attr->args.Add(paramDecl->initExpr);
+                        attr->args.add(paramDecl->initExpr);
                     }
                     else
                     {
@@ -3317,9 +3317,9 @@ namespace Slang
             DeclRef<GenericDecl>        requirementGenDecl,
             RefPtr<WitnessTable>        witnessTable)
         {
-            if (genDecl.getDecl()->Members.Count() != requirementGenDecl.getDecl()->Members.Count())
+            if (genDecl.getDecl()->Members.getCount() != requirementGenDecl.getDecl()->Members.getCount())
                 return false;
-            for (UInt i = 0; i < genDecl.getDecl()->Members.Count(); i++)
+            for (Index i = 0; i < genDecl.getDecl()->Members.getCount(); i++)
             {
                 auto genMbr = genDecl.getDecl()->Members[i];
                 auto requiredGenMbr = genDecl.getDecl()->Members[i];
@@ -4049,7 +4049,7 @@ namespace Slang
                     enumConformanceDecl->ParentDecl = decl;
                     enumConformanceDecl->loc = decl->loc;
                     enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-                    decl->Members.Add(enumConformanceDecl);
+                    decl->Members.add(enumConformanceDecl);
 
                     // The `__EnumType` interface has one required member, the `__Tag` type.
                     // We need to satisfy this requirement automatically, rather than require
@@ -4329,11 +4329,11 @@ namespace Slang
                     continue;
 
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(dd))
-                    outParams.Add(typeParamDecl);
+                    outParams.add(typeParamDecl);
                 else if (auto valueParamDecl = as<GenericValueParamDecl>(dd))
-                    outParams.Add(valueParamDecl);
+                    outParams.add(valueParamDecl);
                 else if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
-                    outConstraints.Add(constraintDecl);
+                    outConstraints.add(constraintDecl);
             }
         }
 
@@ -4358,12 +4358,12 @@ namespace Slang
 
             // For there to be any hope of a match, the
             // two need to have the same number of parameters.
-            UInt paramCount = fstParams.Count();
-            if (paramCount != sndParams.Count())
+            Index paramCount = fstParams.getCount();
+            if (paramCount != sndParams.getCount())
                 return false;
 
             // Now we'll walk through the parameters.
-            for (UInt pp = 0; pp < paramCount; ++pp)
+            for (Index pp = 0; pp < paramCount; ++pp)
             {
                 Decl* fstParam = fstParams[pp];
                 Decl* sndParam = sndParams[pp];
@@ -4416,11 +4416,11 @@ namespace Slang
             //
             // For now I'm going to assume/require that all declarations must
             // declare the signature in a way that matches exactly.
-            UInt constraintCount = fstConstraints.Count();
-            if(constraintCount != sndConstraints.Count())
+            Index constraintCount = fstConstraints.getCount();
+            if(constraintCount != sndConstraints.getCount())
                 return false;
 
-            for (UInt cc = 0; cc < constraintCount; ++cc)
+            for (Index cc = 0; cc < constraintCount; ++cc)
             {
                 //auto fstConstraint = fstConstraints[cc];
                 //auto sndConstraint = sndConstraints[cc];
@@ -4448,12 +4448,12 @@ namespace Slang
 
             // If the functions have different numbers of parameters, then
             // their signatures trivially don't match.
-            auto fstParamCount = fstParams.Count();
-            auto sndParamCount = sndParams.Count();
+            auto fstParamCount = fstParams.getCount();
+            auto sndParamCount = sndParams.getCount();
             if (fstParamCount != sndParamCount)
                 return false;
 
-            for (UInt ii = 0; ii < fstParamCount; ++ii)
+            for (Index ii = 0; ii < fstParamCount; ++ii)
             {
                 auto fstParam = fstParams[ii];
                 auto sndParam = sndParams[ii];
@@ -4495,13 +4495,13 @@ namespace Slang
                 {
                     auto type = DeclRefType::Create(getSession(),
                         makeDeclRef(typeParam));
-                    subst->args.Add(type);
+                    subst->args.add(type);
                 }
                 else if (auto valueParam = as<GenericValueParamDecl>(dd))
                 {
                     auto val = new GenericParamIntVal(
                         makeDeclRef(valueParam));
-                    subst->args.Add(val);
+                    subst->args.add(val);
                 }
                 // TODO: need to handle constraints here?
             }
@@ -4845,8 +4845,8 @@ namespace Slang
         template<typename T>
         T* FindOuterStmt()
         {
-            UInt outerStmtCount = outerStmts.Count();
-            for (UInt ii = outerStmtCount; ii > 0; --ii)
+            const Index outerStmtCount = outerStmts.getCount();
+            for (Index ii = outerStmtCount; ii > 0; --ii)
             {
                 auto outerStmt = outerStmts[ii-1];
                 auto found = as<T>(outerStmt);
@@ -4877,12 +4877,12 @@ namespace Slang
 
         void PushOuterStmt(Stmt* stmt)
         {
-            outerStmts.Add(stmt);
+            outerStmts.add(stmt);
         }
 
         void PopOuterStmt(Stmt* /*stmt*/)
         {
-            outerStmts.RemoveAt(outerStmts.Count() - 1);
+            outerStmts.removeAt(outerStmts.getCount() - 1);
         }
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr)
@@ -5220,7 +5220,7 @@ namespace Slang
 
             // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
             static const int kMaxArgs = 8;
-            if (invokeExpr->Arguments.Count() > kMaxArgs)
+            if (invokeExpr->Arguments.getCount() > kMaxArgs)
                 return nullptr;
 
             // Before checking the operation name, let's look at the arguments
@@ -5483,8 +5483,8 @@ namespace Slang
 
             auto substitutions = new GenericSubstitution();
             substitutions->genericDecl = vectorGenericDecl.Ptr();
-            substitutions->args.Add(elementType);
-            substitutions->args.Add(elementCount);
+            substitutions->args.add(elementType);
+            substitutions->args.add(elementCount);
 
             auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
@@ -5588,7 +5588,7 @@ namespace Slang
                 subscriptCallExpr->FunctionExpr = subscriptFuncExpr;
 
                 // TODO(tfoley): This path can support multiple arguments easily
-                subscriptCallExpr->Arguments.Add(subscriptExpr->IndexExpression);
+                subscriptCallExpr->Arguments.add(subscriptExpr->IndexExpression);
 
                 return CheckInvokeExprWithCheckedOperands(subscriptCallExpr.Ptr());
             }
@@ -5602,9 +5602,9 @@ namespace Slang
 
         bool MatchArguments(FuncDecl * functionNode, List <RefPtr<Expr>> &args)
         {
-            if (functionNode->GetParameters().Count() != args.Count())
+            if (functionNode->GetParameters().getCount() != args.getCount())
                 return false;
-            int i = 0;
+            Index i = 0;
             for (auto param : functionNode->GetParameters())
             {
                 if (!param->type.Equals(args[i]->type.Ptr()))
@@ -5832,7 +5832,7 @@ namespace Slang
                 getterDecl->loc = decl->loc;
 
                 getterDecl->ParentDecl = decl;
-                decl->Members.Add(getterDecl);
+                decl->Members.add(getterDecl);
             }
 
             for(auto mm : decl->Members)
@@ -6221,7 +6221,7 @@ namespace Slang
 
                     if(outWitness)
                     {
-                        caseWitnesses.Add(caseWitness);
+                        caseWitnesses.add(caseWitness);
                     }
                 }
 
@@ -6249,7 +6249,7 @@ namespace Slang
                     RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = new TaggedUnionSubtypeWitness();
                     taggedUnionWitness->sub = taggedUnionType;
                     taggedUnionWitness->sup = DeclRefType::Create(getSession(), interfaceDeclRef);
-                    taggedUnionWitness->caseWitnesses.SwapWith(caseWitnesses);
+                    taggedUnionWitness->caseWitnesses.swapWith(caseWitnesses);
 
                     *outWitness = taggedUnionWitness;
                 }
@@ -6556,7 +6556,7 @@ namespace Slang
                         // failure!
                         return SubstitutionSet();
                     }
-                    args.Add(type);
+                    args.add(type);
                 }
                 else if (auto valParam = m.as<GenericValueParamDecl>())
                 {
@@ -6593,7 +6593,7 @@ namespace Slang
                         // failure!
                         return SubstitutionSet();
                     }
-                    args.Add(val);
+                    args.add(val);
                 }
                 else
                 {
@@ -6638,7 +6638,7 @@ namespace Slang
                 if(subTypeWitness)
                 {
                     // We found a witness, so it will become an (implicit) argument.
-                    solvedSubst->args.Add(subTypeWitness);
+                    solvedSubst->args.add(subTypeWitness);
                 }
                 else
                 {
@@ -6690,13 +6690,13 @@ namespace Slang
             SourceLoc       funcLoc;
 
             // The original arguments to the call
-            UInt argCount = 0;
+            Index argCount = 0;
             RefPtr<Expr>* args = nullptr;
             RefPtr<Type>* argTypes = nullptr;
 
-            UInt getArgCount() { return argCount; }
-            RefPtr<Expr>& getArg(UInt index) { return args[index]; }
-            RefPtr<Type>& getArgType(UInt index)
+            Index getArgCount() { return argCount; }
+            RefPtr<Expr>& getArg(Index index) { return args[index]; }
+            RefPtr<Type>& getArgType(Index index)
             {
                 if(argTypes)
                     return argTypes[index];
@@ -6875,7 +6875,7 @@ namespace Slang
             candidate.subst = genSubst;
             auto& checkedArgs = genSubst->args;
 
-            uint32_t aa = 0;
+            Index aa = 0;
             for (auto memberRef : getMembers(genericDeclRef))
             {
                 if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
@@ -6899,7 +6899,7 @@ namespace Slang
                     {
                         typeExp = CoerceToProperType(TypeExp(arg));
                     }
-                    checkedArgs.Add(typeExp.type);
+                    checkedArgs.add(typeExp.type);
                 }
                 else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
                 {
@@ -6917,7 +6917,7 @@ namespace Slang
 
                     arg = coerce(GetType(valParamRef), arg);
                     auto val = ExtractGenericArgInteger(arg);
-                    checkedArgs.Add(val);
+                    checkedArgs.add(val);
                 }
                 else
                 {
@@ -6933,7 +6933,7 @@ namespace Slang
             OverloadResolveContext&	context,
             OverloadCandidate&		candidate)
         {
-            UInt argCount = context.getArgCount();
+            Index argCount = context.getArgCount();
 
             List<DeclRef<ParamDecl>> params;
             switch (candidate.flavor)
@@ -6952,9 +6952,9 @@ namespace Slang
 
             // Note(tfoley): We might have fewer arguments than parameters in the
             // case where one or more parameters had defaults.
-            SLANG_RELEASE_ASSERT(argCount <= params.Count());
+            SLANG_RELEASE_ASSERT(argCount <= params.getCount());
 
-            for (UInt ii = 0; ii < argCount; ++ii)
+            for (Index ii = 0; ii < argCount; ++ii)
             {
                 auto& arg = context.getArg(ii);
                 auto argType = context.getArgType(ii);
@@ -7072,7 +7072,7 @@ namespace Slang
                 auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
                 if(subTypeWitness)
                 {
-                    subst->args.Add(subTypeWitness);
+                    subst->args.add(subTypeWitness);
                 }
                 else
                 {
@@ -7206,8 +7206,8 @@ namespace Slang
                             callExpr = new InvokeExpr();
                             callExpr->loc = context.loc;
 
-                            for(UInt aa = 0; aa < context.argCount; ++aa)
-                                callExpr->Arguments.Add(context.getArg(aa));
+                            for(Index aa = 0; aa < context.argCount; ++aa)
+                                callExpr->Arguments.add(context.getArg(aa));
                         }
 
 
@@ -7290,13 +7290,13 @@ namespace Slang
 
             bool keepThisCandidate = true; // should this candidate be kept?
 
-            if (context.bestCandidates.Count() != 0)
+            if (context.bestCandidates.getCount() != 0)
             {
                 // We have multiple candidates right now, so filter them.
                 bool anyFiltered = false;
                 // Note that we are querying the list length on every iteration,
                 // because we might remove things.
-                for (UInt cc = 0; cc < context.bestCandidates.Count(); ++cc)
+                for (Index cc = 0; cc < context.bestCandidates.getCount(); ++cc)
                 {
                     int cmp = CompareOverloadCandidates(&candidate, &context.bestCandidates[cc]);
                     if (cmp < 0)
@@ -7304,7 +7304,7 @@ namespace Slang
                         // our new candidate is better!
 
                         // remove it from the list (by swapping in a later one)
-                        context.bestCandidates.FastRemoveAt(cc);
+                        context.bestCandidates.fastRemoveAt(cc);
                         // and then reduce our index so that we re-visit the same index
                         --cc;
 
@@ -7344,16 +7344,16 @@ namespace Slang
                 return;
 
             // Otherwise we want to keep the candidate
-            if (context.bestCandidates.Count() > 0)
+            if (context.bestCandidates.getCount() > 0)
             {
                 // There were already multiple candidates, and we are adding one more
-                context.bestCandidates.Add(candidate);
+                context.bestCandidates.add(candidate);
             }
             else if (context.bestCandidate)
             {
                 // There was a unique best candidate, but now we are ambiguous
-                context.bestCandidates.Add(*context.bestCandidate);
-                context.bestCandidates.Add(candidate);
+                context.bestCandidates.add(*context.bestCandidate);
+                context.bestCandidates.add(candidate);
                 context.bestCandidate = nullptr;
             }
             else
@@ -7581,10 +7581,10 @@ namespace Slang
                 return false;
 
             // Their arguments must unify
-            SLANG_RELEASE_ASSERT(fstGen->args.Count() == sndGen->args.Count());
-            UInt argCount = fstGen->args.Count();
+            SLANG_RELEASE_ASSERT(fstGen->args.getCount() == sndGen->args.getCount());
+            Index argCount = fstGen->args.getCount();
             bool okay = true;
-            for (UInt aa = 0; aa < argCount; ++aa)
+            for (Index aa = 0; aa < argCount; ++aa)
             {
                 if (!TryUnifyVals(constraints, fstGen->args[aa], sndGen->args[aa]))
                 {
@@ -7612,7 +7612,7 @@ namespace Slang
             constraint.decl = typeParamDecl.Ptr();
             constraint.val = type;
 
-            constraints.constraints.Add(constraint);
+            constraints.constraints.add(constraint);
 
             return true;
         }
@@ -7635,7 +7635,7 @@ namespace Slang
             constraint.decl = paramDecl.Ptr();
             constraint.val = val;
 
-            constraints.constraints.Add(constraint);
+            constraints.constraints.add(constraint);
 
             return true;
         }
@@ -7925,8 +7925,8 @@ namespace Slang
             {
                 auto params = GetParameters(funcDeclRef).ToArray();
 
-                UInt argCount = context.getArgCount();
-                UInt paramCount = params.Count();
+                Index argCount = context.getArgCount();
+                Index paramCount = params.getCount();
 
                 // Bail out on mismatch.
                 // TODO(tfoley): need more nuance here
@@ -7935,7 +7935,7 @@ namespace Slang
                     return DeclRef<Decl>(nullptr, nullptr);
                 }
 
-                for (UInt aa = 0; aa < argCount; ++aa)
+                for (Index aa = 0; aa < argCount; ++aa)
                 {
 #if 0
                     if (!TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]))
@@ -8418,8 +8418,8 @@ namespace Slang
             context.originalExpr = expr;
             context.funcLoc = funcExpr->loc;
 
-            context.argCount = expr->Arguments.Count();
-            context.args = expr->Arguments.Buffer();
+            context.argCount = expr->Arguments.getCount();
+            context.args = expr->Arguments.getBuffer();
             context.loc = expr->loc;
 
             if (auto funcMemberExpr = as<MemberExpr>(funcExpr))
@@ -8440,7 +8440,7 @@ namespace Slang
                 AddOverloadCandidates(funcExpr, context);
             }
 
-            if (context.bestCandidates.Count() > 0)
+            if (context.bestCandidates.getCount() > 0)
             {
                 // Things were ambiguous.
 
@@ -8495,9 +8495,9 @@ namespace Slang
                 }
 
                 {
-                    UInt candidateCount = context.bestCandidates.Count();
-                    UInt maxCandidatesToPrint = 10; // don't show too many candidates at once...
-                    UInt candidateIndex = 0;
+                    Index candidateCount = context.bestCandidates.getCount();
+                    Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    Index candidateIndex = 0;
                     for (auto candidate : context.bestCandidates)
                     {
                         String declString = getDeclSignatureString(candidate.item);
@@ -8634,15 +8634,15 @@ namespace Slang
             OverloadResolveContext context;
             context.originalExpr = genericAppExpr;
             context.funcLoc = baseExpr->loc;
-            context.argCount = args.Count();
-            context.args = args.Buffer();
+            context.argCount = args.getCount();
+            context.args = args.getBuffer();
             context.loc = genericAppExpr->loc;
 
             context.baseExpr = GetBaseExpr(baseExpr);
 
             AddGenericOverloadCandidates(baseExpr, context);
 
-            if (context.bestCandidates.Count() > 0)
+            if (context.bestCandidates.getCount() > 0)
             {
                 // Things were ambiguous.
                 if (context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
@@ -8666,7 +8666,7 @@ namespace Slang
                     for (auto candidate : context.bestCandidates)
                     {
                         auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                        overloadedExpr->candidiateExprs.Add(candidateExpr);
+                        overloadedExpr->candidiateExprs.add(candidateExpr);
                     }
                     return overloadedExpr;
                 }
@@ -8708,7 +8708,7 @@ namespace Slang
             for( auto& caseTypeExpr : expr->caseTypes )
             {
                 caseTypeExpr = CheckProperType(caseTypeExpr);
-                type->caseTypes.Add(caseTypeExpr.type);
+                type->caseTypes.add(caseTypeExpr.type);
             }
 
             return expr;
@@ -8735,8 +8735,8 @@ namespace Slang
                 // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
                 if(auto funcType = as<FuncType>(invoke->FunctionExpr->type))
                 {
-                    UInt paramCount = funcType->getParamCount();
-                    for (UInt pp = 0; pp < paramCount; ++pp)
+                    Index paramCount = funcType->getParamCount();
+                    for (Index pp = 0; pp < paramCount; ++pp)
                     {
                         auto paramType = funcType->getParamType(pp);
                         if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
@@ -8748,7 +8748,7 @@ namespace Slang
                             // for an `inout` parameter to be converted in both
                             // directions.
                             //
-                            if( pp < expr->Arguments.Count() )
+                            if( pp < expr->Arguments.getCount() )
                             {
                                 auto argExpr = expr->Arguments[pp];
                                 if( !argExpr->type.IsLeftValue )
@@ -8945,7 +8945,7 @@ namespace Slang
 
             auto swizzleText = getText(memberRefExpr->name);
 
-            for (UInt i = 0; i < swizzleText.Length(); i++)
+            for (Index i = 0; i < swizzleText.getLength(); i++)
             {
                 auto ch = swizzleText[i];
                 int elementIndex = -1;
@@ -9121,7 +9121,7 @@ namespace Slang
                         if (isUsableAsStaticMember(item))
                         {
                             // If yes, then it will be part of the output.
-                            staticItems.Add(item);
+                            staticItems.add(item);
                         }
                         else
                         {
@@ -9135,7 +9135,7 @@ namespace Slang
                     {
                         // If we had some static items, then that's okay,
                         // we just want to use our newly-filtered list.
-                        if (staticItems.Count())
+                        if (staticItems.getCount())
                         {
                             lookupResult.items = staticItems;
                         }
@@ -9585,7 +9585,7 @@ namespace Slang
             {
                 // Each leaf parameter of interface type adds one slot.
                 //
-                ioSlots.paramTypes.Add(type);
+                ioSlots.paramTypes.add(type);
             }
             else if( auto structDeclRef = typeDeclRef.as<StructDecl>() )
             {
@@ -9621,13 +9621,12 @@ namespace Slang
         ExistentialTypeSlots&       ioSlots,
         DeclRef<VarDeclBase>    paramDeclRef)
     {
-        UInt startSlot = ioSlots.paramTypes.Count();
+        Index startSlot = ioSlots.paramTypes.getCount();
         _collectExistentialTypeParamsRec(ioSlots, paramDeclRef);
-        UInt endSlot = ioSlots.paramTypes.Count();
-        UInt slotCount = endSlot - startSlot;
-
-        ioParamInfo.firstExistentialTypeSlot = startSlot;
-        ioParamInfo.existentialTypeSlotCount = slotCount;
+        Index endSlot = ioSlots.paramTypes.getCount();
+        
+        ioParamInfo.firstExistentialTypeSlot = UInt(startSlot);
+        ioParamInfo.existentialTypeSlotCount = UInt(endSlot - startSlot);;
     }
 
         /// Enumerate the existential-type parameters of an `EntryPoint`.
@@ -9652,7 +9651,7 @@ namespace Slang
                     m_existentialSlots,
                     paramDeclRef);
 
-                m_shaderParams.Add(shaderParamInfo);
+                m_shaderParams.add(shaderParamInfo);
             }
         }
     }
@@ -9714,7 +9713,7 @@ namespace Slang
 
             if (attr)
             {
-                if (attr->args.Count() != 1)
+                if (attr->args.getCount() != 1)
                 {
                     sink->diagnose(attr, Diagnostics::badlyDefinedPatchConstantFunc, entryPointName);
                     return;
@@ -9764,7 +9763,7 @@ namespace Slang
                 {
                     const auto& semanticToken = semantic->name;
 
-                    String lowerName = String(semanticToken.Content).ToLower();
+                    String lowerName = String(semanticToken.Content).toLower();
 
                     if(lowerName == "sv_dispatchthreadid")
                     {
@@ -10033,7 +10032,7 @@ static void collectFields(
         if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
             continue;
 
-        outFields.Add(fieldDeclRef);
+        outFields.add(fieldDeclRef);
     }
 }
 
@@ -10112,14 +10111,14 @@ static bool validateGenericSubstitutionsMatch(
 
 
 
-    UInt argCount = left->args.Count();
-    if( argCount != right->args.Count() )
+    Index argCount = left->args.getCount();
+    if( argCount != right->args.getCount() )
     {
         diagnoseTypeMismatch(sink, stack);
         return false;
     }
 
-    for( UInt aa = 0; aa < argCount; ++aa )
+    for( Index aa = 0; aa < argCount; ++aa )
     {
         auto leftArg = left->args[aa];
         auto rightArg = right->args[aa];
@@ -10256,8 +10255,8 @@ static bool validateTypesMatch(
                         collectFields(leftStructDeclRef, leftFields);
                         collectFields(rightStructDeclRef, rightFields);
 
-                        UInt leftFieldCount = leftFields.Count();
-                        UInt rightFieldCount = rightFields.Count();
+                        Index leftFieldCount = leftFields.getCount();
+                        Index rightFieldCount = rightFields.getCount();
 
                         if( leftFieldCount != rightFieldCount )
                         {
@@ -10265,7 +10264,7 @@ static bool validateTypesMatch(
                             return false;
                         }
 
-                        for( UInt ii = 0; ii < leftFieldCount; ++ii )
+                        for( Index ii = 0; ii < leftFieldCount; ++ii )
                         {
                             auto leftField = leftFields[ii];
                             auto rightField = rightFields[ii];
@@ -10399,13 +10398,13 @@ static bool doesParameterMatch(
                         // consider the new variable to be a redclaration of
                         // the existing one.
 
-                        existingParam.additionalParamDeclRefs.Add(
+                        existingParam.additionalParamDeclRefs.add(
                             makeDeclRef(globalVar.Ptr()));
                         continue;
                     }
                 }
 
-                Int newParamIndex = Int(m_shaderParams.Count());
+                Int newParamIndex = Int(m_shaderParams.getCount());
                 mapNameToParamIndex.Add(paramName, newParamIndex);
 
                 GlobalShaderParamInfo shaderParamInfo;
@@ -10416,7 +10415,7 @@ static bool doesParameterMatch(
                     m_globalExistentialSlots,
                     makeDeclRef(globalVar.Ptr()));
 
-                m_shaderParams.Add(shaderParamInfo);
+                m_shaderParams.add(shaderParamInfo);
             }
         }
     }
@@ -10476,7 +10475,7 @@ static bool doesParameterMatch(
                 if( entryPoint )
                 {
                     program->addEntryPoint(entryPoint);
-                    entryPointReq->getTranslationUnit()->entryPoints.Add(entryPoint);
+                    entryPointReq->getTranslationUnit()->entryPoints.add(entryPoint);
                 }
             }
 
@@ -10501,8 +10500,8 @@ static bool doesParameterMatch(
             // For now we'll start with an extremely basic approach that
             // should work for typical HLSL code.
             //
-            UInt translationUnitCount = compileRequest->translationUnits.Count();
-            for(UInt tt = 0; tt < translationUnitCount; ++tt)
+            Index translationUnitCount = compileRequest->translationUnits.getCount();
+            for(Index tt = 0; tt < translationUnitCount; ++tt)
             {
                 auto translationUnit = compileRequest->translationUnits[tt];
                 for( auto globalDecl : translationUnit->getModuleDecl()->Members )
@@ -10542,7 +10541,7 @@ static bool doesParameterMatch(
                     validateEntryPoint(entryPoint, sink);
 
                     program->addEntryPoint(entryPoint);
-                    translationUnit->entryPoints.Add(entryPoint);
+                    translationUnit->entryPoints.add(entryPoint);
                 }
             }
         }
@@ -10558,8 +10557,8 @@ static bool doesParameterMatch(
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        UInt slotCount = ioSlots.paramTypes.Count();
-        UInt argCount = args.Count();
+        Index slotCount = ioSlots.paramTypes.getCount();
+        Index argCount = args.getCount();
 
         if( slotCount != argCount )
         {
@@ -10569,7 +10568,7 @@ static bool doesParameterMatch(
 
         SemanticsVisitor visitor(linkage, sink);
 
-        for( UInt ii = 0; ii < slotCount; ++ii )
+        for( Index ii = 0; ii < slotCount; ++ii )
         {
             auto slotType = ioSlots.paramTypes[ii];
             auto argExpr = args[ii];
@@ -10597,7 +10596,7 @@ static bool doesParameterMatch(
             ExistentialTypeSlots::Arg arg;
             arg.type = argType;
             arg.witness = witness;
-            ioSlots.args.Add(arg);
+            ioSlots.args.add(arg);
         }
     }
 
@@ -10722,7 +10721,7 @@ static bool doesParameterMatch(
         //
         List<RefPtr<Scope>> scopesToTry;
         for( auto module : unspecialiedProgram->getModuleDependencies() )
-            scopesToTry.Add(module->getModuleDecl()->scope);
+            scopesToTry.add(module->getModuleDecl()->scope);
 
         // We are going to do some semantic checking, so we need to
         // set up a `SemanticsVistitor` that we can use.
@@ -10753,7 +10752,7 @@ static bool doesParameterMatch(
                 }
             }
 
-            outGenericArgs.Add(argExpr);
+            outGenericArgs.add(argExpr);
         }
     }
 
@@ -10802,7 +10801,7 @@ static bool doesParameterMatch(
         for(auto module : unspecializedProgram->getModuleDependencies())
         {
             for(auto param : module->getModuleDecl()->getMembersOfType<GlobalGenericParamDecl>())
-                globalGenericParams.Add(param);
+                globalGenericParams.add(param);
         }
 
         // Next, we will check whether the supplied arguments can
@@ -10811,11 +10810,11 @@ static bool doesParameterMatch(
         // An easy early-out case will be if the number of
         // arguments isn't correct.
         //
-        if (globalGenericParams.Count() != globalGenericArgs.Count())
+        if (globalGenericParams.getCount() != globalGenericArgs.getCount())
         {
             sink->diagnose(SourceLoc(), Diagnostics::mismatchGlobalGenericArguments,
-                globalGenericParams.Count(),
-                globalGenericArgs.Count());
+                globalGenericParams.getCount(),
+                globalGenericArgs.getCount());
             return nullptr;
         }
 
@@ -10847,12 +10846,12 @@ static bool doesParameterMatch(
         //
         // We will punt on this for now, and just check each constraint in isolation.
         //
-        UInt argCounter = 0;
+        Index argCounter = 0;
         for(auto& globalGenericParam : globalGenericParams)
         {
             // Get the argument that matches this parameter.
-            UInt argIndex = argCounter++;
-            SLANG_ASSERT(argIndex < globalGenericArgs.Count());
+            Index argIndex = argCounter++;
+            SLANG_ASSERT(argIndex < globalGenericArgs.getCount());
             auto globalGenericArg = checkProperType(linkage, TypeExp(globalGenericArgs[argIndex]), sink);
             if (!globalGenericArg)
             {
@@ -10919,7 +10918,7 @@ static bool doesParameterMatch(
                 GlobalGenericParamSubstitution::ConstraintArg constraintArg;
                 constraintArg.decl = constraint;
                 constraintArg.val = witness;
-                subst->constraintArgs.Add(constraintArg);
+                subst->constraintArgs.add(constraintArg);
             }
 
             // Add the substitution for this parameter to the global substitution
@@ -11049,14 +11048,14 @@ static bool doesParameterMatch(
         // ahead and consider all the entry points that were found
         // by the front-end.
         //
-        UInt entryPointCount = endToEndReq->entryPoints.Count();
+        Index entryPointCount = endToEndReq->entryPoints.getCount();
         if( entryPointCount == 0 )
         {
             entryPointCount = unspecializedProgram->getEntryPointCount();
-            endToEndReq->entryPoints.SetSize(entryPointCount);
+            endToEndReq->entryPoints.setCount(entryPointCount);
         }
 
-        for( UInt ii = 0; ii < entryPointCount; ++ii )
+        for( Index ii = 0; ii < entryPointCount; ++ii )
         {
             auto unspecializedEntryPoint = unspecializedProgram->getEntryPoint(ii);
             auto& entryPointInfo = endToEndReq->entryPoints[ii];
@@ -11228,11 +11227,11 @@ static bool doesParameterMatch(
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
-                genericSubst->args.Add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
+                genericSubst->args.add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
-                genericSubst->args.Add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
+                genericSubst->args.add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
             }
         }
 
@@ -11245,7 +11244,7 @@ static bool doesParameterMatch(
                 witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl, outerSubst);
                 witness->sub = genericTypeConstraintDecl->sub.type;
                 witness->sup = genericTypeConstraintDecl->sup.type;
-                genericSubst->args.Add(witness);
+                genericSubst->args.add(witness);
             }
         }
 

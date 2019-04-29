@@ -5,8 +5,6 @@
 #include "hash.h"
 #include "type-traits.h"
 
-#include <assert.h>
-
 #include "../../slang.h"
 
 namespace Slang

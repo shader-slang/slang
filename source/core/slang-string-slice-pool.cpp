@@ -16,7 +16,7 @@ StringSlicePool::StringSlicePool() :
 
 void StringSlicePool::clear()
 {
-    m_slices.SetSize(2);
+    m_slices.setCount(2);
 
     m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
     m_slices[1] = UnownedStringSlice::fromLiteral("");
@@ -38,9 +38,9 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     // Create a scoped copy
     UnownedStringSlice scopePath(m_arena.allocateString(slice.begin(), slice.size()), slice.size());
 
-    const int index = int(m_slices.Count());
+    const auto index = m_slices.getCount();
 
-    m_slices.Add(scopePath);
+    m_slices.add(scopePath);
     m_map.Add(scopePath, Handle(index));
     return Handle(index);
 }

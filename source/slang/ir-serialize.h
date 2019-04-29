@@ -461,10 +461,10 @@ protected:
             // Need to know how many lines there are
             const List<uint32_t>& lineOffsets = sourceFile->getLineBreakOffsets();
 
-            const auto numLineIndices = lineOffsets.Count();
+            const auto numLineIndices = lineOffsets.getCount();
 
             // Set none as being used initially
-            m_lineIndexUsed.SetSize(numLineIndices);
+            m_lineIndexUsed.setCount(numLineIndices);
             ::memset(m_lineIndexUsed.begin(), 0, numLineIndices * sizeof(uint8_t));
         }
             /// True if we have information on that line index

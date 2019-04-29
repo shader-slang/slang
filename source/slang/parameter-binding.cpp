@@ -99,7 +99,7 @@ struct UsedRanges
         // using indices, because we may actually modify
         // the array as we go.
         //
-        Int rangeCount = ranges.Count();
+        Int rangeCount = ranges.getCount();
         for(Int rr = 0; rr < rangeCount; ++rr)
         {
             auto existingRange = ranges[rr];
@@ -161,7 +161,7 @@ struct UsedRanges
                 prefix.begin = range.begin;
                 prefix.end = existingRange.begin;
                 prefix.parameter = range.parameter;
-                ranges.Add(prefix);
+                ranges.add(prefix);
             }
             //
             // Now we know that the interval `[range.begin, existingRange.begin)`
@@ -195,14 +195,14 @@ struct UsedRanges
         //
         if(range.begin < range.end)
         {
-            ranges.Add(range);
+            ranges.add(range);
         }
 
         // Any ranges that got added along the way might not
         // be in the proper sorted order, so we'll need to
         // sort the array to restore our global invariant.
         //
-        ranges.Sort();
+        ranges.sort();
 
         // We end by returning an overlapping parameter that
         // we found along the way, if any.
@@ -250,7 +250,7 @@ struct UsedRanges
     {
         UInt begin = 0;
 
-        UInt rangeCount = ranges.Count();
+        UInt rangeCount = ranges.getCount();
         for (UInt rr = 0; rr < rangeCount; ++rr)
         {
             // try to fit in before this range...
@@ -584,7 +584,7 @@ static bool findLayoutArg(
     {
         if( modifier )
         {
-            *outVal = (UInt) strtoull(String(modifier->valToken.Content).Buffer(), nullptr, 10);
+            *outVal = (UInt) strtoull(String(modifier->valToken.Content).getBuffer(), nullptr, 10);
             return true;
         }
     }
@@ -671,8 +671,8 @@ static void collectGlobalGenericParameter(
 {
     RefPtr<GenericParamLayout> layout = new GenericParamLayout();
     layout->decl = paramDecl;
-    layout->index = (int)context->shared->programLayout->globalGenericParams.Count();
-    context->shared->programLayout->globalGenericParams.Add(layout);
+    layout->index = (int)context->shared->programLayout->globalGenericParams.getCount();
+    context->shared->programLayout->globalGenericParams.add(layout);
     context->shared->programLayout->globalGenericParamsMap[layout->decl->getName()->text] = layout.Ptr();
 }
 
@@ -716,10 +716,10 @@ static void collectGlobalScopeParameter(
     // TODO: `ParameterInfo` should probably become `LayoutParamInfo`.
     //
     ParameterInfo* parameterInfo = new ParameterInfo();
-    context->shared->parameters.Add(parameterInfo);
+    context->shared->parameters.add(parameterInfo);
 
     // Add the first variable declaration to the list of declarations for the parameter
-    parameterInfo->varLayouts.Add(varLayout);
+    parameterInfo->varLayouts.add(varLayout);
 
     // Add any additional variables to the list of declarations
     for( auto additionalVarDeclRef : shaderParamInfo.additionalParamDeclRefs )
@@ -739,7 +739,7 @@ static void collectGlobalScopeParameter(
         additionalVarLayout->typeLayout = typeLayout;
         additionalVarLayout->varDecl = additionalVarDeclRef;
 
-        parameterInfo->varLayouts.Add(additionalVarLayout);
+        parameterInfo->varLayouts.add(additionalVarLayout);
     }
 }
 
@@ -1002,7 +1002,7 @@ void generateParameterBindings(
     RefPtr<ParameterInfo>       parameterInfo)
 {
     // There must be at least one declaration for the parameter.
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
 
     // Iterate over all declarations looking for explicit binding information.
     for( auto& varLayout : parameterInfo->varLayouts )
@@ -1246,8 +1246,8 @@ static void completeBindingsForParameter(
     // that earlier code has validated that the declarations
     // "match".
 
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
-    auto firstVarLayout = parameterInfo->varLayouts.First();
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+    auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
     completeBindingsForParameterImpl(
         context,
@@ -1342,7 +1342,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
         // The name is everything before the digits
         String stringComposedName(composedName);
 
-        info.name = stringComposedName.SubString(0, indexLoc);
+        info.name = stringComposedName.subString(0, indexLoc);
         info.index = strtol(stringComposedName.begin() + indexLoc, nullptr, 10);
     }
     return info;
@@ -1362,11 +1362,11 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     auto semanticIndex      = *state.ioSemanticIndex;
 
     String semanticName = optSemanticName ? *optSemanticName : "";
-    String sn = semanticName.ToLower();
+    String sn = semanticName.toLower();
 
     RefPtr<TypeLayout> typeLayout;
-    if (sn.StartsWith("sv_")
-        || sn.StartsWith("nv_"))
+    if (sn.startsWith("sv_")
+        || sn.startsWith("nv_"))
     {
         // System-value semantic.
 
@@ -1626,7 +1626,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // supposed to be case-insensitive and
         // upper-case is the dominant convention.
         String semanticName = *optSemanticName;
-        String sn = semanticName.ToUpper();
+        String sn = semanticName.toUpper();
 
         auto semanticIndex      = *state.ioSemanticIndex;
 
@@ -1720,7 +1720,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     }
                 }
 
-                structLayout->fields.Add(fieldVarLayout);
+                structLayout->fields.add(fieldVarLayout);
                 structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
             }
 
@@ -1883,7 +1883,7 @@ struct ScopeLayoutBuilder
             }
         }
 
-        m_structLayout->fields.Add(firstVarLayout);
+        m_structLayout->fields.add(firstVarLayout);
 
         if( parameterInfo )
         {
@@ -1934,8 +1934,8 @@ struct ScopeLayoutBuilder
     void addParameter(
         ParameterInfo* parameterInfo)
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.First();
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         _addParameter(firstVarLayout, parameterInfo);
     }
@@ -2024,7 +2024,7 @@ static void collectEntryPointParameters(
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
     //
-    context->shared->programLayout->entryPoints.Add(entryPointLayout);
+    context->shared->programLayout->entryPoints.add(entryPointLayout);
 
     // For the duration of our parameter collection work we will
     // establish this entry point as the current one in the context.
@@ -2041,7 +2041,7 @@ static void collectEntryPointParameters(
         SLANG_ASSERT(taggedUnionType);
         auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
         auto typeLayout = createTypeLayout(context->layoutContext, substType);
-        entryPointLayout->taggedUnionTypeLayouts.Add(typeLayout);
+        entryPointLayout->taggedUnionTypeLayouts.add(typeLayout);
     }
 
     // We are going to iterate over the entry-point parameters,
@@ -2337,8 +2337,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
     bool needDefaultConstantBuffer = false;
     for( auto& parameterInfo : sharedContext.parameters )
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.First();
+        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         // Does the field have any uniform data?
         if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
@@ -2366,8 +2366,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
         //
         for (auto& parameterInfo : sharedContext.parameters)
         {
-            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.Count() != 0);
-            auto firstVarLayout = parameterInfo->varLayouts.First();
+            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+            auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
             // For each parameter, we will look at each resource it consumes.
             //

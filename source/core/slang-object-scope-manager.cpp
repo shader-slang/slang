@@ -5,8 +5,8 @@ namespace Slang {
 void ObjectScopeManager::_releaseAll()
 {
     RefObject*const* objs = m_objs.begin();
-    const int numObjs = int(m_objs.Count());
-    for (int i = 0; i < numObjs; ++i)
+    const Index numObjs = m_objs.getCount();
+    for (Index i = 0; i < numObjs; ++i)
     {
         objs[i]->decreaseReference();
     }

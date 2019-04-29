@@ -17,7 +17,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
 
 /* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut)
 {
-    slicesOut.Clear();
+    slicesOut.clear();
 
     const char* start = in.begin();
     const char* end = in.end();
@@ -32,7 +32,7 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
         }
 
         // Add to output
-        slicesOut.Add(UnownedStringSlice(start, cur));
+        slicesOut.add(UnownedStringSlice(start, cur));
 
         // Skip the split character, if at end we are okay anyway
         start = cur + 1;
@@ -178,13 +178,13 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         return slice;
     }
 
-    const UInt numChars = slice.size();
+    const Index numChars = slice.size();
     const char* srcChars = slice.begin();
 
     StringBuilder builder;
     char* dstChars = builder.prepareForAppend(numChars);
 
-    for (UInt i = 0; i < numChars; ++i)
+    for (Index i = 0; i < numChars; ++i)
     {
         char c = srcChars[i];
         dstChars[i] = (c == fromChar) ? toChar : c;
@@ -196,7 +196,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
 
 /* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)
 {
-    return (fromChar == toChar || string.IndexOf(fromChar) == UInt(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
+    return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
 

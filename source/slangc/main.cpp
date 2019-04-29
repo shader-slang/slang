@@ -66,7 +66,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
 #ifndef _DEBUG
     catch (Exception & e)
     {
-        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.ToWString().begin());
+        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
         res = SLANG_FAIL;
     }
 #endif
@@ -102,12 +102,12 @@ int wmain(int argc, wchar_t** argv)
         List<String> args;
         for(int ii = 0; ii < argc; ++ii)
         {
-            args.Add(String::FromWString(argv[ii]));
+            args.add(String::fromWString(argv[ii]));
         }
         List<char const*> argBuffers;
         for(int ii = 0; ii < argc; ++ii)
         {
-            argBuffers.Add(args[ii].Buffer());
+            argBuffers.add(args[ii].getBuffer());
         }
 
         result = MAIN(argc, (char**) &argBuffers[0]);

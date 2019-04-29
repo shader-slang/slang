@@ -21,7 +21,6 @@ using namespace Slang;
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
-#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -220,7 +219,7 @@ static TestResult _gatherTestOptions(
                     }
                     
 
-                    outOptions.categories.Add(category);
+                    outOptions.categories.add(category);
 
                     if( *categoryEnd == ',' )
                     {
@@ -240,9 +239,9 @@ static TestResult _gatherTestOptions(
     }
 
     // If no categories were specified, then add the default category
-    if(outOptions.categories.Count() == 0)
+    if(outOptions.categories.getCount() == 0)
     {
-        outOptions.categories.Add(categorySet->defaultCategory);
+        outOptions.categories.add(categorySet->defaultCategory);
     }
 
     if(*cursor == ':')
@@ -319,7 +318,7 @@ static TestResult _gatherTestOptions(
         char const* argEnd = cursor;
         assert(argBegin != argEnd);
 
-        outOptions.args.Add(getString(argBegin, argEnd));
+        outOptions.args.add(getString(argBegin, argEnd));
     }
 }
 
@@ -361,7 +360,7 @@ TestResult gatherTestsForFile(
             if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
 
-            testList->tests.Add(testDetails);
+            testList->tests.add(testDetails);
         }
         else if (match(&cursor, "//DIAGNOSTIC_TEST"))
         {
@@ -372,7 +371,7 @@ TestResult gatherTestsForFile(
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            testList->tests.Add(testDetails);
+            testList->tests.add(testDetails);
         }
         else
         {
@@ -397,7 +396,7 @@ OSError spawnAndWaitExe(TestContext* context, const String& testPath, OSProcessS
     if (err != kOSError_None)
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.ToWString().begin());
+        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
     }
     return err;
 }
@@ -413,7 +412,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         builder << "slang-test";
 
-        if (options.binDir.Length())
+        if (options.binDir.getLength())
         {
             builder << " -bindir " << options.binDir;
         }
@@ -422,7 +421,7 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
         // TODO(js): Potentially this should handle escaping parameters for the command line if need be
         const auto& argList = spawner.argumentList_;
-        for (UInt i = 0; i < argList.Count(); ++i)
+        for (Index i = 0; i < argList.getCount(); ++i)
         {
             builder << " " << argList[i];
         }
@@ -452,13 +451,13 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
         }
 
         List<const char*> args;
-        args.Add(exeName.Buffer());
-        for (int i = 0; i < int(spawner.argumentList_.Count()); ++i)
+        args.add(exeName.getBuffer());
+        for (Index i = 0; i < spawner.argumentList_.getCount(); ++i)
         {
-            args.Add(spawner.argumentList_[i].Buffer());
+            args.add(spawner.argumentList_[i].getBuffer());
         }
 
-        SlangResult res = func(&stdWriters, context->getSession(), int(args.Count()), args.begin());
+        SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
 
         StdWriters::setSingleton(prevStdWriters);
 
@@ -476,10 +475,10 @@ OSError spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, 
 
 static SlangResult _extractArg(const List<String>& args, const String& argName, String& outValue)
 {
-    SLANG_ASSERT(argName.Length() > 0 && argName[0] == '-');
+    SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
 
-    const UInt count = args.Count();
-    for (UInt i = 0; i < count - 1; ++i)
+    const Index count = args.getCount();
+    for (Index i = 0; i < count - 1; ++i)
     {
         if (args[i] == argName)
         {
@@ -492,7 +491,7 @@ static SlangResult _extractArg(const List<String>& args, const String& argName, 
 
 static bool _hasOption(const List<String>& args, const String& argName)
 {
-    return args.IndexOf(argName) != UInt(-1);
+    return args.indexOf(argName) != Index(-1);
 }
 
 static BackendType _toBackendType(const UnownedStringSlice& slice)
@@ -888,7 +887,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     }
 
     // Couldn't find either 
-    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.Buffer(), specializedBuf.Buffer());
+    printf("referenceOutput '%s' or '%s' not found.\n", defaultBuf.getBuffer(), specializedBuf.getBuffer());
 
     return "";
 }
@@ -960,7 +959,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1036,7 +1035,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1077,7 +1076,7 @@ String getExpectedOutput(String const& outputStem)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
     }
@@ -1105,8 +1104,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
     const auto& args = input.testOptions->args;
 
-    const UInt targetIndex = args.IndexOf("-target");
-    if (targetIndex != UInt(-1) && targetIndex + 1 < args.Count())
+    const Index targetIndex = args.indexOf("-target");
+    if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
     {
         SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
 
@@ -1315,11 +1314,11 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
 
     // If no expected output file was found, then we
     // expect everything to be empty
-    if (expectedOutput.Length() == 0)
+    if (expectedOutput.getLength() == 0)
     {
         if (resultCode != 0)				result = TestResult::Fail;
-        if (standardError.Length() != 0)	result = TestResult::Fail;
-        if (standardOutput.Length() != 0)	result = TestResult::Fail;
+        if (standardError.getLength() != 0)	result = TestResult::Fail;
+        if (standardOutput.getLength() != 0)	result = TestResult::Fail;
     }
     // Otherwise we compare to the expected output
     else if (actualOutput != expectedOutput)
@@ -1456,7 +1455,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
 static void _addRenderTestOptions(const Options& options, OSProcessSpawner& spawner)
 {
-    if (options.adapter.Length())
+    if (options.adapter.getLength())
     {
         spawner.pushArgument("-adapter");
         spawner.pushArgument(options.adapter);
@@ -1503,7 +1502,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     }
 
     const String referenceOutput = findExpectedPath(input, ".expected.txt");
-    if (referenceOutput.Length() <= 0)
+    if (referenceOutput.getLength() <= 0)
     {
         return TestResult::Fail;
     }
@@ -1524,12 +1523,12 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     if (!File::exists(actualOutputFile))
     {
         printf("render-test not producing expected outputs.\n");
-        printf("render-test output:\n%s\n", actualOutput.Buffer());
+        printf("render-test output:\n%s\n", actualOutput.getBuffer());
 		return TestResult::Fail;
     }
     if (!File::exists(referenceOutput))
     {
-        printf("referenceOutput %s not found.\n", referenceOutput.Buffer());
+        printf("referenceOutput %s not found.\n", referenceOutput.getBuffer());
 		return TestResult::Fail;
     }
     auto actualOutputContent = File::readAllText(actualOutputFile);
@@ -1537,17 +1536,17 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 	auto referenceProgramOutput = Split(File::readAllText(referenceOutput), '\n');
     auto printOutput = [&]()
     {
-        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.Buffer(), actualOutput.Buffer());
+        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.getBuffer(), actualOutput.getBuffer());
     };
-    if (actualProgramOutput.Count() < referenceProgramOutput.Count())
+    if (actualProgramOutput.getCount() < referenceProgramOutput.getCount())
     {
         printOutput();
 		return TestResult::Fail;
     }
-	for (int i = 0; i < (int)referenceProgramOutput.Count(); i++)
+	for (Index i = 0; i < referenceProgramOutput.getCount(); i++)
 	{
-		auto reference = String(referenceProgramOutput[i].Trim());
-		auto actual = String(actualProgramOutput[i].Trim());
+		auto reference = String(referenceProgramOutput[i].trim());
+		auto actual = String(actualProgramOutput[i].trim());
         if (actual != reference)
         {
             printOutput();
@@ -1710,22 +1709,22 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     String actualPath = filePath + ".actual.png";
 
     STBImage expectedImage;
-    if (SLANG_FAILED(expectedImage.read(expectedPath.Buffer())))
+    if (SLANG_FAILED(expectedImage.read(expectedPath.getBuffer())))
     {
-        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.Buffer());
+        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", expectedPath.getBuffer());
         return TestResult::Fail;
     }
 
     STBImage actualImage;
-    if (SLANG_FAILED(actualImage.read(actualPath.Buffer())))
+    if (SLANG_FAILED(actualImage.read(actualPath.getBuffer())))
     {
-        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.Buffer());
+        reporter->messageFormat(TestMessageType::RunError, "Unable to load image ;%s'", actualPath.getBuffer());
         return TestResult::Fail;
     }
 
     if (!expectedImage.isComparable(actualImage))
     {
-        reporter->messageFormat(TestMessageType::TestFailure, "Images are different sizes '%s' '%s'", actualPath.Buffer(), expectedPath.Buffer());
+        reporter->messageFormat(TestMessageType::TestFailure, "Images are different sizes '%s' '%s'", actualPath.getBuffer(), expectedPath.getBuffer());
         return TestResult::Fail;
     }
 
@@ -1997,15 +1996,15 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         builder << "-";
         builder << RenderApiUtil::getApiName(synthRenderApiType);
 
-        synthOptions.args.Add(builder);
+        synthOptions.args.add(builder);
 
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            UInt index = synthOptions.args.IndexOf("-hlsl");
-            if (index != UInt(-1))
+            Index index = synthOptions.args.indexOf("-hlsl");
+            if (index != Index(-1))
             {
-                synthOptions.args.RemoveAt(index);
+                synthOptions.args.removeAt(index);
             }
         }
 
@@ -2017,7 +2016,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // It does set the explicit render target
         SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == synthRenderApiType);
         // Add to the tests
-        ioSynthTests.Add(synthTestDetails);
+        ioSynthTests.add(synthTestDetails);
     }
 }
 
@@ -2056,7 +2055,7 @@ void runTestsOnFile(
     }
 
     // Note cases where a test file exists, but we found nothing to run
-    if( testList.tests.Count() == 0 )
+    if( testList.tests.getCount() == 0 )
     {
         context->reporter->addTest(filePath, TestResult::Ignored);
         return;
@@ -2094,7 +2093,7 @@ void runTestsOnFile(
         // What render options do we want to synthesize
         RenderApiFlags missingApis = (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
 
-        const UInt numInitialTests = testList.tests.Count();
+        //const Index numInitialTests = testList.tests.getCount();
 
         while (missingApis)
         {
@@ -2110,7 +2109,7 @@ void runTestsOnFile(
         }
 
         // Add all the synthesized tests
-        testList.tests.AddRange(synthesizedTests);
+        testList.tests.addRange(synthesizedTests);
     }
 
     // We have found a test to run!
@@ -2216,7 +2215,7 @@ static bool endsWithAllowedExtension(
 
     for( auto ii = allowedExtensions; *ii; ++ii )
     {
-        if(filePath.EndsWith(*ii))
+        if(filePath.endsWith(*ii))
             return true;
     }
 
@@ -2249,7 +2248,7 @@ void runTestsInDirectory(
     {
         if( shouldRunTest(context, file) )
         {
-//            fprintf(stderr, "slang-test: found '%s'\n", file.Buffer());
+//            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
             runTestsOnFile(context, file);
         }
     }
@@ -2338,26 +2337,26 @@ SlangResult innerMain(int argc, char** argv)
     
     Options& options = context.options;
 
-    if (options.subCommand.Length())
+    if (options.subCommand.getLength())
     {
         // Get the function from the tool
         auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
         if (!func)
         {
-            StdWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.Buffer());
+            StdWriters::getError().print("error: Unable to launch tool '%s'\n", options.subCommand.getBuffer());
             return SLANG_FAIL;
         }
 
         // Copy args to a char* list
         const auto& srcArgs = options.subCommandArgs;
         List<const char*> args;
-        args.SetSize(srcArgs.Count());
-        for (UInt i = 0; i < srcArgs.Count(); ++i)
+        args.setCount(srcArgs.getCount());
+        for (Index i = 0; i < srcArgs.getCount(); ++i)
         {
-            args[i] = srcArgs[i].Buffer();
+            args[i] = srcArgs[i].getBuffer();
         }
 
-        return func(StdWriters::getSingleton(), context.getSession(), int(args.Count()), args.Buffer());
+        return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());
     }
 
     if( options.includeCategories.Count() == 0 )
@@ -2406,7 +2405,7 @@ SlangResult innerMain(int argc, char** argv)
                 filePath << "unit-tests/" << cur->m_name << ".internal";
 
                 TestOptions testOptions;
-                testOptions.categories.Add(unitTestCatagory);
+                testOptions.categories.add(unitTestCatagory);
                 testOptions.command = filePath;
 
                 if (shouldRunTest(&context, testOptions.command))

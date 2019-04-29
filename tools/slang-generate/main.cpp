@@ -1,6 +1,5 @@
 // main.cpp
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -602,7 +601,7 @@ void emitCodeNodes(
 }
 
 // Given line starts and a location, find the line number. Returns -1 if not found
-static int _findLineIndex(const List<const char*>& lineBreaks, const char* location)
+static Index _findLineIndex(const List<const char*>& lineBreaks, const char* location)
 {
     if (location == nullptr)
     {
@@ -610,12 +609,12 @@ static int _findLineIndex(const List<const char*>& lineBreaks, const char* locat
     }
 
     // Use a binary chop to find the associated line
-    int lo = 0;
-    int hi = int(lineBreaks.Count());
+    Index lo = 0;
+    Index hi = lineBreaks.getCount();
 
     while (lo + 1 < hi)
     {
-        const int mid = (hi + lo) >> 1;
+        const auto mid = (hi + lo) >> 1;
         const auto midOffset = lineBreaks[mid];
         if (midOffset <= location)
         {
@@ -638,7 +637,7 @@ static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>
     char const* cursor = begin;
 
     // Treat the beginning of the file as a line break
-    outLineStarts.Add(cursor);
+    outLineStarts.add(cursor);
 
     while (cursor != end)
     {
@@ -657,7 +656,7 @@ static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>
             if ((c^d) == ('\r' ^ '\n'))
                 cursor++;
 
-            outLineStarts.Add(cursor);
+            outLineStarts.add(cursor);
             break;
         }
         default:
@@ -683,7 +682,7 @@ void emitTemplateNodes(
         if (enable && prev && prev->flavor == Node::Flavor::escape && nn->flavor == Node::Flavor::text)
         {
             // Find the line
-            int lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
+            Index lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
             // If found, output the directive
             if (lineIndex >= 0)
             {
@@ -864,11 +863,11 @@ int main(
         // Copy the input paths
         for (; argCursor != argEnd; ++argCursor)
         {
-            inputPaths.Add(*argCursor);
+            inputPaths.add(*argCursor);
         }
     }
 
-    if(inputPaths.Count() == 0)
+    if(inputPaths.getCount() == 0)
     {
         usage(appName);
         exit(1);
@@ -881,7 +880,7 @@ int main(
         SourceFile* sourceFile = parseSourceFile(inputPath);
         if (sourceFile)
         {
-            gSourceFiles.Add(sourceFile);
+            gSourceFiles.add(sourceFile);
         }
     }
 
@@ -897,7 +896,7 @@ int main(
         outputPath << inputPath << ".temp.h";
 
         FILE* outputStream;
-        fopen_s(&outputStream, outputPath.Buffer(), "w");
+        fopen_s(&outputStream, outputPath.getBuffer(), "w");
 
         emitTemplateNodes(sourceFile, outputStream, node);
 
@@ -908,13 +907,13 @@ int main(
         outputPathFinal << inputPath << ".h";
 
         String allTextOld, allTextNew;
-        readAllText(outputPathFinal.Buffer(), allTextOld);
-        readAllText(outputPath.Buffer(), allTextNew);
+        readAllText(outputPathFinal.getBuffer(), allTextOld);
+        readAllText(outputPath.getBuffer(), allTextNew);
         if (allTextOld != allTextNew)
         {
-            writeAllText(inputPath, outputPathFinal.Buffer(), allTextNew.Buffer());
+            writeAllText(inputPath, outputPathFinal.getBuffer(), allTextNew.getBuffer());
         }
-        remove(outputPath.Buffer());
+        remove(outputPath.getBuffer());
     }
 
     return 0;

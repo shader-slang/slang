@@ -1,7 +1,6 @@
 // os.cpp
 #include "os.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -34,7 +33,7 @@ static bool adjustToValidResult(OSFindFilesResult& result)
         if (wcscmp(result.fileData_.cFileName, L"..") == 0)
             goto skip;
 
-        result.filePath_ = result.directoryPath_ + String::FromWString(result.fileData_.cFileName);
+        result.filePath_ = result.directoryPath_ + String::fromWString(result.fileData_.cFileName);
         if (result.fileData_.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             result.filePath_ = result.filePath_ + "/";
 
@@ -63,7 +62,7 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
-        searchPath.ToWString(),
+        searchPath.toWString(),
         &result.fileData_);
 
     result.directoryPath_ = directoryPath;
@@ -101,7 +100,7 @@ OSFindFilesResult osFindChildDirectories(
 
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
-        searchPath.ToWString(),
+        searchPath.toWString(),
         &result.fileData_);
 
     result.directoryPath_ = directoryPath;
@@ -223,7 +222,7 @@ void OSProcessSpawner::pushArgument(
     commandLine_.Append(" ");
     commandLine_.Append(argument);
 
-    argumentList_.Add(argument);
+    argumentList_.add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
@@ -321,8 +320,8 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
 
     // `CreateProcess` requires write access to this, for some reason...
     BOOL success = CreateProcessW(
-        isExecutablePath_ ? executableName_.ToWString().begin() : nullptr,
-        (LPWSTR)commandLine_.ToString().ToWString().begin(),
+        isExecutablePath_ ? executableName_.toWString().begin() : nullptr,
+        (LPWSTR)commandLine_.ToString().toWString().begin(),
         nullptr,
         nullptr,
         true,
@@ -405,9 +404,9 @@ static bool checkValidResult(OSFindFilesResult& result)
     String path = result.directoryPath_
         + String(result.entry_->d_name);
 
-//    fprintf(stderr, "stat(%s)\n", path.Buffer());
+//    fprintf(stderr, "stat(%s)\n", path.getBuffer());
     struct stat fileInfo;
-    if(stat(path.Buffer(), &fileInfo) != 0)
+    if(stat(path.getBuffer(), &fileInfo) != 0)
         return false;
 
     if(S_ISDIR(fileInfo.st_mode))
@@ -443,9 +442,9 @@ OSFindFilesResult osFindFilesInDirectory(
 {
     OSFindFilesResult result;
 
-//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.Buffer());
+//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
 
-    result.directory_ = opendir(directoryPath.Buffer());
+    result.directory_ = opendir(directoryPath.getBuffer());
     if(!result.directory_)
     {
         result.entry_ = NULL;
@@ -462,7 +461,7 @@ OSFindFilesResult osFindChildDirectories(
 {
     OSFindFilesResult result;
 
-    result.directory_ = opendir(directoryPath.Buffer());
+    result.directory_ = opendir(directoryPath.getBuffer());
     if(!result.directory_)
     {
         result.entry_ = NULL;
@@ -482,7 +481,7 @@ void OSProcessSpawner::pushExecutableName(
     Slang::String executableName)
 {
     executableName_ = executableName;
-    arguments_.Add(executableName);
+    arguments_.add(executableName);
     isExecutablePath_ = false;
 }
 
@@ -490,20 +489,20 @@ void OSProcessSpawner::pushExecutablePath(
     Slang::String executablePath)
 {
     executableName_ = executablePath;
-    arguments_.Add(executablePath);
+    arguments_.add(executablePath);
     isExecutablePath_ = true;
 }
 
 void OSProcessSpawner::pushArgument(
     Slang::String argument)
 {
-    arguments_.Add(argument);
-    argumentList_.Add(argument);
+    arguments_.add(argument);
+    argumentList_.add(argument);
 }
 
 Slang::String OSProcessSpawner::getCommandLine()
 {
-    Slang::UInt argCount = arguments_.Count();
+    Slang::UInt argCount = arguments_.getCount();
 
     Slang::StringBuilder sb;
     for(Slang::UInt ii = 0; ii < argCount;  ++ii)
@@ -519,9 +518,9 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
     List<char const*> argPtrs;
     for(auto arg : arguments_)
     {
-        argPtrs.Add(arg.Buffer());
+        argPtrs.add(arg.getBuffer());
     }
-    argPtrs.Add(NULL);
+    argPtrs.add(NULL);
 
     int stdoutPipe[2];
     int stderrPipe[2];

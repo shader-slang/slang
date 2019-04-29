@@ -321,22 +321,22 @@ namespace Slang
             Profile     profile);
 
             /// Get the number of existential type parameters for the entry point.
-        UInt getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.Count(); }
+        Index getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.getCount(); }
 
             /// Get the existential type parameter at `index`.
-        Type* getExistentialTypeParam(UInt index) { return m_existentialSlots.paramTypes[index]; }
+        Type* getExistentialTypeParam(Index index) { return m_existentialSlots.paramTypes[index]; }
 
             /// Get the number of arguments supplied for existential type parameters.
             ///
             /// Note that the number of arguments may not match the number of parameters.
             /// In particular, an unspecialized entry point may have many parameters, but zero arguments.
-        UInt getExistentialTypeArgCount() { return m_existentialSlots.args.Count(); }
+        Index getExistentialTypeArgCount() { return m_existentialSlots.args.getCount(); }
 
             /// Get the existential type argument (type and witness table) at `index`.
-        ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_existentialSlots.args[index]; }
+        ExistentialTypeSlots::Arg getExistentialTypeArg(Index index) { return m_existentialSlots.args[index]; }
 
             /// Get an array of all existential type arguments.
-        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_existentialSlots.args.Buffer(); }
+        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_existentialSlots.args.getBuffer(); }
 
             /// Get an array of all entry-point shader parameters.
         List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
@@ -827,7 +827,7 @@ namespace Slang
         List<RefPtr<FrontEndEntryPointRequest>> m_entryPointReqs;
 
         List<RefPtr<FrontEndEntryPointRequest>> const& getEntryPointReqs() { return m_entryPointReqs; }
-        UInt getEntryPointReqCount() { return m_entryPointReqs.Count(); }
+        UInt getEntryPointReqCount() { return m_entryPointReqs.getCount(); }
         FrontEndEntryPointRequest* getEntryPointReq(UInt index) { return m_entryPointReqs[index]; }
 
         // Directories to search for `#include` files or `import`ed modules
@@ -913,10 +913,10 @@ namespace Slang
         Linkage* getLinkage() { return m_linkage; }
 
             /// Get the number of entry points added to the program
-        UInt getEntryPointCount() { return m_entryPoints.Count(); }
+        Index getEntryPointCount() { return m_entryPoints.getCount(); }
 
             /// Get the entry point at the given `index`.
-        RefPtr<EntryPoint> getEntryPoint(UInt index) { return m_entryPoints[index]; }
+        RefPtr<EntryPoint> getEntryPoint(Index index) { return m_entryPoints[index]; }
 
             /// Get the full ist of entry points on the program.
         List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
@@ -980,22 +980,22 @@ namespace Slang
         RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
 
             /// Get the number of existential type parameters for the program.
-        UInt getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.Count(); }
+        Index getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.getCount(); }
 
             /// Get the existential type parameter at `index`.
-        Type* getExistentialTypeParam(UInt index) { return m_globalExistentialSlots.paramTypes[index]; }
+        Type* getExistentialTypeParam(Index index) { return m_globalExistentialSlots.paramTypes[index]; }
 
             /// Get the number of arguments supplied for existential type parameters.
             ///
             /// Note that the number of arguments may not match the number of parameters.
             /// In particular, an unspecialized program may have many parameters, but zero arguments.
-        UInt getExistentialTypeArgCount() { return m_globalExistentialSlots.args.Count(); }
+        Index getExistentialTypeArgCount() { return m_globalExistentialSlots.args.getCount(); }
 
             /// Get the existential type argument (type and witness table) at `index`.
-        ExistentialTypeSlots::Arg getExistentialTypeArg(UInt index) { return m_globalExistentialSlots.args[index]; }
+        ExistentialTypeSlots::Arg getExistentialTypeArg(Index index) { return m_globalExistentialSlots.args[index]; }
 
             /// Get an array of all existential type arguments.
-        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_globalExistentialSlots.args.Buffer(); }
+        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_globalExistentialSlots.args.getBuffer(); }
 
             /// Get an array of all global shader parameters.
         List<GlobalShaderParamInfo> const& getShaderParams() { return m_shaderParams; }

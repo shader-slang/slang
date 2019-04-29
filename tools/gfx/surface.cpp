@@ -1,4 +1,4 @@
-﻿// surface.cpp
+// surface.cpp
 #include "surface.h"
 
 #include <stdlib.h>
@@ -174,8 +174,8 @@ void Surface::flipInplaceVertically()
     uint8_t* bottom = m_data + (m_numRows - 1) * m_rowStrideInBytes;
 
     List<uint8_t> bufferList;
-    bufferList.SetSize(rowSizeInBytes);
-    uint8_t* buffer = bufferList.Buffer();
+    bufferList.setCount(rowSizeInBytes);
+    uint8_t* buffer = bufferList.getBuffer();
 
     const int stride = m_rowStrideInBytes;
 

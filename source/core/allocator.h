@@ -8,7 +8,7 @@
 
 namespace Slang
 {
-	inline void * AlignedAlloc(size_t size, size_t alignment)
+	inline void* alignedAllocate(size_t size, size_t alignment)
 	{
 #ifdef _MSC_VER
 		return _aligned_malloc(size, alignment);
@@ -23,7 +23,7 @@ namespace Slang
 #endif
 	}
 
-	inline void AlignedFree(void * ptr)
+	inline void alignedDeallocate(void* ptr)
 	{
 #ifdef _MSC_VER
 		_aligned_free(ptr);
@@ -36,27 +36,27 @@ namespace Slang
 	{
 	public:
 		// not really called
-		void * Alloc(size_t size)
+		void* allocate(size_t size)
 		{
-			return malloc(size);
+			return ::malloc(size);
 		}
-		void Free(void * ptr)
+		void deallocate(void * ptr)
 		{
-			return free(ptr);
+			return ::free(ptr);
 		}
 	};
 
-	template<int alignment>
+	template<int ALIGNMENT>
 	class AlignedAllocator
 	{
 	public:
-		void * Alloc(size_t size)
+		void* allocate(size_t size)
 		{
-			return AlignedAlloc(size, alignment);
+			return alignedAllocate(size, ALIGNMENT);
 		}
-		void Free(void * ptr)
+		void deallocate(void * ptr)
 		{
-			return AlignedFree(ptr);
+			return alignedDeallocate(ptr);
 		}
 	};
 }

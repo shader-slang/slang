@@ -4,7 +4,6 @@
 //WORKING:#include "options.h"
 #include "render.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "core/basic.h"
@@ -447,8 +446,8 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 void GLRenderer::flushStateForDraw()
 {
     auto inputLayout = m_currentPipelineState->m_inputLayout.Ptr();
-    auto attrCount = inputLayout->m_attributeCount;
-    for (UInt ii = 0; ii < attrCount; ++ii)
+    auto attrCount = Index(inputLayout->m_attributeCount);
+    for (Index ii = 0; ii < attrCount; ++ii)
     {
         auto& attr = inputLayout->m_attributes[ii];
 
@@ -466,15 +465,15 @@ void GLRenderer::flushStateForDraw()
 
         glEnableVertexAttribArray((GLuint)ii);
     }
-    for (UInt ii = attrCount; ii < kMaxVertexStreams; ++ii)
+    for (Index ii = attrCount; ii < kMaxVertexStreams; ++ii)
     {
         glDisableVertexAttribArray((GLuint)ii);
     }
 
     // Next bind the descriptor sets as required by the layout
     auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
-    auto descriptorSetCount = pipelineLayout->m_sets.Count();
-    for(UInt ii = 0; ii < descriptorSetCount; ++ii)
+    auto descriptorSetCount = pipelineLayout->m_sets.getCount();
+    for(Index ii = 0; ii < descriptorSetCount; ++ii)
     {
         auto descriptorSet = m_boundDescriptorSets[ii];
         auto descriptorSetInfo = pipelineLayout->m_sets[ii];
@@ -678,13 +677,13 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
     auto renderer = glGetString(GL_RENDERER);
 
-    if (renderer && desc.adapter.Length() > 0)
+    if (renderer && desc.adapter.getLength() > 0)
     {
-        String lowerAdapter = desc.adapter.ToLower();
-        String lowerRenderer = String((const char*)renderer).ToLower();
+        String lowerAdapter = desc.adapter.toLower();
+        String lowerRenderer = String((const char*)renderer).toLower();
 
         // The adapter is not available
-        if (lowerRenderer.IndexOf(lowerAdapter) == UInt(-1))
+        if (lowerRenderer.indexOf(lowerAdapter) == Index(-1))
         {
             return SLANG_E_NOT_AVAILABLE;
         }
@@ -1329,7 +1328,7 @@ Result GLRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
         rangeInfo.arrayIndex = counts[int(glSlotType)];
         counts[int(glSlotType)] += rangeDesc.count;
 
-        layoutImpl->m_ranges.Add(rangeInfo);
+        layoutImpl->m_ranges.add(rangeInfo);
     }
 
     for( Int ii = 0; ii < int(GLDescriptorSlotType::CountOf); ++ii )
@@ -1362,7 +1361,7 @@ Result GLRenderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pipeli
             counts[ii] += setLayout->m_counts[ii];
         }
 
-        layoutImpl->m_sets.Add(setInfo);
+        layoutImpl->m_sets.add(setInfo);
     }
 
     *outLayout = layoutImpl.detach();
@@ -1384,15 +1383,15 @@ Result GLRenderer::createDescriptorSet(DescriptorSetLayout* layout, DescriptorSe
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::ConstantBuffer);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
-        descriptorSetImpl->m_constantBuffers.SetSize(slotCount);
+        descriptorSetImpl->m_constantBuffers.setCount(slotCount);
     }
 
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::CombinedTextureSampler);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
 
-        descriptorSetImpl->m_textures.SetSize(slotCount);
-        descriptorSetImpl->m_samplers.SetSize(slotCount);
+        descriptorSetImpl->m_textures.setCount(slotCount);
+        descriptorSetImpl->m_samplers.setCount(slotCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();

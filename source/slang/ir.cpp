@@ -275,12 +275,12 @@ namespace Slang
                 List<IRInst*> existentialArgs;
                 for( UInt ii = 0; ii < existentialArgCount; ++ii )
                 {
-                    existentialArgs.Add(bindExistentials->getExistentialArg(ii));
+                    existentialArgs.add(bindExistentials->getExistentialArg(ii));
                 }
                 return builder->getBindExistentialsType(
                     baseElementType,
                     existentialArgCount,
-                    existentialArgs.Buffer());
+                    existentialArgs.getBuffer());
             }
         }
 
@@ -1862,12 +1862,12 @@ namespace Slang
         List<IRInst*> slotArgs;
         for( UInt ii = 0; ii < slotArgCount; ++ii )
         {
-            slotArgs.Add(slotArgUses[ii].get());
+            slotArgs.add(slotArgUses[ii].get());
         }
         return getBindExistentialsType(
             baseType,
             slotArgCount,
-            slotArgs.Buffer());
+            slotArgs.getBuffer());
     }
 
 
@@ -3069,7 +3069,7 @@ namespace Slang
 
         // Allow an empty nam
         // Special case a name that is the empty string, just in case.
-        if(name.Length() == 0)
+        if(name.getLength() == 0)
         {
             sb.append('_');
         }
@@ -3766,7 +3766,7 @@ namespace Slang
 
         dumpInst(&context, globalVal);
 
-        writer->write(sb.Buffer(), sb.Length());
+        writer->write(sb.getBuffer(), sb.getLength());
         writer->flush();
     }
 
@@ -3780,7 +3780,7 @@ namespace Slang
     void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode)
     {
         String ir = getSlangIRAssembly(module, mode);
-        writer->write(ir.Buffer(), ir.Length());
+        writer->write(ir.getBuffer(), ir.getLength());
         writer->flush();
     }
 

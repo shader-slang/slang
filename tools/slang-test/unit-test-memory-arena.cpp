@@ -2,7 +2,6 @@
 
 #include "../../source/core/slang-memory-arena.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -117,15 +116,15 @@ static void memoryArenaUnitTest()
 
         List<void*> blocks;
 
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
-        blocks.Add(arena.allocate(100));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
 
         arena.deallocateAll();
-        blocks.Add(arena.allocate(100));
-        blocks.Add(arena.allocate(blockSize * 2));
+        blocks.add(arena.allocate(100));
+        blocks.add(arena.allocate(blockSize * 2));
 
         arena.reset();
 
@@ -156,32 +155,32 @@ static void memoryArenaUnitTest()
                 count++;
 
                 const int var = randGen.nextInt32() & 0x3ff;
-                if (var < 3 && blocks.Count() > 0)
+                if (var < 3 && blocks.getCount() > 0)
                 {
                     if (var == 1)
                     {
                         // Deallocate everything
                         arena.deallocateAll();
-                        blocks.Clear();
+                        blocks.clear();
                     }   
                     else if (var == 2)
                     {
                         arena.reset();
-                        blocks.Clear();
+                        blocks.clear();
                     }
                     else if (var == 3)
                     {
                         arena.rewindToCursor(nullptr);
-                        blocks.Clear();
+                        blocks.clear();
                     }
                     else if (var == 4)
                     {
                         // Rewind to a random position
-                        int rewindIndex = randGen.nextInt32UpTo(int32_t(blocks.Count()));
+                        int rewindIndex = randGen.nextInt32UpTo(int32_t(blocks.getCount()));
                         // rewind to this block
                         arena.rewindToCursor(blocks[rewindIndex].m_data);
                         // All the blocks (includign this one) and now deallocated
-                        blocks.SetSize(rewindIndex);
+                        blocks.setCount(rewindIndex);
 
                     }
                     else
@@ -248,11 +247,11 @@ static void memoryArenaUnitTest()
                     block.m_size = sizeInBytes;
                     block.m_value = value;
 
-                    blocks.Add(block);
+                    blocks.add(block);
                 }
 
                 // Check the blocks
-                for (int j = 0; j < int(blocks.Count()); ++j)
+                for (Index j = 0; j < blocks.getCount(); ++j)
                 {
                     const Block& block = blocks[j];
 

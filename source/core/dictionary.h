@@ -91,25 +91,25 @@ namespace Slang
 		}
 		inline bool IsDeleted(int pos) const
 		{
-			return marks.Contains((pos << 1) + 1);
+			return marks.contains((pos << 1) + 1);
 		}
 		inline bool IsEmpty(int pos) const
 		{
-			return !marks.Contains((pos << 1));
+			return !marks.contains((pos << 1));
 		}
 		inline void SetDeleted(int pos, bool val)
 		{
 			if (val)
-				marks.Add((pos << 1) + 1);
+				marks.add((pos << 1) + 1);
 			else
-				marks.Remove((pos << 1) + 1);
+				marks.remove((pos << 1) + 1);
 		}
 		inline void SetEmpty(int pos, bool val)
 		{
 			if (val)
-				marks.Remove((pos << 1));
+				marks.remove((pos << 1));
 			else
-				marks.Add((pos << 1));
+				marks.add((pos << 1));
 		}
 		struct FindPositionResult
 		{
@@ -180,7 +180,7 @@ namespace Slang
 				Dictionary<TKey, TValue> newDict;
 				newDict.bucketSizeMinusOne = newSize - 1;
 				newDict.hashMap = new KeyValuePair<TKey, TValue>[newSize];
-				newDict.marks.SetMax(newSize * 2);
+				newDict.marks.setMax(newSize * 2);
 				if (hashMap)
 				{
 					for (auto & kvPair : *this)
@@ -326,7 +326,7 @@ namespace Slang
 		{
 			_count = 0;
 
-			marks.Clear();
+			marks.clear();
 		}
 
         TValue* TryGetValueOrAdd(const TKey& key, const TValue& value)

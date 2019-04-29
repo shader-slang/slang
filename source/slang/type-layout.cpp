@@ -1119,7 +1119,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 }
             }
 
-            newStructTypeLayout->fields.Add(newField);
+            newStructTypeLayout->fields.add(newField);
 
             mapOldFieldToNew.Add(oldField.Ptr(), newField.Ptr());
         }
@@ -1843,7 +1843,7 @@ static TypeLayoutResult _createTypeLayout(
 
 int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
 {
-    return (int)genericParameters.FindFirst([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
+    return (int)genericParameters.findFirstIndex([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
 }
 
 // When constructing a new var layout from an existing one,
@@ -1999,7 +1999,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
     }
     else if(auto originalStructTypeLayout = originalTypeLayout.as<StructTypeLayout>() )
     {
-        UInt fieldCount = originalStructTypeLayout->fields.Count();
+        Index fieldCount = originalStructTypeLayout->fields.getCount();
 
         // Empty struct? Bail out.
         if(fieldCount == 0)
@@ -2072,7 +2072,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                 }
             }
 
-            adjustedStructTypeLayout->fields.Add(adjustedField);
+            adjustedStructTypeLayout->fields.add(adjustedField);
 
             mapOriginalFieldToAdjusted.Add(originalField, adjustedField);
         }
@@ -2119,7 +2119,7 @@ TypeLayoutResult makeTypeLayoutResult(RefPtr<TypeLayout> typeLayout)
     // If the type only consumes a single kind of non-uniform resource,
     // we can fill in the `info` field directly.
     //
-    if( typeLayout->resourceInfos.Count() == 1 )
+    if( typeLayout->resourceInfos.getCount() == 1 )
     {
         auto resInfo = typeLayout->resourceInfos[0];
         if( resInfo.kind != LayoutResourceKind::Uniform )
@@ -2209,7 +2209,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     RefPtr<VarLayout> fieldLayout = new VarLayout();
     fieldLayout->varDecl = field;
     fieldLayout->typeLayout = fieldTypeLayout;
-    m_typeLayout->fields.Add(fieldLayout);
+    m_typeLayout->fields.add(fieldLayout);
     m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
 
     // Set up uniform offset information, if there is any uniform data in the field
@@ -2906,7 +2906,7 @@ static TypeLayoutResult _createTypeLayout(
             // We need to remember the layout of the case type
             // on the final `TaggedUnionTypeLayout`.
             //
-            taggedUnionLayout->caseTypeLayouts.Add(caseTypeLayout);
+            taggedUnionLayout->caseTypeLayouts.add(caseTypeLayout);
 
             // We also need to consider contributions for other
             // resource kinds beyond uniform data.

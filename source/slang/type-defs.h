@@ -406,7 +406,7 @@ RAW(
     FuncType()
     {}
 
-    UInt getParamCount() { return paramTypes.Count(); }
+    UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
 

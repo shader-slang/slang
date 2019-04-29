@@ -4,7 +4,6 @@
 #include "os.h"
 #include "../../source/core/slang-string-util.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -37,7 +36,7 @@ TestCategory* TestCategorySet::findOrError(String const& name)
     TestCategory* category = find(name);
     if (!category)
     {
-        StdWriters::getError().print("error: unknown test category name '%s'\n", name.Buffer());
+        StdWriters::getError().print("error: unknown test category name '%s'\n", name.getBuffer());
     }
     return category;
 }
@@ -92,18 +91,18 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->subCommand = arg;
                 // Make the first arg the command name
-                optionsOut->subCommandArgs.Add(optionsOut->subCommand);
+                optionsOut->subCommandArgs.add(optionsOut->subCommand);
 
                 // Add all the remaining commands to subCommands
                 for (; argCursor != argEnd; ++argCursor)
                 {
-                    optionsOut->subCommandArgs.Add(*argCursor);
+                    optionsOut->subCommandArgs.add(*argCursor);
                 }
                 // Done
                 return SLANG_OK;
             }
 
-            positionalArgs.Add(arg);
+            positionalArgs.add(arg);
             continue;
         }
 
@@ -112,7 +111,7 @@ static bool _isSubCommand(const char* arg)
             // Add all positional args at the end
             while (argCursor != argEnd)
             {
-                positionalArgs.Add(*argCursor++);
+                positionalArgs.add(*argCursor++);
             }
             break;
         }
@@ -278,24 +277,24 @@ static bool _isSubCommand(const char* arg)
 
 
     // first positional argument is source shader path
-    if (positionalArgs.Count())
+    if (positionalArgs.getCount())
     {
         optionsOut->testPrefix = positionalArgs[0];
-        positionalArgs.RemoveAt(0);
+        positionalArgs.removeAt(0);
     }
 
     // any remaining arguments represent an error
-    if (positionalArgs.Count() != 0)
+    if (positionalArgs.getCount() != 0)
     {
         stdError.print("unexpected arguments\n");
         return SLANG_FAIL;
     }
 
-    if (optionsOut->binDir.Length() == 0)
+    if (optionsOut->binDir.getLength() == 0)
     {
         // If the binDir isn't set try using the path to the executable
         String exePath = Path::getExecutablePath();
-        if (exePath.Length())
+        if (exePath.getLength())
         {
             optionsOut->binDir = Path::getParentDirectory(exePath);
         }

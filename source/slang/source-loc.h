@@ -53,11 +53,11 @@ struct PathInfo
     };
 
         /// True if has a canonical path
-    SLANG_FORCE_INLINE bool hasUniqueIdentity() const { return type == Type::Normal && uniqueIdentity.Length() > 0; }
+    SLANG_FORCE_INLINE bool hasUniqueIdentity() const { return type == Type::Normal && uniqueIdentity.getLength() > 0; }
         /// True if has a regular found path
-    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath || (type == Type::FromString && foundPath.Length() > 0); }
+    SLANG_FORCE_INLINE bool hasFoundPath() const { return type == Type::Normal || type == Type::FoundPath || (type == Type::FromString && foundPath.getLength() > 0); }
         /// True if has a found path that has originated from a file (as opposed to string or some other origin)
-    SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.Length() > 0; }
+    SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.getLength() > 0; }
 
         /// Returns the 'most unique' identity for the path. If has a 'uniqueIdentity' returns that, else the foundPath, else "".
     const String getMostUniqueIdentity() const;
@@ -65,8 +65,8 @@ struct PathInfo
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown", String() }; }
     static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste", String()}; }
-    static PathInfo makeNormal(const String& foundPathIn, const String& uniqueIdentity) { SLANG_ASSERT(uniqueIdentity.Length() > 0 && foundPathIn.Length() > 0); return PathInfo { Type::Normal, foundPathIn, uniqueIdentity }; }
-    static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.Length() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
+    static PathInfo makeNormal(const String& foundPathIn, const String& uniqueIdentity) { SLANG_ASSERT(uniqueIdentity.getLength() > 0 && foundPathIn.getLength() > 0); return PathInfo { Type::Normal, foundPathIn, uniqueIdentity }; }
+    static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.getLength() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
     static PathInfo makeTypeParse() { return PathInfo { Type::TypeParse, "type string", String() }; }
     static PathInfo makeCommandLine() { return PathInfo { Type::CommandLine, "command line", String() }; }
     static PathInfo makeFromString(const String& userPath) { return PathInfo{ Type::FromString, userPath, String() }; }
@@ -264,7 +264,7 @@ class SourceView
         /// Get the entries
     const List<Entry>& getEntries() const { return m_entries; }
         /// Set the entries list
-    void setEntries(const Entry* entries, UInt numEntries) { m_entries.Clear(); m_entries.AddRange(entries, numEntries); }
+    void setEntries(const Entry* entries, UInt numEntries) { m_entries.clear(); m_entries.addRange(entries, numEntries); }
 
         /// Get the source file holds the contents this view 
     SourceFile* getSourceFile() const { return m_sourceFile; }

@@ -589,50 +589,50 @@ namespace Slang
         typedef RefPtr<Decl> Element;
 
         FilteredMemberList()
-            : mBegin(NULL)
-            , mEnd(NULL)
+            : m_begin(nullptr)
+            , m_end(nullptr)
         {}
 
         explicit FilteredMemberList(
             List<Element> const& list)
-            : mBegin(Adjust(list.begin(), list.end()))
-            , mEnd(list.end())
+            : m_begin(adjust(list.begin(), list.end()))
+            , m_end(list.end())
         {}
 
         struct Iterator
         {
-            Element* mCursor;
-            Element* mEnd;
+            Element* m_cursor;
+            Element* m_end;
 
             bool operator!=(Iterator const& other)
             {
-                return mCursor != other.mCursor;
+                return m_cursor != other.m_cursor;
             }
 
             void operator++()
             {
-                mCursor = Adjust(mCursor + 1, mEnd);
+                m_cursor = adjust(m_cursor + 1, m_end);
             }
 
             RefPtr<T>& operator*()
             {
-                return *(RefPtr<T>*)mCursor;
+                return *(RefPtr<T>*)m_cursor;
             }
         };
 
         Iterator begin()
         {
-            Iterator iter = { mBegin, mEnd };
+            Iterator iter = { m_begin, m_end };
             return iter;
         }
 
         Iterator end()
         {
-            Iterator iter = { mEnd, mEnd };
+            Iterator iter = { m_end, m_end };
             return iter;
         }
 
-        static Element* Adjust(Element* cursor, Element* end)
+        static Element* adjust(Element* cursor, Element* end)
         {
             while (cursor != end)
             {
@@ -645,10 +645,10 @@ namespace Slang
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
-        RefPtr<T>& First() { return *begin(); }
-        UInt Count()
+        RefPtr<T>& getFirst() { return *begin(); }
+        Index getCount()
         {
-            UInt count = 0;
+            Index count = 0;
             for (auto iter : (*this))
             {
                 (void)iter;
@@ -657,18 +657,18 @@ namespace Slang
             return count;
         }
 
-        List<RefPtr<T>> ToArray()
+        List<RefPtr<T>> toArray()
         {
             List<RefPtr<T>> result;
             for (auto element : (*this))
             {
-                result.Add(element);
+                result.add(element);
             }
             return result;
         }
 
-        Element* mBegin;
-        Element* mEnd;
+        Element* m_begin;
+        Element* m_end;
     };
 
     struct TransparentMemberInfo
@@ -702,7 +702,7 @@ namespace Slang
         {
             List<DeclRef<T>> result;
             for (auto d : *this)
-                result.Add(d);
+                result.add(d);
             return result;
         }
 
@@ -998,11 +998,11 @@ namespace Slang
         // Was at least one result found?
         bool isValid() const { return item.declRef.getDecl() != nullptr; }
 
-        bool isOverloaded() const { return items.Count() > 1; }
+        bool isOverloaded() const { return items.getCount() > 1; }
 
         Name* getName() const
         {
-            return items.Count() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
+            return items.getCount() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
         }
         LookupResultItem* begin()
         {
@@ -1217,14 +1217,14 @@ namespace Slang
     {
         List<DeclRef<T>> rs;
         for (auto d : getMembersOfType<T>(declRef))
-            rs.Add(d);
+            rs.add(d);
         if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {
                 auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions));
                 for (auto mbr : extMembers)
-                    rs.Add(mbr);
+                    rs.add(mbr);
             }
         }
         return rs;

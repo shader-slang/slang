@@ -235,7 +235,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         {
             // Try getting the uniqueIdentity by asking underlying file system
             ComPtr<ISlangBlob> uniqueIdentity;
-            SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(path.Buffer(), uniqueIdentity.writeRef()));
+            SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
             // Get the path as a string
             outUniqueIdentity = StringUtil::getString(uniqueIdentity);
             return SLANG_OK;
@@ -255,7 +255,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         case UniqueIdentityMode::Hash:
         {
             // I can only see if this is the same file as already loaded by loading the file and doing a hash
-            Result res = m_fileSystem->loadFile(path.Buffer(), outFileContents.writeRef());
+            Result res = m_fileSystem->loadFile(path.getBuffer(), outFileContents.writeRef());
             if (SLANG_FAILED(res) || outFileContents == nullptr)
             {
                 return SLANG_FAIL;
@@ -265,7 +265,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
             const uint64_t hash = GetHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
 
             String hashString = Path::getFileName(path);
-            hashString = hashString.ToLower();
+            hashString = hashString.toLower();
 
             hashString.append(':');
 
@@ -362,7 +362,7 @@ SlangResult CacheFileSystem::loadFile(char const* pathIn, ISlangBlob** blobOut)
     
     if (info->m_loadFileResult == CompressedResult::Uninitialized)
     {
-        info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef()));
+        info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.getBuffer(), info->m_fileBlob.writeRef()));
     }
 
     *blobOut = info->m_fileBlob;
@@ -419,7 +419,7 @@ SlangResult CacheFileSystem::getPathType(const char* pathIn, SlangPathType* path
             // Okay try to load the file
             if (info->m_loadFileResult == CompressedResult::Uninitialized)
             {
-                info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.Buffer(), info->m_fileBlob.writeRef()));
+                info->m_loadFileResult = toCompressedResult(m_fileSystem->loadFile(path.getBuffer(), info->m_fileBlob.writeRef()));
             }
 
             // Make the getPathResult the same as the load result
@@ -482,7 +482,7 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
         {
             // Get the path as a string
             String canonicalPath = StringUtil::getString(canonicalPathBlob);
-            if (canonicalPath.Length() > 0)
+            if (canonicalPath.getLength() > 0)
             {
                 info->m_canonicalPath = new StringBlob(canonicalPath);
             }

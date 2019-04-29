@@ -1,4 +1,4 @@
-﻿// d3d-util.cpp
+// d3d-util.cpp
 #include "d3d-util.h"
 
 #include <d3dcompiler.h>
@@ -294,15 +294,15 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
     if (outSize > 0)
     {
-        const UInt prevSize = out.Count();
-        out.SetSize(prevSize + len + 1);
+        const Index prevSize = out.getCount();
+        out.setCount(prevSize + len + 1);
 
-        WCHAR* dst = out.Buffer() + prevSize;
+        WCHAR* dst = out.getBuffer() + prevSize;
         ::MultiByteToWideChar(CP_UTF8, dwFlags, in, int(len), dst, outSize);
         // Make null terminated
         dst[outSize] = 0;
         // Remove terminating 0 from array
-        out.UnsafeShrinkToSize(prevSize + outSize);
+        out.unsafeShrinkToCount(prevSize + outSize);
     }
 }
 
@@ -376,9 +376,9 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
     DXGI_ADAPTER_DESC desc;
     adapter->GetDesc(&desc);
 
-    String descName = String::FromWString(desc.Description).ToLower();
+    String descName = String::fromWString(desc.Description).toLower();
 
-    return descName.IndexOf(lowerAdapaterName) != UInt(-1);
+    return descName.indexOf(lowerAdapaterName) != Index(-1);
 }
 
 /* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
@@ -397,9 +397,9 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
 
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
-    String lowerAdapterName = String(adapterName).ToLower();
+    String lowerAdapterName = String(adapterName).toLower();
 
-    outDxgiAdapters.Clear();
+    outDxgiAdapters.clear();
 
     ComPtr<IDXGIAdapter> warpAdapter;
     if ((flags & DeviceCheckFlag::UseHardwareDevice) == 0)
@@ -410,7 +410,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
             dxgiFactory4->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.writeRef()));
             if (_isMatch(warpAdapter, lowerAdapterName.getUnownedSlice()))
             {
-                outDxgiAdapters.Add(warpAdapter);
+                outDxgiAdapters.add(warpAdapter);
             }
         }
     }
@@ -444,7 +444,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
         // If the right type then add it
         if ((deviceFlags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 && (flags & DeviceCheckFlag::UseHardwareDevice) != 0)
         {
-            outDxgiAdapters.Add(dxgiAdapter);
+            outDxgiAdapters.add(dxgiAdapter);
         }
     }
 

@@ -19,15 +19,15 @@ namespace Slang
 
     Token* TokenList::begin() const
     {
-        SLANG_ASSERT(mTokens.Count());
+        SLANG_ASSERT(mTokens.getCount());
         return &mTokens[0];
     }
 
     Token* TokenList::end() const
     {
-        SLANG_ASSERT(mTokens.Count());
-        SLANG_ASSERT(mTokens[mTokens.Count()-1].type == TokenType::EndOfFile);
-        return &mTokens[mTokens.Count() - 1];
+        SLANG_ASSERT(mTokens.getCount());
+        SLANG_ASSERT(mTokens[mTokens.getCount()-1].type == TokenType::EndOfFile);
+        return &mTokens[mTokens.getCount() - 1];
     }
 
     TokenSpan::TokenSpan()
@@ -1325,7 +1325,7 @@ namespace Slang
         for(;;)
         {
             Token token = lexToken();
-            tokenList.mTokens.Add(token);
+            tokenList.mTokens.add(token);
 
             if(token.type == TokenType::EndOfFile)
                 return tokenList;

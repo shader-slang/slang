@@ -22,7 +22,7 @@ namespace Slang
 
 LegalVal LegalVal::tuple(RefPtr<TuplePseudoVal> tupleVal)
 {
-    SLANG_ASSERT(tupleVal->elements.Count());
+    SLANG_ASSERT(tupleVal->elements.getCount());
 
     LegalVal result;
     result.flavor = LegalVal::Flavor::tuple;
@@ -202,7 +202,7 @@ static void getArgumentValues(
         break;
 
     case LegalVal::Flavor::simple:
-        instArgs.Add(val.getSimple());
+        instArgs.add(val.getSimple());
         break;
 
     case LegalVal::Flavor::implicitDeref:
@@ -259,8 +259,8 @@ static LegalVal legalizeCall(
     return LegalVal::simple(context->builder->emitCallInst(
         retIRType,
         callInst->getCallee(),
-        instArgs.Count(),
-        instArgs.Buffer()));
+        instArgs.getCount(),
+        instArgs.getBuffer()));
 }
 
 static LegalVal legalizeRetVal(IRTypeLegalizationContext*    context,
@@ -322,7 +322,7 @@ static LegalVal legalizeLoad(
                 element.key = ee.key;
                 element.val = legalizeLoad(context, ee.val);
 
-                tupleVal->elements.Add(element);
+                tupleVal->elements.add(element);
             }
             return LegalVal::tuple(tupleVal);
         }
@@ -382,9 +382,9 @@ static LegalVal legalizeStore(
             // the tuple.
             auto destTuple = legalPtrVal.getTuple();
             auto valTuple = legalVal.getTuple();
-            SLANG_ASSERT(destTuple->elements.Count() == valTuple->elements.Count());
+            SLANG_ASSERT(destTuple->elements.getCount() == valTuple->elements.getCount());
 
-            for (UInt i = 0; i < valTuple->elements.Count(); i++)
+            for (Index i = 0; i < valTuple->elements.getCount(); i++)
             {
                 legalizeStore(context, destTuple->elements[i].val, valTuple->elements[i].val);
             }
@@ -615,7 +615,7 @@ static LegalVal unwrapBufferValue(
                     context,
                     legalPtrOperand,
                     ee.field);
-                obj->elements.Add(element);
+                obj->elements.add(element);
             }
 
             return LegalVal::tuple(obj);
@@ -667,7 +667,7 @@ static LegalType getPointedToType(
                 TuplePseudoType::Element resultElement;
                 resultElement.key = ee.key;
                 resultElement.type = getPointedToType(context, ee.type);
-                resultTuple->elements.Add(resultElement);
+                resultTuple->elements.add(resultElement);
             }
             return LegalType::tuple(resultTuple);
         }
@@ -889,10 +889,10 @@ static LegalVal legalizeGetElement(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.Count();
-            SLANG_ASSERT(elemCount == tupleType->elements.Count());
+            auto elemCount = ptrTupleInfo->elements.getCount();
+            SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
-            for(UInt ee = 0; ee < elemCount; ++ee)
+            for(Index ee = 0; ee < elemCount; ++ee)
             {
                 auto ptrElem = ptrTupleInfo->elements[ee];
                 auto elemType = tupleType->elements[ee].type;
@@ -905,7 +905,7 @@ static LegalVal legalizeGetElement(
                     ptrElem.val,
                     indexOperand);
 
-                resTupleInfo->elements.Add(resElem);
+                resTupleInfo->elements.add(resElem);
             }
 
             return LegalVal::tuple(resTupleInfo);
@@ -1000,10 +1000,10 @@ static LegalVal legalizeGetElementPtr(
             auto tupleType = type.getTuple();
             SLANG_ASSERT(tupleType);
 
-            auto elemCount = ptrTupleInfo->elements.Count();
-            SLANG_ASSERT(elemCount == tupleType->elements.Count());
+            auto elemCount = ptrTupleInfo->elements.getCount();
+            SLANG_ASSERT(elemCount == tupleType->elements.getCount());
 
-            for(UInt ee = 0; ee < elemCount; ++ee)
+            for(Index ee = 0; ee < elemCount; ++ee)
             {
                 auto ptrElem = ptrTupleInfo->elements[ee];
                 auto elemType = tupleType->elements[ee].type;
@@ -1016,7 +1016,7 @@ static LegalVal legalizeGetElementPtr(
                     ptrElem.val,
                     indexOperand);
 
-                resTupleInfo->elements.Add(resElem);
+                resTupleInfo->elements.add(resElem);
             }
 
             return LegalVal::tuple(resTupleInfo);
@@ -1090,13 +1090,13 @@ static LegalVal legalizeMakeStruct(
                 // the `struct` type with them as fields
                 // would not be simple...
                 //
-                args.Add(legalArgs[aa].getSimple());
+                args.add(legalArgs[aa].getSimple());
             }
             return LegalVal::simple(
                 builder->emitMakeStruct(
                     legalType.getSimple(),
                     argCount,
-                    args.Buffer()));
+                    args.getBuffer()));
         }
 
     case LegalType::Flavor::pair:
@@ -1120,30 +1120,30 @@ static LegalVal legalizeMakeStruct(
                 {
                     // The argument is itself a pair
                     auto argPair = arg.getPair();
-                    ordinaryArgs.Add(argPair->ordinaryVal);
-                    specialArgs.Add(argPair->specialVal);
+                    ordinaryArgs.add(argPair->ordinaryVal);
+                    specialArgs.add(argPair->specialVal);
                 }
                 else if(ee.flags & Slang::PairInfo::kFlag_hasOrdinary)
                 {
-                    ordinaryArgs.Add(arg);
+                    ordinaryArgs.add(arg);
                 }
                 else if(ee.flags & Slang::PairInfo::kFlag_hasSpecial)
                 {
-                    specialArgs.Add(arg);
+                    specialArgs.add(arg);
                 }
             }
 
             LegalVal ordinaryVal = legalizeMakeStruct(
                 context,
                 ordinaryType,
-                ordinaryArgs.Buffer(),
-                ordinaryArgs.Count());
+                ordinaryArgs.getBuffer(),
+                ordinaryArgs.getCount());
 
             LegalVal specialVal = legalizeMakeStruct(
                 context,
                 specialType,
-                specialArgs.Buffer(),
-                specialArgs.Count());
+                specialArgs.getBuffer(),
+                specialArgs.getCount());
 
             return LegalVal::pair(ordinaryVal, specialVal, pairInfo);
         }
@@ -1172,7 +1172,7 @@ static LegalVal legalizeMakeStruct(
                 resElem.key = elemKey;
                 resElem.val = argVal;
 
-                resTupleInfo->elements.Add(resElem);
+                resTupleInfo->elements.add(resElem);
             }
             return LegalVal::tuple(resTupleInfo);
         }
@@ -1316,7 +1316,7 @@ static LegalVal legalizeLocalVar(
         // Remove the old local var.
         irLocalVar->removeFromParent();
         // add old local var to list
-        context->replacedInstructions.Add(irLocalVar);
+        context->replacedInstructions.add(irLocalVar);
         return newVal;
     }
     break;
@@ -1348,7 +1348,7 @@ static LegalVal legalizeParam(
         auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, originalParam, nullptr);
 
         originalParam->removeFromParent();
-        context->replacedInstructions.Add(originalParam);
+        context->replacedInstructions.add(originalParam);
         return newVal;
     }
 }
@@ -1422,7 +1422,7 @@ static LegalVal legalizeInst(
     {
         auto oldArg = inst->getOperand(aa);
         auto legalArg = legalizeOperand(context, oldArg);
-        legalArgs.Add(legalArg);
+        legalArgs.add(legalArg);
 
         if (legalArg.flavor != LegalVal::Flavor::simple)
             anyComplex = true;
@@ -1466,14 +1466,14 @@ static LegalVal legalizeInst(
         context,
         inst,
         legalType,
-        legalArgs.Buffer());
+        legalArgs.getBuffer());
 
     // After we are done, we will eliminate the
     // original instruction by removing it from
     // the IR.
     //
     inst->removeFromParent();
-    context->replacedInstructions.Add(inst);
+    context->replacedInstructions.add(inst);
 
     // The value to be used when referencing
     // the original instruction will now be
@@ -1489,7 +1489,7 @@ static void addParamType(List<IRType*>& ioParamTypes, LegalType t)
         break;
 
     case LegalType::Flavor::simple:
-        ioParamTypes.Add(t.getSimple());
+        ioParamTypes.add(t.getSimple());
         break;
 
     case LegalType::Flavor::implicitDeref:
@@ -1571,8 +1571,8 @@ static LegalVal legalizeFunc(
     }
 
     auto newFuncType = context->builder->getFuncType(
-        newParamTypes.Count(),
-        newParamTypes.Buffer(),
+        newParamTypes.getCount(),
+        newParamTypes.getBuffer(),
         newResultType);
 
     context->builder->setDataType(irFunc, newFuncType);
@@ -1799,7 +1799,7 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // information so that we can find the field layout
             // based on the IR key for the struct field.
             //
-            newTypeLayout->fields.Add(newFieldLayout);
+            newTypeLayout->fields.add(newFieldLayout);
             newTypeLayout->mapKeyToLayout.Add(simpleInfo->key, newFieldLayout);
         }
         break;
@@ -2310,7 +2310,7 @@ static LegalVal declareVars(
                 TuplePseudoVal::Element element;
                 element.key = ee.key;
                 element.val = fieldVal;
-                tupleVal->elements.Add(element);
+                tupleVal->elements.add(element);
             }
 
             return LegalVal::tuple(tupleVal);
@@ -2380,7 +2380,7 @@ static LegalVal legalizeGlobalVar(
 
             // Remove the old global from the module.
             irGlobalVar->removeFromParent();
-            context->replacedInstructions.Add(irGlobalVar);
+            context->replacedInstructions.add(irGlobalVar);
 
             return newVal;
         }
@@ -2424,7 +2424,7 @@ static LegalVal legalizeGlobalConstant(
 
             // Remove the old global from the module.
             irGlobalConstant->removeFromParent();
-            context->replacedInstructions.Add(irGlobalConstant);
+            context->replacedInstructions.add(irGlobalConstant);
 
             return newVal;
         }
@@ -2473,7 +2473,7 @@ static LegalVal legalizeGlobalParam(
 
             // Remove the old global from the module.
             irGlobalParam->removeFromParent();
-            context->replacedInstructions.Add(irGlobalParam);
+            context->replacedInstructions.add(irGlobalParam);
 
             return newVal;
         }

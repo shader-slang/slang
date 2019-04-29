@@ -173,7 +173,7 @@ struct OptionsParser
         SlangSourceLanguage language,
         Stage               impliedStage)
     {
-        auto translationUnitIndex = rawTranslationUnits.Count();
+        auto translationUnitIndex = rawTranslationUnits.getCount();
         auto translationUnitID = spAddTranslationUnit(compileRequest, language, nullptr);
 
         // As a sanity check: the API should be returning the same translation
@@ -181,14 +181,14 @@ struct OptionsParser
         // be broken if we decide to support a mix of translation units specified
         // via API, and ones specified via command-line arguments.
         //
-        SLANG_RELEASE_ASSERT(UInt(translationUnitID) == translationUnitIndex);
+        SLANG_RELEASE_ASSERT(Index(translationUnitID) == translationUnitIndex);
 
         RawTranslationUnit rawTranslationUnit;
         rawTranslationUnit.sourceLanguage = language;
         rawTranslationUnit.translationUnitID = translationUnitID;
         rawTranslationUnit.impliedStage = impliedStage;
 
-        rawTranslationUnits.Add(rawTranslationUnit);
+        rawTranslationUnits.add(rawTranslationUnit);
 
         return int(translationUnitIndex);
     }
@@ -247,7 +247,7 @@ struct OptionsParser
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
-            if (path.EndsWith(entry.ext))
+            if (path.endsWith(entry.ext))
             {
                 return entry.profileId;
             }
@@ -283,7 +283,7 @@ struct OptionsParser
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
         {
             const Entry& entry = entries[i];
-            if (path.EndsWith(entry.ext))
+            if (path.endsWith(entry.ext))
             {
                 outImpliedStage = Stage(entry.impliedStage);
                 return entry.sourceLanguage;
@@ -301,7 +301,7 @@ struct OptionsParser
         // how we should handle it.
         String path = String(inPath);
 
-        if( path.EndsWith(".slang") )
+        if( path.endsWith(".slang") )
         {
             // Plain old slang code
             addInputSlangPath(path);
@@ -329,7 +329,7 @@ struct OptionsParser
         RawOutput rawOutput;
         rawOutput.path = path;
         rawOutput.impliedFormat = impliedFormat;
-        rawOutputs.Add(rawOutput);
+        rawOutputs.add(rawOutput);
     }
 
     void addOutputPath(char const* inPath)
@@ -338,7 +338,7 @@ struct OptionsParser
 
         if (!inPath) {}
 #define CASE(EXT, TARGET)   \
-        else if(path.EndsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
+        else if(path.endsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
 
         CASE(".hlsl", HLSL);
         CASE(".fx",   HLSL);
@@ -362,7 +362,7 @@ struct OptionsParser
 
 #undef CASE
 
-        else if (path.EndsWith(".slang-module"))
+        else if (path.endsWith(".slang-module"))
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->containerOutputPath = path;
@@ -377,7 +377,7 @@ struct OptionsParser
 
     RawEntryPoint* getCurrentEntryPoint()
     {
-        auto rawEntryPointCount = rawEntryPoints.Count();
+        auto rawEntryPointCount = rawEntryPoints.getCount();
         return rawEntryPointCount ? &rawEntryPoints[rawEntryPointCount-1] : &defaultEntryPoint;
     }
 
@@ -396,7 +396,7 @@ struct OptionsParser
 
     RawTarget* getCurrentTarget()
     {
-        auto rawTargetCount = rawTargets.Count();
+        auto rawTargetCount = rawTargets.getCount();
         return rawTargetCount ? &rawTargets[rawTargetCount-1] : &defaultTarget;
     }
 
@@ -510,7 +510,7 @@ struct OptionsParser
                     RawTarget rawTarget;
                     rawTarget.format = CodeGenTarget(format);
 
-                    rawTargets.Add(rawTarget);
+                    rawTargets.add(rawTarget);
                 }
                 // A "profile" can specify both a general capability level for
                 // a target, and also (as a legacy/compatibility feature) a
@@ -566,7 +566,7 @@ struct OptionsParser
                     rawEntryPoint.name = name;
                     rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
-                    rawEntryPoints.Add(rawEntryPoint);
+                    rawEntryPoints.add(rawEntryPoint);
                 }
                 else if (argStr == "-pass-through")
                 {
@@ -808,15 +808,15 @@ struct OptionsParser
         // of the translation unit, then we assume they wanted to compile a single
         // entry point named `main`.
         //
-        if(rawEntryPoints.Count() == 0
-           && rawTranslationUnits.Count() == 1
+        if(rawEntryPoints.getCount() == 0
+           && rawTranslationUnits.getCount() == 1
            && (defaultEntryPoint.stage != Stage::Unknown
                 || rawTranslationUnits[0].impliedStage != Stage::Unknown))
         {
             RawEntryPoint entry;
             entry.name = "main";
             entry.translationUnitIndex = 0;
-            rawEntryPoints.Add(entry);
+            rawEntryPoints.add(entry);
         }
 
         // If the user (manually or implicitly) specified only a single entry point,
@@ -825,7 +825,7 @@ struct OptionsParser
         // to the "default" entry point, we should copy it over to the
         // explicit one.
         //
-        if( rawEntryPoints.Count() == 1 )
+        if( rawEntryPoints.getCount() == 1 )
         {
             if(defaultEntryPoint.stage != Stage::Unknown)
             {
@@ -848,7 +848,7 @@ struct OptionsParser
             //
             if( defaultEntryPoint.stage != Stage::Unknown )
             {
-                if( rawEntryPoints.Count() == 0 )
+                if( rawEntryPoints.getCount() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::stageSpecificationIgnoredBecauseNoEntryPoints);
                 }
@@ -988,7 +988,7 @@ struct OptionsParser
         // If there was no explicit `-target` specified, then we will look
         // at the `-o` options to see what we can infer.
         //
-        if(rawTargets.Count() == 0)
+        if(rawTargets.getCount() == 0)
         {
             for(auto& rawOutput : rawOutputs)
             {
@@ -1000,11 +1000,11 @@ struct OptionsParser
                 int targetIndex = 0;
                 if( !mapFormatToTargetIndex.TryGetValue(impliedFormat, targetIndex) )
                 {
-                    targetIndex = (int) rawTargets.Count();
+                    targetIndex = (int) rawTargets.getCount();
 
                     RawTarget rawTarget;
                     rawTarget.format = impliedFormat;
-                    rawTargets.Add(rawTarget);
+                    rawTargets.add(rawTarget);
 
                     mapFormatToTargetIndex[impliedFormat] = targetIndex;
                 }
@@ -1019,7 +1019,7 @@ struct OptionsParser
             // is specified more than once (just because of the ambiguities
             // it will create).
             //
-            int targetCount = (int) rawTargets.Count();
+            int targetCount = (int) rawTargets.getCount();
             for(int targetIndex = 0; targetIndex < targetCount; ++targetIndex)
             {
                 auto format = rawTargets[targetIndex].format;
@@ -1039,7 +1039,7 @@ struct OptionsParser
         // because there were no output paths), but there was a profile specified,
         // then we can try to infer a target from the profile.
         //
-        if( rawTargets.Count() == 0
+        if( rawTargets.getCount() == 0
             && defaultTarget.profileVersion != ProfileVersion::Unknown
             && !defaultTarget.conflictingProfilesSet)
         {
@@ -1085,14 +1085,14 @@ struct OptionsParser
             {
                 RawTarget rawTarget;
                 rawTarget.format = inferredFormat;
-                rawTargets.Add(rawTarget);
+                rawTargets.add(rawTarget);
             }
         }
 
         // Similar to the case for entry points, if there is a single target,
         // then we allow some of its options to come from the "default"
         // target state.
-        if(rawTargets.Count() == 1)
+        if(rawTargets.getCount() == 1)
         {
             if(defaultTarget.profileVersion != ProfileVersion::Unknown)
             {
@@ -1114,7 +1114,7 @@ struct OptionsParser
             //
             if( defaultTarget.profileVersion != ProfileVersion::Unknown )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getCount() == 0 )
                 {
                     // This should only happen if there were multiple `-profile` options,
                     // so we didn't try to infer a target, or if the `-profile` option
@@ -1130,7 +1130,7 @@ struct OptionsParser
 
             if( defaultTarget.targetFlags )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getCount() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
                 }
@@ -1142,7 +1142,7 @@ struct OptionsParser
 
             if( defaultTarget.floatingPointMode != FloatingPointMode::Default )
             {
-                if( rawTargets.Count() == 0 )
+                if( rawTargets.getCount() == 0 )
                 {
                     sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
                 }
@@ -1204,7 +1204,7 @@ struct OptionsParser
         // If there is only a single entry point, then that is automatically
         // the entry point that should be associated with all outputs.
         //
-        if( rawEntryPoints.Count() == 1 )
+        if( rawEntryPoints.getCount() == 1 )
         {
             for( auto& rawOutput : rawOutputs )
             {
@@ -1215,7 +1215,7 @@ struct OptionsParser
         // Similarly, if there is only one target, then all outputs must
         // implicitly appertain to that target.
         //
-        if( rawTargets.Count() == 1 )
+        if( rawTargets.getCount() == 1 )
         {
             for( auto& rawOutput : rawOutputs )
             {

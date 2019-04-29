@@ -52,7 +52,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         {
             builderOut << " ";
             // Convert to string
-            builderOut.Append(String::FromWString(buffer));
+            builderOut.Append(String::fromWString(buffer));
             LocalFree(buffer);
             return SLANG_OK;
         }

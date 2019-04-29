@@ -46,7 +46,7 @@ namespace Slang
 
         // We prefix the string with its byte length, so that
         // decoding doesn't have to worry about finding a terminator.
-        UInt length = str.Length();
+        Index length = str.getLength();
         emit(context, length);
         context->sb.append(str);
     }
@@ -279,7 +279,7 @@ namespace Slang
             {
                 // This is the case where we *do* have substitutions.
                 emitRaw(context, "G");
-                UInt genericArgCount = subst->args.Count();
+                UInt genericArgCount = subst->args.getCount();
                 emit(context, genericArgCount);
                 for( auto aa : subst->args )
                 {

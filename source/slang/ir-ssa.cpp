@@ -247,7 +247,7 @@ void identifyPromotableVars(
 
             if (isPromotableVar(context, var))
             {
-                context->promotableVars.Add(var);
+                context->promotableVars.add(var);
             }
         }
     }
@@ -262,7 +262,7 @@ IRVar* asPromotableVar(
         return nullptr;
 
     IRVar* var = (IRVar*)value;
-    if (!context->promotableVars.Contains(var))
+    if (!context->promotableVars.contains(var))
         return nullptr;
 
     return var;
@@ -312,7 +312,7 @@ IRInst* applyAccessChain(
 
     case kIROp_FieldAddress:
         {
-            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto fieldKey = accessChain->getOperand(1);
@@ -326,7 +326,7 @@ IRInst* applyAccessChain(
 
     case kIROp_getElementPtr:
         {
-            SLANG_ASSERT(context->instsToRemove.Contains(accessChain));
+            SLANG_ASSERT(context->instsToRemove.contains(accessChain));
 
             auto baseChain = accessChain->getOperand(0);
             auto index = accessChain->getOperand(1);
@@ -407,7 +407,7 @@ PhiInfo* addPhi(
     phiInfo->phi = phi;
     phiInfo->var = var;
 
-    blockInfo->phis.Add(phiInfo);
+    blockInfo->phis.add(phiInfo);
 
     return phiInfo;
 }
@@ -474,7 +474,7 @@ IRInst* tryRemoveTrivialPhi(
             auto maybeOtherPhi = (IRParam*) user;
             if( auto otherPhiInfo = context->getPhiInfo(maybeOtherPhi) )
             {
-                otherPhis.Add(otherPhiInfo);
+                otherPhis.add(otherPhiInfo);
             }
         }
     }
@@ -525,7 +525,7 @@ IRInst* addPhiOperands(
 
         auto phiOperand = readVar(context, predInfo, var);
 
-        operandValues.Add(phiOperand);
+        operandValues.add(phiOperand);
     }
 
     // The `IRUse`  type needs to stay at a stable location
@@ -533,8 +533,8 @@ IRInst* addPhiOperands(
     // list with its final size so that we can preserve the
     // required invariant.
 
-    UInt operandCount = operandValues.Count();
-    phiInfo->operands.SetSize(operandCount);
+    UInt operandCount = operandValues.getCount();
+    phiInfo->operands.setCount(operandCount);
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
         phiInfo->operands[ii].init(phiInfo->phi, operandValues[ii]);
@@ -577,7 +577,7 @@ void maybeSealBlock(
     // Note that we are doing the "inefficient" loop where we compute
     // the count on each iteration to account for the possibility that
     // new incomplete phis will get added while we are working.
-    for (UInt ii = 0; ii < blockInfo->phis.Count(); ++ii)
+    for (Index ii = 0; ii < blockInfo->phis.getCount(); ++ii)
     {
         auto incompletePhi = blockInfo->phis[ii];
         addPhiOperands(context, blockInfo, incompletePhi);
@@ -845,7 +845,7 @@ void processBlock(
                 auto  ptrArg = ii->getOperand(0);
                 if (auto var = asPromotableVarAccessChain(context, ptrArg))
                 {
-                    context->instsToRemove.Add(ii);
+                    context->instsToRemove.add(ii);
                 }
             }
             break;
@@ -929,7 +929,7 @@ static void breakCriticalEdges(
             // Furthermore, the `IRUse` embedded in `succIter` represents
             // that edge directly.
             auto edgeUse = succIter.use;
-            criticalEdges.Add(edgeUse);
+            criticalEdges.add(edgeUse);
         }
     }
 
@@ -984,7 +984,7 @@ void constructSSA(ConstructSSAContext* context)
 
     // If none of the variables are promote-able,
     // then we can exit without making any changes
-    if (context->promotableVars.Count() == 0)
+    if (context->promotableVars.getCount() == 0)
         return;
 
     // We are going to walk the blocks in order,
@@ -1036,7 +1036,7 @@ void constructSSA(ConstructSSAContext* context)
 
                 phiInfo->operands[predIndex].clear();
 
-                predInfo->successorArgs.Add(operandVal);
+                predInfo->successorArgs.add(operandVal);
             }
         }
     }
@@ -1053,7 +1053,7 @@ void constructSSA(ConstructSSAContext* context)
 
         // Don't do any work for blocks that don't need to pass along
         // values to the sucessor block.
-        auto addedArgCount = blockInfo->successorArgs.Count();
+        auto addedArgCount = blockInfo->successorArgs.getCount();
         if (addedArgCount == 0)
             continue;
 
@@ -1071,18 +1071,18 @@ void constructSSA(ConstructSSAContext* context)
         List<IRInst*> newArgs;
         for (UInt aa = 0; aa < oldArgCount; ++aa)
         {
-            newArgs.Add(oldTerminator->getOperand(aa));
+            newArgs.add(oldTerminator->getOperand(aa));
         }
-        for (UInt aa = 0; aa < addedArgCount; ++aa)
+        for (Index aa = 0; aa < addedArgCount; ++aa)
         {
-            newArgs.Add(blockInfo->successorArgs[aa]);
+            newArgs.add(blockInfo->successorArgs[aa]);
         }
 
         IRTerminatorInst* newTerminator = (IRTerminatorInst*)blockInfo->builder.emitIntrinsicInst(
             oldTerminator->getFullType(),
             oldTerminator->op,
             newArgCount,
-            newArgs.Buffer());
+            newArgs.getBuffer());
 
         // Transfer decorations (a terminator should have no children) over to the new instruction.
         //

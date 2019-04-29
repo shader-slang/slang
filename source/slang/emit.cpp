@@ -1490,7 +1490,7 @@ struct EmitVisitor
 
         // If no target name was specified, then the modifier implicitly
         // applies to all targets.
-        if(targetName.Length() == 0)
+        if(targetName.getLength() == 0)
             return true;
 
         return isTargetIntrinsicModifierApplicable(targetName);
@@ -2105,7 +2105,7 @@ struct EmitVisitor
         char const* dummyChar = "U";
 
         // Special case a name that is the empty string, just in case.
-        if(name.Length() == 0)
+        if(name.getLength() == 0)
             return dummyChar;
 
         // Otherwise, we are going to walk over the name byte by byte
@@ -2117,7 +2117,7 @@ struct EmitVisitor
             // GLSL reserverse all names that start with `gl_`,
             // so if we are in danger of collision, then make
             // our name start with a dummy character instead.
-            if(name.StartsWith("gl_"))
+            if(name.startsWith("gl_"))
             {
                 sb.append(dummyChar);
             }
@@ -2126,7 +2126,7 @@ struct EmitVisitor
         // We will also detect user-defined names that
         // might overlap with our convention for mangled names,
         // to avoid an possible collision.
-        if(name.StartsWith("_S"))
+        if(name.startsWith("_S"))
         {
             sb.Append(dummyChar);
         }
@@ -2259,7 +2259,7 @@ struct EmitVisitor
             sb.append(nameHint);
 
             // Avoid introducing a double underscore
-            if(!nameHint.EndsWith("_"))
+            if(!nameHint.endsWith("_"))
             {
                 sb.append("_");
             }
@@ -3037,7 +3037,7 @@ struct EmitVisitor
         auto outerPrec = inOuterPrec;
 
         IRUse* args = inst->getOperands();
-        UInt argCount = inst->getOperandCount();
+        Index argCount = inst->getOperandCount();
 
         // First operand was the function to be called
         args++;
@@ -3053,7 +3053,7 @@ struct EmitVisitor
 
             emit(name);
             Emit("(");
-            for (UInt aa = 0; aa < argCount; ++aa)
+            for (Index aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) Emit(", ");
                 emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
@@ -3100,7 +3100,7 @@ struct EmitVisitor
                 case '5': case '6': case '7': case '8': case '9':
                     {
                         // Simple case: emit one of the direct arguments to the call
-                        UInt argIndex = d - '0';
+                        Index argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                         Emit("(");
                         emitIROperand(ctx, args[argIndex].get(), mode, kEOp_General);
@@ -3223,7 +3223,7 @@ struct EmitVisitor
                         // we can use it in the constructed expression.
 
                         SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                        UInt argIndex = (*cursor++) - '0';
+                        Index argIndex = (*cursor++) - '0';
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto vectorArg = args[argIndex].get();
@@ -3246,7 +3246,7 @@ struct EmitVisitor
                         // (this is the inverse of `$z`).
                         //
                         SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-                        UInt argIndex = (*cursor++) - '0';
+                        Index argIndex = (*cursor++) - '0';
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3303,7 +3303,7 @@ struct EmitVisitor
                         // with the front-end picking the right overload
                         // based on the "address space" of the argument.
 
-                        UInt argIndex = 0;
+                        Index argIndex = 0;
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3328,7 +3328,7 @@ struct EmitVisitor
                         // to the `imageAtomic*` function.
                         //
 
-                        UInt argIndex = 0;
+                        Index argIndex = 0;
                         SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                         auto arg = args[argIndex].get();
@@ -3411,7 +3411,7 @@ struct EmitVisitor
                                 // used as the argument ray payload at a
                                 // trace call site.
 
-                                UInt argIndex = 0;
+                                Index argIndex = 0;
                                 SLANG_RELEASE_ASSERT(argCount > argIndex);
                                 auto arg = args[argIndex].get();
                                 auto argLoad = as<IRLoad>(arg);
@@ -3428,7 +3428,7 @@ struct EmitVisitor
                                 // used as the argument callable payload at a
                                 // call site.
 
-                                UInt argIndex = 0;
+                            Index argIndex = 0;
                                 SLANG_RELEASE_ASSERT(argCount > argIndex);
                                 auto arg = args[argIndex].get();
                                 auto argLoad = as<IRLoad>(arg);
@@ -4105,8 +4105,8 @@ struct EmitVisitor
                 auto ii = (IRSwizzle*)inst;
                 emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
                 emit(".");
-                UInt elementCount = ii->getElementCount();
-                for (UInt ee = 0; ee < elementCount; ++ee)
+                const Index elementCount = Index(ii->getElementCount());
+                for (Index ee = 0; ee < elementCount; ++ee)
                 {
                     IRInst* irElementIndex = ii->getElementIndex(ee);
                     SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
@@ -4816,8 +4816,8 @@ struct EmitVisitor
     {
         assert(attrib);
 
-        attrib->args.Count();
-        if (attrib->args.Count() != 1)
+        attrib->args.getCount();
+        if (attrib->args.getCount() != 1)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
             return;
@@ -4843,8 +4843,8 @@ struct EmitVisitor
     {
         assert(attrib);
 
-        attrib->args.Count();
-        if (attrib->args.Count() != 1)
+        attrib->args.getCount();
+        if (attrib->args.getCount() != 1)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
             return;
@@ -6814,7 +6814,7 @@ struct EmitVisitor
         }
 
         ctx->mapInstToLevel[inst] = requiredLevel;
-        ctx->actions->Add(action);
+        ctx->actions->add(action);
     }
 
     void computeIREmitActions(

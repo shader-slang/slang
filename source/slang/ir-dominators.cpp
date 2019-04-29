@@ -245,7 +245,7 @@ struct PostorderComputationContext : public DepthFirstSearchContext
 
     virtual void postVisit(IRBlock* block) SLANG_OVERRIDE
     {
-        order->Add(block);
+        order->add(block);
     }
 };
 
@@ -314,7 +314,7 @@ struct DominatorTreeComputationContext
 
         // We will initialize our map from the block objects to their "name"
         // (index in the traversal order), before moving on.
-        BlockName blockCount = BlockName(postorder.Count());
+        BlockName blockCount = BlockName(postorder.getCount());
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
             mapBlockToName[postorder[bb]] = bb;
@@ -322,7 +322,7 @@ struct DominatorTreeComputationContext
 
         // Next we initialize the `doms` array that we will iteratively turn
         // into an encoding of the dominator tree.
-        doms.SetSize(blockCount);
+        doms.setCount(blockCount);
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
             doms[bb] = kUndefined;
@@ -524,11 +524,11 @@ struct DominatorTreeComputationContext
 
         // We will build some intermediate information on each
         // block to help us fill out the tree.
-        BlockName blockCount = BlockName(doms.Count());
+        BlockName blockCount = BlockName(doms.getCount());
         List<BlockInfo> blockInfos;
         for(BlockName bb = 0; bb < blockCount; ++bb)
         {
-            blockInfos.Add(BlockInfo());
+            blockInfos.add(BlockInfo());
         }
 
         // We will propagate layout information in two passes over the tree.
@@ -626,7 +626,7 @@ struct DominatorTreeComputationContext
         //
         RefPtr<IRDominatorTree> dominatorTree = new IRDominatorTree();
         dominatorTree->code = code;
-        dominatorTree->nodes.SetSize(blockCount);
+        dominatorTree->nodes.setCount(blockCount);
 
         // We will iterate over all of the blocks, and fill in the corresponding
         // dominator tree node for each.

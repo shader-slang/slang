@@ -113,11 +113,11 @@ namespace Slang
 		}
         if (share == Slang::FileShare::None)
 #pragma warning(suppress:4996)
-            handle = _wfopen(fileName.ToWString(), mode);
+            handle = _wfopen(fileName.toWString(), mode);
         else
-			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
+			handle = _wfsopen(fileName.toWString(), mode, shFlag);
 #else
-		handle = fopen(fileName.Buffer(), modeMBCS);
+		handle = fopen(fileName.getBuffer(), modeMBCS);
 #endif
 		if (!handle)
 		{
@@ -228,7 +228,7 @@ namespace Slang
             pos = offset;
             break;
         case Slang::SeekOrigin::End:
-            pos = Int64(m_contents.Count()) + offset;
+            pos = Int64(m_contents.getCount()) + offset;
             break;
         case Slang::SeekOrigin::Current:
             pos = Int64(m_position) + offset;
@@ -242,7 +242,7 @@ namespace Slang
 
         // Clamp to the valid range
         pos = (pos < 0) ? 0 : pos;
-        pos = (pos > Int64(m_contents.Count())) ? Int64(m_contents.Count()) : pos;
+        pos = (pos > Int64(m_contents.getCount())) ? Int64(m_contents.getCount()) : pos;
 
         m_position = UInt(pos);
     }
@@ -254,7 +254,7 @@ namespace Slang
             throw IOException("Cannot read this stream.");
         }
 
-        const Int64 maxRead = Int64(m_contents.Count() - m_position);
+        const Int64 maxRead = Int64(m_contents.getCount() - m_position);
         
         if (maxRead == 0 && length > 0)
         {
@@ -276,13 +276,13 @@ namespace Slang
             throw IOException("Cannot write this stream.");
         }
 
-        if (m_position == m_contents.Count())
+        if (m_position == m_contents.getCount())
         {
-            m_contents.AddRange((const uint8_t*)buffer, UInt(length));
+            m_contents.addRange((const uint8_t*)buffer, UInt(length));
         }
         else
         {
-            m_contents.InsertRange(m_position, (const uint8_t*)buffer, UInt(length));
+            m_contents.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
         }
 
         m_atEnd = false;

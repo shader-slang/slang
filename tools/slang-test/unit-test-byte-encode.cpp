@@ -2,7 +2,6 @@
 
 #include "../../source/core/slang-byte-encode-util.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -79,12 +78,12 @@ static void byteEncodeUnitTest()
         const int blockSize = 1024;
 
         List<uint8_t> encodedBuffer;
-        encodedBuffer.SetSize(ByteEncodeUtil::kMaxLiteEncodeUInt32 * blockSize);
+        encodedBuffer.setCount(ByteEncodeUtil::kMaxLiteEncodeUInt32 * blockSize);
 
         List<uint32_t> initialBuffer;
-        initialBuffer.SetSize(blockSize);
+        initialBuffer.setCount(blockSize);
         List<uint32_t> decodeBuffer;
-        decodeBuffer.SetSize(blockSize);
+        decodeBuffer.setCount(blockSize);
         // Put in cache?
         memset(decodeBuffer.begin(), 0, blockSize * sizeof(uint32_t));
 

@@ -72,7 +72,7 @@ struct VulkanSwapChain
     const Desc& getDesc() const { return m_desc; }
 
         /// True if the swap chain is available
-    bool hasValidSwapChain() const { return m_images.Count() > 0; }
+    bool hasValidSwapChain() const { return m_images.getCount() > 0; }
 
         /// Present to the display
     void present(bool vsync);
@@ -105,11 +105,11 @@ struct VulkanSwapChain
     {
         const PlatformDesc* check = &desc;
         int size = (sizeof(T) + sizeof(void*) - 1) / sizeof(void*);
-        m_platformDescBuffer.SetSize(size);
-        *(T*)m_platformDescBuffer.Buffer() = desc;
+        m_platformDescBuffer.setCount(size);
+        *(T*)m_platformDescBuffer.getBuffer() = desc;
     }
     template <typename T>
-    const T* _getPlatformDesc() const { return static_cast<const T*>((const PlatformDesc*)m_platformDescBuffer.Buffer()); }
+    const T* _getPlatformDesc() const { return static_cast<const T*>((const PlatformDesc*)m_platformDescBuffer.getBuffer()); }
     SlangResult _createSwapChain();
     void _destroySwapChain();
     SlangResult _createFrameBuffers(VkRenderPass renderPass);

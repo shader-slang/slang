@@ -788,7 +788,7 @@ public:
 
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;
 
-    bool hasFeature(const Slang::UnownedStringSlice& feature) { return getFeatures().IndexOf(Slang::String(feature)) != UInt(-1); }
+    bool hasFeature(const Slang::UnownedStringSlice& feature) { return getFeatures().indexOf(Slang::String(feature)) != Slang::Index(-1); }
     virtual const Slang::List<Slang::String>& getFeatures() = 0;
 
     virtual void setClearColor(const float color[4]) = 0;

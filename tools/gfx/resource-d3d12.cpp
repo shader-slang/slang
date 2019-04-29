@@ -1,4 +1,4 @@
-﻿// resource-d3d12.cpp
+// resource-d3d12.cpp
 #include "resource-d3d12.h"
 
 namespace gfx {
@@ -135,7 +135,7 @@ void D3D12CounterFence::nextSignalAndWait(ID3D12CommandQueue* commandQueue)
 	{
 		size_t len = ::strlen(name);
 		List<wchar_t> buf;
-		buf.SetSize(len + 1);
+		buf.setCount(len + 1);
 
 		D3DUtil::appendWideChars(name, buf);
 		resource->SetName(buf.begin());

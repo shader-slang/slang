@@ -358,8 +358,8 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.count = 0;
-        resourceInfos.Add(info);
-        return &resourceInfos.Last();
+        resourceInfos.add(info);
+        return &resourceInfos.getLast();
     }
 
     void addResourceUsage(ResourceInfo info)
@@ -460,8 +460,8 @@ public:
         info.space = 0;
         info.index = 0;
 
-        resourceInfos.Add(info);
-        return &resourceInfos.Last();
+        resourceInfos.add(info);
+        return &resourceInfos.getLast();
     }
 
     ResourceInfo* findOrAddResourceInfo(LayoutResourceKind kind)

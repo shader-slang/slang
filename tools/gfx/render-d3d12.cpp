@@ -175,9 +175,9 @@ protected:
             {
                 case BackingStyle::MemoryBacked:
                 {
-                    const size_t bufferSize = m_memory.Count();
+                    const size_t bufferSize = m_memory.getCount();
                     D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, m_memory.Buffer(), bufferSize);
+                    ::memcpy(cursor.m_position, m_memory.getBuffer(), bufferSize);
                     // Set the constant buffer
                     submitter->setRootConstantBufferView(index, circularHeap.getGpuHandle(cursor));
                     break;
@@ -1000,7 +1000,7 @@ Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& sign
         // Describe and create the compute pipeline state object
         D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
         computeDesc.pRootSignature = rootSignature;
-        computeDesc.CS = { m_boundShaderProgram->m_computeShader.Buffer(), m_boundShaderProgram->m_computeShader.Count() };
+        computeDesc.CS = { m_boundShaderProgram->m_computeShader.getBuffer(), m_boundShaderProgram->m_computeShader.Count() };
         SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
     }
 
@@ -1324,7 +1324,7 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     ComPtr<ID3D12Device> device;
     ComPtr<IDXGIAdapter> adapter;
 
-    for (int i = 0; i < int(dxgiAdapters.Count()); ++i)
+    for (Index i = 0; i < dxgiAdapters.getCount(); ++i)
     {
         IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
         if (SLANG_SUCCEEDED(m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
@@ -1501,7 +1501,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
                 featureShaderModel.HighestShaderModel >= 0x62)
             {
                 // With sm_6_2 we have half
-                m_features.Add("half");
+                m_features.add("half");
             }
         }
         // Check what min precision support we have
@@ -1965,11 +1965,11 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
 
     // Calculate the layout
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
-    layouts.SetSize(numMipMaps);
+    layouts.setCount(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
-    mipRowSizeInBytes.SetSize(numMipMaps);
+    mipRowSizeInBytes.setCount(numMipMaps);
     List<UInt32> mipNumRows;
-    mipNumRows.SetSize(numMipMaps);
+    mipNumRows.setCount(numMipMaps);
 
     // Since textures are effectively immutable currently initData must be set
     assert(initData);
@@ -2052,7 +2052,7 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
                     }
                 }
 
-                //assert(srcRow == (const uint8_t*)(srcMip.Buffer() + srcMip.Count()));
+                //assert(srcRow == (const uint8_t*)(srcMip.getBuffer() + srcMip.getCount()));
             }
             uploadResource->Unmap(0, nullptr);
 
@@ -2119,11 +2119,11 @@ Result D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const B
         {
             // Assume the constant buffer will change every frame. We'll just keep a copy of the contents
             // in regular memory until it needed
-            buffer->m_memory.SetSize(UInt(alignedSizeInBytes));
+            buffer->m_memory.setCount(UInt(alignedSizeInBytes));
             // Initialize
             if (initData)
             {
-                ::memcpy(buffer->m_memory.Buffer(), initData, srcDesc.sizeInBytes);
+                ::memcpy(buffer->m_memory.getBuffer(), initData, srcDesc.sizeInBytes);
             }
             break;
         }
@@ -2424,12 +2424,12 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
         const char* text = inputElements[i].semanticName;
         textSize += text ? (::strlen(text) + 1) : 0;
     }
-    layout->m_text.SetSize(textSize);
-    char* textPos = layout->m_text.Buffer();
+    layout->m_text.setCount(textSize);
+    char* textPos = layout->m_text.getBuffer();
 
     //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
-    elements.SetSize(inputElementCount);
+    elements.setCount(inputElementCount);
 
 
     for (UInt i = 0; i < inputElementCount; ++i)
@@ -2537,20 +2537,20 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
                         SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
                         // Copy to memory buffer
-                        buffer->m_memory.SetSize(bufferSize);
-                        ::memcpy(buffer->m_memory.Buffer(), data, bufferSize);
+                        buffer->m_memory.setCount(bufferSize);
+                        ::memcpy(buffer->m_memory.getBuffer(), data, bufferSize);
 
                         stageBuf.getResource()->Unmap(0, nullptr);
                     }
 
-                    return buffer->m_memory.Buffer();
+                    return buffer->m_memory.getBuffer();
                 }
             }
             break;
         }
         case Style::MemoryBacked:
         {
-            return buffer->m_memory.Buffer();
+            return buffer->m_memory.getBuffer();
         }
         default: return nullptr;
     }
@@ -2636,10 +2636,10 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
 void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
-        const UInt num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.Count())
+        const Index num = startSlot + slotCount;
+        if (num > m_boundVertexBuffers.getCount())
         {
-            m_boundVertexBuffers.SetSize(num);
+            m_boundVertexBuffers.setCount(num);
         }
     }
 
@@ -2739,7 +2739,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
     {
         int numVertexViews = 0;
         D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-        for (int i = 0; i < int(m_boundVertexBuffers.Count()); i++)
+        for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
         {
             const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
             BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
@@ -3116,15 +3116,15 @@ Result D3D12Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgr
     if (desc.pipelineType == PipelineType::Compute)
     {
         auto computeKernel = desc.findKernel(StageType::Compute);
-        program->m_computeShader.InsertRange(0, (const uint8_t*) computeKernel->codeBegin, computeKernel->getCodeSize());
+        program->m_computeShader.insertRange(0, (const uint8_t*) computeKernel->codeBegin, computeKernel->getCodeSize());
     }
     else
     {
         auto vertexKernel = desc.findKernel(StageType::Vertex);
         auto fragmentKernel = desc.findKernel(StageType::Fragment);
 
-        program->m_vertexShader.InsertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
-        program->m_pixelShader.InsertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
+        program->m_vertexShader.insertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
+        program->m_pixelShader.insertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
     }
 
     *outProgram = program.detach();
@@ -3207,21 +3207,21 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalResourceRangeCount);
-        descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
+        descriptorSetLayoutImpl->m_dxRootParameters.add(dxRootParameter);
     }
     if( totalSamplerRangeCount )
     {
         D3D12_ROOT_PARAMETER dxRootParameter = {};
         dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         dxRootParameter.DescriptorTable.NumDescriptorRanges = UINT(totalSamplerRangeCount);
-        descriptorSetLayoutImpl->m_dxRootParameters.Add(dxRootParameter);
+        descriptorSetLayoutImpl->m_dxRootParameters.add(dxRootParameter);
     }
 
     // Next we can allocate space for all the D3D register ranges we need,
     // again based on totals that we can compute easily:
     //
     Int totalRangeCount = totalResourceRangeCount + totalSamplerRangeCount;
-    descriptorSetLayoutImpl->m_dxRanges.SetSize(totalRangeCount);
+    descriptorSetLayoutImpl->m_dxRanges.setCount(totalRangeCount);
 
     // Now we will walk through the ranges in  the order they were
     // specified, so that we can fill in the "range info" required for
@@ -3272,7 +3272,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                 break;
             }
 
-            descriptorSetLayoutImpl->m_ranges.Add(rangeInfo);
+            descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
         }
     }
 
@@ -3584,7 +3584,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto resourceHeap = &m_cpuViewHeap;
         descriptorSetImpl->m_resourceHeap = resourceHeap;
         descriptorSetImpl->m_resourceTable = resourceHeap->allocate(int(resourceCount));
-        descriptorSetImpl->m_resourceObjects.SetSize(resourceCount);
+        descriptorSetImpl->m_resourceObjects.setCount(resourceCount);
     }
 
     Int samplerCount = layoutImpl->m_samplerCount;
@@ -3593,7 +3593,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         auto samplerHeap = &m_cpuSamplerHeap;
         descriptorSetImpl->m_samplerHeap = samplerHeap;
         descriptorSetImpl->m_samplerTable = samplerHeap->allocate(int(samplerCount));
-        descriptorSetImpl->m_samplerObjects.SetSize(samplerCount);
+        descriptorSetImpl->m_samplerObjects.setCount(samplerCount);
     }
 
     *outDescriptorSet = descriptorSetImpl.detach();
@@ -3611,10 +3611,10 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
 
     psoDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
 
-    psoDesc.VS = { programImpl->m_vertexShader.Buffer(), programImpl->m_vertexShader.Count() };
-    psoDesc.PS = { programImpl->m_pixelShader .Buffer(), programImpl->m_pixelShader .Count() };
+    psoDesc.VS = { programImpl->m_vertexShader.getBuffer(), SIZE_T(programImpl->m_vertexShader.getCount()) };
+    psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), SIZE_T(programImpl->m_pixelShader .getCount()) };
 
-    psoDesc.InputLayout = { inputLayoutImpl->m_elements.Buffer(), UINT(inputLayoutImpl->m_elements.Count()) };
+    psoDesc.InputLayout = { inputLayoutImpl->m_elements.getBuffer(), UINT(inputLayoutImpl->m_elements.getCount()) };
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
     {
@@ -3706,7 +3706,7 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     // Describe and create the compute pipeline state object
     D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
     computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
-    computeDesc.CS = { programImpl->m_computeShader.Buffer(), programImpl->m_computeShader.Count() };
+    computeDesc.CS = { programImpl->m_computeShader.getBuffer(), SIZE_T(programImpl->m_computeShader.getCount()) };
 
     ComPtr<ID3D12PipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));

@@ -176,7 +176,7 @@ static void _cloneInstDecorationsAndChildren(
             IRCloningOldNewPair pair;
             pair.oldInst = oldChild;
             pair.newInst = newChild;
-            pairs.Add(pair);
+            pairs.add(pair);
         }
     }
 
@@ -271,9 +271,9 @@ void cloneDecoration(
 
 bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& other) const
 {
-    auto valCount = vals.Count();
-    if(valCount != other.vals.Count()) return false;
-    for( UInt ii = 0; ii < valCount; ++ii )
+    auto valCount = vals.getCount();
+    if(valCount != other.vals.getCount()) return false;
+    for( Index ii = 0; ii < valCount; ++ii )
     {
         if(vals[ii] != other.vals[ii]) return false;
     }
@@ -282,9 +282,9 @@ bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& othe
 
 int IRSimpleSpecializationKey::GetHashCode() const
 {
-    auto valCount = vals.Count();
+    auto valCount = vals.getCount();
     int hash = Slang::GetHashCode(valCount);
-    for( UInt ii = 0; ii < valCount; ++ii )
+    for( Index ii = 0; ii < valCount; ++ii )
     {
         hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
     }

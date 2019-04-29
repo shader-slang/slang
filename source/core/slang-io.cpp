@@ -35,28 +35,28 @@ namespace Slang
 	{
 #ifdef _WIN32
 		struct _stat32 statVar;
-		return ::_wstat32(((String)fileName).ToWString(), &statVar) != -1;
+		return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
 #else
 		struct stat statVar;
-		return ::stat(fileName.Buffer(), &statVar) == 0;
+		return ::stat(fileName.getBuffer(), &statVar) == 0;
 #endif
 	}
 
 	String Path::truncateExt(const String& path)
 	{
-		UInt dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos != -1)
-			return path.SubString(0, dotPos);
+			return path.subString(0, dotPos);
 		else
 			return path;
 	}
 	String Path::replaceExt(const String& path, const char* newExt)
 	{
-		StringBuilder sb(path.Length()+10);
-		UInt dotPos = path.LastIndexOf('.');
+		StringBuilder sb(path.getLength()+10);
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos == -1)
-			dotPos = path.Length();
-		sb.Append(path.Buffer(), dotPos);
+			dotPos = path.getLength();
+		sb.Append(path.getBuffer(), dotPos);
 		sb.Append('.');
 		sb.Append(newExt);
 		return sb.ProduceString();
@@ -64,8 +64,8 @@ namespace Slang
 
     static UInt findLastSeparator(String const& path)
     {
-		UInt slashPos = path.LastIndexOf('/');
-        UInt backslashPos = path.LastIndexOf('\\');
+		UInt slashPos = path.lastIndexOf('/');
+        UInt backslashPos = path.lastIndexOf('\\');
 
         if (slashPos == -1) return backslashPos;
         if (backslashPos == -1) return slashPos;
@@ -83,7 +83,7 @@ namespace Slang
         if (pos != -1)
         {
             pos = pos + 1;
-            return path.SubString(pos, path.Length() - pos);
+            return path.subString(pos, path.getLength() - pos);
         }
         else
         {
@@ -93,16 +93,16 @@ namespace Slang
 	String Path::getFileNameWithoutExt(const String& path)
 	{
         String fileName = getFileName(path);
-		UInt dotPos = fileName.LastIndexOf('.');
+		UInt dotPos = fileName.lastIndexOf('.');
 		if (dotPos == -1)
             return fileName;
-		return fileName.SubString(0, dotPos);
+		return fileName.subString(0, dotPos);
 	}
 	String Path::getFileExt(const String& path)
 	{
-		UInt dotPos = path.LastIndexOf('.');
+		UInt dotPos = path.lastIndexOf('.');
 		if (dotPos != -1)
-			return path.SubString(dotPos+1, path.Length()-dotPos-1);
+			return path.subString(dotPos+1, path.getLength()-dotPos-1);
 		else
 			return "";
 	}
@@ -110,28 +110,28 @@ namespace Slang
 	{
         UInt pos = findLastSeparator(path);
 		if (pos != -1)
-			return path.SubString(0, pos);
+			return path.subString(0, pos);
 		else
 			return "";
 	}
 	String Path::combine(const String& path1, const String& path2)
 	{
-		if (path1.Length() == 0) return path2;
-		StringBuilder sb(path1.Length()+path2.Length()+2);
+		if (path1.getLength() == 0) return path2;
+		StringBuilder sb(path1.getLength()+path2.getLength()+2);
 		sb.Append(path1);
-		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
+		if (!path1.endsWith('\\') && !path1.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path2);
 		return sb.ProduceString();
 	}
 	String Path::combine(const String& path1, const String& path2, const String& path3)
 	{
-		StringBuilder sb(path1.Length()+path2.Length()+path3.Length()+3);
+		StringBuilder sb(path1.getLength()+path2.getLength()+path3.getLength()+3);
 		sb.Append(path1);
-		if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
+		if (!path1.endsWith('\\') && !path1.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path2);
-		if (!path2.EndsWith('\\') && !path2.EndsWith('/'))
+		if (!path2.endsWith('\\') && !path2.endsWith('/'))
 			sb.Append(kPathDelimiter);
 		sb.Append(path3);
 		return sb.ProduceString();
@@ -191,7 +191,7 @@ namespace Slang
 
     /* static */void Path::split(const UnownedStringSlice& path, List<UnownedStringSlice>& splitOut)
     {
-        splitOut.Clear();
+        splitOut.clear();
 
         const char* start = path.begin();
         const char* end = path.end();
@@ -202,21 +202,21 @@ namespace Slang
             // Find the split
             while (cur < end && !isDelimiter(*cur)) cur++;
 
-            splitOut.Add(UnownedStringSlice(start, cur));
+            splitOut.add(UnownedStringSlice(start, cur));
            
             // Next
             start = cur + 1;
         }
 
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
-        if (splitOut.Count() > 1 && splitOut.Last().size() == 0)
+        if (splitOut.getCount() > 1 && splitOut.getLast().size() == 0)
         {
-            if (splitOut.Count() == 2 && isDriveSpecification(splitOut[0]))
+            if (splitOut.getCount() == 2 && isDriveSpecification(splitOut[0]))
             {
                 return;
             }
             // Remove the last 
-            splitOut.RemoveLast();
+            splitOut.removeLast();
         }
     }
 
@@ -241,13 +241,13 @@ namespace Slang
         split(path, splitPath);
 
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (int i = 0; i < int(splitPath.Count()); i++)
+        for (Index i = 0; i < splitPath.getCount(); i++)
         {
             const UnownedStringSlice& cur = splitPath[i];
-            if (cur == "." && splitPath.Count() > 1)
+            if (cur == "." && splitPath.getCount() > 1)
             {
                 // Just remove it 
-                splitPath.RemoveAt(i);
+                splitPath.removeAt(i);
                 i--;
             }
             else if (cur == ".." && i > 0)
@@ -259,20 +259,20 @@ namespace Slang
                     // Can't do it
                     continue;
                 }
-                splitPath.RemoveRange(i - 1, 2);
+                splitPath.removeRange(i - 1, 2);
                 i -= 2;
             }
         }
 
         // If its empty it must be .
-        if (splitPath.Count() == 0)
+        if (splitPath.getCount() == 0)
         {
-            splitPath.Add(UnownedStringSlice::fromLiteral("."));
+            splitPath.add(UnownedStringSlice::fromLiteral("."));
         }
    
         // Reconstruct the string
         StringBuilder builder;
-        for (int i = 0; i < int(splitPath.Count()); i++)
+        for (Index i = 0; i < splitPath.getCount(); i++)
         {
             if (i > 0)
             {
@@ -287,9 +287,9 @@ namespace Slang
 	bool Path::createDirectory(const String& path)
 	{
 #if defined(_WIN32)
-		return _wmkdir(path.ToWString()) == 0;
+		return _wmkdir(path.toWString()) == 0;
 #else 
-		return mkdir(path.Buffer(), 0777) == 0;
+		return mkdir(path.getBuffer(), 0777) == 0;
 #endif
 	}
 
@@ -298,7 +298,7 @@ namespace Slang
 #ifdef _WIN32
         // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
         struct _stat32 statVar;
-        if (::_wstat32(String(path).ToWString(), &statVar) == 0)
+        if (::_wstat32(String(path).toWString(), &statVar) == 0)
         {
             if (statVar.st_mode & _S_IFDIR)
             {
@@ -316,7 +316,7 @@ namespace Slang
         return SLANG_E_NOT_FOUND;
 #else
         struct stat statVar;
-        if (::stat(path.Buffer(), &statVar) == 0)
+        if (::stat(path.getBuffer(), &statVar) == 0)
         {
             if (S_ISDIR(statVar.st_mode))
             {
@@ -340,13 +340,13 @@ namespace Slang
     {
 #if defined(_WIN32)
         // https://msdn.microsoft.com/en-us/library/506720ff.aspx
-        wchar_t* absPath = ::_wfullpath(nullptr, path.ToWString(), 0);
+        wchar_t* absPath = ::_wfullpath(nullptr, path.toWString(), 0);
         if (!absPath)
         {
             return SLANG_FAIL;
         }  
 
-        canonicalPathOut =  String::FromWString(absPath);
+        canonicalPathOut =  String::fromWString(absPath);
         ::free(absPath);
         return SLANG_OK;
 #else
@@ -432,15 +432,15 @@ namespace Slang
         return SLANG_OK;
 #   else        
         String text = Slang::File::readAllText("/proc/self/maps");
-        UInt startIndex = text.IndexOf('/');
-        if (startIndex == UInt(-1))
+        Index startIndex = text.indexOf('/');
+        if (startIndex == Index(-1))
         {
             return SLANG_FAIL;
         }
-        UInt endIndex = text.IndexOf("\n", startIndex);
-        endIndex = (endIndex == UInt(-1)) ? text.Length() : endIndex;
+        Index endIndex = text.indexOf("\n", startIndex);
+        endIndex = (endIndex == Index(-1)) ? text.getLength() : endIndex;
 
-        auto path = text.SubString(startIndex, endIndex - startIndex);
+        auto path = text.subString(startIndex, endIndex - startIndex);
 
         if (path.getLength() < bufferSize)
         {
@@ -476,17 +476,17 @@ namespace Slang
     {
         List<char> buffer;
         // Guess an initial buffer size
-        buffer.SetSize(1024);
+        buffer.setCount(1024);
 
         while (true)
         {
-            const size_t size = buffer.Count();
+            const size_t size = size_t(buffer.getCount());
             size_t bufferSize = size;
-            SlangResult res = _calcExectuablePath(buffer.Buffer(), &bufferSize);
+            SlangResult res = _calcExectuablePath(buffer.getBuffer(), &bufferSize);
 
             if (SLANG_SUCCEEDED(res))
             {
-                return String(buffer.Buffer());
+                return String(buffer.getBuffer());
             }
 
             if (res != SLANG_E_BUFFER_TOO_SMALL)
@@ -497,7 +497,7 @@ namespace Slang
 
             // If bufferSize changed it should be the exact fit size, else we just make the buffer bigger by a guess (50% bigger)
             bufferSize = (bufferSize > size) ? bufferSize : (bufferSize + bufferSize / 2);
-            buffer.SetSize(bufferSize);
+            buffer.setCount(Index(bufferSize));
         }
     }
 
@@ -522,7 +522,7 @@ namespace Slang
 			unsigned char ch;
 			int read = (int)fs->Read(&ch, 1);
 			if (read)
-				buffer.Add(ch);
+				buffer.add(ch);
 			else
 				break;
 		}

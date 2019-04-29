@@ -79,7 +79,7 @@ namespace Slang
             m_atEnd(false)
         {}
 
-        UInt m_position;
+        Index m_position;
 
         bool m_atEnd;           ///< Happens when a read is done and nothing can be returned because already at end
 

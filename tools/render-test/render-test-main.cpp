@@ -351,8 +351,8 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	fseek(sourceFile, 0, SEEK_SET);
 
     List<char> sourceText;
-    sourceText.SetSize(sourceSize + 1);
-	fread(sourceText.Buffer(), sourceSize, 1, sourceFile);
+    sourceText.setCount(sourceSize + 1);
+	fread(sourceText.getBuffer(), sourceSize, 1, sourceFile);
 	fclose(sourceFile);
 	sourceText[sourceSize] = 0;
 
@@ -366,12 +366,12 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
         m_shaderInputLayout.numRenderTargets = 0;
         break;
     }
-	m_shaderInputLayout.Parse(sourceText.Buffer());
+	m_shaderInputLayout.Parse(sourceText.getBuffer());
 
 	ShaderCompileRequest::SourceInfo sourceInfo;
 	sourceInfo.path = sourcePath;
-	sourceInfo.dataBegin = sourceText.Buffer();
-	sourceInfo.dataEnd = sourceText.Buffer() + sourceSize;
+	sourceInfo.dataBegin = sourceText.getBuffer();
+	sourceInfo.dataEnd = sourceText.getBuffer() + sourceSize;
 
 	ShaderCompileRequest compileRequest;
 	compileRequest.source = sourceInfo;
@@ -558,7 +558,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     
     StringBuilder rendererName;
     rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
-    if (gOptions.adapter.Length())
+    if (gOptions.adapter.getLength())
     {
         rendererName << "'" << gOptions.adapter << "'";
     }
@@ -568,7 +568,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     {
         if (!gOptions.onlyStartup)
         {
-            fprintf(stderr, "Unable to create renderer %s\n", rendererName.Buffer());
+            fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
         }
         return SLANG_FAIL;
     }
@@ -584,7 +584,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         {
             if (!gOptions.onlyStartup)
             {
-                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.Buffer());
+                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.getBuffer());
             }
             return res;
         }
