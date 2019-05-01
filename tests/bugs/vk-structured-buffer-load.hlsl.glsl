@@ -33,9 +33,9 @@ void main()
 
     float offsfloat_0 = ((gParamBlock_sbuf_0)._data[(int(uint(0)))]);
 
+    uint use_rcp_1 = use_rcp_0|uint(HitT_0 > 0.00000000000000000000);
 
-
-    if(bool(use_rcp_0 | uint(HitT_0 > 0.00000000000000000000)))
+    if(bool(use_rcp_1))
     {
 
         float _S4 = (1.0/((offsfloat_0)));
@@ -45,9 +45,22 @@ void main()
     }
     else
     {
-        float _S5 = (inversesqrt((offsfloat_0)));
 
-        _S2.PackedHitInfoA_0.y = _S5;
+        if(use_rcp_1 > uint(0)&&offsfloat_0 == 0.00000000000000000000)
+        {
+
+            float _S5 = (inversesqrt((offsfloat_0 + 1.00000000000000000000)));
+
+            _S2.PackedHitInfoA_0.y = _S5;
+
+        }
+        else
+        {
+            float _S6 = (inversesqrt((offsfloat_0)));
+
+            _S2.PackedHitInfoA_0.y = _S6;
+
+        }
 
     }
 
