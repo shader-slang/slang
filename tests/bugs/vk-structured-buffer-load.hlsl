@@ -28,6 +28,8 @@ void HitMain(inout RayHitInfoPacked RayData, BuiltInTriangleIntersectionAttribut
 
     if (use_rcp)
         RayData.PackedHitInfoA.y = rcp(offsfloat);
+    else if ((use_rcp > 0) & (offsfloat == 0.0))
+        RayData.PackedHitInfoA.y = rsqrt(offsfloat + 1.0);
     else
         RayData.PackedHitInfoA.y = rsqrt(offsfloat);
 }

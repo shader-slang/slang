@@ -3938,9 +3938,7 @@ struct EmitVisitor
         CASE_COMPARE(kIROp_Geq, Geq, >=);
         CASE_COMPARE(kIROp_Leq, Leq, <=);
 
-        CASE(kIROp_BitAnd, BitAnd, &);
         CASE(kIROp_BitXor, BitXor, ^);
-        CASE(kIROp_BitOr,  BitOr,  |);
 
         CASE(kIROp_And, And, &&);
         CASE(kIROp_Or,  Or,  ||);
@@ -3989,6 +3987,7 @@ struct EmitVisitor
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             break;
+
         case kIROp_BitNot:
             {
                 auto prec = kEOp_Prefix;
@@ -4003,6 +4002,60 @@ struct EmitVisitor
                     emit("~");
                 }
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            }
+            break;
+
+        case kIROp_BitAnd:
+            {
+                auto prec = kEOp_BitAnd;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                // TODO: handle a bitwise And of a vector of bools by casting to
+                // a uvec and performing the bitwise operation
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+
+                // Are we targetting GLSL, and are both operands scalar bools?
+                // In that case convert the operation to a logical And
+                if (getTarget(ctx) == CodeGenTarget::GLSL
+                    && as<IRBoolType>(inst->getOperand(0)->getDataType())
+                    && as<IRBoolType>(inst->getOperand(1)->getDataType()))
+                {
+                    emit("&&");
+                }
+                else
+                {
+                    emit("&");
+                }
+
+                emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
+            }
+            break;
+
+        case kIROp_BitOr:
+            {
+                auto prec = kEOp_BitOr;
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                // TODO: handle a bitwise Or of a vector of bools by casting to
+                // a uvec and performing the bitwise operation
+
+                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+
+                // Are we targetting GLSL, and are both operands scalar bools?
+                // In that case convert the operation to a logical Or
+                if (getTarget(ctx) == CodeGenTarget::GLSL
+                    && as<IRBoolType>(inst->getOperand(0)->getDataType())
+                    && as<IRBoolType>(inst->getOperand(1)->getDataType()))
+                {
+                    emit("||");
+                }
+                else
+                {
+                    emit("|");
+                }
+
+                emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
             }
             break;
 
