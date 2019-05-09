@@ -29,16 +29,17 @@ UIntSet& UIntSet::operator=(const UIntSet& other)
 
 int UIntSet::GetHashCode()
 {
-	int rs = 0;
-	for (auto val : m_buffer)
-		rs ^= val;
-	return rs;
+    int rs = 0;
+    for (auto val : m_buffer)
+       rs ^= val;
+    return rs;
 }
 
 void UIntSet::resizeAndClear(UInt val)
 {
-	resize(val);
-	clear();
+    // TODO(JS): This could be faster in that if the resize is larger the additional area is cleared twice
+    resize(val);
+    clear();
 }
 
 void UIntSet::setAll()
@@ -48,13 +49,13 @@ void UIntSet::setAll()
 
 void UIntSet::resize(UInt size)
 {
-    const Index oldBufferSize = m_buffer.getCount();
+    const Index oldCount = m_buffer.getCount();
     const Index newCount = Index((size + kElementMask) >> kElementShift);
     m_buffer.setCount(newCount);
 
-    if (newCount > oldBufferSize)
+    if (newCount > oldCount)
     {
-        ::memset(m_buffer.getBuffer() + oldBufferSize, 0, (newCount - oldBufferSize) * sizeof(Element));
+        ::memset(m_buffer.getBuffer() + oldCount, 0, (newCount - oldCount) * sizeof(Element));
     }
 }
 
