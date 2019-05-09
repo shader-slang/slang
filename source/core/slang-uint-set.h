@@ -16,9 +16,9 @@ class UIntSet
 public:
     typedef uint32_t Element;                                   ///< Type that holds the bits to say if value is present
     
-	UIntSet() {}
-	UIntSet(const UIntSet& other) {	m_buffer = other.m_buffer; }
-	UIntSet(UIntSet && other) { *this = (_Move(other)); }
+    UIntSet() {}
+    UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
+    UIntSet(UIntSet && other) { *this = (_Move(other)); }
     UIntSet(UInt maxVal) { resizeAndClear(maxVal); }
 
     UIntSet& operator=(UIntSet&& other);
@@ -53,7 +53,7 @@ public:
         /// ==
     bool operator==(const UIntSet& set) const;
         /// !=
-	bool operator!=(const UIntSet& set) const { return !(*this == set);	}
+    bool operator!=(const UIntSet& set) const { return !(*this == set); }
 
         /// Store the union between this and set in this
     void unionWith(const UIntSet& set);
@@ -67,7 +67,7 @@ public:
         /// Store the subtraction of set2 from set1 in outRs
     static void calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
 
-        /// Returns true if set1 and set2 have the same value set (ie there is an intersection)
+        /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
 private:

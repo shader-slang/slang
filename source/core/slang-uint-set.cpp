@@ -72,13 +72,13 @@ void UIntSet::clearAndDeallocate()
 void UIntSet::unionWith(const UIntSet& set)
 {
     const Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
-	for (Index i = 0; i < minCount; i++)
-	{
-		m_buffer[i] |= set.m_buffer[i];
-	}
+    for (Index i = 0; i < minCount; i++)
+    {
+        m_buffer[i] |= set.m_buffer[i];
+    }
 
-	if (set.m_buffer.getCount() > m_buffer.getCount())
-		m_buffer.addRange(set.m_buffer.getBuffer() + m_buffer.getCount(), set.m_buffer.getCount() - m_buffer.getCount());
+    if (set.m_buffer.getCount() > m_buffer.getCount())
+        m_buffer.addRange(set.m_buffer.getBuffer() + m_buffer.getCount(), set.m_buffer.getCount() - m_buffer.getCount());
 }
 
 bool UIntSet::operator==(const UIntSet& set) const
@@ -98,42 +98,42 @@ bool UIntSet::operator==(const UIntSet& set) const
 
 void UIntSet::intersectWith(const UIntSet& set)
 {
-	if (set.m_buffer.getCount() < m_buffer.getCount())
-		::memset(m_buffer.getBuffer() + set.m_buffer.getCount(), 0, (m_buffer.getCount() - set.m_buffer.getCount()) * sizeof(Element));
+    if (set.m_buffer.getCount() < m_buffer.getCount())
+        ::memset(m_buffer.getBuffer() + set.m_buffer.getCount(), 0, (m_buffer.getCount() - set.m_buffer.getCount()) * sizeof(Element));
 
     const Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
-	for (Index i = 0; i < minCount; i++)
-	{
-		m_buffer[i] &= set.m_buffer[i];
-	}
+    for (Index i = 0; i < minCount; i++)
+    {
+        m_buffer[i] &= set.m_buffer[i];
+    }
 }
 
 /* static */void UIntSet::calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-	outRs.m_buffer.setCount(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
-	outRs.clear();
-	for (Index i = 0; i < set1.m_buffer.getCount(); i++)
-		outRs.m_buffer[i] |= set1.m_buffer[i];
-	for (Index i = 0; i < set2.m_buffer.getCount(); i++)
-		outRs.m_buffer[i] |= set2.m_buffer[i];
+    outRs.m_buffer.setCount(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
+    outRs.clear();
+    for (Index i = 0; i < set1.m_buffer.getCount(); i++)
+        outRs.m_buffer[i] |= set1.m_buffer[i];
+    for (Index i = 0; i < set2.m_buffer.getCount(); i++)
+        outRs.m_buffer[i] |= set2.m_buffer[i];
 }
 
 /* static */void UIntSet::calcIntersection(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
-	outRs.m_buffer.setCount(minCount);
+    outRs.m_buffer.setCount(minCount);
 
-	for (Index i = 0; i < minCount; i++)
-		outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
+    for (Index i = 0; i < minCount; i++)
+        outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
 }
 
 /* static */void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-	outRs.m_buffer.setCount(set1.m_buffer.getCount());
+    outRs.m_buffer.setCount(set1.m_buffer.getCount());
 
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
-	for (Index i = 0; i < minCount; i++)
-		outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
+    for (Index i = 0; i < minCount; i++)
+        outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
 }
 
 /* static */bool UIntSet::hasIntersection(const UIntSet& set1, const UIntSet& set2)
