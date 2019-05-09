@@ -2,7 +2,7 @@
 #define CORE_LIB_DICTIONARY_H
 #include "list.h"
 #include "common.h"
-#include "int-set.h"
+#include "slang-uint-set.h"
 #include "exception.h"
 #include "slang-math.h"
 #include "hash.h"
@@ -81,7 +81,7 @@ namespace Slang
 	private:
 		int bucketSizeMinusOne;
 		int _count;
-		IntSet marks;
+		UIntSet marks;
 		KeyValuePair<TKey, TValue>* hashMap;
 		void Free()
 		{
@@ -180,7 +180,7 @@ namespace Slang
 				Dictionary<TKey, TValue> newDict;
 				newDict.bucketSizeMinusOne = newSize - 1;
 				newDict.hashMap = new KeyValuePair<TKey, TValue>[newSize];
-				newDict.marks.setMax(newSize * 2);
+				newDict.marks.resizeAndClear(newSize * 2);
 				if (hashMap)
 				{
 					for (auto & kvPair : *this)
