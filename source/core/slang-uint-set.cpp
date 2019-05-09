@@ -20,6 +20,7 @@ UIntSet& UIntSet::operator=(UIntSet&& other)
     m_buffer = _Move(other.m_buffer);
     return *this;
 }
+
 UIntSet& UIntSet::operator=(const UIntSet& other)
 {
     m_buffer = other.m_buffer;
@@ -42,19 +43,14 @@ void UIntSet::resizeAndClear(UInt val)
 
 void UIntSet::setAll()
 {
-    const auto count = m_buffer.getCount();
-    Element* dst = m_buffer.getBuffer();
-    for (Index i = 0; i < count; i++)
-    {
-        dst[i] = ~Element(0);
-    }
+    ::memset(m_buffer.getBuffer(), -1, m_buffer.getCount() * sizeof(Element));
 }
 
 void UIntSet::resize(UInt size)
 {
     const Index oldBufferSize = m_buffer.getCount();
     const Index newCount = Index((size + kElementMask) >> kElementShift);
-	m_buffer.setCount(newCount);
+    m_buffer.setCount(newCount);
 
     if (newCount > oldBufferSize)
     {
@@ -64,14 +60,9 @@ void UIntSet::resize(UInt size)
 
 void UIntSet::clear()
 {
-    const auto count = m_buffer.getCount();
-    Element* dst = m_buffer.getBuffer();
-
-    for (Index i = 0; i < count; i++)
-    {
-        dst[i] = 0;
-    }
+    ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
 }
+
 void UIntSet::clearAndDeallocate()
 {
     m_buffer.clearAndDeallocate();
