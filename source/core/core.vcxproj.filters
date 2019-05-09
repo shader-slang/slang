@@ -33,9 +33,6 @@
     <ClInclude Include="hash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="int-set.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -85,6 +82,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-test-tool-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-uint-set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-writer.h">
@@ -147,6 +147,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-test-tool-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-uint-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-writer.cpp">

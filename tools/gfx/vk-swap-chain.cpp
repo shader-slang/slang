@@ -11,7 +11,7 @@
 namespace gfx {
 using namespace Slang;
 
-static int _indexOf(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
+static Index _indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
 {
     const Index numFormats = formatsIn.getCount();
     const VkSurfaceFormatKHR* formats = formatsIn.getBuffer();
@@ -81,7 +81,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
     for(Index i = 0; i < formats.getCount(); ++i)
     {
         VkFormat format = formats[i];
-        if (_indexOf(surfaceFormats, format) >= 0)
+        if (_indexOfFormat(surfaceFormats, format) >= 0)
         {
             m_format =  format;
         }
