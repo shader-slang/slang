@@ -227,6 +227,8 @@ namespace Slang
             /// During propagation of an exception for an internal
             /// error, note that this source location was involved
         void noteInternalErrorLoc(SourceLoc const& loc);
+
+        SlangResult getBlobIfNeeded(ISlangBlob** outBlob);
     };
 
         /// An `ISlangWriter` that writes directly to a diagnostic sink.

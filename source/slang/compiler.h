@@ -133,31 +133,6 @@ namespace Slang
         ComPtr<ISlangBlob> blob;
     };
 
-        /// Collects information about existential type parameters and their arguments.
-    struct ExistentialTypeSlots
-    {
-            /// For each type parameter, holds the interface/existential type that constrains it.
-        List<RefPtr<Type>> paramTypes;
-
-            /// An argument for an existential type parameter.
-            ///
-            /// Comprises a concrete type and a witness for its conformance to the desired
-            /// interface/existential type for the corresponding parameter.
-            ///
-        struct Arg
-        {
-            RefPtr<Type>    type;
-            RefPtr<Val>     witness;
-        };
-
-            /// Any arguments provided for the existential type parameters.
-            ///
-            /// It is possible for `args` to be empty even if `paramTypes` is non-empty;
-            /// that situation represents an unspecialized program or entry point.
-            ///
-        List<Arg> args;
-    };
-
         /// Information collected about global or entry-point shader parameters
     struct ShaderParamInfo
     {
@@ -665,6 +640,12 @@ namespace Slang
 
         RefPtr<Expr> parseTypeString(String typeStr, RefPtr<Scope> scope);
 
+        Type* specializeType(
+            Type*           unspecializedType,
+            Int             argCount,
+            Type* const*    args,
+            DiagnosticSink* sink);
+
             /// Add a mew target amd return its index.
         UInt addTarget(
             CodeGenTarget   target);
@@ -754,6 +735,8 @@ namespace Slang
 
             /// Is the given module in the middle of being imported?
         bool isBeingImported(Module* module);
+
+        List<RefPtr<Type>> m_specializedTypes;
     };
 
         /// Shared functionality between front- and back-end compile requests.

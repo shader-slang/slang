@@ -127,7 +127,8 @@ static LegalVal declareVars(
     LegalVarChain const&        varChain,
     UnownedStringSlice          nameHint,
     IRInst*                     leafVar,
-    IRGlobalNameInfo*           globalNameInfo);
+    IRGlobalNameInfo*           globalNameInfo,
+    bool                        isSpecial);
 
     /// Unwrap a value with flavor `wrappedBuffer`
     ///
@@ -1266,9 +1267,10 @@ static LegalVal legalizeLocalVar(
     IRVar*                irLocalVar)
 {
     // Legalize the type for the variable's value
+    auto originalValueType = irLocalVar->getDataType()->getValueType();
     auto legalValueType = legalizeType(
         context,
-        irLocalVar->getDataType()->getValueType());
+        originalValueType);
 
     auto originalRate = irLocalVar->getRate();
 
@@ -1311,7 +1313,7 @@ static LegalVal legalizeLocalVar(
 
         UnownedStringSlice nameHint = findNameHint(irLocalVar);
         context->builder->setInsertBefore(irLocalVar);
-        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, irLocalVar, nullptr);
+        LegalVal newVal = declareVars(context, kIROp_Var, legalValueType, typeLayout, varChain, nameHint, irLocalVar, nullptr, context->isSpecialType(originalValueType));
 
         // Remove the old local var.
         irLocalVar->removeFromParent();
@@ -1345,7 +1347,7 @@ static LegalVal legalizeParam(
         UnownedStringSlice nameHint = findNameHint(originalParam);
 
         context->builder->setInsertBefore(originalParam);
-        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, originalParam, nullptr);
+        auto newVal = declareVars(context, kIROp_Param, legalParamType, nullptr, LegalVarChain(), nameHint, originalParam, nullptr, context->isSpecialType(originalParam->getDataType()));
 
         originalParam->removeFromParent();
         context->replacedInstructions.add(originalParam);
@@ -2219,12 +2221,31 @@ static LegalVal declareVars(
     IRTypeLegalizationContext*  context,
     IROp                        op,
     LegalType                   type,
-    TypeLayout*                 typeLayout,
-    LegalVarChain const&        varChain,
+    TypeLayout*                 inTypeLayout,
+    LegalVarChain const&        inVarChain,
     UnownedStringSlice          nameHint,
     IRInst*                     leafVar,
-    IRGlobalNameInfo*           globalNameInfo)
+    IRGlobalNameInfo*           globalNameInfo,
+    bool                        isSpecial)
 {
+    LegalVarChain varChain = inVarChain;
+    TypeLayout* typeLayout = inTypeLayout;
+    if( isSpecial )
+    {
+        if( varChain.pendingChain )
+        {
+            varChain.primaryChain = varChain.pendingChain;
+            varChain.pendingChain = nullptr;
+        }
+        if( typeLayout )
+        {
+            if( auto pendingTypeLayout = typeLayout->pendingDataTypeLayout )
+            {
+                typeLayout = pendingTypeLayout;
+            }
+        }
+    }
+
     switch (type.flavor)
     {
     case LegalType::Flavor::none:
@@ -2247,7 +2268,8 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo);
+                globalNameInfo,
+                isSpecial);
             return LegalVal::implicitDeref(val);
         }
         break;
@@ -2255,8 +2277,8 @@ static LegalVal declareVars(
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
-            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain, nameHint, leafVar, globalNameInfo);
-            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain, nameHint, leafVar, globalNameInfo);
+            auto ordinaryVal = declareVars(context, op, pairType->ordinaryType, typeLayout, varChain, nameHint, leafVar, globalNameInfo, false);
+            auto specialVal = declareVars(context, op, pairType->specialType, typeLayout, varChain, nameHint, leafVar, globalNameInfo, true);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
 
@@ -2305,7 +2327,8 @@ static LegalVal declareVars(
                     newVarChain,
                     fieldNameHint,
                     ee.key,
-                    globalNameInfo);
+                    globalNameInfo,
+                    true);
 
                 TuplePseudoVal::Element element;
                 element.key = ee.key;
@@ -2348,9 +2371,10 @@ static LegalVal legalizeGlobalVar(
     IRGlobalVar*                irGlobalVar)
 {
     // Legalize the type for the variable's value
+    auto originalValueType = irGlobalVar->getDataType()->getValueType();
     auto legalValueType = legalizeType(
         context,
-        irGlobalVar->getDataType()->getValueType());
+        originalValueType);
 
     switch (legalValueType.flavor)
     {
@@ -2373,7 +2397,7 @@ static LegalVal legalizeGlobalVar(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
             context->builder->setInsertBefore(irGlobalVar);
-            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalVar, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalVar, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalVar, &globalNameInfo, context->isSpecialType(originalValueType));
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalVar, newVal);
@@ -2417,7 +2441,7 @@ static LegalVal legalizeGlobalConstant(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalConstant);
             context->builder->setInsertBefore(irGlobalConstant);
-            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalConstant, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalConstant, &globalNameInfo, context->isSpecialType(irGlobalConstant->getDataType()));
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalConstant, newVal);
@@ -2466,7 +2490,7 @@ static LegalVal legalizeGlobalParam(
 
             UnownedStringSlice nameHint = findNameHint(irGlobalParam);
             context->builder->setInsertBefore(irGlobalParam);
-            LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, irGlobalParam, &globalNameInfo);
+            LegalVal newVal = declareVars(context, kIROp_GlobalParam, legalValueType, typeLayout, varChain, nameHint, irGlobalParam, &globalNameInfo, context->isSpecialType(irGlobalParam->getDataType()));
 
             // Register the new value as the replacement for the old
             registerLegalizedValue(context, irGlobalParam, newVal);

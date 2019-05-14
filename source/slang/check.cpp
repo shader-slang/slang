@@ -10763,6 +10763,41 @@ static bool doesParameterMatch(
         Slang::_specializeExistentialTypeParams(getLinkage(), m_globalExistentialSlots, args, sink);
     }
 
+    Type* Linkage::specializeType(
+        Type*           unspecializedType,
+        Int             argCount,
+        Type* const*    args,
+        DiagnosticSink* sink)
+    {
+        // TODO: We should cache and re-use specialized types
+        // when the exact same arguments are provided again later.
+
+        SemanticsVisitor visitor(this, sink);
+
+
+        ExistentialTypeSlots slots;
+        _collectExistentialTypeParamsRec(slots, unspecializedType);
+
+        assert(slots.paramTypes.getCount() == argCount);
+
+        for( Int aa = 0; aa < argCount; ++aa )
+        {
+            auto argType = args[aa];
+
+            ExistentialTypeSlots::Arg arg;
+            arg.type = argType;
+            arg.witness = visitor.tryGetSubtypeWitness(argType, slots.paramTypes[aa]);
+            slots.args.add(arg);
+        }
+
+        RefPtr<ExistentialSpecializedType> specializedType = new ExistentialSpecializedType();
+        specializedType->baseType = unspecializedType;
+        specializedType->slots = slots;
+
+        m_specializedTypes.add(specializedType);
+
+        return specializedType;
+    }
 
         /// Specialize a program to global generic arguments
     RefPtr<Program> createSpecializedProgram(

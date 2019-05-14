@@ -2757,7 +2757,109 @@ char const* getGLSLNameForImageFormat(ImageFormat format)
     }
 }
 
+//
+// ExistentialSpecializedType
+//
 
+String ExistentialSpecializedType::ToString()
+{
+    String result;
+    result.append("__ExistentialSpecializedType(");
+    result.append(baseType->ToString());
+    for( auto arg : slots.args )
+    {
+        result.append(", ");
+        result.append(arg.type->ToString());
+    }
+    result.append(")");
+    return result;
+}
 
+bool ExistentialSpecializedType::EqualsImpl(Type * type)
+{
+    auto other = as<ExistentialSpecializedType>(type);
+    if(!other)
+        return false;
+
+    if(!baseType->Equals(other->baseType))
+        return false;
+
+    auto argCount = slots.args.getCount();
+    if(argCount != other->slots.args.getCount())
+        return false;
+
+    for( Index ii = 0; ii < argCount; ++ii )
+    {
+        if(!slots.args[ii].type->Equals(other->slots.args[ii].type))
+            return false;
+
+        if(!slots.args[ii].witness->EqualsVal(other->slots.args[ii].witness))
+            return false;
+    }
+    return true;
+}
+
+int ExistentialSpecializedType::GetHashCode()
+{
+    Hasher hasher;
+    hasher.hashObject(baseType);
+    for(auto arg : slots.args)
+    {
+        hasher.hashObject(arg.type);
+        hasher.hashObject(arg.witness);
+    }
+    return hasher.getResult();
+}
+
+RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
+{
+    RefPtr<ExistentialSpecializedType> canType = new ExistentialSpecializedType();
+    canType->setSession(getSession());
+
+    canType->baseType = baseType->GetCanonicalType();
+    for( auto paramType : slots.paramTypes )
+    {
+        canType->slots.paramTypes.add( paramType->GetCanonicalType() );
+    }
+    for( auto arg : slots.args )
+    {
+        ExistentialTypeSlots::Arg canArg;
+        canArg.type = arg.type->GetCanonicalType();
+        canArg.witness = arg.witness;
+        canType->slots.args.add(canArg);
+    }
+    return canType;
+}
+
+RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substBaseType = baseType->SubstituteImpl(subst, &diff).as<Type>();
+
+    ExistentialTypeSlots substSlots;
+    for( auto paramType : slots.paramTypes )
+    {
+            substSlots.paramTypes.add( paramType->SubstituteImpl(subst, &diff).as<Type>() );
+    }
+    for( auto arg : slots.args )
+    {
+        ExistentialTypeSlots::Arg substArg;
+        substArg.type = arg.type->SubstituteImpl(subst, &diff).as<Type>();
+        substArg.witness = arg.witness->SubstituteImpl(subst, &diff);
+        substSlots.args.add(substArg);
+    }
+
+    if(!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    RefPtr<ExistentialSpecializedType> substType = new ExistentialSpecializedType();
+    substType->setSession(getSession());
+    substType->baseType = substBaseType;
+    substType->slots = substSlots;
+    return substType;
+}
 
 } // namespace Slang
