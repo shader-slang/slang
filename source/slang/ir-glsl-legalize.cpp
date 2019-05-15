@@ -353,6 +353,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if(semanticName == "sv_primitiveid")
     {
         name = "gl_PrimitiveID";
+
+        auto builder = context->getBuilder();
+        requiredType = builder->getBasicType(BaseType::Int);
     }
     else if (semanticName == "sv_rendertargetarrayindex")
     {
