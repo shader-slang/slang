@@ -347,6 +347,8 @@ struct MoveEntryPointUniformParametersToGlobalScope
             //
             param->removeAndDeallocate();
         }
+
+        fixUpFuncType(func);
     }
 
     // We need to be able to determine if a parameter is logically
