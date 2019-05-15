@@ -504,8 +504,11 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         // TODO: This doesn't seem to work correctly on it's own between hlsl/glsl
 
-        // On hlsl UINT related, "higher 16 bits for the right view, lower 16 bits for the left view."
-        // There is use in shader code as uint4 - not clear if that varies 
+        // Indeed on slang issue 109 claims this remains a problem  
+        // https://github.com/shader-slang/slang/issues/109
+
+        // On hlsl it's UINT related. "higher 16 bits for the right view, lower 16 bits for the left view."
+        // There is use in hlsl shader code as uint4 - not clear if that varies 
         // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nvx/GL_NVX_multiview_per_view_attributes.txt
         // On glsl its highp int gl_ViewportMaskPerViewNV[];
 
