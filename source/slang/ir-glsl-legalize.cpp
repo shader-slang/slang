@@ -467,11 +467,21 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_tessfactor")
     {
-        // TODO(JS): Adjust type does *not* handle the conversion correctly.
+        // TODO(JS): Adjust type does *not* handle the conversion correctly. More specifically a float array hlsl
+        // parameter goes through code to make SOA in createGLSLGlobalVaryingsImpl.  
+        // 
+        // Can be input and output.
+        // 
+        // https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sv-tessfactor
+        // "Tessellation factors must be declared as an array; they cannot be packed into a single vector."
+        //
         // float[2|3|4] in hlsl, float[4] on glsl (ie both are arrays but might be different size)
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessLevelOuter.xhtml
 
         name = "gl_TessLevelOuter";
+
+        // float[4] on glsl
+        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
     }
     else if (semanticName == "sv_vertexid")
     {
