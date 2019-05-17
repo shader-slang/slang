@@ -814,6 +814,20 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CSource:
+    {
+        // TODO(JS): This poses a difficult question. The layout will be dependent on the architecture
+        // of the target processor that the code is compiled to.
+        // 
+        // Presumably with C/C++ output the layout can be simpler in some cases because there aren't the
+        // limits and perhaps as so many special cases, and we can define how the binding will work that
+        // users must conform to (as opposed to having to conform to an existing APIs binding limitations)
+
+        return nullptr;
+    }
+
     default:
         return nullptr;
     }

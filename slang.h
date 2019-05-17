@@ -505,6 +505,8 @@ extern "C"
         SLANG_DXBC_ASM,
         SLANG_DXIL,
         SLANG_DXIL_ASM,
+        SLANG_C_SOURCE,             ///< The C language
+        SLANG_CPP_SOURCE,           ///< The C++ language
     };
 
     /* A "container format" describes the way that the outputs

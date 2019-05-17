@@ -7053,7 +7053,7 @@ String emitEntryPoint(
     sharedContext.entryPoint = entryPoint;
     sharedContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
 
-    if (entryPoint)
+    if (entryPoint && programLayout)
     {
         sharedContext.entryPointLayout = findEntryPointLayout(
             programLayout,
@@ -7065,7 +7065,8 @@ String emitEntryPoint(
     // Layout information for the global scope is either an ordinary
     // `struct` in the common case, or a constant buffer in the case
     // where there were global-scope uniforms.
-    StructTypeLayout* globalStructLayout = getGlobalStructLayout(programLayout);
+    
+    StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
     sharedContext.globalStructLayout = globalStructLayout;
 
     EmitContext context;

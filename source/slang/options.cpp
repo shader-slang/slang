@@ -360,6 +360,9 @@ struct OptionsParser
         CASE(".spv",        SPIRV);
         CASE(".spv.asm",    SPIRV_ASM);
 
+        CASE(".c",    C_SOURCE);
+        CASE(".cpp",   CPP_SOURCE);
+
 #undef CASE
 
         else if (path.endsWith(".slang-module"))
@@ -499,6 +502,8 @@ struct OptionsParser
                     CASE("dxil", DXIL)
                     CASE("dxil-assembly", DXIL_ASM)
                     CASE("dxil-asm", DXIL_ASM)
+                    CASE("c", C_SOURCE)
+                    CASE("cpp", CPP_SOURCE)
 
                 #undef CASE
                     /* else */
