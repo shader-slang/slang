@@ -231,6 +231,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
     // HLSL semantic types can be found here
     // https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dx-graphics-hlsl-semantics
+    /// NOTE! While there might be an "official" type for most of these in HLSL, in practice the user is allowed to declare almost anything
+    /// that the HLSL compiler can implicitly convert to/from the correct type
 
     auto builder = context->getBuilder();
     IRType* requiredType = nullptr;
@@ -267,6 +269,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         {
             name = "gl_Position";
         }
+
+        requiredType = builder->getVectorType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
     }
     else if(semanticName == "sv_target")
     {
@@ -286,6 +290,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_ClipDistance.xhtml
 
         name = "gl_ClipDistance";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_culldistance")
     {
@@ -296,6 +301,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         // TODO: type conversion is required here.
         name = "gl_CullDistance";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_coverage")
     {
@@ -315,6 +321,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // Float in hlsl & glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FragDepth.xhtml
         name = "gl_FragDepth";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_depthgreaterequal")
     {
@@ -322,6 +329,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         // Type is 'unknown' in hlsl 
         name = "gl_FragDepth";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_depthlessequal")
     {
@@ -329,6 +337,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         // 'unknown' in hlsl, float in glsl 
         name = "gl_FragDepth";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_dispatchthreadid")
     {
@@ -340,7 +349,6 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if(semanticName == "sv_domainlocation")
     {
-        // TODO: Not 100% confident that say float2 will convert into float3 glsl?
         // float2|3 in hlsl, vec3 in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessCoord.xhtml
 
@@ -360,6 +368,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         // uint in hlsl & in glsl
         name = "gl_LocalInvocationIndex";
+        requiredType = builder->getBasicType(BaseType::UInt);
     }
     else if(semanticName == "sv_groupthreadid")
     {
@@ -389,6 +398,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // bool in hlsl & glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FrontFacing.xhtml
         name = "gl_FrontFacing";
+        requiredType = builder->getBasicType(BaseType::Bool);
     }
     else if(semanticName == "sv_outputcontrolpointid")
     {
@@ -403,6 +413,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         // float in hlsl & glsl
         name = "gl_PointSize";
+        requiredType = builder->getBasicType(BaseType::Float);
     }
     else if(semanticName == "sv_primitiveid")
     {
@@ -456,7 +467,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_tessfactor")
     {
-        // TODO(JS): Need to ensure the adjustType can handle such a scenario. 
+        // TODO(JS): Adjust type does *not* handle the conversion correctly.
         // float[2|3|4] in hlsl, float[4] on glsl (ie both are arrays but might be different size)
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessLevelOuter.xhtml
 
