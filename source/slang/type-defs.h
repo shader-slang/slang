@@ -475,3 +475,16 @@ RAW(
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 )
 END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(ExistentialSpecializedType, Type)
+RAW(
+    RefPtr<Type> baseType;
+    ExistentialTypeSlots slots;
+
+    virtual String ToString() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+)
+END_SYNTAX_CLASS()

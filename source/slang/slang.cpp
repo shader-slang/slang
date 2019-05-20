@@ -567,6 +567,9 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
     return type;
 }
 
+
+
+
 CompileRequestBase::CompileRequestBase(
     Linkage*        linkage,
     DiagnosticSink* sink)
@@ -1443,6 +1446,22 @@ void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
     }
     internalErrorLocsNoted++;
 }
+
+SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
+{
+    // If the client doesn't want an output blob, there is nothing to do.
+    //
+    if(!outBlob) return SLANG_OK;
+
+    // If there were no errors, and there was no diagnostic output, there is nothing to do.
+    if(!GetErrorCount() && !outputBuffer.getLength()) return SLANG_OK;
+
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(outputBuffer);
+    *outBlob = blob.detach();
+
+    return SLANG_OK;
+}
+
 
 Session* CompileRequestBase::getSession()
 {

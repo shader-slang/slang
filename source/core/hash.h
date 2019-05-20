@@ -7,6 +7,8 @@
 
 namespace Slang
 {
+    typedef int HashCode;
+
 	inline int GetHashCode(double key)
 	{
 		return FloatAsInt((float)key);
@@ -120,6 +122,32 @@ namespace Slang
     {
         return (left * 16777619) ^ right;
     }
+
+    struct Hasher
+    {
+    public:
+        Hasher() {}
+
+        template<typename T>
+        void hashValue(T const& value)
+        {
+            m_hashCode = combineHash(m_hashCode, GetHashCode(value));
+        }
+
+        template<typename T>
+        void hashObject(T const& object)
+        {
+            m_hashCode = combineHash(m_hashCode, object->GetHashCode());
+        }
+
+        HashCode getResult() const
+        {
+            return m_hashCode;
+        }
+
+    private:
+        HashCode m_hashCode = 0;
+    };
 }
 
 #endif
