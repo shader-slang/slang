@@ -229,10 +229,18 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
     auto semanticName = semanticNameSpelling.toLower();
 
+    // HLSL semantic types can be found here
+    // https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dx-graphics-hlsl-semantics
+
+    auto builder = context->getBuilder();
     IRType* requiredType = nullptr;
 
     if(semanticName == "sv_position")
     {
+        // float4 in hlsl & glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FragCoord.xhtml
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_Position.xhtml
+
         // This semantic can either work like `gl_FragCoord`
         // when it is used as a fragment shader input, or
         // like `gl_Position` when used in other stages.
@@ -271,10 +279,19 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if(semanticName == "sv_clipdistance")
     {
         // TODO: type conversion is required here.
+
+        // float in hlsl & glsl.
+        // "Clip distance data. SV_ClipDistance values are each assumed to be a float32 signed distance to a plane."
+        // In glsl clipping value meaning is probably different
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_ClipDistance.xhtml
+
         name = "gl_ClipDistance";
     }
     else if(semanticName == "sv_culldistance")
     {
+        // float in hlsl & glsl.
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_CullDistance.xhtml
+
         context->requireGLSLExtension("ARB_cull_distance");
 
         // TODO: type conversion is required here.
@@ -285,80 +302,121 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // TODO: deal with `gl_SampleMaskIn` when used as an input.
 
         // TODO: type conversion is required here.
+
+        // uint in hlsl, int in glsl
+        // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_SampleMask.xml
+
+        requiredType = builder->getBasicType(BaseType::Int);
+
         name = "gl_SampleMask";
     }
     else if(semanticName == "sv_depth")
     {
+        // Float in hlsl & glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FragDepth.xhtml
         name = "gl_FragDepth";
     }
     else if(semanticName == "sv_depthgreaterequal")
     {
         // TODO: layout(depth_greater) out float gl_FragDepth;
+
+        // Type is 'unknown' in hlsl 
         name = "gl_FragDepth";
     }
     else if(semanticName == "sv_depthlessequal")
     {
         // TODO: layout(depth_greater) out float gl_FragDepth;
+
+        // 'unknown' in hlsl, float in glsl 
         name = "gl_FragDepth";
     }
     else if(semanticName == "sv_dispatchthreadid")
     {
+        // uint3 in hlsl, uvec3 in glsl
+        // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_GlobalInvocationID.xml
         name = "gl_GlobalInvocationID";
 
-        auto builder = context->getBuilder();
         requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_domainlocation")
     {
+        // TODO: Not 100% confident that say float2 will convert into float3 glsl?
+        // float2|3 in hlsl, vec3 in glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessCoord.xhtml
+
+        requiredType = builder->getVectorType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 3));
+
         name = "gl_TessCoord";
     }
     else if(semanticName == "sv_groupid")
     {
+        // uint3 in hlsl, uvec3 in glsl
+        // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_WorkGroupID.xml
         name = "gl_WorkGroupID";
 
-        auto builder = context->getBuilder();
         requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_groupindex")
     {
+        // uint in hlsl & in glsl
         name = "gl_LocalInvocationIndex";
     }
     else if(semanticName == "sv_groupthreadid")
     {
+        // uint3 in hlsl, uvec3 in glsl
         name = "gl_LocalInvocationID";
 
-        auto builder = context->getBuilder();
         requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
     }
     else if(semanticName == "sv_gsinstanceid")
     {
+        // uint in hlsl, int in glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_InvocationID.xhtml
+
+        requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_InvocationID";
     }
     else if(semanticName == "sv_instanceid")
     {
+        // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-input-assembler-stage-using#instanceid
+        // uint in hlsl, int in glsl 
+
+        requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_InstanceIndex";
     }
     else if(semanticName == "sv_isfrontface")
     {
+        // bool in hlsl & glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FrontFacing.xhtml
         name = "gl_FrontFacing";
     }
     else if(semanticName == "sv_outputcontrolpointid")
     {
+        // uint in hlsl, int in glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_InvocationID.xhtml
+
         name = "gl_InvocationID";
+
+        requiredType = builder->getBasicType(BaseType::Int);
     }
     else if (semanticName == "sv_pointsize")
     {
+        // float in hlsl & glsl
         name = "gl_PointSize";
     }
     else if(semanticName == "sv_primitiveid")
     {
+        // uint in hlsl, int in glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_PrimitiveID.xhtml
         name = "gl_PrimitiveID";
 
-        auto builder = context->getBuilder();
         requiredType = builder->getBasicType(BaseType::Int);
     }
     else if (semanticName == "sv_rendertargetarrayindex")
     {
+        // uint on hlsl, int on glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_Layer.xhtml
+
         switch (context->getStage())
         {
         case Stage::Geometry:
@@ -376,27 +434,46 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         }
 
         name = "gl_Layer";
-        requiredType = context->getBuilder()->getBasicType(BaseType::Int);
+        requiredType = builder->getBasicType(BaseType::Int);
     }
     else if (semanticName == "sv_sampleindex")
     {
+        // uint in hlsl, int in glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_SampleID.xhtml
+
+        requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_SampleID";
     }
     else if (semanticName == "sv_stencilref")
     {
+        // uint in hlsl, int in glsl
+        // https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_shader_stencil_export.txt
+
+        requiredType = builder->getBasicType(BaseType::Int);
+
         context->requireGLSLExtension("ARB_shader_stencil_export");
         name = "gl_FragStencilRef";
     }
     else if (semanticName == "sv_tessfactor")
     {
+        // TODO(JS): Need to ensure the adjustType can handle such a scenario. 
+        // float[2|3|4] in hlsl, float[4] on glsl (ie both are arrays but might be different size)
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessLevelOuter.xhtml
+
         name = "gl_TessLevelOuter";
     }
     else if (semanticName == "sv_vertexid")
     {
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_VertexIndex";
     }
     else if (semanticName == "sv_viewportarrayindex")
     {
+        // uint on hlsl, int on glsl
+        // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_ViewportIndex.xhtml
+
+        requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_ViewportIndex";
     }
     else if (semanticName == "nv_x_right")
@@ -425,6 +502,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "nv_viewport_mask")
     {
+        // TODO: This doesn't seem to work correctly on it's own between hlsl/glsl
+
+        // Indeed on slang issue 109 claims this remains a problem  
+        // https://github.com/shader-slang/slang/issues/109
+
+        // On hlsl it's UINT related. "higher 16 bits for the right view, lower 16 bits for the left view."
+        // There is use in hlsl shader code as uint4 - not clear if that varies 
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nvx/GL_NVX_multiview_per_view_attributes.txt
+        // On glsl its highp int gl_ViewportMaskPerViewNV[];
+
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
         context->requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
 
