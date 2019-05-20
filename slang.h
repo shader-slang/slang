@@ -1812,6 +1812,8 @@ extern "C"
 
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
+    SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* type);
+
     // Variable Reflection
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
@@ -1842,6 +1844,9 @@ extern "C"
     */
     SLANG_API SlangStage spReflectionVariableLayout_getStage(
         SlangReflectionVariableLayout* var);
+
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(SlangReflectionVariableLayout* var);
 
     // Shader Parameter Reflection
 
@@ -1896,6 +1901,14 @@ extern "C"
 
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
+
+    SLANG_API  SlangReflectionType* spReflection_specializeType(
+        SlangReflection*            reflection,
+        SlangReflectionType*        type,
+        SlangInt                    specializationArgCount,
+        SlangReflectionType* const* specializationArgs,
+        ISlangBlob**                outDiagnostics);
+
 
 #ifdef __cplusplus
 }
@@ -2232,6 +2245,13 @@ namespace slang
             return spReflectionTypeLayout_getGenericParamIndex(
                 (SlangReflectionTypeLayout*) this);
         }
+
+        TypeLayoutReflection* getPendingDataTypeLayout()
+        {
+            return (TypeLayoutReflection*) spReflectionTypeLayout_getPendingDataTypeLayout(
+                (SlangReflectionTypeLayout*) this);
+        }
+
     };
 
     struct Modifier
@@ -2349,6 +2369,11 @@ namespace slang
         SlangStage getStage()
         {
             return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*) this);
+        }
+
+        VariableLayoutReflection* getPendingDataLayout()
+        {
+            return (VariableLayoutReflection*) spReflectionVariableLayout_getPendingDataLayout((SlangReflectionVariableLayout*) this);
         }
     };
 
@@ -2486,6 +2511,20 @@ namespace slang
             return (EntryPointReflection*)spReflection_findEntryPointByName(
                 (SlangReflection*) this,
                 name);
+        }
+
+        TypeReflection* specializeType(
+            TypeReflection*         type,
+            SlangInt                specializationArgCount,
+            TypeReflection* const*  specializationArgs,
+            ISlangBlob**            outDiagnostics)
+        {
+            return (TypeReflection*) spReflection_specializeType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) type,
+                specializationArgCount,
+                (SlangReflectionType* const*) specializationArgs,
+                outDiagnostics);
         }
     };
 }
