@@ -1281,20 +1281,19 @@ namespace Slang
         }
     }
 
-    /// True if constants are equal
-    bool IRConstant::equal(IRConstant& rhs)
+    bool IRConstant::isValueEqual(IRConstant& rhs)
     {
         // If they are literally the same thing.. 
         if (this == &rhs)
         {
             return true;
         }
-        // Check the type and they are the same op
-        if (op != rhs.op || 
-           getFullType() != rhs.getFullType())
+        // Check the type and they are the same op & same type
+        if (op != rhs.op)
         {
             return false;
         }
+
         switch (op)
         {
             case kIROp_BoolLit:
@@ -1318,6 +1317,13 @@ namespace Slang
 
         SLANG_ASSERT(!"Unhandled type");
         return false;
+    }
+
+    /// True if constants are equal
+    bool IRConstant::equal(IRConstant& rhs)
+    {
+        // TODO(JS): Only equal if pointer types are identical (to match how getHashCode works below)
+        return isValueEqual(rhs) && getFullType() == rhs.getFullType();
     }
 
     int IRConstant::getHashCode()
@@ -3811,16 +3817,37 @@ namespace Slang
         return true;
     }
 
+    static bool _hasNominalEquality(IROp op)
+    {
+        // True if the type should be handled 'nominally' for equality
+        switch (op)
+        {
+            case kIROp_StructType:
+            case kIROp_InterfaceType:
+            case kIROp_Generic:
+            case kIROp_Param:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool _isNominallyEqual(IRInst* a, IRInst* b)
+    {
+        // Two instruction are nominally equal if their instruction pointer is equal
+        return a == b;
+    }
+
     // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set
     // if equality of nominal types is by names alone. 
     static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
     {
-#if 0
         if (a == b)
         {
             return true;
         }
-#endif
+
         if (a == nullptr || b == nullptr)
         {
             return false;
@@ -3837,7 +3864,11 @@ namespace Slang
         // If it's a constant...
         if (IRConstant::isaImpl(opA))
         {
-            return static_cast<IRConstant*>(a)->equal(*static_cast<IRConstant*>(b));
+            // TODO: This is contrived in that we want two types that are the same, but are different
+            // pointers to match here.
+            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
+            return static_cast<IRConstant*>(a)->isValueEqual(*static_cast<IRConstant*>(b)) &&
+                isTypeEqual(a->getFullType(), b->getFullType());
         }
 
         // If it's a type
@@ -3846,54 +3877,25 @@ namespace Slang
             return isTypeEqual(static_cast<IRType*>(a), static_cast<IRType*>(b));
         }
 
-        // IRParam
-        if (IRParam::isaImpl(opA))
+        if (_hasNominalEquality(opA))
         {
-            auto paramA = static_cast<IRParam*>(a);
-            auto paramB = static_cast<IRParam*>(b);
-
-            // Could this be recursive? 
-            IRType* paramTypeA = paramA->getFullType();
-            IRType* paramTypeB = paramB->getFullType();
-
-            if (!isTypeEqual(paramTypeA, paramTypeB))
-            {
-                return false;
-            }
-
-
-            return _areTypeOperandsEqual(paramA, paramB);
+            return _isNominallyEqual(a, b);
         }
 
-        
         SLANG_ASSERT(!"Unhandled comparison");
 
         // We can't equate any other type..
         return false;
     }
 
-    bool _isNamedType(IROp op)
-    {
-        switch (op)
-        {
-            case kIROp_StructType:
-            case kIROp_InterfaceType:
-            case kIROp_TaggedUnionType:
-            {
-                return true;
-            }
-        }
-        return false;
-    }
 
     bool isTypeEqual(IRType* a, IRType* b)
     {
-#if 0
         if (a == b)
         {
             return true;
         }
-#endif
+
         if (a == nullptr || b == nullptr)
         {
             return false;
@@ -3917,30 +3919,13 @@ namespace Slang
         // 
         // We may want to care about decorations.
         //
-        // If the types are both nominal we just compare by name
+
+        if (_hasNominalEquality(opA))
         {
-            auto nameHintDecorationA = a->findDecoration<IRNameHintDecoration>();
-            auto nameHintDecorationB = b->findDecoration<IRNameHintDecoration>();
-
-            if (nameHintDecorationA && nameHintDecorationB)
-            {
-                const auto nameA = nameHintDecorationA->getNameOperand();
-                const auto nameB = nameHintDecorationB->getNameOperand();
-
-                return nameA->equal(*nameB);
-            }
-        }
-
-
-        // TODO(JS): I'm assuming for an anonymous type, it does have name when in IR form
-        if (_isNamedType(opA))
-        {
-            SLANG_ASSERT(!"Didn't have name set, so couldn't compare");
-            return false;
+            return _isNominallyEqual(a, b);
         }
 
         // IRTextureType contains IRParam
-
         // If it's a resource type - handle the resource flavor 
         if (IRResourceTypeBase::isaImpl(opA))
         {
@@ -3958,15 +3943,12 @@ namespace Slang
             return false;
         }
 
-        // TODO(JS): There is a question here about what to do about decorations. For now we ignore decorations (other than for nominal types)
-        // Are two types potentially different if there decorations different?
+        // TODO(JS): There is a question here about what to do about decorations.
+        // For now we ignore decorations. Are two types potentially different if there decorations different?
         // If decorations play a part in difference in types - the order of decorations presumably is not important.
 
-        // Not totally clear what to do about IRBindExistentialsType - does it need to specially handled
-        
         return true;
     }
-
 
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {

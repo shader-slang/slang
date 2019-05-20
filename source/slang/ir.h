@@ -547,6 +547,10 @@ struct IRConstant : IRInst
 
         /// True if constants are equal
     bool equal(IRConstant& rhs);
+        /// True if the value is equal.
+        /// Does *NOT* compare if the type is equal. 
+    bool isValueEqual(IRConstant& rhs);
+
         /// Get the hash 
     int getHashCode();
 

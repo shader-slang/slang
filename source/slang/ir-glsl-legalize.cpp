@@ -658,7 +658,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // the actual type of the GLSL global.
             auto toType = inType;
 
-            if( fromType != toType )
+            if( !isTypeEqual(fromType, toType ))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
                 typeAdapter->actualType = systemValueInfo->requiredType;
