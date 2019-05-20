@@ -7280,6 +7280,28 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
+
+        {
+            List<IRInst*> insts;
+            findAllInstsBreadthFirst(irModule->getModuleInst(), insts);
+
+            for (auto inst : insts)
+            {
+                IRType* type = inst->getFullType();
+
+                if (type)
+                {
+                    SLANG_ASSERT(isTypeEqual(type, type));
+                }
+
+                type = dynamicCast<IRType>(inst);
+                if (type)
+                {
+                    SLANG_ASSERT(isTypeEqual(type, type));
+                }
+            }
+        }
+
         // For GLSL only, we will need to perform "legalization" of
         // the entry point and any entry-point parameters.
         //

@@ -3784,9 +3784,207 @@ namespace Slang
         writer->flush();
     }
 
-    //
-    //
-    //
+    // Pre-declare
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b);
+
+    static bool _areTypeOperandsEqual(IRInst* a, IRInst* b)
+    {
+        // Must have same number of operands
+        const auto operandCountA = Index(a->getOperandCount());
+        if (operandCountA != Index(b->getOperandCount()))
+        {
+            return false;
+        }
+
+        // All the operands must be equal
+        for (Index i = 0; i < operandCountA; ++i)
+        {
+            IRInst* operandA = a->getOperand(i);
+            IRInst* operandB = b->getOperand(i);
+
+            if (!_isTypeOperandEqual(operandA, operandB))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set
+    // if equality of nominal types is by names alone. 
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
+    {
+#if 0
+        if (a == b)
+        {
+            return true;
+        }
+#endif
+        if (a == nullptr || b == nullptr)
+        {
+            return false;
+        }
+
+        IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+
+        if (opA != opB)
+        {
+            return false;
+        }
+
+        // If it's a constant...
+        if (IRConstant::isaImpl(opA))
+        {
+            return static_cast<IRConstant*>(a)->equal(*static_cast<IRConstant*>(b));
+        }
+
+        // If it's a type
+        if (IRType::isaImpl(opA))
+        {
+            return isTypeEqual(static_cast<IRType*>(a), static_cast<IRType*>(b));
+        }
+
+        // IRParam
+        if (IRParam::isaImpl(opA))
+        {
+            auto paramA = static_cast<IRParam*>(a);
+            auto paramB = static_cast<IRParam*>(b);
+
+            // Could this be recursive? 
+            IRType* paramTypeA = paramA->getFullType();
+            IRType* paramTypeB = paramB->getFullType();
+
+            if (!isTypeEqual(paramTypeA, paramTypeB))
+            {
+                return false;
+            }
+
+
+            return _areTypeOperandsEqual(paramA, paramB);
+        }
+
+        
+        SLANG_ASSERT(!"Unhandled comparison");
+
+        // We can't equate any other type..
+        return false;
+    }
+
+    bool _isNamedType(IROp op)
+    {
+        switch (op)
+        {
+            case kIROp_StructType:
+            case kIROp_InterfaceType:
+            case kIROp_TaggedUnionType:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isTypeEqual(IRType* a, IRType* b)
+    {
+#if 0
+        if (a == b)
+        {
+            return true;
+        }
+#endif
+        if (a == nullptr || b == nullptr)
+        {
+            return false;
+        }
+
+        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+        if (opA != opB)
+        {
+            return false;
+        }
+
+        if (IRBasicType::isaImpl(opA))
+        {
+            // If it's a basic type, then their op being the same means we are done
+            return true;
+        }
+
+        // We don't care about the parent or positioning
+        // We also don't care about 'type' - because these instructions are defining the type.
+        // 
+        // We may want to care about decorations.
+        //
+        // If the types are both nominal we just compare by name
+        {
+            auto nameHintDecorationA = a->findDecoration<IRNameHintDecoration>();
+            auto nameHintDecorationB = b->findDecoration<IRNameHintDecoration>();
+
+            if (nameHintDecorationA && nameHintDecorationB)
+            {
+                const auto nameA = nameHintDecorationA->getNameOperand();
+                const auto nameB = nameHintDecorationB->getNameOperand();
+
+                return nameA->equal(*nameB);
+            }
+        }
+
+
+        // TODO(JS): I'm assuming for an anonymous type, it does have name when in IR form
+        if (_isNamedType(opA))
+        {
+            SLANG_ASSERT(!"Didn't have name set, so couldn't compare");
+            return false;
+        }
+
+        // IRTextureType contains IRParam
+
+        // If it's a resource type - handle the resource flavor 
+        if (IRResourceTypeBase::isaImpl(opA))
+        {
+            auto resourceA = static_cast<const IRResourceTypeBase*>(a);
+            auto resourceB = static_cast<const IRResourceTypeBase*>(b);
+
+            if (resourceA->getFlavor() != resourceB->getFlavor())
+            {
+                return false;
+            }
+        }
+
+        if (!_areTypeOperandsEqual(a, b))
+        {
+            return false;
+        }
+
+        // TODO(JS): There is a question here about what to do about decorations. For now we ignore decorations (other than for nominal types)
+        // Are two types potentially different if there decorations different?
+        // If decorations play a part in difference in types - the order of decorations presumably is not important.
+
+        // Not totally clear what to do about IRBindExistentialsType - does it need to specially handled
+        
+        return true;
+    }
+
+
+    void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
+    {
+        Index index = outInsts.getCount();
+
+        outInsts.add(inst);
+
+        while (index < outInsts.getCount())
+        {
+            IRInst* cur = outInsts[index++];
+
+            IRInstListBase childrenList = cur->getDecorationsAndChildren();
+            for (IRInst* child : childrenList)
+            {
+                outInsts.add(child);
+            }
+        }
+    }
 
     IRDecoration* IRInst::getFirstDecoration()
     {

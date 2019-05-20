@@ -504,6 +504,13 @@ struct IRBoolType : IRBasicType
 
 SIMPLE_IR_TYPE(StringType, Type)
 
+
+// True if types are equal
+// Note compares nominal types by name alone 
+bool isTypeEqual(IRType* a, IRType* b);
+
+void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
+
 // Constant Instructions
 
 typedef int64_t IRIntegerValue;
