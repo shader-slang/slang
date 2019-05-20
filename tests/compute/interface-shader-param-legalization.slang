@@ -7,15 +7,15 @@
 
 interface IModifier
 {
-	int modify(int val);
+    int modify(int val);
 }
 
 IModifier gModifier;
 
 int test(
-	int val)
+    int val)
 {
-	return gModifier.modify(val);
+    return gModifier.modify(val);
 }
 
 
@@ -40,14 +40,14 @@ void computeMain(
 
 struct ConcreteData
 {
-	int offset;
+    int offset;
 }
 
 struct ConcreteModifier : IModifier
 {
     ConstantBuffer<ConcreteData> data;
 
-	int modify(int val) { return val + data.offset; }
+    int modify(int val) { return val + data.offset; }
 }
 
 //TEST_INPUT: globalExistentialType ConcreteModifier

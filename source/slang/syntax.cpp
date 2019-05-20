@@ -2840,7 +2840,7 @@ RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, in
     ExistentialTypeSlots substSlots;
     for( auto paramType : slots.paramTypes )
     {
-            substSlots.paramTypes.add( paramType->SubstituteImpl(subst, &diff).as<Type>() );
+        substSlots.paramTypes.add( paramType->SubstituteImpl(subst, &diff).as<Type>() );
     }
     for( auto arg : slots.args )
     {
