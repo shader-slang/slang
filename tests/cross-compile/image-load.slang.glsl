@@ -1,4 +1,5 @@
 // image-load.slang.glsl
+//TEST_IGNORE_FILE:
 
 #version 450
 
@@ -12,11 +13,11 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 void main()
 {
-    uvec3 _S1 = uvec3(gl_GlobalInvocationID);
-
-    float _S2 = imageLoad(
+    float _S1 = imageLoad(
     	gParams_tex_0,
-    	ivec3(ivec2(_S1.xy), int(_S1.z))).x;
+    	ivec3(
+    		ivec2(gl_GlobalInvocationID.xy),
+    		int(gl_GlobalInvocationID.z))).x;
 
     return;
 }
