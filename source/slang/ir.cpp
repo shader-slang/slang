@@ -636,6 +636,33 @@ namespace Slang
         block->insertAtEnd(this);
     }
 
+    void fixUpFuncType(IRFunc* func)
+    {
+        SLANG_ASSERT(func);
+
+        auto irModule = func->getModule();
+        SLANG_ASSERT(irModule);
+
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.module = irModule;
+
+        IRBuilder builder;
+        builder.sharedBuilder = &sharedBuilder;
+
+        builder.setInsertBefore(func);
+
+        List<IRType*> paramTypes;
+        for(auto param : func->getParams())
+        {
+            paramTypes.add(param->getFullType());
+        }
+
+        auto resultType = func->getResultType();
+
+        auto funcType = builder.getFuncType(paramTypes, resultType);
+        builder.setDataType(func, funcType);
+    }
+
     //
 
     bool isTerminatorInst(IROp op)
@@ -1834,6 +1861,9 @@ namespace Slang
         UInt            slotArgCount,
         IRInst* const*  slotArgs)
     {
+        if(slotArgCount == 0)
+            return (IRType*) baseType;
+
         // If we are trying to bind an interface type, then
         // we will go ahead and simplify the instruction
         // away impmediately.
@@ -1865,6 +1895,9 @@ namespace Slang
         UInt            slotArgCount,
         IRUse const*    slotArgUses)
     {
+        if(slotArgCount == 0)
+            return (IRType*) baseType;
+
         List<IRInst*> slotArgs;
         for( UInt ii = 0; ii < slotArgCount; ++ii )
         {
@@ -2097,6 +2130,9 @@ namespace Slang
         UInt            slotArgCount,
         IRInst* const*  slotArgs)
     {
+        if(slotArgCount == 0)
+            return value;
+
         // If we are wrapping a single concrete value into
         // an interface type, then this is really a `makeExistential`
         //
@@ -4158,13 +4194,14 @@ namespace Slang
     void IRInst::insertAfter(IRInst* other)
     {
         SLANG_ASSERT(other);
-
+        removeFromParent();
         _insertAt(other, other->getNextInst(), other->getParent());
     }
 
     void IRInst::insertAtEnd(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
+        removeFromParent();
         _insertAt(newParent->getLastDecorationOrChild(), nullptr, newParent);
     }
 

@@ -1086,6 +1086,9 @@ struct IRFunc : IRGlobalValueWithParams
     IR_LEAF_ISA(Func)
 };
 
+    /// Adjust the type of an IR function based on its parameter list.
+void fixUpFuncType(IRFunc* func);
+
 // A generic is akin to a function, but is conceptually executed
 // before runtime, to specialize the code nested within.
 //
