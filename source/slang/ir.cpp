@@ -1308,20 +1308,19 @@ namespace Slang
         }
     }
 
-    /// True if constants are equal
-    bool IRConstant::equal(IRConstant& rhs)
+    bool IRConstant::isValueEqual(IRConstant& rhs)
     {
         // If they are literally the same thing.. 
         if (this == &rhs)
         {
             return true;
         }
-        // Check the type and they are the same op
-        if (op != rhs.op || 
-           getFullType() != rhs.getFullType())
+        // Check the type and they are the same op & same type
+        if (op != rhs.op)
         {
             return false;
         }
+
         switch (op)
         {
             case kIROp_BoolLit:
@@ -1345,6 +1344,13 @@ namespace Slang
 
         SLANG_ASSERT(!"Unhandled type");
         return false;
+    }
+
+    /// True if constants are equal
+    bool IRConstant::equal(IRConstant& rhs)
+    {
+        // TODO(JS): Only equal if pointer types are identical (to match how getHashCode works below)
+        return isValueEqual(rhs) && getFullType() == rhs.getFullType();
     }
 
     int IRConstant::getHashCode()
@@ -3820,9 +3826,183 @@ namespace Slang
         writer->flush();
     }
 
-    //
-    //
-    //
+    // Pre-declare
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b);
+
+    static bool _areTypeOperandsEqual(IRInst* a, IRInst* b)
+    {
+        // Must have same number of operands
+        const auto operandCountA = Index(a->getOperandCount());
+        if (operandCountA != Index(b->getOperandCount()))
+        {
+            return false;
+        }
+
+        // All the operands must be equal
+        for (Index i = 0; i < operandCountA; ++i)
+        {
+            IRInst* operandA = a->getOperand(i);
+            IRInst* operandB = b->getOperand(i);
+
+            if (!_isTypeOperandEqual(operandA, operandB))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static bool _hasNominalEquality(IROp op)
+    {
+        // True if the type should be handled 'nominally' for equality
+        switch (op)
+        {
+            case kIROp_StructType:
+            case kIROp_InterfaceType:
+            case kIROp_Generic:
+            case kIROp_Param:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool _isNominallyEqual(IRInst* a, IRInst* b)
+    {
+        // Two instruction are nominally equal if their instruction pointer is equal
+        return a == b;
+    }
+
+    // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set
+    // if equality of nominal types is by names alone. 
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        if (a == nullptr || b == nullptr)
+        {
+            return false;
+        }
+
+        IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+
+        if (opA != opB)
+        {
+            return false;
+        }
+
+        // If it's a constant...
+        if (IRConstant::isaImpl(opA))
+        {
+            // TODO: This is contrived in that we want two types that are the same, but are different
+            // pointers to match here.
+            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
+            return static_cast<IRConstant*>(a)->isValueEqual(*static_cast<IRConstant*>(b)) &&
+                isTypeEqual(a->getFullType(), b->getFullType());
+        }
+
+        // If it's a type
+        if (IRType::isaImpl(opA))
+        {
+            return isTypeEqual(static_cast<IRType*>(a), static_cast<IRType*>(b));
+        }
+
+        if (_hasNominalEquality(opA))
+        {
+            return _isNominallyEqual(a, b);
+        }
+
+        SLANG_ASSERT(!"Unhandled comparison");
+
+        // We can't equate any other type..
+        return false;
+    }
+
+
+    bool isTypeEqual(IRType* a, IRType* b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        if (a == nullptr || b == nullptr)
+        {
+            return false;
+        }
+
+        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+        if (opA != opB)
+        {
+            return false;
+        }
+
+        if (IRBasicType::isaImpl(opA))
+        {
+            // If it's a basic type, then their op being the same means we are done
+            return true;
+        }
+
+        // We don't care about the parent or positioning
+        // We also don't care about 'type' - because these instructions are defining the type.
+        // 
+        // We may want to care about decorations.
+        //
+
+        if (_hasNominalEquality(opA))
+        {
+            return _isNominallyEqual(a, b);
+        }
+
+        // IRTextureType contains IRParam
+        // If it's a resource type - handle the resource flavor 
+        if (IRResourceTypeBase::isaImpl(opA))
+        {
+            auto resourceA = static_cast<const IRResourceTypeBase*>(a);
+            auto resourceB = static_cast<const IRResourceTypeBase*>(b);
+
+            if (resourceA->getFlavor() != resourceB->getFlavor())
+            {
+                return false;
+            }
+        }
+
+        if (!_areTypeOperandsEqual(a, b))
+        {
+            return false;
+        }
+
+        // TODO(JS): There is a question here about what to do about decorations.
+        // For now we ignore decorations. Are two types potentially different if there decorations different?
+        // If decorations play a part in difference in types - the order of decorations presumably is not important.
+
+        return true;
+    }
+
+    void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
+    {
+        Index index = outInsts.getCount();
+
+        outInsts.add(inst);
+
+        while (index < outInsts.getCount())
+        {
+            IRInst* cur = outInsts[index++];
+
+            IRInstListBase childrenList = cur->getDecorationsAndChildren();
+            for (IRInst* child : childrenList)
+            {
+                outInsts.add(child);
+            }
+        }
+    }
 
     IRDecoration* IRInst::getFirstDecoration()
     {
