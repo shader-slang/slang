@@ -1453,7 +1453,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
     sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, int($1))$z\") get;\n";
 
-    if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
+    if (access != SLANG_RESOURCE_ACCESS_READ)
     {
         sb << "ref;\n";
     }
