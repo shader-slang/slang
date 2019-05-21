@@ -3,41 +3,41 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 <Type Name="Slang::String">
-    <DisplayString>{((char*) (buffer.pointer+1)),s}</DisplayString>
-	<StringView>((char*) (buffer.pointer+1)),s</StringView>
+    <DisplayString>{((char*) (m_buffer.pointer+1)),s}</DisplayString>
+	<StringView>((char*) (m_buffer.pointer+1)),s</StringView>
 </Type>
 
 <Type Name="Slang::ArrayView&lt;*&gt;">
-  <DisplayString>{{ size={_count} }}</DisplayString>
+  <DisplayString>{{ size={m_count} }}</DisplayString>
   <Expand>
-    <Item Name="[size]">_count</Item>
+    <Item Name="[size]">m_count</Item>
     <ArrayItems>
-      <Size>_count</Size>
-      <ValuePointer>_buffer</ValuePointer>
+      <Size>m_count</Size>
+      <ValuePointer>m_buffer</ValuePointer>
     </ArrayItems>
   </Expand>
 </Type>
 
 <Type Name="Slang::List&lt;*&gt;">
-    <DisplayString>{{ size={_count} }}</DisplayString>
+    <DisplayString>{{ size={m_count} }}</DisplayString>
     <Expand>
-        <Item Name="[size]">_count</Item>
-        <Item Name="[capacity]">bufferSize</Item>
+        <Item Name="[size]">m_count</Item>
+        <Item Name="[capacity]">m_capacity</Item>
         <ArrayItems>
-            <Size>_count</Size>
-            <ValuePointer>buffer</ValuePointer>
+            <Size>m_count</Size>
+            <ValuePointer>m_buffer</ValuePointer>
         </ArrayItems>
     </Expand>
 </Type>
 
 
 <Type Name="Slang::Array&lt;*,*&gt;">
-  <DisplayString>{{ size={_count} }}</DisplayString>
+  <DisplayString>{{ size={m_count} }}</DisplayString>
   <Expand>
-    <Item Name="[size]">_count</Item>
+    <Item Name="[size]">m_count</Item>
     <ArrayItems>
-      <Size>_count</Size>
-      <ValuePointer>_buffer</ValuePointer>
+      <Size>m_count</Size>
+      <ValuePointer>m_buffer</ValuePointer>
     </ArrayItems>
   </Expand>
 </Type>
