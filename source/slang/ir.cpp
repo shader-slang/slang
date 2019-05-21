@@ -3867,14 +3867,43 @@ namespace Slang
             return false;
         }
 
-        IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
-        IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
 
         if (opA != opB)
         {
             return false;
         }
 
+        // Both are types
+        if (IRType::isaImpl(opA))
+        {
+            if (IRBasicType::isaImpl(opA))
+            {
+                // If it's a basic type, then their op being the same means we are done
+                return true;
+            }
+
+            // We don't care about the parent or positioning
+            // We also don't care about 'type' - because these instructions are defining the type.
+            // 
+            // We may want to care about decorations.
+
+            // If it's a resource type - special case the handling of the resource flavor 
+            if (IRResourceTypeBase::isaImpl(opA) &&
+                static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
+            {
+                return false;
+            }
+
+            // TODO(JS): There is a question here about what to do about decorations.
+            // For now we ignore decorations. Are two types potentially different if there decorations different?
+            // If decorations play a part in difference in types - the order of decorations presumably is not important.
+
+            // All the operands of the types must be equal
+            return _areTypeOperandsEqual(a, b);
+        }
+       
         // If it's a constant...
         if (IRConstant::isaImpl(opA))
         {
@@ -3885,73 +3914,18 @@ namespace Slang
                 isTypeEqual(a->getFullType(), b->getFullType());
         }
 
-        // If it's a type
-        if (IRType::isaImpl(opA))
-        {
-            return isTypeEqual(static_cast<IRType*>(a), static_cast<IRType*>(b));
-        }
-
         SLANG_ASSERT(!"Unhandled comparison");
 
         // We can't equate any other type..
         return false;
     }
 
-
     bool isTypeEqual(IRType* a, IRType* b)
     {
-        // If pointers are the same then the types must be the same. 
-        // Note that 'nominal' types (like say IRStruct) are equal if and only if their pointers are equal,
-        // so do not need a special test
-        if (a == b)
-        {
-            return true;
-        }
-
-        if (a == nullptr || b == nullptr)
-        {
-            return false;
-        }
-
-        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
-        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
-        if (opA != opB)
-        {
-            return false;
-        }
-
-        if (IRBasicType::isaImpl(opA))
-        {
-            // If it's a basic type, then their op being the same means we are done
-            return true;
-        }
-
-        // We don't care about the parent or positioning
-        // We also don't care about 'type' - because these instructions are defining the type.
-        // 
-        // We may want to care about decorations.
-       
-        // If it's a resource type - special case the handling of the resource flavor 
-        if (IRResourceTypeBase::isaImpl(opA))
-        {
-            if (static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
-            {
-                return false;
-            }
-        }
-
-        if (!_areTypeOperandsEqual(a, b))
-        {
-            return false;
-        }
-
-        // TODO(JS): There is a question here about what to do about decorations.
-        // For now we ignore decorations. Are two types potentially different if there decorations different?
-        // If decorations play a part in difference in types - the order of decorations presumably is not important.
-
-        return true;
+        // _isTypeOperandEqual handles comparison of types so can defer to it
+        return _isTypeOperandEqual(a, b);
     }
-
+     
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();
