@@ -3853,6 +3853,22 @@ namespace Slang
         return true;
     }
 
+    static bool _isNominalOp(IROp op)
+    {
+        // True if the op identity is 'nominal'
+        switch (op)
+        {
+            case kIROp_StructType:
+            case kIROp_InterfaceType:
+            case kIROp_Generic:
+            case kIROp_Param:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set that
     // can be operands of IRType instructions
     static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
@@ -3872,6 +3888,13 @@ namespace Slang
 
         if (opA != opB)
         {
+            return false;
+        }
+
+        // If the type is nominal - it can only be the same if the pointer is the same.
+        if (_isNominalOp(opA))
+        {
+            // The pointer isn't the same (as that was already tested), so cannot be equal
             return false;
         }
 
