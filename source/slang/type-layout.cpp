@@ -2986,7 +2986,7 @@ static TypeLayoutResult _createTypeLayout(
                 }
                 else
                 {
-                    if(auto primaryResInfo = baseTypeLayoutResult.layout->FindResourceInfo(pendingResInfo.kind))
+                    if(auto primaryResInfo = baseTypeLayoutResult.layout->FindResourceInfo(kind))
                         index = primaryResInfo->count.getFiniteValue();
                 }
                 pendingDataVarLayout->AddResourceInfo(kind)->index = index;
