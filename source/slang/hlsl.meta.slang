@@ -1429,7 +1429,8 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
-    auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, kBaseBufferAccessLevels[aa].access).flavor;
+    auto access = kBaseBufferAccessLevels[aa].access;
+    auto flavor = TextureFlavor::create(TextureFlavor::Shape::ShapeBuffer, access).flavor;
     sb << "__generic<T>\n";
     sb << "__magic_type(Texture," << int(flavor) << ")\n";
     sb << "__intrinsic_type(" << (kIROp_TextureType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
@@ -1439,8 +1440,10 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "void GetDimensions(out uint dim);\n";
 
+    char const* glslLoadFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetch" : "imageLoad";
+
     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-    sb << "__target_intrinsic(glsl, \"texelFetch($0, $1)$z\")\n";
+    sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, $1)$z\")\n";
     sb << "T Load(int location);\n";
 
     sb << "T Load(int location, out uint status);\n";
@@ -1448,9 +1451,9 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     sb << "__subscript(uint index) -> T {\n";
 
     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-    sb << "__target_intrinsic(glsl, \"texelFetch($0, int($1))$z\") get;\n";
+    sb << "__target_intrinsic(glsl, \"" << glslLoadFuncName << "($0, int($1))$z\") get;\n";
 
-    if (kBaseBufferAccessLevels[aa].access != SLANG_RESOURCE_ACCESS_READ)
+    if (access != SLANG_RESOURCE_ACCESS_READ)
     {
         sb << "ref;\n";
     }

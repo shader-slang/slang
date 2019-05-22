@@ -687,6 +687,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 int loadCoordCount = kBaseTextureTypes[tt].coordCount + isArray + (needsMipLevel?1:0);
 
+                char const* glslFuncName = (access == SLANG_RESOURCE_ACCESS_READ) ? "texelFetch" : "imageLoad";
+
                 // When translating to GLSL, we need to break apart the `location` argument.
                 //
                 // TODO: this should realy be handled by having this member actually get lowered!
@@ -703,19 +705,19 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, $1, $3)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $1, $3)$z\")\n";
                 }
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, ";
+                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, ";
                     if( needsMipLevel )
                     {
                         sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
                     }
                     else
                     {
-                        sb << "$1, 0";
+                        sb << "$1";
                     }
                     sb << ")$z\")\n";
                 }
@@ -730,12 +732,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetchOffset($0, $0, $1, $2)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $0, $1, $2)$z\")\n";
                 }
                 else
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, ";
+                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, ";
                     if( needsMipLevel )
                     {
                         sb << "($1)." << kGLSLLoadCoordsSwizzle[loadCoordCount] << ", ($1)." << kGLSLLoadLODSwizzle[loadCoordCount];
