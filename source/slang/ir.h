@@ -546,10 +546,10 @@ struct IRConstant : IRInst
     UnownedStringSlice getStringSlice();
 
         /// True if constants are equal
-    bool equal(IRConstant& rhs);
+    bool equal(IRConstant* rhs);
         /// True if the value is equal.
         /// Does *NOT* compare if the type is equal. 
-    bool isValueEqual(IRConstant& rhs);
+    bool isValueEqual(IRConstant* rhs);
 
         /// Get the hash 
     int getHashCode();

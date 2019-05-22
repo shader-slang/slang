@@ -234,9 +234,13 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
                     // where a multi-byte sequence might encode
                     // the line break.
 
-                    int d = *cursor;
-                    if ((c^d) == ('\r' ^ '\n'))
-                        cursor++;
+                    // Check to make sure that the EOF hasn't been reached.
+                    if (cursor != end)
+                    {
+                        int d = *cursor;
+                        if ((c ^ d) == ('\r' ^ '\n'))
+                            cursor++;
+                    }
 
                     m_lineBreakOffsets.add(uint32_t(cursor - begin));
                     break;
