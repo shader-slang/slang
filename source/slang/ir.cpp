@@ -1308,15 +1308,15 @@ namespace Slang
         }
     }
 
-    bool IRConstant::isValueEqual(IRConstant& rhs)
+    bool IRConstant::isValueEqual(IRConstant* rhs)
     {
         // If they are literally the same thing.. 
-        if (this == &rhs)
+        if (this == rhs)
         {
             return true;
         }
         // Check the type and they are the same op & same type
-        if (op != rhs.op)
+        if (op != rhs->op)
         {
             return false;
         }
@@ -1329,15 +1329,15 @@ namespace Slang
             {
                 SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
                 // ... we can just compare as bits
-                return value.intVal == rhs.value.intVal;
+                return value.intVal == rhs->value.intVal;
             }
             case kIROp_PtrLit:
             {
-                return value.ptrVal == rhs.value.ptrVal;
+                return value.ptrVal == rhs->value.ptrVal;
             }
             case kIROp_StringLit:
             {
-                return getStringSlice() == rhs.getStringSlice();
+                return getStringSlice() == rhs->getStringSlice();
             }
             default: break;
         }
@@ -1347,10 +1347,10 @@ namespace Slang
     }
 
     /// True if constants are equal
-    bool IRConstant::equal(IRConstant& rhs)
+    bool IRConstant::equal(IRConstant* rhs)
     {
         // TODO(JS): Only equal if pointer types are identical (to match how getHashCode works below)
-        return isValueEqual(rhs) && getFullType() == rhs.getFullType();
+        return isValueEqual(rhs) && getFullType() == rhs->getFullType();
     }
 
     int IRConstant::getHashCode()
@@ -3853,9 +3853,9 @@ namespace Slang
         return true;
     }
 
-    static bool _hasNominalEquality(IROp op)
+    static bool _isNominalOp(IROp op)
     {
-        // True if the type should be handled 'nominally' for equality
+        // True if the op identity is 'nominal'
         switch (op)
         {
             case kIROp_StructType:
@@ -3869,63 +3869,9 @@ namespace Slang
         return false;
     }
 
-    static bool _isNominallyEqual(IRInst* a, IRInst* b)
-    {
-        // Two instruction are nominally equal if their instruction pointer is equal
-        return a == b;
-    }
-
-    // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set
-    // if equality of nominal types is by names alone. 
+    // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set that
+    // can be operands of IRType instructions
     static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
-    {
-        if (a == b)
-        {
-            return true;
-        }
-
-        if (a == nullptr || b == nullptr)
-        {
-            return false;
-        }
-
-        IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
-        IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
-
-        if (opA != opB)
-        {
-            return false;
-        }
-
-        // If it's a constant...
-        if (IRConstant::isaImpl(opA))
-        {
-            // TODO: This is contrived in that we want two types that are the same, but are different
-            // pointers to match here.
-            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
-            return static_cast<IRConstant*>(a)->isValueEqual(*static_cast<IRConstant*>(b)) &&
-                isTypeEqual(a->getFullType(), b->getFullType());
-        }
-
-        // If it's a type
-        if (IRType::isaImpl(opA))
-        {
-            return isTypeEqual(static_cast<IRType*>(a), static_cast<IRType*>(b));
-        }
-
-        if (_hasNominalEquality(opA))
-        {
-            return _isNominallyEqual(a, b);
-        }
-
-        SLANG_ASSERT(!"Unhandled comparison");
-
-        // We can't equate any other type..
-        return false;
-    }
-
-
-    bool isTypeEqual(IRType* a, IRType* b)
     {
         if (a == b)
         {
@@ -3939,53 +3885,70 @@ namespace Slang
 
         const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
         const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+
         if (opA != opB)
         {
             return false;
         }
 
-        if (IRBasicType::isaImpl(opA))
+        // If the type is nominal - it can only be the same if the pointer is the same.
+        if (_isNominalOp(opA))
         {
-            // If it's a basic type, then their op being the same means we are done
-            return true;
-        }
-
-        // We don't care about the parent or positioning
-        // We also don't care about 'type' - because these instructions are defining the type.
-        // 
-        // We may want to care about decorations.
-        //
-
-        if (_hasNominalEquality(opA))
-        {
-            return _isNominallyEqual(a, b);
-        }
-
-        // IRTextureType contains IRParam
-        // If it's a resource type - handle the resource flavor 
-        if (IRResourceTypeBase::isaImpl(opA))
-        {
-            auto resourceA = static_cast<const IRResourceTypeBase*>(a);
-            auto resourceB = static_cast<const IRResourceTypeBase*>(b);
-
-            if (resourceA->getFlavor() != resourceB->getFlavor())
-            {
-                return false;
-            }
-        }
-
-        if (!_areTypeOperandsEqual(a, b))
-        {
+            // The pointer isn't the same (as that was already tested), so cannot be equal
             return false;
         }
 
-        // TODO(JS): There is a question here about what to do about decorations.
-        // For now we ignore decorations. Are two types potentially different if there decorations different?
-        // If decorations play a part in difference in types - the order of decorations presumably is not important.
+        // Both are types
+        if (IRType::isaImpl(opA))
+        {
+            if (IRBasicType::isaImpl(opA))
+            {
+                // If it's a basic type, then their op being the same means we are done
+                return true;
+            }
 
-        return true;
+            // We don't care about the parent or positioning
+            // We also don't care about 'type' - because these instructions are defining the type.
+            // 
+            // We may want to care about decorations.
+
+            // If it's a resource type - special case the handling of the resource flavor 
+            if (IRResourceTypeBase::isaImpl(opA) &&
+                static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
+            {
+                return false;
+            }
+
+            // TODO(JS): There is a question here about what to do about decorations.
+            // For now we ignore decorations. Are two types potentially different if there decorations different?
+            // If decorations play a part in difference in types - the order of decorations presumably is not important.
+
+            // All the operands of the types must be equal
+            return _areTypeOperandsEqual(a, b);
+        }
+       
+        // If it's a constant...
+        if (IRConstant::isaImpl(opA))
+        {
+            // TODO: This is contrived in that we want two types that are the same, but are different
+            // pointers to match here.
+            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
+            return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
+                isTypeEqual(a->getFullType(), b->getFullType());
+        }
+
+        SLANG_ASSERT(!"Unhandled comparison");
+
+        // We can't equate any other type..
+        return false;
     }
 
+    bool isTypeEqual(IRType* a, IRType* b)
+    {
+        // _isTypeOperandEqual handles comparison of types so can defer to it
+        return _isTypeOperandEqual(a, b);
+    }
+     
     void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     {
         Index index = outInsts.getCount();

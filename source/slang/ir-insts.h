@@ -671,7 +671,7 @@ struct IRConstantKey
 {
     IRConstant* inst;
 
-    bool operator==(const IRConstantKey& rhs) const { return inst->equal(*rhs.inst); }
+    bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
     int GetHashCode() const { return inst->getHashCode(); }
 };
 

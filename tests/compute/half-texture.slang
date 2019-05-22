@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -target spirv -entry computeMain -profile cs_6_2
+//TEST:CROSS_COMPILE: -target spirv -entry computeMain -profile cs_6_2
 //TEST:SIMPLE: -target hlsl -entry computeMain -profile cs_6_2 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):dxbinding(0),glbinding(0),out
