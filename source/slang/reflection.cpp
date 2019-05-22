@@ -279,6 +279,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_INTERFACE;
         }
     }
+    else if( auto specializedType = as<ExistentialSpecializedType>(type) )
+    {
+        return SLANG_TYPE_KIND_SPECIALIZED;
+    }
     else if (auto errorType = as<ErrorType>(type))
     {
         // This means we saw a type we didn't understand in the user's code
@@ -746,6 +750,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     {
         return convert(structuredBufferTypeLayout->elementTypeLayout.Ptr());
     }
+    else if( auto specializedTypeLayout = as<ExistentialSpecializedTypeLayout>(typeLayout) )
+    {
+        return convert(specializedTypeLayout->baseTypeLayout.Ptr());
+    }
 
     return nullptr;
 }
@@ -876,6 +884,22 @@ SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDa
 
     auto pendingDataLayout = varLayout->pendingVarLayout.Ptr();
     return convert(pendingDataLayout);
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return nullptr;
+
+    if( auto specializedTypeLayout = as<ExistentialSpecializedTypeLayout>(typeLayout) )
+    {
+        auto pendingDataVarLayout = specializedTypeLayout->pendingDataVarLayout.Ptr();
+        return convert(pendingDataVarLayout);
+    }
+    else
+    {
+        return nullptr;
+    }
 }
 
 

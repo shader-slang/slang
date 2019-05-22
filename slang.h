@@ -1593,6 +1593,7 @@ extern "C"
         SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
         SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_OUTPUT_STREAM,
+        SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1814,6 +1815,8 @@ extern "C"
 
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* type);
 
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
+
     // Variable Reflection
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
@@ -1970,7 +1973,8 @@ namespace slang
             ShaderStorageBuffer = SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
             ParameterBlock = SLANG_TYPE_KIND_PARAMETER_BLOCK,
             GenericTypeParameter = SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
-            Interface = SLANG_TYPE_KIND_INTERFACE
+            Interface = SLANG_TYPE_KIND_INTERFACE,
+            Specialized = SLANG_TYPE_KIND_SPECIALIZED,
         };
 
         enum ScalarType : SlangScalarType
@@ -2252,6 +2256,11 @@ namespace slang
                 (SlangReflectionTypeLayout*) this);
         }
 
+        VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
+        {
+            return (VariableLayoutReflection*) spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
+                (SlangReflectionTypeLayout*) this);
+        }
     };
 
     struct Modifier
