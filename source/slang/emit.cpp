@@ -40,6 +40,12 @@
 
 namespace Slang {
 
+enum class BuiltInCOp
+{
+    Splat,                  //< Splat a single value to all values of a vector or matrix type
+    Init,                   //< Initialize with parameters (must match the type)
+};
+
 struct ExtensionUsageTracker
 {
     // Record the GLSL extnsions we have already emitted a `#extension` for
@@ -1028,6 +1034,112 @@ struct EmitVisitor
         }
     }
 
+    static IROp _getCType(IROp op)
+    {
+        switch (op)
+        {
+            case kIROp_VoidType:
+            case kIROp_BoolType:
+            {
+                return op;
+            }
+            case kIROp_Int8Type:
+            case kIROp_Int16Type:
+            case kIROp_IntType:
+            case kIROp_UInt8Type:
+            case kIROp_UInt16Type:
+            case kIROp_UIntType:
+            {
+                // Promote all these to Int
+                return kIROp_IntType;
+            }
+            case kIROp_Int64Type:
+            case kIROp_UInt64Type:
+            {
+                // Promote all these to Int16, we can just vary the call to make these work
+                return kIROp_Int64Type;
+            }
+            case kIROp_DoubleType:
+            {
+                return kIROp_DoubleType;
+            }
+            case kIROp_HalfType:
+            case kIROp_FloatType:
+            {
+                // Promote both to float
+                return kIROp_FloatType;
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled type");
+                return kIROp_undefined;
+            }
+        }
+    }
+
+    static UnownedStringSlice _getCTypeVecPostFix(IROp op)
+    {
+        switch (op)
+        {
+            case kIROp_BoolType:        return UnownedStringSlice::fromLiteral("B");
+            case kIROp_IntType:         return UnownedStringSlice::fromLiteral("I");
+            case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F");
+            case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
+            case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
+            default:                    return UnownedStringSlice::fromLiteral("?");
+        }
+    }
+
+    static UnownedStringSlice _getCTypeName(IROp op)
+    {
+        switch (op)
+        {
+        case kIROp_BoolType:        return UnownedStringSlice::fromLiteral("Bool");
+        case kIROp_IntType:         return UnownedStringSlice::fromLiteral("I32");
+        case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F32");
+        case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
+        case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
+        default:                    return UnownedStringSlice::fromLiteral("?");
+        }
+    }
+
+    void _emitCVecType(IROp op, Int size)
+    {
+        emit("Vec");
+        const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
+        emit(postFix);
+        if (postFix.size() > 1)
+        {
+            emit("_");
+        }
+        emit(size);
+    }
+
+    void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount)
+    {
+        emit("Mat");
+        const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
+        emit(postFix);
+        if (postFix.size() > 1)
+        {
+            emit("_");
+        }
+        emit(rowCount);
+        emit(colCount);
+    }
+
+    void _emitCFunc(BuiltInCOp cop, IRType* type)
+    {
+        emitSimpleTypeImpl(type);
+        emit("_");
+
+        switch (cop)
+        {
+            case BuiltInCOp::Init:  emit("init");
+            case BuiltInCOp::Splat: emit("splat"); break;
+        }
+    }
+
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
     {
         switch(context->shared->target)
@@ -1056,6 +1168,11 @@ struct EmitVisitor
             Emit(",");
             emit(elementCount);
             Emit(">");
+            break;
+
+        case CodeGenTarget::CSource:
+        case CodeGenTarget::CPPSource:
+            _emitCVecType(elementType->op, elementCount);
             break;
 
         default:
@@ -1114,6 +1231,16 @@ struct EmitVisitor
             EmitVal(matType->getColumnCount(), kEOp_General);
             Emit("> ");
             break;
+
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CSource:
+        {
+            const auto rowCount = static_cast<const IRConstant*>(matType->getRowCount())->value.intVal;
+            const auto colCount = static_cast<const IRConstant*>(matType->getColumnCount())->value.intVal;
+
+            _emitCMatType(matType->getElementType()->op, rowCount, colCount);
+            break;
+        }
 
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
@@ -3801,6 +3928,7 @@ struct EmitVisitor
         emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
     }
 
+    
     void emitIRInstExpr(
         EmitContext*    ctx,
         IRInst*         inst,
@@ -3821,24 +3949,48 @@ struct EmitVisitor
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
             // Simple constructor call
-            if( inst->getOperandCount() == 1 && getTarget(ctx) == CodeGenTarget::HLSL)
-            {
-                auto prec = kEOp_Prefix;
-                needClose = maybeEmitParens(outerPrec, prec);
 
-                // Need to emit as cast for HLSL
-                emit("(");
-                emitIRType(ctx, inst->getDataType());
-                emit(") ");
-                emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec,prec));
-            }
-            else
+            switch (getTarget(ctx))
             {
-                emitIRType(ctx, inst->getDataType());
-                emitIRArgs(ctx, inst, mode);
+                case CodeGenTarget::HLSL:
+                {
+                    if (inst->getOperandCount() == 1)
+                    {
+                        auto prec = kEOp_Prefix;
+                        needClose = maybeEmitParens(outerPrec, prec);
+
+                        // Need to emit as cast for HLSL
+                        emit("(");
+                        emitIRType(ctx, inst->getDataType());
+                        emit(") ");
+                        emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec, prec));
+                        break;
+                    }
+                    /* fallthru*/
+                }
+                case CodeGenTarget::GLSL:
+                {
+                    emitIRType(ctx, inst->getDataType());
+                    emitIRArgs(ctx, inst, mode);
+                    break;
+                }
+                case CodeGenTarget::CPPSource:
+                case CodeGenTarget::CSource:
+                {
+                    if (inst->getOperandCount() == 1)
+                    {
+                        _emitCFunc(BuiltInCOp::Splat, inst->getDataType());
+                        emitIRArgs(ctx, inst, mode);
+                    }
+                    else
+                    {
+                        _emitCFunc(BuiltInCOp::Init, inst->getDataType());
+                        emitIRArgs(ctx, inst, mode);
+                    }
+                    break;
+                }
             }
             break;
-
         case kIROp_constructVectorFromScalar:
 
             // Simple constructor call
