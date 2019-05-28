@@ -1595,6 +1595,7 @@ extern "C"
         SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
         SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_OUTPUT_STREAM,
+        SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1814,6 +1815,10 @@ extern "C"
 
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
+    SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* type);
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
+
     // Variable Reflection
 
     SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* var);
@@ -1844,6 +1849,9 @@ extern "C"
     */
     SLANG_API SlangStage spReflectionVariableLayout_getStage(
         SlangReflectionVariableLayout* var);
+
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(SlangReflectionVariableLayout* var);
 
     // Shader Parameter Reflection
 
@@ -1898,6 +1906,14 @@ extern "C"
 
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
+
+    SLANG_API  SlangReflectionType* spReflection_specializeType(
+        SlangReflection*            reflection,
+        SlangReflectionType*        type,
+        SlangInt                    specializationArgCount,
+        SlangReflectionType* const* specializationArgs,
+        ISlangBlob**                outDiagnostics);
+
 
 #ifdef __cplusplus
 }
@@ -1959,7 +1975,8 @@ namespace slang
             ShaderStorageBuffer = SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
             ParameterBlock = SLANG_TYPE_KIND_PARAMETER_BLOCK,
             GenericTypeParameter = SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
-            Interface = SLANG_TYPE_KIND_INTERFACE
+            Interface = SLANG_TYPE_KIND_INTERFACE,
+            Specialized = SLANG_TYPE_KIND_SPECIALIZED,
         };
 
         enum ScalarType : SlangScalarType
@@ -2234,6 +2251,18 @@ namespace slang
             return spReflectionTypeLayout_getGenericParamIndex(
                 (SlangReflectionTypeLayout*) this);
         }
+
+        TypeLayoutReflection* getPendingDataTypeLayout()
+        {
+            return (TypeLayoutReflection*) spReflectionTypeLayout_getPendingDataTypeLayout(
+                (SlangReflectionTypeLayout*) this);
+        }
+
+        VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
+        {
+            return (VariableLayoutReflection*) spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
+                (SlangReflectionTypeLayout*) this);
+        }
     };
 
     struct Modifier
@@ -2351,6 +2380,11 @@ namespace slang
         SlangStage getStage()
         {
             return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*) this);
+        }
+
+        VariableLayoutReflection* getPendingDataLayout()
+        {
+            return (VariableLayoutReflection*) spReflectionVariableLayout_getPendingDataLayout((SlangReflectionVariableLayout*) this);
         }
     };
 
@@ -2488,6 +2522,20 @@ namespace slang
             return (EntryPointReflection*)spReflection_findEntryPointByName(
                 (SlangReflection*) this,
                 name);
+        }
+
+        TypeReflection* specializeType(
+            TypeReflection*         type,
+            SlangInt                specializationArgCount,
+            TypeReflection* const*  specializationArgs,
+            ISlangBlob**            outDiagnostics)
+        {
+            return (TypeReflection*) spReflection_specializeType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) type,
+                specializationArgCount,
+                (SlangReflectionType* const*) specializationArgs,
+                outDiagnostics);
         }
     };
 }

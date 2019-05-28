@@ -504,6 +504,13 @@ struct IRBoolType : IRBasicType
 
 SIMPLE_IR_TYPE(StringType, Type)
 
+
+// True if types are equal
+// Note compares nominal types by name alone 
+bool isTypeEqual(IRType* a, IRType* b);
+
+void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
+
 // Constant Instructions
 
 typedef int64_t IRIntegerValue;
@@ -539,7 +546,11 @@ struct IRConstant : IRInst
     UnownedStringSlice getStringSlice();
 
         /// True if constants are equal
-    bool equal(IRConstant& rhs);
+    bool equal(IRConstant* rhs);
+        /// True if the value is equal.
+        /// Does *NOT* compare if the type is equal. 
+    bool isValueEqual(IRConstant* rhs);
+
         /// Get the hash 
     int getHashCode();
 
@@ -1074,6 +1085,9 @@ struct IRFunc : IRGlobalValueWithParams
 
     IR_LEAF_ISA(Func)
 };
+
+    /// Adjust the type of an IR function based on its parameter list.
+void fixUpFuncType(IRFunc* func);
 
 // A generic is akin to a function, but is conceptually executed
 // before runtime, to specialize the code nested within.

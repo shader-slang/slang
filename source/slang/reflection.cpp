@@ -279,6 +279,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_INTERFACE;
         }
     }
+    else if( auto specializedType = as<ExistentialSpecializedType>(type) )
+    {
+        return SLANG_TYPE_KIND_SPECIALIZED;
+    }
     else if (auto errorType = as<ErrorType>(type))
     {
         // This means we saw a type we didn't understand in the user's code
@@ -746,6 +750,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     {
         return convert(structuredBufferTypeLayout->elementTypeLayout.Ptr());
     }
+    else if( auto specializedTypeLayout = as<ExistentialSpecializedTypeLayout>(typeLayout) )
+    {
+        return convert(specializedTypeLayout->baseTypeLayout.Ptr());
+    }
 
     return nullptr;
 }
@@ -857,6 +865,40 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
     else
     {
         return -1;
+    }
+}
+
+SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return nullptr;
+
+    auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout.Ptr();
+    return convert(pendingDataTypeLayout);
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if(!varLayout) return nullptr;
+
+    auto pendingDataLayout = varLayout->pendingVarLayout.Ptr();
+    return convert(pendingDataLayout);
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return nullptr;
+
+    if( auto specializedTypeLayout = as<ExistentialSpecializedTypeLayout>(typeLayout) )
+    {
+        auto pendingDataVarLayout = specializedTypeLayout->pendingDataVarLayout.Ptr();
+        return convert(pendingDataVarLayout);
+    }
+    else
+    {
+        return nullptr;
     }
 }
 
@@ -1381,3 +1423,29 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     if (!uniform) return 0;
     return getReflectionSize(uniform->count);
 }
+
+SLANG_API  SlangReflectionType* spReflection_specializeType(
+    SlangReflection*            inProgramLayout,
+    SlangReflectionType*        inType,
+    SlangInt                    specializationArgCount,
+    SlangReflectionType* const* specializationArgs,
+    ISlangBlob**                outDiagnostics)
+{
+    auto programLayout = convert(inProgramLayout);
+    if(!programLayout) return nullptr;
+
+    auto unspecializedType = convert(inType);
+    if(!unspecializedType) return nullptr;
+
+    auto linkage = programLayout->getProgram()->getLinkage();
+
+    DiagnosticSink sink;
+    sink.sourceManager = linkage->getSourceManager();
+
+    auto specializedType = linkage->specializeType(unspecializedType, specializationArgCount, (Type* const*) specializationArgs, &sink);
+
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    return convert(specializedType);
+}
+

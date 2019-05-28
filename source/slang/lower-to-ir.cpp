@@ -1608,6 +1608,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irType);
     }
 
+    LoweredValInfo visitExistentialSpecializedType(ExistentialSpecializedType* type)
+    {
+        auto irBaseType = lowerType(context, type->baseType);
+
+        List<IRInst*> slotArgs;
+        for(auto arg : type->slots.args)
+        {
+            auto irArgType = lowerType(context, arg.type);
+            auto irArgWitness = lowerSimpleVal(context, arg.witness);
+
+            slotArgs.add(irArgType);
+            slotArgs.add(irArgWitness);
+        }
+
+        auto irType = getBuilder()->getBindExistentialsType(irBaseType, slotArgs.getCount(), slotArgs.getBuffer());
+        return LoweredValInfo::simple(irType);
+    }
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }

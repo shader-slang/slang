@@ -671,7 +671,7 @@ struct IRConstantKey
 {
     IRConstant* inst;
 
-    bool operator==(const IRConstantKey& rhs) const { return inst->equal(*rhs.inst); }
+    bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
     int GetHashCode() const { return inst->getHashCode(); }
 };
 
@@ -918,6 +918,19 @@ struct IRBuilder
         IRInst*         value,
         UInt            slotArgCount,
         IRInst* const*  slotArgs);
+
+    IRInst* emitWrapExistential(
+        IRType*         type,
+        IRInst*         value,
+        UInt            slotArgCount,
+        IRUse const*    slotArgs)
+    {
+        List<IRInst*> slotArgVals;
+        for(UInt ii = 0; ii < slotArgCount; ++ii)
+            slotArgVals.add(slotArgs[ii].get());
+
+        return emitWrapExistential(type, value, slotArgCount, slotArgVals.getBuffer());
+    }
 
     IRUndefined* emitUndefined(IRType* type);
 

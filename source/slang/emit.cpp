@@ -7281,6 +7281,7 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
+
         // For GLSL only, we will need to perform "legalization" of
         // the entry point and any entry-point parameters.
         //

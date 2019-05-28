@@ -32,6 +32,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
 
     struct TextureFlavor
     {
+        typedef TextureFlavor ThisType;
         enum
         {
             // Mask for the overall "shape" of the texture
@@ -77,6 +78,9 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
         //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }
+
+        SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         SlangResourceShape getShape() const { return flavor & 0xFF; }
         SlangResourceAccess getAccess() const { return (flavor >> 8) & 0xFF; }

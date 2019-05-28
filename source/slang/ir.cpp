@@ -636,6 +636,33 @@ namespace Slang
         block->insertAtEnd(this);
     }
 
+    void fixUpFuncType(IRFunc* func)
+    {
+        SLANG_ASSERT(func);
+
+        auto irModule = func->getModule();
+        SLANG_ASSERT(irModule);
+
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.module = irModule;
+
+        IRBuilder builder;
+        builder.sharedBuilder = &sharedBuilder;
+
+        builder.setInsertBefore(func);
+
+        List<IRType*> paramTypes;
+        for(auto param : func->getParams())
+        {
+            paramTypes.add(param->getFullType());
+        }
+
+        auto resultType = func->getResultType();
+
+        auto funcType = builder.getFuncType(paramTypes, resultType);
+        builder.setDataType(func, funcType);
+    }
+
     //
 
     bool isTerminatorInst(IROp op)
@@ -1281,20 +1308,19 @@ namespace Slang
         }
     }
 
-    /// True if constants are equal
-    bool IRConstant::equal(IRConstant& rhs)
+    bool IRConstant::isValueEqual(IRConstant* rhs)
     {
         // If they are literally the same thing.. 
-        if (this == &rhs)
+        if (this == rhs)
         {
             return true;
         }
-        // Check the type and they are the same op
-        if (op != rhs.op || 
-           getFullType() != rhs.getFullType())
+        // Check the type and they are the same op & same type
+        if (op != rhs->op)
         {
             return false;
         }
+
         switch (op)
         {
             case kIROp_BoolLit:
@@ -1303,21 +1329,28 @@ namespace Slang
             {
                 SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
                 // ... we can just compare as bits
-                return value.intVal == rhs.value.intVal;
+                return value.intVal == rhs->value.intVal;
             }
             case kIROp_PtrLit:
             {
-                return value.ptrVal == rhs.value.ptrVal;
+                return value.ptrVal == rhs->value.ptrVal;
             }
             case kIROp_StringLit:
             {
-                return getStringSlice() == rhs.getStringSlice();
+                return getStringSlice() == rhs->getStringSlice();
             }
             default: break;
         }
 
         SLANG_ASSERT(!"Unhandled type");
         return false;
+    }
+
+    /// True if constants are equal
+    bool IRConstant::equal(IRConstant* rhs)
+    {
+        // TODO(JS): Only equal if pointer types are identical (to match how getHashCode works below)
+        return isValueEqual(rhs) && getFullType() == rhs->getFullType();
     }
 
     int IRConstant::getHashCode()
@@ -1828,6 +1861,9 @@ namespace Slang
         UInt            slotArgCount,
         IRInst* const*  slotArgs)
     {
+        if(slotArgCount == 0)
+            return (IRType*) baseType;
+
         // If we are trying to bind an interface type, then
         // we will go ahead and simplify the instruction
         // away impmediately.
@@ -1859,6 +1895,9 @@ namespace Slang
         UInt            slotArgCount,
         IRUse const*    slotArgUses)
     {
+        if(slotArgCount == 0)
+            return (IRType*) baseType;
+
         List<IRInst*> slotArgs;
         for( UInt ii = 0; ii < slotArgCount; ++ii )
         {
@@ -2091,6 +2130,9 @@ namespace Slang
         UInt            slotArgCount,
         IRInst* const*  slotArgs)
     {
+        if(slotArgCount == 0)
+            return value;
+
         // If we are wrapping a single concrete value into
         // an interface type, then this is really a `makeExistential`
         //
@@ -3784,9 +3826,146 @@ namespace Slang
         writer->flush();
     }
 
-    //
-    //
-    //
+    // Pre-declare
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b);
+
+    static bool _areTypeOperandsEqual(IRInst* a, IRInst* b)
+    {
+        // Must have same number of operands
+        const auto operandCountA = Index(a->getOperandCount());
+        if (operandCountA != Index(b->getOperandCount()))
+        {
+            return false;
+        }
+
+        // All the operands must be equal
+        for (Index i = 0; i < operandCountA; ++i)
+        {
+            IRInst* operandA = a->getOperand(i);
+            IRInst* operandB = b->getOperand(i);
+
+            if (!_isTypeOperandEqual(operandA, operandB))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static bool _isNominalOp(IROp op)
+    {
+        // True if the op identity is 'nominal'
+        switch (op)
+        {
+            case kIROp_StructType:
+            case kIROp_InterfaceType:
+            case kIROp_Generic:
+            case kIROp_Param:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // True if a type operand is equal. Operands are 'IRInst' - but it's only a restricted set that
+    // can be operands of IRType instructions
+    static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
+    {
+        if (a == b)
+        {
+            return true;
+        }
+
+        if (a == nullptr || b == nullptr)
+        {
+            return false;
+        }
+
+        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
+        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+
+        if (opA != opB)
+        {
+            return false;
+        }
+
+        // If the type is nominal - it can only be the same if the pointer is the same.
+        if (_isNominalOp(opA))
+        {
+            // The pointer isn't the same (as that was already tested), so cannot be equal
+            return false;
+        }
+
+        // Both are types
+        if (IRType::isaImpl(opA))
+        {
+            if (IRBasicType::isaImpl(opA))
+            {
+                // If it's a basic type, then their op being the same means we are done
+                return true;
+            }
+
+            // We don't care about the parent or positioning
+            // We also don't care about 'type' - because these instructions are defining the type.
+            // 
+            // We may want to care about decorations.
+
+            // If it's a resource type - special case the handling of the resource flavor 
+            if (IRResourceTypeBase::isaImpl(opA) &&
+                static_cast<const IRResourceTypeBase*>(a)->getFlavor() != static_cast<const IRResourceTypeBase*>(b)->getFlavor())
+            {
+                return false;
+            }
+
+            // TODO(JS): There is a question here about what to do about decorations.
+            // For now we ignore decorations. Are two types potentially different if there decorations different?
+            // If decorations play a part in difference in types - the order of decorations presumably is not important.
+
+            // All the operands of the types must be equal
+            return _areTypeOperandsEqual(a, b);
+        }
+       
+        // If it's a constant...
+        if (IRConstant::isaImpl(opA))
+        {
+            // TODO: This is contrived in that we want two types that are the same, but are different
+            // pointers to match here.
+            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
+            return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
+                isTypeEqual(a->getFullType(), b->getFullType());
+        }
+
+        SLANG_ASSERT(!"Unhandled comparison");
+
+        // We can't equate any other type..
+        return false;
+    }
+
+    bool isTypeEqual(IRType* a, IRType* b)
+    {
+        // _isTypeOperandEqual handles comparison of types so can defer to it
+        return _isTypeOperandEqual(a, b);
+    }
+     
+    void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
+    {
+        Index index = outInsts.getCount();
+
+        outInsts.add(inst);
+
+        while (index < outInsts.getCount())
+        {
+            IRInst* cur = outInsts[index++];
+
+            IRInstListBase childrenList = cur->getDecorationsAndChildren();
+            for (IRInst* child : childrenList)
+            {
+                outInsts.add(child);
+            }
+        }
+    }
 
     IRDecoration* IRInst::getFirstDecoration()
     {
@@ -3978,13 +4157,14 @@ namespace Slang
     void IRInst::insertAfter(IRInst* other)
     {
         SLANG_ASSERT(other);
-
+        removeFromParent();
         _insertAt(other, other->getNextInst(), other->getParent());
     }
 
     void IRInst::insertAtEnd(IRInst* newParent)
     {
         SLANG_ASSERT(newParent);
+        removeFromParent();
         _insertAt(newParent->getLastDecorationOrChild(), nullptr, newParent);
     }
 

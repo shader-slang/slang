@@ -630,6 +630,14 @@ public:
     LayoutSize tagOffset;
 };
 
+    /// Layout information for a type with existential (sub-)field types specialized.
+class ExistentialSpecializedTypeLayout : public TypeLayout
+{
+public:
+    RefPtr<TypeLayout> baseTypeLayout;
+    RefPtr<VarLayout> pendingDataVarLayout;
+};
+
     /// Layout for a scoped entity like a program, module, or entry point
 class ScopeLayout : public Layout
 {

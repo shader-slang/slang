@@ -2224,7 +2224,11 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     fieldLayout->varDecl = field;
     fieldLayout->typeLayout = fieldTypeLayout;
     m_typeLayout->fields.add(fieldLayout);
-    m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+
+    if( field )
+    {
+        m_typeLayout->mapVarToLayout.Add(field.getDecl(), fieldLayout);
+    }
 
     // Set up uniform offset information, if there is any uniform data in the field
     if( fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
@@ -2961,6 +2965,52 @@ static TypeLayoutResult _createTypeLayout(
         taggedUnionLayout->uniformAlignment = info.alignment;
 
         return TypeLayoutResult(taggedUnionLayout, info);
+    }
+    else if( auto existentialSpecializedType = as<ExistentialSpecializedType>(type) )
+    {
+        TypeLayoutContext subContext = context.withExistentialTypeArgs(
+            existentialSpecializedType->slots.args.getCount(),
+            existentialSpecializedType->slots.args.getBuffer());
+
+        auto baseTypeLayoutResult = _createTypeLayout(
+            subContext,
+            existentialSpecializedType->baseType);
+
+        UniformLayoutInfo info = rules->BeginStructLayout();
+        rules->AddStructField(&info, baseTypeLayoutResult.info.getUniformLayout());
+
+        RefPtr<ExistentialSpecializedTypeLayout> typeLayout = new ExistentialSpecializedTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        RefPtr<VarLayout> pendingDataVarLayout = new VarLayout();
+        if(auto pendingDataTypeLayout = baseTypeLayoutResult.layout->pendingDataTypeLayout)
+        {
+            for( auto pendingResInfo : pendingDataTypeLayout->resourceInfos )
+            {
+                auto kind = pendingResInfo.kind;
+                UInt index = 0;
+                if( kind == LayoutResourceKind::Uniform )
+                {
+                    LayoutSize uniformOffset = rules->AddStructField(
+                        &info,
+                        makeTypeLayoutResult(pendingDataTypeLayout).info.getUniformLayout());
+
+                    index = uniformOffset.getFiniteValue();
+                }
+                else
+                {
+                    if(auto primaryResInfo = baseTypeLayoutResult.layout->FindResourceInfo(kind))
+                        index = primaryResInfo->count.getFiniteValue();
+                }
+                pendingDataVarLayout->AddResourceInfo(kind)->index = index;
+            }
+        }
+
+        typeLayout->baseTypeLayout = baseTypeLayoutResult.layout;
+        typeLayout->pendingDataVarLayout = pendingDataVarLayout;
+
+        return makeTypeLayoutResult(typeLayout);
     }
 
     // catch-all case in case nothing matched
