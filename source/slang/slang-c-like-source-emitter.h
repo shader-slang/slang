@@ -83,7 +83,7 @@ struct EDeclarator
     IRInst* elementCount;
 };
 
-struct EmitVisitor
+struct CLikeSourceEmitter
 {
     enum class BuiltInCOp
     {
@@ -173,7 +173,7 @@ struct EmitVisitor
     EmitContext* context;
     SourceStream* stream;
 
-    EmitVisitor(EmitContext* context);
+    CLikeSourceEmitter(EmitContext* context);
 
     SourceManager* getSourceManager() { return context->getSourceManager(); }
 

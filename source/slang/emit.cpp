@@ -197,7 +197,7 @@ String emitEntryPoint(
     StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
     emitContext.globalStructLayout = globalStructLayout;
 
-    EmitVisitor visitor(&emitContext);
+    CLikeSourceEmitter visitor(&emitContext);
 
     {
         auto session = targetRequest->getSession();
