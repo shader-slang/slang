@@ -1790,7 +1790,6 @@ void CLikeSourceEmitter::emitGLSLPreprocessorDirectives()
     emitGLSLVersionDirective();
 }
 
-/// Emit directives to control overall layout computation for the emitted code.
 void CLikeSourceEmitter::emitLayoutDirectives(TargetRequest* targetReq)
 {
     // We are going to emit the target-language-specific directives
@@ -1852,16 +1851,12 @@ void CLikeSourceEmitter::emitLayoutDirectives(TargetRequest* targetReq)
     }
 }
 
-// Utility code for generating unique IDs as needed
-// during the emit process (e.g., for declarations
-// that didn't origianlly have names, but now need to).
-
 UInt CLikeSourceEmitter::allocateUniqueID()
 {
     return m_context->uniqueIDCounter++;
 }
 
-// IR-level emit logc
+// IR-level emit logic
 
 UInt CLikeSourceEmitter::getID(IRInst* value)
 {
@@ -1877,8 +1872,7 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
 }
 
 /// "Scrub" a name so that it complies with restrictions of the target language.
-String CLikeSourceEmitter::scrubName(
-    String const& name)
+String CLikeSourceEmitter::scrubName(const String& name)
 {
     // We will use a plain `U` as a dummy character to insert
     // whenever we need to insert things to make a string into
@@ -1996,8 +1990,7 @@ String CLikeSourceEmitter::scrubName(
     return sb.ProduceString();
 }
 
-String CLikeSourceEmitter::generateIRName(
-    IRInst* inst)
+String CLikeSourceEmitter::generateIRName(IRInst* inst)
 {
     // If the instruction names something
     // that should be emitted as a target intrinsic,
@@ -2056,9 +2049,6 @@ String CLikeSourceEmitter::generateIRName(
         return sb.ProduceString();
     }
 
-
-
-
     // If the instruction has a mangled name, then emit using that.
     if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
     {
@@ -2074,8 +2064,7 @@ String CLikeSourceEmitter::generateIRName(
     return sb.ProduceString();
 }
 
-String CLikeSourceEmitter::getIRName(
-    IRInst*        inst)
+String CLikeSourceEmitter::getIRName(IRInst* inst)
 {
     String name;
     if(!m_context->mapInstToName.TryGetValue(inst, name))
@@ -2085,9 +2074,7 @@ String CLikeSourceEmitter::getIRName(
     }
     return name;
 }
-void CLikeSourceEmitter::emitDeclarator(
-    EmitContext*    ctx,
-    IRDeclaratorInfo*   declarator)
+void CLikeSourceEmitter::emitDeclarator(EmitContext* ctx, IRDeclaratorInfo* declarator)
 {
     if(!declarator)
         return;

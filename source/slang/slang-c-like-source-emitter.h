@@ -103,10 +103,13 @@ struct CLikeSourceEmitter
         IRInst* inst;
     };
 
+        /// Ctor
     CLikeSourceEmitter(EmitContext* context);
 
+        /// Get the source manager
     SourceManager* getSourceManager() { return m_context->getSourceManager(); }
 
+        /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_context->getSink();}
 
     //
@@ -309,8 +312,7 @@ struct CLikeSourceEmitter
         IREmitMode      mode,
         EOpInfo         outerPrec);
 
-    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode);
-
+    
     void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose);
 
     void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut);
@@ -515,6 +517,8 @@ struct CLikeSourceEmitter
     void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
 
     void _emitCFunc(BuiltInCOp cop, IRType* type);
+    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode);
+
 
     EmitContext* m_context;
     SourceStream* m_stream;
