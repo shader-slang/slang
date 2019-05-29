@@ -1048,7 +1048,7 @@ void CLikeSourceEmitter::emitUntypedBufferType(IRUntypedBufferResourceType* type
 
 void CLikeSourceEmitter::_requireHalf()
 {
-    if (getTarget(m_context) == CodeGenTarget::GLSL)
+    if (getTarget() == CodeGenTarget::GLSL)
     {
         m_context->extensionUsageTracker.requireGLSLHalfExtension();
     }
@@ -1077,7 +1077,7 @@ void CLikeSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_HalfType:
     {
         _requireHalf();
-        if (getTarget(m_context) == CodeGenTarget::GLSL)
+        if (getTarget() == CodeGenTarget::GLSL)
         {
             m_stream->emit("float16_t");
         }
@@ -1406,9 +1406,7 @@ void CLikeSourceEmitter::doSampleRateInputCheck(Name* name)
     }
 }
 
-void CLikeSourceEmitter::emitVal(
-    IRInst*         val,
-    EOpInfo const&  outerPrec)
+void CLikeSourceEmitter::emitVal(IRInst* val, EOpInfo const& outerPrec)
 {
     if(auto type = as<IRType>(val))
     {
@@ -1416,7 +1414,7 @@ void CLikeSourceEmitter::emitVal(
     }
     else
     {
-        emitIRInstExpr(m_context, val, IREmitMode::Default, outerPrec);
+        emitIRInstExpr(val, IREmitMode::Default, outerPrec);
     }
 }
 
@@ -1451,12 +1449,7 @@ UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind
     return space;
 }
 
-// Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
-void CLikeSourceEmitter::emitHLSLRegisterSemantic(
-    LayoutResourceKind  kind,
-    EmitVarChain*       chain,
-    // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    char const* uniformSemanticSpelling)
+void CLikeSourceEmitter::emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
     if(!chain)
         return;
@@ -1549,10 +1542,7 @@ void CLikeSourceEmitter::emitHLSLRegisterSemantic(
     }
 }
 
-// Emit all the `register` semantics that are appropriate for a particular variable layout
-void CLikeSourceEmitter::emitHLSLRegisterSemantics(
-    EmitVarChain*       chain,
-    char const*         uniformSemanticSpelling)
+void CLikeSourceEmitter::emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
     if (!chain) return;
 
@@ -1573,9 +1563,7 @@ void CLikeSourceEmitter::emitHLSLRegisterSemantics(
     }
 }
 
-void CLikeSourceEmitter::emitHLSLRegisterSemantics(
-    VarLayout*  varLayout,
-    char const* uniformSemanticSpelling)
+void CLikeSourceEmitter::emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling)
 {
     if(!varLayout)
         return;
@@ -1584,8 +1572,7 @@ void CLikeSourceEmitter::emitHLSLRegisterSemantics(
     emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
 }
 
-void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(
-    EmitVarChain*       chain)
+void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
 {
     if(!chain)
         return;
@@ -1598,17 +1585,13 @@ void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(
 }
 
 
-void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(
-    RefPtr<VarLayout>   fieldLayout,
-    EmitVarChain*       inChain)
+void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain)
 {
     EmitVarChain chain(fieldLayout, inChain);
     emitHLSLParameterGroupFieldLayoutSemantics(&chain);
 }
 
-bool CLikeSourceEmitter::emitGLSLLayoutQualifier(
-    LayoutResourceKind  kind,
-    EmitVarChain*       chain)
+bool CLikeSourceEmitter::emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain)
 {
     if(!chain)
         return false;
@@ -1689,14 +1672,11 @@ bool CLikeSourceEmitter::emitGLSLLayoutQualifier(
     return true;
 }
 
-void CLikeSourceEmitter::emitGLSLLayoutQualifiers(
-    RefPtr<VarLayout>               layout,
-    EmitVarChain*                   inChain,
-    LayoutResourceKind              filter)
+void CLikeSourceEmitter::emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter)
 {
     if(!layout) return;
 
-    switch( m_context->target )
+    switch( getTarget())
     {
     default:
         return;
@@ -1777,7 +1757,7 @@ void CLikeSourceEmitter::emitGLSLVersionDirective()
 
 void CLikeSourceEmitter::emitGLSLPreprocessorDirectives()
 {
-    switch(m_context->target)
+    switch(getTarget())
     {
     // Don't emit this stuff unless we are targetting GLSL
     default:
@@ -1888,7 +1868,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
     // and write some legal characters to the output as we go.
     StringBuilder sb;
 
-    if(getTarget(m_context) == CodeGenTarget::GLSL)
+    if(getTarget() == CodeGenTarget::GLSL)
     {
         // GLSL reserverse all names that start with `gl_`,
         // so if we are in danger of collision, then make
@@ -1995,7 +1975,7 @@ String CLikeSourceEmitter::generateIRName(IRInst* inst)
     // If the instruction names something
     // that should be emitted as a target intrinsic,
     // then use that name instead.
-    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(m_context, inst))
+    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(inst))
     {
         return String(intrinsicDecoration->getDefinition());
     }
@@ -2074,7 +2054,7 @@ String CLikeSourceEmitter::getIRName(IRInst* inst)
     }
     return name;
 }
-void CLikeSourceEmitter::emitDeclarator(EmitContext* ctx, IRDeclaratorInfo* declarator)
+void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
 {
     if(!declarator)
         return;
@@ -2088,21 +2068,19 @@ void CLikeSourceEmitter::emitDeclarator(EmitContext* ctx, IRDeclaratorInfo* decl
 
     case IRDeclaratorInfo::Flavor::Ptr:
         m_stream->emit("*");
-        emitDeclarator(ctx, declarator->next);
+        emitDeclarator(declarator->next);
         break;
 
     case IRDeclaratorInfo::Flavor::Array:
-        emitDeclarator(ctx, declarator->next);
+        emitDeclarator(declarator->next);
         m_stream->emit("[");
-        emitIROperand(ctx, declarator->elementCount, IREmitMode::Default, kEOp_General);
+        emitIROperand(declarator->elementCount, IREmitMode::Default, kEOp_General);
         m_stream->emit("]");
         break;
     }
 }
 
-void CLikeSourceEmitter::emitIRSimpleValue(
-    EmitContext*    /*context*/,
-    IRInst*         inst)
+void CLikeSourceEmitter::emitIRSimpleValue(IRInst* inst)
 {
     switch(inst->op)
     {
@@ -2128,15 +2106,12 @@ void CLikeSourceEmitter::emitIRSimpleValue(
 
 }
 
-CodeGenTarget CLikeSourceEmitter::getTarget(EmitContext* ctx)
+CodeGenTarget CLikeSourceEmitter::getTarget()
 {
-    return ctx->target;
+    return m_context->target;
 }
 
-bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(
-    EmitContext*    ctx,
-    IRInst*        inst,
-    IREmitMode      mode)
+bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode)
 {
     // Certain opcodes should never/always be folded in
     switch( inst->op )
@@ -2252,7 +2227,7 @@ bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(
     // GLSL doesn't allow texture/resource types to
     // be used as first-class values, so we need
     // to fold them into their use sites in all cases
-    if (getTarget(ctx) == CodeGenTarget::GLSL)
+    if (getTarget() == CodeGenTarget::GLSL)
     {
         if(as<IRResourceTypeBase>(type))
         {
@@ -2285,7 +2260,7 @@ bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(
     // above, we can now deal with the more general cases where we
     // *should not* fold things.
 
-    // Don't fold somethin with no users:
+    // Don't fold something with no users:
     if(!inst->hasUses())
         return false;
 
@@ -2341,15 +2316,11 @@ bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(
     return true;
 }
 
-void CLikeSourceEmitter::emitIROperand(
-    EmitContext*    ctx,
-    IRInst*         inst,
-    IREmitMode      mode,
-    EOpInfo const&  outerPrec)
+void CLikeSourceEmitter::emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const&  outerPrec)
 {
-    if( shouldFoldIRInstIntoUseSites(ctx, inst, mode) )
+    if( shouldFoldIRInstIntoUseSites(inst, mode) )
     {
-        emitIRInstExpr(ctx, inst, mode, outerPrec);
+        emitIRInstExpr(inst, mode, outerPrec);
         return;
     }
 
@@ -2362,10 +2333,7 @@ void CLikeSourceEmitter::emitIROperand(
     }
 }
 
-void CLikeSourceEmitter::emitIRArgs(
-    EmitContext*    ctx,
-    IRInst*         inst,
-    IREmitMode      mode)
+void CLikeSourceEmitter::emitIRArgs(IRInst* inst, IREmitMode mode)
 {
     UInt argCount = inst->getOperandCount();
     IRUse* args = inst->getOperands();
@@ -2374,43 +2342,33 @@ void CLikeSourceEmitter::emitIRArgs(
     for(UInt aa = 0; aa < argCount; ++aa)
     {
         if(aa != 0) m_stream->emit(", ");
-        emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
+        emitIROperand(args[aa].get(), mode, kEOp_General);
     }
     m_stream->emit(")");
 }
 
-void CLikeSourceEmitter::emitIRType(
-    EmitContext*    /*context*/,
-    IRType*         type,
-    String const&   name)
+void CLikeSourceEmitter::emitIRType(IRType* type, String const& name)
 {
     emitType(type, name);
 }
 
-void CLikeSourceEmitter::emitIRType(
-    EmitContext*    /*context*/,
-    IRType*         type,
-    Name*           name)
+void CLikeSourceEmitter::emitIRType(IRType* type, Name* name)
 {
     emitType(type, name);
 }
 
-void CLikeSourceEmitter::emitIRType(
-    EmitContext*    /*context*/,
-    IRType*         type)
+void CLikeSourceEmitter::emitIRType(IRType* type)
 {
     emitType(type);
 }
 
-void CLikeSourceEmitter::emitIRRateQualifiers(
-    EmitContext*    ctx,
-    IRRate*         rate)
+void CLikeSourceEmitter::emitIRRateQualifiers(IRRate* rate)
 {
     if(!rate) return;
 
     if(as<IRConstExprRate>(rate))
     {
-        switch( getTarget(ctx) )
+        switch( getTarget() )
         {
         case CodeGenTarget::GLSL:
             m_stream->emit("const ");
@@ -2423,7 +2381,7 @@ void CLikeSourceEmitter::emitIRRateQualifiers(
 
     if (as<IRGroupSharedRate>(rate))
     {
-        switch( getTarget(ctx) )
+        switch( getTarget() )
         {
         case CodeGenTarget::HLSL:
             m_stream->emit("groupshared ");
@@ -2439,17 +2397,12 @@ void CLikeSourceEmitter::emitIRRateQualifiers(
     }
 }
 
-void CLikeSourceEmitter::emitIRRateQualifiers(
-    EmitContext*    ctx,
-    IRInst*         value)
+void CLikeSourceEmitter::emitIRRateQualifiers(IRInst* value)
 {
-    emitIRRateQualifiers(ctx, value->getRate());
+    emitIRRateQualifiers(value->getRate());
 }
 
-
-void CLikeSourceEmitter::emitIRInstResultDecl(
-    EmitContext*    ctx,
-    IRInst*         inst)
+void CLikeSourceEmitter::emitIRInstResultDecl(IRInst* inst)
 {
     auto type = inst->getDataType();
     if(!type)
@@ -2458,17 +2411,15 @@ void CLikeSourceEmitter::emitIRInstResultDecl(
     if (as<IRVoidType>(type))
         return;
 
-    emitIRTempModifiers(ctx, inst);
+    emitIRTempModifiers(inst);
 
-    emitIRRateQualifiers(ctx, inst);
+    emitIRRateQualifiers(inst);
 
-    emitIRType(ctx, type, getIRName(inst));
+    emitIRType(type, getIRName(inst));
     m_stream->emit(" = ");
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(
-    EmitContext*    /* ctx */,
-    IRInst*         inst)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(IRInst* inst)
 {
     for(auto dd : inst->getDecorations())
     {
@@ -2483,9 +2434,6 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(
     return nullptr;
 }
 
-// Check if the string being used to define a target intrinsic
-// is an "ordinary" name, such that we can simply emit a call
-// to the new name with the arguments of the old operation.
 /* static */bool CLikeSourceEmitter::isOrdinaryName(String const& name)
 {
     char const* cursor = name.begin();
@@ -2504,7 +2452,6 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(
 }
 
 void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
-    EmitContext*                    ctx,
     IRCall*                         inst,
     IRFunc*                         /* func */,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
@@ -2533,7 +2480,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
         for (Index aa = 0; aa < argCount; ++aa)
         {
             if (aa != 0) m_stream->emit(", ");
-            emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
+            emitIROperand(args[aa].get(), mode, kEOp_General);
         }
         m_stream->emit(")");
 
@@ -2580,7 +2527,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                     Index argIndex = d - '0';
                     SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                     m_stream->emit("(");
-                    emitIROperand(ctx, args[argIndex].get(), mode, kEOp_General);
+                    emitIROperand(args[argIndex].get(), mode, kEOp_General);
                     m_stream->emit(")");
                 }
                 break;
@@ -2608,9 +2555,9 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                         }
 
                         m_stream->emit("(");
-                        emitIROperand(ctx, textureArg, mode, kEOp_General);
+                        emitIROperand(textureArg, mode, kEOp_General);
                         m_stream->emit(",");
-                        emitIROperand(ctx, samplerArg, mode, kEOp_General);
+                        emitIROperand(samplerArg, mode, kEOp_General);
                         m_stream->emit(")");
                     }
                     else
@@ -2739,7 +2686,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                     {
                         // In the simple case, the operand is already a 4-vector,
                         // so we can just emit it as-is.
-                        emitIROperand(ctx, arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, kEOp_General);
                     }
                     else
                     {
@@ -2749,11 +2696,11 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                         //
                         emitVectorTypeName(elementType, 4);
                         m_stream->emit("(");
-                        emitIROperand(ctx, arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, kEOp_General);
                         for(IRIntegerValue ii = elementCount; ii < 4; ++ii)
                         {
                             m_stream->emit(", ");
-                            if(getTarget(ctx) == CodeGenTarget::GLSL)
+                            if(getTarget() == CodeGenTarget::GLSL)
                             {
                                 emitSimpleTypeImpl(elementType);
                                 m_stream->emit("(0)");
@@ -2811,7 +2758,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                     auto arg = args[argIndex].get();
                     if(arg->op == kIROp_ImageSubscript)
                     {
-                        if(getTarget(ctx) == CodeGenTarget::GLSL)
+                        if(getTarget() == CodeGenTarget::GLSL)
                         {
                             // TODO: we don't handle the multisample
                             // case correctly here, where the last
@@ -2819,7 +2766,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             // to be broken out into its own argument.
                             //
                             m_stream->emit("(");
-                            emitIROperand(ctx, arg->getOperand(0), mode, kEOp_General);
+                            emitIROperand(arg->getOperand(0), mode, kEOp_General);
                             m_stream->emit("), ");
 
                             // The coordinate argument will have been computed
@@ -2854,20 +2801,20 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             }
 
                             m_stream->emit("(");
-                            emitIROperand(ctx, arg->getOperand(1), mode, kEOp_General);
+                            emitIROperand(arg->getOperand(1), mode, kEOp_General);
                             m_stream->emit(")");
                         }
                         else
                         {
                             m_stream->emit("(");
-                            emitIROperand(ctx, arg, mode, kEOp_General);
+                            emitIROperand(arg, mode, kEOp_General);
                             m_stream->emit(")");
                         }
                     }
                     else
                     {
                         m_stream->emit("(");
-                        emitIROperand(ctx, arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, kEOp_General);
                         m_stream->emit(")");
                     }
                 }
@@ -2894,7 +2841,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             auto argLoad = as<IRLoad>(arg);
                             SLANG_RELEASE_ASSERT(argLoad);
                             auto argVar = argLoad->getOperand(0);
-                            m_stream->emit(getRayPayloadLocation(ctx, argVar));
+                            m_stream->emit(getRayPayloadLocation(argVar));
                         }
                         break;
 
@@ -2911,7 +2858,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             auto argLoad = as<IRLoad>(arg);
                             SLANG_RELEASE_ASSERT(argLoad);
                             auto argVar = argLoad->getOperand(0);
-                            m_stream->emit(getCallablePayloadLocation(ctx, argVar));
+                            m_stream->emit(getCallablePayloadLocation(argVar));
                         }
                         break;
 
@@ -2920,7 +2867,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             // The `$XT` case handles selecting between
                             // the `gl_HitTNV` and `gl_RayTmaxNV` builtins,
                             // based on what stage we are using:
-                            switch( ctx->entryPoint->getStage() )
+                            switch( m_context->entryPoint->getStage() )
                             {
                             default:
                                 m_stream->emit("gl_RayTmaxNV");
@@ -2956,7 +2903,6 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
 }
 
 void CLikeSourceEmitter::emitIntrinsicCallExpr(
-    EmitContext*    ctx,
     IRCall*         inst,
     IRFunc*         func,
     IREmitMode      mode,
@@ -2974,10 +2920,9 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
 
 
     //
-    if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(ctx, func))
+    if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(func))
     {
         emitTargetIntrinsicCallExpr(
-            ctx,
             inst,
             func,
             targetIntrinsicDecoration,
@@ -3043,15 +2988,15 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
         auto prec = kEOp_Postfix;
         needClose = maybeEmitParens(outerPrec, prec);
 
-        emitIROperand(ctx, inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
+        emitIROperand(inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
         m_stream->emit("[");
-        emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
+        emitIROperand(inst->getOperand(operandIndex++), mode, kEOp_General);
         m_stream->emit("]");
 
         if(operandIndex < operandCount)
         {
             m_stream->emit(" = ");
-            emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
+            emitIROperand(inst->getOperand(operandIndex++), mode, kEOp_General);
         }
 
         maybeCloseParens(needClose);
@@ -3071,12 +3016,12 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     if(argCount != paramCount)
     {
         // Looks like a member function call
-        emitIROperand(ctx, inst->getOperand(operandIndex), mode, leftSide(outerPrec, prec));
+        emitIROperand(inst->getOperand(operandIndex), mode, leftSide(outerPrec, prec));
         m_stream->emit(".");
         operandIndex++;
     }
     // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
-    bool glslSignFix = ctx->target == CodeGenTarget::GLSL && name == "sign";
+    bool glslSignFix = getTarget() == CodeGenTarget::GLSL && name == "sign";
     if (glslSignFix)
     {
         if (auto vectorType = as<IRVectorType>(inst->getDataType()))
@@ -3098,7 +3043,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     for(; operandIndex < operandCount; ++operandIndex )
     {
         if(!first) m_stream->emit(", ");
-        emitIROperand(ctx, inst->getOperand(operandIndex), mode, kEOp_General);
+        emitIROperand(inst->getOperand(operandIndex), mode, kEOp_General);
         first = false;
     }
     m_stream->emit(")");
@@ -3107,17 +3052,13 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     maybeCloseParens(needClose);
 }
 
-void CLikeSourceEmitter::emitIRCallExpr(
-    EmitContext*    ctx,
-    IRCall*         inst,
-    IREmitMode      mode,
-    EOpInfo         outerPrec)
+void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
 
     // Does this function declare any requirements on GLSL version or
     // extensions, which should affect our output?
-    if(getTarget(ctx) == CodeGenTarget::GLSL)
+    if(getTarget() == CodeGenTarget::GLSL)
     {
         auto decoratedValue = funcValue;
         while (auto specInst = as<IRSpecialize>(decoratedValue))
@@ -3145,16 +3086,16 @@ void CLikeSourceEmitter::emitIRCallExpr(
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
-    if(auto irFunc = asTargetIntrinsic(ctx, funcValue))
+    if(auto irFunc = asTargetIntrinsic(funcValue))
     {
-        emitIntrinsicCallExpr(ctx, inst, irFunc, mode, outerPrec);
+        emitIntrinsicCallExpr(inst, irFunc, mode, outerPrec);
     }
     else
     {
         auto prec = kEOp_Postfix;
         bool needClose = maybeEmitParens(outerPrec, prec);
 
-        emitIROperand(ctx, funcValue, mode, leftSide(outerPrec, prec));
+        emitIROperand(funcValue, mode, leftSide(outerPrec, prec));
         m_stream->emit("(");
         UInt argCount = inst->getOperandCount();
         for( UInt aa = 1; aa < argCount; ++aa )
@@ -3163,7 +3104,7 @@ void CLikeSourceEmitter::emitIRCallExpr(
             if (as<IRVoidType>(operand->getDataType()))
                 continue;
             if(aa != 1) m_stream->emit(", ");
-            emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
+            emitIROperand(inst->getOperand(aa), mode, kEOp_General);
         }
         m_stream->emit(")");
 
@@ -3188,31 +3129,31 @@ static const char* _getGLSLVectorCompareFunctionName(IROp op)
     }
 }
 
-void CLikeSourceEmitter::_maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
+void CLikeSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode)
 {
     // Wrap in cast if a cast type is specified
     if (castType)
     {
-        emitIRType(ctx, castType);
+        emitIRType(castType);
         m_stream->emit("(");
 
         // Emit the operand
-        emitIROperand(ctx, inst, mode, kEOp_General);
+        emitIROperand(inst, mode, kEOp_General);
 
         m_stream->emit(")");
     }
     else
     {
         // Emit the operand
-        emitIROperand(ctx, inst, mode, kEOp_General);
+        emitIROperand(inst, mode, kEOp_General);
     }
 }
 
-void CLikeSourceEmitter::emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
 {
     IRInst* operand = inst->getOperand(0);
 
-    if (getTarget(ctx) == CodeGenTarget::GLSL)
+    if (getTarget() == CodeGenTarget::GLSL)
     {
         if (auto vectorType = as<IRVectorType>(operand->getDataType()))
         {
@@ -3221,7 +3162,7 @@ void CLikeSourceEmitter::emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode
             *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
             m_stream->emit("not(");
-            emitIROperand(ctx, operand, mode, kEOp_General);
+            emitIROperand(operand, mode, kEOp_General);
             m_stream->emit(")");
             return;
         }
@@ -3231,13 +3172,13 @@ void CLikeSourceEmitter::emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode
     *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
     m_stream->emit("!");
-    emitIROperand(ctx, operand, mode, rightSide(prec, ioOuterPrec));
+    emitIROperand(operand, mode, rightSide(prec, ioOuterPrec));
 }
 
 
-void CLikeSourceEmitter::emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
 {        
-    if (getTarget(ctx) == CodeGenTarget::GLSL)
+    if (getTarget() == CodeGenTarget::GLSL)
     {
         IRInst* left = inst->getOperand(0);
         IRInst* right = inst->getOperand(1);
@@ -3260,9 +3201,9 @@ void CLikeSourceEmitter::emitComparison(EmitContext* ctx, IRInst* inst, IREmitMo
 
             m_stream->emit(funcName);
             m_stream->emit("(");
-            _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
+            _maybeEmitGLSLCast((leftVectorType ? nullptr : vecType), left, mode);
             m_stream->emit(",");
-            _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
+            _maybeEmitGLSLCast((rightVectorType ? nullptr : vecType), right, mode);
             m_stream->emit(")");
 
             return;
@@ -3271,16 +3212,15 @@ void CLikeSourceEmitter::emitComparison(EmitContext* ctx, IRInst* inst, IREmitMo
 
     *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
 
-    emitIROperand(ctx, inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
+    emitIROperand(inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
     m_stream->emit(" ");
     m_stream->emit(opPrec.op);
     m_stream->emit(" ");
-    emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
+    emitIROperand(inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
 }
 
     
 void CLikeSourceEmitter::emitIRInstExpr(
-    EmitContext*    ctx,
     IRInst*         inst,
     IREmitMode      mode,
     EOpInfo const&  inOuterPrec)
@@ -3292,7 +3232,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
-        emitIRSimpleValue(ctx, inst);
+        emitIRSimpleValue(inst);
         break;
 
     case kIROp_Construct:
@@ -3300,7 +3240,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
     case kIROp_MakeMatrix:
         // Simple constructor call
 
-        switch (getTarget(ctx))
+        switch (getTarget())
         {
             case CodeGenTarget::HLSL:
             {
@@ -3311,17 +3251,17 @@ void CLikeSourceEmitter::emitIRInstExpr(
 
                     // Need to emit as cast for HLSL
                     m_stream->emit("(");
-                    emitIRType(ctx, inst->getDataType());
+                    emitIRType(inst->getDataType());
                     m_stream->emit(") ");
-                    emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec, prec));
+                    emitIROperand(inst->getOperand(0), mode, rightSide(outerPrec, prec));
                     break;
                 }
                 /* fallthru*/
             }
             case CodeGenTarget::GLSL:
             {
-                emitIRType(ctx, inst->getDataType());
-                emitIRArgs(ctx, inst, mode);
+                emitIRType(inst->getDataType());
+                emitIRArgs(inst, mode);
                 break;
             }
             case CodeGenTarget::CPPSource:
@@ -3330,12 +3270,12 @@ void CLikeSourceEmitter::emitIRInstExpr(
                 if (inst->getOperandCount() == 1)
                 {
                     _emitCFunc(BuiltInCOp::Splat, inst->getDataType());
-                    emitIRArgs(ctx, inst, mode);
+                    emitIRArgs(inst, mode);
                 }
                 else
                 {
                     _emitCFunc(BuiltInCOp::Init, inst->getDataType());
-                    emitIRArgs(ctx, inst, mode);
+                    emitIRArgs(inst, mode);
                 }
                 break;
             }
@@ -3344,25 +3284,25 @@ void CLikeSourceEmitter::emitIRInstExpr(
     case kIROp_constructVectorFromScalar:
 
         // Simple constructor call
-        if( getTarget(ctx) == CodeGenTarget::HLSL )
+        if( getTarget() == CodeGenTarget::HLSL )
         {
             auto prec = kEOp_Prefix;
             needClose = maybeEmitParens(outerPrec, prec);
 
             m_stream->emit("(");
-            emitIRType(ctx, inst->getDataType());
+            emitIRType(inst->getDataType());
             m_stream->emit(")");
 
-            emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec,prec));
+            emitIROperand(inst->getOperand(0), mode, rightSide(outerPrec,prec));
         }
         else
         {
             auto prec = kEOp_Postfix;
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIRType(ctx, inst->getDataType());
+            emitIRType(inst->getDataType());
             m_stream->emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, kEOp_General);
             m_stream->emit(")");
         }
         break;
@@ -3377,9 +3317,9 @@ void CLikeSourceEmitter::emitIRInstExpr(
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto base = fieldExtract->getBase();
-            emitIROperand(ctx, base, mode, leftSide(outerPrec, prec));
+            emitIROperand(base, mode, leftSide(outerPrec, prec));
             m_stream->emit(".");
-            if(getTarget(ctx) == CodeGenTarget::GLSL
+            if(getTarget() == CodeGenTarget::GLSL
                 && as<IRUniformParameterGroupType>(base->getDataType()))
             {
                 m_stream->emit("_data.");
@@ -3398,9 +3338,9 @@ void CLikeSourceEmitter::emitIRInstExpr(
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto base = ii->getBase();
-            emitIROperand(ctx, base, mode, leftSide(outerPrec, prec));
+            emitIROperand(base, mode, leftSide(outerPrec, prec));
             m_stream->emit(".");
-            if(getTarget(ctx) == CodeGenTarget::GLSL
+            if(getTarget() == CodeGenTarget::GLSL
                 && as<IRUniformParameterGroupType>(base->getDataType()))
             {
                 m_stream->emit("_data.");
@@ -3412,15 +3352,15 @@ void CLikeSourceEmitter::emitIRInstExpr(
 
 #define CASE_COMPARE(OPCODE, PREC, OP)                                                          \
     case OPCODE:                                                                            \
-        emitComparison(ctx, inst,  mode, outerPrec, kEOp_##PREC, &needClose);               \
+        emitComparison(inst,  mode, outerPrec, kEOp_##PREC, &needClose);               \
         break
 
 #define CASE(OPCODE, PREC, OP)                                                                  \
     case OPCODE:                                                                            \
         needClose = maybeEmitParens(outerPrec, kEOp_##PREC);                                \
-        emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, kEOp_##PREC));    \
+        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, kEOp_##PREC));    \
         m_stream->emit(" " #OP " ");                                                                  \
-        emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, kEOp_##PREC));   \
+        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, kEOp_##PREC));   \
         break
 
     CASE(kIROp_Add, Add, +);
@@ -3447,19 +3387,19 @@ void CLikeSourceEmitter::emitIRInstExpr(
 
 #undef CASE
 
-    // Component-wise ultiplication needs to be special cased,
+    // Component-wise multiplication needs to be special cased,
     // because GLSL uses infix `*` to express inner product
     // when working with matrices.
     case kIROp_Mul:
         // Are we targetting GLSL, and are both operands matrices?
-        if(getTarget(ctx) == CodeGenTarget::GLSL
+        if(getTarget() == CodeGenTarget::GLSL
             && as<IRMatrixType>(inst->getOperand(0)->getDataType())
             && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
         {
             m_stream->emit("matrixCompMult(");
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, kEOp_General);
             m_stream->emit(", ");
-            emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, kEOp_General);
             m_stream->emit(")");
         }
         else
@@ -3468,15 +3408,15 @@ void CLikeSourceEmitter::emitIRInstExpr(
             // `operator*`.
             auto prec = kEOp_Mul;
             needClose = maybeEmitParens(outerPrec, prec);
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
             m_stream->emit(" * ");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(1), mode, rightSide(prec, outerPrec));
         }
         break;
 
     case kIROp_Not:
         {
-            emitNot(ctx, inst,  mode, outerPrec, &needClose);
+            emitNot(inst,  mode, outerPrec, &needClose);
         }
         break;
 
@@ -3486,7 +3426,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             needClose = maybeEmitParens(outerPrec, prec);
 
             m_stream->emit("-");
-            emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
         }
         break;
 
@@ -3503,7 +3443,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             {
                 m_stream->emit("~");
             }
-            emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
         }
         break;
 
@@ -3515,11 +3455,11 @@ void CLikeSourceEmitter::emitIRInstExpr(
             // TODO: handle a bitwise And of a vector of bools by casting to
             // a uvec and performing the bitwise operation
 
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
 
             // Are we targetting GLSL, and are both operands scalar bools?
             // In that case convert the operation to a logical And
-            if (getTarget(ctx) == CodeGenTarget::GLSL
+            if (getTarget() == CodeGenTarget::GLSL
                 && as<IRBoolType>(inst->getOperand(0)->getDataType())
                 && as<IRBoolType>(inst->getOperand(1)->getDataType()))
             {
@@ -3530,7 +3470,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
                 m_stream->emit("&");
             }
 
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
         }
         break;
 
@@ -3542,11 +3482,11 @@ void CLikeSourceEmitter::emitIRInstExpr(
             // TODO: handle a bitwise Or of a vector of bools by casting to
             // a uvec and performing the bitwise operation
 
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
 
             // Are we targetting GLSL, and are both operands scalar bools?
             // In that case convert the operation to a logical Or
-            if (getTarget(ctx) == CodeGenTarget::GLSL
+            if (getTarget() == CodeGenTarget::GLSL
                 && as<IRBoolType>(inst->getOperand(0)->getDataType())
                 && as<IRBoolType>(inst->getOperand(1)->getDataType()))
             {
@@ -3557,15 +3497,15 @@ void CLikeSourceEmitter::emitIRInstExpr(
                 m_stream->emit("|");
             }
 
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
         }
         break;
 
     case kIROp_Load:
         {
             auto base = inst->getOperand(0);
-            emitIROperand(ctx, base, mode, outerPrec);
-            if(getTarget(ctx) == CodeGenTarget::GLSL
+            emitIROperand(base, mode, outerPrec);
+            if(getTarget() == CodeGenTarget::GLSL
                 && as<IRUniformParameterGroupType>(base->getDataType()))
             {
                 m_stream->emit("._data");
@@ -3578,15 +3518,15 @@ void CLikeSourceEmitter::emitIRInstExpr(
             auto prec = kEOp_Assign;
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
             m_stream->emit(" = ");
-            emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(1), mode, rightSide(prec, outerPrec));
         }
         break;
 
     case kIROp_Call:
         {
-            emitIRCallExpr(ctx, (IRCall*)inst, mode, outerPrec);
+            emitIRCallExpr((IRCall*)inst, mode, outerPrec);
         }
         break;
 
@@ -3605,9 +3545,9 @@ void CLikeSourceEmitter::emitIRInstExpr(
 
             m_stream->emit(decoration->getOuterArrayName());
             m_stream->emit("[");
-            emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, kEOp_General);
             m_stream->emit("].");
-            emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
             break;
         }
         else
@@ -3615,9 +3555,9 @@ void CLikeSourceEmitter::emitIRInstExpr(
             auto prec = kEOp_Postfix;
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+            emitIROperand( inst->getOperand(0), mode, leftSide(outerPrec, prec));
             m_stream->emit("[");
-            emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, kEOp_General);
             m_stream->emit("]");
         }
         break;
@@ -3625,7 +3565,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
     case kIROp_Mul_Vector_Matrix:
     case kIROp_Mul_Matrix_Vector:
     case kIROp_Mul_Matrix_Matrix:
-        if(getTarget(ctx) == CodeGenTarget::GLSL)
+        if(getTarget() == CodeGenTarget::GLSL)
         {
             // GLSL expresses inner-product multiplications
             // with the ordinary infix `*` operator.
@@ -3638,16 +3578,16 @@ void CLikeSourceEmitter::emitIRInstExpr(
             auto prec = kEOp_Mul;
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIROperand(ctx, inst->getOperand(1), mode, leftSide(outerPrec, prec));
+            emitIROperand(inst->getOperand(1), mode, leftSide(outerPrec, prec));
             m_stream->emit(" * ");
-            emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
         }
         else
         {
             m_stream->emit("mul(");
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, kEOp_General);
             m_stream->emit(", ");
-            emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, kEOp_General);
             m_stream->emit(")");
         }
         break;
@@ -3658,7 +3598,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto ii = (IRSwizzle*)inst;
-            emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
+            emitIROperand(ii->getBase(), mode, leftSide(outerPrec, prec));
             m_stream->emit(".");
             const Index elementCount = Index(ii->getElementCount());
             for (Index ee = 0; ee < elementCount; ++ee)
@@ -3678,22 +3618,22 @@ void CLikeSourceEmitter::emitIRInstExpr(
 
     case kIROp_Specialize:
         {
-            emitIROperand(ctx, inst->getOperand(0), mode, outerPrec);
+            emitIROperand(inst->getOperand(0), mode, outerPrec);
         }
         break;
 
     case kIROp_Select:
         {
-            if (getTarget(ctx) == CodeGenTarget::GLSL &&
+            if (getTarget() == CodeGenTarget::GLSL &&
                 inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
             {
                 // For GLSL, emit a call to `mix` if condition is a vector
                 m_stream->emit("mix(");
-                emitIROperand(ctx, inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
                 m_stream->emit(", ");
-                emitIROperand(ctx, inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
                 m_stream->emit(", ");
-                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
                 m_stream->emit(")");
             }
             else
@@ -3701,11 +3641,11 @@ void CLikeSourceEmitter::emitIRInstExpr(
                 auto prec = kEOp_Conditional;
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
                 m_stream->emit(" ? ");
-                emitIROperand(ctx, inst->getOperand(1), mode, prec);
+                emitIROperand(inst->getOperand(1), mode, prec);
                 m_stream->emit(" : ");
-                emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
+                emitIROperand(inst->getOperand(2), mode, rightSide(prec, outerPrec));
             }
         }
         break;
@@ -3726,7 +3666,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) m_stream->emit(", ");
-                emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
+                emitIROperand(inst->getOperand(aa), mode, kEOp_General);
             }
             m_stream->emit(" }");
         }
@@ -3744,7 +3684,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             //
 //                auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             auto toType = extractBaseType(inst->getDataType());
-            switch(getTarget(ctx))
+            switch(getTarget())
             {
             case CodeGenTarget::GLSL:
                 switch(toType)
@@ -3757,7 +3697,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
                     break;
 
                 case BaseType::Int:
-                    emitIRType(ctx, inst->getDataType());
+                    emitIRType(inst->getDataType());
                     break;
 
                 case BaseType::Float:
@@ -3777,7 +3717,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
                     break;
                 case BaseType::Int:
                     m_stream->emit("(");
-                    emitIRType(ctx, inst->getDataType());
+                    emitIRType(inst->getDataType());
                     m_stream->emit(")");
                     break;
                 case BaseType::Float:
@@ -3793,7 +3733,7 @@ void CLikeSourceEmitter::emitIRInstExpr(
             }
 
             m_stream->emit("(");
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, kEOp_General);
             m_stream->emit(")");
         }
         break;
@@ -3826,31 +3766,25 @@ BaseType CLikeSourceEmitter::extractBaseType(IRType* inType)
     }
 }
 
-void CLikeSourceEmitter::emitIRInst(
-    EmitContext*    ctx,
-    IRInst*         inst,
-    IREmitMode      mode)
+void CLikeSourceEmitter::emitIRInst(IRInst* inst, IREmitMode mode)
 {
     try
     {
-        emitIRInstImpl(ctx, inst, mode);
+        emitIRInstImpl(inst, mode);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch(AbortCompilationException&) { throw; }
     catch(...)
     {
-        ctx->noteInternalErrorLoc(inst->sourceLoc);
+        m_context->noteInternalErrorLoc(inst->sourceLoc);
         throw;
     }
 }
 
-void CLikeSourceEmitter::emitIRInstImpl(
-    EmitContext*    ctx,
-    IRInst*         inst,
-    IREmitMode      mode)
+void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
 {
-    if (shouldFoldIRInstIntoUseSites(ctx, inst, mode))
+    if (shouldFoldIRInstIntoUseSites(inst, mode))
     {
         return;
     }
@@ -3860,15 +3794,15 @@ void CLikeSourceEmitter::emitIRInstImpl(
     switch(inst->op)
     {
     default:
-        emitIRInstResultDecl(ctx, inst);
-        emitIRInstExpr(ctx, inst, mode, kEOp_General);
+        emitIRInstResultDecl(inst);
+        emitIRInstExpr(inst, mode, kEOp_General);
         m_stream->emit(";\n");
         break;
 
     case kIROp_undefined:
         {
             auto type = inst->getDataType();
-            emitIRType(ctx, type, getIRName(inst));
+            emitIRType(type, getIRName(inst));
             m_stream->emit(";\n");
         }
         break;
@@ -3879,8 +3813,8 @@ void CLikeSourceEmitter::emitIRInstImpl(
             auto valType = ptrType->getValueType();
 
             auto name = getIRName(inst);
-            emitIRRateQualifiers(ctx, inst);
-            emitIRType(ctx, valType, name);
+            emitIRRateQualifiers(inst);
+            emitIRType(valType, name);
             m_stream->emit(";\n");
         }
         break;
@@ -3900,7 +3834,7 @@ void CLikeSourceEmitter::emitIRInstImpl(
 
     case kIROp_ReturnVal:
         m_stream->emit("return ");
-        emitIROperand(ctx, ((IRReturnVal*) inst)->getVal(), mode, kEOp_General);
+        emitIROperand(((IRReturnVal*) inst)->getVal(), mode, kEOp_General);
         m_stream->emit(";\n");
         break;
 
@@ -3911,15 +3845,15 @@ void CLikeSourceEmitter::emitIRInstImpl(
     case kIROp_swizzleSet:
         {
             auto ii = (IRSwizzleSet*)inst;
-            emitIRInstResultDecl(ctx, inst);
-            emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
+            emitIRInstResultDecl(inst);
+            emitIROperand(inst->getOperand(0), mode, kEOp_General);
             m_stream->emit(";\n");
 
             auto subscriptOuter = kEOp_General;
             auto subscriptPrec = kEOp_Postfix;
             bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
 
-            emitIROperand(ctx, inst, mode, leftSide(subscriptOuter, subscriptPrec));
+            emitIROperand(inst, mode, leftSide(subscriptOuter, subscriptPrec));
             m_stream->emit(".");
             UInt elementCount = ii->getElementCount();
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -3937,7 +3871,7 @@ void CLikeSourceEmitter::emitIRInstImpl(
             maybeCloseParens(needCloseSubscript);
 
             m_stream->emit(" = ");
-            emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, kEOp_General);
             m_stream->emit(";\n");
         }
         break;
@@ -3950,7 +3884,7 @@ void CLikeSourceEmitter::emitIRInstImpl(
 
 
             auto ii = cast<IRSwizzledStore>(inst);
-            emitIROperand(ctx, ii->getDest(), mode, leftSide(subscriptOuter, subscriptPrec));
+            emitIROperand(ii->getDest(), mode, leftSide(subscriptOuter, subscriptPrec));
             m_stream->emit(".");
             UInt elementCount = ii->getElementCount();
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -3968,16 +3902,14 @@ void CLikeSourceEmitter::emitIRInstImpl(
             maybeCloseParens(needCloseSubscript);
 
             m_stream->emit(" = ");
-            emitIROperand(ctx, ii->getSource(), mode, kEOp_General);
+            emitIROperand(ii->getSource(), mode, kEOp_General);
             m_stream->emit(";\n");
         }
         break;
     }
 }
 
-void CLikeSourceEmitter::emitIRSemantics(
-    EmitContext*,
-    VarLayout*      varLayout)
+void CLikeSourceEmitter::emitIRSemantics(VarLayout* varLayout)
 {
     if(varLayout->flags & VarLayoutFlag::HasSemantic)
     {
@@ -3990,12 +3922,10 @@ void CLikeSourceEmitter::emitIRSemantics(
     }
 }
 
-void CLikeSourceEmitter::emitIRSemantics(
-    EmitContext*    ctx,
-    IRInst*         inst)
+void CLikeSourceEmitter::emitIRSemantics(IRInst* inst)
 {
     // Don't emit semantics if we aren't translating down to HLSL
-    switch (ctx->target)
+    switch (getTarget())
     {
     case CodeGenTarget::HLSL:
         break;
@@ -4016,21 +3946,19 @@ void CLikeSourceEmitter::emitIRSemantics(
         auto layout = layoutDecoration->getLayout();
         if(auto varLayout = as<VarLayout>(layout))
         {
-            emitIRSemantics(ctx, varLayout);
+            emitIRSemantics(varLayout);
         }
         else if (auto entryPointLayout = as<EntryPointLayout>(layout))
         {
             if(auto resultLayout = entryPointLayout->resultLayout)
             {
-                emitIRSemantics(ctx, resultLayout);
+                emitIRSemantics(resultLayout);
             }
         }
     }
 }
 
-VarLayout* CLikeSourceEmitter::getVarLayout(
-    EmitContext*    /*context*/,
-    IRInst*         var)
+VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
 {
     auto decoration = var->findDecoration<IRLayoutDecoration>();
     if (!decoration)
@@ -4039,28 +3967,16 @@ VarLayout* CLikeSourceEmitter::getVarLayout(
     return (VarLayout*) decoration->getLayout();
 }
 
-void CLikeSourceEmitter::emitIRLayoutSemantics(
-    EmitContext*    ctx,
-    IRInst*         inst,
-    char const*     uniformSemanticSpelling)
+void CLikeSourceEmitter::emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    auto layout = getVarLayout(ctx, inst);
+    auto layout = getVarLayout(inst);
     if (layout)
     {
         emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
     }
 }
 
-// When we are about to traverse an edge from one block to another,
-// we need to emit the assignments that conceptually occur "along"
-// the edge. In traditional SSA these are the phi nodes in the
-// target block, while in our representation these use the arguments
-// to the branch instruction to fill in the parameters of the target.
-void CLikeSourceEmitter::emitPhiVarAssignments(
-    EmitContext*    ctx,
-    UInt            argCount,
-    IRUse*          args,
-    IRBlock*        targetBlock)
+void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock)
 {
     UInt argCounter = 0;
     for (auto pp = targetBlock->getFirstParam(); pp; pp = pp->getNextParam())
@@ -4078,17 +3994,14 @@ void CLikeSourceEmitter::emitPhiVarAssignments(
         auto outerPrec = kEOp_General;
         auto prec = kEOp_Assign;
 
-        emitIROperand(ctx, pp, IREmitMode::Default, leftSide(outerPrec, prec));
+        emitIROperand(pp, IREmitMode::Default, leftSide(outerPrec, prec));
         m_stream->emit(" = ");
-        emitIROperand(ctx, arg, IREmitMode::Default, rightSide(prec, outerPrec));
+        emitIROperand(arg, IREmitMode::Default, rightSide(prec, outerPrec));
         m_stream->emit(";\n");
     }
 }
 
-/// Emit high-level language statements from a structrured region.
-void CLikeSourceEmitter::emitRegion(
-    EmitContext*    ctx,
-    Region*         inRegion)
+void CLikeSourceEmitter::emitRegion(Region* inRegion)
 {
     // We will use a loop so that we can process sequential (simple)
     // regions iteratively rather than recursively.
@@ -4113,7 +4026,7 @@ void CLikeSourceEmitter::emitRegion(
                 auto terminator = block->getTerminator();
                 for (auto inst = block->getFirstInst(); inst != terminator; inst = inst->getNextInst())
                 {
-                    emitIRInst(ctx, inst, IREmitMode::Default);
+                    emitIRInst(inst, IREmitMode::Default);
                 }
 
                 // Next we have to deal with the terminator instruction
@@ -4136,7 +4049,7 @@ void CLikeSourceEmitter::emitRegion(
                     // For extremely simple terminators, we just handle
                     // them here, so that we don't have to allocate
                     // separate `Region`s for them.
-                    emitIRInst(ctx, terminator, IREmitMode::Default);
+                    emitIRInst(terminator, IREmitMode::Default);
                     break;
 
                 // We will also handle any unconditional branches
@@ -4149,7 +4062,7 @@ void CLikeSourceEmitter::emitRegion(
                 // replace any "phi nodes." This would avoid possible
                 // complications if we ever end up in the bad case where
                 // one of the block arguments on a branch is also
-                // a paremter of the target block, so that the order
+                // a parameter of the target block, so that the order
                 // of operations is important.
                 //
                 case kIROp_unconditionalBranch:
@@ -4158,7 +4071,6 @@ void CLikeSourceEmitter::emitRegion(
                         UInt argCount = t->getOperandCount();
                         static const UInt kFixedArgCount = 1;
                         emitPhiVarAssignments(
-                            ctx,
                             argCount - kFixedArgCount,
                             t->getOperands() + kFixedArgCount,
                             t->getTargetBlock());
@@ -4170,7 +4082,6 @@ void CLikeSourceEmitter::emitRegion(
                         UInt argCount = t->getOperandCount();
                         static const UInt kFixedArgCount = 3;
                         emitPhiVarAssignments(
-                            ctx,
                             argCount - kFixedArgCount,
                             t->getOperands() + kFixedArgCount,
                             t->getTargetBlock());
@@ -4211,10 +4122,10 @@ void CLikeSourceEmitter::emitRegion(
                 // instead of the current `if(condition) {} else { elseRegion }`
 
                 m_stream->emit("if(");
-                emitIROperand(ctx, ifRegion->condition, IREmitMode::Default, kEOp_General);
+                emitIROperand(ifRegion->condition, IREmitMode::Default, kEOp_General);
                 m_stream->emit(")\n{\n");
                 m_stream->indent();
-                emitRegion(ctx, ifRegion->thenRegion);
+                emitRegion(ifRegion->thenRegion);
                 m_stream->dedent();
                 m_stream->emit("}\n");
 
@@ -4224,7 +4135,7 @@ void CLikeSourceEmitter::emitRegion(
                 {
                     m_stream->emit("else\n{\n");
                     m_stream->indent();
-                    emitRegion(ctx, elseRegion);
+                    emitRegion(elseRegion);
                     m_stream->dedent();
                     m_stream->emit("}\n");
                 }
@@ -4257,7 +4168,7 @@ void CLikeSourceEmitter::emitRegion(
                     {
                     case kIRLoopControl_Unroll:
                         // Note: loop unrolling control is only available in HLSL, not GLSL
-                        if(getTarget(ctx) == CodeGenTarget::HLSL)
+                        if(getTarget() == CodeGenTarget::HLSL)
                         {
                             m_stream->emit("[unroll]\n");
                         }
@@ -4270,7 +4181,7 @@ void CLikeSourceEmitter::emitRegion(
 
                 m_stream->emit("for(;;)\n{\n");
                 m_stream->indent();
-                emitRegion(ctx, loopRegion->body);
+                emitRegion(loopRegion->body);
                 m_stream->dedent();
                 m_stream->emit("}\n");
 
@@ -4285,7 +4196,7 @@ void CLikeSourceEmitter::emitRegion(
 
                 // Emit the start of our statement.
                 m_stream->emit("switch(");
-                emitIROperand(ctx, switchRegion->condition, IREmitMode::Default, kEOp_General);
+                emitIROperand(switchRegion->condition, IREmitMode::Default, kEOp_General);
                 m_stream->emit(")\n{\n");
 
                 auto defaultCase = switchRegion->defaultCase;
@@ -4294,7 +4205,7 @@ void CLikeSourceEmitter::emitRegion(
                     for(auto caseVal : currentCase->values)
                     {
                         m_stream->emit("case ");
-                        emitIROperand(ctx, caseVal, IREmitMode::Default, kEOp_General);
+                        emitIROperand(caseVal, IREmitMode::Default, kEOp_General);
                         m_stream->emit(":\n");
                     }
                     if(currentCase.Ptr() == defaultCase)
@@ -4305,7 +4216,7 @@ void CLikeSourceEmitter::emitRegion(
                     m_stream->indent();
                     m_stream->emit("{\n");
                     m_stream->indent();
-                    emitRegion(ctx, currentCase->body);
+                    emitRegion(currentCase->body);
                     m_stream->dedent();
                     m_stream->emit("}\n");
                     m_stream->dedent();
@@ -4324,14 +4235,11 @@ void CLikeSourceEmitter::emitRegion(
 }
 
 /// Emit high-level language statements from a structured region tree.
-void CLikeSourceEmitter::emitRegionTree(
-    EmitContext*    ctx,
-    RegionTree*     regionTree)
+void CLikeSourceEmitter::emitRegionTree(RegionTree* regionTree)
 {
-    emitRegion(ctx, regionTree->rootRegion);
+    emitRegion(regionTree->rootRegion);
 }
 
-// Is an IR function a definition? (otherwise it is a declaration)
 bool CLikeSourceEmitter::isDefinition(IRFunc* func)
 {
     // For now, we use a simple approach: a function is
@@ -4339,8 +4247,7 @@ bool CLikeSourceEmitter::isDefinition(IRFunc* func)
     return func->getFirstBlock() != nullptr;
 }
 
-String CLikeSourceEmitter::getIRFuncName(
-    IRFunc* func)
+String CLikeSourceEmitter::getIRFuncName(IRFunc* func)
 {
     if (auto entryPointLayout = asEntryPoint(func))
     {
@@ -4352,7 +4259,7 @@ String CLikeSourceEmitter::getIRFuncName(
         // that wraps this know to use `main` instead
         // of the original entry-point name...
         //
-        if (getTarget(m_context) != CodeGenTarget::GLSL)
+        if (getTarget() != CodeGenTarget::GLSL)
         {
             return getText(entryPointLayout->entryPoint->getName());
         }
@@ -4440,12 +4347,9 @@ void CLikeSourceEmitter::emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, 
     m_stream->emit("\")]\n");
 }
 
-void CLikeSourceEmitter::emitIREntryPointAttributes_HLSL(
-    IRFunc*             irFunc,
-    EmitContext*        ctx,
-    EntryPointLayout*   entryPointLayout)
+void CLikeSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    auto profile = ctx->effectiveProfile;
+    auto profile = m_context->effectiveProfile;
     auto stage = entryPointLayout->profile.GetStage();
 
     if(profile.getFamily() == ProfileFamily::DX)
@@ -4562,10 +4466,7 @@ void CLikeSourceEmitter::emitIREntryPointAttributes_HLSL(
     }
 }
 
-void CLikeSourceEmitter::emitIREntryPointAttributes_GLSL(
-    IRFunc*             irFunc,
-    EmitContext*        /*ctx*/,
-    EntryPointLayout*   entryPointLayout)
+void CLikeSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = entryPointLayout->profile;
     auto stage = profile.GetStage();
@@ -4674,26 +4575,21 @@ void CLikeSourceEmitter::emitIREntryPointAttributes_GLSL(
     }
 }
 
-void CLikeSourceEmitter::emitIREntryPointAttributes(
-    IRFunc*             irFunc,
-    EmitContext*        ctx,
-    EntryPointLayout*   entryPointLayout)
+void CLikeSourceEmitter::emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    switch(getTarget(ctx))
+    switch(getTarget())
     {
     case CodeGenTarget::HLSL:
-        emitIREntryPointAttributes_HLSL(irFunc, ctx, entryPointLayout);
+        emitIREntryPointAttributes_HLSL(irFunc, entryPointLayout);
         break;
 
     case CodeGenTarget::GLSL:
-        emitIREntryPointAttributes_GLSL(irFunc, ctx, entryPointLayout);
+        emitIREntryPointAttributes_GLSL(irFunc, entryPointLayout);
         break;
     }
 }
 
-void CLikeSourceEmitter::emitPhiVarDecls(
-    EmitContext*    ctx,
-    IRFunc*         func)
+void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
 {
     // We will skip the first block, since its parameters are
     // the parameters of the whole function.
@@ -4706,24 +4602,22 @@ void CLikeSourceEmitter::emitPhiVarDecls(
     {
         for (auto pp = bb->getFirstParam(); pp; pp = pp->getNextParam())
         {
-            emitIRTempModifiers(ctx, pp);
-            emitIRType(ctx, pp->getFullType(), getIRName(pp));
+            emitIRTempModifiers(pp);
+            emitIRType(pp->getFullType(), getIRName(pp));
             m_stream->emit(";\n");
         }
     }
 }
 
 /// Emit high-level statements for the body of a function.
-void CLikeSourceEmitter::emitIRFunctionBody(
-    EmitContext*            ctx,
-    IRGlobalValueWithCode*  code)
+void CLikeSourceEmitter::emitIRFunctionBody(IRGlobalValueWithCode* code)
 {
     // Compute a structured region tree that can represent
     // the control flow of our function.
     //
     RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(
         code,
-        ctx->getSink());
+        m_context->getSink());
 
     // Now that we've computed the region tree, we have
     // an opportunity to perform some last-minute transformations
@@ -4743,12 +4637,10 @@ void CLikeSourceEmitter::emitIRFunctionBody(
 
     // Now emit high-level code from that structured region tree.
     //
-    emitRegionTree(ctx, regionTree);
+    emitRegionTree(regionTree);
 }
 
-void CLikeSourceEmitter::emitIRSimpleFunc(
-    EmitContext*    ctx,
-    IRFunc*         func)
+void CLikeSourceEmitter::emitIRSimpleFunc(IRFunc* func)
 {
     auto resultType = func->getResultType();
 
@@ -4757,10 +4649,10 @@ void CLikeSourceEmitter::emitIRSimpleFunc(
     auto entryPointLayout = asEntryPoint(func);
     if (entryPointLayout)
     {
-        emitIREntryPointAttributes(func, ctx, entryPointLayout);
+        emitIREntryPointAttributes(func, entryPointLayout);
     }
 
-    const CodeGenTarget target = ctx->target;
+    const CodeGenTarget target = getTarget();
 
     auto name = getIRFuncName(func);
 
@@ -4804,14 +4696,13 @@ void CLikeSourceEmitter::emitIRSimpleFunc(
             }
         }
 
-        emitIRParamType(ctx, paramType, paramName);
+        emitIRParamType(paramType, paramName);
 
-        emitIRSemantics(ctx, pp);
+        emitIRSemantics(pp);
     }
     m_stream->emit(")");
 
-
-    emitIRSemantics(ctx, func);
+    emitIRSemantics(func);
 
     // TODO: encode declaration vs. definition
     if(isDefinition(func))
@@ -4821,10 +4712,10 @@ void CLikeSourceEmitter::emitIRSimpleFunc(
 
         // HACK: forward-declare all the local variables needed for the
         // parameters of non-entry blocks.
-        emitPhiVarDecls(ctx, func);
+        emitPhiVarDecls(func);
 
         // Need to emit the operations in the blocks of the function
-        emitIRFunctionBody(ctx, func);
+        emitIRFunctionBody(func);
 
         m_stream->dedent();
         m_stream->emit("}\n\n");
@@ -4835,10 +4726,7 @@ void CLikeSourceEmitter::emitIRSimpleFunc(
     }
 }
 
-void CLikeSourceEmitter::emitIRParamType(
-    EmitContext*    ctx,
-    IRType*         type,
-    String const&   name)
+void CLikeSourceEmitter::emitIRParamType(IRType* type, String const& name)
 {
     // An `out` or `inout` parameter will have been
     // encoded as a parameter of pointer type, so
@@ -4862,7 +4750,7 @@ void CLikeSourceEmitter::emitIRParamType(
         type = inOutType->getValueType();
     }
 
-    emitIRType(ctx, type, name);
+    emitIRType(type, name);
 }
 
 IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
@@ -4883,14 +4771,12 @@ IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
     return returnInst->getVal();
 }
 
-void CLikeSourceEmitter::emitIRFuncDecl(
-    EmitContext*    ctx,
-    IRFunc*         func)
+void CLikeSourceEmitter::emitIRFuncDecl(IRFunc* func)
 {
     // We don't want to emit declarations for operations
     // that only appear in the IR as stand-ins for built-in
     // operations on that target.
-    if (isTargetIntrinsic(ctx, func))
+    if (isTargetIntrinsic(func))
         return;
 
     // Finally, don't emit a declaration for an entry point,
@@ -4911,7 +4797,7 @@ void CLikeSourceEmitter::emitIRFuncDecl(
 
     auto name = getIRFuncName(func);
 
-    emitIRType(ctx, resultType, name);
+    emitIRType(resultType, name);
 
     m_stream->emit("(");
     auto paramCount = funcType->getParamCount();
@@ -4925,14 +4811,12 @@ void CLikeSourceEmitter::emitIRFuncDecl(
         paramName.append(Int32(pp));
         auto paramType = funcType->getParamType(pp);
 
-        emitIRParamType(ctx, paramType, paramName);
+        emitIRParamType(paramType, paramName);
     }
     m_stream->emit(");\n\n");
 }
 
-EntryPointLayout* CLikeSourceEmitter::getEntryPointLayout(
-    EmitContext*    /*context*/,
-    IRFunc*         func)
+EntryPointLayout* CLikeSourceEmitter::getEntryPointLayout(IRFunc* func)
 {
     if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
     {
@@ -4954,12 +4838,7 @@ EntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
     return nullptr;
 }
 
-// Detect if the given IR function represents a
-// declaration of an intrinsic/builtin for the
-// current code-generation target.
-bool CLikeSourceEmitter::isTargetIntrinsic(
-    EmitContext*    /*ctxt*/,
-    IRFunc*         func)
+bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
 {
     // For now we do this in an overly simplistic
     // fashion: we say that *any* function declaration
@@ -4967,12 +4846,7 @@ bool CLikeSourceEmitter::isTargetIntrinsic(
     return !isDefinition(func);
 }
 
-// Check whether a given value names a target intrinsic,
-// and return the IR function representing the intrinsic
-// if it does.
-IRFunc* CLikeSourceEmitter::asTargetIntrinsic(
-    EmitContext*    ctxt,
-    IRInst*         value)
+IRFunc* CLikeSourceEmitter::asTargetIntrinsic(IRInst* value)
 {
     if(!value)
         return nullptr;
@@ -4986,15 +4860,13 @@ IRFunc* CLikeSourceEmitter::asTargetIntrinsic(
         return nullptr;
 
     IRFunc* func = (IRFunc*) value;
-    if(!isTargetIntrinsic(ctxt, func))
+    if(!isTargetIntrinsic(func))
         return nullptr;
 
     return func;
 }
 
-void CLikeSourceEmitter::emitIRFunc(
-    EmitContext*    ctx,
-    IRFunc*         func)
+void CLikeSourceEmitter::emitIRFunc(IRFunc* func)
 {
     if(!isDefinition(func))
     {
@@ -5005,27 +4877,25 @@ void CLikeSourceEmitter::emitIRFunc(
         // We do not emit the declaration for
         // functions that appear to be intrinsics/builtins
         // in the target language.
-        if (isTargetIntrinsic(ctx, func))
+        if (isTargetIntrinsic(func))
             return;
 
-        emitIRFuncDecl(ctx, func);
+        emitIRFuncDecl(func);
     }
     else
     {
         // The common case is that what we
         // have is just an ordinary function,
         // and we can emit it as such.
-        emitIRSimpleFunc(ctx, func);
+        emitIRSimpleFunc(func);
     }
 }
 
-void CLikeSourceEmitter::emitIRStruct(
-    EmitContext*    ctx,
-    IRStructType*   structType)
+void CLikeSourceEmitter::emitIRStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(ctx, structType))
+    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -5046,13 +4916,13 @@ void CLikeSourceEmitter::emitIRStruct(
             continue;
 
         // Note: GLSL doesn't support interpolation modifiers on `struct` fields
-        if( ctx->target != CodeGenTarget::GLSL )
+        if( getTarget() != CodeGenTarget::GLSL )
         {
-            emitInterpolationModifiers(ctx, fieldKey, fieldType, nullptr);
+            emitInterpolationModifiers(fieldKey, fieldType, nullptr);
         }
 
-        emitIRType(ctx, fieldType, getIRName(fieldKey));
-        emitIRSemantics(ctx, fieldKey);
+        emitIRType(fieldType, getIRName(fieldKey));
+        emitIRSemantics(fieldKey);
         m_stream->emit(";\n");
     }
 
@@ -5060,9 +4930,7 @@ void CLikeSourceEmitter::emitIRStruct(
     m_stream->emit("};\n\n");
 }
 
-void CLikeSourceEmitter::emitIRMatrixLayoutModifiers(
-    EmitContext*    ctx,
-    VarLayout*      layout)
+void CLikeSourceEmitter::emitIRMatrixLayoutModifiers(VarLayout* layout)
 {
     // When a variable has a matrix type, we want to emit an explicit
     // layout qualifier based on what the layout has been computed to be.
@@ -5074,7 +4942,7 @@ void CLikeSourceEmitter::emitIRMatrixLayoutModifiers(
 
     if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
     {
-        auto target = ctx->target;
+        auto target = getTarget();
 
         switch (target)
         {
@@ -5114,14 +4982,9 @@ void CLikeSourceEmitter::emitIRMatrixLayoutModifiers(
         }
 
     }
-
 }
 
-// Emit the `flat` qualifier if the underlying type
-// of the variable is an integer type.
-void CLikeSourceEmitter::maybeEmitGLSLFlatModifier(
-    EmitContext*,
-    IRType*           valueType)
+void CLikeSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
 {
     auto tt = valueType;
     if(auto vecType = as<IRVectorType>(tt))
@@ -5142,13 +5005,9 @@ void CLikeSourceEmitter::maybeEmitGLSLFlatModifier(
     }
 }
 
-void CLikeSourceEmitter::emitInterpolationModifiers(
-    EmitContext*    ctx,
-    IRInst*         varInst,
-    IRType*         valueType,
-    VarLayout*      layout)
+void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout)
 {
-    bool isGLSL = (ctx->target == CodeGenTarget::GLSL);
+    bool isGLSL = (getTarget() == CodeGenTarget::GLSL);
     bool anyModifiers = false;
 
     for(auto dd : varInst->getDecorations())
@@ -5210,16 +5069,14 @@ void CLikeSourceEmitter::emitInterpolationModifiers(
         if(layout && layout->stage == Stage::Fragment
             && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
         {
-            maybeEmitGLSLFlatModifier(ctx, valueType);
+            maybeEmitGLSLFlatModifier(valueType);
         }
     }
 }
 
-UInt CLikeSourceEmitter::getRayPayloadLocation(
-    EmitContext*    ctx,
-    IRInst*         inst)
+UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)
 {
-    auto& map = ctx->mapIRValueToRayPayloadLocation;
+    auto& map = m_context->mapIRValueToRayPayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
         return value;
@@ -5229,11 +5086,9 @@ UInt CLikeSourceEmitter::getRayPayloadLocation(
     return value;
 }
 
-UInt CLikeSourceEmitter::getCallablePayloadLocation(
-    EmitContext*    ctx,
-    IRInst*         inst)
+UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
 {
-    auto& map = ctx->mapIRValueToCallablePayloadLocation;
+    auto& map = m_context->mapIRValueToCallablePayloadLocation;
     UInt value = 0;
     if(map.TryGetValue(inst, value))
         return value;
@@ -5243,9 +5098,7 @@ UInt CLikeSourceEmitter::getCallablePayloadLocation(
     return value;
 }
 
-void CLikeSourceEmitter::emitGLSLImageFormatModifier(
-    IRInst*         var,
-    IRTextureType*  resourceType)
+void CLikeSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType*  resourceType)
 {
     // If the user specified a format manually, using `[format(...)]`,
     // then we will respect that format and emit a matching `layout` modifier.
@@ -5416,23 +5269,15 @@ void CLikeSourceEmitter::emitGLSLImageFormatModifier(
 }
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
-void CLikeSourceEmitter::emitIRTempModifiers(
-    EmitContext*    ctx,
-    IRInst*         temp)
+void CLikeSourceEmitter::emitIRTempModifiers(IRInst* temp)
 {
-    SLANG_UNUSED(ctx);
-
     if(temp->findDecoration<IRPreciseDecoration>())
     {
         m_stream->emit("precise ");
     }
 }
 
-void CLikeSourceEmitter::emitIRVarModifiers(
-    EmitContext*    ctx,
-    VarLayout*      layout,
-    IRInst*         varDecl,
-    IRType*         varType)
+void CLikeSourceEmitter::emitIRVarModifiers(VarLayout* layout,IRInst* varDecl, IRType* varType)
 {
     // Deal with Vulkan raytracing layout stuff *before* we
     // do the check for whether `layout` is null, because
@@ -5442,14 +5287,14 @@ void CLikeSourceEmitter::emitIRVarModifiers(
     if(varDecl->findDecoration<IRVulkanRayPayloadDecoration>())
     {
         m_stream->emit("layout(location = ");
-        m_stream->emit(getRayPayloadLocation(ctx, varDecl));
+        m_stream->emit(getRayPayloadLocation(varDecl));
         m_stream->emit(")\n");
         m_stream->emit("rayPayloadNV\n");
     }
     if(varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
     {
         m_stream->emit("layout(location = ");
-        m_stream->emit(getCallablePayloadLocation(ctx, varDecl));
+        m_stream->emit(getCallablePayloadLocation(varDecl));
         m_stream->emit(")\n");
         m_stream->emit("callableDataNV\n");
     }
@@ -5461,7 +5306,7 @@ void CLikeSourceEmitter::emitIRVarModifiers(
 
     if(varDecl->findDecoration<IRGloballyCoherentDecoration>())
     {
-        switch(getTarget(m_context))
+        switch(getTarget())
         {
         default:
             break;
@@ -5476,16 +5321,16 @@ void CLikeSourceEmitter::emitIRVarModifiers(
         }
     }
 
-    emitIRTempModifiers(ctx, varDecl);
+    emitIRTempModifiers(varDecl);
 
     if (!layout)
         return;
 
-    emitIRMatrixLayoutModifiers(ctx, layout);
+    emitIRMatrixLayoutModifiers(layout);
 
     // As a special case, if we are emitting a GLSL declaration
     // for an HLSL `RWTexture*` then we need to emit a `format` layout qualifier.
-    if(getTarget(m_context) == CodeGenTarget::GLSL)
+    if(getTarget() == CodeGenTarget::GLSL)
     {
         if(auto resourceType = as<IRTextureType>(unwrapArray(varType)))
         {
@@ -5507,10 +5352,10 @@ void CLikeSourceEmitter::emitIRVarModifiers(
     if(layout->FindResourceInfo(LayoutResourceKind::VaryingInput)
         || layout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
     {
-        emitInterpolationModifiers(ctx, varDecl, varType, layout);
+        emitInterpolationModifiers(varDecl, varType, layout);
     }
 
-    if (ctx->target == CodeGenTarget::GLSL)
+    if (getTarget() == CodeGenTarget::GLSL)
     {
         // Layout-related modifiers need to come before the declaration,
         // so deal with them here.
@@ -5566,10 +5411,7 @@ void CLikeSourceEmitter::emitIRVarModifiers(
     }
 }
 
-void CLikeSourceEmitter::emitHLSLParameterGroup(
-    EmitContext*                    ctx,
-    IRGlobalParam*                  varDecl,
-    IRUniformParameterGroupType*    type)
+void CLikeSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     if(as<IRTextureBufferType>(type))
     {
@@ -5581,7 +5423,7 @@ void CLikeSourceEmitter::emitHLSLParameterGroup(
     }
     m_stream->emit(getIRName(varDecl));
 
-    auto varLayout = getVarLayout(ctx, varDecl);
+    auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
 
     EmitVarChain blockChain(varLayout);
@@ -5605,20 +5447,15 @@ void CLikeSourceEmitter::emitHLSLParameterGroup(
 
     auto elementType = type->getElementType();
 
-    emitIRType(ctx, elementType, getIRName(varDecl));
+    emitIRType(elementType, getIRName(varDecl));
     m_stream->emit(";\n");
 
     m_stream->dedent();
     m_stream->emit("}\n");
 }
 
-    /// Emit the array brackets that go on the end of a declaration of the given type.
-void CLikeSourceEmitter::emitArrayBrackets(
-    EmitContext*    ctx,
-    IRType*         inType)
+void CLikeSourceEmitter::emitArrayBrackets(IRType* inType)
 {
-    SLANG_UNUSED(ctx);
-
     // A declaration may require zero, one, or
     // more array brackets. When writing out array
     // brackets from left to right, they represent
@@ -5666,12 +5503,9 @@ void CLikeSourceEmitter::emitArrayBrackets(
 }
 
 
-void CLikeSourceEmitter::emitGLSLParameterGroup(
-    EmitContext*                    ctx,
-    IRGlobalParam*                  varDecl,
-    IRUniformParameterGroupType*    type)
+void CLikeSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    auto varLayout = getVarLayout(ctx, varDecl);
+    auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
 
     EmitVarChain blockChain(varLayout);
@@ -5720,14 +5554,14 @@ void CLikeSourceEmitter::emitGLSLParameterGroup(
 
     // Generate a dummy name for the block
     m_stream->emit("_S");
-    m_stream->emit(ctx->uniqueIDCounter++);
+    m_stream->emit(m_context->uniqueIDCounter++);
 
     m_stream->emit("\n{\n");
     m_stream->indent();
 
     auto elementType = type->getElementType();
 
-    emitIRType(ctx, elementType, "_data");
+    emitIRType(elementType, "_data");
     m_stream->emit(";\n");
 
     m_stream->dedent();
@@ -5737,31 +5571,26 @@ void CLikeSourceEmitter::emitGLSLParameterGroup(
 
     // If the underlying variable was an array (or array of arrays, etc.)
     // we need to emit all those array brackets here.
-    emitArrayBrackets(ctx, varDecl->getDataType());
+    emitArrayBrackets(varDecl->getDataType());
 
     m_stream->emit(";\n");
 }
 
-void CLikeSourceEmitter::emitIRParameterGroup(
-    EmitContext*                    ctx,
-    IRGlobalParam*                  varDecl,
-    IRUniformParameterGroupType*    type)
+void CLikeSourceEmitter::emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    switch (ctx->target)
+    switch (getTarget())
     {
     case CodeGenTarget::HLSL:
-        emitHLSLParameterGroup(ctx, varDecl, type);
+        emitHLSLParameterGroup(varDecl, type);
         break;
 
     case CodeGenTarget::GLSL:
-        emitGLSLParameterGroup(ctx, varDecl, type);
+        emitGLSLParameterGroup(varDecl, type);
         break;
     }
 }
 
-void CLikeSourceEmitter::emitIRVar(
-    EmitContext*    ctx,
-    IRVar*          varDecl)
+void CLikeSourceEmitter::emitIRVar(IRVar* varDecl)
 {
     auto allocatedType = varDecl->getDataType();
     auto varType = allocatedType->getValueType();
@@ -5782,9 +5611,9 @@ void CLikeSourceEmitter::emitIRVar(
 
     // Need to emit appropriate modifiers here.
 
-    auto layout = getVarLayout(ctx, varDecl);
+    auto layout = getVarLayout(varDecl);
 
-    emitIRVarModifiers(ctx, layout, varDecl, varType);
+    emitIRVarModifiers(layout, varDecl, varType);
 
 #if 0
     switch (addressSpace)
@@ -5797,21 +5626,18 @@ void CLikeSourceEmitter::emitIRVar(
         break;
     }
 #endif
-    emitIRRateQualifiers(ctx, varDecl);
+    emitIRRateQualifiers(varDecl);
 
-    emitIRType(ctx, varType, getIRName(varDecl));
+    emitIRType(varType, getIRName(varDecl));
 
-    emitIRSemantics(ctx, varDecl);
+    emitIRSemantics(varDecl);
 
-    emitIRLayoutSemantics(ctx, varDecl);
+    emitIRLayoutSemantics(varDecl);
 
     m_stream->emit(";\n");
 }
 
-void CLikeSourceEmitter::emitIRStructuredBuffer_GLSL(
-    EmitContext*                    ctx,
-    IRGlobalParam*                  varDecl,
-    IRHLSLStructuredBufferTypeBase* structuredBufferType)
+void CLikeSourceEmitter::emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
     //
@@ -5820,7 +5646,7 @@ void CLikeSourceEmitter::emitIRStructuredBuffer_GLSL(
 
     m_stream->emit("layout(std430");
 
-    auto layout = getVarLayout(ctx, varDecl);
+    auto layout = getVarLayout(varDecl);
     if (layout)
     {
         LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
@@ -5862,29 +5688,26 @@ void CLikeSourceEmitter::emitIRStructuredBuffer_GLSL(
     
     // Generate a dummy name for the block
     m_stream->emit("_S");
-    m_stream->emit(ctx->uniqueIDCounter++);
+    m_stream->emit(m_context->uniqueIDCounter++);
 
     m_stream->emit(" {\n");
     m_stream->indent();
 
 
     auto elementType = structuredBufferType->getElementType();
-    emitIRType(ctx, elementType, "_data[]");
+    emitIRType(elementType, "_data[]");
     m_stream->emit(";\n");
 
     m_stream->dedent();
     m_stream->emit("} ");
 
     m_stream->emit(getIRName(varDecl));
-    emitArrayBrackets(ctx, varDecl->getDataType());
+    emitArrayBrackets(varDecl->getDataType());
 
     m_stream->emit(";\n");
 }
 
-void CLikeSourceEmitter::emitIRByteAddressBuffer_GLSL(
-    EmitContext*                    ctx,
-    IRGlobalParam*                  varDecl,
-    IRByteAddressBufferTypeBase*    byteAddressBufferType)
+void CLikeSourceEmitter::emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
     // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -5897,7 +5720,7 @@ void CLikeSourceEmitter::emitIRByteAddressBuffer_GLSL(
 
     m_stream->emit("layout(std430");
 
-    auto layout = getVarLayout(ctx, varDecl);
+    auto layout = getVarLayout(varDecl);
     if (layout)
     {
         LayoutResourceKind kind = LayoutResourceKind::DescriptorTableSlot;
@@ -5935,7 +5758,7 @@ void CLikeSourceEmitter::emitIRByteAddressBuffer_GLSL(
 
     // Generate a dummy name for the block
     m_stream->emit("_S");
-    m_stream->emit(ctx->uniqueIDCounter++);
+    m_stream->emit(m_context->uniqueIDCounter++);
     m_stream->emit("\n{\n");
     m_stream->indent();
 
@@ -5945,14 +5768,12 @@ void CLikeSourceEmitter::emitIRByteAddressBuffer_GLSL(
     m_stream->emit("} ");
 
     m_stream->emit(getIRName(varDecl));
-    emitArrayBrackets(ctx, varDecl->getDataType());
+    emitArrayBrackets(varDecl->getDataType());
 
     m_stream->emit(";\n");
 }
 
-void CLikeSourceEmitter::emitIRGlobalVar(
-    EmitContext*    ctx,
-    IRGlobalVar*    varDecl)
+void CLikeSourceEmitter::emitIRGlobalVar(IRGlobalVar* varDecl)
 {
     auto allocatedType = varDecl->getDataType();
     auto varType = allocatedType->getValueType();
@@ -5969,10 +5790,10 @@ void CLikeSourceEmitter::emitIRGlobalVar(
         initFuncName.append("_init");
 
         m_stream->emit("\n");
-        emitIRType(ctx, varType, initFuncName);
+        emitIRType(varType, initFuncName);
         m_stream->emit("()\n{\n");
         m_stream->indent();
-        emitIRFunctionBody(ctx, varDecl);
+        emitIRFunctionBody(varDecl);
         m_stream->dedent();
         m_stream->emit("}\n");
     }
@@ -5981,14 +5802,14 @@ void CLikeSourceEmitter::emitIRGlobalVar(
     // associated with it, since it is not a shader
     // parameter.
     //
-    SLANG_ASSERT(!getVarLayout(ctx, varDecl));
+    SLANG_ASSERT(!getVarLayout(varDecl));
     VarLayout* layout = nullptr;
 
     // An ordinary global variable (which is not a
     // shader parameter) may need special
     // modifiers to indicate it as such.
     //
-    switch (getTarget(ctx))
+    switch (getTarget())
     {
     case CodeGenTarget::HLSL:
         // HLSL requires the `static` modifier on any
@@ -6001,16 +5822,16 @@ void CLikeSourceEmitter::emitIRGlobalVar(
         break;
     }
 
-    emitIRVarModifiers(ctx, layout, varDecl, varType);
+    emitIRVarModifiers(layout, varDecl, varType);
 
-    emitIRRateQualifiers(ctx, varDecl);
-    emitIRType(ctx, varType, getIRName(varDecl));
+    emitIRRateQualifiers(varDecl);
+    emitIRType(varType, getIRName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
     // global variables.
     //
-    emitIRSemantics(ctx, varDecl);
-    emitIRLayoutSemantics(ctx, varDecl);
+    emitIRSemantics(varDecl);
+    emitIRLayoutSemantics(varDecl);
 
     if (varDecl->getFirstBlock())
     {
@@ -6022,9 +5843,7 @@ void CLikeSourceEmitter::emitIRGlobalVar(
     m_stream->emit(";\n\n");
 }
 
-void CLikeSourceEmitter::emitIRGlobalParam(
-    EmitContext*    ctx,
-    IRGlobalParam*  varDecl)
+void CLikeSourceEmitter::emitIRGlobalParam(IRGlobalParam* varDecl)
 {
     auto rawType = varDecl->getDataType();
 
@@ -6048,14 +5867,11 @@ void CLikeSourceEmitter::emitIRGlobalParam(
     //
     if (auto paramBlockType = as<IRUniformParameterGroupType>(varType))
     {
-        emitIRParameterGroup(
-            ctx,
-            varDecl,
-            paramBlockType);
+        emitIRParameterGroup(varDecl, paramBlockType);
         return;
     }
 
-    if(getTarget(ctx) == CodeGenTarget::GLSL)
+    if(getTarget() == CodeGenTarget::GLSL)
     {
         // There are a number of types that are (or can be)
         // "first-class" in D3D HLSL, but are second-class in GLSL in
@@ -6076,26 +5892,17 @@ void CLikeSourceEmitter::emitIRGlobalParam(
         //
         if (auto paramBlockType = as<IRUniformParameterGroupType>(unwrapArray(varType)))
         {
-            emitGLSLParameterGroup(
-                ctx,
-                varDecl,
-                paramBlockType);
+            emitGLSLParameterGroup(varDecl, paramBlockType);
             return;
         }
         if( auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(unwrapArray(varType)) )
         {
-            emitIRStructuredBuffer_GLSL(
-                ctx,
-                varDecl,
-                structuredBufferType);
+            emitIRStructuredBuffer_GLSL(varDecl, structuredBufferType);
             return;
         }
         if( auto byteAddressBufferType = as<IRByteAddressBufferTypeBase>(unwrapArray(varType)) )
         {
-            emitIRByteAddressBuffer_GLSL(
-                ctx,
-                varDecl,
-                byteAddressBufferType);
+            emitIRByteAddressBuffer_GLSL(varDecl, byteAddressBufferType);
             return;
         }
 
@@ -6149,17 +5956,17 @@ void CLikeSourceEmitter::emitIRGlobalParam(
     // We expect/require all shader parameters to
     // have some kind of layout information associted with them.
     //
-    auto layout = getVarLayout(ctx, varDecl);
+    auto layout = getVarLayout(varDecl);
     SLANG_ASSERT(layout);
 
-    emitIRVarModifiers(ctx, layout, varDecl, varType);
+    emitIRVarModifiers(layout, varDecl, varType);
 
-    emitIRRateQualifiers(ctx, varDecl);
-    emitIRType(ctx, varType, getIRName(varDecl));
+    emitIRRateQualifiers(varDecl);
+    emitIRType(varType, getIRName(varDecl));
 
-    emitIRSemantics(ctx, varDecl);
+    emitIRSemantics(varDecl);
 
-    emitIRLayoutSemantics(ctx, varDecl);
+    emitIRLayoutSemantics(varDecl);
 
     // A shader parameter cannot have an initializer,
     // so we do need to consider emitting one here.
@@ -6168,9 +5975,7 @@ void CLikeSourceEmitter::emitIRGlobalParam(
 }
 
 
-void CLikeSourceEmitter::emitIRGlobalConstantInitializer(
-    EmitContext*        ctx,
-    IRGlobalConstant*   valDecl)
+void CLikeSourceEmitter::emitIRGlobalConstantInitializer(IRGlobalConstant*   valDecl)
 {
     // We expect to see only a single block
     auto block = valDecl->getFirstBlock();
@@ -6192,22 +5997,20 @@ void CLikeSourceEmitter::emitIRGlobalConstantInitializer(
     // cases where the value might *need* to emit as a named referenced
     // (e.g., when it names another constant directly).
     //
-    emitIROperand(ctx, returnInst->getVal(), IREmitMode::GlobalConstant, kEOp_General);
+    emitIROperand(returnInst->getVal(), IREmitMode::GlobalConstant, kEOp_General);
 }
 
-void CLikeSourceEmitter::emitIRGlobalConstant(
-    EmitContext*        ctx,
-    IRGlobalConstant*   valDecl)
+void CLikeSourceEmitter::emitIRGlobalConstant(IRGlobalConstant* valDecl)
 {
     auto valType = valDecl->getDataType();
 
-    if( ctx->target != CodeGenTarget::GLSL )
+    if( getTarget() != CodeGenTarget::GLSL )
     {
         m_stream->emit("static ");
     }
     m_stream->emit("const ");
-    emitIRRateQualifiers(ctx, valDecl);
-    emitIRType(ctx, valType, getIRName(valDecl));
+    emitIRRateQualifiers(valDecl);
+    emitIRType(valType, getIRName(valDecl));
 
     if (valDecl->getFirstBlock())
     {
@@ -6218,43 +6021,41 @@ void CLikeSourceEmitter::emitIRGlobalConstant(
 
         // We need to emit the entire initializer as
         // a single expression.
-        emitIRGlobalConstantInitializer(ctx, valDecl);
+        emitIRGlobalConstantInitializer(valDecl);
     }
 
 
     m_stream->emit(";\n");
 }
 
-void CLikeSourceEmitter::emitIRGlobalInst(
-    EmitContext*    ctx,
-    IRInst*         inst)
+void CLikeSourceEmitter::emitIRGlobalInst(IRInst* inst)
 {
     m_stream->advanceToSourceLocation(inst->sourceLoc);
 
     switch(inst->op)
     {
     case kIROp_Func:
-        emitIRFunc(ctx, (IRFunc*) inst);
+        emitIRFunc((IRFunc*) inst);
         break;
 
     case kIROp_GlobalVar:
-        emitIRGlobalVar(ctx, (IRGlobalVar*) inst);
+        emitIRGlobalVar((IRGlobalVar*) inst);
         break;
 
     case kIROp_GlobalParam:
-        emitIRGlobalParam(ctx, (IRGlobalParam*) inst);
+        emitIRGlobalParam((IRGlobalParam*) inst);
         break;
 
     case kIROp_GlobalConstant:
-        emitIRGlobalConstant(ctx, (IRGlobalConstant*) inst);
+        emitIRGlobalConstant((IRGlobalConstant*) inst);
         break;
 
     case kIROp_Var:
-        emitIRVar(ctx, (IRVar*) inst);
+        emitIRVar((IRVar*) inst);
         break;
 
     case kIROp_StructType:
-        emitIRStruct(ctx, cast<IRStructType>(inst));
+        emitIRStruct(cast<IRStructType>(inst));
         break;
 
     default:
@@ -6372,28 +6173,24 @@ void CLikeSourceEmitter::computeIREmitActions(
     }
 }
 
-void CLikeSourceEmitter::executeIREmitActions(
-    EmitContext*                ctx,
-    List<EmitAction> const&     actions)
+void CLikeSourceEmitter::executeIREmitActions(List<EmitAction> const& actions)
 {
     for(auto action : actions)
     {
         switch(action.level)
         {
         case EmitAction::Level::ForwardDeclaration:
-            emitIRFuncDecl(ctx, cast<IRFunc>(action.inst));
+            emitIRFuncDecl(cast<IRFunc>(action.inst));
             break;
 
         case EmitAction::Level::Definition:
-            emitIRGlobalInst(ctx, action.inst);
+            emitIRGlobalInst(action.inst);
             break;
         }
     }
 }
 
-void CLikeSourceEmitter::emitIRModule(
-    EmitContext*    ctx,
-    IRModule*       module)
+void CLikeSourceEmitter::emitIRModule(IRModule* module)
 {
     // The IR will usually come in an order that respects
     // dependencies between global declarations, but this
@@ -6403,7 +6200,7 @@ void CLikeSourceEmitter::emitIRModule(
     List<EmitAction> actions;
 
     computeIREmitActions(module, actions);
-    executeIREmitActions(ctx, actions);
+    executeIREmitActions(actions);
 }
 
 } // namespace Slang

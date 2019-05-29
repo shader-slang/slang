@@ -245,46 +245,30 @@ struct CLikeSourceEmitter
     String generateIRName(IRInst* inst);
     String getIRName(IRInst* inst);
 
-    void emitDeclarator(EmitContext* ctx, IRDeclaratorInfo* declarator);    
-    void emitIRSimpleValue(EmitContext* /*context*/, IRInst* inst);
+    void emitDeclarator(IRDeclaratorInfo* declarator);    
+    void emitIRSimpleValue(IRInst* inst);
 
-    CodeGenTarget getTarget(EmitContext* ctx);
+    CodeGenTarget getTarget();
 
-    bool shouldFoldIRInstIntoUseSites(
-        EmitContext*    ctx,
-        IRInst*        inst,
-        IREmitMode      mode);
+    bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
-    void emitIROperand(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        IREmitMode      mode,
-        EOpInfo const&  outerPrec);
+    void emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const&  outerPrec);
 
-    void emitIRArgs(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        IREmitMode      mode);
+    void emitIRArgs(IRInst* inst, IREmitMode mode);
 
-    void emitIRType(
-        EmitContext*    /*context*/,
-        IRType*         type,
-        String const&   name);
+    void emitIRType(IRType* type, String const&   name);
 
-    void emitIRType(
-        EmitContext*    /*context*/,
-        IRType*         type,
-        Name*           name);
+    void emitIRType(IRType* type, Name* name);
 
-    void emitIRType(EmitContext* /*context*/, IRType* type);
+    void emitIRType(IRType* type);
 
-    void emitIRRateQualifiers(EmitContext* ctx, IRRate* rate);
+    void emitIRRateQualifiers(IRRate* rate);
 
-    void emitIRRateQualifiers(EmitContext*    ctx, IRInst* value);
+    void emitIRRateQualifiers(IRInst* value);
 
-    void emitIRInstResultDecl(EmitContext* ctx, IRInst* inst);
+    void emitIRInstResultDecl(IRInst* inst);
 
-    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(EmitContext* /* ctx */, IRInst* inst);
+    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(IRInst* inst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
@@ -292,7 +276,6 @@ struct CLikeSourceEmitter
     static bool isOrdinaryName(const String& name);
     
     void emitTargetIntrinsicCallExpr(
-        EmitContext*                    ctx,
         IRCall*                         inst,
         IRFunc*                         /* func */,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
@@ -300,75 +283,49 @@ struct CLikeSourceEmitter
         EOpInfo const&                  inOuterPrec);
 
     void emitIntrinsicCallExpr(
-        EmitContext*    ctx,
         IRCall*         inst,
         IRFunc*         func,
         IREmitMode      mode,
         EOpInfo const&  inOuterPrec);
 
-    void emitIRCallExpr(
-        EmitContext*    ctx,
-        IRCall*         inst,
-        IREmitMode      mode,
-        EOpInfo         outerPrec);
+    void emitIRCallExpr(IRCall* inst, IREmitMode mode, EOpInfo outerPrec);
 
     
-    void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose);
+    void emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose);
 
-    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut);
+    void emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut);
 
-    void emitIRInstExpr(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        IREmitMode      mode,
-        EOpInfo const&  inOuterPrec);
+    void emitIRInstExpr(IRInst* inst, IREmitMode mode, EOpInfo const&  inOuterPrec);
     
     BaseType extractBaseType(IRType* inType);
 
-    void emitIRInst(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        IREmitMode      mode);
+    void emitIRInst(IRInst* inst, IREmitMode mode);
 
-    void emitIRInstImpl(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        IREmitMode      mode);
+    void emitIRInstImpl(IRInst* inst, IREmitMode mode);
 
-    void emitIRSemantics(EmitContext*, VarLayout* varLayout);
+    void emitIRSemantics(VarLayout* varLayout);
 
-    void emitIRSemantics(EmitContext* ctx, IRInst* inst);
+    void emitIRSemantics(IRInst* inst);
 
-    VarLayout* getVarLayout(EmitContext*    /*context*/, IRInst* var);
+    VarLayout* getVarLayout(IRInst* var);
 
-    void emitIRLayoutSemantics(
-        EmitContext*    ctx,
-        IRInst*         inst,
-        char const*     uniformSemanticSpelling = "register");
+    void emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
-    // When we are about to traverse an edge from one block to another,
-    // we need to emit the assignments that conceptually occur "along"
-    // the edge. In traditional SSA these are the phi nodes in the
-    // target block, while in our representation these use the arguments
-    // to the branch instruction to fill in the parameters of the target.
-    void emitPhiVarAssignments(
-        EmitContext*    ctx,
-        UInt            argCount,
-        IRUse*          args,
-        IRBlock*        targetBlock);
+        // When we are about to traverse an edge from one block to another,
+        // we need to emit the assignments that conceptually occur "along"
+        // the edge. In traditional SSA these are the phi nodes in the
+        // target block, while in our representation these use the arguments
+        // to the branch instruction to fill in the parameters of the target.
+    void emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock);
 
-    /// Emit high-level language statements from a structured region.
-    void emitRegion(
-        EmitContext*    ctx,
-        Region*         inRegion);
+        /// Emit high-level language statements from a structured region.
+    void emitRegion(Region* inRegion);
 
     
-    /// Emit high-level language statements from a structured region tree.
-    void emitRegionTree(
-        EmitContext*    ctx,
-        RegionTree*     regionTree);
+        /// Emit high-level language statements from a structured region tree.
+    void emitRegionTree(RegionTree* regionTree);
 
-    // Is an IR function a definition? (otherwise it is a declaration)
+        // Is an IR function a definition? (otherwise it is a declaration)
     bool isDefinition(IRFunc* func);
 
     String getIRFuncName(IRFunc* func);
@@ -379,119 +336,84 @@ struct CLikeSourceEmitter
 
     void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
 
-    void emitIREntryPointAttributes_HLSL(
-        IRFunc*             irFunc,
-        EmitContext*        ctx,
-        EntryPointLayout*   entryPointLayout);
+    void emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
-    void emitIREntryPointAttributes_GLSL(
-        IRFunc*             irFunc,
-        EmitContext*        /*ctx*/,
-        EntryPointLayout*   entryPointLayout);
+    void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
-    void emitIREntryPointAttributes(
-        IRFunc*             irFunc,
-        EmitContext*        ctx,
-        EntryPointLayout*   entryPointLayout);
+    void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
-    void emitPhiVarDecls(EmitContext* ctx, IRFunc* func);
+    void emitPhiVarDecls(IRFunc* func);
 
-    /// Emit high-level statements for the body of a function.
-    void emitIRFunctionBody(EmitContext* ctx, IRGlobalValueWithCode* code);
+        /// Emit high-level statements for the body of a function.
+    void emitIRFunctionBody(IRGlobalValueWithCode* code);
 
-    void emitIRSimpleFunc(EmitContext* ctx, IRFunc* func);
+    void emitIRSimpleFunc(IRFunc* func);
 
-    void emitIRParamType(
-        EmitContext*    ctx,
-        IRType*         type,
-        String const&   name);
+    void emitIRParamType(IRType* type, String const&   name);
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
-    void emitIRFuncDecl(EmitContext* ctx, IRFunc* func);
+    void emitIRFuncDecl(IRFunc* func);
 
-    EntryPointLayout* getEntryPointLayout(EmitContext*    /*context*/, IRFunc*         func);
+    EntryPointLayout* getEntryPointLayout(IRFunc*         func);
 
     EntryPointLayout* asEntryPoint(IRFunc* func);
 
         // Detect if the given IR function represents a
         // declaration of an intrinsic/builtin for the
         // current code-generation target.
-    bool isTargetIntrinsic(EmitContext*    /*ctxt*/, IRFunc* func);
+    bool isTargetIntrinsic(IRFunc* func);
 
         // Check whether a given value names a target intrinsic,
         // and return the IR function representing the intrinsic
         // if it does.
-    IRFunc* asTargetIntrinsic(EmitContext* ctxt, IRInst* value);
+    IRFunc* asTargetIntrinsic(IRInst* value);
 
-    void emitIRFunc(EmitContext* ctx, IRFunc* func);
+    void emitIRFunc(IRFunc* func);
 
-    void emitIRStruct(EmitContext* ctx, IRStructType* structType);
+    void emitIRStruct(IRStructType* structType);
 
-    void emitIRMatrixLayoutModifiers(EmitContext* ctx, VarLayout* layout);
+    void emitIRMatrixLayoutModifiers(VarLayout* layout);
 
         // Emit the `flat` qualifier if the underlying type
         // of the variable is an integer type.
-    void maybeEmitGLSLFlatModifier(EmitContext*, IRType* valueType);
+    void maybeEmitGLSLFlatModifier(IRType* valueType);
 
-    void emitInterpolationModifiers(
-        EmitContext*    ctx,
-        IRInst*         varInst,
-        IRType*         valueType,
-        VarLayout*      layout);
+    void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
 
-    UInt getRayPayloadLocation(EmitContext* ctx, IRInst* inst);
+    UInt getRayPayloadLocation(IRInst* inst);
 
-    UInt getCallablePayloadLocation(EmitContext* ctx, IRInst* inst);
+    UInt getCallablePayloadLocation(IRInst* inst);
 
     void emitGLSLImageFormatModifier(IRInst* var, IRTextureType*  resourceType);
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
-    void emitIRTempModifiers(EmitContext* ctx, IRInst* temp);
+    void emitIRTempModifiers(IRInst* temp);
 
-    void emitIRVarModifiers(
-        EmitContext*    ctx,
-        VarLayout*      layout,
-        IRInst*         varDecl,
-        IRType*         varType);
+    void emitIRVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
 
-    void emitHLSLParameterGroup(
-        EmitContext*                    ctx,
-        IRGlobalParam*                  varDecl,
-        IRUniformParameterGroupType*    type);
+    void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
-    void emitArrayBrackets(EmitContext* ctx, IRType* inType);
+    void emitArrayBrackets(IRType* inType);
 
-    void emitGLSLParameterGroup(
-        EmitContext*                    ctx,
-        IRGlobalParam*                  varDecl,
-        IRUniformParameterGroupType*    type);
+    void emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
     
-    void emitIRParameterGroup(
-        EmitContext*                    ctx,
-        IRGlobalParam*                  varDecl,
-        IRUniformParameterGroupType*    type);
+    void emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
-    void emitIRVar(EmitContext* ctx, IRVar* varDecl);
+    void emitIRVar(IRVar* varDecl);
 
-    void emitIRStructuredBuffer_GLSL(
-        EmitContext*                    ctx,
-        IRGlobalParam*                  varDecl,
-        IRHLSLStructuredBufferTypeBase* structuredBufferType);
+    void emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
     
-    void emitIRByteAddressBuffer_GLSL(
-        EmitContext*                    ctx,
-        IRGlobalParam*                  varDecl,
-        IRByteAddressBufferTypeBase*    byteAddressBufferType);
+    void emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
 
-    void emitIRGlobalVar(EmitContext* ctx, IRGlobalVar* varDecl);
-    void emitIRGlobalParam(EmitContext* ctx, IRGlobalParam* varDecl);
-    void emitIRGlobalConstantInitializer(EmitContext* ctx, IRGlobalConstant* valDecl);
+    void emitIRGlobalVar(IRGlobalVar* varDecl);
+    void emitIRGlobalParam(IRGlobalParam* varDecl);
+    void emitIRGlobalConstantInitializer(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalConstant(EmitContext* ctx, IRGlobalConstant* valDecl);
+    void emitIRGlobalConstant(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalInst(EmitContext* ctx, IRInst* inst);
+    void emitIRGlobalInst(IRInst* inst);
 
     void ensureInstOperand(
         ComputeEmitActionsContext*  ctx,
@@ -507,8 +429,8 @@ struct CLikeSourceEmitter
 
     void computeIREmitActions(IRModule* module, List<EmitAction>& ioActions);
 
-    void executeIREmitActions(EmitContext* ctx, List<EmitAction> const& actions);
-    void emitIRModule(EmitContext* ctx, IRModule* module);
+    void executeIREmitActions(List<EmitAction> const& actions);
+    void emitIRModule(IRModule* module);
 
     protected:
 
@@ -517,8 +439,7 @@ struct CLikeSourceEmitter
     void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
 
     void _emitCFunc(BuiltInCOp cop, IRType* type);
-    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode);
-
+    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 
     EmitContext* m_context;
     SourceStream* m_stream;

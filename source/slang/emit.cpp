@@ -197,7 +197,7 @@ String emitEntryPoint(
     StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
     emitContext.globalStructLayout = globalStructLayout;
 
-    CLikeSourceEmitter visitor(&emitContext);
+    CLikeSourceEmitter sourceEmitter(&emitContext);
 
     {
         auto session = targetRequest->getSession();
@@ -458,7 +458,7 @@ String emitEntryPoint(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
-        visitor.emitIRModule(&emitContext, irModule);
+        sourceEmitter.emitIRModule(irModule);
     }
 
     // Deal with cases where a particular stage requires certain GLSL versions
@@ -489,9 +489,9 @@ String emitEntryPoint(
     // it is time to stitch together the final output.
 
     // There may be global-scope modifiers that we should emit now
-    visitor.emitGLSLPreprocessorDirectives();
+    sourceEmitter.emitGLSLPreprocessorDirectives();
 
-    visitor.emitLayoutDirectives(targetRequest);
+    sourceEmitter.emitLayoutDirectives(targetRequest);
 
     String prefix = sourceStream.getContent();
     
