@@ -334,7 +334,7 @@ struct EmitVisitor
     // Types
     //
 
-    void EmitDeclarator(EDeclarator* declarator)
+    void emitDeclarator(EDeclarator* declarator)
     {
         if (!declarator) return;
 
@@ -347,17 +347,17 @@ struct EmitVisitor
             break;
 
         case EDeclarator::Flavor::Array:
-            EmitDeclarator(declarator->next);
+            emitDeclarator(declarator->next);
             stream->emit("[");
             if(auto elementCount = declarator->elementCount)
             {
-                EmitVal(elementCount, kEOp_General);
+                emitVal(elementCount, kEOp_General);
             }
             stream->emit("]");
             break;
 
         case EDeclarator::Flavor::UnsizedArray:
-            EmitDeclarator(declarator->next);
+            emitDeclarator(declarator->next);
             stream->emit("[]");
             break;
 
@@ -468,7 +468,7 @@ struct EmitVisitor
             stream->emit("Array");
         }
         stream->emit("<");
-        EmitType(texType->getElementType());
+        emitType(texType->getElementType());
         stream->emit(" >");
     }
 
@@ -720,7 +720,7 @@ struct EmitVisitor
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
             stream->emit("vector<");
-            EmitType(elementType);
+            emitType(elementType);
             stream->emit(",");
             stream->emit(elementCount);
             stream->emit(">");
@@ -769,22 +769,22 @@ struct EmitVisitor
             {
                 emitGLSLTypePrefix(matType->getElementType());
                 stream->emit("mat");
-                EmitVal(matType->getRowCount(), kEOp_General);
+                emitVal(matType->getRowCount(), kEOp_General);
                 // TODO(tfoley): only emit the next bit
                 // for non-square matrix
                 stream->emit("x");
-                EmitVal(matType->getColumnCount(), kEOp_General);
+                emitVal(matType->getColumnCount(), kEOp_General);
             }
             break;
 
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
             stream->emit("matrix<");
-            EmitType(matType->getElementType());
+            emitType(matType->getElementType());
             stream->emit(",");
-            EmitVal(matType->getRowCount(), kEOp_General);
+            emitVal(matType->getRowCount(), kEOp_General);
             stream->emit(",");
-            EmitVal(matType->getColumnCount(), kEOp_General);
+            emitVal(matType->getColumnCount(), kEOp_General);
             stream->emit("> ");
             break;
 
@@ -855,7 +855,7 @@ struct EmitVisitor
                 }
 
                 stream->emit("<");
-                EmitType(type->getElementType());
+                emitType(type->getElementType());
                 stream->emit(" >");
             }
             break;
@@ -1022,7 +1022,7 @@ struct EmitVisitor
                 for(UInt ii = 0; ii < operandCount; ++ii)
                 {
                     if(ii != 0) stream->emit(", ");
-                    EmitVal(type->getOperand(ii), kEOp_General);
+                    emitVal(type->getOperand(ii), kEOp_General);
                 }
                 stream->emit(" >");
             }
@@ -1058,7 +1058,7 @@ struct EmitVisitor
         {
         default:
             emitSimpleTypeImpl(type);
-            EmitDeclarator(declarator);
+            emitDeclarator(declarator);
             break;
 
         case kIROp_RateQualifiedType:
@@ -1079,7 +1079,7 @@ struct EmitVisitor
 
     }
 
-    void EmitType(
+    void emitType(
         IRType*             type,
         SourceLoc const&    typeLoc,
         Name*               name,
@@ -1094,23 +1094,23 @@ struct EmitVisitor
         emitTypeImpl(type, &nameDeclarator);
     }
 
-    void EmitType(IRType* type, Name* name)
+    void emitType(IRType* type, Name* name)
     {
-        EmitType(type, SourceLoc(), name, SourceLoc());
+        emitType(type, SourceLoc(), name, SourceLoc());
     }
 
-    void EmitType(IRType* type, String const& name)
+    void emitType(IRType* type, String const& name)
     {
         // HACK: the rest of the code wants a `Name`,
         // so we'll create one for a bit...
         Name tempName;
         tempName.text = name;
 
-        EmitType(type, SourceLoc(), &tempName, SourceLoc());
+        emitType(type, SourceLoc(), &tempName, SourceLoc());
     }
 
 
-    void EmitType(IRType* type)
+    void emitType(IRType* type)
     {
         emitTypeImpl(type, nullptr);
     }
@@ -1154,18 +1154,18 @@ struct EmitVisitor
         }
     }
 
-    void EmitType(IRType* type, Name* name, SourceLoc const& nameLoc)
+    void emitType(IRType* type, Name* name, SourceLoc const& nameLoc)
     {
-        EmitType(
+        emitType(
             type,
             SourceLoc(),
             name,
             nameLoc);
     }
 
-    void EmitType(IRType* type, NameLoc const& nameAndLoc)
+    void emitType(IRType* type, NameLoc const& nameAndLoc)
     {
-        EmitType(type, nameAndLoc.name, nameAndLoc.loc);
+        emitType(type, nameAndLoc.name, nameAndLoc.loc);
     }
 
     bool isTargetIntrinsicModifierApplicable(
@@ -1277,13 +1277,13 @@ struct EmitVisitor
         }
     }
 
-    void EmitVal(
+    void emitVal(
         IRInst*         val,
         EOpInfo const&  outerPrec)
     {
         if(auto type = as<IRType>(val))
         {
-            EmitType(type);
+            emitType(type);
         }
         else
         {
@@ -2326,7 +2326,7 @@ struct EmitVisitor
         IRType*         type,
         String const&   name)
     {
-        EmitType(type, name);
+        emitType(type, name);
     }
 
     void emitIRType(
@@ -2334,14 +2334,14 @@ struct EmitVisitor
         IRType*         type,
         Name*           name)
     {
-        EmitType(type, name);
+        emitType(type, name);
     }
 
     void emitIRType(
         EmitContext*    /*context*/,
         IRType*         type)
     {
-        EmitType(type);
+        emitType(type);
     }
 
     void emitIRRateQualifiers(
@@ -4972,7 +4972,7 @@ struct EmitVisitor
 
         auto name = getIRFuncName(func);
 
-        EmitType(resultType, name);
+        emitType(resultType, name);
 
         stream->emit("(");
         auto firstParam = func->getFirstParam();
@@ -5849,7 +5849,7 @@ struct EmitVisitor
             if(auto arrayType = as<IRArrayType>(type))
             {
                 stream->emit("[");
-                EmitVal(arrayType->getElementCount(), kEOp_General);
+                emitVal(arrayType->getElementCount(), kEOp_General);
                 stream->emit("]");
 
                 // Continue looping on the next layer in.
