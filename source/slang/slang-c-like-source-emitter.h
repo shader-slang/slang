@@ -63,26 +63,6 @@ struct EOpInfo
     EPrecedence rightPrecedence;
 };
 
-// represents a declarator for use in emitting types
-struct EDeclarator
-{
-    enum class Flavor
-    {
-        name,
-        Array,
-        UnsizedArray,
-    };
-    Flavor flavor;
-    EDeclarator* next = nullptr;
-
-    // Used for `Flavor::name`
-    Name*       name;
-    SourceLoc   loc;
-
-    // Used for `Flavor::Array`
-    IRInst* elementCount;
-};
-
 struct CLikeSourceEmitter
 {
     enum class BuiltInCOp
@@ -95,9 +75,7 @@ struct CLikeSourceEmitter
     enum
     {
         kESemanticMask_None = 0,
-
         kESemanticMask_NoPackOffset = 1 << 0,
-
         kESemanticMask_Default = kESemanticMask_NoPackOffset,
     };
 
@@ -108,47 +86,10 @@ struct CLikeSourceEmitter
         GlobalConstant,
     };
 
-    // A chain of variables to use for emitting semantic/layout info
-    struct EmitVarChain
-    {
-        VarLayout*      varLayout;
-        EmitVarChain*   next;
-
-        EmitVarChain()
-            : varLayout(0)
-            , next(0)
-        {}
-
-        EmitVarChain(VarLayout* varLayout)
-            : varLayout(varLayout)
-            , next(0)
-        {}
-
-        EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
-            : varLayout(varLayout)
-            , next(next)
-        {}
-    };
-
-
-    struct IRDeclaratorInfo
-    {
-        enum class Flavor
-        {
-            Simple,
-            Ptr,
-            Array,
-        };
-
-        Flavor flavor;
-        IRDeclaratorInfo*   next;
-        union
-        {
-            String const* name;
-            IRInst* elementCount;
-        };
-    };
-
+    struct EmitVarChain;
+    struct IRDeclaratorInfo;
+    struct EDeclarator;
+    struct ComputeEmitActionsContext;
 
     // An action to be performed during code emit.
     struct EmitAction
@@ -162,22 +103,11 @@ struct CLikeSourceEmitter
         IRInst* inst;
     };
 
-    struct ComputeEmitActionsContext
-    {
-        IRInst*             moduleInst;
-        HashSet<IRInst*>    openInsts;
-        Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
-        List<EmitAction>*   actions;
-    };
-
-    EmitContext* context;
-    SourceStream* stream;
-
     CLikeSourceEmitter(EmitContext* context);
 
-    SourceManager* getSourceManager() { return context->getSourceManager(); }
+    SourceManager* getSourceManager() { return m_context->getSourceManager(); }
 
-    DiagnosticSink* getSink() { return context->getSink();}
+    DiagnosticSink* getSink() { return m_context->getSink();}
 
     //
     // Types
@@ -189,9 +119,7 @@ struct CLikeSourceEmitter
 
     void emitHLSLTextureType(IRTextureTypeBase* texType);
 
-    void emitGLSLTextureOrTextureSamplerType(
-        IRTextureTypeBase*  type,
-        char const*         baseName);
+    void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName);
 
     void emitGLSLTextureType(IRTextureType* texType);
 
@@ -200,23 +128,15 @@ struct CLikeSourceEmitter
     void emitGLSLImageType(IRGLSLImageType* type);
 
     void emitTextureType(IRTextureType* texType);
-    
 
     void emitTextureSamplerType(IRTextureSamplerType* type);
     void emitImageType(IRGLSLImageType* type);
 
-    void _emitCVecType(IROp op, Int size); 
-    void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
-
-    void _emitCFunc(BuiltInCOp cop, IRType* type);
-
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
-
 
     void emitVectorTypeImpl(IRVectorType* vecType);
 
     void emitMatrixTypeImpl(IRMatrixType* matType);
-
 
     void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
 
@@ -224,11 +144,7 @@ struct CLikeSourceEmitter
 
     void emitUntypedBufferType(IRUntypedBufferResourceType* type);
 
-
-    void _requireHalf();
-
     void emitSimpleTypeImpl(IRType* type);
-
 
     void emitArrayTypeImpl(IRArrayType* arrayType, EDeclarator* declarator);
 
@@ -266,10 +182,8 @@ struct CLikeSourceEmitter
 
     void emitStringLiteral(const String& value);
 
-
-    EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec);
-
-    EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec);
+    static EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec);
+    static EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec);
 
     void requireGLSLExtension(const String& name);
 
@@ -278,7 +192,6 @@ struct CLikeSourceEmitter
     void setSampleRateFlag();
 
     void doSampleRateInputCheck(Name* name);
-
 
     void emitVal(IRInst* val, const EOpInfo&  outerPrec);
 
@@ -294,13 +207,9 @@ struct CLikeSourceEmitter
 
         // Emit all the `register` semantics that are appropriate for a particular variable layout
     void emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-
-    void emitHLSLRegisterSemantics(
-        VarLayout*  varLayout,
-        char const* uniformSemanticSpelling = "register");
+    void emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
 
     void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain*       chain);
-
 
     void emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
 
@@ -318,10 +227,9 @@ struct CLikeSourceEmitter
     /// Emit directives to control overall layout computation for the emitted code.
     void emitLayoutDirectives(TargetRequest* targetReq);
 
-    // Utility code for generating unique IDs as needed
-    // during the emit process (e.g., for declarations
-    // that didn't originally have names, but now need to).
-
+        // Utility code for generating unique IDs as needed
+        // during the emit process (e.g., for declarations
+        // that didn't originally have names, but now need to).
     UInt allocateUniqueID();
 
     // IR-level emit logic
@@ -335,7 +243,7 @@ struct CLikeSourceEmitter
     String getIRName(IRInst* inst);
 
     void emitDeclarator(EmitContext* ctx, IRDeclaratorInfo* declarator);    
-    void emitIRSimpleValue(EmitContext*    /*context*/, IRInst* inst);
+    void emitIRSimpleValue(EmitContext* /*context*/, IRInst* inst);
 
     CodeGenTarget getTarget(EmitContext* ctx);
 
@@ -344,7 +252,6 @@ struct CLikeSourceEmitter
         IRInst*        inst,
         IREmitMode      mode);
 
-    
     void emitIROperand(
         EmitContext*    ctx,
         IRInst*         inst,
@@ -366,287 +273,13 @@ struct CLikeSourceEmitter
         IRType*         type,
         Name*           name);
 
-    void emitIRType(
-        EmitContext*    /*context*/,
-        IRType*         type);
+    void emitIRType(EmitContext* /*context*/, IRType* type);
 
-    void emitIRRateQualifiers(
-        EmitContext*    ctx,
-        IRRate*         rate);
+    void emitIRRateQualifiers(EmitContext* ctx, IRRate* rate);
 
-    void emitIRRateQualifiers(
-        EmitContext*    ctx,
-        IRInst*         value);
+    void emitIRRateQualifiers(EmitContext*    ctx, IRInst* value);
 
-    void emitIRInstResultDecl(
-        EmitContext*    ctx,
-        IRInst*         inst);
-
-    class UnmangleContext
-    {
-    private:
-        char const* cursor_  = nullptr;
-        char const* begin_   = nullptr;
-        char const* end_     = nullptr;
-
-        bool isDigit(char c)
-        {
-            return (c >= '0') && (c <= '9');
-        }
-
-        char peek()
-        {
-            return *cursor_;
-        }
-
-        char get()
-        {
-            return *cursor_++;
-        }
-
-        void expect(char c)
-        {
-            if(peek() == c)
-            {
-                get();
-            }
-            else
-            {
-                // ERROR!
-                SLANG_UNEXPECTED("mangled name error");
-            }
-        }
-
-        void expect(char const* str)
-        {
-            while(char c = *str++)
-                expect(c);
-        }
-
-    public:
-        UnmangleContext()
-        {}
-
-        UnmangleContext(String const& str)
-            : cursor_(str.begin())
-            , begin_(str.begin())
-            , end_(str.end())
-        {}
-
-        // Call at the beginning of a mangled name,
-        // to strip off the main prefix
-        void startUnmangling()
-        {
-            expect("_S");
-        }
-
-        UInt readCount()
-        {
-            int c = peek();
-            if(!isDigit((char)c))
-            {
-                SLANG_UNEXPECTED("bad name mangling");
-                UNREACHABLE_RETURN(0);
-            }
-            get();
-
-            if(c == '0')
-                return 0;
-
-            UInt count = 0;
-            for(;;)
-            {
-                count = count*10 + c - '0';
-                c = peek();
-                if(!isDigit((char)c))
-                    return count;
-
-                get();
-            }
-        }
-
-        void readGenericParam()
-        {
-            switch(peek())
-            {
-                case 'T':
-                case 'C':
-                    get();
-                    break;
-
-                case 'v':
-                    get();
-                    readType();
-                    break;
-
-                default:
-                    SLANG_UNEXPECTED("bad name mangling");
-                    break;
-            }
-        }
-
-        void readGenericParams()
-        {
-            expect("g");
-            UInt paramCount = readCount();
-            for(UInt pp = 0; pp < paramCount; pp++)
-            {
-                readGenericParam();
-            }
-        }
-
-        void readSimpleIntVal()
-        {
-            int c = peek();
-            if(isDigit((char)c))
-            {
-                get();
-            }
-            else
-            {
-                readVal();
-            }
-        }
-
-
-        UnownedStringSlice readRawStringSegment()
-        {
-            // Read the length part
-            UInt count = readCount();
-            if(count > UInt(end_ - cursor_))
-            {
-                SLANG_UNEXPECTED("bad name mangling");
-                UNREACHABLE_RETURN(UnownedStringSlice());
-            }
-
-            auto result = UnownedStringSlice(cursor_, cursor_ + count);
-            cursor_ += count;
-            return result;
-        }
-
-        void readNamedType()
-        {
-            // TODO: handle types with more complicated names
-            readRawStringSegment();
-        }
-
-        void readType()
-        {
-            int c = peek();
-            switch(c)
-            {
-                case 'V':
-                case 'b':
-                case 'i':
-                case 'u':
-                case 'U':
-                case 'h':
-                case 'f':
-                case 'd':
-                    get();
-                    break;
-
-                case 'v':
-                    get();
-                    readSimpleIntVal();
-                    readType();
-                    break;
-
-                default:
-                    readNamedType();
-                    break;
-            }
-        }
-
-        void readVal()
-        {
-            switch(peek())
-            {
-                case 'k':
-                    get();
-                    readCount();
-                    break;
-
-                case 'K':
-                    get();
-                    readRawStringSegment();
-                    break;
-
-                default:
-                    readType();
-                    break;
-            }
-
-        }
-
-        void readGenericArg()
-        {
-            readVal();
-        }
-
-        void readGenericArgs()
-        {
-            expect("G");
-            UInt argCount = readCount();
-            for(UInt aa = 0; aa < argCount; aa++)
-            {
-                readGenericArg();
-            }
-        }
-
-        void readExtensionSpec()
-        {
-            expect("X");
-            readType();
-        }
-
-        UnownedStringSlice readSimpleName()
-        {
-            UnownedStringSlice result;
-            for(;;)
-            {
-                int c = peek();
-
-                if(c == 'g')
-                {
-                    readGenericParams();
-                    continue;
-                }
-                else if(c == 'G')
-                {
-                    readGenericArgs();
-                    continue;
-                }
-                else if(c == 'X')
-                {
-                    readExtensionSpec();
-                    continue;
-                }
-
-                if(!isDigit((char)c))
-                    return result;
-
-                // Read the length part
-                UInt count = readCount();
-                if(count > UInt(end_ - cursor_))
-                {
-                    SLANG_UNEXPECTED("bad name mangling");
-                    UNREACHABLE_RETURN(result);
-                }
-
-                result = UnownedStringSlice(cursor_, cursor_ + count);
-                cursor_ += count;
-            }
-        }
-
-        UInt readParamCount()
-        {
-            expect("p");
-            UInt count = readCount();
-            expect("p");
-            return count;
-        }
-    };
+    void emitIRInstResultDecl(EmitContext* ctx, IRInst* inst);
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(EmitContext* /* ctx */, IRInst* inst);
 
@@ -779,15 +412,15 @@ struct CLikeSourceEmitter
 
     EntryPointLayout* asEntryPoint(IRFunc* func);
 
-    // Detect if the given IR function represents a
-    // declaration of an intrinsic/builtin for the
-    // current code-generation target.
+        // Detect if the given IR function represents a
+        // declaration of an intrinsic/builtin for the
+        // current code-generation target.
     bool isTargetIntrinsic(EmitContext*    /*ctxt*/, IRFunc* func);
 
-    // Check whether a given value names a target intrinsic,
-    // and return the IR function representing the intrinsic
-    // if it does.
-    IRFunc* asTargetIntrinsic(EmitContext*    ctxt, IRInst* value);
+        // Check whether a given value names a target intrinsic,
+        // and return the IR function representing the intrinsic
+        // if it does.
+    IRFunc* asTargetIntrinsic(EmitContext* ctxt, IRInst* value);
 
     void emitIRFunc(EmitContext* ctx, IRFunc* func);
 
@@ -795,8 +428,8 @@ struct CLikeSourceEmitter
 
     void emitIRMatrixLayoutModifiers(EmitContext* ctx, VarLayout* layout);
 
-    // Emit the `flat` qualifier if the underlying type
-    // of the variable is an integer type.
+        // Emit the `flat` qualifier if the underlying type
+        // of the variable is an integer type.
     void maybeEmitGLSLFlatModifier(EmitContext*, IRType* valueType);
 
     void emitInterpolationModifiers(
@@ -811,7 +444,7 @@ struct CLikeSourceEmitter
 
     void emitGLSLImageFormatModifier(IRInst* var, IRTextureType*  resourceType);
 
-    /// Emit modifiers that should apply even for a declaration of an SSA temporary.
+        /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     void emitIRTempModifiers(EmitContext* ctx, IRInst* temp);
 
     void emitIRVarModifiers(
@@ -820,22 +453,18 @@ struct CLikeSourceEmitter
         IRInst*         varDecl,
         IRType*         varType);
 
-    
-
     void emitHLSLParameterGroup(
         EmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type);
 
-    /// Emit the array brackets that go on the end of a declaration of the given type.
+        /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(EmitContext* ctx, IRType* inType);
-
 
     void emitGLSLParameterGroup(
         EmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type);
-
     
     void emitIRParameterGroup(
         EmitContext*                    ctx,
@@ -848,7 +477,6 @@ struct CLikeSourceEmitter
         EmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRHLSLStructuredBufferTypeBase* structuredBufferType);
-
     
     void emitIRByteAddressBuffer_GLSL(
         EmitContext*                    ctx,
@@ -861,7 +489,7 @@ struct CLikeSourceEmitter
 
     void emitIRGlobalConstant(EmitContext* ctx, IRGlobalConstant* valDecl);
 
-    void emitIRGlobalInst(EmitContext* ctx, IRInst*         inst);
+    void emitIRGlobalInst(EmitContext* ctx, IRInst* inst);
 
     void ensureInstOperand(
         ComputeEmitActionsContext*  ctx,
@@ -879,10 +507,18 @@ struct CLikeSourceEmitter
 
     void executeIREmitActions(EmitContext* ctx, List<EmitAction> const& actions);
     void emitIRModule(EmitContext* ctx, IRModule* module);
+
+    protected:
+
+    void _requireHalf();
+    void _emitCVecType(IROp op, Int size);
+    void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
+
+    void _emitCFunc(BuiltInCOp cop, IRType* type);
+
+    EmitContext* m_context;
+    SourceStream* m_stream;
 };
-
-//
-
     
 }
 #endif
