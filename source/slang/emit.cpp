@@ -91,6 +91,11 @@ void requireGLSLHalfExtension(ExtensionUsageTracker* tracker)
 // Shared state for an entire emit session
 struct SharedEmitContext
 {
+    DiagnosticSink* getSink() { return compileRequest->getSink(); }
+    LineDirectiveMode getLineDirectiveMode() { return compileRequest->getLineDirectiveMode(); }
+    SourceManager* getSourceManager() { return compileRequest->getSourceManager(); }
+    void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
+
     BackEndCompileRequest* compileRequest = nullptr;
 
     // The entry point we are being asked to compile
@@ -142,24 +147,9 @@ struct SharedEmitContext
     // to use for it when emitting code.
     Dictionary<IRInst*, String> mapInstToName;
 
-    DiagnosticSink* getSink() { return compileRequest->getSink(); }
-
     Dictionary<IRInst*, UInt> mapIRValueToRayPayloadLocation;
     Dictionary<IRInst*, UInt> mapIRValueToCallablePayloadLocation;
 };
-
-struct EmitContext
-{
-    // The shared context that is in effect
-    SharedEmitContext* shared;
-
-    DiagnosticSink* getSink() { return shared->getSink(); }
-
-    LineDirectiveMode getLineDirectiveMode() { return shared->compileRequest->getLineDirectiveMode(); }
-    SourceManager* getSourceManager() { return shared->compileRequest->getSourceManager(); }
-    void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
-};
-
 //
 
 enum EPrecedence
@@ -322,12 +312,12 @@ struct EDeclarator
 
 struct EmitVisitor
 {
-    EmitContext* context;
+    SharedEmitContext* context;
     SourceStream* stream;
 
-    EmitVisitor(EmitContext* context)
+    EmitVisitor(SharedEmitContext* context)
         : context(context),
-        stream(context->shared->stream)
+        stream(context->stream)
     {}
 
     SourceManager* getSourceManager()
@@ -550,7 +540,7 @@ struct EmitVisitor
     void emitTextureType(
         IRTextureType*  texType)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::HLSL:
             emitHLSLTextureType(texType);
@@ -569,7 +559,7 @@ struct EmitVisitor
     void emitTextureSamplerType(
         IRTextureSamplerType*   type)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::GLSL:
             emitGLSLTextureSamplerType(type);
@@ -584,7 +574,7 @@ struct EmitVisitor
     void emitImageType(
         IRGLSLImageType*    type)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::HLSL:
             emitHLSLTextureType(type);
@@ -708,7 +698,7 @@ struct EmitVisitor
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::GLSL:
         case CodeGenTarget::GLSL_Vulkan:
@@ -771,7 +761,7 @@ struct EmitVisitor
 
     void emitMatrixTypeImpl(IRMatrixType* matType)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::GLSL:
         case CodeGenTarget::GLSL_Vulkan:
@@ -816,7 +806,7 @@ struct EmitVisitor
 
     void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::HLSL:
         default:
@@ -846,7 +836,7 @@ struct EmitVisitor
 
     void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::HLSL:
         default:
@@ -885,7 +875,7 @@ struct EmitVisitor
 
     void emitUntypedBufferType(IRUntypedBufferResourceType* type)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         case CodeGenTarget::HLSL:
         default:
@@ -931,7 +921,7 @@ struct EmitVisitor
     {
         if (getTarget(context) == CodeGenTarget::GLSL)
         {
-            requireGLSLHalfExtension(&context->shared->extensionUsageTracker);
+            requireGLSLHalfExtension(&context->extensionUsageTracker);
         }
     }
 
@@ -1021,7 +1011,7 @@ struct EmitVisitor
 
         // HACK: As a fallback for HLSL targets, assume that the name of the
         // instruction being used is the same as the name of the HLSL type.
-        if(context->shared->target == CodeGenTarget::HLSL)
+        if(context->target == CodeGenTarget::HLSL)
         {
             auto opInfo = getIROpInfo(type->op);
             stream->emit(opInfo.name);
@@ -1151,7 +1141,7 @@ struct EmitVisitor
     bool isTargetIntrinsicModifierApplicable(
         String const& targetName)
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
@@ -1238,15 +1228,15 @@ struct EmitVisitor
 
     void requireGLSLExtension(String const& name)
     {
-        Slang::requireGLSLExtension(&context->shared->extensionUsageTracker, name);
+        Slang::requireGLSLExtension(&context->extensionUsageTracker, name);
     }
 
     void requireGLSLVersion(ProfileVersion version)
     {
-        if (context->shared->target != CodeGenTarget::GLSL)
+        if (context->target != CodeGenTarget::GLSL)
             return;
 
-        Slang::requireGLSLVersionImpl(&context->shared->extensionUsageTracker, version);
+        Slang::requireGLSLVersionImpl(&context->extensionUsageTracker, version);
     }
 
     void requireGLSLVersion(int version)
@@ -1275,7 +1265,7 @@ struct EmitVisitor
 
     void setSampleRateFlag()
     {
-        context->shared->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
+        context->entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
     }
 
     void doSampleRateInputCheck(Name* name)
@@ -1471,7 +1461,7 @@ struct EmitVisitor
 
         auto layout = chain->varLayout;
 
-        switch( context->shared->target )
+        switch( context->target )
         {
         default:
             return;
@@ -1609,7 +1599,7 @@ struct EmitVisitor
     {
         if(!layout) return;
 
-        switch( context->shared->target )
+        switch( context->target )
         {
         default:
             return;
@@ -1635,7 +1625,7 @@ struct EmitVisitor
 
     void emitGLSLVersionDirective()
     {
-        auto effectiveProfile = context->shared->effectiveProfile;
+        auto effectiveProfile = context->effectiveProfile;
         if(effectiveProfile.getFamily() == ProfileFamily::GLSL)
         {
             requireGLSLVersion(effectiveProfile.GetVersion());
@@ -1650,9 +1640,9 @@ struct EmitVisitor
         //
         // TODO: Either correctly compute a minimum required version, or require
         // the user to specify a version as part of the target.
-        requireGLSLVersionImpl(&context->shared->extensionUsageTracker, ProfileVersion::GLSL_450);
+        requireGLSLVersionImpl(&context->extensionUsageTracker, ProfileVersion::GLSL_450);
 
-        auto requiredProfileVersion = context->shared->extensionUsageTracker.profileVersion;
+        auto requiredProfileVersion = context->extensionUsageTracker.profileVersion;
         switch (requiredProfileVersion)
         {
 #define CASE(TAG, VALUE)    \
@@ -1690,7 +1680,7 @@ struct EmitVisitor
 
     void emitGLSLPreprocessorDirectives()
     {
-        switch(context->shared->target)
+        switch(context->target)
         {
         // Don't emit this stuff unless we are targetting GLSL
         default:
@@ -1723,7 +1713,7 @@ struct EmitVisitor
 
         auto matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
 
-        switch(context->shared->target)
+        switch(context->target)
         {
         default:
             return;
@@ -1771,14 +1761,14 @@ struct EmitVisitor
 
     UInt allocateUniqueID()
     {
-        return context->shared->uniqueIDCounter++;
+        return context->uniqueIDCounter++;
     }
 
     // IR-level emit logc
 
     UInt getID(IRInst* value)
     {
-        auto& mapIRValueToID = context->shared->mapIRValueToID;
+        auto& mapIRValueToID = context->mapIRValueToID;
 
         UInt id = 0;
         if (mapIRValueToID.TryGetValue(value, id))
@@ -1961,9 +1951,9 @@ struct EmitVisitor
 
             String key = sb.ProduceString();
             UInt count = 0;
-            context->shared->uniqueNameCounters.TryGetValue(key, count);
+            context->uniqueNameCounters.TryGetValue(key, count);
 
-            context->shared->uniqueNameCounters[key] = count+1;
+            context->uniqueNameCounters[key] = count+1;
 
             sb.append(Int32(count));
             return sb.ProduceString();
@@ -1991,10 +1981,10 @@ struct EmitVisitor
         IRInst*        inst)
     {
         String name;
-        if(!context->shared->mapInstToName.TryGetValue(inst, name))
+        if(!context->mapInstToName.TryGetValue(inst, name))
         {
             name = generateIRName(inst);
-            context->shared->mapInstToName.Add(inst, name);
+            context->mapInstToName.Add(inst, name);
         }
         return name;
     }
@@ -2018,7 +2008,7 @@ struct EmitVisitor
     };
 
     void emitDeclarator(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRDeclaratorInfo*   declarator)
     {
         if(!declarator)
@@ -2046,7 +2036,7 @@ struct EmitVisitor
     }
 
     void emitIRSimpleValue(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRInst*         inst)
     {
         switch(inst->op)
@@ -2073,9 +2063,9 @@ struct EmitVisitor
 
     }
 
-    CodeGenTarget getTarget(EmitContext* ctx)
+    CodeGenTarget getTarget(SharedEmitContext* ctx)
     {
-        return ctx->shared->target;
+        return ctx->target;
     }
 
     // Hack to allow IR emit for global constant to override behavior
@@ -2086,7 +2076,7 @@ struct EmitVisitor
     };
 
     bool shouldFoldIRInstIntoUseSites(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*        inst,
         IREmitMode      mode)
     {
@@ -2294,7 +2284,7 @@ struct EmitVisitor
     }
 
     void emitIROperand(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode,
         EOpInfo const&  outerPrec)
@@ -2315,7 +2305,7 @@ struct EmitVisitor
     }
 
     void emitIRArgs(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode)
     {
@@ -2332,7 +2322,7 @@ struct EmitVisitor
     }
 
     void emitIRType(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRType*         type,
         String const&   name)
     {
@@ -2340,7 +2330,7 @@ struct EmitVisitor
     }
 
     void emitIRType(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRType*         type,
         Name*           name)
     {
@@ -2348,14 +2338,14 @@ struct EmitVisitor
     }
 
     void emitIRType(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRType*         type)
     {
         EmitType(type);
     }
 
     void emitIRRateQualifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRRate*         rate)
     {
         if(!rate) return;
@@ -2392,7 +2382,7 @@ struct EmitVisitor
     }
 
     void emitIRRateQualifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         value)
     {
         emitIRRateQualifiers(ctx, value->getRate());
@@ -2400,7 +2390,7 @@ struct EmitVisitor
 
 
     void emitIRInstResultDecl(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst)
     {
         auto type = inst->getDataType();
@@ -2685,7 +2675,7 @@ struct EmitVisitor
     };
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
-        EmitContext*    /* ctx */,
+        SharedEmitContext*    /* ctx */,
         IRInst*         inst)
     {
         for(auto dd : inst->getDecorations())
@@ -2722,7 +2712,7 @@ struct EmitVisitor
     }
 
     void emitTargetIntrinsicCallExpr(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRCall*                         inst,
         IRFunc*                         /* func */,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
@@ -3138,7 +3128,7 @@ struct EmitVisitor
                                 // The `$XT` case handles selecting between
                                 // the `gl_HitTNV` and `gl_RayTmaxNV` builtins,
                                 // based on what stage we are using:
-                                switch( ctx->shared->entryPoint->getStage() )
+                                switch( ctx->entryPoint->getStage() )
                                 {
                                 default:
                                     stream->emit("gl_RayTmaxNV");
@@ -3174,7 +3164,7 @@ struct EmitVisitor
     }
 
     void emitIntrinsicCallExpr(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRCall*         inst,
         IRFunc*         func,
         IREmitMode      mode,
@@ -3294,7 +3284,7 @@ struct EmitVisitor
             operandIndex++;
         }
         // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
-        bool glslSignFix = ctx->shared->target == CodeGenTarget::GLSL && name == "sign";
+        bool glslSignFix = ctx->target == CodeGenTarget::GLSL && name == "sign";
         if (glslSignFix)
         {
             if (auto vectorType = as<IRVectorType>(inst->getDataType()))
@@ -3326,7 +3316,7 @@ struct EmitVisitor
     }
 
     void emitIRCallExpr(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRCall*         inst,
         IREmitMode      mode,
         EOpInfo         outerPrec)
@@ -3406,7 +3396,7 @@ struct EmitVisitor
         }
     }
 
-    void _maybeEmitGLSLCast(EmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
+    void _maybeEmitGLSLCast(SharedEmitContext* ctx, IRType* castType, IRInst* inst, IREmitMode mode)
     {
         // Wrap in cast if a cast type is specified
         if (castType)
@@ -3426,7 +3416,7 @@ struct EmitVisitor
         }
     }
 
-    void emitNot(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+    void emitNot(SharedEmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
     {
         IRInst* operand = inst->getOperand(0);
 
@@ -3453,7 +3443,7 @@ struct EmitVisitor
     }
 
 
-    void emitComparison(EmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+    void emitComparison(SharedEmitContext* ctx, IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
     {        
         if (getTarget(ctx) == CodeGenTarget::GLSL)
         {
@@ -3498,7 +3488,7 @@ struct EmitVisitor
 
     
     void emitIRInstExpr(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode,
         EOpInfo const&  inOuterPrec)
@@ -4045,7 +4035,7 @@ struct EmitVisitor
     }
 
     void emitIRInst(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode)
     {
@@ -4064,7 +4054,7 @@ struct EmitVisitor
     }
 
     void emitIRInstImpl(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         IREmitMode      mode)
     {
@@ -4194,7 +4184,7 @@ struct EmitVisitor
     }
 
     void emitIRSemantics(
-        EmitContext*,
+        SharedEmitContext*,
         VarLayout*      varLayout)
     {
         if(varLayout->flags & VarLayoutFlag::HasSemantic)
@@ -4209,11 +4199,11 @@ struct EmitVisitor
     }
 
     void emitIRSemantics(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst)
     {
         // Don't emit semantics if we aren't translating down to HLSL
-        switch (ctx->shared->target)
+        switch (ctx->target)
         {
         case CodeGenTarget::HLSL:
             break;
@@ -4247,7 +4237,7 @@ struct EmitVisitor
     }
 
     VarLayout* getVarLayout(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRInst*         var)
     {
         auto decoration = var->findDecoration<IRLayoutDecoration>();
@@ -4258,7 +4248,7 @@ struct EmitVisitor
     }
 
     void emitIRLayoutSemantics(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst,
         char const*     uniformSemanticSpelling = "register")
     {
@@ -4275,7 +4265,7 @@ struct EmitVisitor
     // target block, while in our representation these use the arguments
     // to the branch instruction to fill in the parameters of the target.
     void emitPhiVarAssignments(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         UInt            argCount,
         IRUse*          args,
         IRBlock*        targetBlock)
@@ -4305,7 +4295,7 @@ struct EmitVisitor
 
     /// Emit high-level language statements from a structrured region.
     void emitRegion(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         Region*         inRegion)
     {
         // We will use a loop so that we can process sequential (simple)
@@ -4543,7 +4533,7 @@ struct EmitVisitor
 
     /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         RegionTree*     regionTree)
     {
         emitRegion(ctx, regionTree->rootRegion);
@@ -4660,10 +4650,10 @@ struct EmitVisitor
 
     void emitIREntryPointAttributes_HLSL(
         IRFunc*             irFunc,
-        EmitContext*        ctx,
+        SharedEmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
-        auto profile = ctx->shared->effectiveProfile;
+        auto profile = ctx->effectiveProfile;
         auto stage = entryPointLayout->profile.GetStage();
 
         if(profile.getFamily() == ProfileFamily::DX)
@@ -4782,7 +4772,7 @@ struct EmitVisitor
 
     void emitIREntryPointAttributes_GLSL(
         IRFunc*             irFunc,
-        EmitContext*        /*ctx*/,
+        SharedEmitContext*        /*ctx*/,
         EntryPointLayout*   entryPointLayout)
     {
         auto profile = entryPointLayout->profile;
@@ -4894,7 +4884,7 @@ struct EmitVisitor
 
     void emitIREntryPointAttributes(
         IRFunc*             irFunc,
-        EmitContext*        ctx,
+        SharedEmitContext*        ctx,
         EntryPointLayout*   entryPointLayout)
     {
         switch(getTarget(ctx))
@@ -4910,7 +4900,7 @@ struct EmitVisitor
     }
 
     void emitPhiVarDecls(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRFunc*         func)
     {
         // We will skip the first block, since its parameters are
@@ -4933,7 +4923,7 @@ struct EmitVisitor
 
     /// Emit high-level statements for the body of a function.
     void emitIRFunctionBody(
-        EmitContext*            ctx,
+        SharedEmitContext*            ctx,
         IRGlobalValueWithCode*  code)
     {
         // Compute a structured region tree that can represent
@@ -4965,7 +4955,7 @@ struct EmitVisitor
     }
 
     void emitIRSimpleFunc(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRFunc*         func)
     {
         auto resultType = func->getResultType();
@@ -4978,7 +4968,7 @@ struct EmitVisitor
             emitIREntryPointAttributes(func, ctx, entryPointLayout);
         }
 
-        const CodeGenTarget target = ctx->shared->target;
+        const CodeGenTarget target = ctx->target;
 
         auto name = getIRFuncName(func);
 
@@ -5054,7 +5044,7 @@ struct EmitVisitor
     }
 
     void emitIRParamType(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRType*         type,
         String const&   name)
     {
@@ -5102,7 +5092,7 @@ struct EmitVisitor
     }
 
     void emitIRFuncDecl(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRFunc*         func)
     {
         // We don't want to emit declarations for operations
@@ -5149,7 +5139,7 @@ struct EmitVisitor
     }
 
     EntryPointLayout* getEntryPointLayout(
-        EmitContext*    /*context*/,
+        SharedEmitContext*    /*context*/,
         IRFunc*         func)
     {
         if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
@@ -5176,7 +5166,7 @@ struct EmitVisitor
     // declaration of an intrinsic/builtin for the
     // current code-generation target.
     bool isTargetIntrinsic(
-        EmitContext*    /*ctxt*/,
+        SharedEmitContext*    /*ctxt*/,
         IRFunc*         func)
     {
         // For now we do this in an overly simplistic
@@ -5189,7 +5179,7 @@ struct EmitVisitor
     // and return the IR function representing the intrinsic
     // if it does.
     IRFunc* asTargetIntrinsic(
-        EmitContext*    ctxt,
+        SharedEmitContext*    ctxt,
         IRInst*         value)
     {
         if(!value)
@@ -5211,7 +5201,7 @@ struct EmitVisitor
     }
 
     void emitIRFunc(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRFunc*         func)
     {
         if(!isDefinition(func))
@@ -5238,7 +5228,7 @@ struct EmitVisitor
     }
 
     void emitIRStruct(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRStructType*   structType)
     {
         // If the selected `struct` type is actually an intrinsic
@@ -5264,7 +5254,7 @@ struct EmitVisitor
                 continue;
 
             // Note: GLSL doesn't support interpolation modifiers on `struct` fields
-            if( ctx->shared->target != CodeGenTarget::GLSL )
+            if( ctx->target != CodeGenTarget::GLSL )
             {
                 emitInterpolationModifiers(ctx, fieldKey, fieldType, nullptr);
             }
@@ -5279,7 +5269,7 @@ struct EmitVisitor
     }
 
     void emitIRMatrixLayoutModifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         VarLayout*      layout)
     {
         // When a variable has a matrix type, we want to emit an explicit
@@ -5292,7 +5282,7 @@ struct EmitVisitor
 
         if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
         {
-            auto target = ctx->shared->target;
+            auto target = ctx->target;
 
             switch (target)
             {
@@ -5338,7 +5328,7 @@ struct EmitVisitor
     // Emit the `flat` qualifier if the underlying type
     // of the variable is an integer type.
     void maybeEmitGLSLFlatModifier(
-        EmitContext*,
+        SharedEmitContext*,
         IRType*           valueType)
     {
         auto tt = valueType;
@@ -5361,12 +5351,12 @@ struct EmitVisitor
     }
 
     void emitInterpolationModifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         varInst,
         IRType*         valueType,
         VarLayout*      layout)
     {
-        bool isGLSL = (ctx->shared->target == CodeGenTarget::GLSL);
+        bool isGLSL = (ctx->target == CodeGenTarget::GLSL);
         bool anyModifiers = false;
 
         for(auto dd : varInst->getDecorations())
@@ -5434,10 +5424,10 @@ struct EmitVisitor
     }
 
     UInt getRayPayloadLocation(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst)
     {
-        auto& map = ctx->shared->mapIRValueToRayPayloadLocation;
+        auto& map = ctx->mapIRValueToRayPayloadLocation;
         UInt value = 0;
         if(map.TryGetValue(inst, value))
             return value;
@@ -5448,10 +5438,10 @@ struct EmitVisitor
     }
 
     UInt getCallablePayloadLocation(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst)
     {
-        auto& map = ctx->shared->mapIRValueToCallablePayloadLocation;
+        auto& map = ctx->mapIRValueToCallablePayloadLocation;
         UInt value = 0;
         if(map.TryGetValue(inst, value))
             return value;
@@ -5514,7 +5504,7 @@ struct EmitVisitor
         // treating images without explicit formats as having
         // unknown format.
         //
-        if(this->context->shared->compileRequest->useUnknownImageFormatAsDefault)
+        if(this->context->compileRequest->useUnknownImageFormatAsDefault)
         {
             requireGLSLExtension("GL_EXT_shader_image_load_formatted");
             return;
@@ -5635,7 +5625,7 @@ struct EmitVisitor
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     void emitIRTempModifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         temp)
     {
         SLANG_UNUSED(ctx);
@@ -5647,7 +5637,7 @@ struct EmitVisitor
     }
 
     void emitIRVarModifiers(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         VarLayout*      layout,
         IRInst*         varDecl,
         IRType*         varType)
@@ -5728,7 +5718,7 @@ struct EmitVisitor
             emitInterpolationModifiers(ctx, varDecl, varType, layout);
         }
 
-        if (ctx->shared->target == CodeGenTarget::GLSL)
+        if (ctx->target == CodeGenTarget::GLSL)
         {
             // Layout-related modifiers need to come before the declaration,
             // so deal with them here.
@@ -5785,7 +5775,7 @@ struct EmitVisitor
     }
 
     void emitHLSLParameterGroup(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
@@ -5832,7 +5822,7 @@ struct EmitVisitor
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRType*         inType)
     {
         SLANG_UNUSED(ctx);
@@ -5885,7 +5875,7 @@ struct EmitVisitor
 
 
     void emitGLSLParameterGroup(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
@@ -5938,7 +5928,7 @@ struct EmitVisitor
 
         // Generate a dummy name for the block
         stream->emit("_S");
-        stream->emit(ctx->shared->uniqueIDCounter++);
+        stream->emit(ctx->uniqueIDCounter++);
 
         stream->emit("\n{\n");
         stream->indent();
@@ -5961,11 +5951,11 @@ struct EmitVisitor
     }
 
     void emitIRParameterGroup(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRUniformParameterGroupType*    type)
     {
-        switch (ctx->shared->target)
+        switch (ctx->target)
         {
         case CodeGenTarget::HLSL:
             emitHLSLParameterGroup(ctx, varDecl, type);
@@ -5978,7 +5968,7 @@ struct EmitVisitor
     }
 
     void emitIRVar(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRVar*          varDecl)
     {
         auto allocatedType = varDecl->getDataType();
@@ -6027,7 +6017,7 @@ struct EmitVisitor
     }
 
     void emitIRStructuredBuffer_GLSL(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRHLSLStructuredBufferTypeBase* structuredBufferType)
     {
@@ -6080,7 +6070,7 @@ struct EmitVisitor
     
         // Generate a dummy name for the block
         stream->emit("_S");
-        stream->emit(ctx->shared->uniqueIDCounter++);
+        stream->emit(ctx->uniqueIDCounter++);
 
         stream->emit(" {\n");
         stream->indent();
@@ -6100,7 +6090,7 @@ struct EmitVisitor
     }
 
     void emitIRByteAddressBuffer_GLSL(
-        EmitContext*                    ctx,
+        SharedEmitContext*                    ctx,
         IRGlobalParam*                  varDecl,
         IRByteAddressBufferTypeBase*    byteAddressBufferType)
     {
@@ -6153,7 +6143,7 @@ struct EmitVisitor
 
         // Generate a dummy name for the block
         stream->emit("_S");
-        stream->emit(ctx->shared->uniqueIDCounter++);
+        stream->emit(ctx->uniqueIDCounter++);
         stream->emit("\n{\n");
         stream->indent();
 
@@ -6169,7 +6159,7 @@ struct EmitVisitor
     }
 
     void emitIRGlobalVar(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRGlobalVar*    varDecl)
     {
         auto allocatedType = varDecl->getDataType();
@@ -6241,7 +6231,7 @@ struct EmitVisitor
     }
 
     void emitIRGlobalParam(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRGlobalParam*  varDecl)
     {
         auto rawType = varDecl->getDataType();
@@ -6387,7 +6377,7 @@ struct EmitVisitor
 
 
     void emitIRGlobalConstantInitializer(
-        EmitContext*        ctx,
+        SharedEmitContext*        ctx,
         IRGlobalConstant*   valDecl)
     {
         // We expect to see only a single block
@@ -6414,12 +6404,12 @@ struct EmitVisitor
     }
 
     void emitIRGlobalConstant(
-        EmitContext*        ctx,
+        SharedEmitContext*        ctx,
         IRGlobalConstant*   valDecl)
     {
         auto valType = valDecl->getDataType();
 
-        if( ctx->shared->target != CodeGenTarget::GLSL )
+        if( ctx->target != CodeGenTarget::GLSL )
         {
             stream->emit("static ");
         }
@@ -6444,7 +6434,7 @@ struct EmitVisitor
     }
 
     void emitIRGlobalInst(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRInst*         inst)
     {
         stream->advanceToSourceLocation(inst->sourceLoc);
@@ -6611,7 +6601,7 @@ struct EmitVisitor
     }
 
     void executeIREmitActions(
-        EmitContext*                ctx,
+        SharedEmitContext*                ctx,
         List<EmitAction> const&     actions)
     {
         for(auto action : actions)
@@ -6630,7 +6620,7 @@ struct EmitVisitor
     }
 
     void emitIRModule(
-        EmitContext*    ctx,
+        SharedEmitContext*    ctx,
         IRModule*       module)
     {
         // The IR will usually come in an order that respects
@@ -6803,10 +6793,7 @@ String emitEntryPoint(
     StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
     sharedContext.globalStructLayout = globalStructLayout;
 
-    EmitContext context;
-    context.shared = &sharedContext;
-
-    EmitVisitor visitor(&context);
+    EmitVisitor visitor(&sharedContext);
 
     {
         auto session = targetRequest->getSession();
@@ -7067,7 +7054,7 @@ String emitEntryPoint(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
-        visitor.emitIRModule(&context, irModule);
+        visitor.emitIRModule(&sharedContext, irModule);
     }
 
     // Deal with cases where a particular stage requires certain GLSL versions
@@ -7085,8 +7072,8 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            requireGLSLExtension(&context.shared->extensionUsageTracker, "GL_NV_ray_tracing");
-            requireGLSLVersionImpl(&context.shared->extensionUsageTracker, ProfileVersion::GLSL_460);
+            requireGLSLExtension(&sharedContext.extensionUsageTracker, "GL_NV_ray_tracing");
+            requireGLSLVersionImpl(&sharedContext.extensionUsageTracker, ProfileVersion::GLSL_460);
         }
         break;
     }
