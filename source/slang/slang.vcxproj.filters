@@ -153,6 +153,9 @@
     <ClInclude Include="reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-c-like-source-emitter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-emit-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -315,6 +318,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="reflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-c-like-source-emitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-context.cpp">
