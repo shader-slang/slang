@@ -4,6 +4,8 @@
 #include "ir.h"
 #include "ir-insts.h"
 
+#include "slang-extension-usage-tracker.h"
+
 namespace Slang
 {
 
@@ -174,14 +176,6 @@ struct GLSLSystemValueInfo
     IRType*     requiredType;
 };
 
-void requireGLSLVersionImpl(
-    ExtensionUsageTracker*  tracker,
-    ProfileVersion          version);
-
-void requireGLSLExtension(
-    ExtensionUsageTracker*  tracker,
-    String const&           name);
-
 struct GLSLLegalizationContext
 {
     Session*                session;
@@ -191,12 +185,12 @@ struct GLSLLegalizationContext
 
     void requireGLSLExtension(String const& name)
     {
-        Slang::requireGLSLExtension(extensionUsageTracker, name);
+        extensionUsageTracker->requireGLSLExtension(name);
     }
 
     void requireGLSLVersion(ProfileVersion version)
     {
-        Slang::requireGLSLVersionImpl(extensionUsageTracker, version);
+        extensionUsageTracker->requireGLSLVersion(version);
     }
 
     Stage getStage()

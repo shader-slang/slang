@@ -24,6 +24,7 @@
 #include "visitor.h"
 
 #include "slang-source-stream.h"
+#include "slang-emit-context.h"
 
 #include <assert.h>
 
@@ -35,121 +36,8 @@ enum class BuiltInCOp
     Init,                   //< Initialize with parameters (must match the type)
 };
 
-struct ExtensionUsageTracker
-{
-    // Record the GLSL extnsions we have already emitted a `#extension` for
-    HashSet<String> glslExtensionsRequired;
-    StringBuilder glslExtensionRequireLines;
-
-    ProfileVersion profileVersion = ProfileVersion::GLSL_110;
-
-    bool hasHalfExtension = false;
-};
-
-void requireGLSLExtension(
-    ExtensionUsageTracker*  tracker,
-    String const&           name)
-{
-    if (tracker->glslExtensionsRequired.Contains(name))
-        return;
-
-    StringBuilder& sb = tracker->glslExtensionRequireLines;
-
-    sb.append("#extension ");
-    sb.append(name);
-    sb.append(" : require\n");
-
-    tracker->glslExtensionsRequired.Add(name);
-}
-
-void requireGLSLVersionImpl(
-    ExtensionUsageTracker*  tracker,
-    ProfileVersion          version)
-{
-    // Check if this profile is newer
-    if ((UInt)version > (UInt)tracker->profileVersion)
-    {
-        tracker->profileVersion = version;
-    }
-}
-
-void requireGLSLHalfExtension(ExtensionUsageTracker* tracker)
-{
-    if (!tracker->hasHalfExtension)
-    {
-        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
-        requireGLSLExtension(tracker, "GL_EXT_shader_16bit_storage");
-
-        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
-        requireGLSLExtension(tracker, "GL_EXT_shader_explicit_arithmetic_types");
-        
-        tracker->hasHalfExtension = true;
-    }
-}
 
 
-// Shared state for an entire emit session
-struct EmitContext
-{
-    DiagnosticSink* getSink() { return compileRequest->getSink(); }
-    LineDirectiveMode getLineDirectiveMode() { return compileRequest->getLineDirectiveMode(); }
-    SourceManager* getSourceManager() { return compileRequest->getSourceManager(); }
-    void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
-
-    BackEndCompileRequest* compileRequest = nullptr;
-
-    // The entry point we are being asked to compile
-    EntryPoint* entryPoint;
-
-    // The layout for the entry point
-    EntryPointLayout*   entryPointLayout;
-
-    // The target language we want to generate code for
-    CodeGenTarget target;
-
-    // Where source is written to
-    SourceStream* stream;  
-     
-    // We only want to emit each `import`ed module one time, so
-    // we maintain a set of already-emitted modules.
-    HashSet<ModuleDecl*> modulesAlreadyEmitted;
-
-    // We track the original global-scope layout so that we can
-    // find layout information for `import`ed parameters.
-    //
-    // TODO: This will probably change if we represent imports
-    // explicitly in the layout data.
-    StructTypeLayout*   globalStructLayout;
-
-    ProgramLayout*      programLayout;
-
-    ModuleDecl*  program;
-
-    ExtensionUsageTracker extensionUsageTracker;
-
-    UInt uniqueIDCounter = 1;
-    Dictionary<IRInst*, UInt> mapIRValueToID;
-    Dictionary<Decl*, UInt> mapDeclToID;
-
-    HashSet<String> irDeclsVisited;
-
-    HashSet<String> irTupleTypes;
-
-    // The "effective" profile that is being used to emit code,
-    // combining information from the target and entry point.
-    Profile effectiveProfile;
-
-    // Map a string name to the number of times we have seen this
-    // name used so far during code emission.
-    Dictionary<String, UInt> uniqueNameCounters;
-
-    // Map an IR instruction to the name that we've decided
-    // to use for it when emitting code.
-    Dictionary<IRInst*, String> mapInstToName;
-
-    Dictionary<IRInst*, UInt> mapIRValueToRayPayloadLocation;
-    Dictionary<IRInst*, UInt> mapIRValueToCallablePayloadLocation;
-};
 //
 
 enum EPrecedence
@@ -921,7 +809,7 @@ struct EmitVisitor
     {
         if (getTarget(context) == CodeGenTarget::GLSL)
         {
-            requireGLSLHalfExtension(&context->extensionUsageTracker);
+            context->extensionUsageTracker.requireGLSLHalfExtension();
         }
     }
 
@@ -1228,7 +1116,7 @@ struct EmitVisitor
 
     void requireGLSLExtension(String const& name)
     {
-        Slang::requireGLSLExtension(&context->extensionUsageTracker, name);
+        context->extensionUsageTracker.requireGLSLExtension(name);
     }
 
     void requireGLSLVersion(ProfileVersion version)
@@ -1236,7 +1124,7 @@ struct EmitVisitor
         if (context->target != CodeGenTarget::GLSL)
             return;
 
-        Slang::requireGLSLVersionImpl(&context->extensionUsageTracker, version);
+        context->extensionUsageTracker.requireGLSLVersion(version);
     }
 
     void requireGLSLVersion(int version)
@@ -1640,9 +1528,9 @@ struct EmitVisitor
         //
         // TODO: Either correctly compute a minimum required version, or require
         // the user to specify a version as part of the target.
-        requireGLSLVersionImpl(&context->extensionUsageTracker, ProfileVersion::GLSL_450);
+        context->extensionUsageTracker.requireGLSLVersion(ProfileVersion::GLSL_450);
 
-        auto requiredProfileVersion = context->extensionUsageTracker.profileVersion;
+        auto requiredProfileVersion = context->extensionUsageTracker.getRequiredGLSLProfileVersion();
         switch (requiredProfileVersion)
         {
 #define CASE(TAG, VALUE)    \
@@ -7072,8 +6960,8 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            requireGLSLExtension(&emitContext.extensionUsageTracker, "GL_NV_ray_tracing");
-            requireGLSLVersionImpl(&emitContext.extensionUsageTracker, ProfileVersion::GLSL_460);
+            emitContext.extensionUsageTracker.requireGLSLExtension("GL_NV_ray_tracing");
+            emitContext.extensionUsageTracker.requireGLSLVersion(ProfileVersion::GLSL_460);
         }
         break;
     }
@@ -7094,7 +6982,7 @@ String emitEntryPoint(
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << emitContext.extensionUsageTracker.glslExtensionRequireLines.ProduceString();
+    finalResultBuilder << emitContext.extensionUsageTracker.getGLSLExtensionRequireLines();
 
     finalResultBuilder << code;
 

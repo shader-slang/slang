@@ -153,6 +153,12 @@
     <ClInclude Include="reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit-context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-extension-usage-tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -309,6 +315,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="reflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-emit-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-extension-usage-tracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-file-system.cpp">
