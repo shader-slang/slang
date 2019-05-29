@@ -156,7 +156,7 @@
     <ClInclude Include="slang-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-source-sink.h">
+    <ClInclude Include="slang-source-stream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source-loc.h">
@@ -314,7 +314,7 @@
     <ClCompile Include="slang-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-source-sink.cpp">
+    <ClCompile Include="slang-source-stream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-stdlib.cpp">

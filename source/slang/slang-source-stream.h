@@ -1,6 +1,6 @@
-// slang-source-sink.h
-#ifndef SLANG_SOURCE_SINK_H_INCLUDED
-#define SLANG_SOURCE_SINK_H_INCLUDED
+// slang-source-stream.h
+#ifndef SLANG_SOURCE_STREAM_H_INCLUDED
+#define SLANG_SOURCE_STREAM_H_INCLUDED
 
 #include "../core/basic.h"
 
@@ -9,7 +9,7 @@
 namespace Slang
 {
 
-class SourceSink
+class SourceStream
 {
 public:
 
@@ -74,7 +74,7 @@ public:
     SourceManager* getSourceManager() const { return sourceManager; }
 
         /// Ctor
-    SourceSink(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode);
+    SourceStream(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode);
 
 protected:
     // The string of code we've built so far

@@ -23,7 +23,7 @@
 #include "type-layout.h"
 #include "visitor.h"
 
-#include "slang-source-sink.h"
+#include "slang-source-stream.h"
 
 #include <assert.h>
 
@@ -103,7 +103,7 @@ struct SharedEmitContext
     CodeGenTarget target;
 
     // Where source is written to
-    SourceSink* sourceSink;  
+    SourceStream* stream;  
      
     // We only want to emit each `import`ed module one time, so
     // we maintain a set of already-emitted modules.
@@ -323,10 +323,11 @@ struct EDeclarator
 struct EmitVisitor
 {
     EmitContext* context;
-    SourceSink* sourceSink;
+    SourceStream* stream;
+
     EmitVisitor(EmitContext* context)
         : context(context),
-        sourceSink(context->shared->sourceSink)
+        stream(context->shared->stream)
     {}
 
     SourceManager* getSourceManager()
@@ -347,27 +348,27 @@ struct EmitVisitor
     {
         if (!declarator) return;
 
-        sourceSink->Emit(" ");
+        stream->Emit(" ");
 
         switch (declarator->flavor)
         {
         case EDeclarator::Flavor::name:
-            sourceSink->emitName(declarator->name, declarator->loc);
+            stream->emitName(declarator->name, declarator->loc);
             break;
 
         case EDeclarator::Flavor::Array:
             EmitDeclarator(declarator->next);
-            sourceSink->Emit("[");
+            stream->Emit("[");
             if(auto elementCount = declarator->elementCount)
             {
                 EmitVal(elementCount, kEOp_General);
             }
-            sourceSink->Emit("]");
+            stream->Emit("]");
             break;
 
         case EDeclarator::Flavor::UnsizedArray:
             EmitDeclarator(declarator->next);
-            sourceSink->Emit("[]");
+            stream->Emit("[]");
             break;
 
         default:
@@ -386,17 +387,17 @@ struct EmitVisitor
             // no prefix
             break;
 
-        case kIROp_Int8Type:    sourceSink->Emit("i8");     break;
-        case kIROp_Int16Type:   sourceSink->Emit("i16");    break;
-        case kIROp_IntType:     sourceSink->Emit("i");      break;
-        case kIROp_Int64Type:   sourceSink->Emit("i64");    break;
+        case kIROp_Int8Type:    stream->Emit("i8");     break;
+        case kIROp_Int16Type:   stream->Emit("i16");    break;
+        case kIROp_IntType:     stream->Emit("i");      break;
+        case kIROp_Int64Type:   stream->Emit("i64");    break;
 
-        case kIROp_UInt8Type:   sourceSink->Emit("u8");     break;
-        case kIROp_UInt16Type:  sourceSink->Emit("u16");    break;
-        case kIROp_UIntType:    sourceSink->Emit("u");      break;
-        case kIROp_UInt64Type:  sourceSink->Emit("u64");    break;
+        case kIROp_UInt8Type:   stream->Emit("u8");     break;
+        case kIROp_UInt16Type:  stream->Emit("u16");    break;
+        case kIROp_UIntType:    stream->Emit("u");      break;
+        case kIROp_UInt64Type:  stream->Emit("u64");    break;
 
-        case kIROp_BoolType:    sourceSink->Emit("b");		break;
+        case kIROp_BoolType:    stream->Emit("b");		break;
 
         case kIROp_HalfType:
         {
@@ -407,11 +408,11 @@ struct EmitVisitor
             }
             else
             {
-                sourceSink->Emit("f16");
+                stream->Emit("f16");
             }
             break;
         }
-        case kIROp_DoubleType:  sourceSink->Emit("d");		break;
+        case kIROp_DoubleType:  stream->Emit("d");		break;
 
         case kIROp_VectorType:
             emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
@@ -436,19 +437,19 @@ struct EmitVisitor
             break;
 
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
-            sourceSink->Emit("RW");
+            stream->Emit("RW");
             break;
 
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            sourceSink->Emit("RasterizerOrdered");
+            stream->Emit("RasterizerOrdered");
             break;
 
         case SLANG_RESOURCE_ACCESS_APPEND:
-            sourceSink->Emit("Append");
+            stream->Emit("Append");
             break;
 
         case SLANG_RESOURCE_ACCESS_CONSUME:
-            sourceSink->Emit("Consume");
+            stream->Emit("Consume");
             break;
 
         default:
@@ -458,11 +459,11 @@ struct EmitVisitor
 
         switch (texType->GetBaseShape())
         {
-        case TextureFlavor::Shape::Shape1D:		sourceSink->Emit("Texture1D");		break;
-        case TextureFlavor::Shape::Shape2D:		sourceSink->Emit("Texture2D");		break;
-        case TextureFlavor::Shape::Shape3D:		sourceSink->Emit("Texture3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	sourceSink->Emit("TextureCube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:  sourceSink->Emit("Buffer");         break;
+        case TextureFlavor::Shape::Shape1D:		stream->Emit("Texture1D");		break;
+        case TextureFlavor::Shape::Shape2D:		stream->Emit("Texture2D");		break;
+        case TextureFlavor::Shape::Shape3D:		stream->Emit("Texture3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	stream->Emit("TextureCube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:  stream->Emit("Buffer");         break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -470,15 +471,15 @@ struct EmitVisitor
 
         if (texType->isMultisample())
         {
-            sourceSink->Emit("MS");
+            stream->Emit("MS");
         }
         if (texType->isArray())
         {
-            sourceSink->Emit("Array");
+            stream->Emit("Array");
         }
-        sourceSink->Emit("<");
+        stream->Emit("<");
         EmitType(texType->getElementType());
-        sourceSink->Emit(" >");
+        stream->Emit(" >");
     }
 
     void emitGLSLTextureOrTextureSamplerType(
@@ -495,14 +496,14 @@ struct EmitVisitor
             emitGLSLTypePrefix(type->getElementType(), true);
         }
 
-        sourceSink->Emit(baseName);
+        stream->Emit(baseName);
         switch (type->GetBaseShape())
         {
-        case TextureFlavor::Shape::Shape1D:		sourceSink->Emit("1D");		break;
-        case TextureFlavor::Shape::Shape2D:		sourceSink->Emit("2D");		break;
-        case TextureFlavor::Shape::Shape3D:		sourceSink->Emit("3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	sourceSink->Emit("Cube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:	sourceSink->Emit("Buffer");	break;
+        case TextureFlavor::Shape::Shape1D:		stream->Emit("1D");		break;
+        case TextureFlavor::Shape::Shape2D:		stream->Emit("2D");		break;
+        case TextureFlavor::Shape::Shape3D:		stream->Emit("3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	stream->Emit("Cube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:	stream->Emit("Buffer");	break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
             break;
@@ -510,11 +511,11 @@ struct EmitVisitor
 
         if (type->isMultisample())
         {
-            sourceSink->Emit("MS");
+            stream->Emit("MS");
         }
         if (type->isArray())
         {
-            sourceSink->Emit("Array");
+            stream->Emit("Array");
         }
     }
 
@@ -670,38 +671,38 @@ struct EmitVisitor
 
     void _emitCVecType(IROp op, Int size)
     {
-        sourceSink->emit("Vec");
+        stream->emit("Vec");
         const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-        sourceSink->emit(postFix);
+        stream->emit(postFix);
         if (postFix.size() > 1)
         {
-            sourceSink->emit("_");
+            stream->emit("_");
         }
-        sourceSink->emit(size);
+        stream->emit(size);
     }
 
     void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount)
     {
-        sourceSink->emit("Mat");
+        stream->emit("Mat");
         const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-        sourceSink->emit(postFix);
+        stream->emit(postFix);
         if (postFix.size() > 1)
         {
-            sourceSink->emit("_");
+            stream->emit("_");
         }
-        sourceSink->emit(rowCount);
-        sourceSink->emit(colCount);
+        stream->emit(rowCount);
+        stream->emit(colCount);
     }
 
     void _emitCFunc(BuiltInCOp cop, IRType* type)
     {
         emitSimpleTypeImpl(type);
-        sourceSink->emit("_");
+        stream->emit("_");
 
         switch (cop)
         {
-            case BuiltInCOp::Init:  sourceSink->emit("init");
-            case BuiltInCOp::Splat: sourceSink->emit("splat"); break;
+            case BuiltInCOp::Init:  stream->emit("init");
+            case BuiltInCOp::Splat: stream->emit("splat"); break;
         }
     }
 
@@ -716,8 +717,8 @@ struct EmitVisitor
                 if (elementCount > 1)
                 {
                     emitGLSLTypePrefix(elementType);
-                    sourceSink->Emit("vec");
-                    sourceSink->emit(elementCount);
+                    stream->Emit("vec");
+                    stream->emit(elementCount);
                 }
                 else
                 {
@@ -728,11 +729,11 @@ struct EmitVisitor
 
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
-            sourceSink->Emit("vector<");
+            stream->Emit("vector<");
             EmitType(elementType);
-            sourceSink->Emit(",");
-            sourceSink->emit(elementCount);
-            sourceSink->Emit(">");
+            stream->Emit(",");
+            stream->emit(elementCount);
+            stream->Emit(">");
             break;
 
         case CodeGenTarget::CSource:
@@ -777,24 +778,24 @@ struct EmitVisitor
         case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 emitGLSLTypePrefix(matType->getElementType());
-                sourceSink->Emit("mat");
+                stream->Emit("mat");
                 EmitVal(matType->getRowCount(), kEOp_General);
                 // TODO(tfoley): only emit the next bit
                 // for non-square matrix
-                sourceSink->Emit("x");
+                stream->Emit("x");
                 EmitVal(matType->getColumnCount(), kEOp_General);
             }
             break;
 
         case CodeGenTarget::HLSL:
             // TODO(tfoley): should really emit these with sugar
-            sourceSink->Emit("matrix<");
+            stream->Emit("matrix<");
             EmitType(matType->getElementType());
-            sourceSink->Emit(",");
+            stream->Emit(",");
             EmitVal(matType->getRowCount(), kEOp_General);
-            sourceSink->Emit(",");
+            stream->Emit(",");
             EmitVal(matType->getColumnCount(), kEOp_General);
-            sourceSink->Emit("> ");
+            stream->Emit("> ");
             break;
 
         case CodeGenTarget::CPPSource:
@@ -821,8 +822,8 @@ struct EmitVisitor
         default:
             switch (samplerStateType->op)
             {
-            case kIROp_SamplerStateType:			sourceSink->Emit("SamplerState");			break;
-            case kIROp_SamplerComparisonStateType:	sourceSink->Emit("SamplerComparisonState");	break;
+            case kIROp_SamplerStateType:			stream->Emit("SamplerState");			break;
+            case kIROp_SamplerComparisonStateType:	stream->Emit("SamplerComparisonState");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -832,8 +833,8 @@ struct EmitVisitor
         case CodeGenTarget::GLSL:
             switch (samplerStateType->op)
             {
-            case kIROp_SamplerStateType:			sourceSink->Emit("sampler");		break;
-            case kIROp_SamplerComparisonStateType:	sourceSink->Emit("samplerShadow");	break;
+            case kIROp_SamplerStateType:			stream->Emit("sampler");		break;
+            case kIROp_SamplerComparisonStateType:	stream->Emit("samplerShadow");	break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -852,20 +853,20 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLStructuredBufferType:                    sourceSink->Emit("StructuredBuffer");                   break;
-                case kIROp_HLSLRWStructuredBufferType:                  sourceSink->Emit("RWStructuredBuffer");                 break;
-                case kIROp_HLSLRasterizerOrderedStructuredBufferType:   sourceSink->Emit("RasterizerOrderedStructuredBuffer");  break;
-                case kIROp_HLSLAppendStructuredBufferType:              sourceSink->Emit("AppendStructuredBuffer");             break;
-                case kIROp_HLSLConsumeStructuredBufferType:             sourceSink->Emit("ConsumeStructuredBuffer");            break;
+                case kIROp_HLSLStructuredBufferType:                    stream->Emit("StructuredBuffer");                   break;
+                case kIROp_HLSLRWStructuredBufferType:                  stream->Emit("RWStructuredBuffer");                 break;
+                case kIROp_HLSLRasterizerOrderedStructuredBufferType:   stream->Emit("RasterizerOrderedStructuredBuffer");  break;
+                case kIROp_HLSLAppendStructuredBufferType:              stream->Emit("AppendStructuredBuffer");             break;
+                case kIROp_HLSLConsumeStructuredBufferType:             stream->Emit("ConsumeStructuredBuffer");            break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
                     break;
                 }
 
-                sourceSink->Emit("<");
+                stream->Emit("<");
                 EmitType(type->getElementType());
-                sourceSink->Emit(" >");
+                stream->Emit(" >");
             }
             break;
 
@@ -891,10 +892,10 @@ struct EmitVisitor
             {
                 switch (type->op)
                 {
-                case kIROp_HLSLByteAddressBufferType:                   sourceSink->Emit("ByteAddressBuffer");                  break;
-                case kIROp_HLSLRWByteAddressBufferType:                 sourceSink->Emit("RWByteAddressBuffer");                break;
-                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  sourceSink->Emit("RasterizerOrderedByteAddressBuffer"); break;
-                case kIROp_RaytracingAccelerationStructureType:         sourceSink->Emit("RaytracingAccelerationStructure");    break;
+                case kIROp_HLSLByteAddressBufferType:                   stream->Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:                 stream->Emit("RWByteAddressBuffer");                break;
+                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  stream->Emit("RasterizerOrderedByteAddressBuffer"); break;
+                case kIROp_RaytracingAccelerationStructureType:         stream->Emit("RaytracingAccelerationStructure");    break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -909,13 +910,13 @@ struct EmitVisitor
                 {
                 case kIROp_RaytracingAccelerationStructureType:
                     requireGLSLExtension("GL_NV_ray_tracing");
-                    sourceSink->Emit("accelerationStructureNV");
+                    stream->Emit("accelerationStructureNV");
                     break;
 
                 // TODO: These "translations" are obviously wrong for GLSL.
-                case kIROp_HLSLByteAddressBufferType:                   sourceSink->Emit("ByteAddressBuffer");                  break;
-                case kIROp_HLSLRWByteAddressBufferType:                 sourceSink->Emit("RWByteAddressBuffer");                break;
-                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  sourceSink->Emit("RasterizerOrderedByteAddressBuffer"); break;
+                case kIROp_HLSLByteAddressBufferType:                   stream->Emit("ByteAddressBuffer");                  break;
+                case kIROp_HLSLRWByteAddressBufferType:                 stream->Emit("RWByteAddressBuffer");                break;
+                case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  stream->Emit("RasterizerOrderedByteAddressBuffer"); break;
 
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
@@ -941,34 +942,34 @@ struct EmitVisitor
         default:
             break;
 
-        case kIROp_VoidType:    sourceSink->Emit("void");       return;
-        case kIROp_BoolType:    sourceSink->Emit("bool");       return;
+        case kIROp_VoidType:    stream->Emit("void");       return;
+        case kIROp_BoolType:    stream->Emit("bool");       return;
 
-        case kIROp_Int8Type:    sourceSink->Emit("int8_t");     return;
-        case kIROp_Int16Type:   sourceSink->Emit("int16_t");    return;
-        case kIROp_IntType:     sourceSink->Emit("int");        return;
-        case kIROp_Int64Type:   sourceSink->Emit("int64_t");    return;
+        case kIROp_Int8Type:    stream->Emit("int8_t");     return;
+        case kIROp_Int16Type:   stream->Emit("int16_t");    return;
+        case kIROp_IntType:     stream->Emit("int");        return;
+        case kIROp_Int64Type:   stream->Emit("int64_t");    return;
 
-        case kIROp_UInt8Type:   sourceSink->Emit("uint8_t");    return;
-        case kIROp_UInt16Type:  sourceSink->Emit("uint16_t");   return;
-        case kIROp_UIntType:    sourceSink->Emit("uint");       return;
-        case kIROp_UInt64Type:  sourceSink->Emit("uint64_t");   return;
+        case kIROp_UInt8Type:   stream->Emit("uint8_t");    return;
+        case kIROp_UInt16Type:  stream->Emit("uint16_t");   return;
+        case kIROp_UIntType:    stream->Emit("uint");       return;
+        case kIROp_UInt64Type:  stream->Emit("uint64_t");   return;
 
         case kIROp_HalfType:
         {
             _requireHalf();
             if (getTarget(context) == CodeGenTarget::GLSL)
             {
-                sourceSink->Emit("float16_t");
+                stream->Emit("float16_t");
             }
             else
             {
-                sourceSink->Emit("half");
+                stream->Emit("half");
             }
             return;
         }
-        case kIROp_FloatType:   sourceSink->Emit("float");      return;
-        case kIROp_DoubleType:  sourceSink->Emit("double");     return;
+        case kIROp_FloatType:   stream->Emit("float");      return;
+        case kIROp_DoubleType:  stream->Emit("double");     return;
 
         case kIROp_VectorType:
             emitVectorTypeImpl((IRVectorType*)type);
@@ -984,7 +985,7 @@ struct EmitVisitor
             return;
 
         case kIROp_StructType:
-            sourceSink->emit(getIRName(type));
+            stream->emit(getIRName(type));
             return;
         }
 
@@ -1023,17 +1024,17 @@ struct EmitVisitor
         if(context->shared->target == CodeGenTarget::HLSL)
         {
             auto opInfo = getIROpInfo(type->op);
-            sourceSink->emit(opInfo.name);
+            stream->emit(opInfo.name);
             UInt operandCount = type->getOperandCount();
             if(operandCount)
             {
-                sourceSink->emit("<");
+                stream->emit("<");
                 for(UInt ii = 0; ii < operandCount; ++ii)
                 {
-                    if(ii != 0) sourceSink->emit(", ");
+                    if(ii != 0) stream->emit(", ");
                     EmitVal(type->getOperand(ii), kEOp_General);
                 }
-                sourceSink->emit(" >");
+                stream->emit(" >");
             }
 
             return;
@@ -1094,7 +1095,7 @@ struct EmitVisitor
         Name*               name,
         SourceLoc const&    nameLoc)
     {
-        sourceSink->advanceToSourceLocation(typeLoc);
+        stream->advanceToSourceLocation(typeLoc);
 
         EDeclarator nameDeclarator;
         nameDeclarator.flavor = EDeclarator::Flavor::name;
@@ -1135,7 +1136,7 @@ struct EmitVisitor
 
         if (needParens)
         {
-            sourceSink->Emit("(");
+            stream->Emit("(");
 
             outerPrec = kEOp_None;
         }
@@ -1144,7 +1145,7 @@ struct EmitVisitor
 
     void maybeCloseParens(bool needClose)
     {
-        if(needClose) sourceSink->Emit(")");
+        if(needClose) stream->Emit(")");
     }
 
     bool isTargetIntrinsicModifierApplicable(
@@ -1193,7 +1194,7 @@ struct EmitVisitor
     void emitStringLiteral(
         String const&   value)
     {
-        sourceSink->emit("\"");
+        stream->emit("\"");
         for (auto c : value)
         {
             // TODO: This needs a more complete implementation,
@@ -1203,18 +1204,18 @@ struct EmitVisitor
             switch (c)
             {
             default:
-                sourceSink->emit(buffer);
+                stream->emit(buffer);
                 break;
 
-            case '\"': sourceSink->emit("\\\"");
-            case '\'': sourceSink->emit("\\\'");
-            case '\\': sourceSink->emit("\\\\");
-            case '\n': sourceSink->emit("\\n");
-            case '\r': sourceSink->emit("\\r");
-            case '\t': sourceSink->emit("\\t");
+            case '\"': stream->emit("\\\"");
+            case '\'': stream->emit("\\\'");
+            case '\\': stream->emit("\\\\");
+            case '\n': stream->emit("\\n");
+            case '\r': stream->emit("\\r");
+            case '\t': stream->emit("\\t");
             }
         }
-        sourceSink->emit("\"");
+        stream->emit("\"");
     }
 
     EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec)
@@ -1390,9 +1391,9 @@ struct EmitVisitor
                 // units, and then a "component" within that register, based on 4-byte
                 // offsets from there. We cannot support more fine-grained offsets than that.
 
-                sourceSink->Emit(" : ");
-                sourceSink->Emit(uniformSemanticSpelling);
-                sourceSink->Emit("(c");
+                stream->Emit(" : ");
+                stream->Emit(uniformSemanticSpelling);
+                stream->Emit("(c");
 
                 // Size of a logical `c` register in bytes
                 auto registerSize = 16;
@@ -1401,7 +1402,7 @@ struct EmitVisitor
                 auto componentSize = 4;
 
                 size_t startRegister = offset / registerSize;
-                sourceSink->Emit(int(startRegister));
+                stream->Emit(int(startRegister));
 
                 size_t byteOffsetInRegister = offset % registerSize;
 
@@ -1416,10 +1417,10 @@ struct EmitVisitor
                     size_t startComponent = byteOffsetInRegister / componentSize;
 
                     static const char* kComponentNames[] = {"x", "y", "z", "w"};
-                    sourceSink->Emit(".");
-                    sourceSink->Emit(kComponentNames[startComponent]);
+                    stream->Emit(".");
+                    stream->Emit(kComponentNames[startComponent]);
                 }
-                sourceSink->Emit(")");
+                stream->Emit(")");
             }
             break;
 
@@ -1431,32 +1432,32 @@ struct EmitVisitor
             break;
         default:
             {
-                sourceSink->Emit(" : register(");
+                stream->Emit(" : register(");
                 switch( kind )
                 {
                 case LayoutResourceKind::ConstantBuffer:
-                    sourceSink->Emit("b");
+                    stream->Emit("b");
                     break;
                 case LayoutResourceKind::ShaderResource:
-                    sourceSink->Emit("t");
+                    stream->Emit("t");
                     break;
                 case LayoutResourceKind::UnorderedAccess:
-                    sourceSink->Emit("u");
+                    stream->Emit("u");
                     break;
                 case LayoutResourceKind::SamplerState:
-                    sourceSink->Emit("s");
+                    stream->Emit("s");
                     break;
                 default:
                     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                     break;
                 }
-                sourceSink->Emit(index);
+                stream->Emit(index);
                 if(space)
                 {
-                    sourceSink->Emit(", space");
-                    sourceSink->Emit(space);
+                    stream->Emit(", space");
+                    stream->Emit(space);
                 }
-                sourceSink->Emit(")");
+                stream->Emit(")");
             }
         }
     }
@@ -1555,24 +1556,24 @@ struct EmitVisitor
                 {
                     requireGLSLExtension("GL_ARB_enhanced_layouts");
 
-                    sourceSink->Emit("layout(offset = ");
-                    sourceSink->Emit(index);
-                    sourceSink->Emit(")\n");
+                    stream->Emit("layout(offset = ");
+                    stream->Emit(index);
+                    stream->Emit(")\n");
                 }
             }
             break;
 
         case LayoutResourceKind::VertexInput:
         case LayoutResourceKind::FragmentOutput:
-            sourceSink->Emit("layout(location = ");
-            sourceSink->Emit(index);
-            sourceSink->Emit(")\n");
+            stream->Emit("layout(location = ");
+            stream->Emit(index);
+            stream->Emit(")\n");
             break;
 
         case LayoutResourceKind::SpecializationConstant:
-            sourceSink->Emit("layout(constant_id = ");
-            sourceSink->Emit(index);
-            sourceSink->Emit(")\n");
+            stream->Emit("layout(constant_id = ");
+            stream->Emit(index);
+            stream->Emit(")\n");
             break;
 
         case LayoutResourceKind::ConstantBuffer:
@@ -1580,21 +1581,21 @@ struct EmitVisitor
         case LayoutResourceKind::UnorderedAccess:
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
-            sourceSink->Emit("layout(binding = ");
-            sourceSink->Emit(index);
+            stream->Emit("layout(binding = ");
+            stream->Emit(index);
             if(space)
             {
-                sourceSink->Emit(", set = ");
-                sourceSink->Emit(space);
+                stream->Emit(", set = ");
+                stream->Emit(space);
             }
-            sourceSink->Emit(")\n");
+            stream->Emit(")\n");
             break;
 
         case LayoutResourceKind::PushConstantBuffer:
-            sourceSink->Emit("layout(push_constant)\n");
+            stream->Emit("layout(push_constant)\n");
             break;
         case LayoutResourceKind::ShaderRecord:
-            sourceSink->Emit("layout(shaderRecordNV)\n");
+            stream->Emit("layout(shaderRecordNV)\n");
             break;
 
         }
@@ -1655,7 +1656,7 @@ struct EmitVisitor
         switch (requiredProfileVersion)
         {
 #define CASE(TAG, VALUE)    \
-        case ProfileVersion::TAG: sourceSink->Emit("#version " #VALUE "\n"); return
+        case ProfileVersion::TAG: stream->Emit("#version " #VALUE "\n"); return
 
         CASE(GLSL_110, 110);
         CASE(GLSL_120, 120);
@@ -1684,7 +1685,7 @@ struct EmitVisitor
         //
         // For now we just fall back to a reasonably recent version.
 
-        sourceSink->Emit("#version 420\n");
+        stream->Emit("#version 420\n");
     }
 
     void emitGLSLPreprocessorDirectives()
@@ -1737,13 +1738,13 @@ struct EmitVisitor
             {
             case kMatrixLayoutMode_RowMajor:
             default:
-                sourceSink->Emit("layout(column_major) uniform;\n");
-                sourceSink->Emit("layout(column_major) buffer;\n");
+                stream->Emit("layout(column_major) uniform;\n");
+                stream->Emit("layout(column_major) buffer;\n");
                 break;
 
             case kMatrixLayoutMode_ColumnMajor:
-                sourceSink->Emit("layout(row_major) uniform;\n");
-                sourceSink->Emit("layout(row_major) buffer;\n");
+                stream->Emit("layout(row_major) uniform;\n");
+                stream->Emit("layout(row_major) buffer;\n");
                 break;
             }
             break;
@@ -1753,11 +1754,11 @@ struct EmitVisitor
             {
             case kMatrixLayoutMode_RowMajor:
             default:
-                sourceSink->Emit("#pragma pack_matrix(row_major)\n");
+                stream->Emit("#pragma pack_matrix(row_major)\n");
                 break;
 
             case kMatrixLayoutMode_ColumnMajor:
-                sourceSink->Emit("#pragma pack_matrix(column_major)\n");
+                stream->Emit("#pragma pack_matrix(column_major)\n");
                 break;
             }
             break;
@@ -2026,20 +2027,20 @@ struct EmitVisitor
         switch( declarator->flavor )
         {
         case IRDeclaratorInfo::Flavor::Simple:
-            sourceSink->emit(" ");
-            sourceSink->emit(*declarator->name);
+            stream->emit(" ");
+            stream->emit(*declarator->name);
             break;
 
         case IRDeclaratorInfo::Flavor::Ptr:
-            sourceSink->emit("*");
+            stream->emit("*");
             emitDeclarator(ctx, declarator->next);
             break;
 
         case IRDeclaratorInfo::Flavor::Array:
             emitDeclarator(ctx, declarator->next);
-            sourceSink->emit("[");
+            stream->emit("[");
             emitIROperand(ctx, declarator->elementCount, IREmitMode::Default, kEOp_General);
-            sourceSink->emit("]");
+            stream->emit("]");
             break;
         }
     }
@@ -2051,17 +2052,17 @@ struct EmitVisitor
         switch(inst->op)
         {
         case kIROp_IntLit:
-            sourceSink->emit(((IRConstant*) inst)->value.intVal);
+            stream->emit(((IRConstant*) inst)->value.intVal);
             break;
 
         case kIROp_FloatLit:
-            sourceSink->Emit(((IRConstant*) inst)->value.floatVal);
+            stream->Emit(((IRConstant*) inst)->value.floatVal);
             break;
 
         case kIROp_BoolLit:
             {
                 bool val = ((IRConstant*)inst)->value.intVal != 0;
-                sourceSink->emit(val ? "true" : "false");
+                stream->emit(val ? "true" : "false");
             }
             break;
 
@@ -2308,7 +2309,7 @@ struct EmitVisitor
         {
         case 0: // nothing yet
         default:
-            sourceSink->emit(getIRName(inst));
+            stream->emit(getIRName(inst));
             break;
         }
     }
@@ -2321,13 +2322,13 @@ struct EmitVisitor
         UInt argCount = inst->getOperandCount();
         IRUse* args = inst->getOperands();
 
-        sourceSink->emit("(");
+        stream->emit("(");
         for(UInt aa = 0; aa < argCount; ++aa)
         {
-            if(aa != 0) sourceSink->emit(", ");
+            if(aa != 0) stream->emit(", ");
             emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
         }
-        sourceSink->emit(")");
+        stream->emit(")");
     }
 
     void emitIRType(
@@ -2364,7 +2365,7 @@ struct EmitVisitor
             switch( getTarget(ctx) )
             {
             case CodeGenTarget::GLSL:
-                sourceSink->emit("const ");
+                stream->emit("const ");
                 break;
 
             default:
@@ -2377,11 +2378,11 @@ struct EmitVisitor
             switch( getTarget(ctx) )
             {
             case CodeGenTarget::HLSL:
-                sourceSink->Emit("groupshared ");
+                stream->Emit("groupshared ");
                 break;
 
             case CodeGenTarget::GLSL:
-                sourceSink->Emit("shared ");
+                stream->Emit("shared ");
                 break;
 
             default:
@@ -2414,7 +2415,7 @@ struct EmitVisitor
         emitIRRateQualifiers(ctx, inst);
 
         emitIRType(ctx, type, getIRName(inst));
-        sourceSink->emit(" = ");
+        stream->emit(" = ");
     }
 
     class UnmangleContext
@@ -2745,14 +2746,14 @@ struct EmitVisitor
             auto prec = kEOp_Postfix;
             bool needClose = maybeEmitParens(outerPrec, prec);
 
-            sourceSink->emit(name);
-            sourceSink->Emit("(");
+            stream->emit(name);
+            stream->Emit("(");
             for (Index aa = 0; aa < argCount; ++aa)
             {
-                if (aa != 0) sourceSink->Emit(", ");
+                if (aa != 0) stream->Emit(", ");
                 emitIROperand(ctx, args[aa].get(), mode, kEOp_General);
             }
-            sourceSink->Emit(")");
+            stream->Emit(")");
 
             maybeCloseParens(needClose);
             return;
@@ -2766,7 +2767,7 @@ struct EmitVisitor
             // If it returns void -> then we don't need parenthesis 
             if (as<IRVoidType>(returnType) == nullptr)
             {
-                sourceSink->Emit("(");
+                stream->Emit("(");
                 openParenCount++;
             }
 
@@ -2780,7 +2781,7 @@ struct EmitVisitor
                 if( c != '$' )
                 {
                     // Not an escape sequence
-                    sourceSink->emitRawTextSpan(&c, &c+1);
+                    stream->emitRawTextSpan(&c, &c+1);
                     continue;
                 }
 
@@ -2796,9 +2797,9 @@ struct EmitVisitor
                         // Simple case: emit one of the direct arguments to the call
                         Index argIndex = d - '0';
                         SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
-                        sourceSink->Emit("(");
+                        stream->Emit("(");
                         emitIROperand(ctx, args[argIndex].get(), mode, kEOp_General);
-                        sourceSink->Emit(")");
+                        stream->Emit(")");
                     }
                     break;
 
@@ -2820,15 +2821,15 @@ struct EmitVisitor
                             {
                                 if (as<IRSamplerComparisonStateType>(samplerType))
                                 {
-                                    sourceSink->Emit("Shadow");
+                                    stream->Emit("Shadow");
                                 }
                             }
 
-                            sourceSink->Emit("(");
+                            stream->Emit("(");
                             emitIROperand(ctx, textureArg, mode, kEOp_General);
-                            sourceSink->Emit(",");
+                            stream->Emit(",");
                             emitIROperand(ctx, samplerArg, mode, kEOp_General);
-                            sourceSink->Emit(")");
+                            stream->Emit(")");
                         }
                         else
                         {
@@ -2864,7 +2865,7 @@ struct EmitVisitor
                             if (underlyingType && underlyingType->op == kIROp_HalfType)
                             {
                                 emitSimpleTypeImpl(elementType);
-                                sourceSink->emit("(");
+                                stream->emit("(");
                                 openParenCount++;
                             }
                         }    
@@ -2886,7 +2887,7 @@ struct EmitVisitor
                             if (auto basicType = as<IRBasicType>(elementType))
                             {
                                 // A scalar result is expected
-                                sourceSink->Emit(".x");
+                                stream->Emit(".x");
                             }
                             else if (auto vectorType = as<IRVectorType>(elementType))
                             {
@@ -2896,7 +2897,7 @@ struct EmitVisitor
                                 if (elementCount < 4)
                                 {
                                     char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
-                                    sourceSink->Emit(swiz[elementCount]);
+                                    stream->Emit(swiz[elementCount]);
                                 }
                             }
                             else
@@ -2924,7 +2925,7 @@ struct EmitVisitor
                         if (auto vectorType = as<IRVectorType>(vectorArg->getDataType()))
                         {
                             auto elementCount = GetIntVal(vectorType->getElementCount());
-                            sourceSink->Emit(elementCount);
+                            stream->Emit(elementCount);
                         }
                         else
                         {
@@ -2965,22 +2966,22 @@ struct EmitVisitor
                             // needed.
                             //
                             emitVectorTypeName(elementType, 4);
-                            sourceSink->Emit("(");
+                            stream->Emit("(");
                             emitIROperand(ctx, arg, mode, kEOp_General);
                             for(IRIntegerValue ii = elementCount; ii < 4; ++ii)
                             {
-                                sourceSink->Emit(", ");
+                                stream->Emit(", ");
                                 if(getTarget(ctx) == CodeGenTarget::GLSL)
                                 {
                                     emitSimpleTypeImpl(elementType);
-                                    sourceSink->Emit("(0)");
+                                    stream->Emit("(0)");
                                 }
                                 else
                                 {
-                                    sourceSink->Emit("0");
+                                    stream->Emit("0");
                                 }
                             }
-                            sourceSink->Emit(")");
+                            stream->Emit(")");
                         }
                     }
                     break;
@@ -3003,11 +3004,11 @@ struct EmitVisitor
                         auto arg = args[argIndex].get();
                         if(arg->op == kIROp_ImageSubscript)
                         {
-                            sourceSink->Emit("imageA");
+                            stream->Emit("imageA");
                         }
                         else
                         {
-                            sourceSink->Emit("a");
+                            stream->Emit("a");
                         }
                     }
                     break;
@@ -3035,9 +3036,9 @@ struct EmitVisitor
                                 // component of the image coordinate needs
                                 // to be broken out into its own argument.
                                 //
-                                sourceSink->Emit("(");
+                                stream->Emit("(");
                                 emitIROperand(ctx, arg->getOperand(0), mode, kEOp_General);
-                                sourceSink->Emit("), ");
+                                stream->Emit("), ");
 
                                 // The coordinate argument will have been computed
                                 // as a `vector<uint, N>` because that is how the
@@ -3062,30 +3063,30 @@ struct EmitVisitor
 
                                 if (elementCount > 1)
                                 {
-                                    sourceSink->Emit("ivec");
-                                    sourceSink->emit(elementCount);
+                                    stream->Emit("ivec");
+                                    stream->emit(elementCount);
                                 }
                                 else
                                 {
-                                    sourceSink->Emit("int");
+                                    stream->Emit("int");
                                 }
 
-                                sourceSink->Emit("(");
+                                stream->Emit("(");
                                 emitIROperand(ctx, arg->getOperand(1), mode, kEOp_General);
-                                sourceSink->Emit(")");
+                                stream->Emit(")");
                             }
                             else
                             {
-                                sourceSink->Emit("(");
+                                stream->Emit("(");
                                 emitIROperand(ctx, arg, mode, kEOp_General);
-                                sourceSink->Emit(")");
+                                stream->Emit(")");
                             }
                         }
                         else
                         {
-                            sourceSink->Emit("(");
+                            stream->Emit("(");
                             emitIROperand(ctx, arg, mode, kEOp_General);
-                            sourceSink->Emit(")");
+                            stream->Emit(")");
                         }
                     }
                     break;
@@ -3111,7 +3112,7 @@ struct EmitVisitor
                                 auto argLoad = as<IRLoad>(arg);
                                 SLANG_RELEASE_ASSERT(argLoad);
                                 auto argVar = argLoad->getOperand(0);
-                                sourceSink->Emit(getRayPayloadLocation(ctx, argVar));
+                                stream->Emit(getRayPayloadLocation(ctx, argVar));
                             }
                             break;
 
@@ -3128,7 +3129,7 @@ struct EmitVisitor
                                 auto argLoad = as<IRLoad>(arg);
                                 SLANG_RELEASE_ASSERT(argLoad);
                                 auto argVar = argLoad->getOperand(0);
-                                sourceSink->Emit(getCallablePayloadLocation(ctx, argVar));
+                                stream->Emit(getCallablePayloadLocation(ctx, argVar));
                             }
                             break;
 
@@ -3140,12 +3141,12 @@ struct EmitVisitor
                                 switch( ctx->shared->entryPoint->getStage() )
                                 {
                                 default:
-                                    sourceSink->Emit("gl_RayTmaxNV");
+                                    stream->Emit("gl_RayTmaxNV");
                                     break;
 
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
-                                    sourceSink->Emit("gl_HitTNV");
+                                    stream->Emit("gl_HitTNV");
                                     break;
                                 }
                             }
@@ -3167,7 +3168,7 @@ struct EmitVisitor
             // Close any remaining open parens
             for (; openParenCount > 0; --openParenCount)
             {
-                sourceSink->Emit(")");
+                stream->Emit(")");
             }
         }
     }
@@ -3261,13 +3262,13 @@ struct EmitVisitor
             needClose = maybeEmitParens(outerPrec, prec);
 
             emitIROperand(ctx, inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
-            sourceSink->emit("[");
+            stream->emit("[");
             emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
-            sourceSink->emit("]");
+            stream->emit("]");
 
             if(operandIndex < operandCount)
             {
-                sourceSink->emit(" = ");
+                stream->emit(" = ");
                 emitIROperand(ctx, inst->getOperand(operandIndex++), mode, kEOp_General);
             }
 
@@ -3289,7 +3290,7 @@ struct EmitVisitor
         {
             // Looks like a member function call
             emitIROperand(ctx, inst->getOperand(operandIndex), mode, leftSide(outerPrec, prec));
-            sourceSink->emit(".");
+            stream->emit(".");
             operandIndex++;
         }
         // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
@@ -3298,29 +3299,29 @@ struct EmitVisitor
         {
             if (auto vectorType = as<IRVectorType>(inst->getDataType()))
             {
-                sourceSink->emit("ivec");
-                sourceSink->emit(as<IRConstant>(vectorType->getElementCount())->value.intVal);
-                sourceSink->emit("(");
+                stream->emit("ivec");
+                stream->emit(as<IRConstant>(vectorType->getElementCount())->value.intVal);
+                stream->emit("(");
             }
             else if (auto scalarType = as<IRBasicType>(inst->getDataType()))
             {
-                sourceSink->emit("int(");
+                stream->emit("int(");
             }
             else
                 glslSignFix = false;
         }
-        sourceSink->emit(name);
-        sourceSink->emit("(");
+        stream->emit(name);
+        stream->emit("(");
         bool first = true;
         for(; operandIndex < operandCount; ++operandIndex )
         {
-            if(!first) sourceSink->emit(", ");
+            if(!first) stream->emit(", ");
             emitIROperand(ctx, inst->getOperand(operandIndex), mode, kEOp_General);
             first = false;
         }
-        sourceSink->emit(")");
+        stream->emit(")");
         if (glslSignFix)
-            sourceSink->emit(")");
+            stream->emit(")");
         maybeCloseParens(needClose);
     }
 
@@ -3372,17 +3373,17 @@ struct EmitVisitor
             bool needClose = maybeEmitParens(outerPrec, prec);
 
             emitIROperand(ctx, funcValue, mode, leftSide(outerPrec, prec));
-            sourceSink->emit("(");
+            stream->emit("(");
             UInt argCount = inst->getOperandCount();
             for( UInt aa = 1; aa < argCount; ++aa )
             {
                 auto operand = inst->getOperand(aa);
                 if (as<IRVoidType>(operand->getDataType()))
                     continue;
-                if(aa != 1) sourceSink->emit(", ");
+                if(aa != 1) stream->emit(", ");
                 emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
             }
-            sourceSink->emit(")");
+            stream->emit(")");
 
             maybeCloseParens(needClose);
         }
@@ -3411,12 +3412,12 @@ struct EmitVisitor
         if (castType)
         {
             emitIRType(ctx, castType);
-            sourceSink->emit("(");
+            stream->emit("(");
 
             // Emit the operand
             emitIROperand(ctx, inst, mode, kEOp_General);
 
-            sourceSink->emit(")");
+            stream->emit(")");
         }
         else
         {
@@ -3437,9 +3438,9 @@ struct EmitVisitor
                 auto prec = kEOp_Postfix;
                 *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
-                sourceSink->emit("not(");
+                stream->emit("not(");
                 emitIROperand(ctx, operand, mode, kEOp_General);
-                sourceSink->emit(")");
+                stream->emit(")");
                 return;
             }
         }
@@ -3447,7 +3448,7 @@ struct EmitVisitor
         auto prec = kEOp_Prefix;
         *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
-        sourceSink->emit("!");
+        stream->emit("!");
         emitIROperand(ctx, operand, mode, rightSide(prec, ioOuterPrec));
     }
 
@@ -3475,12 +3476,12 @@ struct EmitVisitor
                 auto prec = kEOp_Postfix;
                 *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
 
-                sourceSink->emit(funcName);
-                sourceSink->emit("(");
+                stream->emit(funcName);
+                stream->emit("(");
                 _maybeEmitGLSLCast(ctx, (leftVectorType ? nullptr : vecType), left, mode);
-                sourceSink->emit(",");
+                stream->emit(",");
                 _maybeEmitGLSLCast(ctx, (rightVectorType ? nullptr : vecType), right, mode);
-                sourceSink->emit(")");
+                stream->emit(")");
 
                 return;
             }
@@ -3489,9 +3490,9 @@ struct EmitVisitor
         *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
 
         emitIROperand(ctx, inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
-        sourceSink->emit(" ");
-        sourceSink->emit(opPrec.op);
-        sourceSink->emit(" ");
+        stream->emit(" ");
+        stream->emit(opPrec.op);
+        stream->emit(" ");
         emitIROperand(ctx, inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
     }
 
@@ -3527,9 +3528,9 @@ struct EmitVisitor
                         needClose = maybeEmitParens(outerPrec, prec);
 
                         // Need to emit as cast for HLSL
-                        sourceSink->emit("(");
+                        stream->emit("(");
                         emitIRType(ctx, inst->getDataType());
-                        sourceSink->emit(") ");
+                        stream->emit(") ");
                         emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec, prec));
                         break;
                     }
@@ -3566,9 +3567,9 @@ struct EmitVisitor
                 auto prec = kEOp_Prefix;
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                sourceSink->emit("(");
+                stream->emit("(");
                 emitIRType(ctx, inst->getDataType());
-                sourceSink->emit(")");
+                stream->emit(")");
 
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(outerPrec,prec));
             }
@@ -3578,9 +3579,9 @@ struct EmitVisitor
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 emitIRType(ctx, inst->getDataType());
-                sourceSink->emit("(");
+                stream->emit("(");
                 emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-                sourceSink->emit(")");
+                stream->emit(")");
             }
             break;
 
@@ -3595,13 +3596,13 @@ struct EmitVisitor
 
                 auto base = fieldExtract->getBase();
                 emitIROperand(ctx, base, mode, leftSide(outerPrec, prec));
-                sourceSink->emit(".");
+                stream->emit(".");
                 if(getTarget(ctx) == CodeGenTarget::GLSL
                     && as<IRUniformParameterGroupType>(base->getDataType()))
                 {
-                    sourceSink->emit("_data.");
+                    stream->emit("_data.");
                 }
-                sourceSink->emit(getIRName(fieldExtract->getField()));
+                stream->emit(getIRName(fieldExtract->getField()));
             }
             break;
 
@@ -3616,13 +3617,13 @@ struct EmitVisitor
 
                 auto base = ii->getBase();
                 emitIROperand(ctx, base, mode, leftSide(outerPrec, prec));
-                sourceSink->emit(".");
+                stream->emit(".");
                 if(getTarget(ctx) == CodeGenTarget::GLSL
                     && as<IRUniformParameterGroupType>(base->getDataType()))
                 {
-                    sourceSink->emit("_data.");
+                    stream->emit("_data.");
                 }
-                sourceSink->emit(getIRName(ii->getField()));
+                stream->emit(getIRName(ii->getField()));
             }
             break;
 
@@ -3636,7 +3637,7 @@ struct EmitVisitor
         case OPCODE:                                                                            \
             needClose = maybeEmitParens(outerPrec, kEOp_##PREC);                                \
             emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, kEOp_##PREC));    \
-            sourceSink->emit(" " #OP " ");                                                                  \
+            stream->emit(" " #OP " ");                                                                  \
             emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, kEOp_##PREC));   \
             break
 
@@ -3673,11 +3674,11 @@ struct EmitVisitor
                 && as<IRMatrixType>(inst->getOperand(0)->getDataType())
                 && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
-                sourceSink->emit("matrixCompMult(");
+                stream->emit("matrixCompMult(");
                 emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-                sourceSink->emit(", ");
+                stream->emit(", ");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
-                sourceSink->emit(")");
+                stream->emit(")");
             }
             else
             {
@@ -3686,7 +3687,7 @@ struct EmitVisitor
                 auto prec = kEOp_Mul;
                 needClose = maybeEmitParens(outerPrec, prec);
                 emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                sourceSink->emit(" * ");
+                stream->emit(" * ");
                 emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
             }
             break;
@@ -3702,7 +3703,7 @@ struct EmitVisitor
                 auto prec = kEOp_Prefix;
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                sourceSink->emit("-");
+                stream->emit("-");
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             break;
@@ -3714,11 +3715,11 @@ struct EmitVisitor
 
                 if (as<IRBoolType>(inst->getDataType()))
                 {
-                    sourceSink->emit("!");
+                    stream->emit("!");
                 }
                 else
                 {
-                    sourceSink->emit("~");
+                    stream->emit("~");
                 }
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
@@ -3740,11 +3741,11 @@ struct EmitVisitor
                     && as<IRBoolType>(inst->getOperand(0)->getDataType())
                     && as<IRBoolType>(inst->getOperand(1)->getDataType()))
                 {
-                    sourceSink->emit("&&");
+                    stream->emit("&&");
                 }
                 else
                 {
-                    sourceSink->emit("&");
+                    stream->emit("&");
                 }
 
                 emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
@@ -3767,11 +3768,11 @@ struct EmitVisitor
                     && as<IRBoolType>(inst->getOperand(0)->getDataType())
                     && as<IRBoolType>(inst->getOperand(1)->getDataType()))
                 {
-                    sourceSink->emit("||");
+                    stream->emit("||");
                 }
                 else
                 {
-                    sourceSink->emit("|");
+                    stream->emit("|");
                 }
 
                 emitIROperand(ctx, inst->getOperand(1), mode, rightSide(outerPrec, prec));
@@ -3785,7 +3786,7 @@ struct EmitVisitor
                 if(getTarget(ctx) == CodeGenTarget::GLSL
                     && as<IRUniformParameterGroupType>(base->getDataType()))
                 {
-                    sourceSink->emit("._data");
+                    stream->emit("._data");
                 }
             }
             break;
@@ -3796,7 +3797,7 @@ struct EmitVisitor
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                sourceSink->emit(" = ");
+                stream->emit(" = ");
                 emitIROperand(ctx, inst->getOperand(1), mode, rightSide(prec, outerPrec));
             }
             break;
@@ -3808,7 +3809,7 @@ struct EmitVisitor
             break;
 
         case kIROp_GroupMemoryBarrierWithGroupSync:
-            sourceSink->emit("GroupMemoryBarrierWithGroupSync()");
+            stream->emit("GroupMemoryBarrierWithGroupSync()");
             break;
 
         case kIROp_getElement:
@@ -3820,10 +3821,10 @@ struct EmitVisitor
                 auto prec = kEOp_Postfix;
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                sourceSink->emit(decoration->getOuterArrayName());
-                sourceSink->emit("[");
+                stream->emit(decoration->getOuterArrayName());
+                stream->emit("[");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
-                sourceSink->emit("].");
+                stream->emit("].");
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
                 break;
             }
@@ -3833,9 +3834,9 @@ struct EmitVisitor
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                sourceSink->emit("[");
+                stream->emit("[");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
-                sourceSink->emit("]");
+                stream->emit("]");
             }
             break;
 
@@ -3856,16 +3857,16 @@ struct EmitVisitor
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 emitIROperand(ctx, inst->getOperand(1), mode, leftSide(outerPrec, prec));
-                sourceSink->emit(" * ");
+                stream->emit(" * ");
                 emitIROperand(ctx, inst->getOperand(0), mode, rightSide(prec, outerPrec));
             }
             else
             {
-                sourceSink->emit("mul(");
+                stream->emit("mul(");
                 emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-                sourceSink->emit(", ");
+                stream->emit(", ");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
-                sourceSink->emit(")");
+                stream->emit(")");
             }
             break;
 
@@ -3876,7 +3877,7 @@ struct EmitVisitor
 
                 auto ii = (IRSwizzle*)inst;
                 emitIROperand(ctx, ii->getBase(), mode, leftSide(outerPrec, prec));
-                sourceSink->emit(".");
+                stream->emit(".");
                 const Index elementCount = Index(ii->getElementCount());
                 for (Index ee = 0; ee < elementCount; ++ee)
                 {
@@ -3888,7 +3889,7 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
-                    sourceSink->emit(kComponents[elementIndex]);
+                    stream->emit(kComponents[elementIndex]);
                 }
             }
             break;
@@ -3905,13 +3906,13 @@ struct EmitVisitor
                     inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
                 {
                     // For GLSL, emit a call to `mix` if condition is a vector
-                    sourceSink->emit("mix(");
+                    stream->emit("mix(");
                     emitIROperand(ctx, inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
-                    sourceSink->emit(", ");
+                    stream->emit(", ");
                     emitIROperand(ctx, inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
-                    sourceSink->emit(", ");
+                    stream->emit(", ");
                     emitIROperand(ctx, inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
-                    sourceSink->emit(")");
+                    stream->emit(")");
                 }
                 else
                 {
@@ -3919,16 +3920,16 @@ struct EmitVisitor
                     needClose = maybeEmitParens(outerPrec, prec);
 
                     emitIROperand(ctx, inst->getOperand(0), mode, leftSide(outerPrec, prec));
-                    sourceSink->emit(" ? ");
+                    stream->emit(" ? ");
                     emitIROperand(ctx, inst->getOperand(1), mode, prec);
-                    sourceSink->emit(" : ");
+                    stream->emit(" : ");
                     emitIROperand(ctx, inst->getOperand(2), mode, rightSide(prec, outerPrec));
                 }
             }
             break;
 
         case kIROp_Param:
-            sourceSink->emit(getIRName(inst));
+            stream->emit(getIRName(inst));
             break;
 
         case kIROp_makeArray:
@@ -3938,14 +3939,14 @@ struct EmitVisitor
                 // be appropriate, depending on the context
                 // of the expression.
 
-                sourceSink->emit("{ ");
+                stream->emit("{ ");
                 UInt argCount = inst->getOperandCount();
                 for (UInt aa = 0; aa < argCount; ++aa)
                 {
-                    if (aa != 0) sourceSink->emit(", ");
+                    if (aa != 0) stream->emit(", ");
                     emitIROperand(ctx, inst->getOperand(aa), mode, kEOp_General);
                 }
-                sourceSink->emit(" }");
+                stream->emit(" }");
             }
             break;
 
@@ -3967,7 +3968,7 @@ struct EmitVisitor
                     switch(toType)
                     {
                     default:
-                        sourceSink->emit("/* unhandled */");
+                        stream->emit("/* unhandled */");
                         break;
 
                     case BaseType::UInt:
@@ -3978,7 +3979,7 @@ struct EmitVisitor
                         break;
 
                     case BaseType::Float:
-                        sourceSink->emit("uintBitsToFloat(");
+                        stream->emit("uintBitsToFloat(");
                         break;
                     }
                     break;
@@ -3987,18 +3988,18 @@ struct EmitVisitor
                     switch(toType)
                     {
                     default:
-                        sourceSink->emit("/* unhandled */");
+                        stream->emit("/* unhandled */");
                         break;
 
                     case BaseType::UInt:
                         break;
                     case BaseType::Int:
-                        sourceSink->emit("(");
+                        stream->emit("(");
                         emitIRType(ctx, inst->getDataType());
-                        sourceSink->emit(")");
+                        stream->emit(")");
                         break;
                     case BaseType::Float:
-                        sourceSink->emit("asfloat");
+                        stream->emit("asfloat");
                         break;
                     }
                     break;
@@ -4009,14 +4010,14 @@ struct EmitVisitor
                     break;
                 }
 
-                sourceSink->emit("(");
+                stream->emit("(");
                 emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-                sourceSink->emit(")");
+                stream->emit(")");
             }
             break;
 
         default:
-            sourceSink->emit("/* unhandled */");
+            stream->emit("/* unhandled */");
             break;
         }
         maybeCloseParens(needClose);
@@ -4072,21 +4073,21 @@ struct EmitVisitor
             return;
         }
 
-        sourceSink->advanceToSourceLocation(inst->sourceLoc);
+        stream->advanceToSourceLocation(inst->sourceLoc);
 
         switch(inst->op)
         {
         default:
             emitIRInstResultDecl(ctx, inst);
             emitIRInstExpr(ctx, inst, mode, kEOp_General);
-            sourceSink->emit(";\n");
+            stream->emit(";\n");
             break;
 
         case kIROp_undefined:
             {
                 auto type = inst->getDataType();
                 emitIRType(ctx, type, getIRName(inst));
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
             }
             break;
 
@@ -4098,7 +4099,7 @@ struct EmitVisitor
                 auto name = getIRName(inst);
                 emitIRRateQualifiers(ctx, inst);
                 emitIRType(ctx, valType, name);
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
             }
             break;
 
@@ -4112,17 +4113,17 @@ struct EmitVisitor
             break;
 
         case kIROp_ReturnVoid:
-            sourceSink->emit("return;\n");
+            stream->emit("return;\n");
             break;
 
         case kIROp_ReturnVal:
-            sourceSink->emit("return ");
+            stream->emit("return ");
             emitIROperand(ctx, ((IRReturnVal*) inst)->getVal(), mode, kEOp_General);
-            sourceSink->emit(";\n");
+            stream->emit(";\n");
             break;
 
         case kIROp_discard:
-            sourceSink->emit("discard;\n");
+            stream->emit("discard;\n");
             break;
 
         case kIROp_swizzleSet:
@@ -4130,14 +4131,14 @@ struct EmitVisitor
                 auto ii = (IRSwizzleSet*)inst;
                 emitIRInstResultDecl(ctx, inst);
                 emitIROperand(ctx, inst->getOperand(0), mode, kEOp_General);
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
 
                 auto subscriptOuter = kEOp_General;
                 auto subscriptPrec = kEOp_Postfix;
                 bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
 
                 emitIROperand(ctx, inst, mode, leftSide(subscriptOuter, subscriptPrec));
-                sourceSink->emit(".");
+                stream->emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
@@ -4149,13 +4150,13 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
-                    sourceSink->emit(kComponents[elementIndex]);
+                    stream->emit(kComponents[elementIndex]);
                 }
                 maybeCloseParens(needCloseSubscript);
 
-                sourceSink->emit(" = ");
+                stream->emit(" = ");
                 emitIROperand(ctx, inst->getOperand(1), mode, kEOp_General);
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
             }
             break;
 
@@ -4168,7 +4169,7 @@ struct EmitVisitor
 
                 auto ii = cast<IRSwizzledStore>(inst);
                 emitIROperand(ctx, ii->getDest(), mode, leftSide(subscriptOuter, subscriptPrec));
-                sourceSink->emit(".");
+                stream->emit(".");
                 UInt elementCount = ii->getElementCount();
                 for (UInt ee = 0; ee < elementCount; ++ee)
                 {
@@ -4180,13 +4181,13 @@ struct EmitVisitor
                     SLANG_RELEASE_ASSERT(elementIndex < 4);
 
                     char const* kComponents[] = { "x", "y", "z", "w" };
-                    sourceSink->emit(kComponents[elementIndex]);
+                    stream->emit(kComponents[elementIndex]);
                 }
                 maybeCloseParens(needCloseSubscript);
 
-                sourceSink->emit(" = ");
+                stream->emit(" = ");
                 emitIROperand(ctx, ii->getSource(), mode, kEOp_General);
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
             }
             break;
         }
@@ -4198,11 +4199,11 @@ struct EmitVisitor
     {
         if(varLayout->flags & VarLayoutFlag::HasSemantic)
         {
-            sourceSink->Emit(" : ");
-            sourceSink->emit(varLayout->semanticName);
+            stream->Emit(" : ");
+            stream->emit(varLayout->semanticName);
             if(varLayout->semanticIndex)
             {
-                sourceSink->Emit(varLayout->semanticIndex);
+                stream->Emit(varLayout->semanticIndex);
             }
         }
     }
@@ -4223,8 +4224,8 @@ struct EmitVisitor
 
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
-            sourceSink->Emit(" : ");
-            sourceSink->emit(semanticDecoration->getSemanticName());
+            stream->Emit(" : ");
+            stream->emit(semanticDecoration->getSemanticName());
             return;
         }
 
@@ -4296,9 +4297,9 @@ struct EmitVisitor
             auto prec = kEOp_Assign;
 
             emitIROperand(ctx, pp, IREmitMode::Default, leftSide(outerPrec, prec));
-            sourceSink->emit(" = ");
+            stream->emit(" = ");
             emitIROperand(ctx, arg, IREmitMode::Default, rightSide(prec, outerPrec));
-            sourceSink->emit(";\n");
+            stream->emit(";\n");
         }
     }
 
@@ -4339,7 +4340,7 @@ struct EmitVisitor
                     // of terminators are simple enough that we just fold
                     // them into the current block.
                     //
-                    sourceSink->advanceToSourceLocation(terminator->sourceLoc);
+                    stream->advanceToSourceLocation(terminator->sourceLoc);
                     switch(terminator->op)
                     {
                     default:
@@ -4412,10 +4413,10 @@ struct EmitVisitor
             // don't need to consider multi-level break/continue (which we
             // don't for now).
             case Region::Flavor::Break:
-                sourceSink->emit("break;\n");
+                stream->emit("break;\n");
                 break;
             case Region::Flavor::Continue:
-                sourceSink->emit("continue;\n");
+                stream->emit("continue;\n");
                 break;
 
             case Region::Flavor::If:
@@ -4427,23 +4428,23 @@ struct EmitVisitor
                     // so that we output `if(!condition) { elseRegion }`
                     // instead of the current `if(condition) {} else { elseRegion }`
 
-                    sourceSink->emit("if(");
+                    stream->emit("if(");
                     emitIROperand(ctx, ifRegion->condition, IREmitMode::Default, kEOp_General);
-                    sourceSink->emit(")\n{\n");
-                    sourceSink->indent();
+                    stream->emit(")\n{\n");
+                    stream->indent();
                     emitRegion(ctx, ifRegion->thenRegion);
-                    sourceSink->dedent();
-                    sourceSink->emit("}\n");
+                    stream->dedent();
+                    stream->emit("}\n");
 
                     // Don't emit the `else` region if it would be empty
                     //
                     if(auto elseRegion = ifRegion->elseRegion)
                     {
-                        sourceSink->emit("else\n{\n");
-                        sourceSink->indent();
+                        stream->emit("else\n{\n");
+                        stream->indent();
                         emitRegion(ctx, elseRegion);
-                        sourceSink->dedent();
-                        sourceSink->emit("}\n");
+                        stream->dedent();
+                        stream->emit("}\n");
                     }
 
                     // Continue with the region after the `if`.
@@ -4476,7 +4477,7 @@ struct EmitVisitor
                             // Note: loop unrolling control is only available in HLSL, not GLSL
                             if(getTarget(ctx) == CodeGenTarget::HLSL)
                             {
-                                sourceSink->emit("[unroll]\n");
+                                stream->emit("[unroll]\n");
                             }
                             break;
 
@@ -4485,11 +4486,11 @@ struct EmitVisitor
                         }
                     }
 
-                    sourceSink->emit("for(;;)\n{\n");
-                    sourceSink->indent();
+                    stream->emit("for(;;)\n{\n");
+                    stream->indent();
                     emitRegion(ctx, loopRegion->body);
-                    sourceSink->dedent();
-                    sourceSink->emit("}\n");
+                    stream->dedent();
+                    stream->emit("}\n");
 
                     // Continue with the region after the loop
                     region = loopRegion->nextRegion;
@@ -4501,34 +4502,34 @@ struct EmitVisitor
                     auto switchRegion = (SwitchRegion*) region;
 
                     // Emit the start of our statement.
-                    sourceSink->emit("switch(");
+                    stream->emit("switch(");
                     emitIROperand(ctx, switchRegion->condition, IREmitMode::Default, kEOp_General);
-                    sourceSink->emit(")\n{\n");
+                    stream->emit(")\n{\n");
 
                     auto defaultCase = switchRegion->defaultCase;
                     for(auto currentCase : switchRegion->cases)
                     {
                         for(auto caseVal : currentCase->values)
                         {
-                            sourceSink->emit("case ");
+                            stream->emit("case ");
                             emitIROperand(ctx, caseVal, IREmitMode::Default, kEOp_General);
-                            sourceSink->emit(":\n");
+                            stream->emit(":\n");
                         }
                         if(currentCase.Ptr() == defaultCase)
                         {
-                            sourceSink->emit("default:\n");
+                            stream->emit("default:\n");
                         }
 
-                        sourceSink->indent();
-                        sourceSink->emit("{\n");
-                        sourceSink->indent();
+                        stream->indent();
+                        stream->emit("{\n");
+                        stream->indent();
                         emitRegion(ctx, currentCase->body);
-                        sourceSink->dedent();
-                        sourceSink->emit("}\n");
-                        sourceSink->dedent();
+                        stream->dedent();
+                        stream->emit("}\n");
+                        stream->dedent();
                     }
 
-                    sourceSink->emit("}\n");
+                    stream->emit("}\n");
 
                     // Continue with the region after the `switch`
                     region = switchRegion->nextRegion;
@@ -4604,11 +4605,11 @@ struct EmitVisitor
             return;
         }
 
-        sourceSink->emit("[");
-        sourceSink->emit(name);
-        sourceSink->emit("(\"");
-        sourceSink->emit(stringLitExpr->value);
-        sourceSink->emit("\")]\n");
+        stream->emit("[");
+        stream->emit(name);
+        stream->emit("(\"");
+        stream->emit(stringLitExpr->value);
+        stream->emit("\")]\n");
     }
 
     void emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
@@ -4631,11 +4632,11 @@ struct EmitVisitor
             return;
         }
 
-        sourceSink->emit("[");
-        sourceSink->emit(name);
-        sourceSink->emit("(");
-        sourceSink->emit(intLitExpr->value);
-        sourceSink->emit(")]\n");
+        stream->emit("[");
+        stream->emit(name);
+        stream->emit("(");
+        stream->emit(intLitExpr->value);
+        stream->emit(")]\n");
     }
 
     void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
@@ -4652,9 +4653,9 @@ struct EmitVisitor
 
         const String irName = getIRName(irPatchFunc->getFunc());
 
-        sourceSink->emit("[patchconstantfunc(\"");
-        sourceSink->emit(irName);
-        sourceSink->emit("\")]\n");
+        stream->emit("[patchconstantfunc(\"");
+        stream->emit(irName);
+        stream->emit("\")]\n");
     }
 
     void emitIREntryPointAttributes_HLSL(
@@ -4672,9 +4673,9 @@ struct EmitVisitor
                 char const* stageName = getStageName(stage);
                 if(stageName)
                 {
-                    sourceSink->emit("[shader(\"");
-                    sourceSink->emit(stageName);
-                    sourceSink->emit("\")]");
+                    stream->emit("[shader(\"");
+                    stream->emit(stageName);
+                    stream->emit("\")]");
                 }
             }
         }
@@ -4694,28 +4695,28 @@ struct EmitVisitor
                     kAxisCount,
                     &sizeAlongAxis[0]);
 
-                sourceSink->emit("[numthreads(");
+                stream->emit("[numthreads(");
                 for (int ii = 0; ii < 3; ++ii)
                 {
-                    if (ii != 0) sourceSink->emit(", ");
-                    sourceSink->Emit(sizeAlongAxis[ii]);
+                    if (ii != 0) stream->emit(", ");
+                    stream->Emit(sizeAlongAxis[ii]);
                 }
-                sourceSink->emit(")]\n");
+                stream->emit(")]\n");
             }
             break;
         case Stage::Geometry:
         {
             if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
             {
-                sourceSink->emit("[maxvertexcount(");
-                sourceSink->Emit(attrib->value);
-                sourceSink->emit(")]\n");
+                stream->emit("[maxvertexcount(");
+                stream->Emit(attrib->value);
+                stream->emit(")]\n");
             }
             if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
             {
-                sourceSink->emit("[instance(");
-                sourceSink->Emit(attrib->value);
-                sourceSink->emit(")]\n");
+                stream->emit("[instance(");
+                stream->Emit(attrib->value);
+                stream->emit(")]\n");
             }
             break;
         }
@@ -4769,7 +4770,7 @@ struct EmitVisitor
         {
             if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
             {
-                sourceSink->emit("[earlydepthstencil]\n");
+                stream->emit("[earlydepthstencil]\n");
             }
             break;
         }
@@ -4802,32 +4803,32 @@ struct EmitVisitor
                     kAxisCount,
                     &sizeAlongAxis[0]);
 
-                sourceSink->emit("layout(");
+                stream->emit("layout(");
                 char const* axes[] = { "x", "y", "z" };
                 for (int ii = 0; ii < 3; ++ii)
                 {
-                    if (ii != 0) sourceSink->emit(", ");
-                    sourceSink->emit("local_size_");
-                    sourceSink->emit(axes[ii]);
-                    sourceSink->emit(" = ");
-                    sourceSink->Emit(sizeAlongAxis[ii]);
+                    if (ii != 0) stream->emit(", ");
+                    stream->emit("local_size_");
+                    stream->emit(axes[ii]);
+                    stream->emit(" = ");
+                    stream->Emit(sizeAlongAxis[ii]);
                 }
-                sourceSink->emit(") in;");
+                stream->emit(") in;");
             }
             break;
         case Stage::Geometry:
         {
             if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
             {
-                sourceSink->emit("layout(max_vertices = ");
-                sourceSink->Emit(attrib->value);
-                sourceSink->emit(") out;\n");
+                stream->emit("layout(max_vertices = ");
+                stream->Emit(attrib->value);
+                stream->emit(") out;\n");
             }
             if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
             {
-                sourceSink->emit("layout(invocations = ");
-                sourceSink->Emit(attrib->value);
-                sourceSink->emit(") in;\n");
+                stream->emit("layout(invocations = ");
+                stream->Emit(attrib->value);
+                stream->emit(") in;\n");
             }
 
             for(auto pp : entryPointLayout->entryPoint->GetParameters())
@@ -4836,23 +4837,23 @@ struct EmitVisitor
                 {
                     if(as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
                     {
-                        sourceSink->emit("layout(triangles) in;\n");
+                        stream->emit("layout(triangles) in;\n");
                     }
                     else if(as<HLSLLineModifier>(inputPrimitiveTypeModifier))
                     {
-                        sourceSink->emit("layout(lines) in;\n");
+                        stream->emit("layout(lines) in;\n");
                     }
                     else if(as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
                     {
-                        sourceSink->emit("layout(lines_adjacency) in;\n");
+                        stream->emit("layout(lines_adjacency) in;\n");
                     }
                     else if(as<HLSLPointModifier>(inputPrimitiveTypeModifier))
                     {
-                        sourceSink->emit("layout(points) in;\n");
+                        stream->emit("layout(points) in;\n");
                     }
                     else if(as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
                     {
-                        sourceSink->emit("layout(triangles_adjacency) in;\n");
+                        stream->emit("layout(triangles_adjacency) in;\n");
                     }
                 }
 
@@ -4860,15 +4861,15 @@ struct EmitVisitor
                 {
                     if(as<HLSLTriangleStreamType>(outputStreamType))
                     {
-                        sourceSink->emit("layout(triangle_strip) out;\n");
+                        stream->emit("layout(triangle_strip) out;\n");
                     }
                     else if(as<HLSLLineStreamType>(outputStreamType))
                     {
-                        sourceSink->emit("layout(line_strip) out;\n");
+                        stream->emit("layout(line_strip) out;\n");
                     }
                     else if(as<HLSLPointStreamType>(outputStreamType))
                     {
-                        sourceSink->emit("layout(points) out;\n");
+                        stream->emit("layout(points) out;\n");
                     }
                 }
             }
@@ -4881,7 +4882,7 @@ struct EmitVisitor
             if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
             {
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
-                sourceSink->emit("layout(early_fragment_tests) in;\n");
+                stream->emit("layout(early_fragment_tests) in;\n");
             }
             break;
         }
@@ -4925,7 +4926,7 @@ struct EmitVisitor
             {
                 emitIRTempModifiers(ctx, pp);
                 emitIRType(ctx, pp->getFullType(), getIRName(pp));
-                sourceSink->emit(";\n");
+                stream->emit(";\n");
             }
         }
     }
@@ -4983,12 +4984,12 @@ struct EmitVisitor
 
         EmitType(resultType, name);
 
-        sourceSink->emit("(");
+        stream->emit("(");
         auto firstParam = func->getFirstParam();
         for( auto pp = firstParam; pp; pp = pp->getNextParam())
         {
             if(pp != firstParam)
-                sourceSink->emit(", ");
+                stream->emit(", ");
 
             auto paramName = getIRName(pp);
             auto paramType = pp->getDataType();
@@ -5007,15 +5008,15 @@ struct EmitVisitor
                         if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                         {
                             if (as<HLSLTriangleModifier>(primTypeModifier))
-                                sourceSink->emit("triangle ");
+                                stream->emit("triangle ");
                             else if (as<HLSLPointModifier>(primTypeModifier))
-                                sourceSink->emit("point ");
+                                stream->emit("point ");
                             else if (as<HLSLLineModifier>(primTypeModifier))
-                                sourceSink->emit("line ");
+                                stream->emit("line ");
                             else if (as<HLSLLineAdjModifier>(primTypeModifier))
-                                sourceSink->emit("lineadj ");
+                                stream->emit("lineadj ");
                             else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
-                                sourceSink->emit("triangleadj ");
+                                stream->emit("triangleadj ");
                         }
                     }
                 }
@@ -5025,7 +5026,7 @@ struct EmitVisitor
 
             emitIRSemantics(ctx, pp);
         }
-        sourceSink->emit(")");
+        stream->emit(")");
 
 
         emitIRSemantics(ctx, func);
@@ -5033,8 +5034,8 @@ struct EmitVisitor
         // TODO: encode declaration vs. definition
         if(isDefinition(func))
         {
-            sourceSink->emit("\n{\n");
-            sourceSink->indent();
+            stream->emit("\n{\n");
+            stream->indent();
 
             // HACK: forward-declare all the local variables needed for the
             // parameters of non-entry blocks.
@@ -5043,12 +5044,12 @@ struct EmitVisitor
             // Need to emit the operations in the blocks of the function
             emitIRFunctionBody(ctx, func);
 
-            sourceSink->dedent();
-            sourceSink->emit("}\n\n");
+            stream->dedent();
+            stream->emit("}\n\n");
         }
         else
         {
-            sourceSink->emit(";\n\n");
+            stream->emit(";\n\n");
         }
     }
 
@@ -5063,19 +5064,19 @@ struct EmitVisitor
         //
         if( auto outType = as<IROutType>(type))
         {
-            sourceSink->emit("out ");
+            stream->emit("out ");
             type = outType->getValueType();
         }
         else if( auto inOutType = as<IRInOutType>(type))
         {
-            sourceSink->emit("inout ");
+            stream->emit("inout ");
             type = inOutType->getValueType();
         }
         else if( auto refType = as<IRRefType>(type))
         {
             // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
             // so we don't actually expect to encounter these in user code.
-            sourceSink->emit("inout ");
+            stream->emit("inout ");
             type = inOutType->getValueType();
         }
 
@@ -5130,12 +5131,12 @@ struct EmitVisitor
 
         emitIRType(ctx, resultType, name);
 
-        sourceSink->emit("(");
+        stream->emit("(");
         auto paramCount = funcType->getParamCount();
         for(UInt pp = 0; pp < paramCount; ++pp)
         {
             if(pp != 0)
-                sourceSink->emit(", ");
+                stream->emit(", ");
 
             String paramName;
             paramName.append("_");
@@ -5144,7 +5145,7 @@ struct EmitVisitor
 
             emitIRParamType(ctx, paramType, paramName);
         }
-        sourceSink->emit(");\n\n");
+        stream->emit(");\n\n");
     }
 
     EntryPointLayout* getEntryPointLayout(
@@ -5247,10 +5248,10 @@ struct EmitVisitor
             return;
         }
 
-        sourceSink->emit("struct ");
-        sourceSink->emit(getIRName(structType));
-        sourceSink->emit("\n{\n");
-        sourceSink->indent();
+        stream->emit("struct ");
+        stream->emit(getIRName(structType));
+        stream->emit("\n{\n");
+        stream->indent();
 
         for(auto ff : structType->getFields())
         {
@@ -5270,11 +5271,11 @@ struct EmitVisitor
 
             emitIRType(ctx, fieldType, getIRName(fieldKey));
             emitIRSemantics(ctx, fieldKey);
-            sourceSink->emit(";\n");
+            stream->emit(";\n");
         }
 
-        sourceSink->dedent();
-        sourceSink->emit("};\n\n");
+        stream->dedent();
+        stream->emit("};\n\n");
     }
 
     void emitIRMatrixLayoutModifiers(
@@ -5299,11 +5300,11 @@ struct EmitVisitor
                 switch (matrixTypeLayout->mode)
                 {
                 case kMatrixLayoutMode_ColumnMajor:
-                    sourceSink->emit("column_major ");
+                    stream->emit("column_major ");
                     break;
 
                 case kMatrixLayoutMode_RowMajor:
-                    sourceSink->emit("row_major ");
+                    stream->emit("row_major ");
                     break;
                 }
                 break;
@@ -5317,11 +5318,11 @@ struct EmitVisitor
                 switch (matrixTypeLayout->mode)
                 {
                 case kMatrixLayoutMode_ColumnMajor:
-                    sourceSink->emit("layout(row_major)\n");
+                    stream->emit("layout(row_major)\n");
                     break;
 
                 case kMatrixLayoutMode_RowMajor:
-                    sourceSink->emit("layout(column_major)\n");
+                    stream->emit("layout(column_major)\n");
                     break;
                 }
                 break;
@@ -5354,7 +5355,7 @@ struct EmitVisitor
         case kIROp_IntType:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
-            sourceSink->Emit("flat ");
+            stream->Emit("flat ");
             break;
         }
     }
@@ -5380,27 +5381,27 @@ struct EmitVisitor
             {
             case IRInterpolationMode::NoInterpolation:
                 anyModifiers = true;
-                sourceSink->Emit(isGLSL ? "flat " : "nointerpolation ");
+                stream->Emit(isGLSL ? "flat " : "nointerpolation ");
                 break;
 
             case IRInterpolationMode::NoPerspective:
                 anyModifiers = true;
-                sourceSink->Emit("noperspective ");
+                stream->Emit("noperspective ");
                 break;
 
             case IRInterpolationMode::Linear:
                 anyModifiers = true;
-                sourceSink->Emit(isGLSL ? "smooth " : "linear ");
+                stream->Emit(isGLSL ? "smooth " : "linear ");
                 break;
 
             case IRInterpolationMode::Sample:
                 anyModifiers = true;
-                sourceSink->Emit("sample ");
+                stream->Emit("sample ");
                 break;
 
             case IRInterpolationMode::Centroid:
                 anyModifiers = true;
-                sourceSink->Emit("centroid ");
+                stream->Emit("centroid ");
                 break;
 
             default:
@@ -5491,9 +5492,9 @@ struct EmitVisitor
                 // should emit a `layout` modifier using the GLSL name
                 // for the format.
                 //
-                sourceSink->Emit("layout(");
-                sourceSink->Emit(getGLSLNameForImageFormat(format));
-                sourceSink->Emit(")\n");
+                stream->Emit("layout(");
+                stream->Emit(getGLSLNameForImageFormat(format));
+                stream->Emit(")\n");
             }
 
             // No matter what, if an explicit `[format(...)]` was given,
@@ -5553,10 +5554,10 @@ struct EmitVisitor
         }
         if(auto elementBasicType = as<IRBasicType>(elementType))
         {
-            sourceSink->Emit("layout(");
+            stream->Emit("layout(");
             switch(vectorWidth)
             {
-            default: sourceSink->Emit("rgba");  break;
+            default: stream->Emit("rgba");  break;
 
             case 3:
             {
@@ -5577,21 +5578,21 @@ struct EmitVisitor
                 // and add an attribute for specifying the format manually if you really want to override our
                 // inference (e.g., to specify r11fg11fb10f).
 
-                sourceSink->Emit("rgba");
+                stream->Emit("rgba");
                 //Emit("rgb");                                
                 break;
             }
 
-            case 2:  sourceSink->Emit("rg");    break;
-            case 1:  sourceSink->Emit("r");     break;
+            case 2:  stream->Emit("rg");    break;
+            case 1:  stream->Emit("r");     break;
             }
             switch(elementBasicType->getBaseType())
             {
             default:
-            case BaseType::Float:   sourceSink->Emit("32f");  break;
-            case BaseType::Half:    sourceSink->Emit("16f");  break;
-            case BaseType::UInt:    sourceSink->Emit("32ui"); break;
-            case BaseType::Int:     sourceSink->Emit("32i"); break;
+            case BaseType::Float:   stream->Emit("32f");  break;
+            case BaseType::Half:    stream->Emit("16f");  break;
+            case BaseType::UInt:    stream->Emit("32ui"); break;
+            case BaseType::Int:     stream->Emit("32i"); break;
 
             // TODO: Here are formats that are available in GLSL,
             // but that are not handled by the above cases.
@@ -5628,7 +5629,7 @@ struct EmitVisitor
             // r16ui
             // r8ui
             }
-            sourceSink->Emit(")\n");
+            stream->Emit(")\n");
         }
     }
 
@@ -5641,7 +5642,7 @@ struct EmitVisitor
 
         if(temp->findDecoration<IRPreciseDecoration>())
         {
-            sourceSink->emit("precise ");
+            stream->emit("precise ");
         }
     }
 
@@ -5658,22 +5659,22 @@ struct EmitVisitor
         //
         if(varDecl->findDecoration<IRVulkanRayPayloadDecoration>())
         {
-            sourceSink->emit("layout(location = ");
-            sourceSink->Emit(getRayPayloadLocation(ctx, varDecl));
-            sourceSink->emit(")\n");
-            sourceSink->emit("rayPayloadNV\n");
+            stream->emit("layout(location = ");
+            stream->Emit(getRayPayloadLocation(ctx, varDecl));
+            stream->emit(")\n");
+            stream->emit("rayPayloadNV\n");
         }
         if(varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
         {
-            sourceSink->emit("layout(location = ");
-            sourceSink->Emit(getCallablePayloadLocation(ctx, varDecl));
-            sourceSink->emit(")\n");
-            sourceSink->emit("callableDataNV\n");
+            stream->emit("layout(location = ");
+            stream->Emit(getCallablePayloadLocation(ctx, varDecl));
+            stream->emit(")\n");
+            stream->emit("callableDataNV\n");
         }
 
         if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
         {
-            sourceSink->emit("hitAttributeNV\n");
+            stream->emit("hitAttributeNV\n");
         }
 
         if(varDecl->findDecoration<IRGloballyCoherentDecoration>())
@@ -5684,11 +5685,11 @@ struct EmitVisitor
                 break;
 
             case CodeGenTarget::HLSL:
-                sourceSink->emit("globallycoherent\n");
+                stream->emit("globallycoherent\n");
                 break;
 
             case CodeGenTarget::GLSL:
-                sourceSink->emit("coherent\n");
+                stream->emit("coherent\n");
                 break;
             }
         }
@@ -5741,36 +5742,36 @@ struct EmitVisitor
                 case LayoutResourceKind::Uniform:
                 case LayoutResourceKind::ShaderResource:
                 case LayoutResourceKind::DescriptorTableSlot:
-                    sourceSink->emit("uniform ");
+                    stream->emit("uniform ");
                     break;
 
                 case LayoutResourceKind::VaryingInput:
                     {
-                        sourceSink->emit("in ");
+                        stream->emit("in ");
                     }
                     break;
 
                 case LayoutResourceKind::VaryingOutput:
                     {
-                        sourceSink->emit("out ");
+                        stream->emit("out ");
                     }
                     break;
 
                 case LayoutResourceKind::RayPayload:
                     {
-                        sourceSink->emit("rayPayloadInNV ");
+                        stream->emit("rayPayloadInNV ");
                     }
                     break;
 
                 case LayoutResourceKind::CallablePayload:
                     {
-                        sourceSink->emit("callableDataInNV ");
+                        stream->emit("callableDataInNV ");
                     }
                     break;
 
                 case LayoutResourceKind::HitAttributes:
                     {
-                        sourceSink->emit("hitAttributeNV ");
+                        stream->emit("hitAttributeNV ");
                     }
                     break;
 
@@ -5790,13 +5791,13 @@ struct EmitVisitor
     {
         if(as<IRTextureBufferType>(type))
         {
-            sourceSink->emit("tbuffer ");
+            stream->emit("tbuffer ");
         }
         else
         {
-            sourceSink->emit("cbuffer ");
+            stream->emit("cbuffer ");
         }
-        sourceSink->emit(getIRName(varDecl));
+        stream->emit(getIRName(varDecl));
 
         auto varLayout = getVarLayout(ctx, varDecl);
         SLANG_RELEASE_ASSERT(varLayout);
@@ -5817,16 +5818,16 @@ struct EmitVisitor
 
         emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
-        sourceSink->emit("\n{\n");
-        sourceSink->indent();
+        stream->emit("\n{\n");
+        stream->indent();
 
         auto elementType = type->getElementType();
 
         emitIRType(ctx, elementType, getIRName(varDecl));
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
 
-        sourceSink->dedent();
-        sourceSink->emit("}\n");
+        stream->dedent();
+        stream->emit("}\n");
     }
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
@@ -5857,9 +5858,9 @@ struct EmitVisitor
         {
             if(auto arrayType = as<IRArrayType>(type))
             {
-                sourceSink->emit("[");
+                stream->emit("[");
                 EmitVal(arrayType->getElementCount(), kEOp_General);
-                sourceSink->emit("]");
+                stream->emit("]");
 
                 // Continue looping on the next layer in.
                 //
@@ -5867,7 +5868,7 @@ struct EmitVisitor
             }
             else if(auto unsizedArrayType = as<IRUnsizedArrayType>(type))
             {
-                sourceSink->emit("[]");
+                stream->emit("[]");
 
                 // Continue looping on the next layer in.
                 //
@@ -5921,42 +5922,42 @@ struct EmitVisitor
         {
             // TODO: A shader record in vk can be potentially read-write. Currently slang doesn't support write access
             // and readonly buffer generates SPIRV validation error.
-            sourceSink->emit("buffer ");
+            stream->emit("buffer ");
         }
         else if(as<IRGLSLShaderStorageBufferType>(type))
         {
             // Is writable 
-            sourceSink->emit("layout(std430) buffer ");
+            stream->emit("layout(std430) buffer ");
         }
         // TODO: what to do with HLSL `tbuffer` style buffers?
         else
         {
             // uniform is implicitly read only
-            sourceSink->emit("layout(std140) uniform ");
+            stream->emit("layout(std140) uniform ");
         }
 
         // Generate a dummy name for the block
-        sourceSink->emit("_S");
-        sourceSink->Emit(ctx->shared->uniqueIDCounter++);
+        stream->emit("_S");
+        stream->Emit(ctx->shared->uniqueIDCounter++);
 
-        sourceSink->emit("\n{\n");
-        sourceSink->indent();
+        stream->emit("\n{\n");
+        stream->indent();
 
         auto elementType = type->getElementType();
 
         emitIRType(ctx, elementType, "_data");
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
 
-        sourceSink->dedent();
-        sourceSink->emit("} ");
+        stream->dedent();
+        stream->emit("} ");
 
-        sourceSink->emit(getIRName(varDecl));
+        stream->emit(getIRName(varDecl));
 
         // If the underlying variable was an array (or array of arrays, etc.)
         // we need to emit all those array brackets here.
         emitArrayBrackets(ctx, varDecl->getDataType());
 
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
     }
 
     void emitIRParameterGroup(
@@ -6022,7 +6023,7 @@ struct EmitVisitor
 
         emitIRLayoutSemantics(ctx, varDecl);
 
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
     }
 
     void emitIRStructuredBuffer_GLSL(
@@ -6035,7 +6036,7 @@ struct EmitVisitor
         // TODO: we should require either the extension or the version...
         requireGLSLVersion(430);
 
-        sourceSink->Emit("layout(std430");
+        stream->Emit("layout(std430");
 
         auto layout = getVarLayout(ctx, varDecl);
         if (layout)
@@ -6046,16 +6047,16 @@ struct EmitVisitor
             const UInt index = getBindingOffset(&chain, kind);
             const UInt space = getBindingSpace(&chain, kind);
 
-            sourceSink->Emit(", binding = ");
-            sourceSink->Emit(index);
+            stream->Emit(", binding = ");
+            stream->Emit(index);
             if (space)
             {
-                sourceSink->Emit(", set = ");
-                sourceSink->Emit(space);
+                stream->Emit(", set = ");
+                stream->Emit(space);
             }
         }
         
-        sourceSink->emit(") ");
+        stream->emit(") ");
 
         /*
         If the output type is a buffer, and we can determine it is only readonly we can prefix before
@@ -6072,30 +6073,30 @@ struct EmitVisitor
 
         if (as<IRHLSLStructuredBufferType>(structuredBufferType))
         {
-            sourceSink->emit("readonly ");
+            stream->emit("readonly ");
         }
 
-        sourceSink->emit("buffer ");
+        stream->emit("buffer ");
     
         // Generate a dummy name for the block
-        sourceSink->emit("_S");
-        sourceSink->Emit(ctx->shared->uniqueIDCounter++);
+        stream->emit("_S");
+        stream->Emit(ctx->shared->uniqueIDCounter++);
 
-        sourceSink->emit(" {\n");
-        sourceSink->indent();
+        stream->emit(" {\n");
+        stream->indent();
 
 
         auto elementType = structuredBufferType->getElementType();
         emitIRType(ctx, elementType, "_data[]");
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
 
-        sourceSink->dedent();
-        sourceSink->emit("} ");
+        stream->dedent();
+        stream->emit("} ");
 
-        sourceSink->emit(getIRName(varDecl));
+        stream->emit(getIRName(varDecl));
         emitArrayBrackets(ctx, varDecl->getDataType());
 
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
     }
 
     void emitIRByteAddressBuffer_GLSL(
@@ -6112,7 +6113,7 @@ struct EmitVisitor
         // TODO: we should require either the extension or the version...
         requireGLSLVersion(430);
 
-        sourceSink->Emit("layout(std430");
+        stream->Emit("layout(std430");
 
         auto layout = getVarLayout(ctx, varDecl);
         if (layout)
@@ -6123,16 +6124,16 @@ struct EmitVisitor
             const UInt index = getBindingOffset(&chain, kind);
             const UInt space = getBindingSpace(&chain, kind);
 
-            sourceSink->Emit(", binding = ");
-            sourceSink-> Emit(index);
+            stream->Emit(", binding = ");
+            stream-> Emit(index);
             if (space)
             {
-                sourceSink->Emit(", set = ");
-                sourceSink->Emit(space);
+                stream->Emit(", set = ");
+                stream->Emit(space);
             }
         }
 
-        sourceSink->emit(") ");
+        stream->emit(") ");
 
         /*
         If the output type is a buffer, and we can determine it is only readonly we can prefix before
@@ -6145,26 +6146,26 @@ struct EmitVisitor
 
         if (as<IRHLSLByteAddressBufferType>(byteAddressBufferType))
         {
-            sourceSink->emit("readonly ");
+            stream->emit("readonly ");
         }
 
-        sourceSink->emit("buffer ");
+        stream->emit("buffer ");
 
         // Generate a dummy name for the block
-        sourceSink->emit("_S");
-        sourceSink->Emit(ctx->shared->uniqueIDCounter++);
-        sourceSink->emit("\n{\n");
-        sourceSink->indent();
+        stream->emit("_S");
+        stream->Emit(ctx->shared->uniqueIDCounter++);
+        stream->emit("\n{\n");
+        stream->indent();
 
-        sourceSink->emit("uint _data[];\n");
+        stream->emit("uint _data[];\n");
 
-        sourceSink->dedent();
-        sourceSink->emit("} ");
+        stream->dedent();
+        stream->emit("} ");
 
-        sourceSink->emit(getIRName(varDecl));
+        stream->emit(getIRName(varDecl));
         emitArrayBrackets(ctx, varDecl->getDataType());
 
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
     }
 
     void emitIRGlobalVar(
@@ -6185,13 +6186,13 @@ struct EmitVisitor
             initFuncName = getIRName(varDecl);
             initFuncName.append("_init");
 
-            sourceSink->emit("\n");
+            stream->emit("\n");
             emitIRType(ctx, varType, initFuncName);
-            sourceSink->Emit("()\n{\n");
-            sourceSink->indent();
+            stream->Emit("()\n{\n");
+            stream->indent();
             emitIRFunctionBody(ctx, varDecl);
-            sourceSink->dedent();
-            sourceSink->Emit("}\n");
+            stream->dedent();
+            stream->Emit("}\n");
         }
 
         // An ordinary global variable won't have a layout
@@ -6211,7 +6212,7 @@ struct EmitVisitor
             // HLSL requires the `static` modifier on any
             // global variables; otherwise they are assumed
             // to be uniforms.
-            sourceSink->Emit("static ");
+            stream->Emit("static ");
             break;
 
         default:
@@ -6231,12 +6232,12 @@ struct EmitVisitor
 
         if (varDecl->getFirstBlock())
         {
-            sourceSink->Emit(" = ");
-            sourceSink->emit(initFuncName);
-            sourceSink->Emit("()");
+            stream->Emit(" = ");
+            stream->emit(initFuncName);
+            stream->Emit("()");
         }
 
-        sourceSink->emit(";\n\n");
+        stream->emit(";\n\n");
     }
 
     void emitIRGlobalParam(
@@ -6381,7 +6382,7 @@ struct EmitVisitor
         // A shader parameter cannot have an initializer,
         // so we do need to consider emitting one here.
 
-        sourceSink->emit(";\n\n");
+        stream->emit(";\n\n");
     }
 
 
@@ -6420,9 +6421,9 @@ struct EmitVisitor
 
         if( ctx->shared->target != CodeGenTarget::GLSL )
         {
-            sourceSink->emit("static ");
+            stream->emit("static ");
         }
-        sourceSink->emit("const ");
+        stream->emit("const ");
         emitIRRateQualifiers(ctx, valDecl);
         emitIRType(ctx, valType, getIRName(valDecl));
 
@@ -6431,7 +6432,7 @@ struct EmitVisitor
             // There is an initializer (which we expect for
             // any global constant...).
 
-            sourceSink->emit(" = ");
+            stream->emit(" = ");
 
             // We need to emit the entire initializer as
             // a single expression.
@@ -6439,14 +6440,14 @@ struct EmitVisitor
         }
 
 
-        sourceSink->emit(";\n");
+        stream->emit(";\n");
     }
 
     void emitIRGlobalInst(
         EmitContext*    ctx,
         IRInst*         inst)
     {
-        sourceSink->advanceToSourceLocation(inst->sourceLoc);
+        stream->advanceToSourceLocation(inst->sourceLoc);
 
         switch(inst->op)
         {
@@ -6777,14 +6778,14 @@ String emitEntryPoint(
         lineDirectiveMode = LineDirectiveMode::GLSL;
     }
 
-    SourceSink sourceSink(compileRequest->getSourceManager(), lineDirectiveMode );
+    SourceStream sourceStream(compileRequest->getSourceManager(), lineDirectiveMode );
 
     SharedEmitContext sharedContext;
     sharedContext.compileRequest = compileRequest;
     sharedContext.target = target;
     sharedContext.entryPoint = entryPoint;
     sharedContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
-    sharedContext.sourceSink = &sourceSink;
+    sharedContext.stream = &sourceStream;
 
     if (entryPoint && programLayout)
     {
@@ -7090,8 +7091,8 @@ String emitEntryPoint(
         break;
     }
 
-    String code = sourceSink.getContent();
-    sourceSink.clearContent();
+    String code = sourceStream.getContent();
+    sourceStream.clearContent();
 
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
@@ -7101,7 +7102,7 @@ String emitEntryPoint(
 
     visitor.emitLayoutDirectives(targetRequest);
 
-    String prefix = sourceSink.getContent();
+    String prefix = sourceStream.getContent();
     
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;

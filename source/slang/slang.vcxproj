@@ -219,7 +219,7 @@
     <ClInclude Include="profile.h" />
     <ClInclude Include="reflection.h" />
     <ClInclude Include="slang-file-system.h" />
-    <ClInclude Include="slang-source-sink.h" />
+    <ClInclude Include="slang-source-stream.h" />
     <ClInclude Include="source-loc.h" />
     <ClInclude Include="stmt-defs.h" />
     <ClInclude Include="syntax-base-defs.h" />
@@ -273,7 +273,7 @@
     <ClCompile Include="profile.cpp" />
     <ClCompile Include="reflection.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
-    <ClCompile Include="slang-source-sink.cpp" />
+    <ClCompile Include="slang-source-stream.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang.cpp" />
     <ClCompile Include="source-loc.cpp" />
