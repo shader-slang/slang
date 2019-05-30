@@ -16,44 +16,57 @@
 namespace Slang
 {
 
+// x macro of precedence of types in order.
+// Used because in header, need to prefix macros to avoid clashes, and this style allows for prefixing without additional clutter
+#define SLANG_PRECEDENCE(x) \
+    x(None,         NON_ASSOC) \
+    x(Comma,        LEFT) \
+    \
+    x(General,      NON_ASSOC) \
+    \
+    x(Assign,       RIGHT) \
+    \
+    x(Conditional,  RIGHT) \
+    \
+    x(Or,           LEFT) \
+    x(And,          LEFT) \
+    x(BitOr,        LEFT) \
+    x(BitXor,       LEFT) \
+    x(BitAnd,       LEFT) \
+    \
+    x(Equality,     LEFT) \
+    x(Relational,   LEFT) \
+    x(Shift,        LEFT) \
+    x(Additive,     LEFT) \
+    x(Multiplicative, LEFT) \
+    x(Prefix,       RIGHT) \
+    x(Postfix,      LEFT) \
+    x(Atomic,       NON_ASSOC)
+
+#define SLANG_PRECEDENCE_LEFT(NAME)                      \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right,
+
+#define SLANG_PRECEDENCE_RIGHT(NAME)                     \
+    kEPrecedence_##NAME##_Right,    \
+    kEPrecedence_##NAME##_Left,
+
+#define SLANG_PRECEDENCE_NON_ASSOC(NAME)                  \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left,
+
+#define SLANG_PRECEDENCE_EXPAND(NAME, ASSOC) \
+    SLANG_PRECEDENCE_##ASSOC(NAME)
+
 enum EPrecedence
 {
-#define LEFT(NAME)                      \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right
-
-#define RIGHT(NAME)                     \
-    kEPrecedence_##NAME##_Right,    \
-    kEPrecedence_##NAME##_Left
-
-#define NONASSOC(NAME)                  \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left
-
-    NONASSOC(None),
-    LEFT(Comma),
-
-    NONASSOC(General),
-
-    RIGHT(Assign),
-
-    RIGHT(Conditional),
-
-    LEFT(Or),
-    LEFT(And),
-    LEFT(BitOr),
-    LEFT(BitXor),
-    LEFT(BitAnd),
-
-    LEFT(Equality),
-    LEFT(Relational),
-    LEFT(Shift),
-    LEFT(Additive),
-    LEFT(Multiplicative),
-    RIGHT(Prefix),
-    LEFT(Postfix),
-    NONASSOC(Atomic),
+    SLANG_PRECEDENCE(SLANG_PRECEDENCE_EXPAND)
 };
+
+#undef SLANG_PRECEDENCE_EXPAND
+#undef SLANG_PRECEDENCE_NON_ASSOC
+#undef SLANG_PRECEDENCE_RIGHT
+#undef SLANG_PRECEDENCE_LEFT
 
 // Info on an op for emit purposes
 struct EOpInfo
@@ -155,16 +168,9 @@ struct CLikeSourceEmitter
 
     void emitTypeImpl(IRType* type, EDeclarator* declarator);
 
-    void emitType(
-        IRType*             type,
-        SourceLoc const&    typeLoc,
-        Name*               name,
-        SourceLoc const&    nameLoc);
-
+    void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
-
     void emitType(IRType* type, String const& name);
-
     void emitType(IRType* type);
 
     //
@@ -196,32 +202,26 @@ struct CLikeSourceEmitter
 
     void doSampleRateInputCheck(Name* name);
 
-    void emitVal(IRInst* val, const EOpInfo&  outerPrec);
+    void emitVal(IRInst* val, const EOpInfo& outerPrec);
 
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
         // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    void emitHLSLRegisterSemantic(
-        LayoutResourceKind  kind,
-        EmitVarChain*       chain,
-        char const* uniformSemanticSpelling = "register");
+    void emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
 
         // Emit all the `register` semantics that are appropriate for a particular variable layout
     void emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
     void emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
 
-    void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain*       chain);
+    void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
 
     void emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
 
-    bool emitGLSLLayoutQualifier(LayoutResourceKind  kind, EmitVarChain*       chain);
+    bool emitGLSLLayoutQualifier(LayoutResourceKind  kind, EmitVarChain* chain);
 
-    void emitGLSLLayoutQualifiers(
-        RefPtr<VarLayout>               layout,
-        EmitVarChain*                   inChain,
-        LayoutResourceKind              filter = LayoutResourceKind::None);
+    void emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
 
     void emitGLSLVersionDirective();
 
@@ -252,7 +252,7 @@ struct CLikeSourceEmitter
 
     bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
-    void emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const&  outerPrec);
+    void emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const& outerPrec);
 
     void emitIRArgs(IRInst* inst, IREmitMode mode);
 
@@ -290,7 +290,6 @@ struct CLikeSourceEmitter
 
     void emitIRCallExpr(IRCall* inst, IREmitMode mode, EOpInfo outerPrec);
 
-    
     void emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose);
 
     void emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut);
@@ -321,7 +320,6 @@ struct CLikeSourceEmitter
         /// Emit high-level language statements from a structured region.
     void emitRegion(Region* inRegion);
 
-    
         /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(RegionTree* regionTree);
 
@@ -349,13 +347,13 @@ struct CLikeSourceEmitter
 
     void emitIRSimpleFunc(IRFunc* func);
 
-    void emitIRParamType(IRType* type, String const&   name);
+    void emitIRParamType(IRType* type, String const& name);
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
     void emitIRFuncDecl(IRFunc* func);
 
-    EntryPointLayout* getEntryPointLayout(IRFunc*         func);
+    EntryPointLayout* getEntryPointLayout(IRFunc* func);
 
     EntryPointLayout* asEntryPoint(IRFunc* func);
 
@@ -385,7 +383,7 @@ struct CLikeSourceEmitter
 
     UInt getCallablePayloadLocation(IRInst* inst);
 
-    void emitGLSLImageFormatModifier(IRInst* var, IRTextureType*  resourceType);
+    void emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     void emitIRTempModifiers(IRInst* temp);
@@ -415,17 +413,11 @@ struct CLikeSourceEmitter
 
     void emitIRGlobalInst(IRInst* inst);
 
-    void ensureInstOperand(
-        ComputeEmitActionsContext*  ctx,
-        IRInst*                     inst,
-        EmitAction::Level           requiredLevel = EmitAction::Level::Definition);
+    void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
     void ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst);
 
-    void ensureGlobalInst(
-        ComputeEmitActionsContext*  ctx,
-        IRInst*                     inst,
-        EmitAction::Level           requiredLevel);
+    void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
 
     void computeIREmitActions(IRModule* module, List<EmitAction>& ioActions);
 
