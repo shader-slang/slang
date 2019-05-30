@@ -222,7 +222,7 @@
     <ClInclude Include="slang-emit-context.h" />
     <ClInclude Include="slang-extension-usage-tracker.h" />
     <ClInclude Include="slang-file-system.h" />
-    <ClInclude Include="slang-mangled-name-parser.h" />
+    <ClInclude Include="slang-mangled-lexer.h" />
     <ClInclude Include="slang-source-stream.h" />
     <ClInclude Include="source-loc.h" />
     <ClInclude Include="stmt-defs.h" />
@@ -280,7 +280,7 @@
     <ClCompile Include="slang-emit-context.cpp" />
     <ClCompile Include="slang-extension-usage-tracker.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
-    <ClCompile Include="slang-mangled-name-parser.cpp" />
+    <ClCompile Include="slang-mangled-lexer.cpp" />
     <ClCompile Include="slang-source-stream.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang.cpp" />

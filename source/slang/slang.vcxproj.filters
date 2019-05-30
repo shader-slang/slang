@@ -165,7 +165,7 @@
     <ClInclude Include="slang-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-mangled-name-parser.h">
+    <ClInclude Include="slang-mangled-lexer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-source-stream.h">
@@ -335,7 +335,7 @@
     <ClCompile Include="slang-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-mangled-name-parser.cpp">
+    <ClCompile Include="slang-mangled-lexer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-source-stream.cpp">

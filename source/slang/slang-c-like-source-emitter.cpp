@@ -24,7 +24,7 @@
 
 #include "slang-source-stream.h"
 #include "slang-emit-context.h"
-#include "slang-mangled-name-parser.h"
+#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
@@ -2693,16 +2693,15 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     auto mangledName = String(linkageDecoration->getMangledName());
 
 
-    // We will use the `MangledNameParser` to
+    // We will use the `MangledLexer` to
     // help us split the original name into its pieces.
-    MangledNameParser um(mangledName);
-    um.startUnmangling();
-
+    MangledLexer lexer(mangledName);
+    
     // We'll read through the qualified name of the
     // symbol (e.g., `Texture2D<T>.Sample`) and then
     // only keep the last segment of the name (e.g.,
     // the `Sample` part).
-    auto name = um.readSimpleName();
+    auto name = lexer.readSimpleName();
 
     // We will special-case some names here, that
     // represent callable declarations that aren't
@@ -2738,7 +2737,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     // doesn't include the implicit `this` parameter.
     // We can compare the argument and parameter counts
     // to figure out whether we have a member function call.
-    UInt paramCount = um.readParamCount();
+    UInt paramCount = lexer.readParamCount();
 
     if(argCount != paramCount)
     {

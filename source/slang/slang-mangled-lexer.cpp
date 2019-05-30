@@ -1,12 +1,11 @@
-// slang-mangled-name-parser.cpp
-#include "slang-mangled-name-parser.h"
+// slang-mangled-lexer.cpp
+#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
 namespace Slang {
 
-
-UInt MangledNameParser::readCount()
+UInt MangledLexer::readCount()
 {
     int c = _peek();
     if (!_isDigit((char)c))
@@ -14,7 +13,7 @@ UInt MangledNameParser::readCount()
         SLANG_UNEXPECTED("bad name mangling");
         UNREACHABLE_RETURN(0);
     }
-    _get();
+    _next();
 
     if (c == '0')
         return 0;
@@ -27,21 +26,21 @@ UInt MangledNameParser::readCount()
         if (!_isDigit((char)c))
             return count;
 
-        _get();
+        _next();
     }
 }
 
-void MangledNameParser::readGenericParam()
+void MangledLexer::readGenericParam()
 {
     switch (_peek())
     {
     case 'T':
     case 'C':
-        _get();
+        _next();
         break;
 
     case 'v':
-        _get();
+        _next();
         readType();
         break;
 
@@ -51,7 +50,7 @@ void MangledNameParser::readGenericParam()
     }
 }
 
-void MangledNameParser::readGenericParams()
+void MangledLexer::readGenericParams()
 {
     _expect("g");
     UInt paramCount = readCount();
@@ -61,7 +60,7 @@ void MangledNameParser::readGenericParams()
     }
 }
 
-void MangledNameParser::readType()
+void MangledLexer::readType()
 {
     int c = _peek();
     switch (c)
@@ -74,11 +73,11 @@ void MangledNameParser::readType()
     case 'h':
     case 'f':
     case 'd':
-        _get();
+        _next();
         break;
 
     case 'v':
-        _get();
+        _next();
         readSimpleIntVal();
         readType();
         break;
@@ -89,17 +88,17 @@ void MangledNameParser::readType()
     }
 }
 
-void MangledNameParser::readVal()
+void MangledLexer::readVal()
 {
     switch (_peek())
     {
     case 'k':
-        _get();
+        _next();
         readCount();
         break;
 
     case 'K':
-        _get();
+        _next();
         readRawStringSegment();
         break;
 
@@ -110,7 +109,7 @@ void MangledNameParser::readVal()
 
 }
 
-void MangledNameParser::readGenericArgs()
+void MangledLexer::readGenericArgs()
 {
     _expect("G");
     UInt argCount = readCount();
@@ -120,7 +119,7 @@ void MangledNameParser::readGenericArgs()
     }
 }
 
-UnownedStringSlice MangledNameParser::readSimpleName()
+UnownedStringSlice MangledLexer::readSimpleName()
 {
     UnownedStringSlice result;
     for (;;)
@@ -159,7 +158,7 @@ UnownedStringSlice MangledNameParser::readSimpleName()
     }
 }
 
-UnownedStringSlice MangledNameParser::readRawStringSegment()
+UnownedStringSlice MangledLexer::readRawStringSegment()
 {
     // Read the length part
     UInt count = readCount();
@@ -174,7 +173,7 @@ UnownedStringSlice MangledNameParser::readRawStringSegment()
     return result;
 }
 
-UInt MangledNameParser::readParamCount()
+UInt MangledLexer::readParamCount()
 {
     _expect("p");
     UInt count = readCount();
