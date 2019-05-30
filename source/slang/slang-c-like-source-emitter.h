@@ -16,6 +16,21 @@
 namespace Slang
 {
 
+// Macros for setting up precedence
+#define SLANG_PRECEDENCE_LEFT(NAME)                      \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right,
+
+#define SLANG_PRECEDENCE_RIGHT(NAME)                     \
+    kEPrecedence_##NAME##_Right,    \
+    kEPrecedence_##NAME##_Left,
+
+#define SLANG_PRECEDENCE_NON_ASSOC(NAME)                  \
+    kEPrecedence_##NAME##_Left,     \
+    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left,
+
+#define SLANG_PRECEDENCE_EXPAND(NAME, ASSOC) SLANG_PRECEDENCE_##ASSOC(NAME)
+
 // x macro of precedence of types in order.
 // Used because in header, need to prefix macros to avoid clashes, and this style allows for prefixing without additional clutter
 #define SLANG_PRECEDENCE(x) \
@@ -43,30 +58,64 @@ namespace Slang
     x(Postfix,      LEFT) \
     x(Atomic,       NON_ASSOC)
 
-#define SLANG_PRECEDENCE_LEFT(NAME)                      \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right,
-
-#define SLANG_PRECEDENCE_RIGHT(NAME)                     \
-    kEPrecedence_##NAME##_Right,    \
-    kEPrecedence_##NAME##_Left,
-
-#define SLANG_PRECEDENCE_NON_ASSOC(NAME)                  \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left,
-
-#define SLANG_PRECEDENCE_EXPAND(NAME, ASSOC) \
-    SLANG_PRECEDENCE_##ASSOC(NAME)
-
+// Precedence enum produced from the SLANG_PRECEDENCE macro
 enum EPrecedence
 {
     SLANG_PRECEDENCE(SLANG_PRECEDENCE_EXPAND)
 };
 
-#undef SLANG_PRECEDENCE_EXPAND
-#undef SLANG_PRECEDENCE_NON_ASSOC
-#undef SLANG_PRECEDENCE_RIGHT
-#undef SLANG_PRECEDENCE_LEFT
+// Macro for define OpInfo and an associated enum type. Order or macro parameters is
+// Op, OpName, Precedence
+#define SLANG_OP_INFO(x) \
+    x(None, "", None) \
+    \
+    x(Comma, ",", Comma) \
+    \
+    x(General, "", General) \
+    \
+    x(Assign, "=", Assign) \
+    x(AddAssign, "+=", Assign) \
+    x(SubAssign, "-=", Assign) \
+    x(MulAssign, "*=", Assign) \
+    x(DivAssign, "/=", Assign) \
+    x(ModAssign, "%=", Assign) \
+    x(LshAssign, "<<=", Assign) \
+    x(RshAssign, ">>=", Assign) \
+    x(OrAssign, "|=", Assign) \
+    x(AndAssign, "&=", Assign) \
+    x(XorAssign, "^=", Assign) \
+    \
+    x(Conditional, "?:", Conditional) \
+    \
+    x(Or, "||", Or) \
+    x(And, "&&", And) \
+    x(BitOr, "|", BitOr) \
+    x(BitXor, "^", BitXor) \
+    x(BitAnd, "&", BitAnd) \
+    \
+    x(Eql, "==", Equality) \
+    x(Neq, "!=", Equality) \
+    \
+    x(Less, "<", Relational) \
+    x(Greater, ">", Relational) \
+    x(Leq, "<=", Relational) \
+    x(Geq, ">=", Relational) \
+    \
+    x(Lsh, "<<", Shift) \
+    x(Rsh, ">>", Shift) \
+    \
+    x(Add, "+", Additive) \
+    x(Sub, "-", Additive) \
+    \
+    x(Mul, "*", Multiplicative) \
+    x(Div, "/", Multiplicative) \
+    x(Mod, "%", Multiplicative) \
+    \
+    x(Prefix, "", Prefix) \
+    x(Postfix, "", Postfix) \
+    x(Atomic, "", Atomic)
+
+#define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 
 // Info on an op for emit purposes
 struct EOpInfo
@@ -78,6 +127,12 @@ struct EOpInfo
 
 struct CLikeSourceEmitter
 {
+    enum class EmitOp
+    {
+        SLANG_OP_INFO(SLANG_OP_INFO_ENUM)
+        CountOf,
+    };
+
     enum class BuiltInCOp
     {
         Splat,                  //< Splat a single value to all values of a vector or matrix type
@@ -124,6 +179,8 @@ struct CLikeSourceEmitter
 
         /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_context->getSink();}
+
+    static const EOpInfo& getEOpInfo(EmitOp op) { return s_opInfos[Int(op)]; }
 
     //
     // Types
@@ -435,7 +492,16 @@ struct CLikeSourceEmitter
 
     EmitContext* m_context;
     SourceStream* m_stream;
+
+    static const EOpInfo s_opInfos[int(EmitOp::CountOf)];
 };
-    
+
+// Precedence macros no longer needed
+#undef SLANG_PRECEDENCE_EXPAND
+#undef SLANG_PRECEDENCE_NON_ASSOC
+#undef SLANG_PRECEDENCE_RIGHT
+#undef SLANG_PRECEDENCE_LEFT
+
+
 }
 #endif

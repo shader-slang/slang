@@ -98,6 +98,13 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     List<EmitAction>*   actions;
 };
 
+#define SLANG_OP_INFO_EXPAND(op, name, precedence) {name, kEPrecedence_##precedence##_Left, kEPrecedence_##precedence##_Right, },
+
+/* static */const EOpInfo CLikeSourceEmitter::s_opInfos[int(EmitOp::CountOf)] =
+{
+    SLANG_OP_INFO(SLANG_OP_INFO_EXPAND)
+};
+
 
 #define OP(NAME, TEXT, PREC) \
 static const EOpInfo kEOp_##NAME = { TEXT, kEPrecedence_##PREC##_Left, kEPrecedence_##PREC##_Right, }
