@@ -2967,15 +2967,15 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
 #define CASE_COMPARE(OPCODE, PREC, OP)                                                          \
     case OPCODE:                                                                            \
-        emitComparison(inst,  mode, outerPrec, getInfo(EmitOp::##PREC), &needClose);               \
+        emitComparison(inst,  mode, outerPrec, getInfo(EmitOp::PREC), &needClose);               \
         break
 
 #define CASE(OPCODE, PREC, OP)                                                                  \
     case OPCODE:                                                                            \
-        needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::##PREC));                                \
-        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, getInfo(EmitOp::##PREC)));    \
+        needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::PREC));                                \
+        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, getInfo(EmitOp::PREC)));    \
         m_stream->emit(" " #OP " ");                                                                  \
-        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, getInfo(EmitOp::##PREC)));   \
+        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, getInfo(EmitOp::PREC)));   \
         break
 
     CASE(kIROp_Add, Add, +);
