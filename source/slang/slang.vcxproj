@@ -220,6 +220,7 @@
     <ClInclude Include="reflection.h" />
     <ClInclude Include="slang-c-like-source-emitter.h" />
     <ClInclude Include="slang-emit-context.h" />
+    <ClInclude Include="slang-emit-precedence.h" />
     <ClInclude Include="slang-extension-usage-tracker.h" />
     <ClInclude Include="slang-file-system.h" />
     <ClInclude Include="slang-mangled-lexer.h" />
@@ -278,6 +279,7 @@
     <ClCompile Include="reflection.cpp" />
     <ClCompile Include="slang-c-like-source-emitter.cpp" />
     <ClCompile Include="slang-emit-context.cpp" />
+    <ClCompile Include="slang-emit-precedence.cpp" />
     <ClCompile Include="slang-extension-usage-tracker.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
     <ClCompile Include="slang-mangled-lexer.cpp" />

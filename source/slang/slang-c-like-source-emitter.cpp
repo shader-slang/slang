@@ -98,106 +98,6 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     List<EmitAction>*   actions;
 };
 
-#define SLANG_OP_INFO_EXPAND(op, name, precedence) {name, kEPrecedence_##precedence##_Left, kEPrecedence_##precedence##_Right, },
-
-/* static */const EmitOpInfo EmitOpInfo::s_infos[int(EmitOp::CountOf)] =
-{
-    SLANG_OP_INFO(SLANG_OP_INFO_EXPAND)
-};
-
-#define OP(NAME, TEXT, PREC) \
-static const EmitOpInfo kEOp_##NAME = { TEXT, kEPrecedence_##PREC##_Left, kEPrecedence_##PREC##_Right, }
-
-OP(None,        "",     None);
-
-OP(Comma,       ",",    Comma);
-
-OP(General,     "",     General);
-
-OP(Assign,      "=",    Assign);
-OP(AddAssign,   "+=",   Assign);
-OP(SubAssign,   "-=",   Assign);
-OP(MulAssign,   "*=",   Assign);
-OP(DivAssign,   "/=",   Assign);
-OP(ModAssign,   "%=",   Assign);
-OP(LshAssign,   "<<=",  Assign);
-OP(RshAssign,   ">>=",  Assign);
-OP(OrAssign,    "|=",   Assign);
-OP(AndAssign,   "&=",   Assign);
-OP(XorAssign,   "^=",   Assign);
-
-OP(Conditional, "?:",   Conditional);
-
-OP(Or,          "||",   Or);
-OP(And,         "&&",   And);
-OP(BitOr,       "|",    BitOr);
-OP(BitXor,      "^",    BitXor);
-OP(BitAnd,      "&",    BitAnd);
-
-OP(Eql,         "==",   Equality);
-OP(Neq,         "!=",   Equality);
-
-OP(Less,        "<",    Relational);
-OP(Greater,     ">",    Relational);
-OP(Leq,         "<=",   Relational);
-OP(Geq,         ">=",   Relational);
-
-OP(Lsh,         "<<",   Shift);
-OP(Rsh,         ">>",   Shift);
-
-OP(Add,         "+",    Additive);
-OP(Sub,         "-",    Additive);
-
-OP(Mul,         "*",    Multiplicative);
-OP(Div,         "/",    Multiplicative);
-OP(Mod,         "%",    Multiplicative);
-
-OP(Prefix,      "",     Prefix);
-OP(Postfix,     "",     Postfix);
-OP(Atomic,      "",     Atomic);
-
-#undef OP
-
-#if 0
-static const EmitOpInfo* _getOpInfo(EmitOp op) { return &CLikeSourceEmitter::getOpInfo(op); }
-
-// Table to allow data-driven lookup of an op based on its
-// name (to assist when outputting unchecked operator calls)
-static EmitOpInfo const* const kInfixOpInfos[] =
-{
-    _getOpInfo(EmitOp::Comma),
-    _getOpInfo(EmitOp::Assign),
-    _getOpInfo(EmitOp::AddAssign),
-    _getOpInfo(EmitOp::SubAssign),
-    _getOpInfo(EmitOp::MulAssign),
-    _getOpInfo(EmitOp::DivAssign),
-    _getOpInfo(EmitOp::ModAssign),
-    _getOpInfo(EmitOp::LshAssign),
-    _getOpInfo(EmitOp::RshAssign),
-    _getOpInfo(EmitOp::OrAssign),
-    _getOpInfo(EmitOp::AndAssign),
-    _getOpInfo(EmitOp::XorAssign),
-    _getOpInfo(EmitOp::Or),
-    _getOpInfo(EmitOp::And),
-    _getOpInfo(EmitOp::BitOr),
-    _getOpInfo(EmitOp::BitXor),
-    _getOpInfo(EmitOp::BitAnd),
-    _getOpInfo(EmitOp::Eql),
-    _getOpInfo(EmitOp::Neq),
-    _getOpInfo(EmitOp::Less),
-    _getOpInfo(EmitOp::Greater),
-    _getOpInfo(EmitOp::Leq),
-    _getOpInfo(EmitOp::Geq),
-    _getOpInfo(EmitOp::Lsh),
-    _getOpInfo(EmitOp::Rsh),
-    _getOpInfo(EmitOp::Add),
-    _getOpInfo(EmitOp::Sub),
-    _getOpInfo(EmitOp::Mul),
-    _getOpInfo(EmitOp::Div),
-    _getOpInfo(EmitOp::Mod),
-};
-#endif
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 CLikeSourceEmitter::CLikeSourceEmitter(EmitContext* context)
@@ -226,7 +126,7 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
         m_stream->emit("[");
         if(auto elementCount = declarator->elementCount)
         {
-            emitVal(elementCount, kEOp_General);
+            emitVal(elementCount, getInfo(EmitOp::General));
         }
         m_stream->emit("]");
         break;
@@ -636,11 +536,11 @@ void CLikeSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
         {
             emitGLSLTypePrefix(matType->getElementType());
             m_stream->emit("mat");
-            emitVal(matType->getRowCount(), kEOp_General);
+            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
             // TODO(tfoley): only emit the next bit
             // for non-square matrix
             m_stream->emit("x");
-            emitVal(matType->getColumnCount(), kEOp_General);
+            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
         }
         break;
 
@@ -649,9 +549,9 @@ void CLikeSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
         m_stream->emit("matrix<");
         emitType(matType->getElementType());
         m_stream->emit(",");
-        emitVal(matType->getRowCount(), kEOp_General);
+        emitVal(matType->getRowCount(), getInfo(EmitOp::General));
         m_stream->emit(",");
-        emitVal(matType->getColumnCount(), kEOp_General);
+        emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
         m_stream->emit("> ");
         break;
 
@@ -889,7 +789,7 @@ void CLikeSourceEmitter::emitSimpleTypeImpl(IRType* type)
             for(UInt ii = 0; ii < operandCount; ++ii)
             {
                 if(ii != 0) m_stream->emit(", ");
-                emitVal(type->getOperand(ii), kEOp_General);
+                emitVal(type->getOperand(ii), getInfo(EmitOp::General));
             }
             m_stream->emit(" >");
         }
@@ -995,7 +895,7 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec)
     {
         m_stream->emit("(");
 
-        outerPrec = kEOp_None;
+        outerPrec = getInfo(EmitOp::None);
     }
     return needParens;
 }
@@ -1072,24 +972,6 @@ void CLikeSourceEmitter::emitStringLiteral(
         }
     }
     m_stream->emit("\"");
-}
-
-/* static */EmitOpInfo CLikeSourceEmitter::leftSide(EmitOpInfo const& outerPrec, EmitOpInfo const& prec)
-{
-    EmitOpInfo result;
-    result.op = nullptr;
-    result.leftPrecedence = outerPrec.leftPrecedence;
-    result.rightPrecedence = prec.leftPrecedence;
-    return result;
-}
-
-/* static */EmitOpInfo CLikeSourceEmitter::rightSide(EmitOpInfo const& prec, EmitOpInfo const& outerPrec)
-{
-    EmitOpInfo result;
-    result.op = nullptr;
-    result.leftPrecedence = prec.rightPrecedence;
-    result.rightPrecedence = outerPrec.rightPrecedence;
-    return result;
 }
 
 void CLikeSourceEmitter::requireGLSLExtension(String const& name)
@@ -1811,7 +1693,7 @@ void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
     case IRDeclaratorInfo::Flavor::Array:
         emitDeclarator(declarator->next);
         m_stream->emit("[");
-        emitIROperand(declarator->elementCount, IREmitMode::Default, kEOp_General);
+        emitIROperand(declarator->elementCount, IREmitMode::Default, getInfo(EmitOp::General));
         m_stream->emit("]");
         break;
     }
@@ -2079,7 +1961,7 @@ void CLikeSourceEmitter::emitIRArgs(IRInst* inst, IREmitMode mode)
     for(UInt aa = 0; aa < argCount; ++aa)
     {
         if(aa != 0) m_stream->emit(", ");
-        emitIROperand(args[aa].get(), mode, kEOp_General);
+        emitIROperand(args[aa].get(), mode, getInfo(EmitOp::General));
     }
     m_stream->emit(")");
 }
@@ -2209,7 +2091,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
     if(isOrdinaryName(name))
     {
         // Simple case: it is just an ordinary name, so we call it like a builtin.
-        auto prec = kEOp_Postfix;
+        auto prec = getInfo(EmitOp::Postfix);
         bool needClose = maybeEmitParens(outerPrec, prec);
 
         m_stream->emit(name);
@@ -2217,7 +2099,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
         for (Index aa = 0; aa < argCount; ++aa)
         {
             if (aa != 0) m_stream->emit(", ");
-            emitIROperand(args[aa].get(), mode, kEOp_General);
+            emitIROperand(args[aa].get(), mode, getInfo(EmitOp::General));
         }
         m_stream->emit(")");
 
@@ -2264,7 +2146,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                     Index argIndex = d - '0';
                     SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < argCount));
                     m_stream->emit("(");
-                    emitIROperand(args[argIndex].get(), mode, kEOp_General);
+                    emitIROperand(args[argIndex].get(), mode, getInfo(EmitOp::General));
                     m_stream->emit(")");
                 }
                 break;
@@ -2292,9 +2174,9 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                         }
 
                         m_stream->emit("(");
-                        emitIROperand(textureArg, mode, kEOp_General);
+                        emitIROperand(textureArg, mode, getInfo(EmitOp::General));
                         m_stream->emit(",");
-                        emitIROperand(samplerArg, mode, kEOp_General);
+                        emitIROperand(samplerArg, mode, getInfo(EmitOp::General));
                         m_stream->emit(")");
                     }
                     else
@@ -2423,7 +2305,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                     {
                         // In the simple case, the operand is already a 4-vector,
                         // so we can just emit it as-is.
-                        emitIROperand(arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, getInfo(EmitOp::General));
                     }
                     else
                     {
@@ -2433,7 +2315,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                         //
                         emitVectorTypeName(elementType, 4);
                         m_stream->emit("(");
-                        emitIROperand(arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, getInfo(EmitOp::General));
                         for(IRIntegerValue ii = elementCount; ii < 4; ++ii)
                         {
                             m_stream->emit(", ");
@@ -2503,7 +2385,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             // to be broken out into its own argument.
                             //
                             m_stream->emit("(");
-                            emitIROperand(arg->getOperand(0), mode, kEOp_General);
+                            emitIROperand(arg->getOperand(0), mode, getInfo(EmitOp::General));
                             m_stream->emit("), ");
 
                             // The coordinate argument will have been computed
@@ -2538,20 +2420,20 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             }
 
                             m_stream->emit("(");
-                            emitIROperand(arg->getOperand(1), mode, kEOp_General);
+                            emitIROperand(arg->getOperand(1), mode, getInfo(EmitOp::General));
                             m_stream->emit(")");
                         }
                         else
                         {
                             m_stream->emit("(");
-                            emitIROperand(arg, mode, kEOp_General);
+                            emitIROperand(arg, mode, getInfo(EmitOp::General));
                             m_stream->emit(")");
                         }
                     }
                     else
                     {
                         m_stream->emit("(");
-                        emitIROperand(arg, mode, kEOp_General);
+                        emitIROperand(arg, mode, getInfo(EmitOp::General));
                         m_stream->emit(")");
                     }
                 }
@@ -2721,25 +2603,25 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     {
         // The user is invoking a built-in subscript operator
 
-        auto prec = kEOp_Postfix;
+        auto prec = getInfo(EmitOp::Postfix);
         needClose = maybeEmitParens(outerPrec, prec);
 
         emitIROperand(inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
         m_stream->emit("[");
-        emitIROperand(inst->getOperand(operandIndex++), mode, kEOp_General);
+        emitIROperand(inst->getOperand(operandIndex++), mode, getInfo(EmitOp::General));
         m_stream->emit("]");
 
         if(operandIndex < operandCount)
         {
             m_stream->emit(" = ");
-            emitIROperand(inst->getOperand(operandIndex++), mode, kEOp_General);
+            emitIROperand(inst->getOperand(operandIndex++), mode, getInfo(EmitOp::General));
         }
 
         maybeCloseParens(needClose);
         return;
     }
 
-    auto prec = kEOp_Postfix;
+    auto prec = getInfo(EmitOp::Postfix);
     needClose = maybeEmitParens(outerPrec, prec);
 
     // The mangled function name currently records
@@ -2779,7 +2661,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     for(; operandIndex < operandCount; ++operandIndex )
     {
         if(!first) m_stream->emit(", ");
-        emitIROperand(inst->getOperand(operandIndex), mode, kEOp_General);
+        emitIROperand(inst->getOperand(operandIndex), mode, getInfo(EmitOp::General));
         first = false;
     }
     m_stream->emit(")");
@@ -2828,7 +2710,7 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
     }
     else
     {
-        auto prec = kEOp_Postfix;
+        auto prec = getInfo(EmitOp::Postfix);
         bool needClose = maybeEmitParens(outerPrec, prec);
 
         emitIROperand(funcValue, mode, leftSide(outerPrec, prec));
@@ -2840,7 +2722,7 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
             if (as<IRVoidType>(operand->getDataType()))
                 continue;
             if(aa != 1) m_stream->emit(", ");
-            emitIROperand(inst->getOperand(aa), mode, kEOp_General);
+            emitIROperand(inst->getOperand(aa), mode, getInfo(EmitOp::General));
         }
         m_stream->emit(")");
 
@@ -2874,14 +2756,14 @@ void CLikeSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREm
         m_stream->emit("(");
 
         // Emit the operand
-        emitIROperand(inst, mode, kEOp_General);
+        emitIROperand(inst, mode, getInfo(EmitOp::General));
 
         m_stream->emit(")");
     }
     else
     {
         // Emit the operand
-        emitIROperand(inst, mode, kEOp_General);
+        emitIROperand(inst, mode, getInfo(EmitOp::General));
     }
 }
 
@@ -2894,17 +2776,17 @@ void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOu
         if (auto vectorType = as<IRVectorType>(operand->getDataType()))
         {
             // Handle as a function call
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
             m_stream->emit("not(");
-            emitIROperand(operand, mode, kEOp_General);
+            emitIROperand(operand, mode, getInfo(EmitOp::General));
             m_stream->emit(")");
             return;
         }
     }
 
-    auto prec = kEOp_Prefix;
+    auto prec = getInfo(EmitOp::Prefix);
     *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
 
     m_stream->emit("!");
@@ -2932,7 +2814,7 @@ void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EmitOpInf
             const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
 
             // Handle as a function call
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
 
             m_stream->emit(funcName);
@@ -2979,7 +2861,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             {
                 if (inst->getOperandCount() == 1)
                 {
-                    auto prec = kEOp_Prefix;
+                    auto prec = getInfo(EmitOp::Prefix);
                     needClose = maybeEmitParens(outerPrec, prec);
 
                     // Need to emit as cast for HLSL
@@ -3019,7 +2901,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         // Simple constructor call
         if( getTarget() == CodeGenTarget::HLSL )
         {
-            auto prec = kEOp_Prefix;
+            auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             m_stream->emit("(");
@@ -3030,12 +2912,12 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         }
         else
         {
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             emitIRType(inst->getDataType());
             m_stream->emit("(");
-            emitIROperand(inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_stream->emit(")");
         }
         break;
@@ -3046,7 +2928,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
             IRFieldExtract* fieldExtract = (IRFieldExtract*) inst;
 
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto base = fieldExtract->getBase();
@@ -3067,7 +2949,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
             IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto base = ii->getBase();
@@ -3085,15 +2967,15 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
 #define CASE_COMPARE(OPCODE, PREC, OP)                                                          \
     case OPCODE:                                                                            \
-        emitComparison(inst,  mode, outerPrec, kEOp_##PREC, &needClose);               \
+        emitComparison(inst,  mode, outerPrec, getInfo(EmitOp::##PREC), &needClose);               \
         break
 
 #define CASE(OPCODE, PREC, OP)                                                                  \
     case OPCODE:                                                                            \
-        needClose = maybeEmitParens(outerPrec, kEOp_##PREC);                                \
-        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, kEOp_##PREC));    \
+        needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::##PREC));                                \
+        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, getInfo(EmitOp::##PREC)));    \
         m_stream->emit(" " #OP " ");                                                                  \
-        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, kEOp_##PREC));   \
+        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, getInfo(EmitOp::##PREC)));   \
         break
 
     CASE(kIROp_Add, Add, +);
@@ -3130,16 +3012,16 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
         {
             m_stream->emit("matrixCompMult(");
-            emitIROperand(inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_stream->emit(", ");
-            emitIROperand(inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
             m_stream->emit(")");
         }
         else
         {
             // Default handling is to just rely on infix
             // `operator*`.
-            auto prec = kEOp_Mul;
+            auto prec = getInfo(EmitOp::Mul);
             needClose = maybeEmitParens(outerPrec, prec);
             emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
             m_stream->emit(" * ");
@@ -3155,7 +3037,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
     case kIROp_Neg:
         {
-            auto prec = kEOp_Prefix;
+            auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             m_stream->emit("-");
@@ -3165,7 +3047,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
     case kIROp_BitNot:
         {
-            auto prec = kEOp_Prefix;
+            auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             if (as<IRBoolType>(inst->getDataType()))
@@ -3182,7 +3064,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
     case kIROp_BitAnd:
         {
-            auto prec = kEOp_BitAnd;
+            auto prec = getInfo(EmitOp::BitAnd);
             needClose = maybeEmitParens(outerPrec, prec);
 
             // TODO: handle a bitwise And of a vector of bools by casting to
@@ -3209,7 +3091,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
     case kIROp_BitOr:
         {
-            auto prec = kEOp_BitOr;
+            auto prec = getInfo(EmitOp::BitOr);
             needClose = maybeEmitParens(outerPrec, prec);
 
             // TODO: handle a bitwise Or of a vector of bools by casting to
@@ -3248,7 +3130,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
 
     case kIROp_Store:
         {
-            auto prec = kEOp_Assign;
+            auto prec = getInfo(EmitOp::Assign);
             needClose = maybeEmitParens(outerPrec, prec);
 
             emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
@@ -3273,24 +3155,24 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         // HACK: deal with translation of GLSL geometry shader input arrays.
         if(auto decoration = inst->getOperand(0)->findDecoration<IRGLSLOuterArrayDecoration>())
         {
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             m_stream->emit(decoration->getOuterArrayName());
             m_stream->emit("[");
-            emitIROperand(inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
             m_stream->emit("].");
             emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
             break;
         }
         else
         {
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             emitIROperand( inst->getOperand(0), mode, leftSide(outerPrec, prec));
             m_stream->emit("[");
-            emitIROperand(inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
             m_stream->emit("]");
         }
         break;
@@ -3308,7 +3190,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             // because the notion of what is a "row" vs. a "column"
             // is reversed between HLSL/Slang and GLSL.
             //
-            auto prec = kEOp_Mul;
+            auto prec = getInfo(EmitOp::Mul);
             needClose = maybeEmitParens(outerPrec, prec);
 
             emitIROperand(inst->getOperand(1), mode, leftSide(outerPrec, prec));
@@ -3318,16 +3200,16 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         else
         {
             m_stream->emit("mul(");
-            emitIROperand(inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_stream->emit(", ");
-            emitIROperand(inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
             m_stream->emit(")");
         }
         break;
 
     case kIROp_swizzle:
         {
-            auto prec = kEOp_Postfix;
+            auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
             auto ii = (IRSwizzle*)inst;
@@ -3362,16 +3244,16 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             {
                 // For GLSL, emit a call to `mix` if condition is a vector
                 m_stream->emit("mix(");
-                emitIROperand(inst->getOperand(2), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(2), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_stream->emit(", ");
-                emitIROperand(inst->getOperand(1), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(1), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_stream->emit(", ");
-                emitIROperand(inst->getOperand(0), mode, leftSide(kEOp_General, kEOp_General));
+                emitIROperand(inst->getOperand(0), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_stream->emit(")");
             }
             else
             {
-                auto prec = kEOp_Conditional;
+                auto prec = getInfo(EmitOp::Conditional);
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
@@ -3399,7 +3281,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             for (UInt aa = 0; aa < argCount; ++aa)
             {
                 if (aa != 0) m_stream->emit(", ");
-                emitIROperand(inst->getOperand(aa), mode, kEOp_General);
+                emitIROperand(inst->getOperand(aa), mode, getInfo(EmitOp::General));
             }
             m_stream->emit(" }");
         }
@@ -3466,7 +3348,7 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
             }
 
             m_stream->emit("(");
-            emitIROperand(inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_stream->emit(")");
         }
         break;
@@ -3528,7 +3410,7 @@ void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
     {
     default:
         emitIRInstResultDecl(inst);
-        emitIRInstExpr(inst, mode, kEOp_General);
+        emitIRInstExpr(inst, mode, getInfo(EmitOp::General));
         m_stream->emit(";\n");
         break;
 
@@ -3567,7 +3449,7 @@ void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
 
     case kIROp_ReturnVal:
         m_stream->emit("return ");
-        emitIROperand(((IRReturnVal*) inst)->getVal(), mode, kEOp_General);
+        emitIROperand(((IRReturnVal*) inst)->getVal(), mode, getInfo(EmitOp::General));
         m_stream->emit(";\n");
         break;
 
@@ -3579,11 +3461,11 @@ void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
         {
             auto ii = (IRSwizzleSet*)inst;
             emitIRInstResultDecl(inst);
-            emitIROperand(inst->getOperand(0), mode, kEOp_General);
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_stream->emit(";\n");
 
-            auto subscriptOuter = kEOp_General;
-            auto subscriptPrec = kEOp_Postfix;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
             bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
 
             emitIROperand(inst, mode, leftSide(subscriptOuter, subscriptPrec));
@@ -3604,15 +3486,15 @@ void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
             maybeCloseParens(needCloseSubscript);
 
             m_stream->emit(" = ");
-            emitIROperand(inst->getOperand(1), mode, kEOp_General);
+            emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
             m_stream->emit(";\n");
         }
         break;
 
     case kIROp_SwizzledStore:
         {
-            auto subscriptOuter = kEOp_General;
-            auto subscriptPrec = kEOp_Postfix;
+            auto subscriptOuter = getInfo(EmitOp::General);
+            auto subscriptPrec = getInfo(EmitOp::Postfix);
             bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
 
 
@@ -3635,7 +3517,7 @@ void CLikeSourceEmitter::emitIRInstImpl(IRInst* inst, IREmitMode mode)
             maybeCloseParens(needCloseSubscript);
 
             m_stream->emit(" = ");
-            emitIROperand(ii->getSource(), mode, kEOp_General);
+            emitIROperand(ii->getSource(), mode, getInfo(EmitOp::General));
             m_stream->emit(";\n");
         }
         break;
@@ -3724,8 +3606,8 @@ void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlo
 
         IRInst* arg = args[argIndex].get();
 
-        auto outerPrec = kEOp_General;
-        auto prec = kEOp_Assign;
+        auto outerPrec = getInfo(EmitOp::General);
+        auto prec = getInfo(EmitOp::Assign);
 
         emitIROperand(pp, IREmitMode::Default, leftSide(outerPrec, prec));
         m_stream->emit(" = ");
@@ -3855,7 +3737,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 // instead of the current `if(condition) {} else { elseRegion }`
 
                 m_stream->emit("if(");
-                emitIROperand(ifRegion->condition, IREmitMode::Default, kEOp_General);
+                emitIROperand(ifRegion->condition, IREmitMode::Default, getInfo(EmitOp::General));
                 m_stream->emit(")\n{\n");
                 m_stream->indent();
                 emitRegion(ifRegion->thenRegion);
@@ -3929,7 +3811,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
 
                 // Emit the start of our statement.
                 m_stream->emit("switch(");
-                emitIROperand(switchRegion->condition, IREmitMode::Default, kEOp_General);
+                emitIROperand(switchRegion->condition, IREmitMode::Default, getInfo(EmitOp::General));
                 m_stream->emit(")\n{\n");
 
                 auto defaultCase = switchRegion->defaultCase;
@@ -3938,7 +3820,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                     for(auto caseVal : currentCase->values)
                     {
                         m_stream->emit("case ");
-                        emitIROperand(caseVal, IREmitMode::Default, kEOp_General);
+                        emitIROperand(caseVal, IREmitMode::Default, getInfo(EmitOp::General));
                         m_stream->emit(":\n");
                     }
                     if(currentCase.Ptr() == defaultCase)
@@ -5211,7 +5093,7 @@ void CLikeSourceEmitter::emitArrayBrackets(IRType* inType)
         if(auto arrayType = as<IRArrayType>(type))
         {
             m_stream->emit("[");
-            emitVal(arrayType->getElementCount(), kEOp_General);
+            emitVal(arrayType->getElementCount(), getInfo(EmitOp::General));
             m_stream->emit("]");
 
             // Continue looping on the next layer in.
@@ -5730,7 +5612,7 @@ void CLikeSourceEmitter::emitIRGlobalConstantInitializer(IRGlobalConstant* valDe
     // cases where the value might *need* to emit as a named referenced
     // (e.g., when it names another constant directly).
     //
-    emitIROperand(returnInst->getVal(), IREmitMode::GlobalConstant, kEOp_General);
+    emitIROperand(returnInst->getVal(), IREmitMode::GlobalConstant, getInfo(EmitOp::General));
 }
 
 void CLikeSourceEmitter::emitIRGlobalConstant(IRGlobalConstant* valDecl)

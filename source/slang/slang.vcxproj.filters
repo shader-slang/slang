@@ -159,6 +159,9 @@
     <ClInclude Include="slang-emit-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit-precedence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-extension-usage-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -327,6 +330,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-emit-precedence.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-extension-usage-tracker.cpp">
