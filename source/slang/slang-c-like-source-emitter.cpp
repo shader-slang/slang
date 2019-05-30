@@ -494,9 +494,7 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
     }
 }
 
-void CLikeSourceEmitter::emitGLSLTypePrefix(
-    IRType* type,
-    bool promoteHalfToFloat)
+void CLikeSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
     switch (type->op)
     {
@@ -545,8 +543,7 @@ void CLikeSourceEmitter::emitGLSLTypePrefix(
     }
 }
 
-void CLikeSourceEmitter::emitHLSLTextureType(
-    IRTextureTypeBase* texType)
+void CLikeSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
 {
     switch(texType->getAccess())
     {
@@ -599,9 +596,7 @@ void CLikeSourceEmitter::emitHLSLTextureType(
     m_stream->emit(" >");
 }
 
-void CLikeSourceEmitter::emitGLSLTextureOrTextureSamplerType(
-    IRTextureTypeBase*  type,
-    char const*         baseName)
+void CLikeSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
     if (type->getElementType()->op == kIROp_HalfType)
     {
@@ -652,20 +647,17 @@ void CLikeSourceEmitter::emitGLSLTextureType(
     }
 }
 
-void CLikeSourceEmitter::emitGLSLTextureSamplerType(
-    IRTextureSamplerType* type)
+void CLikeSourceEmitter::emitGLSLTextureSamplerType(IRTextureSamplerType* type)
 {
     emitGLSLTextureOrTextureSamplerType(type, "sampler");
 }
 
-void CLikeSourceEmitter::emitGLSLImageType(
-    IRGLSLImageType* type)
+void CLikeSourceEmitter::emitGLSLImageType(IRGLSLImageType* type)
 {
     emitGLSLTextureOrTextureSamplerType(type, "image");
 }
 
-void CLikeSourceEmitter::emitTextureType(
-    IRTextureType*  texType)
+void CLikeSourceEmitter::emitTextureType(IRTextureType* texType)
 {
     switch(m_context->target)
     {
@@ -683,8 +675,7 @@ void CLikeSourceEmitter::emitTextureType(
     }
 }
 
-void CLikeSourceEmitter::emitTextureSamplerType(
-    IRTextureSamplerType*   type)
+void CLikeSourceEmitter::emitTextureSamplerType(IRTextureSamplerType* type)
 {
     switch(m_context->target)
     {
@@ -698,8 +689,7 @@ void CLikeSourceEmitter::emitTextureSamplerType(
     }
 }
 
-void CLikeSourceEmitter::emitImageType(
-    IRGLSLImageType*    type)
+void CLikeSourceEmitter::emitImageType(IRGLSLImageType* type)
 {
     switch(m_context->target)
     {
@@ -1228,7 +1218,7 @@ void CLikeSourceEmitter::emitType(IRType* type, Name* name)
     emitType(type, SourceLoc(), name, SourceLoc());
 }
 
-void CLikeSourceEmitter::emitType(IRType* type, String const& name)
+void CLikeSourceEmitter::emitType(IRType* type, const String& name)
 {
     // HACK: the rest of the code wants a `Name`,
     // so we'll create one for a bit...
@@ -1267,8 +1257,7 @@ void CLikeSourceEmitter::maybeCloseParens(bool needClose)
     if(needClose) m_stream->emit(")");
 }
 
-bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(
-    String const& targetName)
+bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(const String& targetName)
 {
     switch(m_context->target)
     {
@@ -3220,10 +3209,7 @@ void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& 
 }
 
     
-void CLikeSourceEmitter::emitIRInstExpr(
-    IRInst*         inst,
-    IREmitMode      mode,
-    EOpInfo const&  inOuterPrec)
+void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const EOpInfo&  inOuterPrec)
 {
     EOpInfo outerPrec = inOuterPrec;
     bool needClose = false;
@@ -5098,7 +5084,7 @@ UInt CLikeSourceEmitter::getCallablePayloadLocation(IRInst* inst)
     return value;
 }
 
-void CLikeSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType*  resourceType)
+void CLikeSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
     // If the user specified a format manually, using `[format(...)]`,
     // then we will respect that format and emit a matching `layout` modifier.
@@ -5954,7 +5940,7 @@ void CLikeSourceEmitter::emitIRGlobalParam(IRGlobalParam* varDecl)
     // Need to emit appropriate modifiers here.
 
     // We expect/require all shader parameters to
-    // have some kind of layout information associted with them.
+    // have some kind of layout information associated with them.
     //
     auto layout = getVarLayout(varDecl);
     SLANG_ASSERT(layout);
@@ -5975,7 +5961,7 @@ void CLikeSourceEmitter::emitIRGlobalParam(IRGlobalParam* varDecl)
 }
 
 
-void CLikeSourceEmitter::emitIRGlobalConstantInitializer(IRGlobalConstant*   valDecl)
+void CLikeSourceEmitter::emitIRGlobalConstantInitializer(IRGlobalConstant* valDecl)
 {
     // We expect to see only a single block
     auto block = valDecl->getFirstBlock();
@@ -6063,10 +6049,7 @@ void CLikeSourceEmitter::emitIRGlobalInst(IRInst* inst)
     }
 }
 
-void CLikeSourceEmitter::ensureInstOperand(
-    ComputeEmitActionsContext*  ctx,
-    IRInst*                     inst,
-    EmitAction::Level           requiredLevel)
+void CLikeSourceEmitter::ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel)
 {
     if(!inst) return;
 
@@ -6076,9 +6059,7 @@ void CLikeSourceEmitter::ensureInstOperand(
     }
 }
 
-void CLikeSourceEmitter::ensureInstOperandsRec(
-    ComputeEmitActionsContext*  ctx,
-    IRInst*                     inst)
+void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
     ensureInstOperand(ctx, inst->getFullType());
 
@@ -6103,12 +6084,9 @@ void CLikeSourceEmitter::ensureInstOperandsRec(
     }
 }
 
-void CLikeSourceEmitter::ensureGlobalInst(
-    ComputeEmitActionsContext*  ctx,
-    IRInst*                     inst,
-    EmitAction::Level           requiredLevel)
+void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel)
 {
-    // Skip certain instrutions, since they
+    // Skip certain instructions, since they
     // don't affect output.
     switch(inst->op)
     {
@@ -6153,9 +6131,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     ctx->actions->add(action);
 }
 
-void CLikeSourceEmitter::computeIREmitActions(
-    IRModule*           module,
-    List<EmitAction>&   ioActions)
+void CLikeSourceEmitter::computeIREmitActions(IRModule* module, List<EmitAction>& ioActions)
 {
     ComputeEmitActionsContext ctx;
     ctx.moduleInst = module->getModuleInst();
