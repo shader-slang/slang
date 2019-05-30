@@ -117,22 +117,26 @@ enum EPrecedence
 
 #define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 
-// Info on an op for emit purposes
-struct EOpInfo
+enum class EmitOp
 {
+    SLANG_OP_INFO(SLANG_OP_INFO_ENUM)
+    CountOf,
+};
+
+// Info on an op for emit purposes
+struct EmitOpInfo
+{
+    SLANG_FORCE_INLINE static const EmitOpInfo& get(EmitOp inOp) { return s_infos[int(inOp)]; }
+
     char const* op;
     EPrecedence leftPrecedence;
     EPrecedence rightPrecedence;
+
+    static const EmitOpInfo s_infos[int(EmitOp::CountOf)];
 };
 
 struct CLikeSourceEmitter
 {
-    enum class EmitOp
-    {
-        SLANG_OP_INFO(SLANG_OP_INFO_ENUM)
-        CountOf,
-    };
-
     enum class BuiltInCOp
     {
         Splat,                  //< Splat a single value to all values of a vector or matrix type
@@ -179,8 +183,6 @@ struct CLikeSourceEmitter
 
         /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_context->getSink();}
-
-    static const EOpInfo& getEOpInfo(EmitOp op) { return s_opInfos[Int(op)]; }
 
     //
     // Types
@@ -234,7 +236,7 @@ struct CLikeSourceEmitter
     // Expressions
     //
 
-    bool maybeEmitParens(EOpInfo& outerPrec, EOpInfo prec);
+    bool maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec);
 
     void maybeCloseParens(bool needClose);
 
@@ -248,8 +250,8 @@ struct CLikeSourceEmitter
 
     void emitStringLiteral(const String& value);
 
-    static EOpInfo leftSide(EOpInfo const& outerPrec, EOpInfo const& prec);
-    static EOpInfo rightSide(EOpInfo const& prec, EOpInfo const& outerPrec);
+    static EmitOpInfo leftSide(EmitOpInfo const& outerPrec, EmitOpInfo const& prec);
+    static EmitOpInfo rightSide(EmitOpInfo const& prec, EmitOpInfo const& outerPrec);
 
     void requireGLSLExtension(const String& name);
 
@@ -259,7 +261,7 @@ struct CLikeSourceEmitter
 
     void doSampleRateInputCheck(Name* name);
 
-    void emitVal(IRInst* val, const EOpInfo& outerPrec);
+    void emitVal(IRInst* val, const EmitOpInfo& outerPrec);
 
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
@@ -309,7 +311,7 @@ struct CLikeSourceEmitter
 
     bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
-    void emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const& outerPrec);
+    void emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
 
     void emitIRArgs(IRInst* inst, IREmitMode mode);
 
@@ -337,21 +339,21 @@ struct CLikeSourceEmitter
         IRFunc*                         /* func */,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
         IREmitMode                      mode,
-        EOpInfo const&                  inOuterPrec);
+        EmitOpInfo const&                  inOuterPrec);
 
     void emitIntrinsicCallExpr(
         IRCall*         inst,
         IRFunc*         func,
         IREmitMode      mode,
-        EOpInfo const&  inOuterPrec);
+        EmitOpInfo const&  inOuterPrec);
 
-    void emitIRCallExpr(IRCall* inst, IREmitMode mode, EOpInfo outerPrec);
+    void emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
-    void emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose);
+    void emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, bool* outNeedClose);
 
-    void emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut);
+    void emitComparison(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, const EmitOpInfo& opPrec, bool* needCloseOut);
 
-    void emitIRInstExpr(IRInst* inst, IREmitMode mode, EOpInfo const&  inOuterPrec);
+    void emitIRInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const&  inOuterPrec);
     
     BaseType extractBaseType(IRType* inType);
 
@@ -492,8 +494,6 @@ struct CLikeSourceEmitter
 
     EmitContext* m_context;
     SourceStream* m_stream;
-
-    static const EOpInfo s_opInfos[int(EmitOp::CountOf)];
 };
 
 // Precedence macros no longer needed

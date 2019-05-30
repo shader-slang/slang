@@ -100,14 +100,13 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
 
 #define SLANG_OP_INFO_EXPAND(op, name, precedence) {name, kEPrecedence_##precedence##_Left, kEPrecedence_##precedence##_Right, },
 
-/* static */const EOpInfo CLikeSourceEmitter::s_opInfos[int(EmitOp::CountOf)] =
+/* static */const EmitOpInfo EmitOpInfo::s_infos[int(EmitOp::CountOf)] =
 {
     SLANG_OP_INFO(SLANG_OP_INFO_EXPAND)
 };
 
-
 #define OP(NAME, TEXT, PREC) \
-static const EOpInfo kEOp_##NAME = { TEXT, kEPrecedence_##PREC##_Left, kEPrecedence_##PREC##_Right, }
+static const EmitOpInfo kEOp_##NAME = { TEXT, kEPrecedence_##PREC##_Left, kEPrecedence_##PREC##_Right, }
 
 OP(None,        "",     None);
 
@@ -159,41 +158,45 @@ OP(Atomic,      "",     Atomic);
 
 #undef OP
 
+#if 0
+static const EmitOpInfo* _getOpInfo(EmitOp op) { return &CLikeSourceEmitter::getOpInfo(op); }
+
 // Table to allow data-driven lookup of an op based on its
 // name (to assist when outputting unchecked operator calls)
-static EOpInfo const* const kInfixOpInfos[] =
+static EmitOpInfo const* const kInfixOpInfos[] =
 {
-    &kEOp_Comma,
-    &kEOp_Assign,
-    &kEOp_AddAssign,
-    &kEOp_SubAssign,
-    &kEOp_MulAssign,
-    &kEOp_DivAssign,
-    &kEOp_ModAssign,
-    &kEOp_LshAssign,
-    &kEOp_RshAssign,
-    &kEOp_OrAssign,
-    &kEOp_AndAssign,
-    &kEOp_XorAssign,
-    &kEOp_Or,
-    &kEOp_And,
-    &kEOp_BitOr,
-    &kEOp_BitXor,
-    &kEOp_BitAnd,
-    &kEOp_Eql,
-    &kEOp_Neq,
-    &kEOp_Less,
-    &kEOp_Greater,
-    &kEOp_Leq,
-    &kEOp_Geq,
-    &kEOp_Lsh,
-    &kEOp_Rsh,
-    &kEOp_Add,
-    &kEOp_Sub,
-    &kEOp_Mul,
-    &kEOp_Div,
-    &kEOp_Mod,
+    _getOpInfo(EmitOp::Comma),
+    _getOpInfo(EmitOp::Assign),
+    _getOpInfo(EmitOp::AddAssign),
+    _getOpInfo(EmitOp::SubAssign),
+    _getOpInfo(EmitOp::MulAssign),
+    _getOpInfo(EmitOp::DivAssign),
+    _getOpInfo(EmitOp::ModAssign),
+    _getOpInfo(EmitOp::LshAssign),
+    _getOpInfo(EmitOp::RshAssign),
+    _getOpInfo(EmitOp::OrAssign),
+    _getOpInfo(EmitOp::AndAssign),
+    _getOpInfo(EmitOp::XorAssign),
+    _getOpInfo(EmitOp::Or),
+    _getOpInfo(EmitOp::And),
+    _getOpInfo(EmitOp::BitOr),
+    _getOpInfo(EmitOp::BitXor),
+    _getOpInfo(EmitOp::BitAnd),
+    _getOpInfo(EmitOp::Eql),
+    _getOpInfo(EmitOp::Neq),
+    _getOpInfo(EmitOp::Less),
+    _getOpInfo(EmitOp::Greater),
+    _getOpInfo(EmitOp::Leq),
+    _getOpInfo(EmitOp::Geq),
+    _getOpInfo(EmitOp::Lsh),
+    _getOpInfo(EmitOp::Rsh),
+    _getOpInfo(EmitOp::Add),
+    _getOpInfo(EmitOp::Sub),
+    _getOpInfo(EmitOp::Mul),
+    _getOpInfo(EmitOp::Div),
+    _getOpInfo(EmitOp::Mod),
 };
+#endif
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -983,7 +986,7 @@ void CLikeSourceEmitter::emitType(IRType* type)
 // Expressions
 //
 
-bool CLikeSourceEmitter::maybeEmitParens(EOpInfo& outerPrec, EOpInfo prec)
+bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec)
 {
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
         || (prec.rightPrecedence <= outerPrec.rightPrecedence);
@@ -1071,18 +1074,18 @@ void CLikeSourceEmitter::emitStringLiteral(
     m_stream->emit("\"");
 }
 
-/* static */EOpInfo CLikeSourceEmitter::leftSide(EOpInfo const& outerPrec, EOpInfo const& prec)
+/* static */EmitOpInfo CLikeSourceEmitter::leftSide(EmitOpInfo const& outerPrec, EmitOpInfo const& prec)
 {
-    EOpInfo result;
+    EmitOpInfo result;
     result.op = nullptr;
     result.leftPrecedence = outerPrec.leftPrecedence;
     result.rightPrecedence = prec.leftPrecedence;
     return result;
 }
 
-/* static */EOpInfo CLikeSourceEmitter::rightSide(EOpInfo const& prec, EOpInfo const& outerPrec)
+/* static */EmitOpInfo CLikeSourceEmitter::rightSide(EmitOpInfo const& prec, EmitOpInfo const& outerPrec)
 {
-    EOpInfo result;
+    EmitOpInfo result;
     result.op = nullptr;
     result.leftPrecedence = prec.rightPrecedence;
     result.rightPrecedence = outerPrec.rightPrecedence;
@@ -1140,7 +1143,7 @@ void CLikeSourceEmitter::doSampleRateInputCheck(Name* name)
     }
 }
 
-void CLikeSourceEmitter::emitVal(IRInst* val, EOpInfo const& outerPrec)
+void CLikeSourceEmitter::emitVal(IRInst* val, EmitOpInfo const& outerPrec)
 {
     if(auto type = as<IRType>(val))
     {
@@ -2050,7 +2053,7 @@ bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode m
     return true;
 }
 
-void CLikeSourceEmitter::emitIROperand(IRInst* inst, IREmitMode mode, EOpInfo const&  outerPrec)
+void CLikeSourceEmitter::emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const&  outerPrec)
 {
     if( shouldFoldIRInstIntoUseSites(inst, mode) )
     {
@@ -2190,7 +2193,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
     IRFunc*                         /* func */,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     IREmitMode                      mode,
-    EOpInfo const&                  inOuterPrec)
+    EmitOpInfo const&                  inOuterPrec)
 {
     auto outerPrec = inOuterPrec;
 
@@ -2640,7 +2643,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     IRCall*         inst,
     IRFunc*         func,
     IREmitMode      mode,
-    EOpInfo const&  inOuterPrec)
+    EmitOpInfo const&  inOuterPrec)
 {
     auto outerPrec = inOuterPrec;
     bool needClose = false;
@@ -2785,7 +2788,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     maybeCloseParens(needClose);
 }
 
-void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EOpInfo outerPrec)
+void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
 
@@ -2882,7 +2885,7 @@ void CLikeSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREm
     }
 }
 
-void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, bool* outNeedClose)
+void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, bool* outNeedClose)
 {
     IRInst* operand = inst->getOperand(0);
 
@@ -2909,7 +2912,7 @@ void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EOpInfo& ioOuter
 }
 
 
-void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& ioOuterPrec, const EOpInfo& opPrec, bool* needCloseOut)
+void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, const EmitOpInfo& opPrec, bool* needCloseOut)
 {        
     if (getTarget() == CodeGenTarget::GLSL)
     {
@@ -2953,9 +2956,9 @@ void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EOpInfo& 
 }
 
     
-void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const EOpInfo&  inOuterPrec)
+void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const EmitOpInfo&  inOuterPrec)
 {
-    EOpInfo outerPrec = inOuterPrec;
+    EmitOpInfo outerPrec = inOuterPrec;
     bool needClose = false;
     switch(inst->op)
     {
