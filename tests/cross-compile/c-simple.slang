@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -profile ps_5_0 -entry main -target c
+//DISABLE_TEST:SIMPLE: -profile ps_5_0 -entry main -target c
 
 //Texture2D t;
 //SamplerState s;
