@@ -1,8 +1,8 @@
 // slang-stdlib.cpp
 
-#include "compiler.h"
-#include "ir.h"
-#include "syntax.h"
+#include "slang-compiler.h"
+#include "slang-ir.h"
+#include "slang-syntax.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
