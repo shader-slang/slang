@@ -2,17 +2,17 @@
 #ifndef SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
 #define SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
-#include "compiler.h"
+#include "slang-compiler.h"
 
 #include "slang-emit-context.h"
 #include "slang-extension-usage-tracker.h"
 #include "slang-emit-precedence.h"
 
-#include "ir.h"
-#include "ir-insts.h"
-#include "ir-restructure.h"
+#include "slang-ir.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-restructure.h"
 
 namespace Slang
 {

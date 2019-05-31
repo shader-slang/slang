@@ -1,12 +1,12 @@
-#ifndef SLANG_RANDOM_GENERATOR_H
-#define SLANG_RANDOM_GENERATOR_H
+#ifndef SLANG_CORE_RANDOM_GENERATOR_H
+#define SLANG_CORE_RANDOM_GENERATOR_H
 
 #include "../../slang.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "smart-pointer.h"
+#include "slang-smart-pointer.h"
 
 namespace Slang { 
 

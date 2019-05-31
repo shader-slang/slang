@@ -6,7 +6,7 @@
 
 #include "render.h"
 
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 namespace gfx {
 

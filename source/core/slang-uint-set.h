@@ -1,9 +1,9 @@
-#ifndef SLANG_UINT_SET_H
-#define SLANG_UINT_SET_H
+#ifndef SLANG_CORE_UINT_SET_H
+#define SLANG_CORE_UINT_SET_H
 
-#include "list.h"
+#include "slang-list.h"
 #include "slang-math.h"
-#include "common.h"
+#include "slang-common.h"
 
 #include <memory.h>
 

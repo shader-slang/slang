@@ -6,8 +6,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "core/basic.h"
-#include "core/secure-crt.h"
+#include "core/slang-basic.h"
+#include "core/slang-secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
 #include "surface.h"

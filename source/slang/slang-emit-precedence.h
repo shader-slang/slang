@@ -2,7 +2,7 @@
 #ifndef SLANG_EMIT_PRECEDENCE_H_INCLUDED
 #define SLANG_EMIT_PRECEDENCE_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 namespace Slang
 {

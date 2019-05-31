@@ -1,5 +1,5 @@
-#ifndef SLANG_STD_WRITERS_H
-#define SLANG_STD_WRITERS_H
+#ifndef SLANG_CORE_STD_WRITERS_H
+#define SLANG_CORE_STD_WRITERS_H
 
 #include "slang-writer.h"
 #include "../../slang-com-ptr.h"

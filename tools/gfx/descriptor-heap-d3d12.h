@@ -5,7 +5,7 @@
 #include <d3d12.h>
 
 #include "../../slang-com-ptr.h"
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 namespace gfx {
 

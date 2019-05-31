@@ -6,7 +6,7 @@
 #include "../../slang-com-ptr.h"
 
 #include "../core/slang-string-util.h"
-#include "../core/dictionary.h"
+#include "../core/slang-dictionary.h"
 
 namespace Slang
 {

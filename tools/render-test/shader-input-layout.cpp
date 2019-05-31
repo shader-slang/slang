@@ -1,5 +1,5 @@
 #include "shader-input-layout.h"
-#include "core/token-reader.h"
+#include "core/slang-token-reader.h"
 
 #include "render.h"
 

@@ -1,5 +1,5 @@
-#ifndef CORE_LIB_MATH_H
-#define CORE_LIB_MATH_H
+#ifndef SLANG_CORE_MATH_H
+#define SLANG_CORE_MATH_H
 
 #include <math.h>
 

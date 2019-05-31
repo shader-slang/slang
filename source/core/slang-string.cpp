@@ -1,5 +1,5 @@
 #include "slang-string.h"
-#include "text-io.h"
+#include "slang-text-io.h"
 
 namespace Slang
 {

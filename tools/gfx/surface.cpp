@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 namespace gfx {
 using namespace Slang;

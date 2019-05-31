@@ -1,7 +1,7 @@
 #ifndef GFX_FLAG_COMBINER_H
 #define GFX_FLAG_COMBINER_H
 
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 namespace gfx {
 

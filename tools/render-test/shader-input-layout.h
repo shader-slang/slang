@@ -1,7 +1,7 @@
 #ifndef SLANG_TEST_SHADER_INPUT_LAYOUT_H
 #define SLANG_TEST_SHADER_INPUT_LAYOUT_H
 
-#include "core/basic.h"
+#include "core/slang-basic.h"
 
 #include "render.h"
 

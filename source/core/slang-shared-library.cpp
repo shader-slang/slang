@@ -1,8 +1,9 @@
 #include "slang-shared-library.h"
 
 #include "../../slang-com-ptr.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string-util.h"
+
+#include "slang-io.h"
+#include "slang-string-util.h"
 
 namespace Slang
 {

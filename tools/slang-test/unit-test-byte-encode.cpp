@@ -8,7 +8,7 @@
 #include "test-context.h"
 
 #include "../../source/core/slang-random-generator.h"
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 using namespace Slang;
 

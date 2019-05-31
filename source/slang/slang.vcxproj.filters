@@ -12,28 +12,7 @@
     <ClInclude Include="..\..\slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="check.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="compiler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="core.meta.slang.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="decl-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="diagnostic-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="diagnostics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="emit.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="expr-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="glsl.meta.slang.h">
@@ -42,118 +21,22 @@
     <ClInclude Include="hlsl.meta.slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="image-format-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-bind-existentials.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-clone.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-constexpr.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-dce.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-dominators.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-entry-point-uniforms.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-glsl-legalize.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-inst-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-insts.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-link.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-missing-return.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-restructure-scoping.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-restructure.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-sccp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-serialize.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-specialize-resources.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-specialize.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-ssa.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-union.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir-validate.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ir.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="legalize-types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lexer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lookup.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lower-to-ir.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mangle.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="modifier-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="name.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="object-meta-begin.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="object-meta-end.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="parameter-binding.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="parser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="preprocessor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="profile-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="profile.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="reflection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-c-like-source-emitter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-check.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-decl-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-diagnostic-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit-context.h">
@@ -162,171 +45,189 @@
     <ClInclude Include="slang-emit-precedence.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-expr-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-extension-usage-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-image-format-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-bind-existentials.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-clone.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-constexpr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-dce.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-dominators.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-entry-point-uniforms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-glsl-legalize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-inst-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-insts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-link.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-missing-return.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-restructure-scoping.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-restructure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-sccp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-serialize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-specialize-resources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-specialize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-ssa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-union.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-validate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-legalize-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-lexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-lookup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-lower-to-ir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-mangle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-mangled-lexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-modifier-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-name.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-object-meta-begin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-object-meta-end.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-parameter-binding.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-parser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-preprocessor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-profile-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-profile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-reflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-source-stream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="source-loc.h">
+    <ClInclude Include="slang-stmt-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="stmt-defs.h">
+    <ClInclude Include="slang-syntax-base-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="syntax-base-defs.h">
+    <ClInclude Include="slang-syntax-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="syntax-defs.h">
+    <ClInclude Include="slang-syntax-visitors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="syntax-visitors.h">
+    <ClInclude Include="slang-syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="syntax.h">
+    <ClInclude Include="slang-token-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="token-defs.h">
+    <ClInclude Include="slang-token.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="token.h">
+    <ClInclude Include="slang-type-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="type-defs.h">
+    <ClInclude Include="slang-type-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="type-layout.h">
+    <ClInclude Include="slang-type-system-shared.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="type-system-shared.h">
+    <ClInclude Include="slang-val-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="val-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="visitor.h">
+    <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="check.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="compiler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="diagnostics.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dxc-support.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="emit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-bind-existentials.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-clone.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-constexpr.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-dce.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-dominators.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-entry-point-uniforms.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-glsl-legalize.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-legalize-types.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-link.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-missing-return.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-restructure-scoping.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-restructure.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-sccp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-serialize.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-specialize-resources.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-specialize.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-ssa.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-union.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir-validate.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ir.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="legalize-types.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lexer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lookup.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lower-to-ir.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="mangle.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="name.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="options.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="parameter-binding.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="parser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="preprocessor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="profile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="reflection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-c-like-source-emitter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-diagnostics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-dxc-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-context.cpp">
@@ -335,13 +236,115 @@
     <ClCompile Include="slang-emit-precedence.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-emit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-extension-usage-tracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-bind-existentials.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-clone.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-constexpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-dce.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-dominators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-entry-point-uniforms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-glsl-legalize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-link.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-missing-return.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-restructure-scoping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-restructure.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-sccp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-serialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-specialize-resources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-specialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-ssa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-union.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-validate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-legalize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-lexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-lookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-lower-to-ir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-mangle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-mangled-lexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-name.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-parameter-binding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-preprocessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-profile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-reflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-source-loc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-source-stream.cpp">
@@ -350,22 +353,19 @@
     <ClCompile Include="slang-stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-syntax.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-token.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-type-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-type-system-shared.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source-loc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="syntax.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="token.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="type-layout.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="type-system-shared.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

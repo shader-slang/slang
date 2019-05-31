@@ -1,13 +1,13 @@
-#ifndef SLANG_SHARED_LIBRARY_H_INCLUDED
-#define SLANG_SHARED_LIBRARY_H_INCLUDED
+#ifndef SLANG_CORE_SHARED_LIBRARY_H
+#define SLANG_CORE_SHARED_LIBRARY_H
 
 #include "../../slang.h"
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
-#include "../core/platform.h"
-#include "../core/common.h"
-#include "../core/dictionary.h"
+#include "../core/slang-platform.h"
+#include "../core/slang-common.h"
+#include "../core/slang-dictionary.h"
 
 namespace Slang
 {

@@ -1,14 +1,14 @@
-#ifndef FUNDAMENTAL_LIB_STRING_H
-#define FUNDAMENTAL_LIB_STRING_H
+#ifndef SLANG_CORE_STRING_H
+#define SLANG_CORE_STRING_H
 
 #include <string.h>
 #include <cstdlib>
 #include <stdio.h>
 
-#include "smart-pointer.h"
-#include "common.h"
-#include "hash.h"
-#include "secure-crt.h"
+#include "slang-smart-pointer.h"
+#include "slang-common.h"
+#include "slang-hash.h"
+#include "slang-secure-crt.h"
 
 #include <new>
 

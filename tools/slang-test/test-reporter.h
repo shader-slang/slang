@@ -4,9 +4,9 @@
 #define TEST_REPORTER_H_INCLUDED
 
 #include "../../source/core/slang-string-util.h"
-#include "../../source/core/platform.h"
+#include "../../source/core/slang-platform.h"
 #include "../../source/core/slang-std-writers.h"
-#include "../../source/core/dictionary.h"
+#include "../../source/core/slang-dictionary.h"
 
 
 #define SLANG_CHECK(x) TestReporter::get()->addResultWithLocation((x), #x, __FILE__, __LINE__); 
