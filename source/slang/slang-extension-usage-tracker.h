@@ -2,9 +2,9 @@
 #ifndef SLANG_EXTENSION_USAGE_TRACKER_H_INCLUDED
 #define SLANG_EXTENSION_USAGE_TRACKER_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
-#include "compiler.h"
+#include "slang-compiler.h"
 
 namespace Slang
 {

@@ -2,10 +2,10 @@
 #ifndef SLANG_EMIT_CONTEXT_H_INCLUDED
 #define SLANG_EMIT_CONTEXT_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
-#include "compiler.h"
-#include "type-layout.h"
+#include "slang-compiler.h"
+#include "slang-type-layout.h"
 #include "slang-source-stream.h"
 #include "slang-extension-usage-tracker.h"
 
