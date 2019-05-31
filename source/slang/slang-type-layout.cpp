@@ -814,6 +814,19 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CSource:
+    {
+        // We just need to decide here what style of layout is appropriate, in terms of memory
+        // and binding. That in terms of the actual binding that will be injected into functions
+        // in the form of a BindContext. For now we'll go with HLSL layout -
+        // that we may want to rethink that with the use of arrays and binding VK style binding might be
+        // more appropriate in some ways.
+
+        return &kHLSLLayoutRulesFamilyImpl;
+    }
+
     default:
         return nullptr;
     }

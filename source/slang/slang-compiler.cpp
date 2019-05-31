@@ -365,6 +365,12 @@ namespace Slang
             {
                 return PassThroughMode::dxc;
             }
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CSource:
+            {
+                // Don't need an external compiler to output C and C++ code
+                return PassThroughMode::None;
+            }
 
             default: break;
         }
@@ -1048,6 +1054,17 @@ SlangResult dissassembleDXILUsingDXC(
                     endToEndReq);
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
+            }
+            break;
+
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CSource:
+            {
+                return emitEntryPoint(
+                    compileRequest,
+                    entryPoint,
+                    target, 
+                    targetReq);
             }
             break;
 

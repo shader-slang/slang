@@ -811,6 +811,12 @@ String getTargetName(IRSpecContext* context)
     case CodeGenTarget::GLSL:
         return "glsl";
 
+    case CodeGenTarget::CSource:
+        return "c";
+
+    case CodeGenTarget::CPPSource:
+        return "cpp";
+
     default:
         SLANG_UNEXPECTED("unhandled case");
         UNREACHABLE_RETURN("unknown");

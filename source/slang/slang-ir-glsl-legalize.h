@@ -7,7 +7,8 @@ namespace Slang
 class DiagnosticSink;
 class Session;
 
-struct ExtensionUsageTracker;
+class ExtensionUsageTracker;
+
 struct IRFunc;
 struct IRModule;
 

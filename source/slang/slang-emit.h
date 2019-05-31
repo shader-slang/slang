@@ -12,11 +12,6 @@ namespace Slang
     class ProgramLayout;
     class TranslationUnitRequest;
 
-    struct ExtensionUsageTracker;
-    void requireGLSLExtension(
-        ExtensionUsageTracker*  tracker,
-        String const&           name);
-
     // Emit code for a single entry point, based on
     // the input translation unit.
     String emitEntryPoint(
