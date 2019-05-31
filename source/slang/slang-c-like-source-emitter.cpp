@@ -495,7 +495,7 @@ void CLikeSourceEmitter::emitVectorTypeName(IRType* elementType, IRIntegerValue 
 
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
-        _emitCVecType(elementType->op, elementCount);
+        _emitCVecType(elementType->op, Int(elementCount));
         break;
 
     default:
