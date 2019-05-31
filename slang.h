@@ -1044,8 +1044,7 @@ extern "C"
     */
     typedef struct SlangSession SlangSession;
 
-    typedef struct SlangLinkage SlangLinkage;
-    typedef struct SlangModule SlangModule;
+    typedef struct SlangProgramLayout SlangProgramLayout;
 
     /*!
     @brief A request for one or more compilation actions to be performed.
@@ -1112,20 +1111,6 @@ extern "C"
         SlangSession*   session,
         char const*     sourcePath,
         char const*     sourceString);
-
-
-
-    SLANG_API SlangLinkage* spCreateLinkage(
-        SlangSession* session);
-
-    SLANG_API void spDestroyLinkage(
-        SlangLinkage* linkage);
-
-    SLANG_API SlangModule* spLoadModule(
-        SlangLinkage* linkage,
-        char const* moduleName);
-
-
 
     /*!
     @brief Create a compile request.
@@ -1563,11 +1548,17 @@ extern "C"
         SlangCompileRequest*    request,
         size_t*                 outSize);
 
-    /* Note(tfoley): working on new reflection interface...
+    /*
+    Forward declarations of types used in the reflection interface;
     */
 
-    typedef struct SlangReflection                  SlangReflection;
-    typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
+    typedef struct SlangProgramLayout SlangProgramLayout;
+    typedef struct SlangEntryPoint SlangEntryPoint;
+    typedef struct SlangEntryPointLayout SlangEntryPointLayout;
+    typedef struct SlangEntryPointGroupLayout SlangEntryPointGroupLayout;
+
+//    typedef struct SlangReflection                  SlangReflection;
+//    typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
     typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
@@ -1575,6 +1566,12 @@ extern "C"
     typedef struct SlangReflectionVariableLayout    SlangReflectionVariableLayout;
     typedef struct SlangReflectionTypeParameter     SlangReflectionTypeParameter;
     typedef struct SlangReflectionUserAttribute     SlangReflectionUserAttribute;
+
+    /*
+    Type aliases to maintain backward compatibility.
+    */
+    typedef SlangProgramLayout SlangReflection;
+    typedef SlangEntryPointLayout SlangReflectionEntryPoint;
 
     // get reflection data from a compilation request
     SLANG_API SlangReflection* spGetReflection(
@@ -1909,6 +1906,9 @@ extern "C"
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
     SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangReflection* reflection, char const* name);
 
+    SLANG_API SlangInt spReflection_getEntryPointGroupCount(SlangReflection* reflection);
+    SLANG_API SlangEntryPointGroupLayout* spReflection_getEntryPointGroupByIndex(SlangReflection* reflection, SlangInt index);
+
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
@@ -1919,6 +1919,15 @@ extern "C"
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
 
+    // Entry point group reflection
+
+    SLANG_API SlangInt spEntryPointGroupLayout_getEntryPointCount(SlangEntryPointGroupLayout* group);
+    SLANG_API SlangReflectionEntryPoint* spEntryPointGroupLayout_getEntryPointByIndex(SlangEntryPointGroupLayout* group, SlangInt index);
+    SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getVarLayout(SlangEntryPointGroupLayout* group);
+
+    SLANG_API SlangInt spEntryPointGroupLayout_getParameterCount(SlangEntryPointGroupLayout* group);
+    SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getParameterByIndex(SlangEntryPointGroupLayout* group, SlangInt index);
+
 
 #ifdef __cplusplus
 }
@@ -1926,9 +1935,6 @@ extern "C"
 /* Helper interfaces for C++ users */
 namespace slang
 {
-#define SLANG_SAFE_BOOL(expr) \
-    operator bool() const { return expr; }
-
     struct BufferReflection;
     struct TypeLayoutReflection;
     struct TypeReflection;
@@ -2427,6 +2433,35 @@ namespace slang
             return 0 != spReflectionEntryPoint_usesAnySampleRateInput((SlangReflectionEntryPoint*) this);
         }
     };
+    typedef EntryPointReflection EntryPointLayout;
+
+    struct EntryPointGroupLayout
+    {
+        SlangInt getEntryPointCount()
+        {
+            return spEntryPointGroupLayout_getEntryPointCount((SlangEntryPointGroupLayout*) this);
+        }
+
+        EntryPointReflection* getEntryPointByIndex(SlangInt index)
+        {
+            return (EntryPointReflection*) spEntryPointGroupLayout_getEntryPointByIndex((SlangEntryPointGroupLayout*) this, index);
+        }
+
+        VariableLayoutReflection* getVarLayout()
+        {
+            return (VariableLayoutReflection*) spEntryPointGroupLayout_getVarLayout((SlangEntryPointGroupLayout*) this);
+        }
+
+        SlangInt getParameterCount()
+        {
+            return spEntryPointGroupLayout_getParameterCount((SlangEntryPointGroupLayout*) this);
+        }
+
+        VariableLayoutReflection* getParameterByIndex(SlangInt index)
+        {
+            return (VariableLayoutReflection*) spEntryPointGroupLayout_getParameterByIndex((SlangEntryPointGroupLayout*) this, index);
+        }
+    };
 
     struct TypeParameterReflection
     {
@@ -2452,6 +2487,8 @@ namespace slang
     {
         Default = SLANG_LAYOUT_RULES_DEFAULT,
     };
+
+    typedef struct ShaderReflection ProgramLayout;
 
     struct ShaderReflection
     {
@@ -2480,9 +2517,9 @@ namespace slang
             return (VariableLayoutReflection*) spReflection_GetParameterByIndex((SlangReflection*) this, index);
         }
 
-        static ShaderReflection* get(SlangCompileRequest* request)
+        static ProgramLayout* get(SlangCompileRequest* request)
         {
-            return (ShaderReflection*) spGetReflection(request);
+            return (ProgramLayout*) spGetReflection(request);
         }
 
         SlangUInt getEntryPointCount()
@@ -2493,6 +2530,16 @@ namespace slang
         EntryPointReflection* getEntryPointByIndex(SlangUInt index)
         {
             return (EntryPointReflection*) spReflection_getEntryPointByIndex((SlangReflection*) this, index);
+        }
+
+        SlangInt getEntryPointGroupCount()
+        {
+            return spReflection_getEntryPointGroupCount((SlangReflection*) this);
+        }
+
+        EntryPointGroupLayout* getEntryPointGroupByIndex(SlangInt index)
+        {
+            return (EntryPointGroupLayout*) spReflection_getEntryPointGroupByIndex((SlangReflection*) this, index);
         }
 
         SlangUInt getGlobalConstantBufferBinding()
@@ -2543,7 +2590,328 @@ namespace slang
                 outDiagnostics);
         }
     };
+
+    typedef ISlangBlob IBlob;
+
+    struct IGlobalSession;
+    struct IModule;
+    struct IProgram;
+    struct ISession;
+
+    struct SessionDesc;
+    struct ProgramDesc;
+    struct SpecializationArg;
+    struct TargetDesc;
+
+        /** A global session for interaction with the Slang library.
+
+        An application may create and re-use a single global session across
+        multiple sessions, in order to amortize startups costs (in current
+        Slang this is mostly the cost of loading the Slang standard library).
+
+        The global session is currently *not* thread-safe and objects created from
+        a single global session should only be used from a single thread at
+        a time.
+        */
+    struct IGlobalSession : public ISlangUnknown
+    {
+    public:
+            /** Create a new session for loading and compiling code.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createSession(
+            SessionDesc const&  desc,
+            ISession**          outSession) = 0;
+
+            /** Look up the internal ID of a profile by its `name`.
+
+            Profile IDs are *not* guaranteed to be stable across versions
+            of the Slang library, so clients are expected to look up
+            profiles by name at runtime.
+            */
+        virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
+            char const*     name) = 0;
+    };
+
+    #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
+
+        /** Description of a code generation target.
+        */
+    struct TargetDesc
+    {
+            /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
+            */
+        SlangCompileTarget      format = SLANG_TARGET_UNKNOWN;
+
+            /** The compilation profile supported by the target (e.g., "Shader Model 5.1")
+            */
+        SlangProfileID          profile = SLANG_PROFILE_UNKNOWN;
+
+            /** Flags for the code generation target. Currently unused. */
+        SlangTargetFlags        flags = 0;
+
+            /** Default mode to use for floating-point operations on the target.
+            */
+        SlangFloatingPointMode  floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
+
+            /** Optimization level to use for the target.
+            */
+        SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    };
+
+    typedef uint32_t SessionFlags;
+    enum
+    {
+        kSessionFlags_None = 0,
+
+        /** Use application-specific policy for semantics of the `shared` keyword.
+        
+        This is a legacy/compatibility flag to help an existing Slang client
+        migrate to new language features, and should *not* be used by other
+        clients. This feature may be removed in a future release without a
+        deprecation warning, and this bit may be re-used for another feature.
+        You have been warned.
+        */
+        kSessionFlag_FalcorCustomSharedKeywordSemantics = 1 << 0,
+    };
+
+    struct PreprocessorMacroDesc
+    {
+        const char* name;
+        const char* value;
+    };
+
+    struct SessionDesc
+    {
+            /** Code generation targets to include in the session.
+            */
+        TargetDesc const*   targets = nullptr;
+        SlangInt            targetCount = 0;
+
+            /** Flags to configure the session.
+            */
+        SessionFlags flags = kSessionFlags_None;
+
+            /** Default layout to assume for variables with matrix types.
+            */
+        SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+
+            /** Paths to use when searching for `#include`d or `import`ed files.
+            */
+        char const* const*  searchPaths = nullptr;
+        SlangInt            searchPathCount = 0;
+
+        PreprocessorMacroDesc const*    preprocessorMacros = nullptr;
+        SlangInt                        preprocessorMacroCount = 0;
+
+    };
+
+        /** A session provides a scope for code that is loaded.
+
+        A session can be used to load modules of Slang source code,
+        and to request target-specific compiled binaries and layout
+        information.
+
+        In order to be able to load code, the session owns a set
+        of active "search paths" for resolving `#include` directives
+        and `import` declrations, as well as a set of global
+        preprocessor definitions that will be used for all code
+        that gets `import`ed in the session.
+
+        If multiple user shaders are loaded in the same session,
+        and import the same module (e.g., two source files do `import X`)
+        then there will only be one copy of `X` loaded within the session.
+
+        In order to be able to generate target code, the session
+        owns a list of available compilation targets, which specify
+        code generation options.
+
+        Code loaded and compiled within a session is owned by the session
+        and will remain resident in memory until the session is released.
+        Applications wishing to control the memory usage for compiled
+        and loaded code should use multiple sessions.
+        */
+    struct ISession : public ISlangUnknown
+    {
+    public:
+            /** Get the global session thas was used to create this session.
+            */
+        virtual SLANG_NO_THROW IGlobalSession* SLANG_MCALL getGlobalSession() = 0;
+
+            /** Load a module as it would be by code using `import`.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModule(
+            const char* moduleName,
+            IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Create a program out of existing compiled items.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createProgram(
+            ProgramDesc const& desc,
+            IProgram**         outProgram) = 0;
+
+            /** Specialize a program based on type arguments.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL specializeProgram(
+            IProgram*                   program,
+            SlangInt                    specializationArgCount,
+            SpecializationArg const*    specializationArgs,
+            IProgram**                  outSpecializedProgram,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+            /** Specialize a type based on type arguments.
+            */
+        virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(
+            TypeReflection*             type,
+            SlangInt                    specializationArgCount,
+            SpecializationArg const*    specializationArgs,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+
+            /** Get the layout `type` on the chosen `target`.
+            */
+        virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getTypeLayout(
+            TypeReflection* type,
+            SlangInt        targetIndex = 0,
+            LayoutRules     rules = LayoutRules::Default,
+            ISlangBlob**    outDiagnostics = nullptr) = 0;
+
+            /** Create a request to load/compile front-end code.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
+            SlangCompileRequest**   outCompileRequest) = 0;
+
+#if 0
+            /** Add a path to use when searching for `#include`d or `import`ed files.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addSearchPath(
+            char const* path) = 0;
+
+            /** Add a global preprocessor definition to use for all compilation.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addPreprocessorDefine(
+            char const* name,
+            char const* value) = 0;
+
+            /** Set the default matrix layout mode to use for all compiles.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMatrixLayoutMode(
+            SlangMatrixLayoutMode mode) = 0;
+#endif
+    };
+
+    #define SLANG_UUID_ISession { 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } }
+
+
+        /** A module is the granularity of shader code compilation and loading.
+
+        In most cases a module corresponds to a single compile "translation unit."
+        This will often be a single `.slang` or `.hlsl` file and everything it
+        `#include`s.
+
+        Notably, a module `M` does *not* include the things it `import`s, as these
+        as distinct modules that `M` depends on. There is a directed graph of
+        module dependencies, and all modules in the graph must belong to the
+        same session (`ISession`).
+        */
+    struct IModule : public ISlangUnknown
+    {
+    public:
+    };
+    
+    #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
+
+
+        /** Argument used for specialization to types/values.
+        */
+    struct SpecializationArg
+    {
+        enum class Kind : int32_t
+        {
+            Unknown,
+            Type,
+        };
+        Kind kind;
+        union
+        {
+            TypeReflection* type;
+        };
+    };
+
+        /** Description of a program to be created.
+        */
+    struct ProgramDesc
+    {
+        struct Item
+        {
+            enum class Kind : int32_t
+            {
+                Program,
+                Module,
+            };
+            Kind kind;
+            union
+            {
+                IProgram*  program;
+                IModule*   module;
+            };
+        };
+
+        Item const* items;
+        SlangInt    itemCount;
+    };
+
+
+        /** A program comprises zero or more modules, entry points, etc. that have been linked together.
+        */
+    struct IProgram : public ISlangUnknown
+    {
+    public:
+            /** Get the runtime session that this program belongs to.
+            */
+        virtual SLANG_NO_THROW ISession* SLANG_MCALL getSession() = 0;
+
+            /** Get the layout for this program for the chosen `targetIndex`
+            */
+        virtual SLANG_NO_THROW ProgramLayout* SLANG_MCALL getLayout(
+            SlangInt    targetIndex = 0,
+            IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Get the compiled code for the entry point at `entryPointIndex` for the chosen `targetIndex`
+
+            If code has not already been generated for the given entry point and target,
+            then a compilation error may be detected, in which case `outDiagnostics`
+            (if non-null) will be filled in with a blob of messages diagnosing the error.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt    entryPointIndex,
+            SlangInt    targetIndex,
+            IBlob**     outCode,
+            IBlob**     outDiagnostics = nullptr) = 0;
+    };
+    
+    #define SLANG_UUID_IProgram { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
 }
+
+#define SLANG_API_VERSION 0
+
+SLANG_API SlangResult slang_createGlobalSession(
+    SlangInt                apiVersion,
+    slang::IGlobalSession** outGlobalSession);
+
+namespace slang
+{
+    inline SlangResult createGlobalSession(
+        slang::IGlobalSession** outGlobalSession)
+    {
+        return slang_createGlobalSession(SLANG_API_VERSION, outGlobalSession);
+    }
+}
+
+/**
+*/
+SLANG_API SlangResult spCompileRequest_getProgram(
+    SlangCompileRequest*    request,
+    slang::IProgram**       outProgram);
 
 #endif
 

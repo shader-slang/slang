@@ -293,6 +293,31 @@ namespace Slang
     }
 
     //
+    // EntryPointGroup
+    //
+
+    RefPtr<EntryPointGroup> EntryPointGroup::create(
+        Linkage*                        linkage,
+        List<RefPtr<EntryPoint>> const& entryPoints,
+        DiagnosticSink*                 sink)
+    {
+        RefPtr<EntryPointGroup> group = new EntryPointGroup(linkage);
+
+        for( auto entryPoint : entryPoints )
+        {
+            for( auto module : entryPoint->getModuleDependencies() )
+            {
+                group->m_dependencyList.addDependency(module);
+            }
+            group->m_entryPoints.add(entryPoint);
+        }
+
+        group->_collectShaderParams(sink);
+
+        return group;
+    }
+
+    //
 
     Profile Profile::LookUp(char const* name)
     {
@@ -1481,6 +1506,58 @@ SlangResult dissassembleDXILUsingDXC(
         writeEntryPointResultToStandardOutput(compileRequest, entryPoint, targetReq, result);
     }
 
+    CompileResult& TargetProgram::_createEntryPointResult(
+        Int                     entryPointIndex,
+        BackEndCompileRequest*  backEndRequest,
+        EndToEndCompileRequest* endToEndRequest)
+    {
+        // It is possible that entry points goot added to the `Program`
+        // *after* we created this `TargetProgram`, so there might be
+        // a request for an entry point that we didn't allocate space for.
+        //
+        // TODO: Change the construction logic so that a `Program` is
+        // constructed all at once rather than incrementally, to avoid
+        // this problem.
+        //
+        if(entryPointIndex >= m_entryPointResults.getCount())
+            m_entryPointResults.setCount(entryPointIndex+1);
+
+        auto entryPoint = m_program->getEntryPoint(entryPointIndex);
+
+        auto& result = m_entryPointResults[entryPointIndex];
+        result = emitEntryPoint(
+            backEndRequest,
+            entryPoint,
+            entryPointIndex,
+            m_targetReq,
+            endToEndRequest);
+
+        return result;
+
+    }
+
+    CompileResult& TargetProgram::getOrCreateEntryPointResult(
+        Int entryPointIndex,
+        DiagnosticSink* sink)
+    {
+        if(entryPointIndex >= m_entryPointResults.getCount())
+            m_entryPointResults.setCount(entryPointIndex+1);
+
+        auto& result = m_entryPointResults[entryPointIndex];
+        if( result.format != ResultFormat::None )
+            return result;
+
+        RefPtr<BackEndCompileRequest> backEndRequest = new BackEndCompileRequest(
+            m_program->getLinkageImpl(),
+            sink,
+            m_program);
+
+        return _createEntryPointResult(
+            entryPointIndex,
+            backEndRequest,
+            nullptr);
+    }
+
     void generateOutputForTarget(
         BackEndCompileRequest*  compileReq,
         TargetRequest*          targetReq,
@@ -1494,16 +1571,14 @@ SlangResult dissassembleDXILUsingDXC(
         auto entryPointCount = program->getEntryPointCount();
         for(Index ii = 0; ii < entryPointCount; ++ii)
         {
-            auto entryPoint = program->getEntryPoint(ii);
-            CompileResult entryPointResult = emitEntryPoint(
-                compileReq,
-                entryPoint,
+            targetProgram->_createEntryPointResult(
                 ii,
-                targetReq,
+                compileReq,
                 endToEndReq);
-            targetProgram->setEntryPointResult(ii, entryPointResult);
         }
     }
+
+
 
     static void _generateOutput(
         BackEndCompileRequest* compileRequest,

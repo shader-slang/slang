@@ -1709,8 +1709,7 @@ namespace Slang
         TokenSpan tokenSpan;
         tokenSpan.mBegin = parser->tokenReader.mCursor;
         tokenSpan.mEnd = parser->tokenReader.mEnd;
-        DiagnosticSink newSink;
-        newSink.sourceManager = parser->sink->sourceManager;
+        DiagnosticSink newSink(parser->sink->sourceManager);
         Parser newParser(*parser);
         newParser.sink = &newSink;
         auto speculateParseRs = parseGenericApp(&newParser, base);

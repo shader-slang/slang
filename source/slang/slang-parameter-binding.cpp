@@ -377,6 +377,7 @@ struct SharedParameterBindingContext
 
     TargetRequest* getTargetRequest() { return targetRequest; }
     DiagnosticSink* getSink() { return m_sink; }
+    Linkage* getLinkage() { return targetRequest->getLinkage(); }
 };
 
 static DiagnosticSink* getSink(SharedParameterBindingContext* shared)
@@ -403,6 +404,8 @@ struct ParameterBindingContext
 
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
     LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
+
+    Linkage* getLinkage() { return shared->getLinkage(); }
 };
 
 static DiagnosticSink* getSink(ParameterBindingContext* context)
@@ -585,7 +588,7 @@ static bool findLayoutArg(
         if( modifier )
         {
             *outVal = (UInt) strtoull(String(modifier->valToken.Content).getBuffer(), nullptr, 10);
-            return true;
+return true;
         }
     }
     return false;
@@ -610,7 +613,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
 
-    if( varDecl->HasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type) )
+    if(varDecl->HasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
         return createTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
@@ -620,12 +623,19 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if (varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type))
+    if( varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
     {
         return createTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
             type);
     }
+
+    // TODO: The cases below for detecting globals that aren't actually
+    // shader parameters should be redundant now that the semantic
+    // checking logic is responsible for populating the list of
+    // parameters on a `Program`. We should be able to clean up
+    // the code by removing these two cases, and the related null
+    // pointer checks in the code that calls this.
 
     // HLSL `static` modifier indicates "thread local"
     if(varDecl->HasModifier<HLSLStaticModifier>())
@@ -1940,6 +1950,45 @@ struct ScopeLayoutBuilder
         _addParameter(firstVarLayout, parameterInfo);
     }
 
+
+        // Add a "simple" parameter that cannot have any user-defined
+        // register or binding modifiers, so that its layout computation
+        // can be simplified greatly.
+        //
+    void addSimpleParameter(
+        RefPtr<VarLayout> varLayout)
+    {
+        // The main `addParameter` logic will deal with any ordinary/uniform data,
+        // and with the "pending" part of the layout.
+        //
+        addParameter(varLayout);
+
+        // That leaves us to deal with the resource usage that isn't
+        // handled by `addParameter`.
+        //
+        auto paramTypeLayout = varLayout->getTypeLayout();
+        for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
+        {
+            // We need to skip ordinary/uniform data because it was
+            // handled by `addParameter`.
+            //
+            if(paramTypeResInfo.kind == LayoutResourceKind::Uniform)
+                continue;
+
+            // Whatever resources the parameter uses, we need to
+            // assign the parameter's location/register/binding offset to
+            // be the sum of everything added so far.
+            //
+            auto scopeResInfo = m_structLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
+            varLayout->findOrAddResourceInfo(paramTypeResInfo.kind)->index = scopeResInfo->count.getFiniteValue();
+
+            // We then need to add the resources consumed by the parameter
+            // to those consumed by the scope.
+            //
+            scopeResInfo->count += paramTypeResInfo.count;
+        }
+    }
+
     RefPtr<VarLayout> endLayout()
     {
         // Finish computing the layout for the ordindary data (if any).
@@ -2007,7 +2056,7 @@ static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
 
     /// Iterate over the parameters of an entry point to compute its requirements.
     ///
-static void collectEntryPointParameters(
+static RefPtr<EntryPointLayout> collectEntryPointParameters(
     ParameterBindingContext*        context,
     EntryPoint*                     entryPoint,
     SubstitutionSet                 typeSubst)
@@ -2119,35 +2168,7 @@ static void collectEntryPointParameters(
         // we need to add its resource usage to that of the entry
         // point as a whole.
         //
-        // Any "ordinary" data (e.g., a `float4x4`) needs to be accounted
-        // for using the `ScopeLayoutBuilder`, since it will handle
-        // the details of target-specific `struct` type layout.
-        //
-        scopeBuilder.addParameter(paramVarLayout);
-
-        // All of the other resources types will be handled in a
-        // simpler loop that just increments the relevant counters.
-        //
-        for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
-        {
-            // We need to skip ordinary data because it is being
-            // handled by the `scopeBuilder`.
-            //
-            if(paramTypeResInfo.kind == LayoutResourceKind::Uniform)
-                continue;
-
-            // Whatever resources the parameter uses, we need to
-            // assign the parameter's location/register/binding offset to
-            // be the sum of everything added so far.
-            //
-            auto entryPointResInfo = paramsStructLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
-            paramVarLayout->findOrAddResourceInfo(paramTypeResInfo.kind)->index = entryPointResInfo->count.getFiniteValue();
-
-            // We then need to add the resources consumed by the parameter
-            // to those consumed by the entry point.
-            //
-            entryPointResInfo->count += paramTypeResInfo.count;
-        }
+        scopeBuilder.addSimpleParameter(paramVarLayout);
     }
     entryPointLayout->parametersLayout = scopeBuilder.endLayout();
 
@@ -2189,6 +2210,25 @@ static void collectEntryPointParameters(
 
         entryPointLayout->resultLayout = resultLayout;
     }
+
+    return entryPointLayout;
+}
+
+    /// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
+    ///
+    /// This is used when constructing the layout for an entry point group, to make sure
+    /// that certain kinds of resource usage from the entry point don't "leak" into
+    /// the resource usage of the group.
+    ///
+static void removePerEntryPointParameterKinds(
+    TypeLayout* typeLayout)
+{
+    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingInput);
+    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingOutput);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ShaderRecord);
+    typeLayout->removeResourceUsage(LayoutResourceKind::HitAttributes);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialObjectParam);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
 }
 
 static void collectParameters(
@@ -2242,10 +2282,66 @@ static void collectParameters(
     }
 
     // Next consider parameters for entry points
-    for(auto entryPoint : program->getEntryPoints())
+    for( auto entryPointGroup : program->getEntryPointGroups() )
     {
-        context->stage = entryPoint->getStage();
-        collectEntryPointParameters(context, entryPoint, globalGenericSubst);
+        RefPtr<EntryPointGroupLayout> entryPointGroupLayout = new EntryPointGroupLayout();
+        entryPointGroupLayout->group = entryPointGroup;
+
+        context->shared->programLayout->entryPointGroups.add(entryPointGroupLayout);
+
+
+        ScopeLayoutBuilder scopeBuilder;
+        scopeBuilder.beginLayout(context);
+        auto entryPointGroupParamsStructLayout = scopeBuilder.m_structLayout;
+
+        // First lay out any shader parameters that belong to the group
+        // itself, rather than to its nested entry points.
+        //
+        // This ensures that looking up one of the parameters of the
+        // group by index in its parameters truct will Just Work.
+        //
+        for( auto groupParam : entryPointGroup->getShaderParams() )
+        {
+            auto paramDeclRef = groupParam.paramDeclRef;
+            auto paramType = GetType(paramDeclRef);
+
+            RefPtr<VarLayout> paramVarLayout = new VarLayout();
+            paramVarLayout->varDecl = paramDeclRef;
+
+            auto paramTypeLayout = createTypeLayout(
+                context->layoutContext.with(context->getRulesFamily()->getConstantBufferRules()),
+                paramType);
+            paramVarLayout->typeLayout = paramTypeLayout;
+
+            scopeBuilder.addSimpleParameter(paramVarLayout);
+        }
+
+        for(auto entryPoint : entryPointGroup->getEntryPoints())
+        {
+            // Note: we do not want the entry point group to accumulate
+            // locations for varying input/output parameters: those
+            // should be specific to each entry point.
+            //
+            // We address this issue by manually removing any
+            // layout information for the relevant resource kinds
+            // from the group's layout before adding the parameters
+            // of any entry point for layout.
+            //
+            removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
+
+            context->stage = entryPoint->getStage();
+            auto entryPointLayout = collectEntryPointParameters(context, entryPoint, globalGenericSubst);
+
+            auto entryPointParamsLayout = entryPointLayout->parametersLayout;
+            auto entryPointParamsTypeLayout = entryPointParamsLayout->typeLayout;
+
+            scopeBuilder.addSimpleParameter(entryPointParamsLayout);
+
+            entryPointGroupLayout->entryPoints.add(entryPointLayout);
+        }
+        removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
+
+        entryPointGroupLayout->parametersLayout = scopeBuilder.endLayout();
     }
     context->entryPointLayout = nullptr;
 }
@@ -2452,44 +2548,6 @@ RefPtr<ProgramLayout> generateParameterBindings(
         completeBindingsForParameter(&context, parameter);
     }
 
-    // After we have allocated registers/bindings to everything
-    // in the global scope we will process the parameters
-    // of each entry point in order.
-    //
-    // Note: the effect of the current implementation is to
-    // allocate non-overlapping registers/bindings between all
-    // the entry points in the compile request (e.g., if you
-    // have a vertex and fragment shader being compiled together,
-    // we will allocate distinct constant buffer registers for
-    // their uniform parameters).
-    //
-    // TODO: We probably need to provide some more nuanced control
-    // over whether entry points get overlapping or non-overlapping
-    // bindings. It seems clear that if we were compiling multiple
-    // compute kernels in one invocation we'd want them to get
-    // overlapping bindings, because we cannot ever have them bound
-    // together in a single pipeline state.
-    //
-    // Similarly, entry point parameters of DirectX Raytracing (DXR)
-    // shaders should probably be allowed to overlap by default,
-    // since those parameters should really go into the "local root signature."
-    // (Note: there is a bit more subtlety around ray tracing
-    // shaders that will be assembled into a "hit group")
-    //
-    // For now we are just doing the simplest thing, which will be
-    // appropriate for:
-    //
-    // * Compiling a single compute shader in a compile request.
-    // * Compiling some number of rasterization shader entry points
-    //   in a single request, to be used together.
-    // * Compiling a single ray-tracing shader in a compile request.
-    //
-    for( auto entryPoint : sharedContext.programLayout->entryPoints )
-    {
-        auto entryPointParamsLayout = entryPoint->parametersLayout;
-        completeBindingsForParameter(&context, entryPointParamsLayout);
-    }
-
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`
     // to encapsulate the logic that can be shared with the entry-point
@@ -2510,17 +2568,75 @@ RefPtr<ProgramLayout> generateParameterBindings(
         cbInfo->index = globalConstantBufferBinding.index;
     }
 
-    // After we have laid out all the ordinary parameters,
-    // we need to go through the global scope plus each entry point,
-    // and "flush" out any pending data that was associated with
-    // those scopes as part of dealing with interface-type parameters.
+    // After we have laid out all the ordinary global parameters,
+    // we need to "flush" out any pending data that was associated with
+    // the global scope as part of dealing with interface-type parameters.
     //
     _allocateBindingsForPendingData(&context, globalScopeVarLayout->pendingVarLayout);
-    for( auto entryPoint : sharedContext.programLayout->entryPoints )
-    {
-        _allocateBindingsForPendingData(&context, entryPoint->parametersLayout->pendingVarLayout);
-    }
 
+    // After we have allocated registers/bindings to everything
+    // in the global scope we will process the parameters
+    // of the entry points.
+    //
+    // Note: at the moment we are laying out *all* information related to global-scope
+    // parameters (including pending data from interface-type parameters) before
+    // anything pertaining to entry points. This is a crucial design choice to
+    // get right, and we might want to revisit it based on experience.
+
+    // In some cases, a user will want o ensure that all the
+    // entry points they compile get non-overallping
+    // registers/bindings. E.g., if you have a vertex and fragment
+    // shader being compiled together for Vulkan, you probably want distinct
+    // bindings for their entry-point `uniform` parametres, so
+    // that they can be used together.
+    //
+    // In other cases, however, a user probably doesn't want us
+    // to conservatively allocate non-overlapping bindings.
+    // E.g., if they have a bunch of compute shaders in a single
+    // file, then they probably want each compute shader to
+    // compute its parameter layout "from scratch" as if the
+    // others don't exist.
+    //
+    // The way we handle this is by putting the entry points of a
+    // `Program` into groups, and ensuring that within each group
+    // we allocate parameters that don't overlap, but we don't
+    // worry about overlap across groups.
+    //
+    for( auto entryPointGroup : sharedContext.programLayout->entryPointGroups )
+    {
+        // We save off the allocation state as it was before the entry-point
+        // group, so that we can restore it to this state after each group.
+        //
+        // TODO: We probably ought to wrap all the state relevant to allocation
+        // of registers/bindings into a single struct/field so that we only
+        // have one thing to save/restore here even if new state gets added.
+        //
+        auto savedGlobalSpaceUsedRangeSets = sharedContext.globalSpaceUsedRangeSets;
+        auto savedUsedSpaces = sharedContext.usedSpaces;
+
+        // The group will have been allocated a layout that combines the
+        // usage of all of the contained entry-points, so we just need to
+        // allocate the entry-point group to be placed after all the global-scope
+        // parameters.
+        //
+        auto entryPointGroupParamsLayout = entryPointGroup->parametersLayout;
+        completeBindingsForParameter(&context, entryPointGroupParamsLayout);
+
+        _allocateBindingsForPendingData(&context, entryPointGroupParamsLayout->pendingVarLayout);
+
+        // TODO: Should we add the offset information from the group to
+        // the layout information for each entry point (and thence to its parameters)?
+        //
+        // This seems important if we want to allow clients to conveniently
+        // ignore groups when doing their reflection queries.
+
+        // Once we've allocated bindigns for the parameters of entry points
+        // in the group, we restore the state for tracking what register/bindings
+        // are used to where it was before.
+        //
+        sharedContext.globalSpaceUsedRangeSets = savedGlobalSpaceUsedRangeSets;
+        sharedContext.usedSpaces = savedUsedSpaces;
+    }
 
     // HACK: we want global parameters to not have to deal with offsetting
     // by the `VarLayout` stored in `globalScopeVarLayout`, so we will scan
