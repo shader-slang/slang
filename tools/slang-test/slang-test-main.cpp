@@ -516,8 +516,11 @@ static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
     switch (target)
     {
         case SLANG_TARGET_UNKNOWN:
+
         case SLANG_HLSL:
         case SLANG_GLSL:
+        case SLANG_C_SOURCE:
+        case SLANG_CPP_SOURCE:
         {
             return 0;
         }
@@ -570,6 +573,8 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("dxil", DXIL)
         CASE("dxil-assembly", DXIL_ASM)
         CASE("dxil-asm", DXIL_ASM)
+        CASE("c", C_SOURCE)
+        CASE("cpp", CPP_SOURCE)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;

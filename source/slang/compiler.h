@@ -55,6 +55,8 @@ namespace Slang
         DXBytecodeAssembly  = SLANG_DXBC_ASM,
         DXIL                = SLANG_DXIL,
         DXILAssembly        = SLANG_DXIL_ASM,
+        CSource             = SLANG_C_SOURCE,
+        CPPSource           = SLANG_CPP_SOURCE,
     };
 
     enum class ContainerFormat

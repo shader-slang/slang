@@ -17,8 +17,6 @@ namespace Slang
     class ProgramLayout;
     class TranslationUnitRequest;
 
-    struct ExtensionUsageTracker;
-
     IRModule* generateIRForTranslationUnit(
         TranslationUnitRequest* translationUnit);
 
