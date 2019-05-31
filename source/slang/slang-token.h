@@ -2,7 +2,7 @@
 #ifndef SLANG_TOKEN_H_INCLUDED
 #define SLANG_TOKEN_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 #include "slang-source-loc.h"
 

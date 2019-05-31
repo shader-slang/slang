@@ -1,4 +1,4 @@
-#include "stream.h"
+#include "slang-stream.h"
 #ifdef _WIN32
 #include <share.h>
 #endif

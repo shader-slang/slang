@@ -1,5 +1,5 @@
-#ifndef CORELIB_TYPETRAITS_H
-#define CORELIB_TYPETRAITS_H
+#ifndef SLANG_CORE_TYPE_TRAITS_H
+#define SLANG_CORE_TYPE_TRAITS_H
 
 namespace Slang
 {

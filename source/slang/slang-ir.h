@@ -7,7 +7,7 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 #include "slang-source-loc.h"
 

@@ -6,7 +6,7 @@
 // our intermediate representation, to facilitate further
 // optimization and transformation.
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 #include "slang-compiler.h"
 #include "slang-ir.h"

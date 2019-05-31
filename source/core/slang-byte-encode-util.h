@@ -1,7 +1,7 @@
-#ifndef SLANG_BYTE_ENCODE_UTIL_H
-#define SLANG_BYTE_ENCODE_UTIL_H
+#ifndef SLANG_CORE_BYTE_ENCODE_UTIL_H
+#define SLANG_CORE_BYTE_ENCODE_UTIL_H
 
-#include "list.h"
+#include "slang-list.h"
 
 namespace Slang {
 

@@ -1,4 +1,4 @@
-﻿// d3d-util.h
+// d3d-util.h
 #pragma once
 
 #include <stdint.h>
@@ -6,7 +6,7 @@
 #include "../../slang-com-helper.h"
 
 #include "../../slang-com-ptr.h"
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 
 #include "flag-combiner.h"
 

@@ -1,7 +1,7 @@
 #ifndef SLANG_PARAMETER_BINDING_H
 #define SLANG_PARAMETER_BINDING_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-syntax.h"
 
 #include "../../slang.h"

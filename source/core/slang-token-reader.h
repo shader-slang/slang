@@ -1,10 +1,12 @@
-#ifndef CORE_TOKEN_READER_H
-#define CORE_TOKEN_READER_H
+#ifndef SLANG_CORE_TOKEN_READER_H
+#define SLANG_CORE_TOKEN_READER_H
 
-#include "basic.h"
+#include "slang-basic.h"
 
 namespace Slang
 {
+    /* NOTE! This TokenReader is NOT used by the main slang compiler !*/
+
     enum class TokenType
     {
         EndOfFile = -1,

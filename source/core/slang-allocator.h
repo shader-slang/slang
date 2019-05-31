@@ -1,5 +1,5 @@
-#ifndef CORE_LIB_ALLOCATOR_H
-#define CORE_LIB_ALLOCATOR_H
+#ifndef SLANG_CORE_ALLOCATOR_H
+#define SLANG_CORE_ALLOCATOR_H
 
 #include <stdlib.h>
 #ifdef _MSC_VER

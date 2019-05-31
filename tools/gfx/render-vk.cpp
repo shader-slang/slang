@@ -4,7 +4,7 @@
 //WORKING:#include "options.h"
 #include "render.h"
 
-#include "../../source/core/smart-pointer.h"
+#include "../../source/core/slang-smart-pointer.h"
 
 #include "vk-api.h"
 #include "vk-util.h"

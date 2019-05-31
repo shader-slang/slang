@@ -3,10 +3,10 @@
 
 #include "../../slang.h"
 
-#include "../../source/core/list.h"
-#include "../../source/core/slang-string-util.h"
+#include "slang-list.h"
+#include "slang-string-util.h"
 
-#include "platform.h"
+#include "slang-platform.h"
 
 namespace Slang {
 

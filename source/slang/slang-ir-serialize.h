@@ -2,8 +2,8 @@
 #ifndef SLANG_IR_SERIALIZE_H_INCLUDED
 #define SLANG_IR_SERIALIZE_H_INCLUDED
 
-#include "../core/basic.h"
-#include "../core/stream.h"
+#include "../core/slang-basic.h"
+#include "../core/slang-stream.h"
 
 #include "../core/slang-object-scope-manager.h"
 

@@ -24,7 +24,7 @@
 #undef WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
 
-#include "../core/platform.h"
+#include "../core/slang-platform.h"
 
 namespace Slang
 {

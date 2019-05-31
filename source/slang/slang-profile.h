@@ -1,7 +1,7 @@
 #ifndef SLANG_PROFILE_H_INCLUDED
 #define SLANG_PROFILE_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "../../slang.h"
 
 namespace Slang

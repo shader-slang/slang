@@ -1,7 +1,7 @@
 #ifndef SLANG_LEXER_H
 #define SLANG_LEXER_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-diagnostics.h"
 
 namespace Slang

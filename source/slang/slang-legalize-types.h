@@ -23,7 +23,7 @@
 // of an aggregate (containing the legal/legalized fields),
 // and some extra tuple-ified fields.
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-ir-insts.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"

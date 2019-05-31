@@ -1,7 +1,7 @@
-#ifndef CORE_LIB_ARRAY_VIEW_H
-#define CORE_LIB_ARRAY_VIEW_H
+#ifndef SLANG_CORE_ARRAY_VIEW_H
+#define SLANG_CORE_ARRAY_VIEW_H
 
-#include "common.h"
+#include "slang-common.h"
 
 namespace Slang
 {

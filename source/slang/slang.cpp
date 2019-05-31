@@ -4,20 +4,21 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
 
-#include "parameter-binding.h"
-#include "lower-to-ir.h"
-#include "../slang/parser.h"
-#include "../slang/preprocessor.h"
-#include "../slang/reflection.h"
-#include "syntax-visitors.h"
-#include "../slang/type-layout.h"
+#include "slang-parameter-binding.h"
+#include "slang-lower-to-ir.h"
+#include "slang-parser.h"
+#include "slang-preprocessor.h"
+#include "slang-reflection.h"
+#include "slang-syntax-visitors.h"
+#include "slang-type-layout.h"
 
 #include "slang-file-system.h"
+
 #include "../core/slang-writer.h"
 
-#include "source-loc.h"
+#include "slang-source-loc.h"
 
-#include "ir-serialize.h"
+#include "slang-ir-serialize.h"
 
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
@@ -47,15 +48,15 @@ Session::Session()
     #define SYNTAX_CLASS(NAME, BASE) \
         mapNameToSyntaxClass.Add(getNamePool()->getName(#NAME), getClass<NAME>());
 
-#include "object-meta-begin.h"
-#include "syntax-base-defs.h"
-#include "expr-defs.h"
-#include "decl-defs.h"
-#include "modifier-defs.h"
-#include "stmt-defs.h"
-#include "type-defs.h"
-#include "val-defs.h"
-#include "object-meta-end.h"
+#include "slang-object-meta-begin.h"
+#include "slang-syntax-base-defs.h"
+#include "slang-expr-defs.h"
+#include "slang-decl-defs.h"
+#include "slang-modifier-defs.h"
+#include "slang-stmt-defs.h"
+#include "slang-type-defs.h"
+#include "slang-val-defs.h"
+#include "slang-object-meta-end.h"
 
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);

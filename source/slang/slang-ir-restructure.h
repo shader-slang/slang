@@ -1,7 +1,7 @@
 // slang-ir-restructure.h
 #pragma once
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 namespace Slang
 {

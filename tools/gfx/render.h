@@ -9,9 +9,9 @@
 
 #include "../../slang-com-helper.h"
 
-#include "../../source/core/smart-pointer.h"
-#include "../../source/core/list.h"
-#include "../../source/core/dictionary.h"
+#include "../../source/core/slang-smart-pointer.h"
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-dictionary.h"
 
 #include "../../slang.h"
 

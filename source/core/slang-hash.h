@@ -1,5 +1,5 @@
-#ifndef CORELIB_HASH_H
-#define CORELIB_HASH_H
+#ifndef SLANG_CORE_HASH_H
+#define SLANG_CORE_HASH_H
 
 #include "slang-math.h"
 #include <string.h>

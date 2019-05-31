@@ -1,5 +1,5 @@
-#ifndef SLANG_TEST_TOOL_UTIL_H
-#define SLANG_TEST_TOOL_UTIL_H
+#ifndef SLANG_CORE_TEST_TOOL_UTIL_H
+#define SLANG_CORE_TEST_TOOL_UTIL_H
 
 #include "slang-std-writers.h"
 

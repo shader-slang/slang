@@ -1,8 +1,8 @@
-#ifndef CORE_LIB_TEXT_IO_H
-#define CORE_LIB_TEXT_IO_H
+#ifndef SLANG_CORE_TEXT_IO_H
+#define SLANG_CORE_TEXT_IO_H
 
-#include "secure-crt.h"
-#include "stream.h"
+#include "slang-secure-crt.h"
+#include "slang-stream.h"
 
 namespace Slang
 {

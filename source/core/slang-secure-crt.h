@@ -1,6 +1,6 @@
 #ifndef _MSC_VER
-#ifndef CORE_LIB_SECURE_CRT_H
-#define CORE_LIB_SECURE_CRT_H
+#ifndef SLANG_CORE_SECURE_CRT_H
+#define SLANG_CORE_SECURE_CRT_H
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

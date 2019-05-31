@@ -1,7 +1,7 @@
 #ifndef SLANG_TYPE_LAYOUT_H
 #define SLANG_TYPE_LAYOUT_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"

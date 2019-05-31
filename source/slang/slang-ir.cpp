@@ -2,7 +2,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 #include "slang-mangle.h"
 

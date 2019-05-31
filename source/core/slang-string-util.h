@@ -1,8 +1,8 @@
-#ifndef SLANG_STRING_UTIL_H
-#define SLANG_STRING_UTIL_H
+#ifndef SLANG_CORE_STRING_UTIL_H
+#define SLANG_CORE_STRING_UTIL_H
 
 #include "slang-string.h"
-#include "list.h"
+#include "slang-list.h"
 
 #include <stdarg.h>
 

@@ -1,5 +1,5 @@
 #include "slang-io.h"
-#include "exception.h"
+#include "slang-exception.h"
 
 #include "../../slang-com-helper.h"
 

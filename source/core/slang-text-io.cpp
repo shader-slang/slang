@@ -1,4 +1,4 @@
-#include "text-io.h"
+#include "slang-text-io.h"
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 
 #include "../../slang-com-ptr.h"
-#include "../../source/core/list.h"
+#include "../../source/core/slang-list.h"
 #include "../../source/core/slang-free-list.h"
 
 #include "resource-d3d12.h"

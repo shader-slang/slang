@@ -1,11 +1,11 @@
-#ifndef SLANG_STRING_SLICE_POOL_H
-#define SLANG_STRING_SLICE_POOL_H
+#ifndef SLANG_CORE_STRING_SLICE_POOL_H
+#define SLANG_CORE_STRING_SLICE_POOL_H
 
 #include "slang-string.h"
 
-#include "list.h"
+#include "slang-list.h"
 #include "slang-memory-arena.h"
-#include "dictionary.h"
+#include "slang-dictionary.h"
 
 namespace Slang {
 

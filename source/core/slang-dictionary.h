@@ -1,11 +1,12 @@
-#ifndef CORE_LIB_DICTIONARY_H
-#define CORE_LIB_DICTIONARY_H
-#include "list.h"
-#include "common.h"
+#ifndef SLANG_CORE_DICTIONARY_H
+#define SLANG_CORE_DICTIONARY_H
+
+#include "slang-list.h"
+#include "slang-common.h"
 #include "slang-uint-set.h"
-#include "exception.h"
+#include "slang-exception.h"
 #include "slang-math.h"
-#include "hash.h"
+#include "slang-hash.h"
 
 namespace Slang
 {

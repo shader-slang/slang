@@ -1,7 +1,7 @@
 #ifndef SLANG_REFLECTION_H
 #define SLANG_REFLECTION_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-syntax.h"
 
 #include "../../slang.h"

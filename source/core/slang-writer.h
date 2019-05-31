@@ -1,10 +1,10 @@
-#ifndef SLANG_WRITER_H
-#define SLANG_WRITER_H
+#ifndef SLANG_CORE_WRITER_H
+#define SLANG_CORE_WRITER_H
 
 #include "slang-string.h"
 
 #include "../../slang-com-helper.h"
-#include "../../source/core/list.h"
+#include "slang-list.h"
 
 namespace Slang
 {

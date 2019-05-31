@@ -1,9 +1,9 @@
-#ifndef FUNDAMENTAL_LIB_SMART_POINTER_H
-#define FUNDAMENTAL_LIB_SMART_POINTER_H
+#ifndef SLANG_CORE_SMART_POINTER_H
+#define SLANG_CORE_SMART_POINTER_H
 
-#include "common.h"
-#include "hash.h"
-#include "type-traits.h"
+#include "slang-common.h"
+#include "slang-hash.h"
+#include "slang-type-traits.h"
 
 #include "../../slang.h"
 

@@ -1,7 +1,7 @@
-// platform.cpp
-#include "platform.h"
+// slang-platform.cpp
+#include "slang-platform.h"
 
-#include "common.h"
+#include "slang-common.h"
 
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN

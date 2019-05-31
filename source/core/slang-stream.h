@@ -1,7 +1,7 @@
-#ifndef CORE_LIB_STREAM_H
-#define CORE_LIB_STREAM_H
+#ifndef SLANG_CORE_STREAM_H
+#define SLANG_CORE_STREAM_H
 
-#include "basic.h"
+#include "slang-basic.h"
 
 namespace Slang
 {

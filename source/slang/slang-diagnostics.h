@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_COMPILE_ERROR_H
 #define RASTER_RENDERER_COMPILE_ERROR_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "../core/slang-writer.h"
 
 #include "slang-source-loc.h"

@@ -1,10 +1,10 @@
-#ifndef CORE_LIB_IO_H
-#define CORE_LIB_IO_H
+#ifndef SLANG_CORE_IO_H
+#define SLANG_CORE_IO_H
 
 #include "slang-string.h"
-#include "stream.h"
-#include "text-io.h"
-#include "secure-crt.h"
+#include "slang-stream.h"
+#include "slang-text-io.h"
+#include "slang-secure-crt.h"
 
 namespace Slang
 {

@@ -1,7 +1,7 @@
 #ifndef SLANG_COMPILER_H_INCLUDED
 #define SLANG_COMPILER_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
 
 #include "../../slang-com-ptr.h"

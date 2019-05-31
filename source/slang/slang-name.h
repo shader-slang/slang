@@ -5,7 +5,7 @@
 // This file defines the `Name` type, used to represent
 // the name of types, variables, etc. in the AST.
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 namespace Slang {
 

@@ -1,9 +1,9 @@
-#ifndef SLANG_FREE_LIST_H
-#define SLANG_FREE_LIST_H
+#ifndef SLANG_CORE_FREE_LIST_H
+#define SLANG_CORE_FREE_LIST_H
 
 #include "../../slang.h"
 
-#include "common.h"
+#include "slang-common.h"
 
 #include <stdlib.h>
 #include <string.h>

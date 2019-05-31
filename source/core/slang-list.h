@@ -1,11 +1,11 @@
-#ifndef FUNDAMENTAL_LIB_LIST_H
-#define FUNDAMENTAL_LIB_LIST_H
+#ifndef SLANG_CORE_LIST_H
+#define SLANG_CORE_LIST_H
 
 #include "../../slang.h"
 
-#include "allocator.h"
+#include "slang-allocator.h"
 #include "slang-math.h"
-#include "array-view.h"
+#include "slang-array-view.h"
 
 #include <algorithm>
 #include <new>

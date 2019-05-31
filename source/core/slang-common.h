@@ -1,5 +1,5 @@
-#ifndef CORE_LIB_COMMON_H
-#define CORE_LIB_COMMON_H
+#ifndef SLANG_CORE_COMMON_H
+#define SLANG_CORE_COMMON_H
 
 #include "../../slang.h"
 

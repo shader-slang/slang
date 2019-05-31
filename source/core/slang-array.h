@@ -1,8 +1,8 @@
-#ifndef CORE_LIB_ARRAY_H
-#define CORE_LIB_ARRAY_H
+#ifndef SLANG_CORE_ARRAY_H
+#define SLANG_CORE_ARRAY_H
 
-#include "exception.h"
-#include "array-view.h"
+#include "slang-exception.h"
+#include "slang-array-view.h"
 
 namespace Slang
 {

@@ -1,6 +1,6 @@
-// platform.h
-#ifndef SLANG_CORE_PLATFORM_H_INCLUDED
-#define SLANG_CORE_PLATFORM_H_INCLUDED
+// slang-platform.h
+#ifndef SLANG_CORE_PLATFORM_H
+#define SLANG_CORE_PLATFORM_H
 
 #include "../../slang.h"
 #include "../core/slang-string.h"

@@ -1,7 +1,7 @@
 // slang-ir-dominators.h
 #pragma once
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 namespace Slang
 {

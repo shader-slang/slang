@@ -3,11 +3,11 @@
 #ifndef OPTIONS_H_INCLUDED
 #define OPTIONS_H_INCLUDED
 
-#include "../../source/core/dictionary.h"
+#include "../../source/core/slang-dictionary.h"
 
 #include "test-reporter.h"
 #include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/smart-pointer.h"
+#include "../../source/core/slang-smart-pointer.h"
 
 // A category that a test can be tagged with
 struct TestCategory: public Slang::RefObject

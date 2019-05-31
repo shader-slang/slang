@@ -9,46 +9,40 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="allocator.h">
+    <ClInclude Include="slang-allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="array-view.h">
+    <ClInclude Include="slang-array-view.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="array.h">
+    <ClInclude Include="slang-array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="basic.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="common.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="dictionary.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="exception.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="hash.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="list.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="platform.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="secure-crt.h">
+    <ClInclude Include="slang-basic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-byte-encode-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-dictionary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-exception.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-hash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-io.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-math.h">
@@ -60,16 +54,28 @@
     <ClInclude Include="slang-object-scope-manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-random-generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-render-api-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-secure-crt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-shared-library.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-smart-pointer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-std-writers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-stream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-string-slice-pool.h">
@@ -84,32 +90,23 @@
     <ClInclude Include="slang-test-tool-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-text-io.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-token-reader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-type-traits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-uint-set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="smart-pointer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="stream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="text-io.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="token-reader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="type-traits.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="platform.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-byte-encode-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -125,6 +122,9 @@
     <ClCompile Include="slang-object-scope-manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-platform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-random-generator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -135,6 +135,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-std-writers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-stream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-string-slice-pool.cpp">
@@ -149,19 +152,16 @@
     <ClCompile Include="slang-test-tool-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-text-io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-token-reader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-uint-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-writer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="stream.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="text-io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="token-reader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

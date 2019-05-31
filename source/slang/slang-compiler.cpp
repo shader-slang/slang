@@ -1,7 +1,7 @@
 // Compiler.cpp : Defines the entry point for the console application.
 //
-#include "../core/basic.h"
-#include "../core/platform.h"
+#include "../core/slang-basic.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 

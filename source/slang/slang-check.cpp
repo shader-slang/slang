@@ -4,7 +4,7 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
-#include "../core/secure-crt.h"
+#include "../core/slang-secure-crt.h"
 #include <assert.h>
 
 namespace Slang

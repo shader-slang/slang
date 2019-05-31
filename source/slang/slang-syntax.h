@@ -1,7 +1,7 @@
 #ifndef SLANG_SYNTAX_H
 #define SLANG_SYNTAX_H
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-ir.h"
 #include "slang-lexer.h"
 #include "slang-profile.h"

@@ -1,4 +1,4 @@
-#include "token-reader.h"
+#include "slang-token-reader.h"
 
 namespace Slang
 {

@@ -3,7 +3,7 @@
 
 // This file implements the name mangling scheme for the Slang language.
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "slang-syntax.h"
 
 namespace Slang

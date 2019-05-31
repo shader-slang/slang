@@ -1,7 +1,7 @@
-#ifndef CORE_LIB_EXCEPTION_H
-#define CORE_LIB_EXCEPTION_H
+#ifndef SLANG_CORE_EXCEPTION_H
+#define SLANG_CORE_EXCEPTION_H
 
-#include "common.h"
+#include "slang-common.h"
 #include "slang-string.h"
 
 namespace Slang

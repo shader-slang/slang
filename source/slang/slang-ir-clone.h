@@ -1,7 +1,7 @@
 // slang-ir-clone.h
 #pragma once
 
-#include "../core/dictionary.h"
+#include "../core/slang-dictionary.h"
 
 #include "slang-ir.h"
 
@@ -12,7 +12,7 @@ struct IRInst;
 struct SharedIRBuilder;
 
 // This file provides an interface to simplify the task of
-// correctling "cloning" IR code, whether individual
+// correcting "cloning" IR code, whether individual
 // instructions, or whole functions.
 
     /// An environment for mapping existing values to their cloned replacements.

@@ -1,7 +1,7 @@
 // test-context.cpp
 #include "slangc-tool.h"
 
-#include "../../source/core/exception.h"
+#include "../../source/core/slang-exception.h"
 
 using namespace Slang;
 

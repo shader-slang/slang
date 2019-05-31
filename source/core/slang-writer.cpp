@@ -1,6 +1,6 @@
 #include "slang-writer.h"
 
-#include "platform.h"
+#include "slang-platform.h"
 #include "slang-string-util.h"
 
 // Includes to allow us to control console

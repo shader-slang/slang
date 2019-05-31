@@ -1,8 +1,8 @@
-// Emit.h
+// slang-emit.h
 #ifndef SLANG_EMIT_H_INCLUDED
 #define SLANG_EMIT_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 
 #include "slang-compiler.h"
 

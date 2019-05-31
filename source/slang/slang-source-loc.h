@@ -2,7 +2,7 @@
 #ifndef SLANG_SOURCE_LOC_H_INCLUDED
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
-#include "../core/basic.h"
+#include "../core/slang-basic.h"
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-slice-pool.h"
 
