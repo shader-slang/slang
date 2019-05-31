@@ -143,7 +143,11 @@ namespace Slang
 
     class DiagnosticSink
     {
-    public:        
+    public:
+        DiagnosticSink(SourceManager* sourceManager)
+            : sourceManager(sourceManager)
+        {}
+
         struct Flag 
         {
             enum Enum: uint32_t

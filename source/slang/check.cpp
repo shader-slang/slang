@@ -433,7 +433,7 @@ namespace Slang
 
         Session* getSession()
         {
-            return m_linkage->getSession();
+            return m_linkage->getSessionImpl();
         }
 
     public:
@@ -10636,7 +10636,7 @@ static bool doesParameterMatch(
             // generic application like `F<A,B,C>` if it were
             // encountered in the source code.
 
-            auto session = linkage->getSession();
+            auto session = linkage->getSessionImpl();
             auto genericDeclRef = makeDeclRef(genericDecl);
 
             // The first pieces is a `VarExpr` that refers to `genericDecl`.
@@ -10760,7 +10760,7 @@ static bool doesParameterMatch(
         List<RefPtr<Expr>> const&   args,
         DiagnosticSink*             sink)
     {
-        Slang::_specializeExistentialTypeParams(getLinkage(), m_globalExistentialSlots, args, sink);
+        Slang::_specializeExistentialTypeParams(getLinkageImpl(), m_globalExistentialSlots, args, sink);
     }
 
     Type* Linkage::specializeType(
@@ -10979,6 +10979,66 @@ static bool doesParameterMatch(
         specializedProgram->_specializeExistentialTypeParams(globalExistentialArgs, sink);
 
         return specializedProgram;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::specializeProgram(
+        slang::IProgram*                inUnspecializedProgram,
+        SlangInt                        specializationArgCount,
+        slang::SpecializationArg const* specializationArgs,
+        slang::IProgram**               outSpecializedProgram,
+        ISlangBlob**                    outDiagnostics)
+    {
+        auto unspecializedProgram = asInternal(inUnspecializedProgram);
+
+/*
+        RefPtr<Program> createSpecializedProgram(
+            Linkage*                    linkage,
+            Program*                    unspecializedProgram,
+            List<RefPtr<Expr>> const&   globalGenericArgs,
+            List<RefPtr<Expr>> const&   globalExistentialArgs,
+            DiagnosticSink*             sink)
+*/
+
+        List<RefPtr<Expr>> globalGenericArgs;
+
+        List<RefPtr<Expr>> globalExistentialArgs;
+        for( Int ii = 0; ii < specializationArgCount; ++ii )
+        {
+            auto& specializationArg = specializationArgs[ii];
+            switch( specializationArg.kind )
+            {
+            case slang::SpecializationArg::Kind::Type:
+                {
+                    auto typeArg = asInternal(specializationArg.type);
+                    RefPtr<SharedTypeExpr> argExpr = new SharedTypeExpr();
+                    argExpr->base = TypeExp(typeArg);
+                    argExpr->type = QualType(getTypeType(typeArg));
+
+                    globalExistentialArgs.add(argExpr);
+                }
+                break;
+
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+        }
+
+        DiagnosticSink sink(getSourceManager());
+        auto specialiedProgram = createSpecializedProgram(
+            this,
+            unspecializedProgram,
+            globalGenericArgs,
+            globalExistentialArgs,
+            &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+
+        if(!specialiedProgram)
+            return SLANG_FAIL;
+
+        *outSpecializedProgram = ComPtr<slang::IProgram>(asExternal(specialiedProgram)).detach();
+        return SLANG_OK;
+
+
     }
 
         /// Specialize an entry point that was checked by the front-end, based on generic arguments.

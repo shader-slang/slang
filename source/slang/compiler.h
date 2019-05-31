@@ -377,9 +377,13 @@ namespace Slang
         /// may span multiple Slang source files), and provides access
         /// to both the AST and IR representations of that code.
         ///
-    class Module : public RefObject
+    class Module : public RefObject, public slang::IModule
     {
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
             /// Create a module (initially empty).
         Module(Linkage* linkage);
 
@@ -499,9 +503,13 @@ namespace Slang
     };
 
         /// A request to generate output in some target format.
-    class TargetRequest : public RefObject
+    class TargetRequest : public RefObject, public slang::ITarget
     {
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(Guid const& guid);
+
         Linkage*            linkage;
         CodeGenTarget       target;
         SlangTargetFlags    targetFlags = 0;
@@ -520,6 +528,8 @@ namespace Slang
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
 
         Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
+
+        TypeLayout* getTypeLayout(Type* type);
     };
 
         /// Are we generating code for a D3D API?
@@ -571,14 +581,59 @@ namespace Slang
     ComPtr<ISlangBlob> createRawBlob(void const* data, size_t size);
 
         /// A context for loading and re-using code modules.
-    class Linkage : public RefObject
+    class Linkage : public RefObject, public slang::ILinkage
     {
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
+        SLANG_NO_THROW slang::ITarget* SLANG_MCALL addTarget(
+            slang::TargetDesc const&  desc) override;
+        SLANG_NO_THROW SlangInt SLANG_MCALL getTargetCount() override;
+        SLANG_NO_THROW slang::ITarget* SLANG_MCALL getTargetByIndex(SlangInt index) override;
+        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
+            const char* moduleName,
+            slang::IBlob**     outDiagnostics = nullptr) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL createProgram(
+            slang::ProgramDesc const& desc,
+            slang::IProgram**         outProgram) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL specializeProgram(
+            slang::IProgram*                   program,
+            SlangInt                    specializationArgCount,
+            slang::SpecializationArg const*    specializationArgs,
+            slang::IProgram**                  outSpecializedProgram,
+            ISlangBlob**                outDiagnostics = nullptr) override;
+        SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
+            slang::TypeReflection*          type,
+            SlangInt                        specializationArgCount,
+            slang::SpecializationArg const* specializationArgs,
+            ISlangBlob**                    outDiagnostics = nullptr) override;
+        SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getTypeLayout(
+            slang::TypeReflection* type,
+            slang::ITarget*        target = nullptr,
+            slang::LayoutRules     rules = slang::LayoutRules::Default,
+            ISlangBlob**    outDiagnostics = nullptr) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL beginCompileRequest(
+            SlangCompileRequest**   outCompileRequest) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL addSearchPath(
+            char const* path) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL addPreprocessorDefine(
+            char const* name,
+            char const* value) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL setMatrixLayoutMode(
+            SlangMatrixLayoutMode mode) override;
+
+
+
+
+
             /// Create an initially-empty linkage
         Linkage(Session* session);
 
             /// Get the parent session for this linkage
-        Session* getSession() { return m_session; }
+        Session* getSessionImpl() { return m_session; }
 
         // Information on the targets we are being asked to
         // generate code for.
@@ -882,9 +937,25 @@ namespace Slang
         /// to be used togehter so that, e.g., layout can make sure to allocate
         /// space for the global shader parameters in all referenced modules.
         ///
-    class Program : public RefObject
+    class Program : public RefObject, public slang::IProgram
     {
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL;
+        ISlangUnknown* getInterface(Guid const& guid);
+
+        SLANG_NO_THROW slang::ILinkage* SLANG_MCALL getLinkage() override;
+
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
+            slang::ITarget*         target,
+            slang::IBlob**          outDiagnostics) override;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt            entryPointIndex,
+            slang::ITarget*    target,
+            slang::IBlob**     outCode,
+            slang::IBlob**  outDiagnostics) override;
+
+
             /// Create a new program, initially empty.
             ///
             /// All code loaded into the program must come
@@ -893,7 +964,7 @@ namespace Slang
             Linkage* linkage);
 
             /// Get the linkage that this program uses.
-        Linkage* getLinkage() { return m_linkage; }
+        Linkage* getLinkageImpl() { return m_linkage; }
 
             /// Get the number of entry points added to the program
         Index getEntryPointCount() { return m_entryPoints.getCount(); }
@@ -1060,23 +1131,34 @@ namespace Slang
 
             /// Get the compiled code for an entry point on the target.
             ///
-            /// This routine assumes code generation has already been
-            /// performed and called `setEntryPointResult`.
+            /// If this is the first time that code generation has
+            /// been requested, report any errors that arise during
+            /// code generation to the given `sink`.
+            ///
+        CompileResult& getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
+
+            /// Get the compiled code for an entry point on the target.
+            ///
+            /// This routine assumes that `getOrCreateEntryPointResult`
+            /// has already been called previously.
             ///
         CompileResult& getExistingEntryPointResult(Int entryPointIndex)
         {
             return m_entryPointResults[entryPointIndex];
         }
 
-        // TODO: Need a lazy `getOrCreateEntryPointResult`
 
-            /// Set the compiled code for an entry point.
+            /// Internal helper for `getOrCreateEntryPointResult`.
             ///
-            /// Should only be called by code generation.
-        void setEntryPointResult(Int entryPointIndex, CompileResult const& result)
-        {
-            m_entryPointResults[entryPointIndex] = result;
-        }
+            /// This is used so that command-line and API-based
+            /// requests for code can bottleneck through the same place.
+            ///
+            /// Shouldn't be called directly by most code.
+            ///
+        CompileResult& _createEntryPointResult(
+            Int                     entryPointIndex,
+            BackEndCompileRequest*  backEndRequest,
+            EndToEndCompileRequest* endToEndRequest);
 
     private:
         // The program being compiled or laid out
@@ -1137,6 +1219,9 @@ namespace Slang
     public:
         EndToEndCompileRequest(
             Session* session);
+
+        EndToEndCompileRequest(
+            Linkage* linkage);
 
         // What container format are we being asked to generate?
         //
@@ -1219,6 +1304,8 @@ namespace Slang
         Program* getSpecializedProgram() { return m_specializedProgram; }
 
     private:
+        void init();
+
         Session*                        m_session = nullptr;
         RefPtr<Linkage>                 m_linkage;
         DiagnosticSink                  m_sink;
@@ -1272,9 +1359,24 @@ namespace Slang
     struct TypeCheckingCache;
     //
 
-    class Session
+    class Session : public RefObject, public slang::ISession
     {
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
+            /** Create a new linkage.
+            */
+        SLANG_NO_THROW SlangResult SLANG_MCALL createLinkage(
+            slang::LinkageDesc const&  desc,
+            slang::ILinkage**          outLinkage) override;
+
+        SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
+            char const*     name) override;
+
+
+
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,
@@ -1415,6 +1517,86 @@ namespace Slang
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
     };
+
+
+//
+// The following functiosn are utilties to convert between
+// matching "external" (public API) and "internal" (implementation)
+// types. They are favored over explicit casts because they
+// help avoid making incorrect conversions (e.g., when using
+// `reinterpret_cast` or C-style casts), and because they
+// abstract over the conversion required for each pair of types.
+//
+
+inline slang::ISession* asExternal(Session* session)
+{
+    return static_cast<slang::ISession*>(session);
+}
+
+inline slang::ILinkage* asExternal(Linkage* linkage)
+{
+    return static_cast<slang::ILinkage*>(linkage);
+}
+
+static inline TargetRequest* asInternal(slang::ITarget* target)
+{
+    return static_cast<TargetRequest*>(target);
+}
+
+inline slang::ITarget* asExternal(TargetRequest* target)
+{
+    return static_cast<slang::ITarget*>(target);
+}
+
+inline Module* asInternal(slang::IModule* module)
+{
+    return static_cast<Module*>(module);
+}
+
+inline slang::IModule* asExternal(Module* module)
+{
+    return static_cast<slang::IModule*>(module);
+}
+
+inline Program* asInternal(slang::IProgram* module)
+{
+    return static_cast<Program*>(module);
+}
+
+inline slang::IProgram* asExternal(Program* module)
+{
+    return static_cast<slang::IProgram*>(module);
+}
+
+static inline slang::ProgramLayout* asExternal(ProgramLayout* programLayout)
+{
+    return (slang::ProgramLayout*) programLayout;
+}
+
+inline Type* asInternal(slang::TypeReflection* type)
+{
+    return reinterpret_cast<Type*>(type);
+}
+
+inline slang::TypeReflection* asExternal(Type* type)
+{
+    return reinterpret_cast<slang::TypeReflection*>(type);
+}
+
+inline TypeLayout* asInternal(slang::TypeLayoutReflection* type)
+{
+    return reinterpret_cast<TypeLayout*>(type);
+}
+
+inline slang::TypeLayoutReflection* asExternal(TypeLayout* type)
+{
+    return reinterpret_cast<slang::TypeLayoutReflection*>(type);
+}
+
+inline SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
+{
+    return reinterpret_cast<SlangCompileRequest*>(request);
+}
 
 }
 

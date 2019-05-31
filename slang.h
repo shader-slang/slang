@@ -1037,8 +1037,7 @@ extern "C"
     */
     typedef struct SlangSession SlangSession;
 
-    typedef struct SlangLinkage SlangLinkage;
-    typedef struct SlangModule SlangModule;
+    typedef struct SlangProgramLayout SlangProgramLayout;
 
     /*!
     @brief A request for one or more compilation actions to be performed.
@@ -1105,20 +1104,6 @@ extern "C"
         SlangSession*   session,
         char const*     sourcePath,
         char const*     sourceString);
-
-
-
-    SLANG_API SlangLinkage* spCreateLinkage(
-        SlangSession* session);
-
-    SLANG_API void spDestroyLinkage(
-        SlangLinkage* linkage);
-
-    SLANG_API SlangModule* spLoadModule(
-        SlangLinkage* linkage,
-        char const* moduleName);
-
-
 
     /*!
     @brief Create a compile request.
@@ -1556,11 +1541,16 @@ extern "C"
         SlangCompileRequest*    request,
         size_t*                 outSize);
 
-    /* Note(tfoley): working on new reflection interface...
+    /*
+    Forward declarations of types used in the reflection interface;
     */
 
-    typedef struct SlangReflection                  SlangReflection;
-    typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
+    typedef struct SlangProgramLayout SlangProgramLayout;
+    typedef struct SlangEntryPoint SlangEntryPoint;
+    typedef struct SlangEntryPointLayout SlangEntryPointLayout;
+
+//    typedef struct SlangReflection                  SlangReflection;
+//    typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
     typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
@@ -1568,6 +1558,12 @@ extern "C"
     typedef struct SlangReflectionVariableLayout    SlangReflectionVariableLayout;
     typedef struct SlangReflectionTypeParameter     SlangReflectionTypeParameter;
     typedef struct SlangReflectionUserAttribute     SlangReflectionUserAttribute;
+
+    /*
+    Type aliases to maintain backward compatibility.
+    */
+    typedef SlangProgramLayout SlangReflection;
+    typedef SlangEntryPointLayout SlangReflectionEntryPoint;
 
     // get reflection data from a compilation request
     SLANG_API SlangReflection* spGetReflection(
@@ -1919,9 +1915,6 @@ extern "C"
 /* Helper interfaces for C++ users */
 namespace slang
 {
-#define SLANG_SAFE_BOOL(expr) \
-    operator bool() const { return expr; }
-
     struct BufferReflection;
     struct TypeLayoutReflection;
     struct TypeReflection;
@@ -2446,6 +2439,8 @@ namespace slang
         Default = SLANG_LAYOUT_RULES_DEFAULT,
     };
 
+    typedef struct ShaderReflection ProgramLayout;
+
     struct ShaderReflection
     {
         unsigned getParameterCount()
@@ -2473,9 +2468,9 @@ namespace slang
             return (VariableLayoutReflection*) spReflection_GetParameterByIndex((SlangReflection*) this, index);
         }
 
-        static ShaderReflection* get(SlangCompileRequest* request)
+        static ProgramLayout* get(SlangCompileRequest* request)
         {
-            return (ShaderReflection*) spGetReflection(request);
+            return (ProgramLayout*) spGetReflection(request);
         }
 
         SlangUInt getEntryPointCount()
@@ -2536,7 +2531,208 @@ namespace slang
                 outDiagnostics);
         }
     };
+
+    typedef ISlangBlob IBlob;
+
+    struct ILinkage;
+    struct IModule;
+    struct IProgram;
+    struct ISession;
+    struct ITarget;
+
+    struct LinkageDesc;
+    struct ProgramDesc;
+    struct SpecializationArg;
+    struct TargetDesc;
+
+        /** A session for interaction with the Slang library.
+        */
+    struct ISession : public ISlangUnknown
+    {
+    public:
+            /** Create a new linkage.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createLinkage(
+            LinkageDesc const&  desc,
+            ILinkage**          outLinkage) = 0;
+
+        virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
+            char const*     name) = 0;
+    };
+
+    #define SLANG_UUID_ISession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
+
+    struct LinkageDesc
+    {
+        //TODO: What needs to go in here...
+    };
+
+        /** A linkage provides a scope for code that is loaded and linkable.
+        */
+    struct ILinkage : public ISlangUnknown
+    {
+    public:
+            /** Get the session thas was used to create this linkage.
+            */
+        virtual SLANG_NO_THROW ISession* SLANG_MCALL getSession() = 0;
+
+            /** Add an available code-generation target to the linkage.
+            */
+        virtual SLANG_NO_THROW ITarget* SLANG_MCALL addTarget(
+            TargetDesc const&  desc) = 0;
+
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getTargetCount() = 0;
+        virtual SLANG_NO_THROW ITarget* SLANG_MCALL getTargetByIndex(SlangInt index) = 0;
+
+            /** Load a module as it would be by code using `import`.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModule(
+            const char* moduleName,
+            IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Create a program out of existing compiled items.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createProgram(
+            ProgramDesc const& desc,
+            IProgram**         outProgram) = 0;
+
+            /** Specialize a program based on type arguments.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL specializeProgram(
+            IProgram*                   program,
+            SlangInt                    specializationArgCount,
+            SpecializationArg const*    specializationArgs,
+            IProgram**                  outSpecializedProgram,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+            /** Specialize a type based on type arguments.
+            */
+        virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(
+            TypeReflection*             type,
+            SlangInt                    specializationArgCount,
+            SpecializationArg const*    specializationArgs,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+
+        virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getTypeLayout(
+            TypeReflection* type,
+            ITarget*        target = nullptr,
+            LayoutRules     rules = LayoutRules::Default,
+            ISlangBlob**    outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL beginCompileRequest(
+            SlangCompileRequest**   outCompileRequest) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addSearchPath(
+            char const* path) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addPreprocessorDefine(
+            char const* name,
+            char const* value) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMatrixLayoutMode(
+            SlangMatrixLayoutMode mode) = 0;
+    };
+
+    #define SLANG_UUID_ILinkage { 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } }
+
+
+        /** A shader program comprised of code modules and entry points.
+        */
+    struct IModule : public ISlangUnknown
+    {
+    public:
+    };
+    
+    #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
+
+
+        /** Argument used for specialization to types/values.
+        */
+    struct SpecializationArg
+    {
+        enum class Kind : int32_t
+        {
+            Unknown,
+            Type,
+        };
+        Kind kind;
+        union
+        {
+            TypeReflection* type;
+        };
+    };
+
+        /** Description of a program to be created.
+        */
+    struct ProgramDesc
+    {
+        struct Item
+        {
+            enum class Kind : int32_t
+            {
+                Program,
+                Module,
+            };
+            Kind kind;
+            union
+            {
+                IProgram*  program;
+                IModule*   module;
+            };
+        };
+
+        Item const* items;
+        SlangInt    itemCount;
+    };
+
+
+        /** A shader program comprised of code modules and entry points.
+        */
+    struct IProgram : public ISlangUnknown
+    {
+    public:
+        virtual SLANG_NO_THROW ILinkage* SLANG_MCALL getLinkage() = 0;
+
+        virtual SLANG_NO_THROW ProgramLayout* SLANG_MCALL getLayout(
+            ITarget*        target = nullptr,
+            IBlob**         outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt    entryPointIndex,
+            ITarget*    target,
+            IBlob**     outCode,
+            IBlob**     outDiagnostics = nullptr) = 0;
+    };
+    
+    #define SLANG_UUID_IProgram { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
+
+
+        /** Description of a compilation target.
+        */
+    struct TargetDesc
+    {
+        SlangCompileTarget      format;
+        SlangProfileID          profile;
+        SlangTargetFlags        flags;
+        SlangFloatingPointMode  floatingPointMode;
+    };
+
+        /** A compilation target in some linkage.
+        */
+    struct ITarget : public ISlangUnknown
+    {
+    public:
+    };
+    #define SLANG_UUID_ITarget { 0x81f1f953, 0x533b, 0x4eab, { 0x89, 0x7b, 0x85, 0x12, 0xd2, 0x8a, 0x5d, 0x1e } }
+
 }
+
+/**
+*/
+SLANG_API SlangResult spCompileRequest_getProgram(
+    SlangCompileRequest*    request,
+    slang::IProgram**       outProgram);
 
 #endif
 

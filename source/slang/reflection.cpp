@@ -596,9 +596,9 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     // TODO: We should extend this API to support getting error messages
     // when type lookup fails.
     //
-    Slang::DiagnosticSink sink;
-    
-    sink.sourceManager = programLayout->getTargetReq()->getLinkage()->getSourceManager();;
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager());
+
     RefPtr<Type> result = program->getTypeFromString(name, &sink);
     return (SlangReflectionType*)result.Ptr();
 }
@@ -611,13 +611,9 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto context = convert(reflection);
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, context);
-    RefPtr<TypeLayout> result;
-    if (targetReq->getTypeLayouts().TryGetValue(type, result))
-        return (SlangReflectionTypeLayout*)result.Ptr();
-    result = createTypeLayout(layoutContext, type);
-    targetReq->getTypeLayouts()[type] = result;
-    return (SlangReflectionTypeLayout*)result.Ptr();
+
+    auto typeLayout = targetReq->getTypeLayout(type);
+    return convert(typeLayout);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangReflectionType* inType)
@@ -1437,10 +1433,9 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
     auto unspecializedType = convert(inType);
     if(!unspecializedType) return nullptr;
 
-    auto linkage = programLayout->getProgram()->getLinkage();
+    auto linkage = programLayout->getProgram()->getLinkageImpl();
 
-    DiagnosticSink sink;
-    sink.sourceManager = linkage->getSourceManager();
+    DiagnosticSink sink(linkage->getSourceManager());
 
     auto specializedType = linkage->specializeType(unspecializedType, specializationArgCount, (Type* const*) specializationArgs, &sink);
 
