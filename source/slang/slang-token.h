@@ -1,10 +1,10 @@
-// token.h
+// slang-token.h
 #ifndef SLANG_TOKEN_H_INCLUDED
 #define SLANG_TOKEN_H_INCLUDED
 
 #include "../core/basic.h"
 
-#include "source-loc.h"
+#include "slang-source-loc.h"
 
 namespace Slang {
 
@@ -13,7 +13,7 @@ class Name;
 enum class TokenType
 {
 #define TOKEN(NAME, DESC) NAME,
-#include "token-defs.h"
+#include "slang-token-defs.h"
 };
 
 char const* TokenTypeToString(TokenType type);

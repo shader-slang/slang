@@ -1,4 +1,4 @@
-// token-defs.h
+// slang-token-defs.h
 
 // This file is meant to be included multiple times, to produce different
 // pieces of code related to tokens

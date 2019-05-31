@@ -1,4 +1,4 @@
-#include "type-system-shared.h"
+#include "slang-type-system-shared.h"
 
 namespace Slang
 {

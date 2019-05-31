@@ -1,7 +1,7 @@
-// TypeLayout.cpp
-#include "type-layout.h"
+// slang-type-layout.cpp
+#include "slang-type-layout.h"
 
-#include "syntax.h"
+#include "slang-syntax.h"
 
 #include <assert.h>
 

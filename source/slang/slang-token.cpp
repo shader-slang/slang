@@ -1,5 +1,5 @@
-// token.cpp
-#include "token.h"
+// slang-token.cpp
+#include "slang-token.h"
 
 #include <assert.h>
 
@@ -32,7 +32,7 @@ char const* TokenTypeToString(TokenType type)
         return "<uknown>";
 
 #define TOKEN(NAME, DESC) case TokenType::NAME: return DESC;
-#include "token-defs.h"
+#include "slang-token-defs.h"
     }
 }
 

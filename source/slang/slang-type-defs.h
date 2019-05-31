@@ -1,4 +1,4 @@
-// type-defs.h
+// slang-type-defs.h
 
 // Syntax class definitions for types.
 

@@ -2,9 +2,9 @@
 #define SLANG_TYPE_LAYOUT_H
 
 #include "../core/basic.h"
-#include "compiler.h"
-#include "profile.h"
-#include "syntax.h"
+#include "slang-compiler.h"
+#include "slang-profile.h"
+#include "slang-syntax.h"
 
 #include "../../slang.h"
 

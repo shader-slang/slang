@@ -1,4 +1,4 @@
-// val-defs.h
+// slang-val-defs.h
 
 // Syntax class definitions for compile-time values.
 
