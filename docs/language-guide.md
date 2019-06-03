@@ -202,7 +202,7 @@ interface IMaterial
 struct MyCoolMaterial : IMaterial
 {
 	typedef DisneyBRDF B;
-	DisneyBRDF evalPattern(float3 position, float2 uv)
+	B evalPattern(float3 position, float2 uv)
 	{ ... }
 }
 ```
