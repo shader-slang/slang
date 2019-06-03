@@ -384,7 +384,7 @@ struct CLikeSourceEmitter
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 
     EmitContext* m_context;
-    SourceStream* m_stream;
+    SourceWriter* m_writer;
     SourceStyle m_sourceStyle;
 };
 

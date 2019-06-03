@@ -23,7 +23,7 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
-#include "slang-source-stream.h"
+#include "slang-emit-source-writer.h"
 #include "slang-emit-context.h"
 
 #include "slang-c-like-source-emitter.h"
@@ -172,14 +172,14 @@ String emitEntryPoint(
         lineDirectiveMode = LineDirectiveMode::GLSL;
     }
 
-    SourceStream sourceStream(compileRequest->getSourceManager(), lineDirectiveMode );
+    SourceWriter sourceWriter(compileRequest->getSourceManager(), lineDirectiveMode );
 
     EmitContext emitContext;
     emitContext.compileRequest = compileRequest;
     emitContext.target = target;
     emitContext.entryPoint = entryPoint;
     emitContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
-    emitContext.stream = &sourceStream;
+    emitContext.writer = &sourceWriter;
 
     if (entryPoint && programLayout)
     {
@@ -482,8 +482,8 @@ String emitEntryPoint(
         break;
     }
 
-    String code = sourceStream.getContent();
-    sourceStream.clearContent();
+    String code = sourceWriter.getContent();
+    sourceWriter.clearContent();
 
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
@@ -493,7 +493,7 @@ String emitEntryPoint(
 
     sourceEmitter.emitLayoutDirectives(targetRequest);
 
-    String prefix = sourceStream.getContent();
+    String prefix = sourceWriter.getContent();
     
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;

@@ -6,7 +6,7 @@
 
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
-#include "slang-source-stream.h"
+#include "slang-emit-source-writer.h"
 #include "slang-extension-usage-tracker.h"
 
 namespace Slang
@@ -32,7 +32,7 @@ struct EmitContext
     CodeGenTarget target;
 
     // Where source is written to
-    SourceStream* stream;
+    SourceWriter* writer;
 
     // We only want to emit each `import`ed module one time, so
     // we maintain a set of already-emitted modules.
