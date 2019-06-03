@@ -24,7 +24,6 @@
 #include "slang-visitor.h"
 
 #include "slang-emit-source-writer.h"
-#include "slang-emit-context.h"
 
 #include "slang-c-like-source-emitter.h"
 
@@ -174,30 +173,29 @@ String emitEntryPoint(
 
     SourceWriter sourceWriter(compileRequest->getSourceManager(), lineDirectiveMode );
 
-    EmitContext emitContext;
-    emitContext.compileRequest = compileRequest;
-    emitContext.target = target;
-    emitContext.entryPoint = entryPoint;
-    emitContext.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
-    emitContext.writer = &sourceWriter;
+    CLikeSourceEmitter::CInfo cinfo;
+
+    cinfo.compileRequest = compileRequest;
+    cinfo.target = target;
+    cinfo.entryPoint = entryPoint;
+    cinfo.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
+    cinfo.sourceWriter = &sourceWriter;
 
     if (entryPoint && programLayout)
     {
-        emitContext.entryPointLayout = findEntryPointLayout(
-            programLayout,
-            entryPoint);
+        cinfo.entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
     }
 
-    emitContext.programLayout = programLayout;
+    cinfo.programLayout = programLayout;
 
     // Layout information for the global scope is either an ordinary
     // `struct` in the common case, or a constant buffer in the case
     // where there were global-scope uniforms.
     
     StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
-    emitContext.globalStructLayout = globalStructLayout;
+    cinfo.globalStructLayout = globalStructLayout;
 
-    CLikeSourceEmitter sourceEmitter(&emitContext);
+    CLikeSourceEmitter sourceEmitter(cinfo);
 
     {
         auto session = targetRequest->getSession();
@@ -423,7 +421,7 @@ String emitEntryPoint(
                 irModule,
                 irEntryPoint,
                 compileRequest->getSink(),
-                &emitContext.extensionUsageTracker);
+                sourceEmitter.getExtensionTracker());
 
 #if 0
                 dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
@@ -476,8 +474,8 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            emitContext.extensionUsageTracker.requireGLSLExtension("GL_NV_ray_tracing");
-            emitContext.extensionUsageTracker.requireGLSLVersion(ProfileVersion::GLSL_460);
+            sourceEmitter.getExtensionTracker()->requireGLSLExtension("GL_NV_ray_tracing");
+            sourceEmitter.getExtensionTracker()->requireGLSLVersion(ProfileVersion::GLSL_460);
         }
         break;
     }
@@ -498,7 +496,7 @@ String emitEntryPoint(
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << emitContext.extensionUsageTracker.getGLSLExtensionRequireLines();
+    finalResultBuilder << sourceEmitter.getExtensionTracker()->getGLSLExtensionRequireLines();
 
     finalResultBuilder << code;
 

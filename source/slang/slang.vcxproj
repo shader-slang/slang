@@ -180,7 +180,6 @@
     <ClInclude Include="slang-decl-defs.h" />
     <ClInclude Include="slang-diagnostic-defs.h" />
     <ClInclude Include="slang-diagnostics.h" />
-    <ClInclude Include="slang-emit-context.h" />
     <ClInclude Include="slang-emit-precedence.h" />
     <ClInclude Include="slang-emit-source-writer.h" />
     <ClInclude Include="slang-emit.h" />
@@ -245,7 +244,6 @@
     <ClCompile Include="slang-compiler.cpp" />
     <ClCompile Include="slang-diagnostics.cpp" />
     <ClCompile Include="slang-dxc-support.cpp" />
-    <ClCompile Include="slang-emit-context.cpp" />
     <ClCompile Include="slang-emit-precedence.cpp" />
     <ClCompile Include="slang-emit-source-writer.cpp" />
     <ClCompile Include="slang-emit.cpp" />
