@@ -21,9 +21,6 @@
     <ClInclude Include="hlsl.meta.slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-c-like-source-emitter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-check.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -43,6 +40,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit-source-writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-emit-source.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit.h">
@@ -212,9 +212,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="slang-c-like-source-emitter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -231,6 +228,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-source-writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-emit-source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit.cpp">

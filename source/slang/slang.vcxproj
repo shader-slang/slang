@@ -174,7 +174,6 @@
     <ClInclude Include="core.meta.slang.h" />
     <ClInclude Include="glsl.meta.slang.h" />
     <ClInclude Include="hlsl.meta.slang.h" />
-    <ClInclude Include="slang-c-like-source-emitter.h" />
     <ClInclude Include="slang-check.h" />
     <ClInclude Include="slang-compiler.h" />
     <ClInclude Include="slang-decl-defs.h" />
@@ -182,6 +181,7 @@
     <ClInclude Include="slang-diagnostics.h" />
     <ClInclude Include="slang-emit-precedence.h" />
     <ClInclude Include="slang-emit-source-writer.h" />
+    <ClInclude Include="slang-emit-source.h" />
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-expr-defs.h" />
     <ClInclude Include="slang-extension-usage-tracker.h" />
@@ -239,13 +239,13 @@
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="slang-c-like-source-emitter.cpp" />
     <ClCompile Include="slang-check.cpp" />
     <ClCompile Include="slang-compiler.cpp" />
     <ClCompile Include="slang-diagnostics.cpp" />
     <ClCompile Include="slang-dxc-support.cpp" />
     <ClCompile Include="slang-emit-precedence.cpp" />
     <ClCompile Include="slang-emit-source-writer.cpp" />
+    <ClCompile Include="slang-emit-source.cpp" />
     <ClCompile Include="slang-emit.cpp" />
     <ClCompile Include="slang-extension-usage-tracker.cpp" />
     <ClCompile Include="slang-file-system.cpp" />

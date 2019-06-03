@@ -25,7 +25,7 @@
 
 #include "slang-emit-source-writer.h"
 
-#include "slang-c-like-source-emitter.h"
+#include "slang-emit-source.h"
 
 #include <assert.h>
 

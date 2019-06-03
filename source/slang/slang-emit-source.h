@@ -1,6 +1,6 @@
-// slang-c-like-source-emitter.h
-#ifndef SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
-#define SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
+// slang-emit-source.h
+#ifndef SLANG_EMIT_SOURCE_H
+#define SLANG_EMIT_SOURCE_H
 
 #include "../core/slang-basic.h"
 
@@ -17,9 +17,9 @@
 namespace Slang
 {
 
-struct CLikeSourceEmitter
+class CLikeSourceEmitter
 {
-
+public:
     struct CInfo
     {
         BackEndCompileRequest* compileRequest = nullptr;
