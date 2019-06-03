@@ -136,10 +136,6 @@ public:
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
 
-    void _emitVectorType(IRVectorType* vecType);
-
-    void _emitMatrixType(IRMatrixType* matType);
-
     void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
 
     void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
@@ -405,6 +401,8 @@ public:
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitIRInst(IRInst* inst, IREmitMode mode);
+    void _emitVectorType(IRVectorType* vecType);
+    void _emitMatrixType(IRMatrixType* matType);
 
     void _requireHalf();
     void _emitCVecType(IROp op, Int size);
