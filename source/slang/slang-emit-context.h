@@ -26,7 +26,7 @@ struct EmitContext
     EntryPoint* entryPoint;
 
     // The layout for the entry point
-    EntryPointLayout*   entryPointLayout;
+    EntryPointLayout* entryPointLayout;
 
     // The target language we want to generate code for
     CodeGenTarget target;
@@ -43,11 +43,11 @@ struct EmitContext
     //
     // TODO: This will probably change if we represent imports
     // explicitly in the layout data.
-    StructTypeLayout*   globalStructLayout;
+    StructTypeLayout* globalStructLayout;
 
-    ProgramLayout*      programLayout;
+    ProgramLayout* programLayout;
 
-    ModuleDecl*  program;
+    ModuleDecl* program;
 
     ExtensionUsageTracker extensionUsageTracker;
 

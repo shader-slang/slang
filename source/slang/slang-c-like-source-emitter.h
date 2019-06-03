@@ -19,6 +19,16 @@ namespace Slang
 
 struct CLikeSourceEmitter
 {
+        /// To simplify cases 
+    enum class SourceStyle
+    {
+        Unknown,
+        GLSL,
+        HLSL,
+        C,
+        CPP,
+        CountOf,
+    };
     enum class BuiltInCOp
     {
         Splat,                  //< Splat a single value to all values of a vector or matrix type
@@ -66,6 +76,11 @@ struct CLikeSourceEmitter
         /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_context->getSink();}
 
+        /// Get the code gen target
+    CodeGenTarget getTarget();
+        /// Get the source style
+    SLANG_FORCE_INLINE SourceStyle getSourceStyle() const { return m_sourceStyle;  }
+
     //
     // Types
     //
@@ -91,23 +106,15 @@ struct CLikeSourceEmitter
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
 
-    void emitVectorTypeImpl(IRVectorType* vecType);
+    void _emitVectorType(IRVectorType* vecType);
 
-    void emitMatrixTypeImpl(IRMatrixType* matType);
+    void _emitMatrixType(IRMatrixType* matType);
 
     void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
 
     void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
 
     void emitUntypedBufferType(IRUntypedBufferResourceType* type);
-
-    void emitSimpleTypeImpl(IRType* type);
-
-    void emitArrayTypeImpl(IRArrayType* arrayType, EDeclarator* declarator);
-
-    void emitUnsizedArrayTypeImpl(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
-
-    void emitTypeImpl(IRType* type, EDeclarator* declarator);
 
     void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
@@ -185,9 +192,7 @@ struct CLikeSourceEmitter
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
     void emitIRSimpleValue(IRInst* inst);
-
-    CodeGenTarget getTarget();
-
+    
     bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
     void emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
@@ -237,8 +242,6 @@ struct CLikeSourceEmitter
     BaseType extractBaseType(IRType* inType);
 
     void emitIRInst(IRInst* inst, IREmitMode mode);
-
-    void emitIRInstImpl(IRInst* inst, IREmitMode mode);
 
     void emitIRSemantics(VarLayout* varLayout);
 
@@ -362,7 +365,16 @@ struct CLikeSourceEmitter
     void executeIREmitActions(List<EmitAction> const& actions);
     void emitIRModule(IRModule* module);
 
+        /// Gets a source style for a target. Returns Unknown if not a known target
+    static SourceStyle getSourceStyle(CodeGenTarget target);
+
     protected:
+
+    void _emitSimpleType(IRType* type);
+    void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
+    void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
+    void _emitType(IRType* type, EDeclarator* declarator);
+    void _emitIRInst(IRInst* inst, IREmitMode mode);
 
     void _requireHalf();
     void _emitCVecType(IROp op, Int size);
@@ -373,6 +385,7 @@ struct CLikeSourceEmitter
 
     EmitContext* m_context;
     SourceStream* m_stream;
+    SourceStyle m_sourceStyle;
 };
 
 }
