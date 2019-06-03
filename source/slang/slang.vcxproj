@@ -179,12 +179,12 @@
     <ClInclude Include="slang-decl-defs.h" />
     <ClInclude Include="slang-diagnostic-defs.h" />
     <ClInclude Include="slang-diagnostics.h" />
+    <ClInclude Include="slang-emit-glsl-extension-tracker.h" />
     <ClInclude Include="slang-emit-precedence.h" />
     <ClInclude Include="slang-emit-source-writer.h" />
     <ClInclude Include="slang-emit-source.h" />
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-expr-defs.h" />
-    <ClInclude Include="slang-extension-usage-tracker.h" />
     <ClInclude Include="slang-file-system.h" />
     <ClInclude Include="slang-image-format-defs.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
@@ -243,11 +243,11 @@
     <ClCompile Include="slang-compiler.cpp" />
     <ClCompile Include="slang-diagnostics.cpp" />
     <ClCompile Include="slang-dxc-support.cpp" />
+    <ClCompile Include="slang-emit-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-emit-precedence.cpp" />
     <ClCompile Include="slang-emit-source-writer.cpp" />
     <ClCompile Include="slang-emit-source.cpp" />
     <ClCompile Include="slang-emit.cpp" />
-    <ClCompile Include="slang-extension-usage-tracker.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />

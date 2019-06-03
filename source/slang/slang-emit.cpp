@@ -421,7 +421,7 @@ String emitEntryPoint(
                 irModule,
                 irEntryPoint,
                 compileRequest->getSink(),
-                sourceEmitter.getExtensionTracker());
+                sourceEmitter.getGLSLExtensionTracker());
 
 #if 0
                 dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
@@ -474,8 +474,8 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            sourceEmitter.getExtensionTracker()->requireGLSLExtension("GL_NV_ray_tracing");
-            sourceEmitter.getExtensionTracker()->requireGLSLVersion(ProfileVersion::GLSL_460);
+            sourceEmitter.getGLSLExtensionTracker()->requireExtension("GL_NV_ray_tracing");
+            sourceEmitter.getGLSLExtensionTracker()->requireVersion(ProfileVersion::GLSL_460);
         }
         break;
     }
@@ -496,7 +496,7 @@ String emitEntryPoint(
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << sourceEmitter.getExtensionTracker()->getGLSLExtensionRequireLines();
+    finalResultBuilder << sourceEmitter.getGLSLExtensionTracker()->getExtensionRequireLines();
 
     finalResultBuilder << code;
 

@@ -36,6 +36,9 @@
     <ClInclude Include="slang-diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit-glsl-extension-tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-emit-precedence.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -49,9 +52,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-expr-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-extension-usage-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-file-system.h">
@@ -224,6 +224,9 @@
     <ClCompile Include="slang-dxc-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-emit-glsl-extension-tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-emit-precedence.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -234,9 +237,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-extension-usage-tracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-file-system.cpp">

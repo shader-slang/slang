@@ -6,7 +6,7 @@
 
 #include "slang-compiler.h"
 
-#include "slang-extension-usage-tracker.h"
+#include "slang-emit-glsl-extension-tracker.h"
 #include "slang-emit-precedence.h"
 #include "slang-emit-source-writer.h"
 
@@ -109,7 +109,7 @@ public:
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 
-    ExtensionUsageTracker* getExtensionTracker() { return &m_extensionUsageTracker;  }
+    GLSLExtensionTracker* getGLSLExtensionTracker() { return &m_glslExtensionTracker;  }
 
     //
     // Types
@@ -445,7 +445,7 @@ public:
 
     ModuleDecl* m_program;
 
-    ExtensionUsageTracker m_extensionUsageTracker;
+    GLSLExtensionTracker m_glslExtensionTracker;
 
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;

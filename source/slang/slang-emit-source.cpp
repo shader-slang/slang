@@ -736,7 +736,7 @@ void CLikeSourceEmitter::_requireHalf()
 {
     if (getSourceStyle() == SourceStyle::GLSL)
     {
-        m_extensionUsageTracker.requireGLSLHalfExtension();
+        m_glslExtensionTracker.requireHalfExtension();
     }
 }
 
@@ -1024,7 +1024,7 @@ void CLikeSourceEmitter::emitStringLiteral(
 
 void CLikeSourceEmitter::requireGLSLExtension(String const& name)
 {
-    m_extensionUsageTracker.requireGLSLExtension(name);
+    m_glslExtensionTracker.requireExtension(name);
 }
 
 void CLikeSourceEmitter::requireGLSLVersion(ProfileVersion version)
@@ -1032,7 +1032,7 @@ void CLikeSourceEmitter::requireGLSLVersion(ProfileVersion version)
     if (getSourceStyle() != SourceStyle::GLSL)
         return;
 
-    m_extensionUsageTracker.requireGLSLVersion(version);
+    m_glslExtensionTracker.requireVersion(version);
 }
 
 void CLikeSourceEmitter::requireGLSLVersion(int version)
@@ -1384,9 +1384,9 @@ void CLikeSourceEmitter::emitGLSLVersionDirective()
     //
     // TODO: Either correctly compute a minimum required version, or require
     // the user to specify a version as part of the target.
-    m_extensionUsageTracker.requireGLSLVersion(ProfileVersion::GLSL_450);
+    m_glslExtensionTracker.requireVersion(ProfileVersion::GLSL_450);
 
-    auto requiredProfileVersion = m_extensionUsageTracker.getRequiredGLSLProfileVersion();
+    auto requiredProfileVersion = m_glslExtensionTracker.getRequiredProfileVersion();
     switch (requiredProfileVersion)
     {
 #define CASE(TAG, VALUE)    \
