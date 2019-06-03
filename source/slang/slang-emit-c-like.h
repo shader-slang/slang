@@ -1,6 +1,6 @@
-// slang-emit-source.h
-#ifndef SLANG_EMIT_SOURCE_H
-#define SLANG_EMIT_SOURCE_H
+// slang-emit-c-like.h
+#ifndef SLANG_EMIT_C_LIKE_H
+#define SLANG_EMIT_C_LIKE_H
 
 #include "../core/slang-basic.h"
 

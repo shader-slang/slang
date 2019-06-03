@@ -36,6 +36,9 @@
     <ClInclude Include="slang-diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit-c-like.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-emit-glsl-extension-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -43,9 +46,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit-source-writer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-emit-source.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit.h">
@@ -224,6 +224,9 @@
     <ClCompile Include="slang-dxc-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-emit-c-like.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-emit-glsl-extension-tracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -231,9 +234,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-source-writer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-emit-source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit.cpp">

@@ -1,5 +1,5 @@
-// slang-emit-source.cpp
-#include "slang-emit-source.h"
+// slang-emit-c-like.cpp
+#include "slang-emit-c-like.h"
 
 #include "../core/slang-writer.h"
 #include "slang-ir-bind-existentials.h"
