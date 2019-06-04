@@ -563,6 +563,56 @@ void GLSLSourceEmitter::emitGLSLImageType(IRGLSLImageType* type)
     emitGLSLTextureOrTextureSamplerType(type, "image");
 }
 
+void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
+{
+    switch (type->op)
+    {
+        case kIROp_FloatType:
+            // no prefix
+            break;
+
+        case kIROp_Int8Type:    m_writer->emit("i8");     break;
+        case kIROp_Int16Type:   m_writer->emit("i16");    break;
+        case kIROp_IntType:     m_writer->emit("i");      break;
+        case kIROp_Int64Type:   m_writer->emit("i64");    break;
+
+        case kIROp_UInt8Type:   m_writer->emit("u8");     break;
+        case kIROp_UInt16Type:  m_writer->emit("u16");    break;
+        case kIROp_UIntType:    m_writer->emit("u");      break;
+        case kIROp_UInt64Type:  m_writer->emit("u64");    break;
+
+        case kIROp_BoolType:    m_writer->emit("b");		break;
+
+        case kIROp_HalfType:
+        {
+            _requireHalf();
+            if (promoteHalfToFloat)
+            {
+                // no prefix
+            }
+            else
+            {
+                m_writer->emit("f16");
+            }
+            break;
+        }
+        case kIROp_DoubleType:  m_writer->emit("d");		break;
+
+        case kIROp_VectorType:
+            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
+            break;
+
+        case kIROp_MatrixType:
+            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
+            break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
+            break;
+    }
+}
+
+
 void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     emitGLSLParameterGroup(varDecl, type);
@@ -748,5 +798,29 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(VarLayout* layout)
     }
 }
 
+void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
+{
+    if (elementCount > 1)
+    {
+        emitGLSLTypePrefix(elementType);
+        m_writer->emit("vec");
+        m_writer->emit(elementCount);
+    }
+    else
+    {
+        _emitSimpleType(elementType);
+    }
+}
+
+void GLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
+{
+    emitGLSLTypePrefix(matType->getElementType());
+    m_writer->emit("mat");
+    emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+    // TODO(tfoley): only emit the next bit
+    // for non-square matrix
+    m_writer->emit("x");
+    emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+}
 
 } // namespace Slang

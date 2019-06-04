@@ -398,5 +398,26 @@ void HLSLSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
     emitHLSLTextureType(type);
 }
 
+void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
+{
+    // TODO(tfoley) : should really emit these with sugar
+    m_writer->emit("vector<");
+    emitType(elementType);
+    m_writer->emit(",");
+    m_writer->emit(elementCount);
+    m_writer->emit(">");
+}
+
+void HLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
+{
+    // TODO(tfoley): should really emit these with sugar
+    m_writer->emit("matrix<");
+    emitType(matType->getElementType());
+    m_writer->emit(",");
+    emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+    m_writer->emit("> ");
+}
 
 } // namespace Slang

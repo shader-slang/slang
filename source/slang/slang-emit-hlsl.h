@@ -41,7 +41,8 @@ protected:
     virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitTextureTypeImpl(IRTextureType* texType) SLANG_OVERRIDE;
     virtual void emitImageTypeImpl(IRGLSLImageType* type) SLANG_OVERRIDE;
-
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
+    virtual void emitMatrixTypeImpl(IRMatrixType* matType) SLANG_OVERRIDE;
 
 };
 

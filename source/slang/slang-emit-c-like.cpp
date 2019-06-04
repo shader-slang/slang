@@ -174,55 +174,6 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
     }
 }
 
-void CLikeSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
-{
-    switch (type->op)
-    {
-    case kIROp_FloatType:
-        // no prefix
-        break;
-
-    case kIROp_Int8Type:    m_writer->emit("i8");     break;
-    case kIROp_Int16Type:   m_writer->emit("i16");    break;
-    case kIROp_IntType:     m_writer->emit("i");      break;
-    case kIROp_Int64Type:   m_writer->emit("i64");    break;
-
-    case kIROp_UInt8Type:   m_writer->emit("u8");     break;
-    case kIROp_UInt16Type:  m_writer->emit("u16");    break;
-    case kIROp_UIntType:    m_writer->emit("u");      break;
-    case kIROp_UInt64Type:  m_writer->emit("u64");    break;
-
-    case kIROp_BoolType:    m_writer->emit("b");		break;
-
-    case kIROp_HalfType:
-    {
-        _requireHalf();
-        if (promoteHalfToFloat)
-        {
-            // no prefix
-        }
-        else
-        {
-            m_writer->emit("f16");
-        }
-        break;
-    }
-    case kIROp_DoubleType:  m_writer->emit("d");		break;
-
-    case kIROp_VectorType:
-        emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
-        break;
-
-    case kIROp_MatrixType:
-        emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
-        break;
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
-        break;
-    }
-}
-
 void CLikeSourceEmitter::emitTextureType(IRTextureType* texType)
 {
     emitTextureTypeImpl(texType);
@@ -257,102 +208,6 @@ void CLikeSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
 }
 
 
-static IROp _getCType(IROp op)
-{
-    switch (op)
-    {
-        case kIROp_VoidType:
-        case kIROp_BoolType:
-        {
-            return op;
-        }
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        {
-            // Promote all these to Int
-            return kIROp_IntType;
-        }
-        case kIROp_Int64Type:
-        case kIROp_UInt64Type:
-        {
-            // Promote all these to Int16, we can just vary the call to make these work
-            return kIROp_Int64Type;
-        }
-        case kIROp_DoubleType:
-        {
-            return kIROp_DoubleType;
-        }
-        case kIROp_HalfType:
-        case kIROp_FloatType:
-        {
-            // Promote both to float
-            return kIROp_FloatType;
-        }
-        default:
-        {
-            SLANG_ASSERT(!"Unhandled type");
-            return kIROp_undefined;
-        }
-    }
-}
-
-static UnownedStringSlice _getCTypeVecPostFix(IROp op)
-{
-    switch (op)
-    {
-        case kIROp_BoolType:        return UnownedStringSlice::fromLiteral("B");
-        case kIROp_IntType:         return UnownedStringSlice::fromLiteral("I");
-        case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F");
-        case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
-        case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
-        default:                    return UnownedStringSlice::fromLiteral("?");
-    }
-}
-
-#if 0
-static UnownedStringSlice _getCTypeName(IROp op)
-{
-    switch (op)
-    {
-    case kIROp_BoolType:        return UnownedStringSlice::fromLiteral("Bool");
-    case kIROp_IntType:         return UnownedStringSlice::fromLiteral("I32");
-    case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F32");
-    case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
-    case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
-    default:                    return UnownedStringSlice::fromLiteral("?");
-    }
-}
-#endif
-
-void CLikeSourceEmitter::_emitCVecType(IROp op, Int size)
-{
-    m_writer->emit("Vec");
-    const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-    m_writer->emit(postFix);
-    if (postFix.size() > 1)
-    {
-        m_writer->emit("_");
-    }
-    m_writer->emit(size);
-}
-
-void CLikeSourceEmitter::_emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount)
-{
-    m_writer->emit("Mat");
-    const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-    m_writer->emit(postFix);
-    if (postFix.size() > 1)
-    {
-        m_writer->emit("_");
-    }
-    m_writer->emit(rowCount);
-    m_writer->emit(colCount);
-}
-
 void CLikeSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
 {
     _emitSimpleType(type);
@@ -367,41 +222,7 @@ void CLikeSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
 
 void CLikeSourceEmitter::emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
 {
-    switch(getSourceStyle())
-    {
-    case SourceStyle::GLSL:
-        {
-            if (elementCount > 1)
-            {
-                emitGLSLTypePrefix(elementType);
-                m_writer->emit("vec");
-                m_writer->emit(elementCount);
-            }
-            else
-            {
-                _emitSimpleType(elementType);
-            }
-        }
-        break;
-
-    case SourceStyle::HLSL:
-        // TODO(tfoley): should really emit these with sugar
-        m_writer->emit("vector<");
-        emitType(elementType);
-        m_writer->emit(",");
-        m_writer->emit(elementCount);
-        m_writer->emit(">");
-        break;
-
-    case SourceStyle::C:
-    case SourceStyle::CPP:
-        _emitCVecType(elementType->op, Int(elementCount));
-        break;
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-        break;
-    }
+    emitVectorTypeNameImpl(elementType, elementCount);
 }
 
 void CLikeSourceEmitter::_emitVectorType(IRVectorType* vecType)
@@ -424,49 +245,6 @@ void CLikeSourceEmitter::_emitVectorType(IRVectorType* vecType)
     auto* elementType = vecType->getElementType();
 
     emitVectorTypeName(elementType, elementCount);
-}
-
-void CLikeSourceEmitter::_emitMatrixType(IRMatrixType* matType)
-{
-    switch(getSourceStyle())
-    {
-    case SourceStyle::GLSL:
-        {
-            emitGLSLTypePrefix(matType->getElementType());
-            m_writer->emit("mat");
-            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-            // TODO(tfoley): only emit the next bit
-            // for non-square matrix
-            m_writer->emit("x");
-            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-        }
-        break;
-
-    case SourceStyle::HLSL:
-        // TODO(tfoley): should really emit these with sugar
-        m_writer->emit("matrix<");
-        emitType(matType->getElementType());
-        m_writer->emit(",");
-        emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-        m_writer->emit(",");
-        emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-        m_writer->emit("> ");
-        break;
-
-    case SourceStyle::CPP:
-    case SourceStyle::C:
-    {
-        const auto rowCount = static_cast<const IRConstant*>(matType->getRowCount())->value.intVal;
-        const auto colCount = static_cast<const IRConstant*>(matType->getColumnCount())->value.intVal;
-
-        _emitCMatType(matType->getElementType()->op, rowCount, colCount);
-        break;
-    }
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-        break;
-    }
 }
 
 void CLikeSourceEmitter::emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType)
@@ -631,7 +409,7 @@ void CLikeSourceEmitter::_emitSimpleType(IRType* type)
         return;
 
     case kIROp_MatrixType:
-        _emitMatrixType((IRMatrixType*)type);
+        emitMatrixTypeImpl((IRMatrixType*)type);
         return;
 
     case kIROp_SamplerStateType:
@@ -845,8 +623,7 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(
     return isTargetIntrinsicModifierApplicable(targetName);
 }
 
-void CLikeSourceEmitter::emitStringLiteral(
-    String const&   value)
+void CLikeSourceEmitter::emitStringLiteral(String const&   value)
 {
     m_writer->emit("\"");
     for (auto c : value)

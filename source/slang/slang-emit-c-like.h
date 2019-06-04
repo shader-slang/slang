@@ -138,8 +138,6 @@ public:
 
     void emitDeclarator(EDeclarator* declarator);
 
-    void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
-
     void emitTextureType(IRTextureType* texType);
 
     void emitTextureSamplerType(IRTextureSamplerType* type);
@@ -389,6 +387,8 @@ public:
     virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
     virtual void emitTextureSamplerTypeImpl(IRTextureSamplerType* type);
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
+    virtual void emitMatrixTypeImpl(IRMatrixType* matType) = 0;
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
 
@@ -398,12 +398,9 @@ public:
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitIRInst(IRInst* inst, IREmitMode mode);
     void _emitVectorType(IRVectorType* vecType);
-    void _emitMatrixType(IRMatrixType* matType);
-
+    
     void _requireHalf();
-    void _emitCVecType(IROp op, Int size);
-    void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
-
+    
     void _emitCFunc(BuiltInCOp cop, IRType* type);
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 

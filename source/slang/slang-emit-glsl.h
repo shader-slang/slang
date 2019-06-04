@@ -28,6 +28,8 @@ public:
     void emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
     bool emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain);
 
+    void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
@@ -42,6 +44,9 @@ protected:
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitLayoutQualifiersImpl(VarLayout* layout) SLANG_OVERRIDE;
     virtual void emitTextureSamplerTypeImpl(IRTextureSamplerType* type) SLANG_OVERRIDE;
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
+    virtual void emitMatrixTypeImpl(IRMatrixType* matType) SLANG_OVERRIDE;
+
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) SLANG_OVERRIDE { emitGLSLTextureOrTextureSamplerType(type, baseName); }
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
