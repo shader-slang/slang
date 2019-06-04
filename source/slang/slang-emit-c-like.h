@@ -1,14 +1,14 @@
-// slang-c-like-source-emitter.h
-#ifndef SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
-#define SLANG_C_LIKE_SOURCE_EMITTER_H_INCLUDED
+// slang-emit-c-like.h
+#ifndef SLANG_EMIT_C_LIKE_H
+#define SLANG_EMIT_C_LIKE_H
 
 #include "../core/slang-basic.h"
 
 #include "slang-compiler.h"
 
-#include "slang-emit-context.h"
-#include "slang-extension-usage-tracker.h"
+#include "slang-emit-glsl-extension-tracker.h"
 #include "slang-emit-precedence.h"
+#include "slang-emit-source-writer.h"
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
@@ -17,8 +17,43 @@
 namespace Slang
 {
 
-struct CLikeSourceEmitter
+class CLikeSourceEmitter
 {
+public:
+    struct CInfo
+    {
+        BackEndCompileRequest* compileRequest = nullptr;
+            // The target language we want to generate code for
+        CodeGenTarget target = CodeGenTarget::Unknown;
+            // The entry point we are being asked to compile
+        EntryPoint* entryPoint = nullptr;
+            // The "effective" profile that is being used to emit code,
+            // combining information from the target and entry point.
+        Profile effectiveProfile = Profile::RawEnum::Unknown;
+
+        SourceWriter* sourceWriter = nullptr;
+            // The layout for the entry point
+        EntryPointLayout* entryPointLayout = nullptr;
+
+        ProgramLayout* programLayout = nullptr;
+            // We track the original global-scope layout so that we can
+            // find layout information for `import`ed parameters.
+            //
+            // TODO: This will probably change if we represent imports
+            // explicitly in the layout data.
+        StructTypeLayout* globalStructLayout = nullptr;
+    };
+    
+        /// To simplify cases 
+    enum class SourceStyle
+    {
+        Unknown,
+        GLSL,
+        HLSL,
+        C,
+        CPP,
+        CountOf,
+    };
     enum class BuiltInCOp
     {
         Splat,                  //< Splat a single value to all values of a vector or matrix type
@@ -58,13 +93,23 @@ struct CLikeSourceEmitter
     };
 
         /// Ctor
-    CLikeSourceEmitter(EmitContext* context);
-
+    CLikeSourceEmitter(const CInfo& cinfo);
+    
         /// Get the source manager
-    SourceManager* getSourceManager() { return m_context->getSourceManager(); }
+    SourceManager* getSourceManager() { return m_compileRequest->getSourceManager(); }
 
         /// Get the diagnostic sink
-    DiagnosticSink* getSink() { return m_context->getSink();}
+    DiagnosticSink* getSink() { return m_compileRequest->getSink();}
+    LineDirectiveMode getLineDirectiveMode() { return m_compileRequest->getLineDirectiveMode(); }
+
+        /// Get the code gen target
+    CodeGenTarget getTarget() { return m_target; }
+        /// Get the source style
+    SLANG_FORCE_INLINE SourceStyle getSourceStyle() const { return m_sourceStyle;  }
+
+    void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
+
+    GLSLExtensionTracker* getGLSLExtensionTracker() { return &m_glslExtensionTracker;  }
 
     //
     // Types
@@ -91,23 +136,11 @@ struct CLikeSourceEmitter
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
 
-    void emitVectorTypeImpl(IRVectorType* vecType);
-
-    void emitMatrixTypeImpl(IRMatrixType* matType);
-
     void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
 
     void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
 
     void emitUntypedBufferType(IRUntypedBufferResourceType* type);
-
-    void emitSimpleTypeImpl(IRType* type);
-
-    void emitArrayTypeImpl(IRArrayType* arrayType, EDeclarator* declarator);
-
-    void emitUnsizedArrayTypeImpl(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
-
-    void emitTypeImpl(IRType* type, EDeclarator* declarator);
 
     void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
@@ -185,9 +218,7 @@ struct CLikeSourceEmitter
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
     void emitIRSimpleValue(IRInst* inst);
-
-    CodeGenTarget getTarget();
-
+    
     bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
     void emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
@@ -237,8 +268,6 @@ struct CLikeSourceEmitter
     BaseType extractBaseType(IRType* inType);
 
     void emitIRInst(IRInst* inst, IREmitMode mode);
-
-    void emitIRInstImpl(IRInst* inst, IREmitMode mode);
 
     void emitIRSemantics(VarLayout* varLayout);
 
@@ -362,7 +391,18 @@ struct CLikeSourceEmitter
     void executeIREmitActions(List<EmitAction> const& actions);
     void emitIRModule(IRModule* module);
 
+        /// Gets a source style for a target. Returns Unknown if not a known target
+    static SourceStyle getSourceStyle(CodeGenTarget target);
+
     protected:
+
+    void _emitSimpleType(IRType* type);
+    void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
+    void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
+    void _emitType(IRType* type, EDeclarator* declarator);
+    void _emitIRInst(IRInst* inst, IREmitMode mode);
+    void _emitVectorType(IRVectorType* vecType);
+    void _emitMatrixType(IRMatrixType* matType);
 
     void _requireHalf();
     void _emitCVecType(IROp op, Int size);
@@ -371,8 +411,62 @@ struct CLikeSourceEmitter
     void _emitCFunc(BuiltInCOp cop, IRType* type);
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 
-    EmitContext* m_context;
-    SourceStream* m_stream;
+
+    BackEndCompileRequest* m_compileRequest = nullptr;
+
+    // The entry point we are being asked to compile
+    EntryPoint* m_entryPoint;
+
+    // The layout for the entry point
+    EntryPointLayout* m_entryPointLayout;
+
+    // The target language we want to generate code for
+    CodeGenTarget m_target;
+    // Source style - a simplification of the more nuanced m_target
+    SourceStyle m_sourceStyle;
+
+    // Where source is written to
+    SourceWriter* m_writer;
+
+    // We only want to emit each `import`ed module one time, so
+    // we maintain a set of already-emitted modules.
+    HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
+
+    // We track the original global-scope layout so that we can
+    // find layout information for `import`ed parameters.
+    //
+    // TODO: This will probably change if we represent imports
+    // explicitly in the layout data.
+    StructTypeLayout* m_globalStructLayout;
+
+    ProgramLayout* m_programLayout;
+
+    ModuleDecl* m_program;
+
+    GLSLExtensionTracker m_glslExtensionTracker;
+
+    UInt m_uniqueIDCounter = 1;
+    Dictionary<IRInst*, UInt> m_mapIRValueToID;
+    Dictionary<Decl*, UInt> m_mapDeclToID;
+
+    HashSet<String> m_irDeclsVisited;
+
+    HashSet<String> m_irTupleTypes;
+
+    // The "effective" profile that is being used to emit code,
+    // combining information from the target and entry point.
+    Profile m_effectiveProfile;
+
+    // Map a string name to the number of times we have seen this
+    // name used so far during code emission.
+    Dictionary<String, UInt> m_uniqueNameCounters;
+
+    // Map an IR instruction to the name that we've decided
+    // to use for it when emitting code.
+    Dictionary<IRInst*, String> m_mapInstToName;
+
+    Dictionary<IRInst*, UInt> m_mapIRValueToRayPayloadLocation;
+    Dictionary<IRInst*, UInt> m_mapIRValueToCallablePayloadLocation;
 };
 
 }
