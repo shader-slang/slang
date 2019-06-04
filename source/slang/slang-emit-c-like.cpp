@@ -67,27 +67,7 @@ struct CLikeSourceEmitter::IRDeclaratorInfo
     };
 };
 
-// A chain of variables to use for emitting semantic/layout info
-struct CLikeSourceEmitter::EmitVarChain
-{
-    VarLayout*      varLayout;
-    EmitVarChain*   next;
 
-    EmitVarChain()
-        : varLayout(0)
-        , next(0)
-    {}
-
-    EmitVarChain(VarLayout* varLayout)
-        : varLayout(varLayout)
-        , next(0)
-    {}
-
-    EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
-        : varLayout(varLayout)
-        , next(next)
-    {}
-};
 
 struct CLikeSourceEmitter::ComputeEmitActionsContext
 {
@@ -1114,148 +1094,6 @@ UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind
         }
     }
     return space;
-}
-
-void CLikeSourceEmitter::emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
-{
-    if(!chain)
-        return;
-    if(!chain->varLayout->FindResourceInfo(kind))
-        return;
-
-    UInt index = getBindingOffset(chain, kind);
-    UInt space = getBindingSpace(chain, kind);
-
-    switch(kind)
-    {
-    case LayoutResourceKind::Uniform:
-        {
-            UInt offset = index;
-
-            // The HLSL `c` register space is logically grouped in 16-byte registers,
-            // while we try to traffic in byte offsets. That means we need to pick
-            // a register number, based on the starting offset in 16-byte register
-            // units, and then a "component" within that register, based on 4-byte
-            // offsets from there. We cannot support more fine-grained offsets than that.
-
-            m_writer->emit(" : ");
-            m_writer->emit(uniformSemanticSpelling);
-            m_writer->emit("(c");
-
-            // Size of a logical `c` register in bytes
-            auto registerSize = 16;
-
-            // Size of each component of a logical `c` register, in bytes
-            auto componentSize = 4;
-
-            size_t startRegister = offset / registerSize;
-            m_writer->emit(int(startRegister));
-
-            size_t byteOffsetInRegister = offset % registerSize;
-
-            // If this field doesn't start on an even register boundary,
-            // then we need to emit additional information to pick the
-            // right component to start from
-            if (byteOffsetInRegister != 0)
-            {
-                // The value had better occupy a whole number of components.
-                SLANG_RELEASE_ASSERT(byteOffsetInRegister % componentSize == 0);
-
-                size_t startComponent = byteOffsetInRegister / componentSize;
-
-                static const char* kComponentNames[] = {"x", "y", "z", "w"};
-                m_writer->emit(".");
-                m_writer->emit(kComponentNames[startComponent]);
-            }
-            m_writer->emit(")");
-        }
-        break;
-
-    case LayoutResourceKind::RegisterSpace:
-    case LayoutResourceKind::GenericResource:
-    case LayoutResourceKind::ExistentialTypeParam:
-    case LayoutResourceKind::ExistentialObjectParam:
-        // ignore
-        break;
-    default:
-        {
-            m_writer->emit(" : register(");
-            switch( kind )
-            {
-            case LayoutResourceKind::ConstantBuffer:
-                m_writer->emit("b");
-                break;
-            case LayoutResourceKind::ShaderResource:
-                m_writer->emit("t");
-                break;
-            case LayoutResourceKind::UnorderedAccess:
-                m_writer->emit("u");
-                break;
-            case LayoutResourceKind::SamplerState:
-                m_writer->emit("s");
-                break;
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
-                break;
-            }
-            m_writer->emit(index);
-            if(space)
-            {
-                m_writer->emit(", space");
-                m_writer->emit(space);
-            }
-            m_writer->emit(")");
-        }
-    }
-}
-
-void CLikeSourceEmitter::emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
-{
-    if (!chain) return;
-
-    auto layout = chain->varLayout;
-
-    switch( getSourceStyle())
-    {
-    default:
-        return;
-
-    case SourceStyle::HLSL:
-        break;
-    }
-
-    for( auto rr : layout->resourceInfos )
-    {
-        emitHLSLRegisterSemantic(rr.kind, chain, uniformSemanticSpelling);
-    }
-}
-
-void CLikeSourceEmitter::emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling)
-{
-    if(!varLayout)
-        return;
-
-    EmitVarChain chain(varLayout);
-    emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
-}
-
-void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
-{
-    if(!chain)
-        return;
-
-    auto layout = chain->varLayout;
-    for( auto rr : layout->resourceInfos )
-    {
-        emitHLSLRegisterSemantic(rr.kind, chain, "packoffset");
-    }
-}
-
-
-void CLikeSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain)
-{
-    EmitVarChain chain(fieldLayout, inChain);
-    emitHLSLParameterGroupFieldLayoutSemantics(&chain);
 }
 
 bool CLikeSourceEmitter::emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain)
@@ -3627,11 +3465,7 @@ VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
 
 void CLikeSourceEmitter::emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    auto layout = getVarLayout(inst);
-    if (layout)
-    {
-        emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
-    }
+    emitIRLayoutSemanticsImpl(inst, uniformSemanticSpelling);
 }
 
 void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock)
@@ -4005,125 +3839,6 @@ void CLikeSourceEmitter::emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, 
     m_writer->emit("\")]\n");
 }
 
-void CLikeSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
-{
-    auto profile = m_effectiveProfile;
-    auto stage = entryPointLayout->profile.GetStage();
-
-    if(profile.getFamily() == ProfileFamily::DX)
-    {
-        if(profile.GetVersion() >= ProfileVersion::DX_6_1 )
-        {
-            char const* stageName = getStageName(stage);
-            if(stageName)
-            {
-                m_writer->emit("[shader(\"");
-                m_writer->emit(stageName);
-                m_writer->emit("\")]");
-            }
-        }
-    }
-
-    switch (stage)
-    {
-    case Stage::Compute:
-        {
-            static const UInt kAxisCount = 3;
-            UInt sizeAlongAxis[kAxisCount];
-
-            // TODO: this is kind of gross because we are using a public
-            // reflection API function, rather than some kind of internal
-            // utility it forwards to...
-            spReflectionEntryPoint_getComputeThreadGroupSize(
-                (SlangReflectionEntryPoint*)entryPointLayout,
-                kAxisCount,
-                &sizeAlongAxis[0]);
-
-            m_writer->emit("[numthreads(");
-            for (int ii = 0; ii < 3; ++ii)
-            {
-                if (ii != 0) m_writer->emit(", ");
-                m_writer->emit(sizeAlongAxis[ii]);
-            }
-            m_writer->emit(")]\n");
-        }
-        break;
-    case Stage::Geometry:
-    {
-        if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
-        {
-            m_writer->emit("[maxvertexcount(");
-            m_writer->emit(attrib->value);
-            m_writer->emit(")]\n");
-        }
-        if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
-        {
-            m_writer->emit("[instance(");
-            m_writer->emit(attrib->value);
-            m_writer->emit(")]\n");
-        }
-        break;
-    }
-    case Stage::Domain:
-    {
-        FuncDecl* entryPoint = entryPointLayout->entryPoint;
-        /* [domain("isoline")] */
-        if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
-        {
-            emitAttributeSingleString("domain", entryPoint, attrib);
-        }
-
-        break;
-    }
-    case Stage::Hull:
-    {
-        // Lists these are only attributes for hull shader
-        // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
-
-        FuncDecl* entryPoint = entryPointLayout->entryPoint;
-
-        /* [domain("isoline")] */
-        if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
-        {
-            emitAttributeSingleString("domain", entryPoint, attrib);
-        }
-        /* [domain("partitioning")] */
-        if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
-        {
-            emitAttributeSingleString("partitioning", entryPoint, attrib);
-        }
-        /* [outputtopology("line")] */
-        if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
-        {
-            emitAttributeSingleString("outputtopology", entryPoint, attrib);
-        }
-        /* [outputcontrolpoints(4)] */
-        if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
-        {
-            emitAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
-        }
-        /* [patchconstantfunc("HSConst")] */
-        if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
-        {
-            emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
-        }
-
-        break;
-    }
-    case Stage::Pixel:
-    {
-        if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
-        {
-            m_writer->emit("[earlydepthstencil]\n");
-        }
-        break;
-    }
-    // TODO: There are other stages that will need this kind of handling.
-    default:
-        break;
-    }
-}
-
 void CLikeSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = entryPointLayout->profile;
@@ -4235,16 +3950,7 @@ void CLikeSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPo
 
 void CLikeSourceEmitter::emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    switch(getSourceStyle())
-    {
-    case SourceStyle::HLSL:
-        emitIREntryPointAttributes_HLSL(irFunc, entryPointLayout);
-        break;
-
-    case SourceStyle::GLSL:
-        emitIREntryPointAttributes_GLSL(irFunc, entryPointLayout);
-        break;
-    }
+    emitIREntryPointAttributesImpl(irFunc, entryPointLayout);
 }
 
 void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
@@ -5063,48 +4769,7 @@ void CLikeSourceEmitter::emitIRVarModifiers(VarLayout* layout,IRInst* varDecl, I
     }
 }
 
-void CLikeSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
-{
-    if(as<IRTextureBufferType>(type))
-    {
-        m_writer->emit("tbuffer ");
-    }
-    else
-    {
-        m_writer->emit("cbuffer ");
-    }
-    m_writer->emit(getIRName(varDecl));
 
-    auto varLayout = getVarLayout(varDecl);
-    SLANG_RELEASE_ASSERT(varLayout);
-
-    EmitVarChain blockChain(varLayout);
-
-    EmitVarChain containerChain = blockChain;
-    EmitVarChain elementChain = blockChain;
-
-    auto typeLayout = varLayout->typeLayout;
-    if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
-    {
-        containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
-        elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
-
-        typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
-    }
-
-    emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
-
-    m_writer->emit("\n{\n");
-    m_writer->indent();
-
-    auto elementType = type->getElementType();
-
-    emitIRType(elementType, getIRName(varDecl));
-    m_writer->emit(";\n");
-
-    m_writer->dedent();
-    m_writer->emit("}\n");
-}
 
 void CLikeSourceEmitter::emitArrayBrackets(IRType* inType)
 {
@@ -5230,16 +4895,7 @@ void CLikeSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
 void CLikeSourceEmitter::emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    switch (getSourceStyle())
-    {
-    case SourceStyle::HLSL:
-        emitHLSLParameterGroup(varDecl, type);
-        break;
-
-    case SourceStyle::GLSL:
-        emitGLSLParameterGroup(varDecl, type);
-        break;
-    }
+    emitIRParameterGroupImpl(varDecl, type);
 }
 
 void CLikeSourceEmitter::emitIRVar(IRVar* varDecl)

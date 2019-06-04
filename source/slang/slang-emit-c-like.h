@@ -75,7 +75,6 @@ public:
         GlobalConstant,
     };
 
-    struct EmitVarChain;
     struct IRDeclaratorInfo;
     struct EDeclarator;
     struct ComputeEmitActionsContext;
@@ -90,6 +89,28 @@ public:
         };
         Level   level;
         IRInst* inst;
+    };
+
+    // A chain of variables to use for emitting semantic/layout info
+    struct EmitVarChain
+    {
+        VarLayout*      varLayout;
+        EmitVarChain*   next;
+
+        EmitVarChain()
+            : varLayout(0)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout)
+            : varLayout(varLayout)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
+            : varLayout(varLayout)
+            , next(next)
+        {}
     };
 
         /// Ctor
@@ -177,18 +198,6 @@ public:
 
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
-
-        // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
-        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    void emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-
-        // Emit all the `register` semantics that are appropriate for a particular variable layout
-    void emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-    void emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
 
     bool emitGLSLLayoutQualifier(LayoutResourceKind  kind, EmitVarChain* chain);
 
@@ -301,8 +310,6 @@ public:
 
     void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
 
-    void emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-
     void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
@@ -357,8 +364,6 @@ public:
 
     void emitIRVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
 
-    void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
-
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
 
@@ -395,6 +400,10 @@ public:
     static SourceStyle getSourceStyle(CodeGenTarget target);
 
     protected:
+
+    virtual void emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
+    virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
+    virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
 
     void _emitSimpleType(IRType* type);
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);

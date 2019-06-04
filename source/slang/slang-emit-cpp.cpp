@@ -10,6 +10,18 @@
 
 namespace Slang {
 
+void CPPSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+{
+    SLANG_UNUSED(varDecl);
+    SLANG_UNUSED(type);
+    SLANG_ASSERT(!"Not implemented");
+}
 
+void CPPSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+{
+    SLANG_UNUSED(irFunc);
+    SLANG_UNUSED(entryPointLayout);
+    SLANG_ASSERT(!"Not implemented");
+}
 
 } // namespace Slang
