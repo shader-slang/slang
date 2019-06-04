@@ -140,14 +140,6 @@ public:
 
     void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
-    void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName);
-
-    void emitGLSLTextureType(IRTextureType* texType);
-
-    void emitGLSLTextureSamplerType(IRTextureSamplerType* type);
-    
-    void emitGLSLImageType(IRGLSLImageType* type);
-
     void emitTextureType(IRTextureType* texType);
 
     void emitTextureSamplerType(IRTextureSamplerType* type);
@@ -196,10 +188,6 @@ public:
 
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
-
-    bool emitGLSLLayoutQualifier(LayoutResourceKind  kind, EmitVarChain* chain);
-
-    void emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
 
     void emitGLSLVersionDirective();
 
@@ -355,8 +343,6 @@ public:
 
     UInt getCallablePayloadLocation(IRInst* inst);
 
-    void emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);
-
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     void emitIRTempModifiers(IRInst* temp);
 
@@ -365,16 +351,11 @@ public:
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
 
-    void emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
-    
     void emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitIRVar(IRVar* varDecl);
 
-    void emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
     
-    void emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
-
     void emitIRGlobalVar(IRGlobalVar* varDecl);
     void emitIRGlobalParam(IRGlobalParam* varDecl);
     void emitIRGlobalConstantInitializer(IRGlobalConstant* valDecl);
@@ -404,6 +385,12 @@ public:
     virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
     virtual void emitTextureTypeImpl(IRTextureType* texType);
     virtual void emitImageTypeImpl(IRGLSLImageType* type);
+    virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
+    virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
+    virtual void emitTextureSamplerTypeImpl(IRTextureSamplerType* type);
+    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+
+    virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
 
     void _emitSimpleType(IRType* type);
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
