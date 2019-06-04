@@ -17,10 +17,10 @@
 namespace Slang
 {
 
-class CLikeSourceEmitter
+class CLikeSourceEmitter: public RefObject
 {
 public:
-    struct CInfo
+    struct Desc
     {
         BackEndCompileRequest* compileRequest = nullptr;
             // The target language we want to generate code for
@@ -93,7 +93,7 @@ public:
     };
 
         /// Ctor
-    CLikeSourceEmitter(const CInfo& cinfo);
+    CLikeSourceEmitter(const Desc& desc);
     
         /// Get the source manager
     SourceManager* getSourceManager() { return m_compileRequest->getSourceManager(); }

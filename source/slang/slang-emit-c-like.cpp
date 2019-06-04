@@ -139,22 +139,22 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     }
 }
 
-CLikeSourceEmitter::CLikeSourceEmitter(const CInfo& cinfo)
+CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
 {
-    m_writer = cinfo.sourceWriter;
-    m_sourceStyle = getSourceStyle(cinfo.target);
+    m_writer = desc.sourceWriter;
+    m_sourceStyle = getSourceStyle(desc.target);
     SLANG_ASSERT(m_sourceStyle != SourceStyle::Unknown);
 
-    m_target = cinfo.target;
+    m_target = desc.target;
 
-    m_compileRequest = cinfo.compileRequest;
-    m_entryPoint = cinfo.entryPoint;
-    m_effectiveProfile = cinfo.effectiveProfile;
+    m_compileRequest = desc.compileRequest;
+    m_entryPoint = desc.entryPoint;
+    m_effectiveProfile = desc.effectiveProfile;
     
-    m_entryPointLayout = cinfo.entryPointLayout;
+    m_entryPointLayout = desc.entryPointLayout;
     
-    m_programLayout = cinfo.programLayout;
-    m_globalStructLayout = cinfo.globalStructLayout;
+    m_programLayout = desc.programLayout;
+    m_globalStructLayout = desc.globalStructLayout;
 }
 
 //

@@ -27,6 +27,10 @@
 
 #include "slang-emit-c-like.h"
 
+#include "slang-emit-glsl.h"
+#include "slang-emit-hlsl.h"
+#include "slang-emit-cpp.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -173,30 +177,58 @@ String emitEntryPoint(
 
     SourceWriter sourceWriter(compileRequest->getSourceManager(), lineDirectiveMode );
 
-    CLikeSourceEmitter::CInfo cinfo;
+    CLikeSourceEmitter::Desc desc;
 
-    cinfo.compileRequest = compileRequest;
-    cinfo.target = target;
-    cinfo.entryPoint = entryPoint;
-    cinfo.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
-    cinfo.sourceWriter = &sourceWriter;
+    desc.compileRequest = compileRequest;
+    desc.target = target;
+    desc.entryPoint = entryPoint;
+    desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
+    desc.sourceWriter = &sourceWriter;
 
     if (entryPoint && programLayout)
     {
-        cinfo.entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
+        desc.entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
     }
 
-    cinfo.programLayout = programLayout;
+    desc.programLayout = programLayout;
 
     // Layout information for the global scope is either an ordinary
     // `struct` in the common case, or a constant buffer in the case
     // where there were global-scope uniforms.
     
     StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
-    cinfo.globalStructLayout = globalStructLayout;
+    desc.globalStructLayout = globalStructLayout;
 
-    CLikeSourceEmitter sourceEmitter(cinfo);
+    RefPtr<CLikeSourceEmitter> sourceEmitter;
 
+    typedef CLikeSourceEmitter::SourceStyle SourceStyle;
+
+    SourceStyle sourceStyle = CLikeSourceEmitter::getSourceStyle(target);
+    switch (sourceStyle)
+    {
+        case SourceStyle::CPP:
+        {
+            sourceEmitter = new CPPSourceEmitter(desc);
+            break;
+        }
+        case SourceStyle::GLSL:
+        {
+            sourceEmitter = new GLSLSourceEmitter(desc);
+            break;
+        }
+        case SourceStyle::HLSL:
+        {
+            sourceEmitter = new HLSLSourceEmitter(desc);
+            break;
+        }
+        default: break;
+    }
+
+    if (!sourceEmitter)
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, getCodeGenTargetName(target));
+        return String();
+    }
     {
         auto session = targetRequest->getSession();
 
@@ -421,7 +453,7 @@ String emitEntryPoint(
                 irModule,
                 irEntryPoint,
                 compileRequest->getSink(),
-                sourceEmitter.getGLSLExtensionTracker());
+                sourceEmitter->getGLSLExtensionTracker());
 
 #if 0
                 dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
@@ -456,7 +488,7 @@ String emitEntryPoint(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
-        sourceEmitter.emitIRModule(irModule);
+        sourceEmitter->emitIRModule(irModule);
     }
 
     // Deal with cases where a particular stage requires certain GLSL versions
@@ -474,8 +506,8 @@ String emitEntryPoint(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            sourceEmitter.getGLSLExtensionTracker()->requireExtension("GL_NV_ray_tracing");
-            sourceEmitter.getGLSLExtensionTracker()->requireVersion(ProfileVersion::GLSL_460);
+            sourceEmitter->getGLSLExtensionTracker()->requireExtension("GL_NV_ray_tracing");
+            sourceEmitter->getGLSLExtensionTracker()->requireVersion(ProfileVersion::GLSL_460);
         }
         break;
     }
@@ -487,16 +519,16 @@ String emitEntryPoint(
     // it is time to stitch together the final output.
 
     // There may be global-scope modifiers that we should emit now
-    sourceEmitter.emitGLSLPreprocessorDirectives();
+    sourceEmitter->emitGLSLPreprocessorDirectives();
 
-    sourceEmitter.emitLayoutDirectives(targetRequest);
+    sourceEmitter->emitLayoutDirectives(targetRequest);
 
     String prefix = sourceWriter.getContent();
     
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << sourceEmitter.getGLSLExtensionTracker()->getExtensionRequireLines();
+    finalResultBuilder << sourceEmitter->getGLSLExtensionTracker()->getExtensionRequireLines();
 
     finalResultBuilder << code;
 
