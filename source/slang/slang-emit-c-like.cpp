@@ -223,59 +223,6 @@ void CLikeSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
     }
 }
 
-void CLikeSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
-{
-    switch(texType->getAccess())
-    {
-    case SLANG_RESOURCE_ACCESS_READ:
-        break;
-
-    case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        m_writer->emit("RW");
-        break;
-
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-        m_writer->emit("RasterizerOrdered");
-        break;
-
-    case SLANG_RESOURCE_ACCESS_APPEND:
-        m_writer->emit("Append");
-        break;
-
-    case SLANG_RESOURCE_ACCESS_CONSUME:
-        m_writer->emit("Consume");
-        break;
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
-        break;
-    }
-
-    switch (texType->GetBaseShape())
-    {
-    case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
-    case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
-    case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
-    case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
-    case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-        break;
-    }
-
-    if (texType->isMultisample())
-    {
-        m_writer->emit("MS");
-    }
-    if (texType->isArray())
-    {
-        m_writer->emit("Array");
-    }
-    m_writer->emit("<");
-    emitType(texType->getElementType());
-    m_writer->emit(" >");
-}
-
 void CLikeSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
     if (type->getElementType()->op == kIROp_HalfType)
@@ -311,22 +258,6 @@ void CLikeSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
     }
 }
 
-void CLikeSourceEmitter::emitGLSLTextureType(
-    IRTextureType* texType)
-{
-    switch(texType->getAccess())
-    {
-    case SLANG_RESOURCE_ACCESS_READ_WRITE:
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-        emitGLSLTextureOrTextureSamplerType(texType, "image");
-        break;
-
-    default:
-        emitGLSLTextureOrTextureSamplerType(texType, "texture");
-        break;
-    }
-}
-
 void CLikeSourceEmitter::emitGLSLTextureSamplerType(IRTextureSamplerType* type)
 {
     emitGLSLTextureOrTextureSamplerType(type, "sampler");
@@ -339,20 +270,13 @@ void CLikeSourceEmitter::emitGLSLImageType(IRGLSLImageType* type)
 
 void CLikeSourceEmitter::emitTextureType(IRTextureType* texType)
 {
-    switch(getSourceStyle())
-    {
-    case SourceStyle::HLSL:
-        emitHLSLTextureType(texType);
-        break;
+    emitTextureTypeImpl(texType);
+}
 
-    case SourceStyle::GLSL:
-        emitGLSLTextureType(texType);
-        break;
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-        break;
-    }
+void CLikeSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
+{
+    SLANG_UNUSED(texType);
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
 }
 
 void CLikeSourceEmitter::emitTextureSamplerType(IRTextureSamplerType* type)
@@ -371,21 +295,15 @@ void CLikeSourceEmitter::emitTextureSamplerType(IRTextureSamplerType* type)
 
 void CLikeSourceEmitter::emitImageType(IRGLSLImageType* type)
 {
-    switch(getSourceStyle())
-    {
-    case SourceStyle::HLSL:
-        emitHLSLTextureType(type);
-        break;
-
-    case SourceStyle::GLSL:
-        emitGLSLImageType(type);
-        break;
-
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see GLSL image types");
-        break;
-    }
+    emitImageTypeImpl(type);
 }
+
+void CLikeSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
+{
+    SLANG_UNUSED(type);
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see GLSL image types");
+}
+
 
 static IROp _getCType(IROp op)
 {

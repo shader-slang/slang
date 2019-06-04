@@ -27,7 +27,9 @@ public:
     void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-   
+
+    void emitHLSLTextureType(IRTextureTypeBase* texType);
+
     HLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {}
@@ -37,7 +39,8 @@ protected:
     virtual void emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
     virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
-
+    virtual void emitTextureTypeImpl(IRTextureType* texType) SLANG_OVERRIDE;
+    virtual void emitImageTypeImpl(IRGLSLImageType* type) SLANG_OVERRIDE;
 
 
 };

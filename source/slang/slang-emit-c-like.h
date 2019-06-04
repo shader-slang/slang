@@ -140,8 +140,6 @@ public:
 
     void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
-    void emitHLSLTextureType(IRTextureTypeBase* texType);
-
     void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName);
 
     void emitGLSLTextureType(IRTextureType* texType);
@@ -404,6 +402,8 @@ public:
     virtual void emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
+    virtual void emitTextureTypeImpl(IRTextureType* texType);
+    virtual void emitImageTypeImpl(IRGLSLImageType* type);
 
     void _emitSimpleType(IRType* type);
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);

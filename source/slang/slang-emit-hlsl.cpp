@@ -316,6 +316,59 @@ void HLSLSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPoi
 }
 
 
+void HLSLSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
+{
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
+
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            m_writer->emit("RW");
+            break;
+
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            m_writer->emit("RasterizerOrdered");
+            break;
+
+        case SLANG_RESOURCE_ACCESS_APPEND:
+            m_writer->emit("Append");
+            break;
+
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+            m_writer->emit("Consume");
+            break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
+            break;
+    }
+
+    switch (texType->GetBaseShape())
+    {
+        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
+        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
+        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+            break;
+    }
+
+    if (texType->isMultisample())
+    {
+        m_writer->emit("MS");
+    }
+    if (texType->isArray())
+    {
+        m_writer->emit("Array");
+    }
+    m_writer->emit("<");
+    emitType(texType->getElementType());
+    m_writer->emit(" >");
+}
+
 void HLSLSourceEmitter::emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
     auto layout = getVarLayout(inst);
@@ -334,5 +387,16 @@ void HLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPoin
 {
     emitIREntryPointAttributes_HLSL(irFunc, entryPointLayout);
 }
+
+void HLSLSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
+{
+    emitHLSLTextureType(texType);
+}
+
+void HLSLSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
+{
+    emitHLSLTextureType(type);
+}
+
 
 } // namespace Slang
