@@ -294,8 +294,6 @@ public:
 
     void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
 
-    void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-
     void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitPhiVarDecls(IRFunc* func);
@@ -389,6 +387,10 @@ public:
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
     virtual void emitMatrixTypeImpl(IRMatrixType* matType) = 0;
+    virtual void emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type);
+    virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type);
+    virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType);
+
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
 
@@ -403,7 +405,6 @@ public:
     
     void _emitCFunc(BuiltInCOp cop, IRType* type);
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
-
 
     BackEndCompileRequest* m_compileRequest = nullptr;
 

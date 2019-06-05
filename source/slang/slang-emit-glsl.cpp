@@ -612,6 +612,116 @@ void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat
     }
 }
 
+void GLSLSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+{
+    auto profile = entryPointLayout->profile;
+    auto stage = profile.GetStage();
+
+    switch (stage)
+    {
+        case Stage::Compute:
+        {
+            static const UInt kAxisCount = 3;
+            UInt sizeAlongAxis[kAxisCount];
+
+            // TODO: this is kind of gross because we are using a public
+            // reflection API function, rather than some kind of internal
+            // utility it forwards to...
+            spReflectionEntryPoint_getComputeThreadGroupSize(
+                (SlangReflectionEntryPoint*)entryPointLayout,
+                kAxisCount,
+                &sizeAlongAxis[0]);
+
+            m_writer->emit("layout(");
+            char const* axes[] = { "x", "y", "z" };
+            for (int ii = 0; ii < 3; ++ii)
+            {
+                if (ii != 0) m_writer->emit(", ");
+                m_writer->emit("local_size_");
+                m_writer->emit(axes[ii]);
+                m_writer->emit(" = ");
+                m_writer->emit(sizeAlongAxis[ii]);
+            }
+            m_writer->emit(") in;");
+        }
+        break;
+        case Stage::Geometry:
+        {
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
+            {
+                m_writer->emit("layout(max_vertices = ");
+                m_writer->emit(attrib->value);
+                m_writer->emit(") out;\n");
+            }
+            if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
+            {
+                m_writer->emit("layout(invocations = ");
+                m_writer->emit(attrib->value);
+                m_writer->emit(") in;\n");
+            }
+
+            for (auto pp : entryPointLayout->entryPoint->GetParameters())
+            {
+                if (auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                {
+                    if (as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
+                    {
+                        m_writer->emit("layout(triangles) in;\n");
+                    }
+                    else if (as<HLSLLineModifier>(inputPrimitiveTypeModifier))
+                    {
+                        m_writer->emit("layout(lines) in;\n");
+                    }
+                    else if (as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
+                    {
+                        m_writer->emit("layout(lines_adjacency) in;\n");
+                    }
+                    else if (as<HLSLPointModifier>(inputPrimitiveTypeModifier))
+                    {
+                        m_writer->emit("layout(points) in;\n");
+                    }
+                    else if (as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
+                    {
+                        m_writer->emit("layout(triangles_adjacency) in;\n");
+                    }
+                }
+
+                if (auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
+                {
+                    if (as<HLSLTriangleStreamType>(outputStreamType))
+                    {
+                        m_writer->emit("layout(triangle_strip) out;\n");
+                    }
+                    else if (as<HLSLLineStreamType>(outputStreamType))
+                    {
+                        m_writer->emit("layout(line_strip) out;\n");
+                    }
+                    else if (as<HLSLPointStreamType>(outputStreamType))
+                    {
+                        m_writer->emit("layout(points) out;\n");
+                    }
+                }
+            }
+
+
+        }
+        break;
+        case Stage::Pixel:
+        {
+            if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
+            {
+                // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
+                m_writer->emit("layout(early_fragment_tests) in;\n");
+            }
+            break;
+        }
+        // TODO: There are other stages that will need this kind of handling.
+        default:
+            break;
+    }
+}
+
+
 
 void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
@@ -821,6 +931,51 @@ void GLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
     // for non-square matrix
     m_writer->emit("x");
     emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+}
+
+void GLSLSourceEmitter::emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type)
+{
+    switch (type->op)
+    {
+        case kIROp_RaytracingAccelerationStructureType:
+            requireGLSLExtension("GL_NV_ray_tracing");
+            m_writer->emit("accelerationStructureNV");
+            break;
+
+            // TODO: These "translations" are obviously wrong for GLSL.
+        case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
+        case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+            break;
+    }
+}
+
+void GLSLSourceEmitter::emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type)
+{
+    SLANG_UNUSED(type);
+    // TODO: We desugar global variables with structured-buffer type into GLSL
+    // `buffer` declarations, but we don't currently handle structured-buffer types
+    // in other contexts (e.g., as function parameters). The simplest thing to do
+    // would be to emit a `StructuredBuffer<Foo>` as `Foo[]` and `RWStructuredBuffer<Foo>`
+    // as `in out Foo[]`, but that is starting to get into the realm of transformations
+    // that should really be handled during legalization, rather than during emission.
+    //
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "structured buffer type used unexpectedly");
+}
+
+void GLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType)
+{
+    switch (samplerStateType->op)
+    {
+        case kIROp_SamplerStateType:			m_writer->emit("sampler");		break;
+        case kIROp_SamplerComparisonStateType:	m_writer->emit("samplerShadow");	break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
+            break;
+    }
 }
 
 } // namespace Slang

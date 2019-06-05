@@ -30,6 +30,8 @@ public:
 
     void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
+    void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
@@ -48,6 +50,9 @@ protected:
     virtual void emitMatrixTypeImpl(IRMatrixType* matType) SLANG_OVERRIDE;
 
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) SLANG_OVERRIDE { emitGLSLTextureOrTextureSamplerType(type, baseName); }
+    virtual void emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type) SLANG_OVERRIDE;
+    virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type) SLANG_OVERRIDE;
+    virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
 

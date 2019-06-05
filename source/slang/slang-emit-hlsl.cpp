@@ -420,4 +420,51 @@ void HLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
     m_writer->emit("> ");
 }
 
+void HLSLSourceEmitter::emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type)
+{
+    switch (type->op)
+    {
+        case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
+        case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
+        case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+            break;
+    }
+}
+
+void HLSLSourceEmitter::emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type)
+{
+    switch (type->op)
+    {
+        case kIROp_HLSLStructuredBufferType:                    m_writer->emit("StructuredBuffer");                   break;
+        case kIROp_HLSLRWStructuredBufferType:                  m_writer->emit("RWStructuredBuffer");                 break;
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   m_writer->emit("RasterizerOrderedStructuredBuffer");  break;
+        case kIROp_HLSLAppendStructuredBufferType:              m_writer->emit("AppendStructuredBuffer");             break;
+        case kIROp_HLSLConsumeStructuredBufferType:             m_writer->emit("ConsumeStructuredBuffer");            break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
+            break;
+    }
+
+    m_writer->emit("<");
+    emitType(type->getElementType());
+    m_writer->emit(" >");
+}
+
+void HLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType)
+{
+    switch (samplerStateType->op)
+    {
+        case kIROp_SamplerStateType:			m_writer->emit("SamplerState");			break;
+        case kIROp_SamplerComparisonStateType:	m_writer->emit("SamplerComparisonState");	break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
+            break;
+    }
+}
+
 } // namespace Slang
