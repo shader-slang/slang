@@ -109,7 +109,7 @@ void CPPSourceEmitter::_emitCMatType(IROp op, IRIntegerValue rowCount, IRInteger
 
 void CPPSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
 {
-    _emitSimpleType(type);
+    emitSimpleType(type);
     m_writer->emit("_");
 
     switch (cop)

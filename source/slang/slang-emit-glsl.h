@@ -32,6 +32,11 @@ public:
 
     void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
+    void requireGLSLExtension(const String& name);
+
+    void requireGLSLVersion(ProfileVersion version);
+    void requireGLSLVersion(int version);
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
@@ -54,10 +59,16 @@ protected:
     virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type) SLANG_OVERRIDE;
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
 
+    virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
+    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+
+    virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
+
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
 
-
+    void _requireHalf();
 };
 
 }

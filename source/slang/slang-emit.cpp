@@ -519,7 +519,7 @@ String emitEntryPoint(
     // it is time to stitch together the final output.
 
     // There may be global-scope modifiers that we should emit now
-    sourceEmitter->emitGLSLPreprocessorDirectives();
+    sourceEmitter->emitPreprocessorDirectives();
 
     sourceEmitter->emitLayoutDirectives(targetRequest);
 

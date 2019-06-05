@@ -267,66 +267,57 @@ void CLikeSourceEmitter::emitUntypedBufferType(IRUntypedBufferResourceType* type
     emitUntypedBufferTypeImpl(type);
 }
 
-void CLikeSourceEmitter::_requireHalf()
+void CLikeSourceEmitter::emitSimpleType(IRType* type)
 {
-    if (getSourceStyle() == SourceStyle::GLSL)
+    if (tryEmitSimpleTypeImpl(type))
     {
-        m_glslExtensionTracker.requireHalfExtension();
+        return;
     }
+
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void CLikeSourceEmitter::_emitSimpleType(IRType* type)
+bool CLikeSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
 {
     switch (type->op)
     {
     default:
         break;
 
-    case kIROp_VoidType:    m_writer->emit("void");       return;
-    case kIROp_BoolType:    m_writer->emit("bool");       return;
+    case kIROp_VoidType:    m_writer->emit("void");       return true;
+    case kIROp_BoolType:    m_writer->emit("bool");       return true;
 
-    case kIROp_Int8Type:    m_writer->emit("int8_t");     return;
-    case kIROp_Int16Type:   m_writer->emit("int16_t");    return;
-    case kIROp_IntType:     m_writer->emit("int");        return;
-    case kIROp_Int64Type:   m_writer->emit("int64_t");    return;
+    case kIROp_Int8Type:    m_writer->emit("int8_t");     return true;
+    case kIROp_Int16Type:   m_writer->emit("int16_t");    return true;
+    case kIROp_IntType:     m_writer->emit("int");        return true;
+    case kIROp_Int64Type:   m_writer->emit("int64_t");    return true;
 
-    case kIROp_UInt8Type:   m_writer->emit("uint8_t");    return;
-    case kIROp_UInt16Type:  m_writer->emit("uint16_t");   return;
-    case kIROp_UIntType:    m_writer->emit("uint");       return;
-    case kIROp_UInt64Type:  m_writer->emit("uint64_t");   return;
+    case kIROp_UInt8Type:   m_writer->emit("uint8_t");    return true;
+    case kIROp_UInt16Type:  m_writer->emit("uint16_t");   return true;
+    case kIROp_UIntType:    m_writer->emit("uint");       return true;
+    case kIROp_UInt64Type:  m_writer->emit("uint64_t");   return true;
 
-    case kIROp_HalfType:
-    {
-        _requireHalf();
-        if (getSourceStyle() == SourceStyle::GLSL)
-        {
-            m_writer->emit("float16_t");
-        }
-        else
-        {
-            m_writer->emit("half");
-        }
-        return;
-    }
-    case kIROp_FloatType:   m_writer->emit("float");      return;
-    case kIROp_DoubleType:  m_writer->emit("double");     return;
+    case kIROp_HalfType:    m_writer->emit("half");       return true;
+
+    case kIROp_FloatType:   m_writer->emit("float");      return true;
+    case kIROp_DoubleType:  m_writer->emit("double");     return true;
 
     case kIROp_VectorType:
         _emitVectorType((IRVectorType*)type);
-        return;
+        return true;
 
     case kIROp_MatrixType:
         emitMatrixTypeImpl((IRMatrixType*)type);
-        return;
+        return true;
 
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
         emitSamplerStateType(cast<IRSamplerStateTypeBase>(type));
-        return;
+        return true;
 
     case kIROp_StructType:
         m_writer->emit(getIRName(type));
-        return;
+        return true;
     }
 
     // TODO: Ideally the following should be data-driven,
@@ -336,51 +327,30 @@ void CLikeSourceEmitter::_emitSimpleType(IRType* type)
     if (auto texType = as<IRTextureType>(type))
     {
         emitTextureType(texType);
-        return;
+        return true;
     }
     else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
     {
         emitTextureSamplerType(textureSamplerType);
-        return;
+        return true;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
         emitImageType(imageType);
-        return;
+        return true;
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         emitStructuredBufferType(structuredBufferType);
-        return;
+        return true;
     }
     else if(auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         emitUntypedBufferType(untypedBufferType);
-        return;
+        return true;
     }
 
-    // HACK: As a fallback for HLSL targets, assume that the name of the
-    // instruction being used is the same as the name of the HLSL type.
-    if(getSourceStyle() == SourceStyle::HLSL)
-    {
-        auto opInfo = getIROpInfo(type->op);
-        m_writer->emit(opInfo.name);
-        UInt operandCount = type->getOperandCount();
-        if(operandCount)
-        {
-            m_writer->emit("<");
-            for(UInt ii = 0; ii < operandCount; ++ii)
-            {
-                if(ii != 0) m_writer->emit(", ");
-                emitVal(type->getOperand(ii), getInfo(EmitOp::General));
-            }
-            m_writer->emit(" >");
-        }
-
-        return;
-    }
-
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
+    return false;
 }
 
 void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, EDeclarator* declarator)
@@ -407,7 +377,7 @@ void CLikeSourceEmitter::_emitType(IRType* type, EDeclarator* declarator)
     switch (type->op)
     {
     default:
-        _emitSimpleType(type);
+        emitSimpleType(type);
         emitDeclarator(declarator);
         break;
 
@@ -556,42 +526,7 @@ void CLikeSourceEmitter::emitStringLiteral(String const&   value)
     m_writer->emit("\"");
 }
 
-void CLikeSourceEmitter::requireGLSLExtension(String const& name)
-{
-    m_glslExtensionTracker.requireExtension(name);
-}
 
-void CLikeSourceEmitter::requireGLSLVersion(ProfileVersion version)
-{
-    if (getSourceStyle() != SourceStyle::GLSL)
-        return;
-
-    m_glslExtensionTracker.requireVersion(version);
-}
-
-void CLikeSourceEmitter::requireGLSLVersion(int version)
-{
-    switch (version)
-    {
-#define CASE(NUMBER) \
-    case NUMBER: requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
-
-    CASE(110);
-    CASE(120);
-    CASE(130);
-    CASE(140);
-    CASE(150);
-    CASE(330);
-    CASE(400);
-    CASE(410);
-    CASE(420);
-    CASE(430);
-    CASE(440);
-    CASE(450);
-
-#undef CASE
-    }
-}
 
 void CLikeSourceEmitter::setSampleRateFlag()
 {
@@ -650,76 +585,6 @@ UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind
     return space;
 }
 
-void CLikeSourceEmitter::emitGLSLVersionDirective()
-{
-    auto effectiveProfile = m_effectiveProfile;
-    if(effectiveProfile.getFamily() == ProfileFamily::GLSL)
-    {
-        requireGLSLVersion(effectiveProfile.GetVersion());
-    }
-
-    // HACK: We aren't picking GLSL versions carefully right now,
-    // and so we might end up only requiring the initial 1.10 version,
-    // even though even basic functionality needs a higher version.
-    //
-    // For now, we'll work around this by just setting the minimum required
-    // version to a high one:
-    //
-    // TODO: Either correctly compute a minimum required version, or require
-    // the user to specify a version as part of the target.
-    m_glslExtensionTracker.requireVersion(ProfileVersion::GLSL_450);
-
-    auto requiredProfileVersion = m_glslExtensionTracker.getRequiredProfileVersion();
-    switch (requiredProfileVersion)
-    {
-#define CASE(TAG, VALUE)    \
-    case ProfileVersion::TAG: m_writer->emit("#version " #VALUE "\n"); return
-
-    CASE(GLSL_110, 110);
-    CASE(GLSL_120, 120);
-    CASE(GLSL_130, 130);
-    CASE(GLSL_140, 140);
-    CASE(GLSL_150, 150);
-    CASE(GLSL_330, 330);
-    CASE(GLSL_400, 400);
-    CASE(GLSL_410, 410);
-    CASE(GLSL_420, 420);
-    CASE(GLSL_430, 430);
-    CASE(GLSL_440, 440);
-    CASE(GLSL_450, 450);
-    CASE(GLSL_460, 460);
-#undef CASE
-
-    default:
-        break;
-    }
-
-    // No information is available for us to guess a profile,
-    // so it seems like we need to pick one out of thin air.
-    //
-    // Ideally we should infer a minimum required version based
-    // on the constructs we have seen used in the user's code
-    //
-    // For now we just fall back to a reasonably recent version.
-
-    m_writer->emit("#version 420\n");
-}
-
-void CLikeSourceEmitter::emitGLSLPreprocessorDirectives()
-{
-    switch(getSourceStyle())
-    {
-    // Don't emit this stuff unless we are targeting GLSL
-    default:
-        return;
-
-    case SourceStyle::GLSL:
-        break;
-    }
-
-    emitGLSLVersionDirective();
-}
-
 void CLikeSourceEmitter::emitLayoutDirectives(TargetRequest* targetReq)
 {
     // We are going to emit the target-language-specific directives
@@ -737,48 +602,7 @@ void CLikeSourceEmitter::emitLayoutDirectives(TargetRequest* targetReq)
     // then types/variables defined in those modules should be emitted in
     // a way that is consistent with that layout...
 
-    auto matrixLayoutMode = targetReq->getDefaultMatrixLayoutMode();
-
-    switch(getSourceStyle())
-    {
-    default:
-        return;
-
-    case SourceStyle::GLSL:
-        // Reminder: the meaning of row/column major layout
-        // in our semantics is the *opposite* of what GLSL
-        // calls them, because what they call "columns"
-        // are what we call "rows."
-        //
-        switch(matrixLayoutMode)
-        {
-        case kMatrixLayoutMode_RowMajor:
-        default:
-            m_writer->emit("layout(column_major) uniform;\n");
-            m_writer->emit("layout(column_major) buffer;\n");
-            break;
-
-        case kMatrixLayoutMode_ColumnMajor:
-            m_writer->emit("layout(row_major) uniform;\n");
-            m_writer->emit("layout(row_major) buffer;\n");
-            break;
-        }
-        break;
-
-    case SourceStyle::HLSL:
-        switch(matrixLayoutMode)
-        {
-        case kMatrixLayoutMode_RowMajor:
-        default:
-            m_writer->emit("#pragma pack_matrix(row_major)\n");
-            break;
-
-        case kMatrixLayoutMode_ColumnMajor:
-            m_writer->emit("#pragma pack_matrix(column_major)\n");
-            break;
-        }
-        break;
-    }
+    emitLayoutDirectivesImpl(targetReq);
 }
 
 UInt CLikeSourceEmitter::allocateUniqueID()
@@ -1538,7 +1362,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                         // We only need to output a cast if the underlying type is half.
                         if (underlyingType && underlyingType->op == kIROp_HalfType)
                         {
-                            _emitSimpleType(elementType);
+                            emitSimpleType(elementType);
                             m_writer->emit("(");
                             openParenCount++;
                         }
@@ -1647,7 +1471,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             m_writer->emit(", ");
                             if(getSourceStyle() == SourceStyle::GLSL)
                             {
-                                _emitSimpleType(elementType);
+                                emitSimpleType(elementType);
                                 m_writer->emit("(0)");
                             }
                             else
@@ -2000,33 +1824,8 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
 {
     auto funcValue = inst->getOperand(0);
 
-    // Does this function declare any requirements on GLSL version or
-    // extensions, which should affect our output?
-    if(getSourceStyle() == SourceStyle::GLSL)
-    {
-        auto decoratedValue = funcValue;
-        while (auto specInst = as<IRSpecialize>(decoratedValue))
-        {
-            decoratedValue = getSpecializedValue(specInst);
-        }
-
-        for( auto decoration : decoratedValue->getDecorations() )
-        {
-            switch(decoration->op)
-            {
-            default:
-                break;
-
-            case kIROp_RequireGLSLExtensionDecoration:
-                requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
-                break;
-
-            case kIROp_RequireGLSLVersionDecoration:
-                requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
-                break;
-            }
-        }
-    }
+    // Does this function declare any requirements.
+    handleIRCallExprDecorationsImpl(funcValue);
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.

@@ -169,10 +169,6 @@ public:
 
     void emitStringLiteral(const String& value);
 
-    void requireGLSLExtension(const String& name);
-
-    void requireGLSLVersion(ProfileVersion version);
-    void requireGLSLVersion(int version);
     void setSampleRateFlag();
 
     void doSampleRateInputCheck(Name* name);
@@ -182,11 +178,7 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
-    void emitGLSLVersionDirective();
-
-    void emitGLSLPreprocessorDirectives();
-
-    /// Emit directives to control overall layout computation for the emitted code.
+        /// Emit directives to control overall layout computation for the emitted code.
     void emitLayoutDirectives(TargetRequest* targetReq);
 
         // Utility code for generating unique IDs as needed
@@ -366,6 +358,9 @@ public:
     void executeIREmitActions(List<EmitAction> const& actions);
     void emitIRModule(IRModule* module);
 
+    void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
+    void emitSimpleType(IRType* type);
+    
         /// Gets a source style for a target. Returns Unknown if not a known target
     static SourceStyle getSourceStyle(CodeGenTarget target);
 
@@ -384,20 +379,22 @@ public:
     virtual void emitMatrixTypeImpl(IRMatrixType* matType) = 0;
     virtual void emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type);
     virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type);
-    virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType);
+    virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType);        
+    virtual void emitPreprocessorDirectivesImpl() {}
+    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
+    
+    virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
-
+    virtual bool tryEmitSimpleTypeImpl(IRType* type);
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
     virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
 
-    void _emitSimpleType(IRType* type);
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitIRInst(IRInst* inst, IREmitMode mode);
     void _emitVectorType(IRVectorType* vecType);
     
-    void _requireHalf();
     
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 

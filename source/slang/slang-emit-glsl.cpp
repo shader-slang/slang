@@ -12,6 +12,43 @@
 
 namespace Slang {
 
+void GLSLSourceEmitter::requireGLSLExtension(String const& name)
+{
+    m_glslExtensionTracker.requireExtension(name);
+}
+
+void GLSLSourceEmitter::requireGLSLVersion(ProfileVersion version)
+{
+    if (getSourceStyle() != SourceStyle::GLSL)
+        return;
+
+    m_glslExtensionTracker.requireVersion(version);
+}
+
+void GLSLSourceEmitter::requireGLSLVersion(int version)
+{
+    switch (version)
+    {
+#define CASE(NUMBER) \
+    case NUMBER: requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
+
+        CASE(110);
+        CASE(120);
+        CASE(130);
+        CASE(140);
+        CASE(150);
+        CASE(330);
+        CASE(400);
+        CASE(410);
+        CASE(420);
+        CASE(430);
+        CASE(440);
+        CASE(450);
+
+#undef CASE
+    }
+}
+
 void GLSLSourceEmitter::emitGLSLTextureType(IRTextureType* texType)
 {
     switch (texType->getAccess())
@@ -163,7 +200,6 @@ void GLSLSourceEmitter::emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRB
 
     m_writer->emit(";\n");
 }
-
 
 void GLSLSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
@@ -721,7 +757,10 @@ void GLSLSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPoi
     }
 }
 
-
+void GLSLSourceEmitter::_requireHalf()
+{
+    m_glslExtensionTracker.requireHalfExtension();
+}
 
 void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
@@ -918,7 +957,7 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     }
     else
     {
-        _emitSimpleType(elementType);
+        emitSimpleType(elementType);
     }
 }
 
@@ -1095,5 +1134,128 @@ bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, con
     return false;
 }
 
+void GLSLSourceEmitter::handleIRCallExprDecorationsImpl(IRInst* funcValue)
+{
+    // Does this function declare any requirements on GLSL version or
+    // extensions, which should affect our output?
+
+    auto decoratedValue = funcValue;
+    while (auto specInst = as<IRSpecialize>(decoratedValue))
+    {
+        decoratedValue = getSpecializedValue(specInst);
+    }
+
+    for (auto decoration : decoratedValue->getDecorations())
+    {
+        switch (decoration->op)
+        {
+            default:
+                break;
+
+            case kIROp_RequireGLSLExtensionDecoration:
+                requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
+                break;
+
+            case kIROp_RequireGLSLVersionDecoration:
+                requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
+                break;
+        }
+    }
+}
+
+void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
+{
+    auto effectiveProfile = m_effectiveProfile;
+    if (effectiveProfile.getFamily() == ProfileFamily::GLSL)
+    {
+        requireGLSLVersion(effectiveProfile.GetVersion());
+    }
+
+    // HACK: We aren't picking GLSL versions carefully right now,
+    // and so we might end up only requiring the initial 1.10 version,
+    // even though even basic functionality needs a higher version.
+    //
+    // For now, we'll work around this by just setting the minimum required
+    // version to a high one:
+    //
+    // TODO: Either correctly compute a minimum required version, or require
+    // the user to specify a version as part of the target.
+    m_glslExtensionTracker.requireVersion(ProfileVersion::GLSL_450);
+
+    auto requiredProfileVersion = m_glslExtensionTracker.getRequiredProfileVersion();
+    switch (requiredProfileVersion)
+    {
+#define CASE(TAG, VALUE)    \
+case ProfileVersion::TAG: m_writer->emit("#version " #VALUE "\n"); return
+
+        CASE(GLSL_110, 110);
+        CASE(GLSL_120, 120);
+        CASE(GLSL_130, 130);
+        CASE(GLSL_140, 140);
+        CASE(GLSL_150, 150);
+        CASE(GLSL_330, 330);
+        CASE(GLSL_400, 400);
+        CASE(GLSL_410, 410);
+        CASE(GLSL_420, 420);
+        CASE(GLSL_430, 430);
+        CASE(GLSL_440, 440);
+        CASE(GLSL_450, 450);
+        CASE(GLSL_460, 460);
+#undef CASE
+
+        default:
+            break;
+    }
+
+    // No information is available for us to guess a profile,
+    // so it seems like we need to pick one out of thin air.
+    //
+    // Ideally we should infer a minimum required version based
+    // on the constructs we have seen used in the user's code
+    //
+    // For now we just fall back to a reasonably recent version.
+
+    m_writer->emit("#version 420\n");
+}
+
+void GLSLSourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
+{
+    // Reminder: the meaning of row/column major layout
+    // in our semantics is the *opposite* of what GLSL
+    // calls them, because what they call "columns"
+    // are what we call "rows."
+    //
+    switch (targetReq->getDefaultMatrixLayoutMode())
+    {
+        case kMatrixLayoutMode_RowMajor:
+        default:
+            m_writer->emit("layout(column_major) uniform;\n");
+            m_writer->emit("layout(column_major) buffer;\n");
+            break;
+
+        case kMatrixLayoutMode_ColumnMajor:
+            m_writer->emit("layout(row_major) uniform;\n");
+            m_writer->emit("layout(row_major) buffer;\n");
+            break;
+    }
+}
+
+bool GLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
+{
+    switch (type->op)
+    {
+        case kIROp_HalfType:
+        {
+            _requireHalf();
+            m_writer->emit("float16_t");
+            return true;
+        }
+        default:
+        {
+            // Do the default output
+            return Super::tryEmitSimpleTypeImpl(type);
+        }
+    }
+}
 
 } // namespace Slang

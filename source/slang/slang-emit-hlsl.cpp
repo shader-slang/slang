@@ -526,5 +526,46 @@ bool HLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, con
     return false;
 }
 
+void HLSLSourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
+{
+    switch (targetReq->getDefaultMatrixLayoutMode())
+    {
+        case kMatrixLayoutMode_RowMajor:
+        default:
+            m_writer->emit("#pragma pack_matrix(row_major)\n");
+            break;
+        case kMatrixLayoutMode_ColumnMajor:
+            m_writer->emit("#pragma pack_matrix(column_major)\n");
+            break;
+    }
+}
+
+bool HLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
+{
+    if (Super::tryEmitSimpleTypeImpl(type))
+    {
+        return true;
+    }
+
+    // HACK: As a fallback for HLSL targets, assume that the name of the
+    // instruction being used is the same as the name of the HLSL type.
+    {
+        auto opInfo = getIROpInfo(type->op);
+        m_writer->emit(opInfo.name);
+        UInt operandCount = type->getOperandCount();
+        if (operandCount)
+        {
+            m_writer->emit("<");
+            for (UInt ii = 0; ii < operandCount; ++ii)
+            {
+                if (ii != 0) m_writer->emit(", ");
+                emitVal(type->getOperand(ii), getInfo(EmitOp::General));
+            }
+            m_writer->emit(" >");
+        }
+    }
+
+    return true;
+}
 
 } // namespace Slang
