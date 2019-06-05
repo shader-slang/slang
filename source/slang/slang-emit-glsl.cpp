@@ -49,22 +49,6 @@ void GLSLSourceEmitter::requireGLSLVersion(int version)
     }
 }
 
-void GLSLSourceEmitter::emitGLSLTextureType(IRTextureType* texType)
-{
-    switch (texType->getAccess())
-    {
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            emitGLSLTextureOrTextureSamplerType(texType, "image");
-            break;
-
-        default:
-            emitGLSLTextureOrTextureSamplerType(texType, "texture");
-            break;
-    }
-}
-
-
 void GLSLSourceEmitter::emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
@@ -588,17 +572,6 @@ void GLSLSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  
     }
 }
 
-
-void GLSLSourceEmitter::emitGLSLTextureSamplerType(IRTextureSamplerType* type)
-{
-    emitGLSLTextureOrTextureSamplerType(type, "sampler");
-}
-
-void GLSLSourceEmitter::emitGLSLImageType(IRGLSLImageType* type)
-{
-    emitGLSLTextureOrTextureSamplerType(type, "image");
-}
-
 void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
     switch (type->op)
@@ -648,7 +621,17 @@ void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat
     }
 }
 
-void GLSLSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void GLSLSourceEmitter::_requireHalf()
+{
+    m_glslExtensionTracker.requireHalfExtension();
+}
+
+void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+{
+    emitGLSLParameterGroup(varDecl, type);
+}
+
+void GLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = entryPointLayout->profile;
     auto stage = profile.GetStage();
@@ -757,34 +740,29 @@ void GLSLSourceEmitter::emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPoi
     }
 }
 
-void GLSLSourceEmitter::_requireHalf()
-{
-    m_glslExtensionTracker.requireHalfExtension();
-}
-
-void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
-{
-    emitGLSLParameterGroup(varDecl, type);
-}
-
-void GLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
-{
-    emitIREntryPointAttributes_GLSL(irFunc, entryPointLayout);
-}
-
 void GLSLSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
 {
-    emitGLSLTextureType(texType);
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            emitGLSLTextureOrTextureSamplerType(texType, "image");
+            break;
+
+        default:
+            emitGLSLTextureOrTextureSamplerType(texType, "texture");
+            break;
+    }
 }
 
 void GLSLSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
 {
-    emitGLSLImageType(type);
+    emitGLSLTextureOrTextureSamplerType(type, "image");
 }
 
 void GLSLSourceEmitter::emitTextureSamplerTypeImpl(IRTextureSamplerType* type)
 {
-    emitGLSLTextureSamplerType(type);
+    emitGLSLTextureOrTextureSamplerType(type, "sampler");
 }
 
 bool GLSLSourceEmitter::tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)

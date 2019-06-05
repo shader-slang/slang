@@ -12,12 +12,8 @@ class GLSLSourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
-    void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName);
-    void emitGLSLTextureSamplerType(IRTextureSamplerType* type);
-    void emitGLSLImageType(IRGLSLImageType* type);
-
-    void emitGLSLTextureType(IRTextureType* texType);
-
+    void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
+    
     void emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 
     void emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
@@ -29,8 +25,6 @@ public:
     bool emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain);
 
     void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
-
-    void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void requireGLSLExtension(const String& name);
 
