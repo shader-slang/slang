@@ -106,8 +106,11 @@ enum EPrecedence
     \
     x(Prefix, "", Prefix) \
     x(Postfix, "", Postfix) \
-    x(Atomic, "", Atomic) 
-    
+    x(Atomic, "", Atomic) \
+    \
+    x(Not, "!", Prefix) \
+    x(Neg, "-", Prefix) \
+    x(BitNot, "~", Prefix)
 
 #define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 

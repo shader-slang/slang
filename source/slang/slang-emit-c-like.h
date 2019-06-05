@@ -155,7 +155,7 @@ public:
     // Expressions
     //
 
-    bool maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec);
+    bool maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec);
 
     void maybeCloseParens(bool needClose);
 

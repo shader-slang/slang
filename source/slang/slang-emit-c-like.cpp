@@ -439,7 +439,7 @@ void CLikeSourceEmitter::emitType(IRType* type)
 // Expressions
 //
 
-bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec)
+bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec)
 {
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
         || (prec.rightPrecedence <= outerPrec.rightPrecedence);
@@ -1947,40 +1947,29 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, info));   
         break;
     }
+    // Unary
     case kIROp_Not:
-    {
+    case kIROp_Neg:
+    case kIROp_BitNot:
+    {        
         IRInst* operand = inst->getOperand(0);
 
-        auto prec = getInfo(EmitOp::Prefix);
+        const auto emitOp = getEmitOpForOp(inst->op);
+        const auto prec = getInfo(emitOp);
+
         needClose = maybeEmitParens(outerPrec, prec);
 
-        m_writer->emit("!");
-        emitIROperand(operand, mode, rightSide(prec, outerPrec));
-        break;
-    }
-    case kIROp_Neg:
-    {
-        auto prec = getInfo(EmitOp::Prefix);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        m_writer->emit("-");
-        emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
-        break;
-    }
-    case kIROp_BitNot:
-    {
-        auto prec = getInfo(EmitOp::Prefix);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        if (as<IRBoolType>(inst->getDataType()))
+        // If it's a BitNot, but the data type is bool special case to !
+        if (emitOp == EmitOp::BitNot && as<IRBoolType>(inst->getDataType()))
         {
             m_writer->emit("!");
         }
         else
         {
-            m_writer->emit("~");
+            m_writer->emit(prec.op);
         }
-        emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
+        
+        emitIROperand(operand, mode, rightSide(prec, outerPrec));
         break;
     }
     case kIROp_Load:
