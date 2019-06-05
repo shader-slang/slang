@@ -995,6 +995,53 @@ void GLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* sampler
     }
 }
 
+static EmitOp _getBoolOp(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_BitAnd:          return EmitOp::And;
+        case kIROp_BitOr:           return EmitOp::Or;
+        default:                    return EmitOp::None;
+    }
+}
+
+static const char* _getGLSLVectorCompareFunctionName(IROp op)
+{
+    // Glsl vector comparisons use functions...
+    // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/equal.xhtml
+
+    switch (op)
+    {
+        case kIROp_Eql:     return "equal";
+        case kIROp_Neq:     return "notEqual";
+        case kIROp_Greater: return "greaterThan";
+        case kIROp_Less:    return "lessThan";
+        case kIROp_Geq:     return "greaterThanEqual";
+        case kIROp_Leq:     return "lessThanEqual";
+        default:    return nullptr;
+    }
+}
+
+void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode)
+{
+    // Wrap in cast if a cast type is specified
+    if (castType)
+    {
+        emitIRType(castType);
+        m_writer->emit("(");
+
+        // Emit the operand
+        emitIROperand(inst, mode, getInfo(EmitOp::General));
+
+        m_writer->emit(")");
+    }
+    else
+    {
+        // Emit the operand
+        emitIROperand(inst, mode, getInfo(EmitOp::General));
+    }
+}
+
 bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->op)
@@ -1104,6 +1151,101 @@ bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, con
 
             return true;
         }
+        case kIROp_Not:
+        {
+            IRInst* operand = inst->getOperand(0);
+            if (auto vectorType = as<IRVectorType>(operand->getDataType()))
+            {
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = false;
+
+                // Handle as a function call
+                auto prec = getInfo(EmitOp::Postfix);
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                m_writer->emit("not(");
+                emitIROperand(operand, mode, getInfo(EmitOp::General));
+                m_writer->emit(")");
+
+                maybeCloseParens(needClose);
+                return true;
+            }
+            return false;
+        }
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        {
+            // Are we targetting GLSL, and are both operands scalar bools?
+            // In that case convert the operation to a logical And
+            if (as<IRBoolType>(inst->getOperand(0)->getDataType())
+                && as<IRBoolType>(inst->getOperand(1)->getDataType()))
+            {
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, outerPrec);
+
+                // Get the boolean version of the op
+                const auto op = _getBoolOp(inst->op);
+                auto prec = getInfo(op);
+
+                // TODO: handle a bitwise Or of a vector of bools by casting to
+                // a uvec and performing the bitwise operation
+
+                emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                m_writer->emit(prec.op);
+                emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
+
+                maybeCloseParens(needClose);
+                return true;
+            }
+            break;
+        }
+
+        // Comparisons
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+        {
+            // If the comparison is between vectors use GLSL vector comparisons
+            IRInst* left = inst->getOperand(0);
+            IRInst* right = inst->getOperand(1);
+
+            auto leftVectorType = as<IRVectorType>(left->getDataType());
+            auto rightVectorType = as<IRVectorType>(right->getDataType());
+
+            // If either side is a vector handle as a vector
+            if (leftVectorType || rightVectorType)
+            {
+                const char* funcName = _getGLSLVectorCompareFunctionName(inst->op);
+                SLANG_ASSERT(funcName);
+
+                // Determine the vector type
+                const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
+
+                // Handle as a function call
+                auto prec = getInfo(EmitOp::Postfix);
+
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, outerPrec);
+
+                m_writer->emit(funcName);
+                m_writer->emit("(");
+                _maybeEmitGLSLCast((leftVectorType ? nullptr : vecType), left, mode);
+                m_writer->emit(",");
+                _maybeEmitGLSLCast((rightVectorType ? nullptr : vecType), right, mode);
+                m_writer->emit(")");
+
+                maybeCloseParens(needClose);
+
+                return true;
+            }
+
+            // Use the default
+            break;
+        }
+        
 
         default: break;
     }

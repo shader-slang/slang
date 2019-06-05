@@ -1510,7 +1510,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             // HLSL image subscript operations are defined.
                             // In contrast, the GLSL `imageAtomic*` operations
                             // expect `vector<int, N>` coordinates, so we
-                            // hill hackily insert the conversion here as
+                            // will hackily insert the conversion here as
                             // part of the intrinsic op.
                             //
                             auto coords = arg->getOperand(1);
@@ -1821,114 +1821,6 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
         maybeCloseParens(needClose);
     }
 }
-
-static const char* _getGLSLVectorCompareFunctionName(IROp op)
-{
-    // Glsl vector comparisons use functions...
-    // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/equal.xhtml
-
-    switch (op)
-    {
-    case kIROp_Eql:     return "equal";
-    case kIROp_Neq:     return "notEqual";
-    case kIROp_Greater: return "greaterThan";
-    case kIROp_Less:    return "lessThan";
-    case kIROp_Geq:     return "greaterThanEqual";
-    case kIROp_Leq:     return "lessThanEqual";
-    default:    return nullptr;
-    }
-}
-
-void CLikeSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode)
-{
-    // Wrap in cast if a cast type is specified
-    if (castType)
-    {
-        emitIRType(castType);
-        m_writer->emit("(");
-
-        // Emit the operand
-        emitIROperand(inst, mode, getInfo(EmitOp::General));
-
-        m_writer->emit(")");
-    }
-    else
-    {
-        // Emit the operand
-        emitIROperand(inst, mode, getInfo(EmitOp::General));
-    }
-}
-
-void CLikeSourceEmitter::emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, bool* outNeedClose)
-{
-    IRInst* operand = inst->getOperand(0);
-
-    if (getSourceStyle() == SourceStyle::GLSL)
-    {
-        if (auto vectorType = as<IRVectorType>(operand->getDataType()))
-        {
-            // Handle as a function call
-            auto prec = getInfo(EmitOp::Postfix);
-            *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
-
-            m_writer->emit("not(");
-            emitIROperand(operand, mode, getInfo(EmitOp::General));
-            m_writer->emit(")");
-            return;
-        }
-    }
-
-    auto prec = getInfo(EmitOp::Prefix);
-    *outNeedClose = maybeEmitParens(ioOuterPrec, prec);
-
-    m_writer->emit("!");
-    emitIROperand(operand, mode, rightSide(prec, ioOuterPrec));
-}
-
-
-void CLikeSourceEmitter::emitComparison(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, const EmitOpInfo& opPrec, bool* needCloseOut)
-{        
-    if (getSourceStyle() == SourceStyle::GLSL)
-    {
-        IRInst* left = inst->getOperand(0);
-        IRInst* right = inst->getOperand(1);
-
-        auto leftVectorType = as<IRVectorType>(left->getDataType());
-        auto rightVectorType = as<IRVectorType>(right->getDataType());
-
-        // If either side is a vector handle as a vector
-        if (leftVectorType || rightVectorType)
-        {
-            const char* funcName = _getGLSLVectorCompareFunctionName(inst->op);
-            SLANG_ASSERT(funcName);
-
-            // Determine the vector type
-            const auto vecType = leftVectorType ? leftVectorType : rightVectorType;
-
-            // Handle as a function call
-            auto prec = getInfo(EmitOp::Postfix);
-            *needCloseOut = maybeEmitParens(ioOuterPrec, prec);
-
-            m_writer->emit(funcName);
-            m_writer->emit("(");
-            _maybeEmitGLSLCast((leftVectorType ? nullptr : vecType), left, mode);
-            m_writer->emit(",");
-            _maybeEmitGLSLCast((rightVectorType ? nullptr : vecType), right, mode);
-            m_writer->emit(")");
-
-            return;
-        }
-    }
-
-    *needCloseOut = maybeEmitParens(ioOuterPrec, opPrec);
-
-    emitIROperand(inst->getOperand(0), mode, leftSide(ioOuterPrec, opPrec));
-    m_writer->emit(" ");
-    m_writer->emit(opPrec.op);
-    m_writer->emit(" ");
-    emitIROperand(inst->getOperand(1), mode, rightSide(ioOuterPrec, opPrec));
-}
-
     
 void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
@@ -2008,59 +1900,62 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         m_writer->emit(getIRName(ii->getField()));
         break;
     }
-    
 
-#define CASE_COMPARE(OPCODE, PREC, OP)                                                          \
-    case OPCODE:                                                                            \
-        emitComparison(inst,  mode, outerPrec, getInfo(EmitOp::PREC), &needClose);               \
-        break
+    // Comparisons
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Geq:
+    case kIROp_Leq:
+    {
+        const auto emitOp = getEmitOpForOp(inst->op);
 
-#define CASE(OPCODE, PREC, OP)                                                                  \
-    case OPCODE:                                                                            \
-        needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::PREC));                                \
-        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, getInfo(EmitOp::PREC)));    \
-        m_writer->emit(" " #OP " ");                                                                  \
-        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, getInfo(EmitOp::PREC)));   \
-        break
+        auto prec = getInfo(emitOp);
+        needClose = maybeEmitParens(outerPrec, prec);
 
-    CASE(kIROp_Add, Add, +);
-    CASE(kIROp_Sub, Sub, -);
-    CASE(kIROp_Div, Div, /);
-    CASE(kIROp_Mod, Mod, %);
+        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
+        m_writer->emit(" ");
+        m_writer->emit(prec.op);
+        m_writer->emit(" ");
+        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));          
+        break;
+    }
 
-    CASE(kIROp_Lsh, Lsh, <<);
-    CASE(kIROp_Rsh, Rsh, >>);
-
-    // TODO: Need to pull out component-wise
-    // comparison cases for matrices/vectors
-    CASE_COMPARE(kIROp_Eql, Eql, ==);
-    CASE_COMPARE(kIROp_Neq, Neq, !=);
-    CASE_COMPARE(kIROp_Greater, Greater, >);
-    CASE_COMPARE(kIROp_Less, Less, <);
-    CASE_COMPARE(kIROp_Geq, Geq, >=);
-    CASE_COMPARE(kIROp_Leq, Leq, <=);
-
-    CASE(kIROp_BitXor, BitXor, ^);
-
-    CASE(kIROp_And, And, &&);
-    CASE(kIROp_Or,  Or,  ||);
-
-#undef CASE
-
+    // Binary ops
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Div:
+    case kIROp_Mod:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitXor:
+    case kIROp_BitOr:
+    case kIROp_BitAnd:
+    case kIROp_And:
+    case kIROp_Or:
     case kIROp_Mul:
     {
-        // Default handling is to just rely on infix
-        // `operator*`.
-        auto prec = getInfo(EmitOp::Mul);
-        needClose = maybeEmitParens(outerPrec, prec);
-        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
-        m_writer->emit(" * ");
-        emitIROperand(inst->getOperand(1), mode, rightSide(prec, outerPrec));
+        const auto emitOp = getEmitOpForOp(inst->op);
+        const auto info = getInfo(emitOp);
+
+        needClose = maybeEmitParens(outerPrec, info);
+        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, info));    
+        m_writer->emit(" ");
+        m_writer->emit(info.op);
+        m_writer->emit(" ");                                                                  
+        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, info));   
         break;
     }
     case kIROp_Not:
     {
-        emitNot(inst,  mode, outerPrec, &needClose);
+        IRInst* operand = inst->getOperand(0);
+
+        auto prec = getInfo(EmitOp::Prefix);
+        needClose = maybeEmitParens(outerPrec, prec);
+
+        m_writer->emit("!");
+        emitIROperand(operand, mode, rightSide(prec, outerPrec));
         break;
     }
     case kIROp_Neg:
@@ -2088,60 +1983,6 @@ void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const Emi
         emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
         break;
     }
-    case kIROp_BitAnd:
-    {
-        auto prec = getInfo(EmitOp::BitAnd);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        // TODO: handle a bitwise And of a vector of bools by casting to
-        // a uvec and performing the bitwise operation
-
-        emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
-
-        // Are we targetting GLSL, and are both operands scalar bools?
-        // In that case convert the operation to a logical And
-        if (getSourceStyle() == SourceStyle::GLSL
-            && as<IRBoolType>(inst->getOperand(0)->getDataType())
-            && as<IRBoolType>(inst->getOperand(1)->getDataType()))
-        {
-            m_writer->emit("&&");
-        }
-        else
-        {
-            m_writer->emit("&");
-        }
-
-        emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
-        break;
-    }
-
-    case kIROp_BitOr:
-        {
-            auto prec = getInfo(EmitOp::BitOr);
-            needClose = maybeEmitParens(outerPrec, prec);
-
-            // TODO: handle a bitwise Or of a vector of bools by casting to
-            // a uvec and performing the bitwise operation
-
-            emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
-
-            // Are we targetting GLSL, and are both operands scalar bools?
-            // In that case convert the operation to a logical Or
-            if (getSourceStyle() == SourceStyle::GLSL
-                && as<IRBoolType>(inst->getOperand(0)->getDataType())
-                && as<IRBoolType>(inst->getOperand(1)->getDataType()))
-            {
-                m_writer->emit("||");
-            }
-            else
-            {
-                m_writer->emit("|");
-            }
-
-            emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
-        }
-        break;
-
     case kIROp_Load:
         {
             auto base = inst->getOperand(0);

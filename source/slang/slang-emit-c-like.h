@@ -237,10 +237,6 @@ public:
 
     void emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
-    void emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, bool* outNeedClose);
-
-    void emitComparison(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, const EmitOpInfo& opPrec, bool* needCloseOut);
-
     void emitIRInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const&  inOuterPrec);
     
     BaseType extractBaseType(IRType* inType);
@@ -394,9 +390,6 @@ public:
     void _emitIRInst(IRInst* inst, IREmitMode mode);
     void _emitVectorType(IRVectorType* vecType);
     
-    
-    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
-
     BackEndCompileRequest* m_compileRequest = nullptr;
 
     // The entry point we are being asked to compile

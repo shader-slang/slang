@@ -64,6 +64,7 @@ protected:
     virtual bool tryEmitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
 
     void _requireHalf();
+    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 };
 
 }
