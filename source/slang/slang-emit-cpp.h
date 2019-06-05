@@ -12,6 +12,11 @@ class CPPSourceEmitter: public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
+    enum class BuiltInCOp
+    {
+        Splat,                  //< Splat a single value to all values of a vector or matrix type
+        Init,                   //< Initialize with parameters (must match the type)
+    };
 
     CPPSourceEmitter(const Desc& desc) :
         Super(desc)
@@ -21,11 +26,13 @@ protected:
 
     void _emitCVecType(IROp op, Int size);
     void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
+    void _emitCFunc(BuiltInCOp cop, IRType* type);
 
     virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitMatrixTypeImpl(IRMatrixType* matType) SLANG_OVERRIDE;
+    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 };
 
 }

@@ -55,6 +55,8 @@ protected:
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
+    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+
 
 };
 

@@ -467,4 +467,64 @@ void HLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* sampler
     }
 }
 
+bool HLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+{
+    switch (inst->op)
+    {
+        case kIROp_Construct:
+        case kIROp_makeVector:
+        case kIROp_MakeMatrix:
+        {
+            if (inst->getOperandCount() == 1)
+            {
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = false;
+
+                auto prec = getInfo(EmitOp::Prefix);
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                // Need to emit as cast for HLSL
+                m_writer->emit("(");
+                emitIRType(inst->getDataType());
+                m_writer->emit(") ");
+                emitIROperand(inst->getOperand(0), mode, rightSide(outerPrec, prec));
+
+                maybeCloseParens(needClose);
+                // Handled
+                return true;
+            }
+            break;
+        }
+        case kIROp_BitCast:
+        {
+            auto toType = extractBaseType(inst->getDataType());
+            switch (toType)
+            {
+                default:
+                    m_writer->emit("/* unhandled */");
+                    break;
+                case BaseType::UInt:
+                    break;
+                case BaseType::Int:
+                    m_writer->emit("(");
+                    emitIRType(inst->getDataType());
+                    m_writer->emit(")");
+                    break;
+                case BaseType::Float:
+                    m_writer->emit("asfloat");
+                    break;
+            }
+
+            m_writer->emit("(");
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        default: break;
+    }
+    // Not handled
+    return false;
+}
+
+
 } // namespace Slang

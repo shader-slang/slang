@@ -107,6 +107,17 @@ void CPPSourceEmitter::_emitCMatType(IROp op, IRIntegerValue rowCount, IRInteger
     m_writer->emit(colCount);
 }
 
+void CPPSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
+{
+    _emitSimpleType(type);
+    m_writer->emit("_");
+
+    switch (cop)
+    {
+        case BuiltInCOp::Init:  m_writer->emit("init");
+        case BuiltInCOp::Splat: m_writer->emit("splat"); break;
+    }
+}
 
 void CPPSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
@@ -133,6 +144,34 @@ void CPPSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
     const auto colCount = static_cast<const IRConstant*>(matType->getColumnCount())->value.intVal;
 
     _emitCMatType(matType->getElementType()->op, rowCount, colCount);
+}
+
+bool CPPSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+{
+    SLANG_UNUSED(inOuterPrec);
+
+    //EmitOpInfo outerPrec = inOuterPrec;
+    //bool needClose = false;
+    switch (inst->op)
+    {
+        case kIROp_Construct:
+        case kIROp_makeVector:
+        case kIROp_MakeMatrix:
+            // Simple constructor call
+            if (inst->getOperandCount() == 1)
+            {
+                _emitCFunc(BuiltInCOp::Splat, inst->getDataType());
+                emitIRArgs(inst, mode);
+            }
+            else
+            {
+                _emitCFunc(BuiltInCOp::Init, inst->getDataType());
+                emitIRArgs(inst, mode);
+            }
+            return true;
+        default:
+            return false;
+    }
 }
 
 } // namespace Slang

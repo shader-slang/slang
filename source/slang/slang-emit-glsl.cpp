@@ -978,4 +978,122 @@ void GLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* sampler
     }
 }
 
+bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+{
+    switch (inst->op)
+    {
+        case kIROp_constructVectorFromScalar:
+        {
+            // Simple constructor call
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = false;
+
+            auto prec = getInfo(EmitOp::Postfix);
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            emitIRType(inst->getDataType());
+            m_writer->emit("(");
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            maybeCloseParens(needClose);
+            // Handled
+            return true;
+        }
+        case kIROp_Mul:
+        {
+            // Component-wise multiplication needs to be special cased,
+            // because GLSL uses infix `*` to express inner product
+            // when working with matrices.
+
+            // Are we targetting GLSL, and are both operands matrices?
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType())
+                && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            {
+                m_writer->emit("matrixCompMult(");
+                emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
+        }
+        case kIROp_Mul_Vector_Matrix:
+        case kIROp_Mul_Matrix_Vector:
+        case kIROp_Mul_Matrix_Matrix:
+        {
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = false;
+
+            // GLSL expresses inner-product multiplications
+            // with the ordinary infix `*` operator.
+            //
+            // Note that the order of the operands is reversed
+            // compared to HLSL (and Slang's internal representation)
+            // because the notion of what is a "row" vs. a "column"
+            // is reversed between HLSL/Slang and GLSL.
+            //
+            auto prec = getInfo(EmitOp::Mul);
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            emitIROperand(inst->getOperand(1), mode, leftSide(outerPrec, prec));
+            m_writer->emit(" * ");
+            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
+
+            maybeCloseParens(needClose);
+            return true;
+        }
+        case kIROp_Select:
+        {
+            if (inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
+            {
+                // For GLSL, emit a call to `mix` if condition is a vector
+                m_writer->emit("mix(");
+                emitIROperand(inst->getOperand(2), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                m_writer->emit(", ");
+                emitIROperand(inst->getOperand(1), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                m_writer->emit(", ");
+                emitIROperand(inst->getOperand(0), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
+        }
+        case kIROp_BitCast:
+        {
+            auto toType = extractBaseType(inst->getDataType());
+            switch (toType)
+            {
+                default:
+                    m_writer->emit("/* unhandled */");
+                    break;
+
+                case BaseType::UInt:
+                    break;
+
+                case BaseType::Int:
+                    emitIRType(inst->getDataType());
+                    break;
+
+                case BaseType::Float:
+                    m_writer->emit("uintBitsToFloat");
+                    break;
+            }
+
+            m_writer->emit("(");
+            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            return true;
+        }
+
+        default: break;
+    }
+
+    // Not handled
+    return false;
+}
+
+
 } // namespace Slang

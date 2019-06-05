@@ -54,12 +54,7 @@ public:
         CPP,
         CountOf,
     };
-    enum class BuiltInCOp
-    {
-        Splat,                  //< Splat a single value to all values of a vector or matrix type
-        Init,                   //< Initialize with parameters (must match the type)
-    };
-
+    
     typedef unsigned int ESemanticMask;
     enum
     {
@@ -393,6 +388,7 @@ public:
 
 
     virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
+    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
 
     void _emitSimpleType(IRType* type);
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
@@ -403,7 +399,6 @@ public:
     
     void _requireHalf();
     
-    void _emitCFunc(BuiltInCOp cop, IRType* type);
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
 
     BackEndCompileRequest* m_compileRequest = nullptr;

@@ -47,7 +47,7 @@ protected:
     virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type) SLANG_OVERRIDE;
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
 
-
+    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 };
 
 }
