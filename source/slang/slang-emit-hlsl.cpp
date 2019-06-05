@@ -568,4 +568,12 @@ bool HLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
     return true;
 }
 
+void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+{
+    if (as<IRGroupSharedRate>(rate))
+    {
+        m_writer->emit("groupshared ");
+    }
+}
+
 } // namespace Slang

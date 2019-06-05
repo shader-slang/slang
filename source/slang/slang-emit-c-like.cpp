@@ -535,6 +535,7 @@ void CLikeSourceEmitter::setSampleRateFlag()
 
 void CLikeSourceEmitter::doSampleRateInputCheck(Name* name)
 {
+    // TODO(JS): This doesn't appear to be called from anywhere!!
     auto text = getText(name);
     if (text == "gl_SampleID")
     {
@@ -625,7 +626,6 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
     return id;
 }
 
-/// "Scrub" a name so that it complies with restrictions of the target language.
 String CLikeSourceEmitter::scrubName(const String& name)
 {
     // We will use a plain `U` as a dummy character to insert
@@ -644,7 +644,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
 
     if(getSourceStyle() == SourceStyle::GLSL)
     {
-        // GLSL reserverse all names that start with `gl_`,
+        // GLSL reserves all names that start with `gl_`,
         // so if we are in danger of collision, then make
         // our name start with a dummy character instead.
         if(name.startsWith("gl_"))
@@ -992,7 +992,6 @@ bool CLikeSourceEmitter::shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode m
         return true;
     }
 
-
     // GLSL doesn't allow texture/resource types to
     // be used as first-class values, so we need
     // to fold them into their use sites in all cases
@@ -1131,44 +1130,12 @@ void CLikeSourceEmitter::emitIRType(IRType* type)
     emitType(type);
 }
 
-void CLikeSourceEmitter::emitIRRateQualifiers(IRRate* rate)
-{
-    if(!rate) return;
-
-    if(as<IRConstExprRate>(rate))
-    {
-        switch( getSourceStyle() )
-        {
-        case SourceStyle::GLSL:
-            m_writer->emit("const ");
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    if (as<IRGroupSharedRate>(rate))
-    {
-        switch(getSourceStyle())
-        {
-        case SourceStyle::HLSL:
-            m_writer->emit("groupshared ");
-            break;
-
-        case SourceStyle::GLSL:
-            m_writer->emit("shared ");
-            break;
-
-        default:
-            break;
-        }
-    }
-}
-
 void CLikeSourceEmitter::emitIRRateQualifiers(IRInst* value)
 {
-    emitIRRateQualifiers(value->getRate());
+    if (IRRate* rate = value->getRate())
+    {
+        emitRateQualifiersImpl(rate);
+    }
 }
 
 void CLikeSourceEmitter::emitIRInstResultDecl(IRInst* inst)

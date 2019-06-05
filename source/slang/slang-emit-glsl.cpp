@@ -1236,4 +1236,17 @@ bool GLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
     }
 }
 
+void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
+{
+    if (as<IRConstExprRate>(rate))
+    {
+        m_writer->emit("const ");
+        
+    }
+    else if (as<IRGroupSharedRate>(rate))
+    {
+        m_writer->emit("shared ");
+    }
+}
+
 } // namespace Slang

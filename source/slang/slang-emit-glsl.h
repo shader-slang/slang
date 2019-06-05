@@ -55,6 +55,7 @@ protected:
 
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
 
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 

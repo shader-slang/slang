@@ -190,7 +190,7 @@ public:
 
     UInt getID(IRInst* value);
 
-    /// "Scrub" a name so that it complies with restrictions of the target language.
+        /// "Scrub" a name so that it complies with restrictions of the target language.
     String scrubName(const String& name);
 
     String generateIRName(IRInst* inst);
@@ -210,8 +210,6 @@ public:
     void emitIRType(IRType* type, Name* name);
 
     void emitIRType(IRType* type);
-
-    void emitIRRateQualifiers(IRRate* rate);
 
     void emitIRRateQualifiers(IRInst* value);
 
@@ -360,7 +358,7 @@ public:
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
-    
+  
         /// Gets a source style for a target. Returns Unknown if not a known target
     static SourceStyle getSourceStyle(CodeGenTarget target);
 
@@ -382,7 +380,8 @@ public:
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType);        
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
-    
+    virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
+
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
     virtual bool tryEmitSimpleTypeImpl(IRType* type);
