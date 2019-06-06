@@ -216,7 +216,7 @@ void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
     {
         m_writer->emit("cbuffer ");
     }
-    m_writer->emit(getIRName(varDecl));
+    m_writer->emit(getName(varDecl));
 
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
@@ -242,7 +242,7 @@ void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
 
     auto elementType = type->getElementType();
 
-    emitIRType(elementType, getIRName(varDecl));
+    emitType(elementType, getName(varDecl));
     m_writer->emit(";\n");
 
     m_writer->dedent();
@@ -434,7 +434,7 @@ void HLSLSourceEmitter::emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFun
         return;
     }
 
-    const String irName = getIRName(irPatchFunc->getFunc());
+    const String irName = getName(irPatchFunc->getFunc());
 
     m_writer->emit("[patchconstantfunc(\"");
     m_writer->emit(irName);
@@ -557,9 +557,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
 
                 // Need to emit as cast for HLSL
                 m_writer->emit("(");
-                emitIRType(inst->getDataType());
+                emitType(inst->getDataType());
                 m_writer->emit(") ");
-                emitIROperand(inst->getOperand(0), mode, rightSide(outerPrec, prec));
+                emitOperand(inst->getOperand(0), mode, rightSide(outerPrec, prec));
 
                 maybeCloseParens(needClose);
                 // Handled
@@ -579,7 +579,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                     break;
                 case BaseType::Int:
                     m_writer->emit("(");
-                    emitIRType(inst->getDataType());
+                    emitType(inst->getDataType());
                     m_writer->emit(")");
                     break;
                 case BaseType::Float:
@@ -588,7 +588,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             }
 
             m_writer->emit("(");
-            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
@@ -662,13 +662,13 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
         auto layout = layoutDecoration->getLayout();
         if (auto varLayout = as<VarLayout>(layout))
         {
-            emitIRSemantics(varLayout);
+            emitSemantics(varLayout);
         }
         else if (auto entryPointLayout = as<EntryPointLayout>(layout))
         {
             if (auto resultLayout = entryPointLayout->resultLayout)
             {
-                emitIRSemantics(resultLayout);
+                emitSemantics(resultLayout);
             }
         }
     }

@@ -488,7 +488,7 @@ String emitEntryPoint(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
-        sourceEmitter->emitIRModule(irModule);
+        sourceEmitter->emitModule(irModule);
     }
 
     // Deal with cases where a particular stage requires certain GLSL versions

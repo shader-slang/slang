@@ -161,12 +161,12 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             if (inst->getOperandCount() == 1)
             {
                 _emitCFunc(BuiltInCOp::Splat, inst->getDataType());
-                emitIRArgs(inst, mode);
+                emitArgs(inst, mode);
             }
             else
             {
                 _emitCFunc(BuiltInCOp::Init, inst->getDataType());
-                emitIRArgs(inst, mode);
+                emitArgs(inst, mode);
             }
             return true;
         default:

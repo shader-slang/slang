@@ -49,7 +49,7 @@ void GLSLSourceEmitter::requireGLSLVersion(int version)
     }
 }
 
-void GLSLSourceEmitter::emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
+void GLSLSourceEmitter::emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
     //
@@ -107,19 +107,19 @@ void GLSLSourceEmitter::emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHL
 
 
     auto elementType = structuredBufferType->getElementType();
-    emitIRType(elementType, "_data[]");
+    emitType(elementType, "_data[]");
     m_writer->emit(";\n");
 
     m_writer->dedent();
     m_writer->emit("} ");
 
-    m_writer->emit(getIRName(varDecl));
+    m_writer->emit(getName(varDecl));
     emitArrayBrackets(varDecl->getDataType());
 
     m_writer->emit(";\n");
 }
 
-void GLSLSourceEmitter::emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+void GLSLSourceEmitter::emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
     // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -179,7 +179,7 @@ void GLSLSourceEmitter::emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRB
     m_writer->dedent();
     m_writer->emit("} ");
 
-    m_writer->emit(getIRName(varDecl));
+    m_writer->emit(getName(varDecl));
     emitArrayBrackets(varDecl->getDataType());
 
     m_writer->emit(";\n");
@@ -243,13 +243,13 @@ void GLSLSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
 
     auto elementType = type->getElementType();
 
-    emitIRType(elementType, "_data");
+    emitType(elementType, "_data");
     m_writer->emit(";\n");
 
     m_writer->dedent();
     m_writer->emit("} ");
 
-    m_writer->emit(getIRName(varDecl));
+    m_writer->emit(getName(varDecl));
 
     // If the underlying variable was an array (or array of arrays, etc.)
     // we need to emit all those array brackets here.
@@ -812,12 +812,12 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     }
     if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(unwrapArray(varType)))
     {
-        emitIRStructuredBuffer_GLSL(varDecl, structuredBufferType);
+        emitGLSLStructuredBuffer(varDecl, structuredBufferType);
         return true;
     }
     if (auto byteAddressBufferType = as<IRByteAddressBufferTypeBase>(unwrapArray(varType)))
     {
-        emitIRByteAddressBuffer_GLSL(varDecl, byteAddressBufferType);
+        emitGLSLByteAddressBuffer(varDecl, byteAddressBufferType);
         return true;
     }
 
@@ -1048,18 +1048,18 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmi
     // Wrap in cast if a cast type is specified
     if (castType)
     {
-        emitIRType(castType);
+        emitType(castType);
         m_writer->emit("(");
 
         // Emit the operand
-        emitIROperand(inst, mode, getInfo(EmitOp::General));
+        emitOperand(inst, mode, getInfo(EmitOp::General));
 
         m_writer->emit(")");
     }
     else
     {
         // Emit the operand
-        emitIROperand(inst, mode, getInfo(EmitOp::General));
+        emitOperand(inst, mode, getInfo(EmitOp::General));
     }
 }
 
@@ -1076,9 +1076,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIRType(inst->getDataType());
+            emitType(inst->getDataType());
             m_writer->emit("(");
-            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_writer->emit(")");
 
             maybeCloseParens(needClose);
@@ -1096,9 +1096,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                 && as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
                 m_writer->emit("matrixCompMult(");
-                emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
                 m_writer->emit(", ");
-                emitIROperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(1), mode, getInfo(EmitOp::General));
                 m_writer->emit(")");
                 return true;
             }
@@ -1122,9 +1122,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             auto prec = getInfo(EmitOp::Mul);
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitIROperand(inst->getOperand(1), mode, leftSide(outerPrec, prec));
+            emitOperand(inst->getOperand(1), mode, leftSide(outerPrec, prec));
             m_writer->emit(" * ");
-            emitIROperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
+            emitOperand(inst->getOperand(0), mode, rightSide(prec, outerPrec));
 
             maybeCloseParens(needClose);
             return true;
@@ -1135,11 +1135,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             {
                 // For GLSL, emit a call to `mix` if condition is a vector
                 m_writer->emit("mix(");
-                emitIROperand(inst->getOperand(2), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                emitOperand(inst->getOperand(2), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_writer->emit(", ");
-                emitIROperand(inst->getOperand(1), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                emitOperand(inst->getOperand(1), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_writer->emit(", ");
-                emitIROperand(inst->getOperand(0), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+                emitOperand(inst->getOperand(0), mode, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
                 m_writer->emit(")");
                 return true;
             }
@@ -1158,7 +1158,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                     break;
 
                 case BaseType::Int:
-                    emitIRType(inst->getDataType());
+                    emitType(inst->getDataType());
                     break;
 
                 case BaseType::Float:
@@ -1167,7 +1167,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             }
 
             m_writer->emit("(");
-            emitIROperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
             m_writer->emit(")");
 
             return true;
@@ -1185,7 +1185,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                 needClose = maybeEmitParens(outerPrec, prec);
 
                 m_writer->emit("not(");
-                emitIROperand(operand, mode, getInfo(EmitOp::General));
+                emitOperand(operand, mode, getInfo(EmitOp::General));
                 m_writer->emit(")");
 
                 maybeCloseParens(needClose);
@@ -1211,9 +1211,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                 // TODO: handle a bitwise Or of a vector of bools by casting to
                 // a uvec and performing the bitwise operation
 
-                emitIROperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
+                emitOperand(inst->getOperand(0), mode, leftSide(outerPrec, prec));
                 m_writer->emit(prec.op);
-                emitIROperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
+                emitOperand(inst->getOperand(1), mode, rightSide(outerPrec, prec));
 
                 maybeCloseParens(needClose);
                 return true;

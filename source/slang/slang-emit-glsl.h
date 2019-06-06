@@ -14,9 +14,9 @@ public:
 
     void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     
-    void emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
+    void emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 
-    void emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
+    void emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
     void emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);

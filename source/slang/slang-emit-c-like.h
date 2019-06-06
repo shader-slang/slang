@@ -150,6 +150,8 @@ public:
     void emitType(IRType* type, Name* name);
     void emitType(IRType* type, String const& name);
     void emitType(IRType* type);
+    void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
+    void emitType(IRType* type, NameLoc const& nameAndLoc);
 
     //
     // Expressions
@@ -160,11 +162,7 @@ public:
     void maybeCloseParens(bool needClose);
 
     bool isTargetIntrinsicModifierApplicable(String const& targetName);
-
-    void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
-
-    void emitType(IRType* type, NameLoc const& nameAndLoc);
-
+    
     bool isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration);
 
     void emitStringLiteral(const String& value);
@@ -193,27 +191,22 @@ public:
         /// "Scrub" a name so that it complies with restrictions of the target language.
     String scrubName(const String& name);
 
-    String generateIRName(IRInst* inst);
-    String getIRName(IRInst* inst);
+    String generateName(IRInst* inst);
+    String getName(IRInst* inst);
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
-    void emitIRSimpleValue(IRInst* inst);
+    void emitSimpleValue(IRInst* inst);
     
-    bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
+    bool shouldFoldInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
-    void emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
+    void emitOperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
 
-    void emitIRArgs(IRInst* inst, IREmitMode mode);
+    void emitArgs(IRInst* inst, IREmitMode mode);
 
-    void emitIRType(IRType* type, String const&   name);
+    
+    void emitRateQualifiers(IRInst* value);
 
-    void emitIRType(IRType* type, Name* name);
-
-    void emitIRType(IRType* type);
-
-    void emitIRRateQualifiers(IRInst* value);
-
-    void emitIRInstResultDecl(IRInst* inst);
+    void emitInstResultDecl(IRInst* inst);
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(IRInst* inst);
 
@@ -235,21 +228,20 @@ public:
         IREmitMode      mode,
         EmitOpInfo const&  inOuterPrec);
 
-    void emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
+    void emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
-    void emitIRInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const&  inOuterPrec);
+    void emitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
     
     BaseType extractBaseType(IRType* inType);
 
-    void emitIRInst(IRInst* inst, IREmitMode mode);
+    void emitInst(IRInst* inst, IREmitMode mode);
 
-    void emitIRSemantics(VarLayout* varLayout);
-
-    void emitIRSemantics(IRInst* inst);
+    void emitSemantics(VarLayout* varLayout);
+    void emitSemantics(IRInst* inst);
 
     VarLayout* getVarLayout(IRInst* var);
 
-    void emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
+    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
         // When we are about to traverse an edge from one block to another,
         // we need to emit the assignments that conceptually occur "along"
@@ -267,22 +259,22 @@ public:
         // Is an IR function a definition? (otherwise it is a declaration)
     bool isDefinition(IRFunc* func);
 
-    String getIRFuncName(IRFunc* func);
+    String getFuncName(IRFunc* func);
 
-    void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+    void emitEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitPhiVarDecls(IRFunc* func);
 
         /// Emit high-level statements for the body of a function.
-    void emitIRFunctionBody(IRGlobalValueWithCode* code);
+    void emitFunctionBody(IRGlobalValueWithCode* code);
 
-    void emitIRSimpleFunc(IRFunc* func);
+    void emitSimpleFunc(IRFunc* func);
 
-    void emitIRParamType(IRType* type, String const& name);
+    void emitParamType(IRType* type, String const& name);
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
-    void emitIRFuncDecl(IRFunc* func);
+    void emitFuncDecl(IRFunc* func);
 
     EntryPointLayout* getEntryPointLayout(IRFunc* func);
 
@@ -298,11 +290,11 @@ public:
         // if it does.
     IRFunc* asTargetIntrinsic(IRInst* value);
 
-    void emitIRFunc(IRFunc* func);
+    void emitFunc(IRFunc* func);
 
-    void emitIRStruct(IRStructType* structType);
+    void emitStruct(IRStructType* structType);
 
-    void emitIRMatrixLayoutModifiers(VarLayout* layout);
+    void emitMatrixLayoutModifiers(VarLayout* layout);
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
 
@@ -311,25 +303,24 @@ public:
     UInt getCallablePayloadLocation(IRInst* inst);
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
-    void emitIRTempModifiers(IRInst* temp);
+    void emitTempModifiers(IRInst* temp);
 
-    void emitIRVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
+    void emitVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
 
-    void emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
+    void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
-    void emitIRVar(IRVar* varDecl);
+    void emitVar(IRVar* varDecl);
 
-    
-    void emitIRGlobalVar(IRGlobalVar* varDecl);
-    void emitIRGlobalParam(IRGlobalParam* varDecl);
-    void emitIRGlobalConstantInitializer(IRGlobalConstant* valDecl);
+    void emitGlobalVar(IRGlobalVar* varDecl);
+    void emitGlobalParam(IRGlobalParam* varDecl);
+    void emitGlobalConstantInitializer(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalConstant(IRGlobalConstant* valDecl);
+    void emitGlobalConstant(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalInst(IRInst* inst);
+    void emitGlobalInst(IRInst* inst);
 
     void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
@@ -337,10 +328,10 @@ public:
 
     void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
 
-    void computeIREmitActions(IRModule* module, List<EmitAction>& ioActions);
+    void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
-    void executeIREmitActions(List<EmitAction> const& actions);
-    void emitIRModule(IRModule* module);
+    void executeEmitActions(List<EmitAction> const& actions);
+    void emitModule(IRModule* module);
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -380,7 +371,7 @@ public:
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
-    void _emitIRInst(IRInst* inst, IREmitMode mode);
+    void _emitInst(IRInst* inst, IREmitMode mode);
     void _emitVectorType(IRVectorType* vecType);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
