@@ -2780,60 +2780,6 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     m_writer->emit("};\n\n");
 }
 
-void CLikeSourceEmitter::emitMatrixLayoutModifiers(VarLayout* layout)
-{
-    // When a variable has a matrix type, we want to emit an explicit
-    // layout qualifier based on what the layout has been computed to be.
-    //
-
-    auto typeLayout = layout->typeLayout;
-    while(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
-        typeLayout = arrayTypeLayout->elementTypeLayout;
-
-    if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
-    {
-        switch (getSourceStyle())
-        {
-        case SourceStyle::HLSL:
-            switch (matrixTypeLayout->mode)
-            {
-            case kMatrixLayoutMode_ColumnMajor:
-                m_writer->emit("column_major ");
-                break;
-
-            case kMatrixLayoutMode_RowMajor:
-                m_writer->emit("row_major ");
-                break;
-            }
-            break;
-
-        case SourceStyle::GLSL:
-            // Reminder: the meaning of row/column major layout
-            // in our semantics is the *opposite* of what GLSL
-            // calls them, because what they call "columns"
-            // are what we call "rows."
-            //
-            switch (matrixTypeLayout->mode)
-            {
-            case kMatrixLayoutMode_ColumnMajor:
-                m_writer->emit("layout(row_major)\n");
-                break;
-
-            case kMatrixLayoutMode_RowMajor:
-                m_writer->emit("layout(column_major)\n");
-                break;
-            }
-            break;
-
-        default:
-            break;
-        }
-
-    }
-}
-
-
-
 void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout)
 {
     emitInterpolationModifiersImpl(varInst, valueType, layout);
@@ -2874,54 +2820,14 @@ void CLikeSourceEmitter::emitTempModifiers(IRInst* temp)
 
 void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout,IRInst* varDecl, IRType* varType)
 {
-    // Deal with Vulkan raytracing layout stuff *before* we
-    // do the check for whether `layout` is null, because
-    // the payload won't automatically get a layout applied
-    // (it isn't part of the user-visible interface...)
-    //
-    if(varDecl->findDecoration<IRVulkanRayPayloadDecoration>())
-    {
-        m_writer->emit("layout(location = ");
-        m_writer->emit(getRayPayloadLocation(varDecl));
-        m_writer->emit(")\n");
-        m_writer->emit("rayPayloadNV\n");
-    }
-    if(varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
-    {
-        m_writer->emit("layout(location = ");
-        m_writer->emit(getCallablePayloadLocation(varDecl));
-        m_writer->emit(")\n");
-        m_writer->emit("callableDataNV\n");
-    }
-
-    if(varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
-    {
-        m_writer->emit("hitAttributeNV\n");
-    }
-
-    if(varDecl->findDecoration<IRGloballyCoherentDecoration>())
-    {
-        switch(getSourceStyle())
-        {
-        default:
-            break;
-
-        case SourceStyle::HLSL:
-            m_writer->emit("globallycoherent\n");
-            break;
-
-        case SourceStyle::GLSL:
-            m_writer->emit("coherent\n");
-            break;
-        }
-    }
+    emitVarDecorationsImpl(varDecl);
 
     emitTempModifiers(varDecl);
 
     if (!layout)
         return;
 
-    emitMatrixLayoutModifiers(layout);
+    emitMatrixLayoutModifiersImpl(layout);
 
     // Target specific modifier output
     emitImageFormatModifierImpl(varDecl, varType);

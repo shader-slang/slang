@@ -779,5 +779,38 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
     }
 }
 
+void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
+{
+    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
+    {
+        m_writer->emit("globallycoherent\n");
+    }
+}
+
+void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(VarLayout* layout)
+{
+    // When a variable has a matrix type, we want to emit an explicit
+    // layout qualifier based on what the layout has been computed to be.
+    //
+
+    auto typeLayout = layout->typeLayout;
+    while (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
+        typeLayout = arrayTypeLayout->elementTypeLayout;
+
+    if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
+    {
+        switch (matrixTypeLayout->mode)
+        {
+            case kMatrixLayoutMode_ColumnMajor:
+                m_writer->emit("column_major ");
+                break;
+
+            case kMatrixLayoutMode_RowMajor:
+                m_writer->emit("row_major ");
+                break;
+        }
+    }
+}
+
 
 } // namespace Slang

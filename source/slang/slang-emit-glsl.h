@@ -55,6 +55,8 @@ protected:
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
+    virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
+    virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) SLANG_OVERRIDE;
 
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 

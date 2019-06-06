@@ -289,8 +289,6 @@ public:
 
     void emitStruct(IRStructType* structType);
 
-    void emitMatrixLayoutModifiers(VarLayout* layout);
-
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
 
     UInt getRayPayloadLocation(IRInst* inst);
@@ -353,6 +351,8 @@ public:
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
+    virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
+    virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
