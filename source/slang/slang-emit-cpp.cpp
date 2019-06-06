@@ -119,14 +119,14 @@ void CPPSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
     }
 }
 
-void CPPSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     SLANG_UNUSED(varDecl);
     SLANG_UNUSED(type);
     SLANG_ASSERT(!"Not implemented");
 }
 
-void CPPSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     SLANG_UNUSED(irFunc);
     SLANG_UNUSED(entryPointLayout);
@@ -146,7 +146,7 @@ void CPPSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
     _emitCMatType(matType->getElementType()->op, rowCount, colCount);
 }
 
-bool CPPSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
 

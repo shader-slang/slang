@@ -42,9 +42,9 @@ public:
 
 protected:
 
-    virtual void emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
-    virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
-    virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitTextureTypeImpl(IRTextureType* texType) SLANG_OVERRIDE;
     virtual void emitImageTypeImpl(IRGLSLImageType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
@@ -54,11 +54,11 @@ protected:
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
-    virtual void emitIRSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) SLANG_OVERRIDE;
     
-    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
 };
 

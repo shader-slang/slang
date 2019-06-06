@@ -350,9 +350,9 @@ public:
 
     protected:
 
-    virtual void emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
-    virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
-    virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
     virtual void emitTextureTypeImpl(IRTextureType* texType);
     virtual void emitImageTypeImpl(IRGLSLImageType* type);
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
@@ -367,15 +367,15 @@ public:
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
-    virtual void emitIRSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
+    virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
 
-    virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
+    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
     virtual bool tryEmitSimpleTypeImpl(IRType* type);
-    virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
-    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
+    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
 
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);

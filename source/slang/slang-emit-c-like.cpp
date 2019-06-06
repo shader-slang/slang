@@ -1790,7 +1790,7 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
     auto funcValue = inst->getOperand(0);
 
     // Does this function declare any requirements.
-    handleIRCallExprDecorationsImpl(funcValue);
+    handleCallExprDecorationsImpl(funcValue);
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
@@ -1823,7 +1823,7 @@ void CLikeSourceEmitter::emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInf
 void CLikeSourceEmitter::emitIRInstExpr(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     // Try target specific impl first
-    if (tryEmitIRInstExprImpl(inst, mode, inOuterPrec))
+    if (tryEmitInstExprImpl(inst, mode, inOuterPrec))
     {
         return;
     }
@@ -2312,7 +2312,7 @@ void CLikeSourceEmitter::emitIRSemantics(VarLayout* varLayout)
 
 void CLikeSourceEmitter::emitIRSemantics(IRInst* inst)
 {
-    emitIRSemanticsImpl(inst);
+    emitSemanticsImpl(inst);
 }
 
 VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
@@ -2326,7 +2326,7 @@ VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
 
 void CLikeSourceEmitter::emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    emitIRLayoutSemanticsImpl(inst, uniformSemanticSpelling);
+    emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
 }
 
 void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock)
@@ -2629,7 +2629,7 @@ String CLikeSourceEmitter::getIRFuncName(IRFunc* func)
 
 void CLikeSourceEmitter::emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    emitIREntryPointAttributesImpl(irFunc, entryPointLayout);
+    emitEntryPointAttributesImpl(irFunc, entryPointLayout);
 }
 
 void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
@@ -3151,7 +3151,7 @@ void CLikeSourceEmitter::emitArrayBrackets(IRType* inType)
 
 void CLikeSourceEmitter::emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    emitIRParameterGroupImpl(varDecl, type);
+    emitParameterGroupImpl(varDecl, type);
 }
 
 void CLikeSourceEmitter::emitIRVar(IRVar* varDecl)
@@ -3300,7 +3300,7 @@ void CLikeSourceEmitter::emitIRGlobalParam(IRGlobalParam* varDecl)
     }
 
     // Try target specific ways to emit.
-    if (tryEmitIRGlobalParamImpl(varDecl, varType))
+    if (tryEmitGlobalParamImpl(varDecl, varType))
     {
         return;
     }

@@ -441,7 +441,7 @@ void HLSLSourceEmitter::emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFun
     m_writer->emit("\")]\n");
 }
 
-void HLSLSourceEmitter::emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
     auto layout = getVarLayout(inst);
     if (layout)
@@ -450,12 +450,12 @@ void HLSLSourceEmitter::emitIRLayoutSemanticsImpl(IRInst* inst, char const* unif
     }
 }
 
-void HLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     emitHLSLParameterGroup(varDecl, type);
 }
 
-void HLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
@@ -539,7 +539,7 @@ void HLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* sampler
     }
 }
 
-bool HLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->op)
     {
@@ -648,7 +648,7 @@ void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     }
 }
 
-void HLSLSourceEmitter::emitIRSemanticsImpl(IRInst* inst)
+void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {

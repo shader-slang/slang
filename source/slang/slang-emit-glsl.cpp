@@ -647,12 +647,12 @@ void GLSLSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
     }
 }
 
-void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     emitGLSLParameterGroup(varDecl, type);
 }
 
-void GLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = entryPointLayout->profile;
     auto stage = profile.GetStage();
@@ -786,7 +786,7 @@ void GLSLSourceEmitter::emitTextureSamplerTypeImpl(IRTextureSamplerType* type)
     emitGLSLTextureOrTextureSamplerType(type, "sampler");
 }
 
-bool GLSLSourceEmitter::tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     // There are a number of types that are (or can be)
         // "first-class" in D3D HLSL, but are second-class in GLSL in
@@ -1063,7 +1063,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmi
     }
 }
 
-bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->op)
     {
@@ -1275,7 +1275,7 @@ bool GLSLSourceEmitter::tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, con
     return false;
 }
 
-void GLSLSourceEmitter::handleIRCallExprDecorationsImpl(IRInst* funcValue)
+void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
 {
     // Does this function declare any requirements on GLSL version or
     // extensions, which should affect our output?

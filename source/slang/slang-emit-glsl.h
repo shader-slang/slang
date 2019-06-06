@@ -42,8 +42,8 @@ public:
 
 protected:
 
-    virtual void emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
-    virtual void emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitTextureTypeImpl(IRTextureType* texType) SLANG_OVERRIDE;
     virtual void emitImageTypeImpl(IRGLSLImageType* type) SLANG_OVERRIDE;
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) SLANG_OVERRIDE;
@@ -62,10 +62,10 @@ protected:
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) SLANG_OVERRIDE;
 
-    virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
+    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 
-    virtual bool tryEmitIRGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
-    virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
+    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
 
     void _requireHalf();
