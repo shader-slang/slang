@@ -11,7 +11,7 @@
 namespace Slang {
 
 
-void HLSLSourceEmitter::emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+void HLSLSourceEmitter::_emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
 {
     assert(attrib);
 
@@ -38,7 +38,7 @@ void HLSLSourceEmitter::emitHLSLAttributeSingleString(const char* name, FuncDecl
     m_writer->emit("\")]\n");
 }
 
-void HLSLSourceEmitter::emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+void HLSLSourceEmitter::_emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
 {
     assert(attrib);
 
@@ -65,7 +65,7 @@ void HLSLSourceEmitter::emitHLSLAttributeSingleInt(const char* name, FuncDecl* e
     m_writer->emit(")]\n");
 }
 
-void HLSLSourceEmitter::emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
     if (!chain)
         return;
@@ -158,7 +158,7 @@ void HLSLSourceEmitter::emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVa
     }
 }
 
-void HLSLSourceEmitter::emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
     if (!chain) return;
 
@@ -175,20 +175,20 @@ void HLSLSourceEmitter::emitHLSLRegisterSemantics(EmitVarChain* chain, char cons
 
     for (auto rr : layout->resourceInfos)
     {
-        emitHLSLRegisterSemantic(rr.kind, chain, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantic(rr.kind, chain, uniformSemanticSpelling);
     }
 }
 
-void HLSLSourceEmitter::emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling)
 {
     if (!varLayout)
         return;
 
     EmitVarChain chain(varLayout);
-    emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
+    _emitHLSLRegisterSemantics(&chain, uniformSemanticSpelling);
 }
 
-void HLSLSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
+void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
 {
     if (!chain)
         return;
@@ -196,17 +196,17 @@ void HLSLSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain*
     auto layout = chain->varLayout;
     for (auto rr : layout->resourceInfos)
     {
-        emitHLSLRegisterSemantic(rr.kind, chain, "packoffset");
+        _emitHLSLRegisterSemantic(rr.kind, chain, "packoffset");
     }
 }
 
-void HLSLSourceEmitter::emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain)
+void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain)
 {
     EmitVarChain chain(fieldLayout, inChain);
-    emitHLSLParameterGroupFieldLayoutSemantics(&chain);
+    _emitHLSLParameterGroupFieldLayoutSemantics(&chain);
 }
 
-void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     if (as<IRTextureBufferType>(type))
     {
@@ -235,7 +235,7 @@ void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
         typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
     }
 
-    emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
+    _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
 
     m_writer->emit("\n{\n");
     m_writer->indent();
@@ -249,7 +249,7 @@ void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
     m_writer->emit("}\n");
 }
 
-void HLSLSourceEmitter::emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = m_effectiveProfile;
     auto stage = entryPointLayout->profile.GetStage();
@@ -314,7 +314,7 @@ void HLSLSourceEmitter::emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointL
             /* [domain("isoline")] */
             if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
             {
-                emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
             }
 
             break;
@@ -329,27 +329,27 @@ void HLSLSourceEmitter::emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointL
             /* [domain("isoline")] */
             if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
             {
-                emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
             }
             /* [domain("partitioning")] */
             if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
             {
-                emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
+                _emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
             }
             /* [outputtopology("line")] */
             if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
             {
-                emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
+                _emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
             }
             /* [outputcontrolpoints(4)] */
             if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
             {
-                emitHLSLAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+                _emitHLSLAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
             }
             /* [patchconstantfunc("HSConst")] */
             if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
             {
-                emitHLSLFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+                _emitHLSLFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
             }
 
             break;
@@ -369,7 +369,7 @@ void HLSLSourceEmitter::emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointL
 }
 
 
-void HLSLSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
+void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 {
     switch (texType->getAccess())
     {
@@ -422,7 +422,7 @@ void HLSLSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(" >");
 }
 
-void HLSLSourceEmitter::emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
+void HLSLSourceEmitter::_emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
 {
     SLANG_UNUSED(attrib);
 
@@ -446,18 +446,18 @@ void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* unifor
     auto layout = getVarLayout(inst);
     if (layout)
     {
-        emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
     }
 }
 
 void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    emitHLSLParameterGroup(varDecl, type);
+    _emitHLSLParameterGroup(varDecl, type);
 }
 
 void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
+    _emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
 
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
@@ -611,7 +611,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     // each of these IR opcodes.
     if (auto texType = as<IRTextureType>(type))
     {
-        emitHLSLTextureType(texType);
+        _emitHLSLTextureType(texType);
         return;
     }
     else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
@@ -621,7 +621,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
-        emitHLSLTextureType(imageType);
+        _emitHLSLTextureType(imageType);
         return;
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))

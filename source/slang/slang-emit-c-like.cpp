@@ -2818,8 +2818,9 @@ void CLikeSourceEmitter::emitTempModifiers(IRInst* temp)
     }
 }
 
-void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout,IRInst* varDecl, IRType* varType)
+void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType)
 {
+    // TODO(JS): We could push all of this onto the target impls, and then not need so many virtual hooks.
     emitVarDecorationsImpl(varDecl);
 
     emitTempModifiers(varDecl);
@@ -2841,7 +2842,6 @@ void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout,IRInst* varDecl, IRT
     // Output target specific qualifiers
     emitLayoutQualifiersImpl(layout);
 }
-
 
 void CLikeSourceEmitter::emitArrayBrackets(IRType* inType)
 {

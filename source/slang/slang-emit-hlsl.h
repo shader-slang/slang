@@ -12,30 +12,6 @@ class HLSLSourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
-        // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
-        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    void emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-
-        // Emit all the `register` semantics that are appropriate for a particular variable layout
-    void emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-    void emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
-
-    void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
-
-    void emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-
-    void emitHLSLTextureType(IRTextureTypeBase* texType);
-
-    void emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
-
-    void emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
-    void emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
     HLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {}
@@ -56,6 +32,30 @@ protected:
     virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+
+        // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
+        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
+    void _emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
+
+        // Emit all the `register` semantics that are appropriate for a particular variable layout
+    void _emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
+    void _emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
+
+    void _emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
+    void _emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
+
+    void _emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
+
+    void _emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+
+    void _emitHLSLTextureType(IRTextureTypeBase* texType);
+
+    void _emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
+
+    void _emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
+
+    void _emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
+
 };
 
 }

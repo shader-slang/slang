@@ -12,12 +12,12 @@
 
 namespace Slang {
 
-void GLSLSourceEmitter::requireGLSLExtension(String const& name)
+void GLSLSourceEmitter::_requireGLSLExtension(String const& name)
 {
     m_glslExtensionTracker.requireExtension(name);
 }
 
-void GLSLSourceEmitter::requireGLSLVersion(ProfileVersion version)
+void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
 {
     if (getSourceStyle() != SourceStyle::GLSL)
         return;
@@ -25,12 +25,12 @@ void GLSLSourceEmitter::requireGLSLVersion(ProfileVersion version)
     m_glslExtensionTracker.requireVersion(version);
 }
 
-void GLSLSourceEmitter::requireGLSLVersion(int version)
+void GLSLSourceEmitter::_requireGLSLVersion(int version)
 {
     switch (version)
     {
 #define CASE(NUMBER) \
-    case NUMBER: requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
+    case NUMBER: _requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
 
         CASE(110);
         CASE(120);
@@ -49,12 +49,12 @@ void GLSLSourceEmitter::requireGLSLVersion(int version)
     }
 }
 
-void GLSLSourceEmitter::emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
+void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType)
 {
     // Shader storage buffer is an OpenGL 430 feature
     //
     // TODO: we should require either the extension or the version...
-    requireGLSLVersion(430);
+    _requireGLSLVersion(430);
 
     m_writer->emit("layout(std430");
 
@@ -119,7 +119,7 @@ void GLSLSourceEmitter::emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLS
     m_writer->emit(";\n");
 }
 
-void GLSLSourceEmitter::emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
+void GLSLSourceEmitter::_emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType)
 {
     // TODO: A lot of this logic is copy-pasted from `emitIRStructuredBuffer_GLSL`.
     // It might be worthwhile to share the common code to avoid regressions sneaking
@@ -128,7 +128,7 @@ void GLSLSourceEmitter::emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByte
     // Shader storage buffer is an OpenGL 430 feature
     //
     // TODO: we should require either the extension or the version...
-    requireGLSLVersion(430);
+    _requireGLSLVersion(430);
 
     m_writer->emit("layout(std430");
 
@@ -185,7 +185,7 @@ void GLSLSourceEmitter::emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByte
     m_writer->emit(";\n");
 }
 
-void GLSLSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
@@ -212,9 +212,9 @@ void GLSLSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
     or IRGLSLShaderStorageBufferType which is read write.
     */
 
-    emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
-    emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
-    bool isShaderRecord = emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
+    _emitGLSLLayoutQualifier(LayoutResourceKind::DescriptorTableSlot, &containerChain);
+    _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
+    bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
     if (isShaderRecord)
     {
@@ -258,7 +258,7 @@ void GLSLSourceEmitter::emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
     m_writer->emit(";\n");
 }
 
-void GLSLSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
+void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
     // If the user specified a format manually, using `[format(...)]`,
     // then we will respect that format and emit a matching `layout` modifier.
@@ -279,7 +279,7 @@ void GLSLSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType* 
             // the image *type* (with a "base type" for images with
             // unknown format).
             //
-            requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+            _requireGLSLExtension("GL_EXT_shader_image_load_formatted");
         }
         else
         {
@@ -311,7 +311,7 @@ void GLSLSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType* 
     //
     if (m_compileRequest->useUnknownImageFormatAsDefault)
     {
-        requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+        _requireGLSLExtension("GL_EXT_shader_image_load_formatted");
         return;
     }
 
@@ -428,7 +428,7 @@ void GLSLSourceEmitter::emitGLSLImageFormatModifier(IRInst* var, IRTextureType* 
     }
 }
 
-bool GLSLSourceEmitter::emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain)
+bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVarChain* chain)
 {
     if (!chain)
         return false;
@@ -461,7 +461,7 @@ bool GLSLSourceEmitter::emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVar
             bool useExplicitOffsets = false;
             if (useExplicitOffsets)
             {
-                requireGLSLExtension("GL_ARB_enhanced_layouts");
+                _requireGLSLExtension("GL_ARB_enhanced_layouts");
 
                 m_writer->emit("layout(offset = ");
                 m_writer->emit(index);
@@ -509,7 +509,7 @@ bool GLSLSourceEmitter::emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVar
     return true;
 }
 
-void GLSLSourceEmitter::emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter)
+void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter)
 {
     if (!layout) return;
 
@@ -533,11 +533,11 @@ void GLSLSourceEmitter::emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitV
             continue;
         }
 
-        emitGLSLLayoutQualifier(info.kind, &chain);
+        _emitGLSLLayoutQualifier(info.kind, &chain);
     }
 }
 
-void GLSLSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
+void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
     if (type->getElementType()->op == kIROp_HalfType)
     {
@@ -546,7 +546,7 @@ void GLSLSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  
     }
     else
     {
-        emitGLSLTypePrefix(type->getElementType(), true);
+        _emitGLSLTypePrefix(type->getElementType(), true);
     }
 
     m_writer->emit(baseName);
@@ -572,7 +572,7 @@ void GLSLSourceEmitter::emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  
     }
 }
 
-void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
+void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
     switch (type->op)
     {
@@ -608,11 +608,11 @@ void GLSLSourceEmitter::emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat
         case kIROp_DoubleType:  m_writer->emit("d");		break;
 
         case kIROp_VectorType:
-            emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
+            _emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         case kIROp_MatrixType:
-            emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
+            _emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
             break;
 
         default:
@@ -626,7 +626,7 @@ void GLSLSourceEmitter::_requireHalf()
     m_glslExtensionTracker.requireHalfExtension();
 }
 
-void GLSLSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
+void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
 {
     auto tt = valueType;
     if (auto vecType = as<IRVectorType>(tt))
@@ -649,7 +649,7 @@ void GLSLSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
 
 void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    emitGLSLParameterGroup(varDecl, type);
+    _emitGLSLParameterGroup(varDecl, type);
 }
 
 void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
@@ -782,17 +782,17 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         //
     if (auto paramBlockType = as<IRUniformParameterGroupType>(unwrapArray(varType)))
     {
-        emitGLSLParameterGroup(varDecl, paramBlockType);
+        _emitGLSLParameterGroup(varDecl, paramBlockType);
         return true;
     }
     if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(unwrapArray(varType)))
     {
-        emitGLSLStructuredBuffer(varDecl, structuredBufferType);
+        _emitGLSLStructuredBuffer(varDecl, structuredBufferType);
         return true;
     }
     if (auto byteAddressBufferType = as<IRByteAddressBufferTypeBase>(unwrapArray(varType)))
     {
-        emitGLSLByteAddressBuffer(varDecl, byteAddressBufferType);
+        _emitGLSLByteAddressBuffer(varDecl, byteAddressBufferType);
         return true;
     }
 
@@ -836,7 +836,7 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     {
         if (isResourceType(unwrapArray(varType)))
         {
-            requireGLSLExtension("GL_EXT_nonuniform_qualifier");
+            _requireGLSLExtension("GL_EXT_nonuniform_qualifier");
         }
     }
 
@@ -856,7 +856,7 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
             case SLANG_RESOURCE_ACCESS_READ_WRITE:
             case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
             {
-                emitGLSLImageFormatModifier(varDecl, resourceType);
+                _emitGLSLImageFormatModifier(varDecl, resourceType);
             }
             break;
 
@@ -870,7 +870,7 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(VarLayout* layout)
 {
     // Layout-related modifiers need to come before the declaration,
     // so deal with them here.
-    emitGLSLLayoutQualifiers(layout, nullptr);
+    _emitGLSLLayoutQualifiers(layout, nullptr);
 
     // try to emit an appropriate leading qualifier
     for (auto rr : layout->resourceInfos)
@@ -1199,11 +1199,11 @@ void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
                 break;
 
             case kIROp_RequireGLSLExtensionDecoration:
-                requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
+                _requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
                 break;
 
             case kIROp_RequireGLSLVersionDecoration:
-                requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
+                _requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
                 break;
         }
     }
@@ -1214,7 +1214,7 @@ void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
     auto effectiveProfile = m_effectiveProfile;
     if (effectiveProfile.getFamily() == ProfileFamily::GLSL)
     {
-        requireGLSLVersion(effectiveProfile.GetVersion());
+        _requireGLSLVersion(effectiveProfile.GetVersion());
     }
 
     // HACK: We aren't picking GLSL versions carefully right now,
@@ -1290,7 +1290,7 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 {
     if (elementCount > 1)
     {
-        emitGLSLTypePrefix(elementType);
+        _emitGLSLTypePrefix(elementType);
         m_writer->emit("vec");
         m_writer->emit(elementCount);
     }
@@ -1342,7 +1342,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             auto matType = (IRMatrixType*)type;
 
-            emitGLSLTypePrefix(matType->getElementType());
+            _emitGLSLTypePrefix(matType->getElementType());
             m_writer->emit("mat");
             emitVal(matType->getRowCount(), getInfo(EmitOp::General));
             // TODO(tfoley): only emit the next bit
@@ -1377,23 +1377,23 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case SLANG_RESOURCE_ACCESS_READ_WRITE:
             case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                emitGLSLTextureOrTextureSamplerType(texType, "image");
+                _emitGLSLTextureOrTextureSamplerType(texType, "image");
                 break;
 
             default:
-                emitGLSLTextureOrTextureSamplerType(texType, "texture");
+                _emitGLSLTextureOrTextureSamplerType(texType, "texture");
                 break;
         }
         return;
     }
     else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
     {
-        emitGLSLTextureOrTextureSamplerType(textureSamplerType, "sampler");
+        _emitGLSLTextureOrTextureSamplerType(textureSamplerType, "sampler");
         return;
     }
     else if (auto imageType = as<IRGLSLImageType>(type))
     {
-        emitGLSLTextureOrTextureSamplerType(imageType, "image");
+        _emitGLSLTextureOrTextureSamplerType(imageType, "image");
         return;
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
@@ -1413,7 +1413,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (untypedBufferType->op)
         {
             case kIROp_RaytracingAccelerationStructureType:
-                requireGLSLExtension("GL_NV_ray_tracing");
+                _requireGLSLExtension("GL_NV_ray_tracing");
                 m_writer->emit("accelerationStructureNV");
                 break;
 
@@ -1498,7 +1498,7 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         if (layout && layout->stage == Stage::Fragment
             && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
         {
-            maybeEmitGLSLFlatModifier(valueType);
+            _maybeEmitGLSLFlatModifier(valueType);
         }
     }
 }
