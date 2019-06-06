@@ -133,18 +133,13 @@ public:
 
     void emitDeclarator(EDeclarator* declarator);
 
-    void emitTextureType(IRTextureType* texType);
-
-    void emitTextureSamplerType(IRTextureSamplerType* type);
-    void emitImageType(IRGLSLImageType* type);
-
-    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
-
-    void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
-
-    void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
-
-    void emitUntypedBufferType(IRUntypedBufferResourceType* type);
+    //void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
+    //void emitTextureType(IRTextureType* texType);
+    //void emitTextureSamplerType(IRTextureSamplerType* type);
+    //void emitImageType(IRGLSLImageType* type);
+    //void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
+    //void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
+    //void emitUntypedBufferType(IRUntypedBufferResourceType* type);
 
     void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
@@ -335,36 +330,37 @@ public:
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
-  
+
+    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount) { emitVectorTypeNameImpl(elementType, elementCount); }
+
         /// Gets a source style for a target. Returns Unknown if not a known target
     static SourceStyle getSourceStyle(CodeGenTarget target);
+        /// Gets the default type name for built in scalar types. Different impls may require something different.
+        /// Returns an empty slice if not a built in type
+    static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
 
     protected:
 
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
-    virtual void emitTextureTypeImpl(IRTextureType* texType);
-    virtual void emitImageTypeImpl(IRGLSLImageType* type);
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
     virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
-    virtual void emitTextureSamplerTypeImpl(IRTextureSamplerType* type);
-    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
-    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
-    virtual void emitMatrixTypeImpl(IRMatrixType* matType) = 0;
-    virtual void emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type);
-    virtual void emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type);
-    virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType);        
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitSimpleTypeImpl(IRType* type) = 0;
+
+        // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
+    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+        // Again necessary for & prefix intrinsics. May be removable in the future
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
-    virtual bool tryEmitSimpleTypeImpl(IRType* type);
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
     virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
 
@@ -372,7 +368,6 @@ public:
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitInst(IRInst* inst, IREmitMode mode);
-    void _emitVectorType(IRVectorType* vecType);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
 

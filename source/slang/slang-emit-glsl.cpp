@@ -761,31 +761,6 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
     }
 }
 
-void GLSLSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
-{
-    switch (texType->getAccess())
-    {
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            emitGLSLTextureOrTextureSamplerType(texType, "image");
-            break;
-
-        default:
-            emitGLSLTextureOrTextureSamplerType(texType, "texture");
-            break;
-    }
-}
-
-void GLSLSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
-{
-    emitGLSLTextureOrTextureSamplerType(type, "image");
-}
-
-void GLSLSourceEmitter::emitTextureSamplerTypeImpl(IRTextureSamplerType* type)
-{
-    emitGLSLTextureOrTextureSamplerType(type, "sampler");
-}
-
 bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     // There are a number of types that are (or can be)
@@ -943,76 +918,6 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(VarLayout* layout)
         }
 
         break;
-    }
-}
-
-void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
-{
-    if (elementCount > 1)
-    {
-        emitGLSLTypePrefix(elementType);
-        m_writer->emit("vec");
-        m_writer->emit(elementCount);
-    }
-    else
-    {
-        emitSimpleType(elementType);
-    }
-}
-
-void GLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
-{
-    emitGLSLTypePrefix(matType->getElementType());
-    m_writer->emit("mat");
-    emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-    // TODO(tfoley): only emit the next bit
-    // for non-square matrix
-    m_writer->emit("x");
-    emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-}
-
-void GLSLSourceEmitter::emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type)
-{
-    switch (type->op)
-    {
-        case kIROp_RaytracingAccelerationStructureType:
-            requireGLSLExtension("GL_NV_ray_tracing");
-            m_writer->emit("accelerationStructureNV");
-            break;
-
-            // TODO: These "translations" are obviously wrong for GLSL.
-        case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
-        case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
-        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
-            break;
-    }
-}
-
-void GLSLSourceEmitter::emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type)
-{
-    SLANG_UNUSED(type);
-    // TODO: We desugar global variables with structured-buffer type into GLSL
-    // `buffer` declarations, but we don't currently handle structured-buffer types
-    // in other contexts (e.g., as function parameters). The simplest thing to do
-    // would be to emit a `StructuredBuffer<Foo>` as `Foo[]` and `RWStructuredBuffer<Foo>`
-    // as `in out Foo[]`, but that is starting to get into the realm of transformations
-    // that should really be handled during legalization, rather than during emission.
-    //
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "structured buffer type used unexpectedly");
-}
-
-void GLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType)
-{
-    switch (samplerStateType->op)
-    {
-        case kIROp_SamplerStateType:			m_writer->emit("sampler");		break;
-        case kIROp_SamplerComparisonStateType:	m_writer->emit("samplerShadow");	break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
-            break;
     }
 }
 
@@ -1381,22 +1286,151 @@ void GLSLSourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
     }
 }
 
-bool GLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
+void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
+{
+    if (elementCount > 1)
+    {
+        emitGLSLTypePrefix(elementType);
+        m_writer->emit("vec");
+        m_writer->emit(elementCount);
+    }
+    else
+    {
+        emitSimpleType(elementType);
+    }
+}
+
+
+void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->op)
     {
+        case kIROp_VoidType:   
+        case kIROp_BoolType:   
+        case kIROp_Int8Type:   
+        case kIROp_Int16Type:  
+        case kIROp_IntType:    
+        case kIROp_Int64Type:  
+        case kIROp_UInt8Type:  
+        case kIROp_UInt16Type: 
+        case kIROp_UIntType:   
+        case kIROp_UInt64Type: 
+        case kIROp_FloatType:   
+        case kIROp_DoubleType:
+        {
+            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            return;
+        }
         case kIROp_HalfType:
         {
             _requireHalf();
             m_writer->emit("float16_t");
-            return true;
+            return;
         }
-        default:
+
+        case kIROp_StructType:
+            m_writer->emit(getName(type));
+            return;
+
+        case kIROp_VectorType:
         {
-            // Do the default output
-            return Super::tryEmitSimpleTypeImpl(type);
+            auto vecType = (IRVectorType*)type;
+            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
+            return;
         }
+        case kIROp_MatrixType:
+        {
+            auto matType = (IRMatrixType*)type;
+
+            emitGLSLTypePrefix(matType->getElementType());
+            m_writer->emit("mat");
+            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+            // TODO(tfoley): only emit the next bit
+            // for non-square matrix
+            m_writer->emit("x");
+            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+            return;
+        }
+        case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
+        {
+            auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
+            switch (samplerStateType->op)
+            {
+                case kIROp_SamplerStateType:			m_writer->emit("sampler");		break;
+                case kIROp_SamplerComparisonStateType:	m_writer->emit("samplerShadow");	break;
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
+                    break;
+            }
+            return;
+        }
+        default: break;
     }
+
+    // TODO: Ideally the following should be data-driven,
+    // based on meta-data attached to the definitions of
+    // each of these IR opcodes.
+    if (auto texType = as<IRTextureType>(type))
+    {
+        switch (texType->getAccess())
+        {
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                emitGLSLTextureOrTextureSamplerType(texType, "image");
+                break;
+
+            default:
+                emitGLSLTextureOrTextureSamplerType(texType, "texture");
+                break;
+        }
+        return;
+    }
+    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
+    {
+        emitGLSLTextureOrTextureSamplerType(textureSamplerType, "sampler");
+        return;
+    }
+    else if (auto imageType = as<IRGLSLImageType>(type))
+    {
+        emitGLSLTextureOrTextureSamplerType(imageType, "image");
+        return;
+    }
+    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        // TODO: We desugar global variables with structured-buffer type into GLSL
+        // `buffer` declarations, but we don't currently handle structured-buffer types
+        // in other contexts (e.g., as function parameters). The simplest thing to do
+        // would be to emit a `StructuredBuffer<Foo>` as `Foo[]` and `RWStructuredBuffer<Foo>`
+        // as `in out Foo[]`, but that is starting to get into the realm of transformations
+        // that should really be handled during legalization, rather than during emission.
+        //
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "structured buffer type used unexpectedly");
+        return;
+    }
+    else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    {
+        switch (untypedBufferType->op)
+        {
+            case kIROp_RaytracingAccelerationStructureType:
+                requireGLSLExtension("GL_NV_ray_tracing");
+                m_writer->emit("accelerationStructureNV");
+                break;
+
+                // TODO: These "translations" are obviously wrong for GLSL.
+            case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
+            case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
+            case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
+
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+                break;
+        }
+
+        return;
+    }
+
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
 void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)

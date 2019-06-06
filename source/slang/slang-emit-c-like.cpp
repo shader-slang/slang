@@ -174,183 +174,34 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
     }
 }
 
-void CLikeSourceEmitter::emitTextureType(IRTextureType* texType)
-{
-    emitTextureTypeImpl(texType);
-}
-
-void CLikeSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
-{
-    SLANG_UNUSED(texType);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-}
-
-void CLikeSourceEmitter::emitTextureSamplerType(IRTextureSamplerType* type)
-{
-    emitTextureSamplerTypeImpl(type);
-}
-
-void CLikeSourceEmitter::emitTextureSamplerTypeImpl(IRTextureSamplerType* type)
-{
-    SLANG_UNUSED(type);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
-}
-
-void CLikeSourceEmitter::emitImageType(IRGLSLImageType* type)
-{
-    emitImageTypeImpl(type);
-}
-
-void CLikeSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
-{
-    SLANG_UNUSED(type);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see GLSL image types");
-}
-
-void CLikeSourceEmitter::emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
-{
-    emitVectorTypeNameImpl(elementType, elementCount);
-}
-
-void CLikeSourceEmitter::_emitVectorType(IRVectorType* vecType)
-{
-    IRInst* elementCountInst = vecType->getElementCount();
-    if (elementCountInst->op != kIROp_IntLit)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Expecting an integral size for vector size");
-        return;
-    }
-
-    const IRConstant* irConst = (const IRConstant*)elementCountInst;
-    const IRIntegerValue elementCount = irConst->value.intVal;
-    if (elementCount <= 0)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Vector size must be greater than 0");
-        return;
-    }
-
-    auto* elementType = vecType->getElementType();
-
-    emitVectorTypeName(elementType, elementCount);
-}
-
-void CLikeSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType)
-{
-    SLANG_UNUSED(samplerStateType);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unimplemented for sampler state");
-}
-
-void CLikeSourceEmitter::emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType)
-{
-    emitSamplerStateTypeImpl(samplerStateType);
-}
- 
-void CLikeSourceEmitter::emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type)
-{
-    SLANG_UNUSED(type);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unimplemented buffer type");
-}
-
-void CLikeSourceEmitter::emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type)
-{
-    emitStructuredBufferTypeImpl(type);
-}
- 
-void CLikeSourceEmitter::emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type)
-{
-    SLANG_UNUSED(type);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unimplemented buffer type");
-}
-
-void CLikeSourceEmitter::emitUntypedBufferType(IRUntypedBufferResourceType* type)
-{
-    emitUntypedBufferTypeImpl(type);
-}
-
 void CLikeSourceEmitter::emitSimpleType(IRType* type)
 {
-    if (tryEmitSimpleTypeImpl(type))
-    {
-        return;
-    }
-
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
+    emitSimpleTypeImpl(type);
 }
 
-bool CLikeSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
+/* static */ UnownedStringSlice CLikeSourceEmitter::getDefaultBuiltinTypeName(IROp op)
 {
-    switch (type->op)
+    switch (op)
     {
-    default:
-        break;
+        case kIROp_VoidType:    return UnownedStringSlice("void");      
+        case kIROp_BoolType:    return UnownedStringSlice("bool");      
 
-    case kIROp_VoidType:    m_writer->emit("void");       return true;
-    case kIROp_BoolType:    m_writer->emit("bool");       return true;
+        case kIROp_Int8Type:    return UnownedStringSlice("int8_t");    
+        case kIROp_Int16Type:   return UnownedStringSlice("int16_t");   
+        case kIROp_IntType:     return UnownedStringSlice("int");       
+        case kIROp_Int64Type:   return UnownedStringSlice("int64_t");   
 
-    case kIROp_Int8Type:    m_writer->emit("int8_t");     return true;
-    case kIROp_Int16Type:   m_writer->emit("int16_t");    return true;
-    case kIROp_IntType:     m_writer->emit("int");        return true;
-    case kIROp_Int64Type:   m_writer->emit("int64_t");    return true;
+        case kIROp_UInt8Type:   return UnownedStringSlice("uint8_t");   
+        case kIROp_UInt16Type:  return UnownedStringSlice("uint16_t");  
+        case kIROp_UIntType:    return UnownedStringSlice("uint");     
+        case kIROp_UInt64Type:  return UnownedStringSlice("uint64_t"); 
 
-    case kIROp_UInt8Type:   m_writer->emit("uint8_t");    return true;
-    case kIROp_UInt16Type:  m_writer->emit("uint16_t");   return true;
-    case kIROp_UIntType:    m_writer->emit("uint");       return true;
-    case kIROp_UInt64Type:  m_writer->emit("uint64_t");   return true;
+        case kIROp_HalfType:    return UnownedStringSlice("half");     
 
-    case kIROp_HalfType:    m_writer->emit("half");       return true;
-
-    case kIROp_FloatType:   m_writer->emit("float");      return true;
-    case kIROp_DoubleType:  m_writer->emit("double");     return true;
-
-    case kIROp_VectorType:
-        _emitVectorType((IRVectorType*)type);
-        return true;
-
-    case kIROp_MatrixType:
-        emitMatrixTypeImpl((IRMatrixType*)type);
-        return true;
-
-    case kIROp_SamplerStateType:
-    case kIROp_SamplerComparisonStateType:
-        emitSamplerStateType(cast<IRSamplerStateTypeBase>(type));
-        return true;
-
-    case kIROp_StructType:
-        m_writer->emit(getName(type));
-        return true;
+        case kIROp_FloatType:   return UnownedStringSlice("float");    
+        case kIROp_DoubleType:  return UnownedStringSlice("double");   
+        default:                return UnownedStringSlice();
     }
-
-    // TODO: Ideally the following should be data-driven,
-    // based on meta-data attached to the definitions of
-    // each of these IR opcodes.
-
-    if (auto texType = as<IRTextureType>(type))
-    {
-        emitTextureType(texType);
-        return true;
-    }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        emitTextureSamplerType(textureSamplerType);
-        return true;
-    }
-    else if (auto imageType = as<IRGLSLImageType>(type))
-    {
-        emitImageType(imageType);
-        return true;
-    }
-    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
-    {
-        emitStructuredBufferType(structuredBufferType);
-        return true;
-    }
-    else if(auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
-    {
-        emitUntypedBufferType(untypedBufferType);
-        return true;
-    }
-
-    return false;
 }
 
 void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, EDeclarator* declarator)

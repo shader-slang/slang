@@ -138,13 +138,57 @@ void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValu
     _emitCVecType(elementType->op, Int(elementCount));
 }
 
-void CPPSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
+void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
-    const auto rowCount = static_cast<const IRConstant*>(matType->getRowCount())->value.intVal;
-    const auto colCount = static_cast<const IRConstant*>(matType->getColumnCount())->value.intVal;
+    switch (type->op)
+    {
+        case kIROp_VoidType:
+        case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        {
+            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            return;
+        }
+        case kIROp_HalfType:
+        {
+            m_writer->emit("float");
+            return;
+        }
+        case kIROp_StructType:
+            m_writer->emit(getName(type));
+            return;
 
-    _emitCMatType(matType->getElementType()->op, rowCount, colCount);
+        case kIROp_VectorType:
+        {
+            auto vecType = (IRVectorType*)type;
+            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
+            return;
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = (IRMatrixType*)type;
+
+            const auto rowCount = GetIntVal(matType->getRowCount());
+            const auto colCount = GetIntVal(matType->getColumnCount());
+
+            _emitCMatType(matType->getElementType()->op, rowCount, colCount);
+
+            return;
+        }
+    }
+
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for cpp target");
 }
+
 
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {

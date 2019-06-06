@@ -460,85 +460,6 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
     emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
 
-void HLSLSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
-{
-    emitHLSLTextureType(texType);
-}
-
-void HLSLSourceEmitter::emitImageTypeImpl(IRGLSLImageType* type)
-{
-    emitHLSLTextureType(type);
-}
-
-void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
-{
-    // TODO(tfoley) : should really emit these with sugar
-    m_writer->emit("vector<");
-    emitType(elementType);
-    m_writer->emit(",");
-    m_writer->emit(elementCount);
-    m_writer->emit(">");
-}
-
-void HLSLSourceEmitter::emitMatrixTypeImpl(IRMatrixType* matType)
-{
-    // TODO(tfoley): should really emit these with sugar
-    m_writer->emit("matrix<");
-    emitType(matType->getElementType());
-    m_writer->emit(",");
-    emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-    m_writer->emit(",");
-    emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-    m_writer->emit("> ");
-}
-
-void HLSLSourceEmitter::emitUntypedBufferTypeImpl(IRUntypedBufferResourceType* type)
-{
-    switch (type->op)
-    {
-        case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
-        case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
-        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
-        case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
-            break;
-    }
-}
-
-void HLSLSourceEmitter::emitStructuredBufferTypeImpl(IRHLSLStructuredBufferTypeBase* type)
-{
-    switch (type->op)
-    {
-        case kIROp_HLSLStructuredBufferType:                    m_writer->emit("StructuredBuffer");                   break;
-        case kIROp_HLSLRWStructuredBufferType:                  m_writer->emit("RWStructuredBuffer");                 break;
-        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   m_writer->emit("RasterizerOrderedStructuredBuffer");  break;
-        case kIROp_HLSLAppendStructuredBufferType:              m_writer->emit("AppendStructuredBuffer");             break;
-        case kIROp_HLSLConsumeStructuredBufferType:             m_writer->emit("ConsumeStructuredBuffer");            break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
-            break;
-    }
-
-    m_writer->emit("<");
-    emitType(type->getElementType());
-    m_writer->emit(" >");
-}
-
-void HLSLSourceEmitter::emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType)
-{
-    switch (samplerStateType->op)
-    {
-        case kIROp_SamplerStateType:			m_writer->emit("SamplerState");			break;
-        case kIROp_SamplerComparisonStateType:	m_writer->emit("SamplerComparisonState");	break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
-            break;
-    }
-}
-
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->op)
@@ -612,11 +533,133 @@ void HLSLSourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
     }
 }
 
-bool HLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
+void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    if (Super::tryEmitSimpleTypeImpl(type))
+    // TODO(tfoley) : should really emit these with sugar
+    m_writer->emit("vector<");
+    emitType(elementType);
+    m_writer->emit(",");
+    m_writer->emit(elementCount);
+    m_writer->emit(">");
+}
+
+void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
+{
+    switch (type->op)
     {
-        return true;
+        case kIROp_VoidType:
+        case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        case kIROp_HalfType:
+        {
+            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            return;
+        }
+        case kIROp_StructType:
+            m_writer->emit(getName(type));
+            return;
+
+        case kIROp_VectorType:
+        {
+            auto vecType = (IRVectorType*)type;
+            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
+            return;
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = (IRMatrixType*)type;
+
+            // TODO(tfoley): should really emit these with sugar
+            m_writer->emit("matrix<");
+            emitType(matType->getElementType());
+            m_writer->emit(",");
+            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+            m_writer->emit("> ");           
+            return;
+        }
+        case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
+        {
+            auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
+
+            switch (samplerStateType->op)
+            {
+                case kIROp_SamplerStateType:			m_writer->emit("SamplerState");			break;
+                case kIROp_SamplerComparisonStateType:	m_writer->emit("SamplerComparisonState");	break;
+                default:
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
+                    break;
+            }
+            return;
+        }
+        default: break;
+    }
+
+    // TODO: Ideally the following should be data-driven,
+    // based on meta-data attached to the definitions of
+    // each of these IR opcodes.
+    if (auto texType = as<IRTextureType>(type))
+    {
+        emitHLSLTextureType(texType);
+        return;
+    }
+    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
+        return;
+    }
+    else if (auto imageType = as<IRGLSLImageType>(type))
+    {
+        emitHLSLTextureType(imageType);
+        return;
+    }
+    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        switch (structuredBufferType->op)
+        {
+            case kIROp_HLSLStructuredBufferType:                    m_writer->emit("StructuredBuffer");                   break;
+            case kIROp_HLSLRWStructuredBufferType:                  m_writer->emit("RWStructuredBuffer");                 break;
+            case kIROp_HLSLRasterizerOrderedStructuredBufferType:   m_writer->emit("RasterizerOrderedStructuredBuffer");  break;
+            case kIROp_HLSLAppendStructuredBufferType:              m_writer->emit("AppendStructuredBuffer");             break;
+            case kIROp_HLSLConsumeStructuredBufferType:             m_writer->emit("ConsumeStructuredBuffer");            break;
+
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
+                break;
+        }
+
+        m_writer->emit("<");
+        emitType(structuredBufferType->getElementType());
+        m_writer->emit(" >");
+
+        return;
+    }
+    else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    {
+        switch (type->op)
+        {
+            case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
+            case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
+            case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
+            case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
+
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+                break;
+        }
+
+        return;
     }
 
     // HACK: As a fallback for HLSL targets, assume that the name of the
@@ -636,8 +679,6 @@ bool HLSLSourceEmitter::tryEmitSimpleTypeImpl(IRType* type)
             m_writer->emit(" >");
         }
     }
-
-    return true;
 }
 
 void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
