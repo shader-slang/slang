@@ -674,5 +674,34 @@ void HLSLSourceEmitter::emitIRSemanticsImpl(IRInst* inst)
     }
 }
 
+void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
+{
+    if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
+    {
+        Layout* layout = layoutDecor->getLayout();
+        VarLayout* varLayout = as<VarLayout>(layout);
+
+        if (varLayout)
+        {
+            auto var = varLayout->getVariable();
+
+            if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+            {
+                if (as<HLSLTriangleModifier>(primTypeModifier))
+                    m_writer->emit("triangle ");
+                else if (as<HLSLPointModifier>(primTypeModifier))
+                    m_writer->emit("point ");
+                else if (as<HLSLLineModifier>(primTypeModifier))
+                    m_writer->emit("line ");
+                else if (as<HLSLLineAdjModifier>(primTypeModifier))
+                    m_writer->emit("lineadj ");
+                else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
+                    m_writer->emit("triangleadj ");
+            }
+        }
+    }
+
+    Super::emitSimpleFuncParamImpl(param);
+}
 
 } // namespace Slang

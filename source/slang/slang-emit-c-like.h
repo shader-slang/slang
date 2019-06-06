@@ -372,6 +372,7 @@ public:
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitIRSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
+    virtual void emitSimpleFuncParamImpl(IRParam* param);
 
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 

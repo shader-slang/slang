@@ -2654,7 +2654,6 @@ void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
     }
 }
 
-/// Emit high-level statements for the body of a function.
 void CLikeSourceEmitter::emitIRFunctionBody(IRGlobalValueWithCode* code)
 {
     // Compute a structured region tree that can represent
@@ -2683,6 +2682,15 @@ void CLikeSourceEmitter::emitIRFunctionBody(IRGlobalValueWithCode* code)
     emitRegionTree(regionTree);
 }
 
+void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
+{
+    auto paramName = getIRName(param);
+    auto paramType = param->getDataType();
+
+    emitIRParamType(paramType, paramName);
+    emitIRSemantics(param);
+}
+
 void CLikeSourceEmitter::emitIRSimpleFunc(IRFunc* func)
 {
     auto resultType = func->getResultType();
@@ -2706,40 +2714,7 @@ void CLikeSourceEmitter::emitIRSimpleFunc(IRFunc* func)
         if(pp != firstParam)
             m_writer->emit(", ");
 
-        auto paramName = getIRName(pp);
-        auto paramType = pp->getDataType();
-
-        if (getSourceStyle() == SourceStyle::HLSL)
-        {
-            if (auto layoutDecor = pp->findDecoration<IRLayoutDecoration>())
-            {
-                Layout* layout = layoutDecor->getLayout();
-                VarLayout* varLayout = as<VarLayout>(layout);
-
-                if (varLayout)
-                {
-                    auto var = varLayout->getVariable();
-
-                    if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
-                    {
-                        if (as<HLSLTriangleModifier>(primTypeModifier))
-                            m_writer->emit("triangle ");
-                        else if (as<HLSLPointModifier>(primTypeModifier))
-                            m_writer->emit("point ");
-                        else if (as<HLSLLineModifier>(primTypeModifier))
-                            m_writer->emit("line ");
-                        else if (as<HLSLLineAdjModifier>(primTypeModifier))
-                            m_writer->emit("lineadj ");
-                        else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
-                            m_writer->emit("triangleadj ");
-                    }
-                }
-            }
-        }
-
-        emitIRParamType(paramType, paramName);
-
-        emitIRSemantics(pp);
+        emitSimpleFuncParamImpl(pp);
     }
     m_writer->emit(")");
 
