@@ -11,6 +11,59 @@
 namespace Slang {
 
 
+void HLSLSourceEmitter::emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+{
+    assert(attrib);
+
+    attrib->args.getCount();
+    if (attrib->args.getCount() != 1)
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+        return;
+    }
+
+    Expr* expr = attrib->args[0];
+
+    auto stringLitExpr = as<StringLiteralExpr>(expr);
+    if (!stringLitExpr)
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
+        return;
+    }
+
+    m_writer->emit("[");
+    m_writer->emit(name);
+    m_writer->emit("(\"");
+    m_writer->emit(stringLitExpr->value);
+    m_writer->emit("\")]\n");
+}
+
+void HLSLSourceEmitter::emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+{
+    assert(attrib);
+
+    attrib->args.getCount();
+    if (attrib->args.getCount() != 1)
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
+        return;
+    }
+
+    Expr* expr = attrib->args[0];
+
+    auto intLitExpr = as<IntegerLiteralExpr>(expr);
+    if (!intLitExpr)
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
+        return;
+    }
+
+    m_writer->emit("[");
+    m_writer->emit(name);
+    m_writer->emit("(");
+    m_writer->emit(intLitExpr->value);
+    m_writer->emit(")]\n");
+}
 
 void HLSLSourceEmitter::emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
@@ -196,7 +249,7 @@ void HLSLSourceEmitter::emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniform
     m_writer->emit("}\n");
 }
 
-void HLSLSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void HLSLSourceEmitter::emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     auto profile = m_effectiveProfile;
     auto stage = entryPointLayout->profile.GetStage();
@@ -261,7 +314,7 @@ void HLSLSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPoi
             /* [domain("isoline")] */
             if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
             {
-                emitAttributeSingleString("domain", entryPoint, attrib);
+                emitHLSLAttributeSingleString("domain", entryPoint, attrib);
             }
 
             break;
@@ -276,27 +329,27 @@ void HLSLSourceEmitter::emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPoi
             /* [domain("isoline")] */
             if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
             {
-                emitAttributeSingleString("domain", entryPoint, attrib);
+                emitHLSLAttributeSingleString("domain", entryPoint, attrib);
             }
             /* [domain("partitioning")] */
             if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
             {
-                emitAttributeSingleString("partitioning", entryPoint, attrib);
+                emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
             }
             /* [outputtopology("line")] */
             if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
             {
-                emitAttributeSingleString("outputtopology", entryPoint, attrib);
+                emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
             }
             /* [outputcontrolpoints(4)] */
             if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
             {
-                emitAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+                emitHLSLAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
             }
             /* [patchconstantfunc("HSConst")] */
             if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
             {
-                emitFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+                emitHLSLFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
             }
 
             break;
@@ -369,6 +422,25 @@ void HLSLSourceEmitter::emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(" >");
 }
 
+void HLSLSourceEmitter::emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
+{
+    SLANG_UNUSED(attrib);
+
+    auto irPatchFunc = irFunc->findDecoration<IRPatchConstantFuncDecoration>();
+    assert(irPatchFunc);
+    if (!irPatchFunc)
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find [patchConstantFunc(...)] decoration");
+        return;
+    }
+
+    const String irName = getIRName(irPatchFunc->getFunc());
+
+    m_writer->emit("[patchconstantfunc(\"");
+    m_writer->emit(irName);
+    m_writer->emit("\")]\n");
+}
+
 void HLSLSourceEmitter::emitIRLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
     auto layout = getVarLayout(inst);
@@ -385,7 +457,7 @@ void HLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUnifo
 
 void HLSLSourceEmitter::emitIREntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    emitIREntryPointAttributes_HLSL(irFunc, entryPointLayout);
+    emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
 
 void HLSLSourceEmitter::emitTextureTypeImpl(IRTextureType* texType)
@@ -575,5 +647,32 @@ void HLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
         m_writer->emit("groupshared ");
     }
 }
+
+void HLSLSourceEmitter::emitIRSemanticsImpl(IRInst* inst)
+{
+    if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
+    {
+        m_writer->emit(" : ");
+        m_writer->emit(semanticDecoration->getSemanticName());
+        return;
+    }
+
+    if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
+    {
+        auto layout = layoutDecoration->getLayout();
+        if (auto varLayout = as<VarLayout>(layout))
+        {
+            emitIRSemantics(varLayout);
+        }
+        else if (auto entryPointLayout = as<EntryPointLayout>(layout))
+        {
+            if (auto resultLayout = entryPointLayout->resultLayout)
+            {
+                emitIRSemantics(resultLayout);
+            }
+        }
+    }
+}
+
 
 } // namespace Slang

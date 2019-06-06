@@ -26,9 +26,15 @@ public:
 
     void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
-    void emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+    void emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitHLSLTextureType(IRTextureTypeBase* texType);
+
+    void emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
+
+    void emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
+
+    void emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
 
     HLSLSourceEmitter(const Desc& desc) :
         Super(desc)
@@ -48,6 +54,7 @@ protected:
     virtual void emitSamplerStateTypeImpl(IRSamplerStateTypeBase* samplerStateType) SLANG_OVERRIDE;
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
+    virtual void emitIRSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual bool tryEmitIRInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;

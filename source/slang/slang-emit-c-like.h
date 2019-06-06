@@ -269,12 +269,6 @@ public:
 
     String getIRFuncName(IRFunc* func);
 
-    void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
-    void emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
-    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
-
     void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitPhiVarDecls(IRFunc* func);
@@ -377,6 +371,7 @@ public:
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
+    virtual void emitIRSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
 
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 

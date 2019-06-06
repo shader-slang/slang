@@ -2314,38 +2314,7 @@ void CLikeSourceEmitter::emitIRSemantics(VarLayout* varLayout)
 
 void CLikeSourceEmitter::emitIRSemantics(IRInst* inst)
 {
-    // Don't emit semantics if we aren't translating down to HLSL
-    switch (getSourceStyle())
-    {
-    case SourceStyle::HLSL:
-        break;
-
-    default:
-        return;
-    }
-
-    if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
-    {
-        m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
-        return;
-    }
-
-    if(auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
-    {
-        auto layout = layoutDecoration->getLayout();
-        if(auto varLayout = as<VarLayout>(layout))
-        {
-            emitIRSemantics(varLayout);
-        }
-        else if (auto entryPointLayout = as<EntryPointLayout>(layout))
-        {
-            if(auto resultLayout = entryPointLayout->resultLayout)
-            {
-                emitIRSemantics(resultLayout);
-            }
-        }
-    }
+    emitIRSemanticsImpl(inst);
 }
 
 VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
@@ -2620,7 +2589,6 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
     }
 }
 
-/// Emit high-level language statements from a structured region tree.
 void CLikeSourceEmitter::emitRegionTree(RegionTree* regionTree)
 {
     emitRegion(regionTree->rootRegion);
@@ -2660,78 +2628,6 @@ String CLikeSourceEmitter::getIRFuncName(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
-{
-    assert(attrib);
-
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto stringLitExpr = as<StringLiteralExpr>(expr);
-    if (!stringLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
-        return;
-    }
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(\"");
-    m_writer->emit(stringLitExpr->value);
-    m_writer->emit("\")]\n");
-}
-
-void CLikeSourceEmitter::emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
-{
-    assert(attrib);
-
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto intLitExpr = as<IntegerLiteralExpr>(expr);
-    if (!intLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
-        return;
-    }
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(");
-    m_writer->emit(intLitExpr->value);
-    m_writer->emit(")]\n");
-}
-
-void CLikeSourceEmitter::emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
-{
-    SLANG_UNUSED(attrib);
-
-    auto irPatchFunc = irFunc->findDecoration<IRPatchConstantFuncDecoration>();
-    assert(irPatchFunc);
-    if (!irPatchFunc)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find [patchConstantFunc(...)] decoration");
-        return;
-    }
-
-    const String irName = getIRName(irPatchFunc->getFunc());
-
-    m_writer->emit("[patchconstantfunc(\"");
-    m_writer->emit(irName);
-    m_writer->emit("\")]\n");
-}
 
 void CLikeSourceEmitter::emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
