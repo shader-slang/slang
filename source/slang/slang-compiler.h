@@ -59,6 +59,9 @@ namespace Slang
         CPPSource           = SLANG_CPP_SOURCE,
     };
 
+    CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
+    UnownedStringSlice getCodeGenTargetName(CodeGenTarget target);
+
     enum class ContainerFormat
     {
         None            = SLANG_CONTAINER_FORMAT_NONE,

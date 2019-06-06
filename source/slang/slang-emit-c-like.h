@@ -17,10 +17,10 @@
 namespace Slang
 {
 
-class CLikeSourceEmitter
+class CLikeSourceEmitter: public RefObject
 {
 public:
-    struct CInfo
+    struct Desc
     {
         BackEndCompileRequest* compileRequest = nullptr;
             // The target language we want to generate code for
@@ -54,12 +54,7 @@ public:
         CPP,
         CountOf,
     };
-    enum class BuiltInCOp
-    {
-        Splat,                  //< Splat a single value to all values of a vector or matrix type
-        Init,                   //< Initialize with parameters (must match the type)
-    };
-
+    
     typedef unsigned int ESemanticMask;
     enum
     {
@@ -75,7 +70,6 @@ public:
         GlobalConstant,
     };
 
-    struct EmitVarChain;
     struct IRDeclaratorInfo;
     struct EDeclarator;
     struct ComputeEmitActionsContext;
@@ -92,8 +86,30 @@ public:
         IRInst* inst;
     };
 
+    // A chain of variables to use for emitting semantic/layout info
+    struct EmitVarChain
+    {
+        VarLayout*      varLayout;
+        EmitVarChain*   next;
+
+        EmitVarChain()
+            : varLayout(0)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout)
+            : varLayout(varLayout)
+            , next(0)
+        {}
+
+        EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
+            : varLayout(varLayout)
+            , next(next)
+        {}
+    };
+
         /// Ctor
-    CLikeSourceEmitter(const CInfo& cinfo);
+    CLikeSourceEmitter(const Desc& desc);
     
         /// Get the source manager
     SourceManager* getSourceManager() { return m_compileRequest->getSourceManager(); }
@@ -117,58 +133,35 @@ public:
 
     void emitDeclarator(EDeclarator* declarator);
 
-    void emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
-
-    void emitHLSLTextureType(IRTextureTypeBase* texType);
-
-    void emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName);
-
-    void emitGLSLTextureType(IRTextureType* texType);
-
-    void emitGLSLTextureSamplerType(IRTextureSamplerType* type);
-    
-    void emitGLSLImageType(IRGLSLImageType* type);
-
-    void emitTextureType(IRTextureType* texType);
-
-    void emitTextureSamplerType(IRTextureSamplerType* type);
-    void emitImageType(IRGLSLImageType* type);
-
-    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
-
-    void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
-
-    void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
-
-    void emitUntypedBufferType(IRUntypedBufferResourceType* type);
+    //void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
+    //void emitTextureType(IRTextureType* texType);
+    //void emitTextureSamplerType(IRTextureSamplerType* type);
+    //void emitImageType(IRGLSLImageType* type);
+    //void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
+    //void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
+    //void emitUntypedBufferType(IRUntypedBufferResourceType* type);
 
     void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
     void emitType(IRType* type, String const& name);
     void emitType(IRType* type);
+    void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
+    void emitType(IRType* type, NameLoc const& nameAndLoc);
 
     //
     // Expressions
     //
 
-    bool maybeEmitParens(EmitOpInfo& outerPrec, EmitOpInfo prec);
+    bool maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec);
 
     void maybeCloseParens(bool needClose);
 
     bool isTargetIntrinsicModifierApplicable(String const& targetName);
-
-    void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
-
-    void emitType(IRType* type, NameLoc const& nameAndLoc);
-
+    
     bool isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration);
 
     void emitStringLiteral(const String& value);
 
-    void requireGLSLExtension(const String& name);
-
-    void requireGLSLVersion(ProfileVersion version);
-    void requireGLSLVersion(int version);
     void setSampleRateFlag();
 
     void doSampleRateInputCheck(Name* name);
@@ -178,27 +171,7 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
-        // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
-        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    void emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-
-        // Emit all the `register` semantics that are appropriate for a particular variable layout
-    void emitHLSLRegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-    void emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling = "register");
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
-
-    void emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain);
-
-    bool emitGLSLLayoutQualifier(LayoutResourceKind  kind, EmitVarChain* chain);
-
-    void emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);
-
-    void emitGLSLVersionDirective();
-
-    void emitGLSLPreprocessorDirectives();
-
-    /// Emit directives to control overall layout computation for the emitted code.
+        /// Emit directives to control overall layout computation for the emitted code.
     void emitLayoutDirectives(TargetRequest* targetReq);
 
         // Utility code for generating unique IDs as needed
@@ -210,32 +183,25 @@ public:
 
     UInt getID(IRInst* value);
 
-    /// "Scrub" a name so that it complies with restrictions of the target language.
+        /// "Scrub" a name so that it complies with restrictions of the target language.
     String scrubName(const String& name);
 
-    String generateIRName(IRInst* inst);
-    String getIRName(IRInst* inst);
+    String generateName(IRInst* inst);
+    String getName(IRInst* inst);
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
-    void emitIRSimpleValue(IRInst* inst);
+    void emitSimpleValue(IRInst* inst);
     
-    bool shouldFoldIRInstIntoUseSites(IRInst* inst, IREmitMode mode);
+    bool shouldFoldInstIntoUseSites(IRInst* inst, IREmitMode mode);
 
-    void emitIROperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
+    void emitOperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
 
-    void emitIRArgs(IRInst* inst, IREmitMode mode);
+    void emitArgs(IRInst* inst, IREmitMode mode);
 
-    void emitIRType(IRType* type, String const&   name);
+    
+    void emitRateQualifiers(IRInst* value);
 
-    void emitIRType(IRType* type, Name* name);
-
-    void emitIRType(IRType* type);
-
-    void emitIRRateQualifiers(IRRate* rate);
-
-    void emitIRRateQualifiers(IRInst* value);
-
-    void emitIRInstResultDecl(IRInst* inst);
+    void emitInstResultDecl(IRInst* inst);
 
     IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(IRInst* inst);
 
@@ -257,25 +223,20 @@ public:
         IREmitMode      mode,
         EmitOpInfo const&  inOuterPrec);
 
-    void emitIRCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
+    void emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
-    void emitNot(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, bool* outNeedClose);
-
-    void emitComparison(IRInst* inst, IREmitMode mode, EmitOpInfo& ioOuterPrec, const EmitOpInfo& opPrec, bool* needCloseOut);
-
-    void emitIRInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const&  inOuterPrec);
+    void emitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
     
     BaseType extractBaseType(IRType* inType);
 
-    void emitIRInst(IRInst* inst, IREmitMode mode);
+    void emitInst(IRInst* inst, IREmitMode mode);
 
-    void emitIRSemantics(VarLayout* varLayout);
-
-    void emitIRSemantics(IRInst* inst);
+    void emitSemantics(VarLayout* varLayout);
+    void emitSemantics(IRInst* inst);
 
     VarLayout* getVarLayout(IRInst* var);
 
-    void emitIRLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
+    void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
         // When we are about to traverse an edge from one block to another,
         // we need to emit the assignments that conceptually occur "along"
@@ -293,32 +254,22 @@ public:
         // Is an IR function a definition? (otherwise it is a declaration)
     bool isDefinition(IRFunc* func);
 
-    String getIRFuncName(IRFunc* func);
+    String getFuncName(IRFunc* func);
 
-    void emitAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
-    void emitAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
-
-    void emitFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
-
-    void emitIREntryPointAttributes_HLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-
-    void emitIREntryPointAttributes_GLSL(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
-
-    void emitIREntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+    void emitEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
 
     void emitPhiVarDecls(IRFunc* func);
 
         /// Emit high-level statements for the body of a function.
-    void emitIRFunctionBody(IRGlobalValueWithCode* code);
+    void emitFunctionBody(IRGlobalValueWithCode* code);
 
-    void emitIRSimpleFunc(IRFunc* func);
+    void emitSimpleFunc(IRFunc* func);
 
-    void emitIRParamType(IRType* type, String const& name);
+    void emitParamType(IRType* type, String const& name);
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
-    void emitIRFuncDecl(IRFunc* func);
+    void emitFuncDecl(IRFunc* func);
 
     EntryPointLayout* getEntryPointLayout(IRFunc* func);
 
@@ -334,15 +285,9 @@ public:
         // if it does.
     IRFunc* asTargetIntrinsic(IRInst* value);
 
-    void emitIRFunc(IRFunc* func);
+    void emitFunc(IRFunc* func);
 
-    void emitIRStruct(IRStructType* structType);
-
-    void emitIRMatrixLayoutModifiers(VarLayout* layout);
-
-        // Emit the `flat` qualifier if the underlying type
-        // of the variable is an integer type.
-    void maybeEmitGLSLFlatModifier(IRType* valueType);
+    void emitStruct(IRStructType* structType);
 
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
 
@@ -350,35 +295,25 @@ public:
 
     UInt getCallablePayloadLocation(IRInst* inst);
 
-    void emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);
-
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
-    void emitIRTempModifiers(IRInst* temp);
+    void emitTempModifiers(IRInst* temp);
 
-    void emitIRVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
-
-    void emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
+    void emitVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
 
-    void emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
-    
-    void emitIRParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
+    void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
-    void emitIRVar(IRVar* varDecl);
+    void emitVar(IRVar* varDecl);
 
-    void emitIRStructuredBuffer_GLSL(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
-    
-    void emitIRByteAddressBuffer_GLSL(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
+    void emitGlobalVar(IRGlobalVar* varDecl);
+    void emitGlobalParam(IRGlobalParam* varDecl);
+    void emitGlobalConstantInitializer(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalVar(IRGlobalVar* varDecl);
-    void emitIRGlobalParam(IRGlobalParam* varDecl);
-    void emitIRGlobalConstantInitializer(IRGlobalConstant* valDecl);
+    void emitGlobalConstant(IRGlobalConstant* valDecl);
 
-    void emitIRGlobalConstant(IRGlobalConstant* valDecl);
-
-    void emitIRGlobalInst(IRInst* inst);
+    void emitGlobalInst(IRInst* inst);
 
     void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
@@ -386,32 +321,54 @@ public:
 
     void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
 
-    void computeIREmitActions(IRModule* module, List<EmitAction>& ioActions);
+    void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
-    void executeIREmitActions(List<EmitAction> const& actions);
-    void emitIRModule(IRModule* module);
+    void executeEmitActions(List<EmitAction> const& actions);
+    void emitModule(IRModule* module);
+
+    void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
+    void emitSimpleType(IRType* type);
+
+    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount) { emitVectorTypeNameImpl(elementType, elementCount); }
 
         /// Gets a source style for a target. Returns Unknown if not a known target
     static SourceStyle getSourceStyle(CodeGenTarget target);
+        /// Gets the default type name for built in scalar types. Different impls may require something different.
+        /// Returns an empty slice if not a built in type
+    static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
 
     protected:
 
-    void _emitSimpleType(IRType* type);
+    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
+    virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
+    virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
+    virtual void emitPreprocessorDirectivesImpl() {}
+    virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
+    virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
+    virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
+    virtual void emitSimpleFuncParamImpl(IRParam* param);
+    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitSimpleTypeImpl(IRType* type) = 0;
+    virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
+    virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
+
+        // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
+    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+        // Again necessary for & prefix intrinsics. May be removable in the future
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
+
+    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
+
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
+    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
+
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
-    void _emitIRInst(IRInst* inst, IREmitMode mode);
-    void _emitVectorType(IRVectorType* vecType);
-    void _emitMatrixType(IRMatrixType* matType);
-
-    void _requireHalf();
-    void _emitCVecType(IROp op, Int size);
-    void _emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount);
-
-    void _emitCFunc(BuiltInCOp cop, IRType* type);
-    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
-
-
+    void _emitInst(IRInst* inst, IREmitMode mode);
+    
     BackEndCompileRequest* m_compileRequest = nullptr;
 
     // The entry point we are being asked to compile

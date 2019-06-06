@@ -1519,6 +1519,8 @@ void legalizeEntryPointForGLSL(
     auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getLayout());
     SLANG_ASSERT(entryPointLayout);
 
+
+
     GLSLLegalizationContext context;
     context.session = session;
     context.stage = entryPointLayout->profile.GetStage();

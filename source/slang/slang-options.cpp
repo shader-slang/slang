@@ -486,27 +486,9 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    SlangCompileTarget format = SLANG_TARGET_UNKNOWN;
+                    const CodeGenTarget format = calcCodeGenTargetFromName(name.getUnownedSlice());
 
-                #define CASE(NAME, TARGET)  \
-                    if(name == NAME) { format = SLANG_##TARGET; } else
-
-                    CASE("hlsl", HLSL)
-                    CASE("glsl", GLSL)
-                    CASE("dxbc", DXBC)
-                    CASE("dxbc-assembly", DXBC_ASM)
-                    CASE("dxbc-asm", DXBC_ASM)
-                    CASE("spirv", SPIRV)
-                    CASE("spirv-assembly", SPIRV_ASM)
-                    CASE("spirv-asm", SPIRV_ASM)
-                    CASE("dxil", DXIL)
-                    CASE("dxil-assembly", DXIL_ASM)
-                    CASE("dxil-asm", DXIL_ASM)
-                    CASE("c", C_SOURCE)
-                    CASE("cpp", CPP_SOURCE)
-
-                #undef CASE
-                    /* else */
+                    if (format == CodeGenTarget::Unknown)
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownCodeGenerationTarget, name);
                         return SLANG_FAIL;

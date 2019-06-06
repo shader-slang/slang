@@ -39,7 +39,16 @@
     <ClInclude Include="slang-emit-c-like.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-emit-cpp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-emit-glsl-extension-tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-emit-glsl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-emit-hlsl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit-precedence.h">
@@ -227,7 +236,16 @@
     <ClCompile Include="slang-emit-c-like.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-emit-cpp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-emit-glsl-extension-tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-emit-glsl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-emit-hlsl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-emit-precedence.cpp">
