@@ -34,6 +34,8 @@ public:
     void emit(int value);
     void emit(double value);
 
+    void emitChar(char c);
+
         /// Emit names (doing so can also advance to a new source location)
     void emitName(const NameLoc& nameAndLoc);
     void emitName(Name* name, const SourceLoc& loc);

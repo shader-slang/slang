@@ -304,10 +304,6 @@ public:
 
     void emitIRMatrixLayoutModifiers(VarLayout* layout);
 
-        // Emit the `flat` qualifier if the underlying type
-        // of the variable is an integer type.
-    void maybeEmitGLSLFlatModifier(IRType* valueType);
-
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
 
     UInt getRayPayloadLocation(IRInst* inst);
@@ -373,6 +369,7 @@ public:
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitIRSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
+    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
 
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 

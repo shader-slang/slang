@@ -704,4 +704,39 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     Super::emitSimpleFuncParamImpl(param);
 }
 
+static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
+{
+    switch (mode)
+    {
+        case IRInterpolationMode::NoInterpolation:      return UnownedStringSlice::fromLiteral("nointerpolation");
+        case IRInterpolationMode::NoPerspective:        return UnownedStringSlice::fromLiteral("noperspective");
+        case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("linear");
+        case IRInterpolationMode::Sample:               return UnownedStringSlice::fromLiteral("sample");
+        case IRInterpolationMode::Centroid:             return UnownedStringSlice::fromLiteral("centroid");
+        default:                                        return UnownedStringSlice();
+    }
+}
+
+void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout)
+{
+    SLANG_UNUSED(layout);
+    SLANG_UNUSED(valueType);
+
+    for (auto dd : varInst->getDecorations())
+    {
+        if (dd->op != kIROp_InterpolationModeDecoration)
+            continue;
+
+        auto decoration = (IRInterpolationModeDecoration*)dd;
+  
+        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
+        if (modeText.size() > 0)
+        {
+            m_writer->emit(modeText);
+            m_writer->emitChar(' ');
+        }
+    }
+}
+
+
 } // namespace Slang

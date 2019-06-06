@@ -487,8 +487,7 @@ void CLikeSourceEmitter::emitType(IRType* type, NameLoc const& nameAndLoc)
     emitType(type, nameAndLoc.name, nameAndLoc.loc);
 }
 
-bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(
-    IRTargetIntrinsicDecoration*    decoration)
+bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration)
 {
     auto targetName = String(decoration->getTargetName());
 
@@ -500,7 +499,7 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(
     return isTargetIntrinsicModifierApplicable(targetName);
 }
 
-void CLikeSourceEmitter::emitStringLiteral(String const&   value)
+void CLikeSourceEmitter::emitStringLiteral(String const& value)
 {
     m_writer->emit("\"");
     for (auto c : value)
@@ -525,8 +524,6 @@ void CLikeSourceEmitter::emitStringLiteral(String const&   value)
     }
     m_writer->emit("\"");
 }
-
-
 
 void CLikeSourceEmitter::setSampleRateFlag()
 {
@@ -828,6 +825,7 @@ String CLikeSourceEmitter::getIRName(IRInst* inst)
     }
     return name;
 }
+
 void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
 {
     if(!declarator)
@@ -2998,94 +2996,11 @@ void CLikeSourceEmitter::emitIRMatrixLayoutModifiers(VarLayout* layout)
     }
 }
 
-void CLikeSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
-{
-    auto tt = valueType;
-    if(auto vecType = as<IRVectorType>(tt))
-        tt = vecType->getElementType();
-    if(auto vecType = as<IRMatrixType>(tt))
-        tt = vecType->getElementType();
 
-    switch(tt->op)
-    {
-    default:
-        break;
-
-    case kIROp_IntType:
-    case kIROp_UIntType:
-    case kIROp_UInt64Type:
-        m_writer->emit("flat ");
-        break;
-    }
-}
 
 void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout)
 {
-    bool isGLSL = (getSourceStyle() == SourceStyle::GLSL);
-    bool anyModifiers = false;
-
-    for(auto dd : varInst->getDecorations())
-    {
-        if(dd->op != kIROp_InterpolationModeDecoration)
-            continue;
-
-        auto decoration = (IRInterpolationModeDecoration*)dd;
-        auto mode = decoration->getMode();
-
-        switch(mode)
-        {
-        case IRInterpolationMode::NoInterpolation:
-            anyModifiers = true;
-            m_writer->emit(isGLSL ? "flat " : "nointerpolation ");
-            break;
-
-        case IRInterpolationMode::NoPerspective:
-            anyModifiers = true;
-            m_writer->emit("noperspective ");
-            break;
-
-        case IRInterpolationMode::Linear:
-            anyModifiers = true;
-            m_writer->emit(isGLSL ? "smooth " : "linear ");
-            break;
-
-        case IRInterpolationMode::Sample:
-            anyModifiers = true;
-            m_writer->emit("sample ");
-            break;
-
-        case IRInterpolationMode::Centroid:
-            anyModifiers = true;
-            m_writer->emit("centroid ");
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    // If the user didn't explicitly qualify a varying
-    // with integer type, then we need to explicitly
-    // add the `flat` modifier for GLSL.
-    if(!anyModifiers && isGLSL)
-    {
-        // Only emit a default `flat` for fragment
-        // stage varying inputs.
-        //
-        // TODO: double-check that this works for
-        // signature matching even if the producing
-        // stage didn't use `flat`.
-        //
-        // If this ends up being a problem we can instead
-        // output everything with `flat` except for
-        // fragment *outputs* (and maybe vertex inputs).
-        //
-        if(layout && layout->stage == Stage::Fragment
-            && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
-        {
-            maybeEmitGLSLFlatModifier(valueType);
-        }
-    }
+    emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
 UInt CLikeSourceEmitter::getRayPayloadLocation(IRInst* inst)

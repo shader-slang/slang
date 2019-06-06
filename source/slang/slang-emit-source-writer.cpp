@@ -95,6 +95,11 @@ void SourceWriter::dedent()
     m_indentLevel--;
 }
 
+void SourceWriter::emitChar(char c)
+{
+    emit(&c, &c + 1);
+}
+
 void SourceWriter::emit(char const* textBegin, char const* textEnd)
 {
     char const* spanBegin = textBegin;

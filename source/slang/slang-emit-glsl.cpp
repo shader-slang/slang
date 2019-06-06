@@ -626,6 +626,27 @@ void GLSLSourceEmitter::_requireHalf()
     m_glslExtensionTracker.requireHalfExtension();
 }
 
+void GLSLSourceEmitter::maybeEmitGLSLFlatModifier(IRType* valueType)
+{
+    auto tt = valueType;
+    if (auto vecType = as<IRVectorType>(tt))
+        tt = vecType->getElementType();
+    if (auto vecType = as<IRMatrixType>(tt))
+        tt = vecType->getElementType();
+
+    switch (tt->op)
+    {
+        default:
+            break;
+
+        case kIROp_IntType:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+            m_writer->emit("flat ");
+            break;
+    }
+}
+
 void GLSLSourceEmitter::emitIRParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     emitGLSLParameterGroup(varDecl, type);
@@ -1388,6 +1409,63 @@ void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     else if (as<IRGroupSharedRate>(rate))
     {
         m_writer->emit("shared ");
+    }
+}
+
+static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
+{
+    switch (mode)
+    {
+        case IRInterpolationMode::NoInterpolation:      return UnownedStringSlice::fromLiteral("flat");
+        case IRInterpolationMode::NoPerspective:        return UnownedStringSlice::fromLiteral("noperspective");
+        case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("smooth");
+        case IRInterpolationMode::Sample:               return UnownedStringSlice::fromLiteral("sample");
+        case IRInterpolationMode::Centroid:             return UnownedStringSlice::fromLiteral("centroid");
+        default:                                        return UnownedStringSlice();
+    }
+}
+
+void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout)
+{
+    bool anyModifiers = false;
+
+    for (auto dd : varInst->getDecorations())
+    {
+        if (dd->op != kIROp_InterpolationModeDecoration)
+            continue;
+
+        auto decoration = (IRInterpolationModeDecoration*)dd;
+        const UnownedStringSlice slice = _getInterpolationModifierText(decoration->getMode());
+
+        if (slice.size())
+        {
+            m_writer->emit(slice);
+            m_writer->emitChar(' ');
+            anyModifiers = true;
+        }
+    }
+
+    // If the user didn't explicitly qualify a varying
+    // with integer type, then we need to explicitly
+    // add the `flat` modifier for GLSL.
+    if (!anyModifiers)
+    {
+        // Only emit a default `flat` for fragment
+        // stage varying inputs.
+        //
+        // TODO: double-check that this works for
+        // signature matching even if the producing
+        // stage didn't use `flat`.
+        //
+        // If this ends up being a problem we can instead
+        // output everything with `flat` except for
+        // fragment *outputs* (and maybe vertex inputs).
+        //
+        if (layout && layout->stage == Stage::Fragment
+            && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+        {
+            maybeEmitGLSLFlatModifier(valueType);
+        }
     }
 }
 

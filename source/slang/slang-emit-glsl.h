@@ -31,6 +31,10 @@ public:
     void requireGLSLVersion(ProfileVersion version);
     void requireGLSLVersion(int version);
 
+        // Emit the `flat` qualifier if the underlying type
+        // of the variable is an integer type.
+    void maybeEmitGLSLFlatModifier(IRType* valueType);
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
@@ -56,6 +60,7 @@ protected:
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
+    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) SLANG_OVERRIDE;
 
     virtual void handleIRCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 
