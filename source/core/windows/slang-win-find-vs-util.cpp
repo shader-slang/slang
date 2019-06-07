@@ -162,7 +162,13 @@ static int _getRegistryKeyIndex(Version version)
 {
     int versionCount = SLANG_COUNT_OF(s_versionsInfos);
 
+    for (int i = 0; i < versionCount; ++i)
+    {
+        const auto& versionInfo = s_versionInfos[i];
 
+
+
+    }
 }
 
 } // namespace Slang

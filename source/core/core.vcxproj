@@ -186,6 +186,7 @@
     <ClInclude Include="slang-memory-arena.h" />
     <ClInclude Include="slang-object-scope-manager.h" />
     <ClInclude Include="slang-platform.h" />
+    <ClInclude Include="slang-process.h" />
     <ClInclude Include="slang-random-generator.h" />
     <ClInclude Include="slang-render-api-util.h" />
     <ClInclude Include="slang-secure-crt.h" />
@@ -203,6 +204,7 @@
     <ClInclude Include="slang-uint-set.h" />
     <ClInclude Include="slang-writer.h" />
     <ClInclude Include="windows\slang-win-find-vs-util.h" />
+    <ClInclude Include="windows\slang-win-process.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-byte-encode-util.cpp" />
@@ -211,6 +213,7 @@
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />
     <ClCompile Include="slang-platform.cpp" />
+    <ClCompile Include="slang-process.cpp" />
     <ClCompile Include="slang-random-generator.cpp" />
     <ClCompile Include="slang-render-api-util.cpp" />
     <ClCompile Include="slang-shared-library.cpp" />
@@ -225,6 +228,7 @@
     <ClCompile Include="slang-uint-set.cpp" />
     <ClCompile Include="slang-writer.cpp" />
     <ClCompile Include="windows\slang-win-find-vs-util.cpp" />
+    <ClCompile Include="windows\slang-win-process.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="core.natvis" />
