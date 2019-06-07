@@ -441,6 +441,9 @@ standardProject "core"
     warnings "Extra"
     flags { "FatalWarnings" }
     
+    filter { "system:windows"}
+            addSourceDir "source/core/windows"
+    
     -- We need the core library to be relocatable to be able to link with slang.so
     filter { "system:linux" }
         buildoptions{"-fPIC"}

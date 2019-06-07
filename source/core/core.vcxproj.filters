@@ -105,6 +105,9 @@
     <ClInclude Include="slang-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="windows\slang-win-find-vs-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-byte-encode-util.cpp">
@@ -162,6 +165,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\slang-win-find-vs-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

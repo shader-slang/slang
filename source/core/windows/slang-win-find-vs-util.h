@@ -1,0 +1,32 @@
+#ifndef SLANG_WIN_FIND_VS_UTIL_H
+#define SLANG_WIN_FIND_VS_UTIL_H
+
+#include "../slang-list.h"
+#include "../slang-string.h"
+
+namespace Slang {
+
+struct WinFindVisualStudioUtil
+{
+    enum class Version: uint32_t
+    {
+        Unknown = 0,                ///< This is an unknown (and not later) version
+        Future = 0xff * 10,         ///< This is a version 'from the future' - that isn't specifically known. Will be treated as latest
+    };
+    
+        ///  Find a visual studio compiler installation
+    static SlangResult find(String& outPath);
+
+        /// Get all the known version numbers
+    static void getVersions(List<Version>& outVersions);
+
+        /// Gets the msc compiler used to compile this version. Returning Version(0) means unknown
+    static Version getCompiledVersion();
+
+        /// Create a version from a high and low indices
+    static Version makeVersion(int high, int low = 0) { SLANG_ASSERT(low >= 0 && low <= 9); return Version(high * 10 + low); }
+};
+
+} // namespace Slang
+
+#endif 

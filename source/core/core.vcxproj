@@ -202,6 +202,7 @@
     <ClInclude Include="slang-type-traits.h" />
     <ClInclude Include="slang-uint-set.h" />
     <ClInclude Include="slang-writer.h" />
+    <ClInclude Include="windows\slang-win-find-vs-util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-byte-encode-util.cpp" />
@@ -223,6 +224,7 @@
     <ClCompile Include="slang-token-reader.cpp" />
     <ClCompile Include="slang-uint-set.cpp" />
     <ClCompile Include="slang-writer.cpp" />
+    <ClCompile Include="windows\slang-win-find-vs-util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="core.natvis" />
