@@ -14,7 +14,8 @@ struct CommandLine
         Filename,                   ///< The executable is set as a filename
     };
 
-    void pushParameter(const String& in) { m_parameters.add(in); }
+    void addArg(const String& in) { m_args.add(in); }
+    void addArgs(const String* args, Int argsCount) { m_args.addRange(args, argsCount); }
     void setExecutablePath(const String& path) { m_executableType = ExecutableType::Path; m_executable = path; }
     void setExecutableFilename(const String& filename) { m_executableType = ExecutableType::Filename; m_executable = filename; }
 
@@ -23,7 +24,7 @@ struct CommandLine
 
     ExecutableType m_executableType;    ///< How the executable is specified
     String m_executable;                ///< Executable to run 
-    List<String> m_parameters;          ///< The parameters to pass 
+    List<String> m_args;          ///< The parameters to pass 
 };
 
 struct ExecuteResult
