@@ -265,11 +265,12 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     return SLANG_FAIL;
 }
 
-
-/* static */SlangResult WinFindVisualStudioUtil::invoke(const VersionPath& versionPath)
+/* static */SlangResult WinFindVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
 {
-    StringBuilder builder;
+    // To invoke cl we need to run the suitable vcvars. In order to run this we have to have MS CommandLine.
+    // So here we build up a cl command line that is run by first running vcvars, and then executing cl with the parameters as passed to commandLine
 
+    StringBuilder builder;
     CommandLine cmdLine;
 
     cmdLine.setExecutableFilename("cmd.exe");
@@ -296,12 +297,10 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     cmdLine.addArg("&&");
     cmdLine.addArg("cl");
 
-    ExecuteResult exeResult;
+    // Append the command line options
+    cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
 
-    SlangResult res = ProcessUtil::execute(cmdLine, exeResult);
-
-
-    return res;
+    return ProcessUtil::execute(cmdLine, outResult);
 }
 
 } // namespace Slang

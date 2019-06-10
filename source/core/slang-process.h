@@ -1,4 +1,6 @@
 // process.h
+#ifndef SLANG_PROCESS_H
+#define SLANG_PROCESS_H
 
 #include "slang-string.h"
 #include "slang-list.h"
@@ -54,4 +56,6 @@ struct ProcessUtil
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
 };
 
-} 
+}
+
+#endif // SLANG_PROCESS_H

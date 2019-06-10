@@ -4,6 +4,8 @@
 #include "../slang-list.h"
 #include "../slang-string.h"
 
+#include "../slang-process.h"
+
 namespace Slang {
 
 struct WinFindVisualStudioUtil
@@ -27,7 +29,8 @@ struct WinFindVisualStudioUtil
         /// Given a version find it's path
     static SlangResult find(Version version, VersionPath& outPath);
 
-    static SlangResult invoke(const VersionPath& versionPath);
+        /// Run visual studio on specified path with the parameters specified on the command line. Output placed in outResult.
+    static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 
         /// Get all the known version numbers
     static void getVersions(List<Version>& outVersions);
