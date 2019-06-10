@@ -28,8 +28,8 @@ struct ThreadInfo
     String	output;
 };
 
-// Has behavior very similar to unique_ptr. That assignment is a move.
-class Handle
+// Has behavior very similar to unique_ptr - assignment is a move.
+class WinHandle
 {
 public:
         /// Detach the encapsulated handle. Returns the handle (which now must be externally handled) 
@@ -40,7 +40,7 @@ public:
 
         /// Assign
     void operator=(HANDLE handle) { setNull(); m_handle = handle; }
-    void operator=(Handle&& rhs) { HANDLE handle = m_handle; m_handle = rhs.m_handle; rhs.m_handle = handle; }
+    void operator=(WinHandle&& rhs) { HANDLE handle = m_handle; m_handle = rhs.m_handle; rhs.m_handle = handle; }
 
         /// Get ready for writing 
     SLANG_FORCE_INLINE HANDLE* writeRef() { setNull(); return &m_handle; }
@@ -57,16 +57,16 @@ public:
     }
 
         /// Ctor
-    Handle(HANDLE handle = nullptr):m_handle(handle) {}
-    Handle(Handle&& rhs):m_handle(rhs.m_handle) { rhs.m_handle = nullptr; }
+    WinHandle(HANDLE handle = nullptr):m_handle(handle) {}
+    WinHandle(WinHandle&& rhs):m_handle(rhs.m_handle) { rhs.m_handle = nullptr; }
 
         /// Dtor
-    ~Handle() { setNull(); }
+    ~WinHandle() { setNull(); }
 
 private:
     
-    Handle(const Handle&) = delete;
-    void operator=(const Handle& rhs) = delete;
+    WinHandle(const WinHandle&) = delete;
+    void operator=(const WinHandle& rhs) = delete;
 
     HANDLE m_handle;
 };
@@ -93,10 +93,17 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
         DWORD bytesRead = 0;
         BOOL readResult = ReadFile(file, buffer, kChunkSize, &bytesRead, nullptr);
 
-        if (!readResult || GetLastError() == ERROR_BROKEN_PIPE)
+        const DWORD lastError = GetLastError();
+        if (lastError == ERROR_BROKEN_PIPE)
         {
             break;
         }
+
+        if (!readResult)
+        {
+            break;
+        }
+
 
         // walk the buffer and rewrite to eliminate '\r' '\n' pairs
         char* readCursor = buffer;
@@ -202,22 +209,22 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
     securityAttributes.lpSecurityDescriptor = nullptr;
     securityAttributes.bInheritHandle = true;
 
-    Handle childStdOutRead;
-    Handle childStdErrRead;
-    Handle childStdInWrite;
+    WinHandle childStdOutRead;
+    WinHandle childStdErrRead;
+    WinHandle childStdInWrite;
     
     // Now we can actually get around to starting a process
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(processInfo));
     {
-        Handle childStdOutWrite;
-        Handle childStdErrWrite;
-        Handle childStdInRead;
+        WinHandle childStdOutWrite;
+        WinHandle childStdErrWrite;
+        WinHandle childStdInRead;
 
         {
-            Handle childStdOutReadTmp;
-            Handle childStdErrReadTmp;
-            Handle childStdInWriteTmp;
+            WinHandle childStdOutReadTmp;
+            WinHandle childStdErrReadTmp;
+            WinHandle childStdInWriteTmp;
             // create stdout pipe for child process
             SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, 0));
             // create stderr pipe for child process
@@ -290,12 +297,12 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
     // Create a thread to read from the child's stdout.
     ThreadInfo stdOutThreadInfo;
     stdOutThreadInfo.file = childStdOutRead;
-    Handle stdOutThread = CreateThread(nullptr, 0, &_readerThreadProc, (LPVOID)&stdOutThreadInfo, 0, nullptr);
+    WinHandle stdOutThread = CreateThread(nullptr, 0, &_readerThreadProc, (LPVOID)&stdOutThreadInfo, 0, nullptr);
 
     // Create a thread to read from the child's stderr.
     ThreadInfo stdErrThreadInfo;
     stdErrThreadInfo.file = childStdErrRead;
-    Handle stdErrThread = CreateThread(nullptr, 0, &_readerThreadProc, (LPVOID)&stdErrThreadInfo, 0, nullptr);
+    WinHandle stdErrThread = CreateThread(nullptr, 0, &_readerThreadProc, (LPVOID)&stdErrThreadInfo, 0, nullptr);
 
     // wait for the process to exit
     // TODO: set a timeout as a safety measure...
