@@ -9,6 +9,9 @@
 #   include <Windows.h>
 #   undef WIN32_LEAN_AND_MEAN
 #   undef NOMINMAX
+
+#   include <Shlobj.h>
+
 #endif
 
 namespace Slang {
@@ -179,7 +182,17 @@ static int _getRegistryKeyIndex(Version version)
         {
             CommandLine cmd;
 
-            cmd.setExecutablePath("%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere");
+            // Lookup directly %ProgramFiles(x86)% path
+            // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
+            HWND hwnd = GetConsoleWindow();
+
+            char programFilesPath[_MAX_PATH];
+            SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
+
+            String vswherePath = programFilesPath;
+            vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
+
+            cmd.setExecutableFilename(vswherePath);
 
             String args[] = {"-version", versionInfo.versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
             cmd.addArgs(args, SLANG_COUNT_OF(args));
