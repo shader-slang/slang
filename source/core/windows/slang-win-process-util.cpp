@@ -1,5 +1,5 @@
-// slang-win-process.cpp
-#include "../slang-process.h"
+// slang-win-process-util.cpp
+#include "../slang-process-util.h"
 
 #include "../slang-string.h"
 
@@ -8,11 +8,11 @@
 // TODO: We could try to avoid including this at all, but it would
 // mean trying to hide certain struct layouts, which would add
 // more dynamic allocation.
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
+#   define WIN32_LEAN_AND_MEAN
+#   define NOMINMAX
+#   include <Windows.h>
+#   undef WIN32_LEAN_AND_MEAN
+#   undef NOMINMAX
 #endif
 
 #include <stdio.h>

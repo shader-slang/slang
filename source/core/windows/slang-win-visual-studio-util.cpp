@@ -1,7 +1,7 @@
-#include "slang-win-find-vs-util.h"
+#include "slang-win-visual-studio-util.h"
 
 #include "../slang-common.h"
-#include "../slang-process.h"
+#include "../slang-process-util.h"
 #include "../slang-string-util.h"
 
 #ifdef _WIN32
@@ -23,7 +23,7 @@ namespace Slang {
 
 namespace { // anonymous
 
-typedef WinFindVisualStudioUtil::Version Version;
+typedef WinVisualStudioUtil::Version Version;
 
 struct RegistryInfo
 {
@@ -34,7 +34,6 @@ struct RegistryInfo
 struct VersionInfo
 {
     Version version;                ///< The version
-    const char* versionName;        ///< The version as text
     const char* regKeyName;         ///< The name of the registry key 
 };
 
@@ -68,27 +67,26 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 }
 
 // Make easier to set up the array
-static Version _makeVersion(int main, int dot = 0) { return WinFindVisualStudioUtil::makeVersion(main, dot); }
+static Version _makeVersion(int main, int dot = 0) { return WinVisualStudioUtil::makeVersion(main, dot); }
 
-VersionInfo _makeVersionInfo(const char* regKeyName, const char* versionName, int high, int dot = 0)
+VersionInfo _makeVersionInfo(const char* regKeyName, int high, int dot = 0)
 {
     VersionInfo info;
     info.regKeyName = regKeyName;
-    info.versionName = versionName;
-    info.version = WinFindVisualStudioUtil::makeVersion(high, dot);
+    info.version = WinVisualStudioUtil::makeVersion(high, dot);
     return info;
 }
 
 static const VersionInfo s_versionInfos[] = 
 {
-    _makeVersionInfo("VS 2005", "8.0", 8),
-    _makeVersionInfo("VS 2008", "9.0", 9),
-    _makeVersionInfo("VS 2010", "10.0", 10),
-    _makeVersionInfo("VS 2012", "11.0", 11),
-    _makeVersionInfo("VS 2013", "12.0", 12),
-    _makeVersionInfo("VS 2015", "14.0", 14),
-    _makeVersionInfo("VS 2017", "15.0", 15),
-    _makeVersionInfo("VS 2019", "16.0", 16),
+    _makeVersionInfo("VS 2005", 8),
+    _makeVersionInfo("VS 2008", 9),
+    _makeVersionInfo("VS 2010", 10),
+    _makeVersionInfo("VS 2012", 11),
+    _makeVersionInfo("VS 2013", 12),
+    _makeVersionInfo("VS 2015", 14),
+    _makeVersionInfo("VS 2017", 15),
+    _makeVersionInfo("VS 2019", 16),
 };
 
 static const RegistryInfo s_regInfos[] =
@@ -96,7 +94,6 @@ static const RegistryInfo s_regInfos[] =
     {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7", "" },
     {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", "VC\\Auxiliary\\Build\\" },
 };
-
 
 static bool _canUseVSWhere(Version version)
 {
@@ -113,7 +110,7 @@ static int _getRegistryKeyIndex(Version version)
     return 0;
 }
 
-/* static */void WinFindVisualStudioUtil::getVersions(List<Version>& outVersions)
+/* static */void WinVisualStudioUtil::getVersions(List<Version>& outVersions)
 {
     const int count = SLANG_COUNT_OF(s_versionInfos);
     outVersions.setCount(count);
@@ -125,7 +122,7 @@ static int _getRegistryKeyIndex(Version version)
     }
 }
 
-/* static */WinFindVisualStudioUtil::Version WinFindVisualStudioUtil::getCompiledVersion()
+/* static */WinVisualStudioUtil::Version WinVisualStudioUtil::getCompiledVersion()
 {
     const uint32_t version = _MSC_VER;
 
@@ -169,7 +166,7 @@ static int _getRegistryKeyIndex(Version version)
     return Version::Unknown;
 }
 
-static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath& outPath)
+static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& outPath)
 {
     const auto& versionInfo = s_versionInfos[versionIndex];
 
@@ -194,7 +191,10 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
 
         cmd.setExecutableFilename(vswherePath);
 
-        String args[] = { "-version", versionInfo.versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
+        StringBuilder versionName;
+        WinVisualStudioUtil::append(version, versionName);
+
+        String args[] = { "-version", versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
         cmd.addArgs(args, SLANG_COUNT_OF(args));
 
         ExecuteResult exeRes;
@@ -232,7 +232,7 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     return SLANG_FAIL;
 }
 
-/* static */SlangResult WinFindVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
+/* static */SlangResult WinVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
 {
     outVersionPaths.clear();
 
@@ -250,7 +250,7 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     return SLANG_OK;
 }
 
-/* static */SlangResult WinFindVisualStudioUtil::find(Version version, VersionPath& outPath)
+/* static */SlangResult WinVisualStudioUtil::find(Version version, VersionPath& outPath)
 {
     const int versionCount = SLANG_COUNT_OF(s_versionInfos);
 
@@ -265,7 +265,7 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     return SLANG_FAIL;
 }
 
-/* static */SlangResult WinFindVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
+/* static */SlangResult WinVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
 {
     // To invoke cl we need to run the suitable vcvars. In order to run this we have to have MS CommandLine.
     // So here we build up a cl command line that is run by first running vcvars, and then executing cl with the parameters as passed to commandLine
@@ -301,6 +301,27 @@ static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath&
     cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
 
     return ProcessUtil::execute(cmdLine, outResult);
+}
+
+/* static */void WinVisualStudioUtil::append(Version version, StringBuilder& outBuilder)
+{
+    switch (version)
+    {
+        case Version::Unknown:
+        {
+            outBuilder << "unknown";
+        }
+        case Version::Future:
+        {
+            outBuilder << "future";
+            break;
+        }
+        default:
+        {
+            outBuilder << (int(version) / 10) << "." << (int(version) % 10);
+            break;
+        }
+    }
 }
 
 } // namespace Slang

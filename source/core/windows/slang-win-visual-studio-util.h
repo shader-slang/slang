@@ -1,14 +1,14 @@
-#ifndef SLANG_WIN_FIND_VS_UTIL_H
-#define SLANG_WIN_FIND_VS_UTIL_H
+#ifndef SLANG_WIN_VISUAL_STUDIO_UTIL_H
+#define SLANG_WIN_VISUAL_STUDIO_UTIL_H
 
 #include "../slang-list.h"
 #include "../slang-string.h"
 
-#include "../slang-process.h"
+#include "../slang-process-util.h"
 
 namespace Slang {
 
-struct WinFindVisualStudioUtil
+struct WinVisualStudioUtil
 {
     enum class Version: uint32_t
     {
@@ -16,14 +16,13 @@ struct WinFindVisualStudioUtil
         Future = 0xff * 10,         ///< This is a version 'from the future' - that isn't specifically known. Will be treated as latest
     };
     
-
     struct VersionPath
     {
-        Version version;
-        String vcvarsPath;                
+        Version version;            ///< The visual studio version
+        String vcvarsPath;          ///< The path to vcvars bat files, that need to be executed before executing the compiler
     };
     
-        ///  Find a visual studio compiler installation
+        ///  Find all the installations 
     static SlangResult find(List<VersionPath>& outVersionPaths);
 
         /// Given a version find it's path
@@ -40,6 +39,10 @@ struct WinFindVisualStudioUtil
 
         /// Create a version from a high and low indices
     static Version makeVersion(int high, int low = 0) { SLANG_ASSERT(low >= 0 && low <= 9); return Version(high * 10 + low); }
+
+        /// Convert a version number into a string
+    static void append(Version version, StringBuilder& outBuilder);
+
 };
 
 } // namespace Slang
