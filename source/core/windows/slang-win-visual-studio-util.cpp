@@ -34,7 +34,7 @@ struct RegistryInfo
 struct VersionInfo
 {
     Version version;                ///< The version
-    const char* regKeyName;         ///< The name of the registry key 
+    const char* name;         ///< The name of the registry key 
 };
 
 } // anonymous
@@ -69,10 +69,10 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 // Make easier to set up the array
 static Version _makeVersion(int main, int dot = 0) { return WinVisualStudioUtil::makeVersion(main, dot); }
 
-VersionInfo _makeVersionInfo(const char* regKeyName, int high, int dot = 0)
+VersionInfo _makeVersionInfo(const char* name, int high, int dot = 0)
 {
     VersionInfo info;
-    info.regKeyName = regKeyName;
+    info.name = name;
     info.version = WinVisualStudioUtil::makeVersion(high, dot);
     return info;
 }
@@ -89,6 +89,10 @@ static const VersionInfo s_versionInfos[] =
     _makeVersionInfo("VS 2019", 16),
 };
 
+
+//e.g.: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\VisualStudio\<version>\Setup\VS\<edition>
+// to view 32bit keys on Windows use start->run and enter: %systemroot%\syswow64\regedit
+// as for 32bit keys need to run 32bit regedit.
 static const RegistryInfo s_regInfos[] =
 {
     {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7", "" },
@@ -221,8 +225,11 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         // Try reading the key
         const auto& keyInfo = s_regInfos[keyIndex];
 
+        StringBuilder keyName;
+        WinVisualStudioUtil::append(versionInfo.version, keyName);
+
         String value;
-        if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, versionInfo.regKeyName, value)))
+        if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, keyName.getBuffer(), value)))
         {
             outPath.vcvarsPath = value;
             return SLANG_OK;
