@@ -202,77 +202,90 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
     securityAttributes.lpSecurityDescriptor = nullptr;
     securityAttributes.bInheritHandle = true;
 
-    // create stdout pipe for child process
-    Handle childStdOutReadTmp;
-    Handle childStdOutWrite;
-    SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, 0));
-
-    // create stderr pipe for child process
-    Handle childStdErrReadTmp;
-    Handle childStdErrWrite;
-    SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, 0));
-
-    // create stdin pipe for child process
-    Handle childStdInRead;
-    Handle childStdInWriteTmp;
-    SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, 0));
-
-    HANDLE currentProcess = GetCurrentProcess();
-
-    // create a non-inheritable duplicate of the stdout reader
     Handle childStdOutRead;
-    SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    childStdOutReadTmp.setNull();
-
-    // create a non-inheritable duplicate of the stderr reader
     Handle childStdErrRead;
-    SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    childStdErrReadTmp.setNull();
-
-    // create a non-inheritable duplicate of the stdin writer
     Handle childStdInWrite;
-    SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdInWriteTmp, currentProcess, childStdInWrite.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
-    childStdInWriteTmp.setNull();
-
+    
     // Now we can actually get around to starting a process
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(processInfo));
-
-    // TODO: switch to proper wide-character versions of these...
-    STARTUPINFOW startupInfo;
-    ZeroMemory(&startupInfo, sizeof(startupInfo));
-    startupInfo.cb = sizeof(startupInfo);
-    startupInfo.hStdError = childStdErrWrite;
-    startupInfo.hStdOutput = childStdOutWrite;
-    startupInfo.hStdInput = childStdInRead;
-    startupInfo.dwFlags = STARTF_USESTDHANDLES;
-
-    LPCWSTR path = (commandLine.m_executableType == CommandLine::ExecutableType::Path) ? commandLine.m_executable.toWString().begin() : nullptr;
-
-    // Produce the command line string
-    String cmdString = getCommandLineString(commandLine);
-
-    // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
-    // `CreateProcess` requires write access to this, for some reason...
-    BOOL success = CreateProcessW(
-        path,
-        (LPWSTR)cmdString.toWString().begin(),
-        nullptr,
-        nullptr,
-        true,
-        CREATE_NO_WINDOW,
-        nullptr, // TODO: allow specifying environment variables?
-        nullptr,
-        &startupInfo,
-        &processInfo);
-
-    if (!success)
     {
-        return SLANG_FAIL;
-    }
+        Handle childStdOutWrite;
+        Handle childStdErrWrite;
+        Handle childStdInRead;
 
-    // close handles we are now done with
-    CloseHandle(processInfo.hThread);
+        {
+            Handle childStdOutReadTmp;
+            Handle childStdErrReadTmp;
+            Handle childStdInWriteTmp;
+            // create stdout pipe for child process
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, 0));
+            // create stderr pipe for child process
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, 0));
+            // create stdin pipe for child process        
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, 0));
+
+            HANDLE currentProcess = GetCurrentProcess();
+
+            // create a non-inheritable duplicate of the stdout reader        
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            // create a non-inheritable duplicate of the stderr reader
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            // create a non-inheritable duplicate of the stdin writer
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdInWriteTmp, currentProcess, childStdInWrite.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+        }
+
+        
+        // TODO: switch to proper wide-character versions of these...
+        STARTUPINFOW startupInfo;
+        ZeroMemory(&startupInfo, sizeof(startupInfo));
+        startupInfo.cb = sizeof(startupInfo);
+        startupInfo.hStdError = childStdErrWrite;
+        startupInfo.hStdOutput = childStdOutWrite;
+        startupInfo.hStdInput = childStdInRead;
+        startupInfo.dwFlags = STARTF_USESTDHANDLES;
+
+        OSString pathBuffer;
+        LPCWSTR path = nullptr;
+
+        if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
+        {
+            StringBuilder cmd;
+            _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+
+            pathBuffer = cmd.toWString();
+            path = pathBuffer.begin();
+        }
+
+        // Produce the command line string
+        String cmdString = getCommandLineString(commandLine);
+        OSString cmdStringBuffer = cmdString.toWString();
+
+        // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
+        // `CreateProcess` requires write access to this, for some reason...
+        BOOL success = CreateProcessW(
+            path,
+            (LPWSTR)cmdStringBuffer.begin(),
+            nullptr,
+            nullptr,
+            true,
+            CREATE_NO_WINDOW,
+            nullptr, // TODO: allow specifying environment variables?
+            nullptr,
+            &startupInfo,
+            &processInfo);
+
+        if (!success)
+        {
+            DWORD err = GetLastError();
+            SLANG_UNUSED(err);
+
+            return SLANG_FAIL;
+        }
+
+        // close handles we are now done with
+        CloseHandle(processInfo.hThread);
+    }
 
     // Create a thread to read from the child's stdout.
     ThreadInfo stdOutThreadInfo;
