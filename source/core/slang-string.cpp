@@ -14,8 +14,8 @@ namespace Slang
     // OSString
 
     OSString::OSString()
-        : m_begin(0)
-        , m_end(0)
+        : m_begin(nullptr)
+        , m_end(nullptr)
     {}
 
     OSString::OSString(wchar_t* begin, wchar_t* end)
@@ -23,11 +23,32 @@ namespace Slang
         , m_end(end)
     {}
 
-    OSString::~OSString()
+    void OSString::_releaseBuffer()
     {
         if (m_begin)
         {
             delete[] m_begin;
+        }
+    }
+
+    void OSString::set(const wchar_t* begin, const wchar_t* end)
+    {
+        if (m_begin)
+        {
+            delete[] m_begin;
+            m_begin = nullptr;
+            m_end = nullptr;
+        }
+        const size_t len = end - begin;
+        if (len > 0)
+        {
+            // TODO(JS): The allocation is only done this way to be compatible with the buffer being detached from an array
+            // This is unfortunate, because it means that the allocation stores the size (and alignment fix), which is a shame because we know the size
+            m_begin = new wchar_t[len + 1];
+            memcpy(m_begin, begin, len * sizeof(wchar_t));
+            // Zero terminate
+            m_begin[len] = 0;
+            m_end = m_begin + len;
         }
     }
 
