@@ -2,6 +2,7 @@
 
 #include "../slang-common.h"
 #include "../slang-process.h"
+#include "../slang-string-util.h"
 
 #ifdef _WIN32
 #   define WIN32_LEAN_AND_MEAN
@@ -168,57 +169,139 @@ static int _getRegistryKeyIndex(Version version)
     return Version::Unknown;
 }
 
-/* static */SlangResult WinFindVisualStudioUtil::find(String& outPath)
+static SlangResult _find(int versionIndex, WinFindVisualStudioUtil::VersionPath& outPath)
 {
-    int versionCount = SLANG_COUNT_OF(s_versionInfos);
+    const auto& versionInfo = s_versionInfos[versionIndex];
 
-    for (int i = versionCount - 1; i >= 0; --i)
+    auto version = versionInfo.version;
+
+    outPath.version = version;
+    outPath.vcvarsPath = String();
+
+    if (_canUseVSWhere(version))
     {
-        const auto& versionInfo = s_versionInfos[i];
+        CommandLine cmd;
 
-        Version version = versionInfo.version;
+        // Lookup directly %ProgramFiles(x86)% path
+        // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
+        HWND hwnd = GetConsoleWindow();
 
-        if (_canUseVSWhere(version))
+        char programFilesPath[_MAX_PATH];
+        SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
+
+        String vswherePath = programFilesPath;
+        vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
+
+        cmd.setExecutableFilename(vswherePath);
+
+        String args[] = { "-version", versionInfo.versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
+        cmd.addArgs(args, SLANG_COUNT_OF(args));
+
+        ExecuteResult exeRes;
+        if (SLANG_SUCCEEDED(ProcessUtil::execute(cmd, exeRes)))
         {
-            CommandLine cmd;
+            // We need to chopoff CR/LF if there is one
+            List<UnownedStringSlice> lines;
+            StringUtil::calcLines(exeRes.standardOutput.getUnownedSlice(), lines);
 
-            // Lookup directly %ProgramFiles(x86)% path
-            // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
-            HWND hwnd = GetConsoleWindow();
-
-            char programFilesPath[_MAX_PATH];
-            SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
-
-            String vswherePath = programFilesPath;
-            vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
-
-            cmd.setExecutableFilename(vswherePath);
-
-            String args[] = {"-version", versionInfo.versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
-            cmd.addArgs(args, SLANG_COUNT_OF(args));
-
-            ExecuteResult exeRes;
-            if (SLANG_SUCCEEDED(ProcessUtil::execute(cmd, exeRes)))
+            if (lines.getCount())
             {
+                outPath.vcvarsPath = lines[0];
+                outPath.vcvarsPath.append("\\VC\\Auxiliary\\Build\\");
+                return SLANG_OK;
             }
-        }
-
-        const Int keyIndex = _getRegistryKeyIndex(version);
-        if (keyIndex >= 0)
-        {
-            SLANG_ASSERT(keyIndex < SLANG_COUNT_OF(s_regInfos));
-
-            // Try reading the key
-            const auto& keyInfo = s_regInfos[keyIndex];
-
-            String value;
-
-            _readRegistryKey(keyInfo.regName, versionInfo.regKeyName, value);
         }
     }
 
-    outPath = "";
+    const Int keyIndex = _getRegistryKeyIndex(version);
+    if (keyIndex >= 0)
+    {
+        SLANG_ASSERT(keyIndex < SLANG_COUNT_OF(s_regInfos));
+
+        // Try reading the key
+        const auto& keyInfo = s_regInfos[keyIndex];
+
+        String value;
+        if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, versionInfo.regKeyName, value)))
+        {
+            outPath.vcvarsPath = value;
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
+}
+
+/* static */SlangResult WinFindVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
+{
+    outVersionPaths.clear();
+
+    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
+
+    for (int i = versionCount - 1; i >= 0; --i)
+    {
+        VersionPath versionPath;
+        if (SLANG_SUCCEEDED(_find(i, versionPath)))
+        {
+            outVersionPaths.add(versionPath);
+        }
+    }
+
     return SLANG_OK;
+}
+
+/* static */SlangResult WinFindVisualStudioUtil::find(Version version, VersionPath& outPath)
+{
+    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
+
+    for (int i = 0; i < versionCount; ++i)
+    {
+        const auto& versionInfo = s_versionInfos[i];
+        if (versionInfo.version == version)
+        {
+            return _find(i, outPath);
+        }
+    }
+    return SLANG_FAIL;
+}
+
+
+/* static */SlangResult WinFindVisualStudioUtil::invoke(const VersionPath& versionPath)
+{
+    StringBuilder builder;
+
+    CommandLine cmdLine;
+
+    cmdLine.setExecutableFilename("cmd.exe");
+    {
+        String options[] = { "/q", "/c", "@prompt", "$" };
+        cmdLine.addArgs(options, SLANG_COUNT_OF(options));
+    }
+
+    cmdLine.addArg("&&");
+
+    {
+        StringBuilder path;
+        path << versionPath.vcvarsPath;
+        path << "\\Vcvarsall.bat";
+        cmdLine.addArg(path);
+    }
+
+#if SLANG_PTR_IS_32
+    cmdLine.addArg("x86");
+#else
+    cmdLine.addArg("x86_amd64");
+#endif
+
+    cmdLine.addArg("&&");
+    cmdLine.addArg("cl");
+
+    ExecuteResult exeResult;
+
+    SlangResult res = ProcessUtil::execute(cmdLine, exeResult);
+
+
+    return res;
 }
 
 } // namespace Slang

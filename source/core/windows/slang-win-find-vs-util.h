@@ -14,8 +14,20 @@ struct WinFindVisualStudioUtil
         Future = 0xff * 10,         ///< This is a version 'from the future' - that isn't specifically known. Will be treated as latest
     };
     
+
+    struct VersionPath
+    {
+        Version version;
+        String vcvarsPath;                
+    };
+    
         ///  Find a visual studio compiler installation
-    static SlangResult find(String& outPath);
+    static SlangResult find(List<VersionPath>& outVersionPaths);
+
+        /// Given a version find it's path
+    static SlangResult find(Version version, VersionPath& outPath);
+
+    static SlangResult invoke(const VersionPath& versionPath);
 
         /// Get all the known version numbers
     static void getVersions(List<Version>& outVersions);
