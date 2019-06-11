@@ -463,10 +463,10 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 
         outRes.resultCode = (int)TestToolUtil::getReturnCode(res);
 
-        return kOSError_None;
+        return SLANG_OK;
     }
 
-    return kOSError_OperationFailed;
+    return SLANG_FAIL;
 }
 
 
@@ -829,7 +829,7 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         default: break;
     }
 
-    if (spawnResult != kOSError_None)
+    if (SLANG_FAILED(spawnResult))
     {
         return ToolReturnCode::FailedToRun;
     }
