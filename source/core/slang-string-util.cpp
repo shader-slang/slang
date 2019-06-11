@@ -208,7 +208,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
 
     const char* lineStart = cursor;
 
-    while (cursor != end)
+    while (cursor < end)
     {
         int c = *cursor++;
         switch (c)
@@ -223,10 +223,12 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
                 // where a multi-byte sequence might encode
                 // the line break.
 
-                int d = *cursor;
-                if ((c^d) == ('\r' ^ '\n'))
-                    cursor++;
-
+                if (cursor < end)
+                {
+                    int d = *cursor;
+                    if ((c ^ d) == ('\r' ^ '\n'))
+                        cursor++;
+                }
                 lineStart = cursor;
                 break;
             }
