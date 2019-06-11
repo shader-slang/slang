@@ -154,10 +154,35 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
     return UnownedStringSlice::fromLiteral(".exe");
 }
 
-static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+static bool _isLetter(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static bool _isSwitch(const UnownedStringSlice& slice)
+{
+    if (!slice.startsWith("/"))
+    {
+        return false;
+    }
+    Int index = slice.indexOf(':');
+    if (index > 0)
+    {
+        for (Int i = 1; i < index; ++i)
+        {
+            if (!_isLetter(slice[i]))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     // TODO(JS): This escaping is not complete... !
-    if (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0)
+    if (!_isSwitch(slice) && (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0))
     {
         out << "\"";
 
@@ -181,7 +206,6 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
         }
 
         out << "\"";
-
         return;
     }
 
@@ -191,11 +215,11 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
     StringBuilder cmd;
-    _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+    appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        _appendEscaped(arg.getUnownedSlice(), cmd);
+        appendCommandLineEscaped(arg.getUnownedSlice(), cmd);
     }
     return cmd.ToString();
 }
@@ -260,7 +284,7 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
         if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
         {
             StringBuilder cmd;
-            _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+            appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
 
             pathBuffer = cmd.toWString();
             path = pathBuffer.begin();

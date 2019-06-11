@@ -336,4 +336,91 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     }
 }
 
+/* static */void WinVisualStudioUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
+{
+    typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
+    typedef CPPCompileOptions::TargetType TargetType;
+
+
+    cmdLine.addArg("/nologo");
+    // Generate complete debugging information
+    cmdLine.addArg("/Zi");
+    // Display full path of source files in diagnostics
+    cmdLine.addArg("/FC");
+
+    switch (options.optimizationLevel)
+    {
+        case OptimizationLevel::Debug:
+        {
+            // No optimization
+            cmdLine.addArg("/Od");
+            
+            cmdLine.addArg("/MDd");
+            break;
+        }
+        case OptimizationLevel::Normal:
+        {
+            cmdLine.addArg("/O2");
+            // Multithreaded DLL
+            cmdLine.addArg("/MD");
+            break;
+        }
+        default: break;
+    }
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            // Create dynamic link library
+            if (options.optimizationLevel == OptimizationLevel::Debug)
+            {
+                cmdLine.addArg("/LDd");
+            }
+            else
+            {
+                cmdLine.addArg("/LD");
+            }
+            break;
+        }
+    }
+
+
+    // Add includes
+    for (const auto& include : options.includePaths)
+    {
+        cmdLine.addArg("/I");
+        cmdLine.addArg(include);
+    }
+
+    // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
+
+    // /Fo - object filename
+    // /Fe - executable name
+    // /Fd - followed by name of the pdb file
+
+    // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
+    // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
+
+    // Files to compile
+    for (const auto& sourceFile : options.sourceFiles)
+    {
+        cmdLine.addArg(sourceFile);
+    }
+
+    // Link options (parameters past /link go to linker)
+    cmdLine.addArg("/link");
+
+    for (const auto& libPath : options.libraryPaths)
+    {
+        StringBuilder builder;
+
+        // ProcessUtil knows that if we have a 'switch' in this format, it doesn't need to esacpe
+        builder << "/LIBPATH:";
+        ProcessUtil::appendCommandLineEscaped(libPath.getUnownedSlice(), builder);
+        cmdLine.addArg(builder);
+    }
+
+}
+
 } // namespace Slang
