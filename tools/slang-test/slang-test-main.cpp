@@ -20,10 +20,6 @@ using namespace Slang;
 
 #include "../../source/core/slang-process-util.h"
 
-#ifdef _WIN32
-#   include "../../source/core/windows/slang-win-visual-studio-util.h"
-#endif
-
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
 
@@ -2453,15 +2449,6 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-#if 0
-    {
-        String string;
-
-        WinFindVisualStudioUtil::find(string);
-    }
-#endif
-
-
     const SlangResult res = innerMain(argc, argv);
 #ifdef _MSC_VER
     _CrtDumpMemoryLeaks();
