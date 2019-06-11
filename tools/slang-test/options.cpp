@@ -1,8 +1,8 @@
 // test-context.cpp
 #include "options.h"
 
-#include "os.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-io.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,8 +1,6 @@
 // test-reporter.cpp
 #include "test-reporter.h"
 
-//#include "os.h"
-
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-process-util.h"
 

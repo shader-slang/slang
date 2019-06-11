@@ -1,7 +1,7 @@
 // test-context.cpp
 #include "test-context.h"
 
-#include "os.h"
+#include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-util.h"
 
 #include <stdio.h>
