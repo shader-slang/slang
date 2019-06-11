@@ -1,8 +1,10 @@
 // test-reporter.cpp
 #include "test-reporter.h"
 
-#include "os.h"
+//#include "os.h"
+
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-process-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -373,29 +375,31 @@ void TestReporter::_addResult(const TestInfo& info)
                     break;
             }
 
-            OSProcessSpawner spawner;
-            spawner.pushExecutableName("appveyor");
-            spawner.pushArgument("AddTest");
-            spawner.pushArgument(info.name);
-            spawner.pushArgument("-FileName");
+            CommandLine cmdLine;
+            cmdLine.setExecutableFilename("appveyor");
+            cmdLine.addArg("AddTest");
+            cmdLine.addArg(info.name);
+            cmdLine.addArg("-FileName");
             // TODO: this isn't actually a file name in all cases
-            spawner.pushArgument(info.name);
-            spawner.pushArgument("-Framework");
-            spawner.pushArgument("slang-test");
-            spawner.pushArgument("-Outcome");
-            spawner.pushArgument(resultString);
+            cmdLine.addArg(info.name);
+            cmdLine.addArg("-Framework");
+            cmdLine.addArg("slang-test");
+            cmdLine.addArg("-Outcome");
+            cmdLine.addArg(resultString);
 
-            auto err = spawner.spawnAndWaitForCompletion();
-
-            if (err != kOSError_None)
+            ExecuteResult exeRes;
+            SlangResult res = ProcessUtil::execute(cmdLine, exeRes);
+            
+            if (SLANG_FAILED(res))
             {
                 messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.toWString().begin());
 
 #if 0
-                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, spawner.commandLine_.getBuffer(),
-                    spawner.getResultCode(),
-                    spawner.getStandardOutput().begin(),
-                    spawner.getStandardError().begin());
+                String cmdLineString = ProcessUtil::getCommandLineString(cmdLine);
+                fprintf(stderr, "[%d] TEST RESULT: %s {%d} {%s} {%s}\n", err, cmdLineString.getBuffer(),
+                    exeRes.resultCode,
+                    exeRes.standardOutput.begin(),
+                    exeRes.standardError.begin());
 #endif
             }
 

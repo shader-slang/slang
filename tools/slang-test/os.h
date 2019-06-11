@@ -1,3 +1,6 @@
+#ifndef SLANG_OS_H
+#define SLANG_OS_H
+
 // os.h
 
 #include "../../source/core/slang-io.h"
@@ -21,7 +24,7 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <poll.h>
+//#include <poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -129,62 +132,4 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 OSFindFilesResult osFindFilesInDirectory(
     Slang::String directoryPath);
 
-
-// An `OSProcessSpawner` can be used to launch a process, and handles
-// putting together the arguments in the form required by the target
-// platform, as well as capturing any output from the process (both
-// standard output and standard error) as strings.
-struct OSProcessSpawner
-{
-    // Set the executable name for the process to be spawned.
-    // Note: this call must be made before any arguments are pushed.
-    void pushExecutableName(
-        Slang::String executableName);
-
-    // Set the executable name for the process to be spawned.
-    // Note: this call must be made before any arguments are pushed.
-    void pushExecutablePath(
-        Slang::String executablePath);
-
-    // Append an argument for the process to be spawned.
-    void pushArgument(
-        Slang::String argument);
-
-    // Get a printable version of the command line
-    // that will be run (can be used for debugging)
-    Slang::String getCommandLine();
-
-    // Attempt to spawn the process, and wait for it to complete.
-    // Returns an error if the attempt to spawn and/or wait fails,
-    // but returns `kOSError_None` if the process is run to completion,
-    // whether or not the process returns "successfully" (with a zero
-    // result code);
-    OSError spawnAndWaitForCompletion();
-
-    // If the process is successfully spawned and completes, then
-    // the user can query the result code that the process produce
-    // on exit, along with the output it wrote to stdout and stderr.
-    typedef int ResultCode;
-    ResultCode getResultCode() { return resultCode_; }
-    Slang::String const& getStandardOutput() { return standardOutput_; }
-    Slang::String const& getStandardError() { return standardError_; }
-
-    // "private" data follows
-    Slang::String standardOutput_;
-    Slang::String standardError_;
-    ResultCode resultCode_;
-    Slang::String executableName_;
-#ifdef WIN32
-    Slang::StringBuilder commandLine_;
-#else
-    Slang::List<Slang::String>  arguments_;
-#endif
-
-    // Only holds the argumements in order
-    Slang::List<Slang::String>  argumentList_;          
-
-    // Is the executable specified by path, rather than just by name?
-    bool isExecutablePath_;
-};
-
-char const* osGetExecutableSuffix();
+#endif // SLANG_OS_H

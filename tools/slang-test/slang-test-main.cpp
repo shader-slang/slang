@@ -1484,7 +1484,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	CommandLine cmdLine;
 
-    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
+    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + ProcessUtil::getExecutableSuffix()));
     cmdLine.addArg(filePath999);
 
     _addRenderTestOptions(context->options, cmdLine);
@@ -1603,7 +1603,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + osGetExecutableSuffix()));
+    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + ProcessUtil::getExecutableSuffix()));
     cmdLine.addArg(filePath);
 
     _addRenderTestOptions(context->options, cmdLine);
