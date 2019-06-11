@@ -162,7 +162,7 @@ static int _getRegistryKeyIndex(Version version)
         default:
         {
             // Rather more complicated expression than needed to stop VS complaining it's a constant expression
-            if (version > int(s_versionInfos[SLANG_COUNT_OF(s_versionInfos)].version))
+            if (version > int(s_versionInfos[SLANG_COUNT_OF(s_versionInfos) - 1].version))
             {
                 // Its an unknown newer version
                 return Version::Future;
