@@ -7,7 +7,7 @@ namespace Slang
 class DiagnosticSink;
 class Session;
 
-class ExtensionUsageTracker;
+class GLSLExtensionTracker;
 
 struct IRFunc;
 struct IRModule;
@@ -17,6 +17,6 @@ void legalizeEntryPointForGLSL(
     IRModule*               module,
     IRFunc*                 func,
     DiagnosticSink*         sink,
-    ExtensionUsageTracker*  extensionUsageTracker);
+    GLSLExtensionTracker*   glslExtensionTracker);
 
 }

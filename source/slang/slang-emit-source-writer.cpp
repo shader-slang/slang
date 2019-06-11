@@ -1,5 +1,5 @@
-// emit.cpp
-#include "slang-source-stream.h"
+// slang-emit-source-writer.cpp
+#include "slang-emit-source-writer.h"
 
 // Disable warnings about sprintf
 #ifdef _WIN32
@@ -16,32 +16,32 @@
 
 namespace Slang {
 
-SourceStream::SourceStream(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode)
+SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode)
 {
     m_lineDirectiveMode = lineDirectiveMode;
     this->m_sourceManager = sourceManager;
 }
 
-String SourceStream::getContentAndClear()
+String SourceWriter::getContentAndClear()
 {
     String content(getContent());
     clearContent();
     return content;
 }
 
-void SourceStream::emitRawTextSpan(char const* textBegin, char const* textEnd)
+void SourceWriter::emitRawTextSpan(char const* textBegin, char const* textEnd)
 {
     // TODO(tfoley): Need to make "corelib" not use `int` for pointer-sized things...
     auto len = textEnd - textBegin;
     m_builder.Append(textBegin, len);
 }
 
-void SourceStream::emitRawText(char const* text)
+void SourceWriter::emitRawText(char const* text)
 {
     emitRawTextSpan(text, text + strlen(text));
 }
 
-void SourceStream::_emitTextSpan(char const* textBegin, char const* textEnd)
+void SourceWriter::_emitTextSpan(char const* textBegin, char const* textEnd)
 {
     // Don't change anything given an empty string
     if (textBegin == textEnd)
@@ -85,17 +85,22 @@ void SourceStream::_emitTextSpan(char const* textBegin, char const* textEnd)
     m_loc.column += len;
 }
 
-void SourceStream::indent()
+void SourceWriter::indent()
 {
     m_indentLevel++;
 }
 
-void SourceStream::dedent()
+void SourceWriter::dedent()
 {
     m_indentLevel--;
 }
 
-void SourceStream::emit(char const* textBegin, char const* textEnd)
+void SourceWriter::emitChar(char c)
+{
+    emit(&c, &c + 1);
+}
+
+void SourceWriter::emit(char const* textBegin, char const* textEnd)
 {
     char const* spanBegin = textBegin;
     char const* spanEnd = spanBegin;
@@ -125,70 +130,70 @@ void SourceStream::emit(char const* textBegin, char const* textEnd)
     }
 }
 
-void SourceStream::emit(char const* text)
+void SourceWriter::emit(char const* text)
 {
     emit(text, text + strlen(text));
 }
 
-void SourceStream::emit(const String& text)
+void SourceWriter::emit(const String& text)
 {
     emit(text.begin(), text.end());
 }
 
-void SourceStream::emit(const UnownedStringSlice& text)
+void SourceWriter::emit(const UnownedStringSlice& text)
 {
     emit(text.begin(), text.end());
 }
 
-void SourceStream::emit(Name* name)
+void SourceWriter::emit(Name* name)
 {
     emit(getText(name));
 }
 
-void SourceStream::emit(const NameLoc& nameAndLoc)
+void SourceWriter::emit(const NameLoc& nameAndLoc)
 {
     advanceToSourceLocation(nameAndLoc.loc);
     emit(getText(nameAndLoc.name));
 }
 
-void SourceStream::emitName(Name* name, const SourceLoc& locIn)
+void SourceWriter::emitName(Name* name, const SourceLoc& locIn)
 {
     advanceToSourceLocation(locIn);
     emit(name);
 }
 
-void SourceStream::emitName(const NameLoc& nameAndLoc)
+void SourceWriter::emitName(const NameLoc& nameAndLoc)
 {
     emitName(nameAndLoc.name, nameAndLoc.loc);
 }
 
-void SourceStream::emitName(Name* name)
+void SourceWriter::emitName(Name* name)
 {
     emitName(name, SourceLoc());
 }
 
-void SourceStream::emit(IntegerLiteralValue value)
+void SourceWriter::emit(IntegerLiteralValue value)
 {
     char buffer[32];
     sprintf(buffer, "%lld", (long long int)value);
     emit(buffer);
 }
 
-void SourceStream::emit(UInt value)
+void SourceWriter::emit(UInt value)
 {
     char buffer[32];
     sprintf(buffer, "%llu", (unsigned long long)(value));
     emit(buffer);
 }
 
-void SourceStream::emit(int value)
+void SourceWriter::emit(int value)
 {
     char buffer[16];
     sprintf(buffer, "%d", value);
     emit(buffer);
 }
 
-void SourceStream::emit(double value)
+void SourceWriter::emit(double value)
 {
     // There are a few different requirements here that we need to deal with:
     //
@@ -221,12 +226,12 @@ void SourceStream::emit(double value)
     emit(stream.str().c_str());
 }
 
-void SourceStream::advanceToSourceLocation(const SourceLoc& sourceLocation)
+void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
     advanceToSourceLocation(getSourceManager()->getHumaneLoc(sourceLocation));
 }
 
-void SourceStream::advanceToSourceLocation(const HumaneSourceLoc& sourceLocation)
+void SourceWriter::advanceToSourceLocation(const HumaneSourceLoc& sourceLocation)
 {
     // Skip invalid locations
     if (sourceLocation.line <= 0)
@@ -236,7 +241,7 @@ void SourceStream::advanceToSourceLocation(const HumaneSourceLoc& sourceLocation
     m_nextSourceLocation = sourceLocation;
 }
 
-void SourceStream::_flushSourceLocationChange()
+void SourceWriter::_flushSourceLocationChange()
 {
     if (!m_needToUpdateSourceLocation)
         return;
@@ -249,7 +254,7 @@ void SourceStream::_flushSourceLocationChange()
     _emitLineDirectiveIfNeeded(m_nextSourceLocation);
 }
 
-void SourceStream::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation)
+void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation)
 {
     _emitLineDirective(sourceLocation);
 
@@ -259,7 +264,7 @@ void SourceStream::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceL
     m_loc = newLoc;
 }
 
-void SourceStream::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)
+void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)
 {
     // Don't do any of this work if the user has requested that we
     // not emit line directives.
@@ -309,7 +314,7 @@ void SourceStream::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocat
     }
 }
 
-void SourceStream::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
+void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
 {
     emitRawText("\n#line ");
 

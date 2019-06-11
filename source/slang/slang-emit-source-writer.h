@@ -1,6 +1,6 @@
 // slang-source-stream.h
-#ifndef SLANG_SOURCE_STREAM_H_INCLUDED
-#define SLANG_SOURCE_STREAM_H_INCLUDED
+#ifndef SLANG_EMIT_SOURCE_WRITER_H
+#define SLANG_EMIT_SOURCE_WRITER_H
 
 #include "../core/slang-basic.h"
 
@@ -15,7 +15,7 @@ namespace Slang
 * output line directives
   + Supports GLSL as well as C/CPP/HLSL style directives
 * Support for line indention */
-class SourceStream
+class SourceWriter
 {
 public:
         /// Emits without span without any extra processing
@@ -33,6 +33,8 @@ public:
     void emit(UInt value);
     void emit(int value);
     void emit(double value);
+
+    void emitChar(char c);
 
         /// Emit names (doing so can also advance to a new source location)
     void emitName(const NameLoc& nameAndLoc);
@@ -61,7 +63,7 @@ public:
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
         /// Ctor
-    SourceStream(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode);
+    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode);
 
 protected:
     void _emitTextSpan(char const* textBegin, char const* textEnd);

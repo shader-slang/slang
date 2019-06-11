@@ -4,6 +4,8 @@
 
 #include "../core/slang-basic.h"
 
+#include "slang-ir.h"
+
 namespace Slang
 {
 
@@ -104,7 +106,11 @@ enum EPrecedence
     \
     x(Prefix, "", Prefix) \
     x(Postfix, "", Postfix) \
-    x(Atomic, "", Atomic)
+    x(Atomic, "", Atomic) \
+    \
+    x(Not, "!", Prefix) \
+    x(Neg, "-", Prefix) \
+    x(BitNot, "~", Prefix)
 
 #define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 
@@ -145,6 +151,8 @@ SLANG_INLINE EmitOpInfo rightSide(EmitOpInfo const& prec, EmitOpInfo const& oute
     result.rightPrecedence = outerPrec.rightPrecedence;
     return result;
 }
+
+EmitOp getEmitOpForOp(IROp op);
 
 // Precedence macros no longer needed
 #undef SLANG_PRECEDENCE_EXPAND

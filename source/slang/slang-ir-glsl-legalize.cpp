@@ -4,7 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
-#include "slang-extension-usage-tracker.h"
+#include "slang-emit-glsl-extension-tracker.h"
 
 namespace Slang
 {
@@ -179,18 +179,18 @@ struct GLSLSystemValueInfo
 struct GLSLLegalizationContext
 {
     Session*                session;
-    ExtensionUsageTracker*  extensionUsageTracker;
+    GLSLExtensionTracker*   glslExtensionTracker;
     DiagnosticSink*         sink;
     Stage                   stage;
 
     void requireGLSLExtension(String const& name)
     {
-        extensionUsageTracker->requireGLSLExtension(name);
+        glslExtensionTracker->requireExtension(name);
     }
 
     void requireGLSLVersion(ProfileVersion version)
     {
-        extensionUsageTracker->requireGLSLVersion(version);
+        glslExtensionTracker->requireVersion(version);
     }
 
     Stage getStage()
@@ -1511,7 +1511,7 @@ void legalizeEntryPointForGLSL(
     IRModule*               module,
     IRFunc*                 func,
     DiagnosticSink*         sink,
-    ExtensionUsageTracker*  extensionUsageTracker)
+    GLSLExtensionTracker*   glslExtensionTracker)
 {
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
@@ -1519,11 +1519,13 @@ void legalizeEntryPointForGLSL(
     auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getLayout());
     SLANG_ASSERT(entryPointLayout);
 
+
+
     GLSLLegalizationContext context;
     context.session = session;
     context.stage = entryPointLayout->profile.GetStage();
     context.sink = sink;
-    context.extensionUsageTracker = extensionUsageTracker;
+    context.glslExtensionTracker = glslExtensionTracker;
 
     Stage stage = entryPointLayout->profile.GetStage();
 
