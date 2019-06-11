@@ -443,9 +443,9 @@ standardProject "core"
     
     if isTargetWindows then
         addSourceDir "source/core/windows"
-	else
+    else
         addSourceDir "source/core/unix"
-	end
+    end
     
     -- We need the core library to be relocatable to be able to link with slang.so
     filter { "system:linux" }
