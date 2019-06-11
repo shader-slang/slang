@@ -1,12 +1,19 @@
 // slang-unix-process-util.cpp
-#include "os.h"
+#include "../slang-process-util.h"
 
 #include "../slang-common.h"
-#include "../slang-process-util.h"
 #include "../slang-string-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+
+//#include <dirent.h>
+#include <errno.h>
+#include <poll.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace Slang {
 
@@ -214,7 +221,7 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
                 }
                 else
                 {
-                    ourExecuteResult.resultCode = 1;
+                    outExecuteResult.resultCode = 1;
                 }
                 return SLANG_OK;
             }
