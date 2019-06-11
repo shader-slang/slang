@@ -18,8 +18,11 @@ using namespace Slang;
 #include "options.h"
 #include "slangc-tool.h"
 
-#include "../../source/core/slang-process.h"
-#include "../../source/core/windows/slang-win-find-vs-util.h"
+#include "../../source/core/slang-process-util.h"
+
+#ifdef _WIN32
+#   include "../../source/core/windows/slang-win-find-vs-util.h"
+#endif
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -2445,11 +2448,14 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+#ifdef _WIN32
     {
         String string;
 
         WinFindVisualStudioUtil::find(string);
     }
+#endif
+
 
     const SlangResult res = innerMain(argc, argv);
 #ifdef _MSC_VER
