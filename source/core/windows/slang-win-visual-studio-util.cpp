@@ -15,6 +15,9 @@
 
 #endif
 
+// The method used to invoke VS was originally inspired by some ideas in
+// https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus/
+
 namespace Slang {
 
 // Information on VS versioning can be found here
@@ -89,10 +92,11 @@ static const VersionInfo s_versionInfos[] =
     _makeVersionInfo("VS 2019", 16),
 };
 
+// When trying to figure out how this stuff works by running regedit - care is needed, 
+// because what regedit displays varies on which version of regedit is used. 
+// In order to use the registry paths used here it's necessary to use Start/Run with 
+// %systemroot%\syswow64\regedit to view 32 bit keys
 
-//e.g.: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\VisualStudio\<version>\Setup\VS\<edition>
-// to view 32bit keys on Windows use start->run and enter: %systemroot%\syswow64\regedit
-// as for 32bit keys need to run 32bit regedit.
 static const RegistryInfo s_regInfos[] =
 {
     {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7", "" },
@@ -128,6 +132,7 @@ static int _getRegistryKeyIndex(Version version)
 
 /* static */WinVisualStudioUtil::Version WinVisualStudioUtil::getCompiledVersion()
 {
+    // Get the version of visual studio used to compile this source
     const uint32_t version = _MSC_VER;
 
     switch (version)
