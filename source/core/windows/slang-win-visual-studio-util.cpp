@@ -291,7 +291,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     {
         StringBuilder path;
         path << versionPath.vcvarsPath;
-        path << "\\Vcvarsall.bat";
+        path << "\\vcvarsall.bat";
         cmdLine.addArg(path);
     }
 
