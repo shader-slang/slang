@@ -423,7 +423,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
         testCmdLine.m_args.addRange(cmdLine.m_args);
 
         String testCmdLineString = ProcessUtil::getCommandLineString(testCmdLine);
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLineString);
+        context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLineString.getBuffer());
     }
 
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
