@@ -1,6 +1,6 @@
-// process.h
-#ifndef SLANG_PROCESS_H
-#define SLANG_PROCESS_H
+// slang-process-util.h
+#ifndef SLANG_PROCESS_UTIL_H
+#define SLANG_PROCESS_UTIL_H
 
 #include "slang-string.h"
 #include "slang-list.h"
@@ -58,4 +58,4 @@ struct ProcessUtil
 
 }
 
-#endif // SLANG_PROCESS_H
+#endif // SLANG_PROCESS_UTIL_H

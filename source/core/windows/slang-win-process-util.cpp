@@ -204,6 +204,8 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 
 /* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
 {
+    outExecuteResult.init();
+
     SECURITY_ATTRIBUTES securityAttributes;
     securityAttributes.nLength = sizeof(securityAttributes);
     securityAttributes.lpSecurityDescriptor = nullptr;
