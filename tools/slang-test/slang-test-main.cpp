@@ -455,7 +455,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
         args.add(exeName.getBuffer());
         for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
         {
-            args.add(cmdLine.m_args[i].getBuffer());
+            args.add(cmdLine.m_args[i].value.getBuffer());
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
@@ -474,18 +474,15 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 }
 
 
-static SlangResult _extractArg(const List<String>& args, const String& argName, String& outValue)
+static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
 {
     SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
+    Index index = cmdLine.findArgIndex(argName.getUnownedSlice());
 
-    const Index count = args.getCount();
-    for (Index i = 0; i < count - 1; ++i)
+    if (index >= 0 && index < cmdLine.getArgCount() - 1)
     {
-        if (args[i] == argName)
-        {
-            outValue = args[i + 1];
-            return SLANG_OK;
-        }
+        outValue = cmdLine.m_args[index + 1].value;
+        return SLANG_OK;
     }
     return SLANG_FAIL;
 }
@@ -591,7 +588,7 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
     // That a similar logic has to be kept inside the implementation of render-test and both this
     // and render-test will have to be kept in sync.
    
-    bool useDxil = _hasOption(args, "-use-dxil");
+    bool useDxil = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxil")) >= 0;
 
     bool usePassthru = false;
 
@@ -603,7 +600,7 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
 
         for (const auto& arg: args)
         {
-            Slang::UnownedStringSlice argSlice = arg.getUnownedSlice();
+            Slang::UnownedStringSlice argSlice = arg.value.getUnownedSlice();
             if (argSlice.size() && argSlice[0] == '-')
             {
                 // Look up the rendering API if set
@@ -701,12 +698,10 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
 static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, TestRequirements* ioRequirements)
 {
     // This determines what the requirements are for a slangc like command line
-    const auto& args = cmdLine.m_args;
-    
     // First check pass through
     {
         String passThrough;
-        if (SLANG_SUCCEEDED(_extractArg(args, "-pass-through", passThrough)))
+        if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
             ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
         }
@@ -715,7 +710,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
     // The target if set will also imply a backend
     {
         String targetName;
-        if (SLANG_SUCCEEDED(_extractArg(args, "-target", targetName)))
+        if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
         {
             const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
             ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));

@@ -59,12 +59,21 @@ namespace Slang {
 
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
+    // When outputting the command line we potentially need to escape the path to the
+    // command and args - that aren't already explicitly marked as escaped. 
     StringBuilder cmd;
     appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        appendCommandLineEscaped(arg.getUnownedSlice(), cmd);
+        if (arg.type == CommandLine::ArgType::Unescaped)
+        {
+            appendCommandLineEscaped(arg.value.getUnownedSlice(), cmd);
+        }
+        else
+        {
+            cmd << arg.value;
+        }
     }
     return cmd.ToString();
 }
@@ -76,10 +85,13 @@ namespace Slang {
     List<char const*> argPtrs;
     // Add the command
     argPtrs.add(commandLine.m_executable.getBuffer());
-    // Add all the args
+
+    // Add all the args - they don't need any explicit escaping
     for (auto arg : commandLine.m_args)
     {
-        argPtrs.add(arg.getBuffer());
+        // All args for this target must be unescaped
+        SLANG_ASSERT(arg.type == CommandLine::ArgType::Unescaped);
+        argPtrs.add(arg.value.getBuffer());
     }
     // Terminate with a null
     argPtrs.add(nullptr);
