@@ -7,6 +7,7 @@
 
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string.h"
+#include "../../source/core/slang-string-util.h"
 
 using namespace Slang;
 
@@ -601,7 +602,7 @@ void emitCodeNodes(
 }
 
 // Given line starts and a location, find the line number. Returns -1 if not found
-static Index _findLineIndex(const List<const char*>& lineBreaks, const char* location)
+static Index _findLineIndex(const List<UnownedStringSlice>& lineBreaks, const char* location)
 {
     if (location == nullptr)
     {
@@ -615,7 +616,7 @@ static Index _findLineIndex(const List<const char*>& lineBreaks, const char* loc
     while (lo + 1 < hi)
     {
         const auto mid = (hi + lo) >> 1;
-        const auto midOffset = lineBreaks[mid];
+        const auto midOffset = lineBreaks[mid].begin();
         if (midOffset <= location)
         {
             lo = mid;
@@ -629,50 +630,14 @@ static Index _findLineIndex(const List<const char*>& lineBreaks, const char* loc
     return lo;
 }
 
-static void _calcLineBreaks(const UnownedStringSlice& content, List<const char*>& outLineStarts)
-{
-    char const* begin = content.begin();
-    char const* end = content.end();
-
-    char const* cursor = begin;
-
-    // Treat the beginning of the file as a line break
-    outLineStarts.add(cursor);
-
-    while (cursor != end)
-    {
-        int c = *cursor++;
-        switch (c)
-        {
-        case '\r': case '\n':
-        {
-            // When we see a line-break character we need
-            // to record the line break, but we also need
-            // to deal with the annoying issue of encodings,
-            // where a multi-byte sequence might encode
-            // the line break.
-
-            int d = *cursor;
-            if ((c^d) == ('\r' ^ '\n'))
-                cursor++;
-
-            outLineStarts.add(cursor);
-            break;
-        }
-        default:
-            break;
-        }
-    }
-}
-
 void emitTemplateNodes(
     SourceFile* sourceFile,
     FILE*   stream,
     Node*   node)
 {
     // Work out
-    List<const char*> lineBreaks;
-    _calcLineBreaks(sourceFile->text, lineBreaks);
+    List<UnownedStringSlice> lineBreaks;
+    StringUtil::calcLines(sourceFile->text, lineBreaks);
 
     Node* prev = nullptr;
     for (auto nn = node; nn; prev = nn, nn = nn->next)

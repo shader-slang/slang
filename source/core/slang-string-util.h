@@ -77,6 +77,9 @@ struct StringUtil
     
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
+
+        /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid
+    static void calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& lines);
 };
 
 } // namespace Slang

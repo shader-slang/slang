@@ -199,6 +199,48 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
+/* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
+{
+    char const* begin = textIn.begin();
+    char const* end = textIn.end();
 
+    char const* cursor = begin;
+
+    const char* lineStart = cursor;
+
+    while (cursor < end)
+    {
+        int c = *cursor++;
+        switch (c)
+        {
+            case '\r': case '\n':
+            {
+                outLines.add(UnownedStringSlice(lineStart, cursor - 1));
+
+                // When we see a line-break character we need
+                // to record the line break, but we also need
+                // to deal with the annoying issue of encodings,
+                // where a multi-byte sequence might encode
+                // the line break.
+
+                if (cursor < end)
+                {
+                    int d = *cursor;
+                    if ((c ^ d) == ('\r' ^ '\n'))
+                        cursor++;
+                }
+                lineStart = cursor;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    if (cursor > lineStart)
+    {
+        outLines.add(UnownedStringSlice(lineStart, cursor));
+    }
+}
 
 } // namespace Slang

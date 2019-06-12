@@ -57,6 +57,9 @@
     <ClInclude Include="slang-platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-process-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-random-generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -103,6 +106,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\slang-win-visual-studio-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -162,6 +168,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\slang-win-process-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\slang-win-visual-studio-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

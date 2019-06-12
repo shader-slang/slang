@@ -292,9 +292,43 @@ namespace Slang
     class OSString
     {
     public:
+            /// Default
         OSString();
+            /// NOTE! This assumes that begin is a new wchar_t[] buffer, and it will
+            /// now be owned by the OSString
         OSString(wchar_t* begin, wchar_t* end);
-        ~OSString();
+            /// Move Ctor
+        OSString(OSString&& rhs):
+            m_begin(rhs.m_begin),
+            m_end(rhs.m_end)
+        {
+            rhs.m_begin = nullptr;
+            rhs.m_end = nullptr;
+        }
+            // Copy Ctor
+        OSString(const OSString& rhs) :
+            m_begin(nullptr),
+            m_end(nullptr)
+        {
+            set(rhs.m_begin, rhs.m_end);
+        }
+
+            /// =
+        void operator=(const OSString& rhs) { set(rhs.m_begin, rhs.m_end); }
+        void operator=(OSString&& rhs)
+        {
+            auto begin = m_begin;
+            auto end = m_end;
+            m_begin = rhs.m_begin;
+            m_end = rhs.m_end;
+            rhs.m_begin = begin;
+            rhs.m_end = end;
+        }
+
+        ~OSString() { _releaseBuffer(); }
+
+        size_t getLength() const { return (m_end - m_begin); }
+        void set(const wchar_t* begin, const wchar_t* end);
 
         operator wchar_t const*() const
         {
@@ -305,8 +339,11 @@ namespace Slang
         wchar_t const* end() const;
 
     private:
-        wchar_t* m_begin;
-        wchar_t* m_end;
+
+        void _releaseBuffer();
+
+        wchar_t* m_begin;           ///< First character. This is a new wchar_t[] buffer
+        wchar_t* m_end;             ///< Points to terminating 0
     };
 
 	/*!
