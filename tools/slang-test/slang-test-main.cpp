@@ -1103,6 +1103,9 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
+    String actualOutputPath = outputStem + ".actual";
+    File::remove(actualOutputPath);
+
     // Make the module name the same as the source file
     String directory = Path::getParentDirectory(input.outputStem);
     String moduleName = Path::getFileNameWithoutExt(filePath);
@@ -1162,7 +1165,6 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
         // Write the output, and compare to expected
         String actualOutput = getOutput(exeRes);
-        String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         // Read the expected
