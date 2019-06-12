@@ -373,9 +373,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     // /Fd - followed by name of the pdb file
     if (options.debugInfoType != DebugInfoType::None)
     {
-        StringBuilder builder;
-        builder << "/Fd" << options.modulePath << ".pdb";
-        cmdLine.addArg(builder);
+        cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
     }
     
     switch (options.targetType)
@@ -392,28 +390,20 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
                 cmdLine.addArg("/LD");
             }
 
-            StringBuilder builder;
-            builder << "/Fe" << options.modulePath << ".dll";
-            cmdLine.addArg(builder);
+            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
             break;
         }
         case TargetType::Executable:
         {
-            StringBuilder builder;
-            builder << "/Fe" << options.modulePath << ".exe";
-            cmdLine.addArg(builder);
+            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
             break;
         }
         default: break;
     }
 
     // Object file specify it's location - needed if we are out
-    {
-        StringBuilder builder;
-        builder << "/Fo" << options.modulePath << ".obj";
-        cmdLine.addArg(builder);
-    }
-
+    cmdLine.addPrefixPathArg("/Fo", options.modulePath, ".obj");
+    
     // Add defines
     for (const auto& define : options.defines)
     {
@@ -434,7 +424,6 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         cmdLine.addArg(include);
     }
 
-    
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
     // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
 
@@ -450,10 +439,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     for (const auto& libPath : options.libraryPaths)
     {
         // Note that any escaping of the path is handled in the ProcessUtil::
-        StringBuilder builder;
-        builder << "/LIBPATH:" << libPath;
-
-        cmdLine.addArg(builder);
+        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
     }
 }
 
