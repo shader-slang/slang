@@ -18,6 +18,10 @@ using namespace Slang;
 #include "options.h"
 #include "slangc-tool.h"
 
+#ifdef _WIN32
+#   include "../../source/core/windows/slang-win-visual-studio-util.h"
+#endif
+
 #include "../../source/core/slang-process-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -1089,6 +1093,50 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
+static TestResult runExecuteC(TestContext* context, TestInput& input)
+{
+#ifdef _WIN32
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    // Find
+    List<WinVisualStudioUtil::VersionPath> versionPaths;
+    WinVisualStudioUtil::find(versionPaths);
+
+    // Didn't find the visual studio compiler
+    if (versionPaths.getCount() <= 0)
+    {
+        return TestResult::Ignored;
+    }
+
+    // Make the module name the same as the source file
+
+    String moduleName = Path::getFileNameWithoutExt(filePath);
+
+
+    CPPCompileOptions options;
+
+    // Compile this source
+    options.sourceFiles.add(filePath);
+    options.modulePath = moduleName;
+
+    CommandLine cmdLine;
+    WinVisualStudioUtil::calcArgs(options, cmdLine);
+
+    options.modulePath = moduleName;
+
+    ExecuteResult exeRes;
+    if (SLANG_FAILED(WinVisualStudioUtil::executeCompiler(versionPaths[0], cmdLine, exeRes)))
+    {
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+#else
+    return TestResult::Ignored;
+#endif
+}
+
 TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file
@@ -1895,6 +1943,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
     { "COMPARE_GLSL",                           &runGLSLComparisonTest},
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
+    { "EXECUTE_C",                              &runExecuteC},
 };
 
 TestResult runTest(
@@ -2223,11 +2272,13 @@ static bool endsWithAllowedExtension(
         ".chit",
         ".miss",
         ".rgen",
-        nullptr };
+        ".c",
+        ".cpp",
+        };
 
-    for( auto ii = allowedExtensions; *ii; ++ii )
+    for( auto allowedExtension : allowedExtensions)
     {
-        if(filePath.endsWith(*ii))
+        if(filePath.endsWith(allowedExtension))
             return true;
     }
 

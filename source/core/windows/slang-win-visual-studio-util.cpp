@@ -340,7 +340,9 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
 {
     typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
     typedef CPPCompileOptions::TargetType TargetType;
+    typedef CPPCompileOptions::DebugInfoType DebugInfoType;
 
+    // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
     cmdLine.addArg("/nologo");
     // Generate complete debugging information
@@ -368,6 +370,14 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         default: break;
     }
 
+    // /Fd - followed by name of the pdb file
+    if (options.debugInfoType != DebugInfoType::None)
+    {
+        StringBuilder builder;
+        builder << "/Fd" << options.modulePath << ".pdb";
+        cmdLine.addArg(builder);
+    }
+    
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
@@ -381,10 +391,41 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             {
                 cmdLine.addArg("/LD");
             }
+
+            StringBuilder builder;
+            builder << "/Fe" << options.modulePath << ".dll";
+            cmdLine.addArg(builder);
+            break;
+        }
+        case TargetType::Object:
+        {
+            // /Fo - object filename
+
+            // Specifies the object file location
+            //cmdLine.addArg("/Fo");
+            break;
+        }
+        case TargetType::Executable:
+        {
+            StringBuilder builder;
+            builder << "/Fe" << options.modulePath << ".exe";
+            cmdLine.addArg(builder);
             break;
         }
     }
 
+    // Add defines
+    for (const auto& define : options.defines)
+    {
+        StringBuilder builder;
+        builder << define.nameWithSig;
+        if (define.value.getLength())
+        {
+            builder << "=" << define.value;
+        }
+
+        cmdLine.addArg(builder);
+    }
 
     // Add includes
     for (const auto& include : options.includePaths)
@@ -393,12 +434,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         cmdLine.addArg(include);
     }
 
-    // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
-
-    // /Fo - object filename
-    // /Fe - executable name
-    // /Fd - followed by name of the pdb file
-
+    
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
     // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
 
@@ -413,14 +449,12 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
 
     for (const auto& libPath : options.libraryPaths)
     {
+        // Note that any escaping of the path is handled in the ProcessUtil::
         StringBuilder builder;
+        builder << "/LIBPATH:" << libPath;
 
-        // ProcessUtil knows that if we have a 'switch' in this format, it doesn't need to esacpe
-        builder << "/LIBPATH:";
-        ProcessUtil::appendCommandLineEscaped(libPath.getUnownedSlice(), builder);
         cmdLine.addArg(builder);
     }
-
 }
 
 } // namespace Slang

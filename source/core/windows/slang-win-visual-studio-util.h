@@ -29,9 +29,19 @@ struct CPPCompileOptions
         Object,             ///< Produce an object file
     };
 
+    struct Define
+    {
+        String nameWithSig;             ///< If macro takes parameters include in brackets
+        String value;
+    };
+
     OptimizationLevel optimizationLevel = OptimizationLevel::Debug;
-    DebugInfoType debugInfoType;
-    TargetType targetType;
+    DebugInfoType debugInfoType = DebugInfoType::Normal;
+    TargetType targetType = TargetType::Executable;
+
+    String modulePath;      ///< The path/name of the output module. Should not have the extension, as that will be added for each of the target types
+
+    List<Define> defines;
 
     List<String> sourceFiles;
 
