@@ -397,14 +397,6 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             cmdLine.addArg(builder);
             break;
         }
-        case TargetType::Object:
-        {
-            // /Fo - object filename
-
-            // Specifies the object file location
-            //cmdLine.addArg("/Fo");
-            break;
-        }
         case TargetType::Executable:
         {
             StringBuilder builder;
@@ -412,6 +404,14 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             cmdLine.addArg(builder);
             break;
         }
+        default: break;
+    }
+
+    // Object file specify it's location - needed if we are out
+    {
+        StringBuilder builder;
+        builder << "/Fo" << options.modulePath << ".obj";
+        cmdLine.addArg(builder);
     }
 
     // Add defines
