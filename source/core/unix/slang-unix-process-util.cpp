@@ -89,6 +89,8 @@ namespace Slang {
     // Add all the args - they don't need any explicit escaping
     for (auto arg : commandLine.m_args)
     {
+        // All args for this target must be unescaped
+        SLANG_ASSERT(arg.type == CommandLine::ArgType::Unescaped);
         argPtrs.add(arg.value.getBuffer());
     }
     // Terminate with a null
