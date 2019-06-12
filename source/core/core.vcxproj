@@ -176,6 +176,7 @@
     <ClInclude Include="slang-basic.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
     <ClInclude Include="slang-common.h" />
+    <ClInclude Include="slang-cpp-compiler.h" />
     <ClInclude Include="slang-dictionary.h" />
     <ClInclude Include="slang-exception.h" />
     <ClInclude Include="slang-free-list.h" />
