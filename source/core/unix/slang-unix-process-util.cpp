@@ -23,9 +23,9 @@ namespace Slang {
     return UnownedStringSlice::fromLiteral("");
 }
 
-static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+/* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
-    // TODO(JS): This escaping is not complete... !
+   // TODO(JS): This escaping is not complete... !
     if (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0)
     {
         out << "\"";
@@ -60,11 +60,11 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
     StringBuilder cmd;
-    _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+    appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        _appendEscaped(arg.getUnownedSlice(), cmd);
+        appendCommandLineEscaped(arg.getUnownedSlice(), cmd);
     }
     return cmd.ToString();
 }

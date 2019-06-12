@@ -154,10 +154,39 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
     return UnownedStringSlice::fromLiteral(".exe");
 }
 
-static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+static bool _isLetter(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+/* Special case handling for command line switches of the form /LINKPATH: that it is immediately followed
+potentially by a path. This detects that kind of switch, and returns the index of the first character after
+the :. If doesn't have the right format returns -1, to indicate that it's not this style of switch */
+static int _calcIndexOfColonSwitch(const UnownedStringSlice& slice)
+{
+    if (!slice.startsWith("/"))
+    {
+        return -1;
+    }
+    int index = slice.indexOf(':');
+    if (index > 0)
+    {
+        for (int i = 1; i < index; ++i)
+        {
+            if (!_isLetter(slice[i]))
+            {
+                return -1;
+            }
+        }
+    }
+    return index + 1;
+}
+
+static void _appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     // TODO(JS): This escaping is not complete... !
-    if (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0)
+
+    if ((slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0))
     {
         out << "\"";
 
@@ -166,7 +195,7 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 
         while (cur < end)
         {
-            char c= *cur++;
+            char c = *cur++;
             switch (c)
             {
                 case '\"':
@@ -181,21 +210,39 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
         }
 
         out << "\"";
-
         return;
     }
+    else
+    {
+        out << slice;
+    }
+}
 
-    out << slice;
+/* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    // Check if starts with a colon ending switch, as we need to special case escaping in this case
+    const int index = _calcIndexOfColonSwitch(slice);
+    if (index >= 0)
+    {
+        // Append the switch prefix as is (ie /linkpath:)
+        out << UnownedStringSlice(slice.begin(), index);
+        // Append the stuff after the prefix escaping if needed
+        _appendCommandLineEscaped(UnownedStringSlice(slice.begin() + index, slice.end()), out);
+    }
+    else
+    {
+        _appendCommandLineEscaped(slice, out);
+    } 
 }
 
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
     StringBuilder cmd;
-    _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+    appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        _appendEscaped(arg.getUnownedSlice(), cmd);
+        appendCommandLineEscaped(arg.getUnownedSlice(), cmd);
     }
     return cmd.ToString();
 }
@@ -260,7 +307,7 @@ static void _appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
         if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
         {
             StringBuilder cmd;
-            _appendEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+            appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
 
             pathBuffer = cmd.toWString();
             path = pathBuffer.begin();

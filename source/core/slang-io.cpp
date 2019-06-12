@@ -281,7 +281,7 @@ namespace Slang
             builder.Append(splitPath[i]);
         }
 
-        return builder;
+        return builder.ToString();
     }
 
 	bool Path::createDirectory(const String& path)

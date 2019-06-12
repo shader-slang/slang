@@ -54,6 +54,9 @@ struct ProcessUtil
 
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
+
+        /// Append text escaped for using on a command line
+    static void appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out);
 };
 
 }
