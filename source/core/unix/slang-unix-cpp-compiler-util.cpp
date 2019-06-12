@@ -1,409 +1,101 @@
-#include "slang-win-visual-studio-util.h"
+#include "slang-unix-cpp-compiler-util.h"
 
 #include "../slang-common.h"
 #include "../slang-process-util.h"
 #include "../slang-string-util.h"
 
-#ifdef _WIN32
-#   define WIN32_LEAN_AND_MEAN
-#   define NOMINMAX
-#   include <Windows.h>
-#   undef WIN32_LEAN_AND_MEAN
-#   undef NOMINMAX
+#include "../slang-shared-library.h"
 
-#   include <Shlobj.h>
-
-#endif
+#include "../slang-io.h"
 
 // The method used to invoke VS was originally inspired by some ideas in
 // https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus/
 
 namespace Slang {
 
-// Information on VS versioning can be found here
-// https://en.wikipedia.org/wiki/Microsoft_Visual_C%2B%2B#Internal_version_numbering
 
-
-namespace { // anonymous
-
-typedef WinVisualStudioUtil::Version Version;
-
-struct RegistryInfo
-{
-    const char* regName;            ///< The name of the entry in the registry
-    const char* pathFix;            ///< With the value from the registry how to fix the path
-};
-
-struct VersionInfo
-{
-    Version version;                ///< The version
-    const char* name;         ///< The name of the registry key 
-};
-
-} // anonymous
-
-
-static SlangResult _readRegistryKey(const char* path, const char* keyName, String& outString)
-{
-    // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regopenkeyexa
-    HKEY  key;
-    LONG ret = RegOpenKeyExA(HKEY_LOCAL_MACHINE, path, 0,  KEY_READ | KEY_WOW64_32KEY, &key);
-    if (ret != ERROR_SUCCESS)
-    {
-        return SLANG_FAIL;
-    }
-
-    char value[MAX_PATH];
-    DWORD size = MAX_PATH;
-
-    // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
-    ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value, &size);
-    RegCloseKey(key);
-
-    if (ret != ERROR_SUCCESS)
-    {
-        return SLANG_FAIL;
-    }
-
-    outString = value;
-    return SLANG_OK;
-}
-
-// Make easier to set up the array
-static Version _makeVersion(int main, int dot = 0) { return WinVisualStudioUtil::makeVersion(main, dot); }
-
-VersionInfo _makeVersionInfo(const char* name, int high, int dot = 0)
-{
-    VersionInfo info;
-    info.name = name;
-    info.version = WinVisualStudioUtil::makeVersion(high, dot);
-    return info;
-}
-
-static const VersionInfo s_versionInfos[] = 
-{
-    _makeVersionInfo("VS 2005", 8),
-    _makeVersionInfo("VS 2008", 9),
-    _makeVersionInfo("VS 2010", 10),
-    _makeVersionInfo("VS 2012", 11),
-    _makeVersionInfo("VS 2013", 12),
-    _makeVersionInfo("VS 2015", 14),
-    _makeVersionInfo("VS 2017", 15),
-    _makeVersionInfo("VS 2019", 16),
-};
-
-// When trying to figure out how this stuff works by running regedit - care is needed, 
-// because what regedit displays varies on which version of regedit is used. 
-// In order to use the registry paths used here it's necessary to use Start/Run with 
-// %systemroot%\syswow64\regedit to view 32 bit keys
-
-static const RegistryInfo s_regInfos[] =
-{
-    {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7", "" },
-    {"SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", "VC\\Auxiliary\\Build\\" },
-};
-
-static bool _canUseVSWhere(Version version)
-{
-    // If greater than 15.0 we can use vswhere tool
-    return (int(version) >= int(_makeVersion(15)));
-}
-
-static int _getRegistryKeyIndex(Version version)
-{
-    if (int(version) >= int(_makeVersion(15)))
-    {
-        return 1;
-    }
-    return 0;
-}
-
-/* static */void WinVisualStudioUtil::getVersions(List<Version>& outVersions)
-{
-    const int count = SLANG_COUNT_OF(s_versionInfos);
-    outVersions.setCount(count);
-
-    Version* dst = outVersions.begin();
-    for (int i = 0; i < count; ++i)
-    {
-        dst[i] = s_versionInfos[i].version;
-    }
-}
-
-/* static */WinVisualStudioUtil::Version WinVisualStudioUtil::getCompiledVersion()
-{
-    // Get the version of visual studio used to compile this source
-    const uint32_t version = _MSC_VER;
-
-    switch (version)
-    {
-        case 1400:	    return _makeVersion(8); 
-        case 1500:	    return _makeVersion(9);
-        case 1600:	    return _makeVersion(10);
-        case 1700:	    return _makeVersion(11);
-        case 1800:	    return _makeVersion(12);
-        case 1900:
-        {
-            return _makeVersion(14);
-        }
-        case 1911:
-        case 1912:
-        case 1913:
-        case 1914:
-        case 1915:
-        case 1916:
-        {
-            return _makeVersion(15);
-        }
-        case 1920:
-        {
-            return _makeVersion(16);
-        }
-        default:
-        {
-            int lastKnownVersion = 1920;
-            if (version > lastKnownVersion)
-            {
-                // Its an unknown newer version
-                return Version::Future;
-            }
-            break;
-        }
-    }
-
-    // Unknown version
-    return Version::Unknown;
-}
-
-static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& outPath)
-{
-    const auto& versionInfo = s_versionInfos[versionIndex];
-
-    auto version = versionInfo.version;
-
-    outPath.version = version;
-    outPath.vcvarsPath = String();
-
-    if (_canUseVSWhere(version))
-    {
-        CommandLine cmd;
-
-        // Lookup directly %ProgramFiles(x86)% path
-        // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
-        HWND hwnd = GetConsoleWindow();
-
-        char programFilesPath[_MAX_PATH];
-        SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
-
-        String vswherePath = programFilesPath;
-        vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
-
-        cmd.setExecutableFilename(vswherePath);
-
-        StringBuilder versionName;
-        WinVisualStudioUtil::append(version, versionName);
-
-        String args[] = { "-version", versionName, "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath" };
-        cmd.addArgs(args, SLANG_COUNT_OF(args));
-
-        ExecuteResult exeRes;
-        if (SLANG_SUCCEEDED(ProcessUtil::execute(cmd, exeRes)))
-        {
-            // We need to chopoff CR/LF if there is one
-            List<UnownedStringSlice> lines;
-            StringUtil::calcLines(exeRes.standardOutput.getUnownedSlice(), lines);
-
-            if (lines.getCount())
-            {
-                outPath.vcvarsPath = lines[0];
-                outPath.vcvarsPath.append("\\VC\\Auxiliary\\Build\\");
-                return SLANG_OK;
-            }
-        }
-    }
-
-    const Int keyIndex = _getRegistryKeyIndex(version);
-    if (keyIndex >= 0)
-    {
-        SLANG_ASSERT(keyIndex < SLANG_COUNT_OF(s_regInfos));
-
-        // Try reading the key
-        const auto& keyInfo = s_regInfos[keyIndex];
-
-        StringBuilder keyName;
-        WinVisualStudioUtil::append(versionInfo.version, keyName);
-
-        String value;
-        if (SLANG_SUCCEEDED(_readRegistryKey(keyInfo.regName, keyName.getBuffer(), value)))
-        {
-            outPath.vcvarsPath = value;
-            return SLANG_OK;
-        }
-    }
-
-    return SLANG_FAIL;
-}
-
-/* static */SlangResult WinVisualStudioUtil::find(List<VersionPath>& outVersionPaths)
-{
-    outVersionPaths.clear();
-
-    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
-
-    for (int i = versionCount - 1; i >= 0; --i)
-    {
-        VersionPath versionPath;
-        if (SLANG_SUCCEEDED(_find(i, versionPath)))
-        {
-            outVersionPaths.add(versionPath);
-        }
-    }
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult WinVisualStudioUtil::find(Version version, VersionPath& outPath)
-{
-    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
-
-    for (int i = 0; i < versionCount; ++i)
-    {
-        const auto& versionInfo = s_versionInfos[i];
-        if (versionInfo.version == version)
-        {
-            return _find(i, outPath);
-        }
-    }
-    return SLANG_FAIL;
-}
-
-/* static */SlangResult WinVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
-{
-    // To invoke cl we need to run the suitable vcvars. In order to run this we have to have MS CommandLine.
-    // So here we build up a cl command line that is run by first running vcvars, and then executing cl with the parameters as passed to commandLine
-
-    StringBuilder builder;
-    CommandLine cmdLine;
-
-    cmdLine.setExecutableFilename("cmd.exe");
-    {
-        String options[] = { "/q", "/c", "@prompt", "$" };
-        cmdLine.addArgs(options, SLANG_COUNT_OF(options));
-    }
-
-    cmdLine.addArg("&&");
-
-    {
-        StringBuilder path;
-        path << versionPath.vcvarsPath;
-        path << "\\vcvarsall.bat";
-        cmdLine.addArg(path);
-    }
-
-#if SLANG_PTR_IS_32
-    cmdLine.addArg("x86");
-#else
-    cmdLine.addArg("x86_amd64");
-#endif
-
-    cmdLine.addArg("&&");
-    cmdLine.addArg("cl");
-
-    // Append the command line options
-    cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
-
-    return ProcessUtil::execute(cmdLine, outResult);
-}
-
-/* static */void WinVisualStudioUtil::append(Version version, StringBuilder& outBuilder)
-{
-    switch (version)
-    {
-        case Version::Unknown:
-        {
-            outBuilder << "unknown";
-        }
-        case Version::Future:
-        {
-            outBuilder << "future";
-            break;
-        }
-        default:
-        {
-            outBuilder << (int(version) / 10) << "." << (int(version) % 10);
-            break;
-        }
-    }
-}
-
-/* static */void WinVisualStudioUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
+/* static */void UnixCPPCompilerUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
 {
     typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
     typedef CPPCompileOptions::TargetType TargetType;
     typedef CPPCompileOptions::DebugInfoType DebugInfoType;
 
-    // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
-
-    cmdLine.addArg("/nologo");
-    // Generate complete debugging information
-    cmdLine.addArg("/Zi");
-    // Display full path of source files in diagnostics
-    cmdLine.addArg("/FC");
+    cmdLine.addArg("-fvisibility=hidden");
+    // Use shared libraries
+    //cmdLine.addArg("-shared");
 
     switch (options.optimizationLevel)
     {
         case OptimizationLevel::Debug:
         {
             // No optimization
-            cmdLine.addArg("/Od");
-            
-            cmdLine.addArg("/MDd");
+            cmdLine.addArg("-O0");
             break;
         }
         case OptimizationLevel::Normal:
         {
-            cmdLine.addArg("/O2");
-            // Multithreaded DLL
-            cmdLine.addArg("/MD");
+            cmdLine.addArg("-Os");
             break;
         }
         default: break;
     }
 
-    // /Fd - followed by name of the pdb file
     if (options.debugInfoType != DebugInfoType::None)
     {
-        cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
+        cmdLine.addArg("-g");
     }
-    
+
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
         {
-            // Create dynamic link library
-            if (options.optimizationLevel == OptimizationLevel::Debug)
+            // Position independent
+            cmdLine.addArg("-fPIC");
+
+            String sharedLibraryPath;
+
+            // Work out the shared library name
             {
-                cmdLine.addArg("/LDd");
-            }
-            else
-            {
-                cmdLine.addArg("/LD");
+                String moduleDir = Path::getParentDirectory(options.modulePath);
+                String moduleFilename = Path::getFileName(options.modulePath);
+
+                StringBuilder sharedLibraryFilename;
+                SharedLibrary::appendPlatformFileName(moduleFilename.getUnownedSlice(), sharedLibraryFilename);
+
+                if (moduleDir.getLength() > 0)
+                {
+                    sharedLibraryPath = Path::combine(moduleDir, sharedLibraryFilename);
+                }
+                else
+                {
+                    sharedLibraryPath = sharedLibraryFilename;
+                }
             }
 
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
+            cmdLine.addArg("-o");
+            cmdLine.addArg(sharedLibraryPath);
             break;
         }
         case TargetType::Executable:
         {
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
+            cmdLine.addArg("-o");
+
+            StringBuilder builder;
+            builder << options.modulePath;
+            builder << ProcessUtil::getExecutableSuffix();
+            
+            cmdLine.addArg(options.modulePath);
+            break;
+        }
+        case TargetType::Object:
+        {
+            // Don't link, just produce object file
+            cmdLine.addArg("-c");
             break;
         }
         default: break;
     }
 
-    // Object file specify it's location - needed if we are out
-    cmdLine.addPrefixPathArg("/Fo", options.modulePath, ".obj");
-    
     // Add defines
     for (const auto& define : options.defines)
     {
@@ -420,12 +112,17 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     // Add includes
     for (const auto& include : options.includePaths)
     {
-        cmdLine.addArg("/I");
+        cmdLine.addArg("-I");
         cmdLine.addArg(include);
     }
 
-    // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
-    // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
+    // Link options
+    if (0)
+    {
+        StringBuilder linkOptions;
+        linkOptions << "Wl,";
+        cmdLine.addArg(linkOptions);
+    }
 
     // Files to compile
     for (const auto& sourceFile : options.sourceFiles)
@@ -433,14 +130,34 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         cmdLine.addArg(sourceFile);
     }
 
-    // Link options (parameters past /link go to linker)
-    cmdLine.addArg("/link");
-
     for (const auto& libPath : options.libraryPaths)
     {
         // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
+        cmdLine.addArg("-L");
+        cmdLine.addArg(libPath);
+        cmdLine.addArg("-F");
+        cmdLine.addArg(libPath);
     }
+}
+
+/* static */SlangResult UnixCPPCompilerUtil::executeCompiler(const CommandLine& commandLine, ExecuteResult& outResult)
+{
+    CommandLine cmdLine;
+    // We'll assume g++ for now
+    cmdLine.setExecutableFilename("g++");
+
+    // Append the command line options
+    cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
+
+#if 0
+    // Test
+    {
+        String line = ProcessUtil::getCommandLineString(cmdLine);
+        printf("%s", line.getBuffer());
+    }
+#endif
+
+    return ProcessUtil::execute(cmdLine, outResult);
 }
 
 } // namespace Slang

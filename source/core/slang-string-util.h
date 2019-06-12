@@ -80,6 +80,9 @@ struct StringUtil
 
         /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid
     static void calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& lines);
+
+        /// Equal if the lines are equal (in effect a way to ignore differences in line breaks)
+    static bool areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b);
 };
 
 } // namespace Slang

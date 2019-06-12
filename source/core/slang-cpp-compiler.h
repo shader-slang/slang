@@ -7,6 +7,24 @@
 namespace Slang
 {
 
+class CPPCompiler
+{
+public:
+    enum class Type
+    {
+        VisualStudio,
+        GCC,
+        Clang,
+    };
+
+    struct Version
+    {
+        Type type;      ///< The compiler type
+        Int major;      ///< The major version number
+        Int minor;      ///< The minor version number
+    };
+};
+
 struct CPPCompileOptions
 {
     enum class OptimizationLevel

@@ -18,8 +18,12 @@ using namespace Slang;
 #include "options.h"
 #include "slangc-tool.h"
 
+#include "../../source/core/slang-cpp-compiler.h"
+
 #ifdef _WIN32
 #   include "../../source/core/windows/slang-win-visual-studio-util.h"
+#else
+#   include "../../source/core/unix/slang-unix-cpp-compiler-util.h"
 #endif
 
 #include "../../source/core/slang-process-util.h"
@@ -1090,7 +1094,6 @@ String getExpectedOutput(String const& outputStem)
 
 static TestResult runExecuteC(TestContext* context, TestInput& input)
 {
-#ifdef _WIN32
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
@@ -1100,6 +1103,21 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
+    // Make the module name the same as the source file
+    String directory = Path::getParentDirectory(input.outputStem);
+    String moduleName = Path::getFileNameWithoutExt(filePath);
+
+    String modulePath = Path::combine(directory, moduleName);
+
+    CPPCompileOptions options;
+
+    // Compile this source
+    options.sourceFiles.add(filePath);
+    options.modulePath = modulePath;
+
+    ExecuteResult exeRes;
+
+#ifdef _WIN32
     // Find
     List<WinVisualStudioUtil::VersionPath> versionPaths;
     WinVisualStudioUtil::find(versionPaths);
@@ -1110,30 +1128,22 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
         return TestResult::Ignored;
     }
 
-    // Make the module name the same as the source file
-    String directory = Path::getParentDirectory(input.outputStem);
-    String moduleName = Path::getFileNameWithoutExt(filePath);
+    CommandLine cmdLine;
+    WinVisualStudioUtil::calcArgs(options, cmdLine);
 
-    String modulePath = Path::combine(directory, moduleName);
-
+    if (SLANG_FAILED(WinVisualStudioUtil::executeCompiler(versionPaths[0], cmdLine, exeRes)))
     {
-        CPPCompileOptions options;
-
-        // Compile this source
-        options.sourceFiles.add(filePath);
-        options.modulePath = modulePath;
-
-        CommandLine cmdLine;
-        WinVisualStudioUtil::calcArgs(options, cmdLine);
-
-        options.modulePath = moduleName;
-
-        ExecuteResult exeRes;
-        if (SLANG_FAILED(WinVisualStudioUtil::executeCompiler(versionPaths[0], cmdLine, exeRes)))
-        {
-            return TestResult::Fail;
-        }
+        return TestResult::Fail;
     }
+#else
+    CommandLine cmdLine;
+    UnixCPPCompilerUtil::calcArgs(options, cmdLine);
+
+    if (SLANG_FAILED(UnixCPPCompilerUtil::executeCompiler(cmdLine, exeRes)))
+    {
+        return TestResult::Fail;
+    }
+#endif
 
     // Execute the binary and see what we get
     {
@@ -1167,7 +1177,7 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
         }
 
         // Compare if they are the same 
-        if (actualOutput != expectedOutput)
+        if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
         {
             context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
             return TestResult::Fail;
@@ -1175,9 +1185,6 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
     }
     
     return TestResult::Pass;
-#else
-    return TestResult::Ignored;
-#endif
 }
 
 TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
