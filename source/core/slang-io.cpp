@@ -31,6 +31,27 @@
 
 namespace Slang
 {
+
+    /* static */SlangResult File::remove(const String& fileName)
+    {
+#ifdef _WIN32
+        // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
+        if (DeleteFileA(fileName.getBuffer()))
+        {
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+#else
+        // https://linux.die.net/man/2/unlink
+
+        if (unlink(fileName.getBuffer()) == 0)
+        {
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+#endif
+    }
+
 	bool File::exists(const String& fileName)
 	{
 #ifdef _WIN32

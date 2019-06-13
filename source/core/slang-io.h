@@ -15,6 +15,7 @@ namespace Slang
 		static Slang::String readAllText(const Slang::String& fileName);
 		static Slang::List<unsigned char> readAllBytes(const Slang::String& fileName);
 		static void writeAllText(const Slang::String& fileName, const Slang::String& text);
+        static SlangResult remove(const String& fileName);
 	};
 
 	class Path
