@@ -30,6 +30,9 @@ struct WinVisualStudioUtil
         /// Given a version find it's path
     static SlangResult find(Version version, VersionPath& outPath);
 
+        /// Find and add to the set (if not already there)
+    static SlangResult find(CPPCompilerSet* set);
+
         /// Run visual studio on specified path with the parameters specified on the command line. Output placed in outResult.
     static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 
@@ -59,22 +62,6 @@ struct WinVisualStudioUtil
     }
 
 };
-
-
-class WinVisualStudioCompiler : public CPPCompiler
-{
-public:
-    typedef CPPCompiler Super;
-    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outRes) SLANG_OVERRIDE;
-    /// Ctor
-    WinVisualStudioCompiler(const Desc& desc, const WinVisualStudioUtil::VersionPath& versionPath) :
-        Super(desc),
-        m_versionPath(versionPath)
-    {
-    }
-    WinVisualStudioUtil::VersionPath m_versionPath;
-};
-
 
 } // namespace Slang
 

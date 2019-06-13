@@ -35,6 +35,9 @@ public:
             /// Get the version as a value
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
+            /// Ctor
+        Desc(Type inType = Type::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+
         Type type;                      ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
         Int minorVersion;               ///< Minor version
@@ -114,11 +117,40 @@ public:
     String m_exeName;
 };
 
-class CPPCompilerSystem: public RefObject 
+class CPPCompilerSet : public RefObject
 {
 public:
     typedef RefObject Super;
 
+    
+        /// Find all the available compilers
+    void getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const;
+        /// Returns list of all compilers
+    void getCompilers(List<CPPCompiler*>& outCompilers) const;
+
+        /// Get a compiler
+    CPPCompiler* getCompiler(const CPPCompiler::Desc& compilerDesc) const;
+  
+        /// Will replace if there is one with same desc
+    void addCompiler(CPPCompiler* compiler);
+
+        /// Get a default compiler
+    CPPCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
+        /// Set the default compiler
+    void setDefaultCompiler(CPPCompiler* compiler) { m_defaultCompiler = compiler;  }
+
+protected:
+
+    Index _findIndex(const CPPCompiler::Desc& desc) const;
+
+    RefPtr<CPPCompiler> m_defaultCompiler;
+    // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
+    // somethings easier.
+    List<RefPtr<CPPCompiler>> m_compilers;
+};
+
+struct CPPCompilerUtil
+{
     enum class MatchType
     {
         MinGreaterEqual,
@@ -126,47 +158,27 @@ public:
         Newest,
     };
 
-        /// Get the information on the compiler used to compile this source
-    const CPPCompiler::Desc& getCompiledWithDesc() const { return m_compiledWith;  }
-
-        /// Find all the available compilers
-    void getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const;
-
-        /// Get a compiler
-    CPPCompiler* getCompiler(const CPPCompiler::Desc& compilerDesc);
-        /// Get a compiler by index
-    CPPCompiler* getCompilerByIndex(Index index) const { return m_compilers[index]; }
-
-        /// Find a compiler
-    CPPCompiler* findCompiler(MatchType matchType, CPPCompiler::Desc& desc) const;
-
-        /// Will replace if there is one with same desc
-    void addCompiler(CPPCompiler* compiler);
-
-        /// Get the closest to runtime
-    CPPCompiler* getClosestRuntimeCompiler() const { return m_closestRuntimeCompiler;  }
-
-        /// Find the compiler 'closest' to the compiler that built this binary
-    CPPCompiler* findClosestRuntimeCompiler();
-
-        /// Create a factory
-    static RefPtr<CPPCompilerSystem> create();
-
         /// Extracts version number into desc from text (assumes gcc/slang type layout with a line with version starting with versionPrefix)
     static SlangResult parseGccFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc);
 
         /// Runs the exeName, and extracts the version info into outDesc
     static SlangResult calcGccFamilyVersion(const String& exeName, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc);
 
-protected:
-    CPPCompilerSystem();
-    SlangResult _init();
+        /// Find a compiler
+    static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);
+    static CPPCompiler* findCompiler(const List<CPPCompiler*>& compilers, MatchType matchType, const CPPCompiler::Desc& desc);
 
-    RefPtr<CPPCompiler> m_closestRuntimeCompiler;
+        /// Find the compiler closest to the desc 
+    static CPPCompiler* findClosestCompiler(const List<CPPCompiler*>& compilers, const CPPCompiler::Desc& desc);
+    static CPPCompiler* findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc);
 
-    List<RefPtr<CPPCompiler>> m_compilers;
-    CPPCompiler::Desc m_compiledWith;
+        /// Get the information on the compiler used to compile this source
+    static const CPPCompiler::Desc& getCompiledWithDesc();
+
+        /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
+    static SlangResult initializeSet(CPPCompilerSet* set);
 };
+
 
 }
 

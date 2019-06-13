@@ -97,7 +97,7 @@ class TestContext
     bool isExecuting() const { return testRequirements == nullptr; }
 
         /// Get compiler factory
-    Slang::CPPCompilerSystem* getCPPCompilerSystem();
+    Slang::CPPCompilerSet* getCPPCompilerSet();
 
         /// Ctor
     TestContext();
@@ -115,7 +115,7 @@ class TestContext
     Slang::RenderApiFlags availableRenderApiFlags = 0;
     bool isAvailableRenderApiFlagsValid = false;
 
-    Slang::RefPtr<Slang::CPPCompilerSystem> cppCompilerSystem;
+    Slang::RefPtr<Slang::CPPCompilerSet> cppCompilerSet;
 
 protected:
     struct SharedLibraryTool

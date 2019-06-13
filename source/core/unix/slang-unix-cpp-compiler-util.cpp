@@ -14,11 +14,11 @@
 namespace Slang {
 
 
-/* static */void UnixCPPCompilerUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
+/* static */void UnixCPPCompilerUtil::calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine)
 {
-    typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
-    typedef CPPCompileOptions::TargetType TargetType;
-    typedef CPPCompileOptions::DebugInfoType DebugInfoType;
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
 
     cmdLine.addArg("-fvisibility=hidden");
     // Use shared libraries

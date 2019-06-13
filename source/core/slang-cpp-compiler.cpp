@@ -5,7 +5,7 @@
 #include "../../slang-com-helper.h"
 #include "slang-string-util.h"
 
-#ifdef SLANG_VC
+#if SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"
 #else
 #   include "unix/slang-unix-cpp-compiler-util.h"
@@ -37,28 +37,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteRe
     return ProcessUtil::execute(cmdLine, outResult);
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerFactory !!!!!!!!!!!!!!!!!!!!!!*/
-
-CPPCompilerSystem::CPPCompilerSystem()
-{
-    CPPCompiler::Desc desc = {};
-
-#if SLANG_VC
-    desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
-#elif SLANG_CLANG
-    desc.type = CPPCompiler::Type::Clang;
-#elif SLANG_SNC
-    desc.type = CPPCompiler::Type::SNC;
-#elif SLANG_GHS
-    desc.type = CPPCompiler::Type::GHS;
-#elif
-    desc.type = CPPCompiler::Type::GCC;
-#else
-    desc.type = CPPCompiler::Type::Unknown;
-#endif
-
-    m_compiledWith = desc;
-}
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
 static bool _isDigit(char c)
 {
@@ -70,7 +49,7 @@ static bool _isWhiteSpace(char c)
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-/* static */SlangResult CPPCompilerSystem::parseGccFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
+/* static */SlangResult CPPCompilerUtil::parseGccFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(text, lines);
@@ -91,7 +70,7 @@ static bool _isWhiteSpace(char c)
 
             // Version is in format 0.0.0 
             while (true)
-            {                
+            {
                 Int value = 0;
                 const char* start = cur;
                 while (cur < end && _isDigit(*cur))
@@ -128,7 +107,7 @@ static bool _isWhiteSpace(char c)
     return SLANG_FAIL;
 }
 
-SlangResult CPPCompilerSystem::calcGccFamilyVersion(const String& exeName, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
+SlangResult CPPCompilerUtil::calcGccFamilyVersion(const String& exeName, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableFilename(exeName);
@@ -136,85 +115,44 @@ SlangResult CPPCompilerSystem::calcGccFamilyVersion(const String& exeName, const
 
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
-
-    return CPPCompilerSystem::parseGccFamilyVersion(exeRes.standardOutput.getUnownedSlice(), versionPrefix, outDesc);
+    return parseGccFamilyVersion(exeRes.standardOutput.getUnownedSlice(), versionPrefix, outDesc);
 }
 
-SlangResult CPPCompilerSystem::_init()
+static CPPCompiler::Desc _calcCompiledWithDesc()
 {
-#if SLANG_WINDOWS_FAMILY
-    List<WinVisualStudioUtil::VersionPath> versionPaths;
-    WinVisualStudioUtil::find(versionPaths);
+    CPPCompiler::Desc desc = {};
 
-    for (const auto& versionPath : versionPaths)
-    {
-        RefPtr<CPPCompiler> compiler(new WinVisualStudioCompiler(WinVisualStudioUtil::getDesc(versionPath.version), versionPath));
-        addCompiler(compiler);
-    }
+#if SLANG_VC
+    desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
+#elif SLANG_CLANG
+    desc.type = CPPCompiler::Type::Clang;
+#elif SLANG_SNC
+    desc.type = CPPCompiler::Type::SNC;
+#elif SLANG_GHS
+    desc.type = CPPCompiler::Type::GHS;
+#elif SLANG_GCC
+    desc.type = CPPCompiler::Type::GCC;
 #else
-    {
-        CPPCompiler::Desc desc = { CPPCompiler::Type::Clang };
-        if (SLANG_SUCCEEDED(calcGccFamilyVersion("clang", UnownedStringSlice::fromLiteral("clang version"), desc)))
-        {
-            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "clang", &UnixCPPCompilerUtil::calcArgs));
-            addCompiler(compiler);
-        }
-    }
-    {
-        CPPCompiler::Desc desc = { CPPCompiler::Type::GCC };
-        if (SLANG_SUCCEEDED(calcGccFamilyVersion("g++", UnownedStringSlice::fromLiteral("gcc version"), desc)))
-        {
-            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "g++", &UnixCPPCompilerUtil::calcArgs));
-            addCompiler(compiler);
-        }
-    }
+    desc.type = CPPCompiler::Type::Unknown;
 #endif
 
-    // Need to find the 'best' compiler relative to what built this binary
-    m_closestRuntimeCompiler = findClosestRuntimeCompiler();
-
-    //
-    return SLANG_OK;
+    return desc;
 }
 
-CPPCompiler* CPPCompilerSystem::findClosestRuntimeCompiler()
+const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
 {
-    CPPCompiler::Desc compiledWith = getCompiledWithDesc();
-
-    CPPCompiler* compiler;
-    compiler = findCompiler(MatchType::MinGreaterEqual, compiledWith);
-    if (compiler)
-    {
-        return compiler;
-    }
-    compiler = findCompiler(MatchType::MinAbsolute, compiledWith);
-    if (compiler)
-    {
-        return compiler;
-    }
-
-    // If we are gcc, we can try clang and vice versa
-    if (compiledWith.type == CPPCompiler::Type::GCC || compiledWith.type == CPPCompiler::Type::Clang)
-    {
-        CPPCompiler::Desc compatible = compiledWith;
-        compatible.type = (compatible.type == CPPCompiler::Type::Clang) ? CPPCompiler::Type::GCC : CPPCompiler::Type::Clang;
-
-        compiler = findCompiler(MatchType::MinGreaterEqual, compatible);
-        if (compiler)
-        {
-            return compiler;
-        }
-        compiler = findCompiler(MatchType::MinAbsolute, compatible);
-        if (compiler)
-        {
-            return compiler;
-        }
-    }
-
-    return nullptr;
+    static CPPCompiler::Desc s_desc = _calcCompiledWithDesc();
+    return s_desc;
 }
 
-CPPCompiler* CPPCompilerSystem::findCompiler(MatchType matchType, CPPCompiler::Desc& desc) const
+/* static */CPPCompiler* CPPCompilerUtil::findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc)
+{
+    List<CPPCompiler*> compilers;
+    set->getCompilers(compilers);
+    return findCompiler(compilers, matchType, desc);
+}
+
+/* static */CPPCompiler* CPPCompilerUtil::findCompiler(const List<CPPCompiler*>& compilers, MatchType matchType, const CPPCompiler::Desc& desc)
 {
     Int bestIndex = -1;
 
@@ -225,9 +163,9 @@ CPPCompiler* CPPCompilerSystem::findCompiler(MatchType matchType, CPPCompiler::D
 
     const auto descVersionValue = desc.getVersionValue();
 
-    for (Index i = 0; i < m_compilers.getCount(); ++i)
+    for (Index i = 0; i < compilers.getCount(); ++i)
     {
-        CPPCompiler* compiler = m_compilers[i];
+        CPPCompiler* compiler = compilers[i];
         auto compilerDesc = compiler->getDesc();
 
         if (type == compilerDesc.type)
@@ -239,7 +177,7 @@ CPPCompiler* CPPCompilerSystem::findCompiler(MatchType matchType, CPPCompiler::D
                 {
                     auto diff = descVersionValue - versionValue;
                     if (diff >= 0 && diff < minVersionDiff)
-                    { 
+                    {
                         bestIndex = i;
                         minVersionDiff = diff;
                     }
@@ -268,11 +206,95 @@ CPPCompiler* CPPCompilerSystem::findCompiler(MatchType matchType, CPPCompiler::D
             }
         }
     }
-    
-    return (bestIndex >= 0) ? getCompilerByIndex(bestIndex) : nullptr;
+
+    return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-void CPPCompilerSystem::getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const
+/* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const List<CPPCompiler*>& compilers, const CPPCompiler::Desc& desc)
+{
+    CPPCompiler* compiler;
+
+    compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc);
+    if (compiler)
+    {
+        return compiler;
+    }
+    compiler = findCompiler(compilers, MatchType::MinAbsolute, desc);
+    if (compiler)
+    {
+        return compiler;
+    }
+
+    // If we are gcc, we can try clang and vice versa
+    if (desc.type == CPPCompiler::Type::GCC || desc.type == CPPCompiler::Type::Clang)
+    {
+        CPPCompiler::Desc compatible = desc;
+        compatible.type = (compatible.type == CPPCompiler::Type::Clang) ? CPPCompiler::Type::GCC : CPPCompiler::Type::Clang;
+
+        compiler = findCompiler(compilers, MatchType::MinGreaterEqual, compatible);
+        if (compiler)
+        {
+            return compiler;
+        }
+        compiler = findCompiler(compilers, MatchType::MinAbsolute, compatible);
+        if (compiler)
+        {
+            return compiler;
+        }
+    }
+
+    return nullptr;
+}
+
+/* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc)
+{
+    CPPCompiler* compiler = set->getCompiler(desc);
+    if (compiler)
+    {
+        return compiler;
+    }
+    List<CPPCompiler*> compilers;
+    set->getCompilers(compilers);
+    return findClosestCompiler(compilers, desc);
+}
+
+
+/* static */SlangResult CPPCompilerUtil::initializeSet(CPPCompilerSet* set)
+{
+#if SLANG_WINDOWS_FAMILY
+    WinVisualStudioUtil::find(set);
+#else
+    {
+        CPPCompiler::Desc desc(CPPCompiler::Type::Clang);
+        if (SLANG_SUCCEEDED(calcGccFamilyVersion("clang", UnownedStringSlice::fromLiteral("clang version"), desc)))
+        {
+            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "clang", &UnixCPPCompilerUtil::calcArgs));
+            set->addCompiler(compiler);
+        }
+    }
+    {
+        CPPCompiler::Desc desc(CPPCompiler::Type::GCC);
+        if (SLANG_SUCCEEDED(calcGccFamilyVersion("g++", UnownedStringSlice::fromLiteral("gcc version"), desc)))
+        {
+            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "g++", &UnixCPPCompilerUtil::calcArgs));
+            set->addCompiler(compiler);
+        }
+    }
+#endif
+
+    List<CPPCompiler*> compilers;
+    set->getCompilers(compilers);
+
+    // Set the default to the compiler closest to how this source was compiled
+    set->setDefaultCompiler(findClosestCompiler(set, getCompiledWithDesc()));
+
+    return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerFactory !!!!!!!!!!!!!!!!!!!!!!*/
+
+
+void CPPCompilerSet::getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const
 {
     outCompilerDescs.clear();
     for (CPPCompiler* compiler : m_compilers)
@@ -281,40 +303,42 @@ void CPPCompilerSystem::getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDes
     }
 }
 
-CPPCompiler* CPPCompilerSystem::getCompiler(const CPPCompiler::Desc& compilerDesc)
+Index CPPCompilerSet::_findIndex(const CPPCompiler::Desc& desc) const
 {
-    for (CPPCompiler* compiler : m_compilers)
-    {
-        if (compiler->getDesc() == compilerDesc)
+    const Index count = m_compilers.getCount();
+    for (Index i = 0; i < count; ++i)
+    { 
+        if (m_compilers[i]->getDesc() == desc)
         {
-            return compiler;
+            return i;
         }
     }
-    return nullptr;
+    return -1;
 }
 
-void CPPCompilerSystem::addCompiler(CPPCompiler* compiler)
+CPPCompiler* CPPCompilerSet::getCompiler(const CPPCompiler::Desc& compilerDesc) const
 {
-    for (Index i = 0; i < m_compilers.getCount(); ++i)
-    {
-        CPPCompiler* cur = m_compilers[i];
-        if (cur->getDesc() == compiler->getDesc())
-        {
-            m_compilers[i] = compiler;
-            return;
-        }
-    }
-    m_compilers.add(compiler);
+    const Index index = _findIndex(compilerDesc);
+    return index >= 0 ? m_compilers[index] : nullptr;
 }
 
-/* static */RefPtr<CPPCompilerSystem> CPPCompilerSystem::create()
+void CPPCompilerSet::getCompilers(List<CPPCompiler*>& outCompilers) const
 {
-    RefPtr<CPPCompilerSystem> factory;
-    if (SLANG_FAILED(factory->_init()))
+    outCompilers.clear();
+    outCompilers.addRange((CPPCompiler*const*)m_compilers.begin(), m_compilers.getCount());
+}
+
+void CPPCompilerSet::addCompiler(CPPCompiler* compiler)
+{
+    const Index index = _findIndex(compiler->getDesc());
+    if (index >= 0)
     {
-        return nullptr;
+        m_compilers[index] = compiler;
     }
-    return factory;
+    else
+    {
+        m_compilers.add(compiler);
+    }
 }
 
 }

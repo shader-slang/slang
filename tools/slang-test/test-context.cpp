@@ -91,12 +91,12 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
     }
 }
 
-
-CPPCompilerSystem* TestContext::getCPPCompilerSystem()
+CPPCompilerSet* TestContext::getCPPCompilerSet()
 {
-    if (!cppCompilerSystem)
+    if (!cppCompilerSet)
     {
-        cppCompilerSystem = CPPCompilerSystem::create();
+        cppCompilerSet = new CPPCompilerSet;
+        CPPCompilerUtil::initializeSet(cppCompilerSet);
     }
-    return cppCompilerSystem;
+    return cppCompilerSet;
 }
