@@ -20,7 +20,11 @@ namespace Slang {
 
 /* static */UnownedStringSlice ProcessUtil::getExecutableSuffix()
 {
+#if __CYGWIN__
+    return UnownedStringSlice::fromLiteral(".exe");
+#else
     return UnownedStringSlice::fromLiteral("");
+#endif
 }
 
 /* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)

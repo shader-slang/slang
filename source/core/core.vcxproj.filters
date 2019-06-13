@@ -27,6 +27,9 @@
     <ClInclude Include="slang-common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-cpp-compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-dictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>

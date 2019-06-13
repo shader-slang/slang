@@ -1,4 +1,4 @@
-//TEST:EXECUTE_C: 
+//TEST(smoke):EXECUTE_C: 
 
 #include <stdlib.h>
 #include <stdio.h>

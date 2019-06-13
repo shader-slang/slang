@@ -243,4 +243,28 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
+/* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    List<UnownedStringSlice> slicesA;
+    List<UnownedStringSlice> slicesB;
+
+    calcLines(a, slicesA);
+    calcLines(b, slicesB);
+
+    const auto linesCount = slicesA.getCount();
+    if (linesCount != slicesB.getCount())
+    {
+        return false;
+    }
+
+    for (Index i = 0; i < linesCount; ++i)
+    {
+        if (slicesA[i] != slicesB[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace Slang
