@@ -46,9 +46,35 @@ struct WinVisualStudioUtil
     static void append(Version version, StringBuilder& outBuilder);
 
         /// Calculate the command line args
-    static void calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine);
+    static void calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
+
+        /// Get version as desc
+    static CPPCompiler::Desc getDesc(Version version)
+    {
+        CPPCompiler::Desc desc;
+        desc.type = CPPCompiler::Type::VisualStudio;
+        desc.majorVersion = Int(version) / 10;
+        desc.minorVersion = Int(version) % 10;
+        return desc;
+    }
 
 };
+
+
+class WinVisualStudioCompiler : public CPPCompiler
+{
+public:
+    typedef CPPCompiler Super;
+    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outRes) SLANG_OVERRIDE;
+    /// Ctor
+    WinVisualStudioCompiler(const Desc& desc, const WinVisualStudioUtil::VersionPath& versionPath) :
+        Super(desc),
+        m_versionPath(versionPath)
+    {
+    }
+    WinVisualStudioUtil::VersionPath m_versionPath;
+};
+
 
 } // namespace Slang
 

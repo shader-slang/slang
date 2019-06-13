@@ -208,6 +208,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-byte-encode-util.cpp" />
+    <ClCompile Include="slang-cpp-compiler.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />

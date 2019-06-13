@@ -43,6 +43,13 @@ struct VersionInfo
 } // anonymous
 
 
+Result WinVisualStudioCompiler::compile(const CompileOptions& options, ExecuteResult& outRes)
+{
+    CommandLine cmdLine;
+    WinVisualStudioUtil::calcArgs(options, cmdLine);
+    return WinVisualStudioUtil::executeCompiler(m_versionPath, cmdLine, outRes);
+}
+
 static SlangResult _readRegistryKey(const char* path, const char* keyName, String& outString)
 {
     // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regopenkeyexa
@@ -336,11 +343,11 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     }
 }
 
-/* static */void WinVisualStudioUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
+/* static */void WinVisualStudioUtil::calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine)
 {
-    typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
-    typedef CPPCompileOptions::TargetType TargetType;
-    typedef CPPCompileOptions::DebugInfoType DebugInfoType;
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 

@@ -1112,7 +1112,7 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
     String modulePath = Path::combine(directory, moduleName);
 
-    CPPCompileOptions options;
+    CPPCompiler::CompileOptions options;
 
     // Compile this source
     options.sourceFiles.add(filePath);
