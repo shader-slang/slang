@@ -115,7 +115,7 @@ SlangResult CPPCompilerUtil::calcGccFamilyVersion(const String& exeName, const U
 
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
-    return parseGccFamilyVersion(exeRes.standardOutput.getUnownedSlice(), versionPrefix, outDesc);
+    return parseGccFamilyVersion(exeRes.standardError.getUnownedSlice(), versionPrefix, outDesc);
 }
 
 static CPPCompiler::Desc _calcCompiledWithDesc()
