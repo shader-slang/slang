@@ -282,12 +282,8 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     }
 #endif
 
-    List<CPPCompiler*> compilers;
-    set->getCompilers(compilers);
-
     // Set the default to the compiler closest to how this source was compiled
     set->setDefaultCompiler(findClosestCompiler(set, getCompiledWithDesc()));
-
     return SLANG_OK;
 }
 
