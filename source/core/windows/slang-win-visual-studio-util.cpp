@@ -40,32 +40,7 @@ struct VersionInfo
     const char* name;         ///< The name of the registry key 
 };
 
-
-
-class WinVisualStudioCompiler : public CPPCompiler
-{
-public:
-    typedef CPPCompiler Super;
-    
-    Result WinVisualStudioCompiler::compile(const CompileOptions& options, ExecuteResult& outRes) SLANG_OVERRIDE
-    {
-        CommandLine cmdLine;
-        WinVisualStudioUtil::calcArgs(options, cmdLine);
-        return WinVisualStudioUtil::executeCompiler(m_versionPath, cmdLine, outRes);
-    }
-        /// Ctor
-    WinVisualStudioCompiler(const Desc& desc, const WinVisualStudioUtil::VersionPath& versionPath) :
-        Super(desc),
-        m_versionPath(versionPath)
-    {
-    }
-
-    WinVisualStudioUtil::VersionPath m_versionPath;
-};
-
 } // anonymous
-
-
 
 static SlangResult _readRegistryKey(const char* path, const char* keyName, String& outString)
 {
@@ -313,7 +288,10 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         VersionPath versionPath;
         if (!set->getCompiler(desc) && SLANG_SUCCEEDED(_find(i, versionPath)))
         {
-            RefPtr<WinVisualStudioCompiler> compiler = new WinVisualStudioCompiler(desc, versionPath);
+            CommandLine cmdLine;
+            calcExecuteCompilerArgs(versionPath, cmdLine);
+            
+            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &calcArgs);
             set->addCompiler(compiler);
         }
     }
@@ -321,12 +299,11 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     return SLANG_OK;
 }
 
-/* static */SlangResult WinVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
+/* static */void WinVisualStudioUtil::calcExecuteCompilerArgs(const VersionPath& versionPath, CommandLine& outCmdLine)
 {
     // To invoke cl we need to run the suitable vcvars. In order to run this we have to have MS CommandLine.
     // So here we build up a cl command line that is run by first running vcvars, and then executing cl with the parameters as passed to commandLine
 
-    StringBuilder builder;
     CommandLine cmdLine;
 
     cmdLine.setExecutableFilename("cmd.exe");
@@ -353,9 +330,15 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     cmdLine.addArg("&&");
     cmdLine.addArg("cl");
 
+    outCmdLine = cmdLine;
+}
+
+/* static */SlangResult WinVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
+{
+    CommandLine cmdLine;
+    calcExecuteCompilerArgs(versionPath, cmdLine);
     // Append the command line options
     cmdLine.addArgs(commandLine.m_args.getBuffer(), commandLine.m_args.getCount());
-
     return ProcessUtil::execute(cmdLine, outResult);
 }
 

@@ -20,12 +20,6 @@ using namespace Slang;
 
 #include "../../source/core/slang-cpp-compiler.h"
 
-#ifdef _WIN32
-#   include "../../source/core/windows/slang-win-visual-studio-util.h"
-#else
-#   include "../../source/core/unix/slang-unix-cpp-compiler-util.h"
-#endif
-
 #include "../../source/core/slang-process-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -1120,6 +1114,15 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
     String modulePath = Path::combine(directory, moduleName);
 
+    // Remove the binary..
+    {
+        StringBuilder moduleExePath;
+        moduleExePath << modulePath;
+        moduleExePath << ProcessUtil::getExecutableSuffix();
+        File::remove(moduleExePath);
+    }
+
+    // Set up the compilation options
     CPPCompiler::CompileOptions options;
 
     // Compile this source

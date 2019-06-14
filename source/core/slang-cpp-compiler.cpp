@@ -5,10 +5,11 @@
 #include "../../slang-com-helper.h"
 #include "slang-string-util.h"
 
+#include "slang-io.h"
+#include "slang-shared-library.h"
+
 #if SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"
-#else
-#   include "unix/slang-unix-cpp-compiler-util.h"
 #endif
 
 namespace Slang
@@ -18,13 +19,10 @@ namespace Slang
 
 SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteResult& outResult)
 {
-    CommandLine cmdLine;
+    CommandLine cmdLine(m_cmdLine);
 
     // Calculate the command line options
     m_func(options, cmdLine);
-
-    // Set the executable
-    cmdLine.setExecutableFilename(m_exeName);
 
 #if 0
     // Test
@@ -49,16 +47,17 @@ static bool _isWhiteSpace(char c)
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-/* static */SlangResult CPPCompilerUtil::parseGccFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
+/* static */SlangResult CPPCompilerUtil::parseGCCFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(text, lines);
 
     for (auto line : lines)
     {
-        if (String(line).startsWith(versionPrefix))
+        // TODO(JS): Ugh - having to turn into a string to do this test isn't great.
+        if (String(line).startsWith(prefix))
         {
-            UnownedStringSlice versionSlice(line.begin() + versionPrefix.size(), line.end());
+            UnownedStringSlice versionSlice(line.begin() + prefix.size(), line.end());
 
             List<Int> digits;
 
@@ -99,7 +98,6 @@ static bool _isWhiteSpace(char c)
 
             outDesc.majorVersion = digits[0];
             outDesc.minorVersion = digits[1];
-
             return SLANG_OK;
         }
     }
@@ -107,7 +105,7 @@ static bool _isWhiteSpace(char c)
     return SLANG_FAIL;
 }
 
-SlangResult CPPCompilerUtil::calcGccFamilyVersion(const String& exeName, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc)
+SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPCompiler::Desc& outDesc)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableFilename(exeName);
@@ -115,8 +113,160 @@ SlangResult CPPCompilerUtil::calcGccFamilyVersion(const String& exeName, const U
 
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
-    return parseGccFamilyVersion(exeRes.standardError.getUnownedSlice(), versionPrefix, outDesc);
+
+    const UnownedStringSlice prefixes[] =
+    {
+        UnownedStringSlice::fromLiteral("clang version"),
+        UnownedStringSlice::fromLiteral("gcc version"),
+    };
+    const CPPCompiler::Type types[] =
+    {
+        CPPCompiler::Type::Clang,
+        CPPCompiler::Type::GCC,
+    };
+
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));
+
+    for (Index i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
+    {
+        // Set the type
+        outDesc.type = types[i];
+        // Extract the version
+        if (SLANG_SUCCEEDED(parseGCCFamilyVersion(exeRes.standardError.getUnownedSlice(), prefixes[i], outDesc)))
+        {
+            return SLANG_OK;
+        }
+    }
+    return SLANG_FAIL;
 }
+
+
+/* static */void CPPCompilerUtil::calcGCCFamilyArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine)
+{
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
+
+    cmdLine.addArg("-fvisibility=hidden");
+    // Use shared libraries
+    //cmdLine.addArg("-shared");
+
+    switch (options.optimizationLevel)
+    {
+        case OptimizationLevel::Debug:
+        {
+            // No optimization
+            cmdLine.addArg("-O0");
+            break;
+        }
+        case OptimizationLevel::Normal:
+        {
+            cmdLine.addArg("-Os");
+            break;
+        }
+        default: break;
+    }
+
+    if (options.debugInfoType != DebugInfoType::None)
+    {
+        cmdLine.addArg("-g");
+    }
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            // Position independent
+            cmdLine.addArg("-fPIC");
+
+            String sharedLibraryPath;
+
+            // Work out the shared library name
+            {
+                String moduleDir = Path::getParentDirectory(options.modulePath);
+                String moduleFilename = Path::getFileName(options.modulePath);
+
+                StringBuilder sharedLibraryFilename;
+                SharedLibrary::appendPlatformFileName(moduleFilename.getUnownedSlice(), sharedLibraryFilename);
+
+                if (moduleDir.getLength() > 0)
+                {
+                    sharedLibraryPath = Path::combine(moduleDir, sharedLibraryFilename);
+                }
+                else
+                {
+                    sharedLibraryPath = sharedLibraryFilename;
+                }
+            }
+
+            cmdLine.addArg("-o");
+            cmdLine.addArg(sharedLibraryPath);
+            break;
+        }
+        case TargetType::Executable:
+        {
+            cmdLine.addArg("-o");
+
+            StringBuilder builder;
+            builder << options.modulePath;
+            builder << ProcessUtil::getExecutableSuffix();
+
+            cmdLine.addArg(options.modulePath);
+            break;
+        }
+        case TargetType::Object:
+        {
+            // Don't link, just produce object file
+            cmdLine.addArg("-c");
+            break;
+        }
+        default: break;
+    }
+
+    // Add defines
+    for (const auto& define : options.defines)
+    {
+        StringBuilder builder;
+        builder << define.nameWithSig;
+        if (define.value.getLength())
+        {
+            builder << "=" << define.value;
+        }
+
+        cmdLine.addArg(builder);
+    }
+
+    // Add includes
+    for (const auto& include : options.includePaths)
+    {
+        cmdLine.addArg("-I");
+        cmdLine.addArg(include);
+    }
+
+    // Link options
+    if (0)
+    {
+        StringBuilder linkOptions;
+        linkOptions << "Wl,";
+        cmdLine.addArg(linkOptions);
+    }
+
+    // Files to compile
+    for (const auto& sourceFile : options.sourceFiles)
+    {
+        cmdLine.addArg(sourceFile);
+    }
+
+    for (const auto& libPath : options.libraryPaths)
+    {
+        // Note that any escaping of the path is handled in the ProcessUtil::
+        cmdLine.addArg("-L");
+        cmdLine.addArg(libPath);
+        cmdLine.addArg("-F");
+        cmdLine.addArg(libPath);
+    }
+}
+
 
 static CPPCompiler::Desc _calcCompiledWithDesc()
 {
@@ -246,6 +396,19 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
+// Have to do this conditionally because unreferenced static functions are a warning on VC, and warnings are errors.
+#if !SLANG_WINDOWS_FAMILY
+static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compilerSet)
+{
+    CPPCompiler::Desc desc;
+    if (SLANG_SUCCEEDED(CPPCompilerUtil::calcGCCFamilyVersion(exeName, desc)))
+    {
+        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &CPPCompilerUtil::calcGCCFamilyArgs));
+        compilerSet->addCompiler(compiler);
+    }
+}
+#endif
+
 /* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc)
 {
     CPPCompiler* compiler = set->getCompiler(desc);
@@ -258,28 +421,13 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     return findClosestCompiler(compilers, desc);
 }
 
-
 /* static */SlangResult CPPCompilerUtil::initializeSet(CPPCompilerSet* set)
 {
 #if SLANG_WINDOWS_FAMILY
     WinVisualStudioUtil::find(set);
 #else
-    {
-        CPPCompiler::Desc desc(CPPCompiler::Type::Clang);
-        if (SLANG_SUCCEEDED(calcGccFamilyVersion("clang", UnownedStringSlice::fromLiteral("clang version"), desc)))
-        {
-            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "clang", &UnixCPPCompilerUtil::calcArgs));
-            set->addCompiler(compiler);
-        }
-    }
-    {
-        CPPCompiler::Desc desc(CPPCompiler::Type::GCC);
-        if (SLANG_SUCCEEDED(calcGccFamilyVersion("g++", UnownedStringSlice::fromLiteral("gcc version"), desc)))
-        {
-            RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, "g++", &UnixCPPCompilerUtil::calcArgs));
-            set->addCompiler(compiler);
-        }
-    }
+    _addGCCFamilyCompiler("clang", set);
+    _addGCCFamilyCompiler("g++", set);
 #endif
 
     // Set the default to the compiler closest to how this source was compiled

@@ -52,6 +52,9 @@ struct CommandLine
         /// Get the total number of args
     SLANG_FORCE_INLINE Index getArgCount() const { return m_args.getCount(); }
 
+        /// Reset to the initial state
+    void reset() { *this = CommandLine();  }
+
         /// Ctor
     CommandLine():m_executableType(ExecutableType::Unknown) {}
 
