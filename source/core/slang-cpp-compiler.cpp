@@ -33,21 +33,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteRe
     }
 #endif
 
-#if 0 && SLANG_OSX
-    {
-        CommandLine shCmdLine;
-        shCmdLine.setExecutablePath("/bin/sh");
-        shCmdLine.addArg("-c");
-
-        String escapedCmdLine = ProcessUtil::getCommandLineString(cmdLine);
-
-        shCmdLine.addArg(escapedCmdLine);
-
-        return ProcessUtil::execute(shCmdLine, outResult);
-    }
-#else
     return ProcessUtil::execute(cmdLine, outResult);
-#endif
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
