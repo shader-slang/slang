@@ -2,6 +2,7 @@
 #include "slang-platform.h"
 
 #include "slang-common.h"
+#include "slang-io.h"
 
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
@@ -23,6 +24,25 @@ namespace Slang
     StringBuilder builder;
     appendPlatformFileName(UnownedStringSlice(filename), builder);
     return loadWithPlatformFilename(builder.begin(), handleOut);
+}
+
+/* static */String SharedLibrary::calcPlatformPath(const UnownedStringSlice& path)
+{
+    // Work out the shared library name
+    String parent = Path::getParentDirectory(path);
+    String filename = Path::getFileName(path);
+    
+    StringBuilder builder;
+    SharedLibrary::appendPlatformFileName(filename.getUnownedSlice(), builder);
+
+    if (parent.getLength() > 0)
+    {
+        return Path::combine(parent, builder);
+    }
+    else
+    {
+        return builder;
+    }
 }
 
 #ifdef _WIN32
@@ -105,8 +125,8 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
 {
-    // Windows doesn't need the extension or any prefix to work
     dst.Append(name);
+    dst.Append(".dll");
 }
 
 #else // _WIN32
