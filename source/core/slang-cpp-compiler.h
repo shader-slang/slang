@@ -158,6 +158,11 @@ protected:
 
 struct CPPCompilerUtil
 {
+    typedef CPPCompiler::CompileOptions CompileOptions;
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
+
     enum class MatchType
     {
         MinGreaterEqual,
@@ -172,7 +177,10 @@ struct CPPCompilerUtil
     static SlangResult calcGCCFamilyVersion(const String& exeName, CPPCompiler::Desc& outDesc);
 
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
-    static void calcGCCFamilyArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
+    static void calcGCCFamilyArgs(const CompileOptions& options, CommandLine& cmdLine);
+
+        /// Calculate Visual Studio family compilers cmdLine arguments from options
+    static void calcVisualStudioArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Find a compiler
     static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);

@@ -291,7 +291,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             CommandLine cmdLine;
             calcExecuteCompilerArgs(versionPath, cmdLine);
             
-            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &calcArgs);
+            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &CPPCompilerUtil::calcVisualStudioArgs);
             set->addCompiler(compiler);
         }
     }
@@ -360,113 +360,6 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             outBuilder << (int(version) / 10) << "." << (int(version) % 10);
             break;
         }
-    }
-}
-
-/* static */void WinVisualStudioUtil::calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine)
-{
-    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
-    typedef CPPCompiler::TargetType TargetType;
-    typedef CPPCompiler::DebugInfoType DebugInfoType;
-
-    // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
-
-    cmdLine.addArg("/nologo");
-    // Generate complete debugging information
-    cmdLine.addArg("/Zi");
-    // Display full path of source files in diagnostics
-    cmdLine.addArg("/FC");
-
-    switch (options.optimizationLevel)
-    {
-        case OptimizationLevel::Debug:
-        {
-            // No optimization
-            cmdLine.addArg("/Od");
-            
-            cmdLine.addArg("/MDd");
-            break;
-        }
-        case OptimizationLevel::Normal:
-        {
-            cmdLine.addArg("/O2");
-            // Multithreaded DLL
-            cmdLine.addArg("/MD");
-            break;
-        }
-        default: break;
-    }
-
-    // /Fd - followed by name of the pdb file
-    if (options.debugInfoType != DebugInfoType::None)
-    {
-        cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
-    }
-    
-    switch (options.targetType)
-    {
-        case TargetType::SharedLibrary:
-        {
-            // Create dynamic link library
-            if (options.optimizationLevel == OptimizationLevel::Debug)
-            {
-                cmdLine.addArg("/LDd");
-            }
-            else
-            {
-                cmdLine.addArg("/LD");
-            }
-
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
-            break;
-        }
-        case TargetType::Executable:
-        {
-            cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
-            break;
-        }
-        default: break;
-    }
-
-    // Object file specify it's location - needed if we are out
-    cmdLine.addPrefixPathArg("/Fo", options.modulePath, ".obj");
-    
-    // Add defines
-    for (const auto& define : options.defines)
-    {
-        StringBuilder builder;
-        builder << define.nameWithSig;
-        if (define.value.getLength())
-        {
-            builder << "=" << define.value;
-        }
-
-        cmdLine.addArg(builder);
-    }
-
-    // Add includes
-    for (const auto& include : options.includePaths)
-    {
-        cmdLine.addArg("/I");
-        cmdLine.addArg(include);
-    }
-
-    // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
-    // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
-
-    // Files to compile
-    for (const auto& sourceFile : options.sourceFiles)
-    {
-        cmdLine.addArg(sourceFile);
-    }
-
-    // Link options (parameters past /link go to linker)
-    cmdLine.addArg("/link");
-
-    for (const auto& libPath : options.libraryPaths)
-    {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
     }
 }
 
