@@ -33,7 +33,21 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteRe
     }
 #endif
 
+#if 0 && SLANG_OSX
+    {
+        CommandLine shCmdLine;
+        shCmdLine.setExecutablePath("/bin/sh");
+        shCmdLine.addArg("-c");
+
+        String escapedCmdLine = ProcessUtil::getCommandLineString(cmdLine);
+
+        shCmdLine.addArg(escapedCmdLine);
+
+        return ProcessUtil::execute(shCmdLine, outResult);
+    }
+#else
     return ProcessUtil::execute(cmdLine, outResult);
+#endif
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
@@ -119,11 +133,13 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     {
         UnownedStringSlice::fromLiteral("clang version"),
         UnownedStringSlice::fromLiteral("gcc version"),
+        UnownedStringSlice::fromLiteral("Apple LLVM version"),
     };
     const CPPCompiler::Type types[] =
     {
         CPPCompiler::Type::Clang,
         CPPCompiler::Type::GCC,
+        CPPCompiler::Type::Clang,
     };
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));
