@@ -1086,7 +1086,7 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-static TestResult runExecuteC(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
     CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
     CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
@@ -1111,7 +1111,7 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
     // Make the module name the same as the source file
     String directory = Path::getParentDirectory(input.outputStem);
     String moduleName = Path::getFileNameWithoutExt(filePath);
-
+    String ext = Path::getFileExt(filePath);
     String modulePath = Path::combine(directory, moduleName);
 
     // Remove the binary..
@@ -1124,6 +1124,8 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
     // Set up the compilation options
     CPPCompiler::CompileOptions options;
+
+    options.sourceType = (ext == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
 
     // Compile this source
     options.sourceFiles.add(filePath);
@@ -1174,6 +1176,95 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
         }
     }
     
+    return TestResult::Pass;
+}
+
+static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
+{
+    CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
+    CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
+
+    if (!compiler)
+    {
+        return TestResult::Ignored;
+    }
+
+    // If we are just collecting requirements, say it passed
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    String actualOutputPath = outputStem + ".actual";
+    File::remove(actualOutputPath);
+
+    // Make the module name the same as the source file
+    String directory = Path::getParentDirectory(input.outputStem);
+    String moduleName = Path::getFileNameWithoutExt(filePath);
+    String ext = Path::getFileExt(filePath);
+
+    String modulePath = Path::combine(directory, moduleName);
+
+    // Remove the binary..
+    String sharedLibraryPath = SharedLibrary::calcPlatformPath(modulePath.getUnownedSlice());
+    File::remove(sharedLibraryPath);
+    
+    // Set up the compilation options
+    CPPCompiler::CompileOptions options;
+
+    options.sourceType = (ext == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+    
+    // Build a shared library
+    options.targetType = CPPCompiler::TargetType::SharedLibrary;
+
+    // Compile this source
+    options.sourceFiles.add(filePath);
+    options.modulePath = modulePath;
+
+    options.includePaths.add(".");
+
+    ExecuteResult exeRes;
+
+    if (SLANG_FAILED(compiler->compile(options, exeRes)))
+    {
+        return TestResult::Fail;
+    }
+
+    SharedLibrary::Handle handle;
+    if (SLANG_FAILED(SharedLibrary::loadWithPlatformFilename(sharedLibraryPath.getBuffer(), handle)))
+    {
+        return TestResult::Fail;
+    }
+
+    const int inValue = 10;
+    const char inBuffer[] = "Hello World!";
+
+    char buffer[128] = "";
+    int value = 0;
+
+    typedef int (*TestFunc)(int intValue, const char* textValue, char* outTextValue);
+
+    // We could capture output if we passed in a ISlangWriter - but for that to work we'd need a 
+    TestFunc testFunc = (TestFunc)SharedLibrary::findFuncByName(handle, "test");
+    if (testFunc)
+    {
+        value = testFunc(inValue, inBuffer, buffer);
+    }
+    else
+    {
+        printf("Unable to access 'test' function\n");
+    }
+
+    SharedLibrary::unload(handle);
+
+    if (!(inValue == value && strcmp(inBuffer, buffer) == 0))
+    {
+        return TestResult::Fail;
+    }
+
     return TestResult::Pass;
 }
 
@@ -1983,7 +2074,8 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
     { "COMPARE_GLSL",                           &runGLSLComparisonTest},
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "EXECUTE_C",                              &runExecuteC},
+    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
 };
 
 TestResult runTest(

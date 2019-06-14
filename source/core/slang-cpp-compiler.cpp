@@ -33,7 +33,15 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteRe
     }
 #endif
 
-    return ProcessUtil::execute(cmdLine, outResult);
+    SlangResult res = ProcessUtil::execute(cmdLine, outResult);
+
+#if 0
+    {
+        printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", outResult.standardOutput.getBuffer(), outResult.standardError.getBuffer(), int(outResult.resultCode));
+    }
+#endif
+
+    return res;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
@@ -152,6 +160,16 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     cmdLine.addArg("/Zi");
     // Display full path of source files in diagnostics
     cmdLine.addArg("/FC");
+
+    if (options.flags & CompileOptions::Flag::EnableExceptionHandling)
+    {
+        if (options.sourceType == SourceType::CPP)
+        {
+            // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
+            // Assumes c functions cannot throw
+            cmdLine.addArg("/EHsc");
+        }
+    }
 
     switch (options.optimizationLevel)
     {
@@ -277,28 +295,12 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     {
         case TargetType::SharedLibrary:
         {
+            // Shared library
+            cmdLine.addArg("-shared");
             // Position independent
             cmdLine.addArg("-fPIC");
 
-            String sharedLibraryPath;
-
-            // Work out the shared library name
-            {
-                String moduleDir = Path::getParentDirectory(options.modulePath);
-                String moduleFilename = Path::getFileName(options.modulePath);
-
-                StringBuilder sharedLibraryFilename;
-                SharedLibrary::appendPlatformFileName(moduleFilename.getUnownedSlice(), sharedLibraryFilename);
-
-                if (moduleDir.getLength() > 0)
-                {
-                    sharedLibraryPath = Path::combine(moduleDir, sharedLibraryFilename);
-                }
-                else
-                {
-                    sharedLibraryPath = sharedLibraryFilename;
-                }
-            }
+            String sharedLibraryPath = SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
 
             cmdLine.addArg("-o");
             cmdLine.addArg(sharedLibraryPath);
@@ -365,6 +367,12 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
         cmdLine.addArg(libPath);
         cmdLine.addArg("-F");
         cmdLine.addArg(libPath);
+    }
+
+    if (options.sourceType == SourceType::CPP)
+    {
+        // Make STD libs available
+        cmdLine.addArg("-lstdc++");
     }
 }
 

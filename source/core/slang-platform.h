@@ -42,6 +42,9 @@ namespace Slang
             /// The input name should be unadorned with any 'lib' prefix or extension
         static void appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst);
 
+            /// Calculate the shared library 
+        static String calcPlatformPath(const UnownedStringSlice& path);
+
         private:
             /// Not constructible!
         SharedLibrary();

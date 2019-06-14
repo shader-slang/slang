@@ -23,6 +23,11 @@ public:
         GHS,
         CountOf,
     };
+    enum class SourceType
+    {
+        C,              ///< C source
+        CPP,            ///< C++ source
+    };
 
     struct Desc
     {
@@ -70,9 +75,21 @@ public:
 
     struct CompileOptions
     {
+        typedef uint32_t Flags;
+        struct Flag 
+        {
+            enum Enum : Flags
+            {
+                EnableExceptionHandling = 0x01,
+            };
+        };
+
         OptimizationLevel optimizationLevel = OptimizationLevel::Debug;
         DebugInfoType debugInfoType = DebugInfoType::Normal;
         TargetType targetType = TargetType::Executable;
+        SourceType sourceType = SourceType::CPP;
+
+        Flags flags = Flag::EnableExceptionHandling;
 
         String modulePath;      ///< The path/name of the output module. Should not have the extension, as that will be added for each of the target types
 
@@ -162,6 +179,7 @@ struct CPPCompilerUtil
     typedef CPPCompiler::OptimizationLevel OptimizationLevel;
     typedef CPPCompiler::TargetType TargetType;
     typedef CPPCompiler::DebugInfoType DebugInfoType;
+    typedef CPPCompiler::SourceType SourceType;
 
     enum class MatchType
     {

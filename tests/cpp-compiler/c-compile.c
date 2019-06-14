@@ -1,4 +1,4 @@
-//TEST(smoke):EXECUTE_C: 
+//TEST(smoke):CPP_COMPILER_EXECUTE: 
 
 #include <stdlib.h>
 #include <stdio.h>
