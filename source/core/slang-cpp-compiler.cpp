@@ -374,12 +374,16 @@ static CPPCompiler::Desc _calcCompiledWithDesc()
     desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
 #elif SLANG_CLANG
     desc.type = CPPCompiler::Type::Clang;
+    desc.majorVersion = Int(__clang_major__);
+    desc.minorVersion = Int(__clang_minor__);
 #elif SLANG_SNC
     desc.type = CPPCompiler::Type::SNC;
 #elif SLANG_GHS
     desc.type = CPPCompiler::Type::GHS;
 #elif SLANG_GCC
     desc.type = CPPCompiler::Type::GCC;
+    desc.majorVersion = Int(__GNUC__);
+    desc.minorVersion = Int(__GNUC_MINOR__);
 #else
     desc.type = CPPCompiler::Type::Unknown;
 #endif
