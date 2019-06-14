@@ -16,7 +16,7 @@ struct UnixCPPCompilerUtil
     static SlangResult executeCompiler(const CommandLine& commandLine, ExecuteResult& outResult);
 
         /// Calculate the command line args
-    static void calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine);
+    static void calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
 };
 
 } // namespace Slang

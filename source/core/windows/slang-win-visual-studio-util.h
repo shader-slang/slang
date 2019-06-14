@@ -30,6 +30,9 @@ struct WinVisualStudioUtil
         /// Given a version find it's path
     static SlangResult find(Version version, VersionPath& outPath);
 
+        /// Find and add to the set (if not already there)
+    static SlangResult find(CPPCompilerSet* set);
+
         /// Run visual studio on specified path with the parameters specified on the command line. Output placed in outResult.
     static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 
@@ -46,7 +49,17 @@ struct WinVisualStudioUtil
     static void append(Version version, StringBuilder& outBuilder);
 
         /// Calculate the command line args
-    static void calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine);
+    static void calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
+
+        /// Get version as desc
+    static CPPCompiler::Desc getDesc(Version version)
+    {
+        CPPCompiler::Desc desc;
+        desc.type = CPPCompiler::Type::VisualStudio;
+        desc.majorVersion = Int(version) / 10;
+        desc.minorVersion = Int(version) % 10;
+        return desc;
+    }
 
 };
 

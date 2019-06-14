@@ -9,6 +9,7 @@
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-render-api-util.h"
+#include "../../source/core/slang-cpp-compiler.h"
 
 #include "options.h"
 
@@ -95,6 +96,9 @@ class TestContext
         /// If set, then tests are executed
     bool isExecuting() const { return testRequirements == nullptr; }
 
+        /// Get compiler factory
+    Slang::CPPCompilerSet* getCPPCompilerSet();
+
         /// Ctor
     TestContext();
         /// Dtor
@@ -110,6 +114,8 @@ class TestContext
     BackendFlags availableBackendFlags = 0;
     Slang::RenderApiFlags availableRenderApiFlags = 0;
     bool isAvailableRenderApiFlagsValid = false;
+
+    Slang::RefPtr<Slang::CPPCompilerSet> cppCompilerSet;
 
 protected:
     struct SharedLibraryTool

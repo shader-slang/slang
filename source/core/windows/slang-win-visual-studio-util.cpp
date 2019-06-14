@@ -40,7 +40,31 @@ struct VersionInfo
     const char* name;         ///< The name of the registry key 
 };
 
+
+
+class WinVisualStudioCompiler : public CPPCompiler
+{
+public:
+    typedef CPPCompiler Super;
+    
+    Result WinVisualStudioCompiler::compile(const CompileOptions& options, ExecuteResult& outRes) SLANG_OVERRIDE
+    {
+        CommandLine cmdLine;
+        WinVisualStudioUtil::calcArgs(options, cmdLine);
+        return WinVisualStudioUtil::executeCompiler(m_versionPath, cmdLine, outRes);
+    }
+        /// Ctor
+    WinVisualStudioCompiler(const Desc& desc, const WinVisualStudioUtil::VersionPath& versionPath) :
+        Super(desc),
+        m_versionPath(versionPath)
+    {
+    }
+
+    WinVisualStudioUtil::VersionPath m_versionPath;
+};
+
 } // anonymous
+
 
 
 static SlangResult _readRegistryKey(const char* path, const char* keyName, String& outString)
@@ -277,6 +301,26 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     return SLANG_FAIL;
 }
 
+/* static */SlangResult WinVisualStudioUtil::find(CPPCompilerSet* set)
+{
+    const int versionCount = SLANG_COUNT_OF(s_versionInfos);
+
+    for (int i = versionCount - 1; i >= 0; --i)
+    {
+        const auto& versionInfo = s_versionInfos[i];
+        auto desc = getDesc(versionInfo.version);
+
+        VersionPath versionPath;
+        if (!set->getCompiler(desc) && SLANG_SUCCEEDED(_find(i, versionPath)))
+        {
+            RefPtr<WinVisualStudioCompiler> compiler = new WinVisualStudioCompiler(desc, versionPath);
+            set->addCompiler(compiler);
+        }
+    }
+
+    return SLANG_OK;
+}
+
 /* static */SlangResult WinVisualStudioUtil::executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult)
 {
     // To invoke cl we need to run the suitable vcvars. In order to run this we have to have MS CommandLine.
@@ -336,11 +380,11 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     }
 }
 
-/* static */void WinVisualStudioUtil::calcArgs(const CPPCompileOptions& options, CommandLine& cmdLine)
+/* static */void WinVisualStudioUtil::calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine)
 {
-    typedef CPPCompileOptions::OptimizationLevel OptimizationLevel;
-    typedef CPPCompileOptions::TargetType TargetType;
-    typedef CPPCompileOptions::DebugInfoType DebugInfoType;
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 

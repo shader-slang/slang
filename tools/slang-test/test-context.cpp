@@ -90,3 +90,13 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
         m_sharedLibTools.Add(name, tool);
     }
 }
+
+CPPCompilerSet* TestContext::getCPPCompilerSet()
+{
+    if (!cppCompilerSet)
+    {
+        cppCompilerSet = new CPPCompilerSet;
+        CPPCompilerUtil::initializeSet(cppCompilerSet);
+    }
+    return cppCompilerSet;
+}

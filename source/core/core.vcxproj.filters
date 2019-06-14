@@ -119,6 +119,9 @@
     <ClCompile Include="slang-byte-encode-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-cpp-compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

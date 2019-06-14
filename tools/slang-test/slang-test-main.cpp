@@ -1094,6 +1094,14 @@ String getExpectedOutput(String const& outputStem)
 
 static TestResult runExecuteC(TestContext* context, TestInput& input)
 {
+    CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
+    CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
+
+    if (!compiler)
+    {
+        return TestResult::Ignored;
+    }
+
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
@@ -1112,7 +1120,7 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
     String modulePath = Path::combine(directory, moduleName);
 
-    CPPCompileOptions options;
+    CPPCompiler::CompileOptions options;
 
     // Compile this source
     options.sourceFiles.add(filePath);
@@ -1120,33 +1128,10 @@ static TestResult runExecuteC(TestContext* context, TestInput& input)
 
     ExecuteResult exeRes;
 
-#ifdef _WIN32
-    // Find
-    List<WinVisualStudioUtil::VersionPath> versionPaths;
-    WinVisualStudioUtil::find(versionPaths);
-
-    // Didn't find the visual studio compiler
-    if (versionPaths.getCount() <= 0)
-    {
-        return TestResult::Ignored;
-    }
-
-    CommandLine cmdLine;
-    WinVisualStudioUtil::calcArgs(options, cmdLine);
-
-    if (SLANG_FAILED(WinVisualStudioUtil::executeCompiler(versionPaths[0], cmdLine, exeRes)))
+    if (SLANG_FAILED(compiler->compile(options, exeRes)))
     {
         return TestResult::Fail;
     }
-#else
-    CommandLine cmdLine;
-    UnixCPPCompilerUtil::calcArgs(options, cmdLine);
-
-    if (SLANG_FAILED(UnixCPPCompilerUtil::executeCompiler(cmdLine, exeRes)))
-    {
-        return TestResult::Fail;
-    }
-#endif
 
     // Execute the binary and see what we get
     {
