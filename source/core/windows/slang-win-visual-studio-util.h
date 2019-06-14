@@ -33,6 +33,9 @@ struct WinVisualStudioUtil
         /// Find and add to the set (if not already there)
     static SlangResult find(CPPCompilerSet* set);
 
+        /// Create the cmdLine to start compiler for specified path
+    static void calcExecuteCompilerArgs(const VersionPath& versionPath, CommandLine& outCmdLine);
+
         /// Run visual studio on specified path with the parameters specified on the command line. Output placed in outResult.
     static SlangResult executeCompiler(const VersionPath& versionPath, const CommandLine& commandLine, ExecuteResult& outResult);
 

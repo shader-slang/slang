@@ -42,9 +42,8 @@ namespace Slang
         }
         return SLANG_FAIL;
 #else
-        // https://linux.die.net/man/2/unlink
-
-        if (unlink(fileName.getBuffer()) == 0)
+        // https://linux.die.net/man/3/remove
+        if (::remove(fileName.getBuffer()) == 0)
         {
             return SLANG_OK;
         }

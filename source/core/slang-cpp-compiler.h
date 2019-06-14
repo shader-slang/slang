@@ -109,12 +109,19 @@ public:
 
     GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc func) :
         Super(desc),
-        m_exeName(exeName),
+        m_func(func)
+    {
+        m_cmdLine.setExecutableFilename(exeName);
+    }
+
+    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc func) :
+        Super(desc),
+        m_cmdLine(cmdLine),
         m_func(func)
     {}
 
     CalcArgsFunc m_func;
-    String m_exeName;
+    CommandLine m_cmdLine;
 };
 
 class CPPCompilerSet : public RefObject
@@ -151,6 +158,11 @@ protected:
 
 struct CPPCompilerUtil
 {
+    typedef CPPCompiler::CompileOptions CompileOptions;
+    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
+    typedef CPPCompiler::TargetType TargetType;
+    typedef CPPCompiler::DebugInfoType DebugInfoType;
+
     enum class MatchType
     {
         MinGreaterEqual,
@@ -158,11 +170,17 @@ struct CPPCompilerUtil
         Newest,
     };
 
-        /// Extracts version number into desc from text (assumes gcc/slang type layout with a line with version starting with versionPrefix)
-    static SlangResult parseGccFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc);
+        /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
+    static SlangResult parseGCCFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc);
 
         /// Runs the exeName, and extracts the version info into outDesc
-    static SlangResult calcGccFamilyVersion(const String& exeName, const UnownedStringSlice& versionPrefix, CPPCompiler::Desc& outDesc);
+    static SlangResult calcGCCFamilyVersion(const String& exeName, CPPCompiler::Desc& outDesc);
+
+        /// Calculate gcc family compilers (including clang) cmdLine arguments from options
+    static void calcGCCFamilyArgs(const CompileOptions& options, CommandLine& cmdLine);
+
+        /// Calculate Visual Studio family compilers cmdLine arguments from options
+    static void calcVisualStudioArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Find a compiler
     static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);
