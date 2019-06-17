@@ -199,15 +199,18 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
-/* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
+/* static */UnownedStringSlice StringUtil::extractLine(UnownedStringSlice& ioText)
 {
-    char const* begin = textIn.begin();
-    char const* end = textIn.end();
+    char const*const begin = ioText.begin();
+    char const*const end = ioText.end();
 
+    // If we have hit the end then return the 'special' terminator
+    if (begin >= end)
+    {
+        return UnownedStringSlice(nullptr, nullptr);
+    }
+        
     char const* cursor = begin;
-
-    const char* lineStart = cursor;
-
     while (cursor < end)
     {
         int c = *cursor++;
@@ -215,56 +218,78 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         {
             case '\r': case '\n':
             {
-                outLines.add(UnownedStringSlice(lineStart, cursor - 1));
+                // Remember the end of the line
+                const char*const lineEnd = cursor - 1;
 
                 // When we see a line-break character we need
                 // to record the line break, but we also need
                 // to deal with the annoying issue of encodings,
                 // where a multi-byte sequence might encode
                 // the line break.
-
                 if (cursor < end)
                 {
                     int d = *cursor;
                     if ((c ^ d) == ('\r' ^ '\n'))
                         cursor++;
                 }
-                lineStart = cursor;
-                break;
+
+                ioText = UnownedStringSlice(cursor, end);
+                UnownedStringSlice line = UnownedStringSlice(begin, lineEnd);
+
+                SLANG_ASSERT(line.indexOf('\r') < 0 && line.indexOf('\n') < 0);
+
+                return line;
             }
             default:
                 break;
         }
     }
 
-    if (cursor > lineStart)
+    // Set the remaining
+    ioText = UnownedStringSlice(cursor, end);
+    // It must be less than the cursor (because we tested at top, and must have moved at least one char)
+    SLANG_ASSERT(begin < cursor);
+
+    auto line = UnownedStringSlice(begin, cursor);
+
+    SLANG_ASSERT(line.indexOf('\r') < 0 && line.indexOf('\n') < 0);
+    return line;
+}
+
+/* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
+{
+    UnownedStringSlice text(textIn);
+    while (true)
     {
-        outLines.add(UnownedStringSlice(lineStart, cursor));
+        UnownedStringSlice line = extractLine(text);
+        if (line.begin() == nullptr)
+        {
+            return;
+        }
+        outLines.add(line);
     }
 }
 
-/* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+/* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& inA, const UnownedStringSlice& inB)
 {
-    List<UnownedStringSlice> slicesA;
-    List<UnownedStringSlice> slicesB;
+    UnownedStringSlice a(inA);
+    UnownedStringSlice b(inB);
 
-    calcLines(a, slicesA);
-    calcLines(b, slicesB);
-
-    const auto linesCount = slicesA.getCount();
-    if (linesCount != slicesB.getCount())
+    while (true)
     {
-        return false;
-    }
-
-    for (Index i = 0; i < linesCount; ++i)
-    {
-        if (slicesA[i] != slicesB[i])
+        const UnownedStringSlice lineA = extractLine(a);
+        const UnownedStringSlice lineB = extractLine(b);
+        if (lineA != lineB)
         {
             return false;
         }
+
+        // If either has ended, they both must have ended
+        if (lineA.begin() == nullptr || lineB.begin() == nullptr)
+        {
+            return lineA.begin() == lineB.begin();
+        }
     }
-    return true;
 }
 
 } // namespace Slang
