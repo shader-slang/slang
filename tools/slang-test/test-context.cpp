@@ -61,7 +61,7 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     SharedLibraryTool tool = {};
 
-    if (SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformFilename(path.begin(), tool.m_sharedLibrary)))
+    if (SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformPath(path.begin(), tool.m_sharedLibrary)))
     {
         tool.m_func = (InnerMainFunc)SharedLibrary::findFuncByName(tool.m_sharedLibrary, "innerMain");
     }

@@ -137,13 +137,40 @@ namespace Slang
 	String Path::combine(const String& path1, const String& path2)
 	{
 		if (path1.getLength() == 0) return path2;
-		StringBuilder sb(path1.getLength()+path2.getLength()+2);
-		sb.Append(path1);
-		if (!path1.endsWith('\\') && !path1.endsWith('/'))
-			sb.Append(kPathDelimiter);
-		sb.Append(path2);
-		return sb.ProduceString();
+
+        StringBuilder sb;
+        combineBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
+        return sb.ProduceString();
 	}
+    /* static */void Path::combineBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
+    {
+        outBuilder.Clear();
+        // Make sure we have the space for the full result
+        outBuilder.EnsureCapacity(path1.size() + 2 + path2.size());
+
+        if (path1.size() == 0)
+        {
+            outBuilder.append(path2);
+            return;
+        }
+
+        outBuilder.append(path1);
+
+        // If path1 doesn't end in a delimiter, add one
+        if (!isDelimiter(path1[path1.size() - 1]))
+        {
+            outBuilder.append(kPathDelimiter);
+        }
+
+        // Check that path2 doesn't start with a path delimiter 
+        if (path2.size() > 0)
+        {
+            SLANG_ASSERT(!isDelimiter(path2[0]));
+        }
+        // Append the second path
+        outBuilder.append(path2);
+    }
+
 	String Path::combine(const String& path1, const String& path2, const String& path3)
 	{
 		StringBuilder sb(path1.getLength()+path2.getLength()+path3.getLength()+3);
