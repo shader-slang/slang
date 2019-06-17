@@ -869,6 +869,11 @@ extern "C"
     struct ISlangSharedLibraryLoader: public ISlangUnknown
     {
         public:
+            /** Load a shared library. In typical usage the library name should *not* contain any platform
+            specific elements. For example on windows a dll name should *not* be passed with a '.dll' extension,
+            and similarly on linux a shared library should *not* be passed with the 'lib' prefix and '.so' extension
+            @path path The unadorned filename and/or path for the shared library
+            @ param sharedLibraryOut Holds the shared library if successfully loaded */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(
             const char*     path,
             ISlangSharedLibrary** sharedLibraryOut) = 0;

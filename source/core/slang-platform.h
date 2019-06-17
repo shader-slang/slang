@@ -15,7 +15,12 @@ namespace Slang
         
         typedef void(*FuncPtr)(void);
 
-            /// Load via an unadorned filename
+            /// Load via an unadorned filename.
+            ///
+            /// The unadorned filename here means without any platform specific filename elements. This typically means no extension and no prefix.
+            /// On windows this means without the '.dll' extension.
+            /// On linux this means without the 'lib' prefix and '.so' extension.
+            /// To load with a platform specific filename use the 'loadWithPlatformFilename' API
             /// 
             /// @param the unadorned filename
             /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
@@ -42,7 +47,7 @@ namespace Slang
             /// The input name should be unadorned with any 'lib' prefix or extension
         static void appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst);
 
-            /// Calculate the shared library 
+            /// Given a path, calculate that path with the filename replaced with the platform filename (using appendPlatformFilename)
         static String calcPlatformPath(const UnownedStringSlice& path);
 
         private:
