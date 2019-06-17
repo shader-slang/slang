@@ -78,8 +78,9 @@ struct StringUtil
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 
-        /// Returns the extracted line. If at end of text will return the special UnownedStringSlice with a pointer of nullptr.
-        /// is the input text and on output will contain the remaining text (no including the end delimiters of current line)
+        /// Returns a line extracted from the start of ioText.
+        /// At the end of all the text a 'special' UnownedStringSlice with a null 'begin' pointer is returned.
+        /// The slice passed in will be modified on output to contain the remaining text, starting at the beginning of the next line. 
     static UnownedStringSlice extractLine(UnownedStringSlice& ioText);
     
         /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid
