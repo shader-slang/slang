@@ -234,11 +234,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
                 }
 
                 ioText = UnownedStringSlice(cursor, end);
-                UnownedStringSlice line = UnownedStringSlice(begin, lineEnd);
-
-                SLANG_ASSERT(line.indexOf('\r') < 0 && line.indexOf('\n') < 0);
-
-                return line;
+                return UnownedStringSlice(begin, lineEnd);
             }
             default:
                 break;
@@ -250,10 +246,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     // It must be less than the cursor (because we tested at top, and must have moved at least one char)
     SLANG_ASSERT(begin < cursor);
 
-    auto line = UnownedStringSlice(begin, cursor);
-
-    SLANG_ASSERT(line.indexOf('\r') < 0 && line.indexOf('\n') < 0);
-    return line;
+    return UnownedStringSlice(begin, cursor);
 }
 
 /* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
