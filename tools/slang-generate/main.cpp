@@ -554,29 +554,22 @@ void emitSimpleText(
     FILE*               stream,
     StringSpan const&   span)
 {
-    char const* cursor = span.begin();
-    char const* end = span.end();
-
-    while (cursor != end)
+    UnownedStringSlice content = span;
+    while (true)
     {
-        int c = *cursor++;
-        switch (c)
-        {
-        default:
-            fprintf(stream, "%c", c);
-            break;
+        const auto line = StringUtil::extractLine(content);
 
-        case '\r': case '\n':
-            if (cursor != end)
-            {
-                int d = *cursor;
-                if ((c ^ d) == ('\r' ^ '\n'))
-                {
-                    cursor++;
-                }
-                fprintf(stream, "\n");
-            }
+        if (line.begin() == nullptr)
+        {
             break;
+        }
+
+        // Write the line
+        fwrite(line.begin(), 1, line.size(), stream);
+        // Write \n if we aren't at the final line
+        if (content.begin() != content.end())
+        {
+            fprintf(stream, "\n");
         }
     }
 }
