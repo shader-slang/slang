@@ -45,7 +45,7 @@ public:
     // ISlangUnknown
     SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE
     SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() { return (m_flags & WriterFlag::IsStatic) ? (uint32_t)decreaseReference() : (uint32_t)releaseReference(); }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return (m_flags & WriterFlag::IsStatic) ? (uint32_t)decreaseReference() : (uint32_t)releaseReference(); }
 
     // ISlangWriter - default impl
     SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE {}
