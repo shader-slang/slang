@@ -62,6 +62,25 @@ static void stringUnitTest()
         SLANG_CHECK(_checkLines(UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n"), checkLines, SLANG_COUNT_OF(checkLines)));
     }
 
+    {
+        auto text = UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n");
+
+        UnownedStringSlice remaining(text);
+        for (const auto line : LineParser(text))
+        {
+            UnownedStringSlice extractLine = StringUtil::extractLine(remaining);
+
+            SLANG_CHECK(line == extractLine);
+
+            // Handle hitting the end
+            if (line.begin() == nullptr || extractLine.begin() == nullptr)
+            {
+                SLANG_CHECK(line.begin() == extractLine.begin());
+                break;
+            }
+        }
+    }
+
 }
 
 SLANG_UNIT_TEST("String", stringUnitTest);

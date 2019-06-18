@@ -95,6 +95,44 @@ struct StringUtil
     static bool areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b);
 };
 
+/* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */
+class LineParser
+{
+public:
+    struct Iterator
+    {
+        const UnownedStringSlice& operator*() const { return m_line; }
+        const UnownedStringSlice* operator->() const { return &m_line; }
+        Iterator& operator++()
+        {
+            SLANG_ASSERT(m_remaining.begin());
+            m_line = StringUtil::extractLine(m_remaining);
+            return *this;
+        }
+        Iterator operator++(int) { Iterator rs = *this; operator++(); return rs; }
+
+            /// Equal if remaining pointers are equal. Handles termination case correctly.
+        bool operator==(const Iterator& rhs) const { return m_remaining.begin() == rhs.m_remaining.begin() && m_remaining.end() == rhs.m_remaining.end();  }
+        bool operator !=(const Iterator& rhs) const { return !(*this == rhs); }
+
+            /// Ctor
+        Iterator(const UnownedStringSlice& line, const UnownedStringSlice& remaining) : m_line(line), m_remaining(remaining) {}
+
+    protected:
+        UnownedStringSlice m_line;
+        UnownedStringSlice m_remaining;
+    };
+
+    Iterator begin() const { UnownedStringSlice remaining(m_text);  UnownedStringSlice line = StringUtil::extractLine(remaining); return Iterator(line, remaining);  }
+    Iterator end() const { UnownedStringSlice term(nullptr, nullptr); return Iterator(term, term); }
+
+        /// Ctor
+    LineParser(const UnownedStringSlice& text) : m_text(text) {}
+
+protected:
+    UnownedStringSlice m_text;
+};
+
 } // namespace Slang
 
 #endif // SLANG_STRING_UTIL_H
