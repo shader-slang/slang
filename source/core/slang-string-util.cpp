@@ -277,8 +277,6 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         const UnownedStringSlice lineB = extractLine(b);
 
         // If either has ended, they both must have ended
-        // TODO(JS): On GCC release I need to have this test before the next text, otherwise it appears
-        // to be ignored. It is not clear why.
         if (lineA.begin() == nullptr || lineB.begin() == nullptr)
         {
             return lineA.begin() == lineB.begin();
