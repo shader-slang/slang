@@ -1234,7 +1234,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     }
 
     SharedLibrary::Handle handle;
-    if (SLANG_FAILED(SharedLibrary::loadWithPlatformFilename(sharedLibraryPath.getBuffer(), handle)))
+    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(sharedLibraryPath.getBuffer(), handle)))
     {
         return TestResult::Fail;
     }

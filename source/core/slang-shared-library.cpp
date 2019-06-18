@@ -99,7 +99,7 @@ SlangResult ConfigurableSharedLibraryLoader::loadSharedLibrary(const char* path,
 {
     SLANG_UNUSED(pathIn);
     // The replacement is the *whole* string
-    return SharedLibrary::loadWithPlatformFilename(entryString.begin(), handleOut);
+    return SharedLibrary::loadWithPlatformPath(entryString.begin(), handleOut);
 }
 
 /* static */Result ConfigurableSharedLibraryLoader::changePath(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut )
@@ -109,7 +109,7 @@ SlangResult ConfigurableSharedLibraryLoader::loadSharedLibrary(const char* path,
     SharedLibrary::appendPlatformFileName(UnownedStringSlice(pathIn), builder);
     String path = Path::combine(entryString, builder);
 
-    return SharedLibrary::loadWithPlatformFilename(path.begin(), handleOut);
+    return SharedLibrary::loadWithPlatformPath(path.begin(), handleOut);
 }
 
 
