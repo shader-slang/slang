@@ -4044,7 +4044,7 @@ namespace Slang
                         suffixType = parser->getSession()->getErrorType();
                     }
                     // `f` suffix -> `float`
-                    if(fCount == 1 && !lCount)
+                    if(fCount == 1 && !lCount && !hCount)
                     {
                         suffixType = parser->getSession()->getFloatType();
                     }
@@ -4054,7 +4054,7 @@ namespace Slang
                         suffixType = parser->getSession()->getDoubleType();
                     }
                     // `h` or `hf` suffix on floating-point literal -> `half`
-                    else if(lCount == 1 && (fCount <= 1))
+                    else if(hCount == 1 && (fCount <= 1))
                     {
                         suffixType = parser->getSession()->getHalfType();
                     }
