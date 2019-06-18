@@ -105,14 +105,13 @@ public:
         const UnownedStringSlice* operator->() const { return &m_line; }
         Iterator& operator++()
         {
-            SLANG_ASSERT(m_remaining.begin());
             m_line = StringUtil::extractLine(m_remaining);
             return *this;
         }
         Iterator operator++(int) { Iterator rs = *this; operator++(); return rs; }
 
-            /// Equal if remaining pointers are equal. Handles termination case correctly.
-        bool operator==(const Iterator& rhs) const { return m_remaining.begin() == rhs.m_remaining.begin() && m_remaining.end() == rhs.m_remaining.end();  }
+            /// Equal if both are at the same m_line address exactly. Handles termination case correctly where line.begin() == nullptr.
+        bool operator==(const Iterator& rhs) const { return m_line.begin() == rhs.m_line.begin();  }
         bool operator !=(const Iterator& rhs) const { return !(*this == rhs); }
 
             /// Ctor
