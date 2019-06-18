@@ -70,7 +70,7 @@ For SLANG_IUNKNOWN_QUERY_INTERFACE to work - must have a method 'getInterface' t
 if not found. */
 
 #define SLANG_IUNKNOWN_QUERY_INTERFACE \
-SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) \
+SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE \
 { \
     ISlangUnknown* intf = getInterface(uuid); \
     if (intf) \
