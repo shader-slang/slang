@@ -554,30 +554,26 @@ void emitSimpleText(
     FILE*               stream,
     StringSpan const&   span)
 {
-    char const* cursor = span.begin();
-    char const* end = span.end();
-
-    while (cursor != end)
+    UnownedStringSlice content = span;
+    while (true)
     {
-        int c = *cursor++;
-        switch (c)
+        const auto line = StringUtil::extractLine(content);
+        if (line.begin() == nullptr)
         {
-        default:
-            fprintf(stream, "%c", c);
-            break;
-
-        case '\r': case '\n':
-            if (cursor != end)
-            {
-                int d = *cursor;
-                if ((c ^ d) == ('\r' ^ '\n'))
-                {
-                    cursor++;
-                }
-                fprintf(stream, "\n");
-            }
             break;
         }
+
+        // Write the line
+        fwrite(line.begin(), 1, line.size(), stream);
+
+        // Specially handle the 'final line', excluding an empty line after \n.
+        // We can detect, as if input ends with 'cr/lf' combination, content.begin == span.end(), else if content.begin() == nullptr.
+        if (content.begin() == nullptr || content.begin() == span.end())
+        {
+            break;
+        }
+
+        fprintf(stream, "\n");
     }
 }
 

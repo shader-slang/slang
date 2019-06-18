@@ -78,11 +78,58 @@ struct StringUtil
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 
+        /// Returns a line extracted from the start of ioText.
+        /// 
+        /// At the end of all the text a 'special' null UnownedStringSlice with a null 'begin' pointer is returned.
+        /// The slice passed in will be modified on output to contain the remaining text, starting at the beginning of the next line.
+        /// As en empty final line is still a line, the special null UnownedStringSlice is the last value ioText after the last valid line is returned.
+        /// 
+        /// NOTE! That behavior is as if line terminators (like \n) act as separators. Thus input of "\n" will return *two* lines - an empty line
+        /// before and then after the \n. 
+    static UnownedStringSlice extractLine(UnownedStringSlice& ioText);
+    
         /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid
     static void calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& lines);
 
         /// Equal if the lines are equal (in effect a way to ignore differences in line breaks)
     static bool areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b);
+};
+
+/* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */
+class LineParser
+{
+public:
+    struct Iterator
+    {
+        const UnownedStringSlice& operator*() const { return m_line; }
+        const UnownedStringSlice* operator->() const { return &m_line; }
+        Iterator& operator++()
+        {
+            m_line = StringUtil::extractLine(m_remaining);
+            return *this;
+        }
+        Iterator operator++(int) { Iterator rs = *this; operator++(); return rs; }
+
+            /// Equal if both are at the same m_line address exactly. Handles termination case correctly where line.begin() == nullptr.
+        bool operator==(const Iterator& rhs) const { return m_line.begin() == rhs.m_line.begin();  }
+        bool operator !=(const Iterator& rhs) const { return !(*this == rhs); }
+
+            /// Ctor
+        Iterator(const UnownedStringSlice& line, const UnownedStringSlice& remaining) : m_line(line), m_remaining(remaining) {}
+
+    protected:
+        UnownedStringSlice m_line;
+        UnownedStringSlice m_remaining;
+    };
+
+    Iterator begin() const { UnownedStringSlice remaining(m_text);  UnownedStringSlice line = StringUtil::extractLine(remaining); return Iterator(line, remaining);  }
+    Iterator end() const { UnownedStringSlice term(nullptr, nullptr); return Iterator(term, term); }
+
+        /// Ctor
+    LineParser(const UnownedStringSlice& text) : m_text(text) {}
+
+protected:
+    UnownedStringSlice m_text;
 };
 
 } // namespace Slang
