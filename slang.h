@@ -298,8 +298,15 @@ convention for interface methods.
 
 #ifdef __cplusplus
 // C++ specific macros
+// Clang
+#if SLANG_CLANG
+#    if (__clang_major__*10 + __clang_minor__) >= 330
+#       define SLANG_HAS_MOVE_SEMANTICS 1
+#       define SLANG_HAS_ENUM_CLASS 1
+#       define SLANG_OVERRIDE override
+#    endif
 // Gcc
-#	if SLANG_GCC_FAMILY
+#elif SLANG_GCC_FAMILY
 // Check for C++11
 #		if (__cplusplus >= 201103L)
 #			if (__GNUC__ * 100 + __GNUC_MINOR__) >= 405
