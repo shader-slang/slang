@@ -108,7 +108,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
 {
-    auto linkage = new Linkage(this);
+    RefPtr<Linkage> linkage = new Linkage(this);
 
     Int targetCount = desc.targetCount;
     for(Int ii = 0; ii < targetCount; ++ii)
@@ -136,7 +136,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         linkage->addPreprocessorDefine(macro.name, macro.value);
     }
 
-    *outSession = ComPtr<slang::ISession>(asExternal(linkage)).detach();
+    *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
 
@@ -472,14 +472,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createProgram(
         }
     }
 
-    *outProgram = ComPtr<slang::IProgram>(asExternal(program)).detach();
+    *outProgram = asExternal(program.detach());
     return SLANG_OK;
 }
 
 SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     slang::TypeReflection*          inUnspecializedType,
-    SlangInt                        specializationArgCount,
     slang::SpecializationArg const* specializationArgs,
+    SlangInt                        specializationArgCount,
     ISlangBlob**                    outDiagnostics)
 {
     auto unspecializedType = asInternal(inUnspecializedType);

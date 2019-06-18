@@ -653,8 +653,8 @@ namespace Slang
             ISlangBlob**                outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
             slang::TypeReflection*          type,
-            SlangInt                        specializationArgCount,
             slang::SpecializationArg const* specializationArgs,
+            SlangInt                        specializationArgCount,
             ISlangBlob**                    outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getTypeLayout(
             slang::TypeReflection* type,

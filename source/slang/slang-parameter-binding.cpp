@@ -588,7 +588,7 @@ static bool findLayoutArg(
         if( modifier )
         {
             *outVal = (UInt) strtoull(String(modifier->valToken.Content).getBuffer(), nullptr, 10);
-return true;
+            return true;
         }
     }
     return false;
@@ -2583,8 +2583,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // anything pertaining to entry points. This is a crucial design choice to
     // get right, and we might want to revisit it based on experience.
 
-    // In some cases, a user will want o ensure that all the
-    // entry points they compile get non-overallping
+    // In some cases, a user will want to ensure that all the
+    // entry points they compile get non-overlapping
     // registers/bindings. E.g., if you have a vertex and fragment
     // shader being compiled together for Vulkan, you probably want distinct
     // bindings for their entry-point `uniform` parametres, so

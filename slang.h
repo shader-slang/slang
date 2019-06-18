@@ -2769,8 +2769,8 @@ namespace slang
             */
         virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(
             TypeReflection*             type,
-            SlangInt                    specializationArgCount,
             SpecializationArg const*    specializationArgs,
+            SlangInt                    specializationArgCount,
             ISlangBlob**                outDiagnostics = nullptr) = 0;
 
 
@@ -2786,24 +2786,6 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) = 0;
-
-#if 0
-            /** Add a path to use when searching for `#include`d or `import`ed files.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addSearchPath(
-            char const* path) = 0;
-
-            /** Add a global preprocessor definition to use for all compilation.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addPreprocessorDefine(
-            char const* name,
-            char const* value) = 0;
-
-            /** Set the default matrix layout mode to use for all compiles.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMatrixLayoutMode(
-            SlangMatrixLayoutMode mode) = 0;
-#endif
     };
 
     #define SLANG_UUID_ISession { 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } }
