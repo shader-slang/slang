@@ -101,10 +101,37 @@ public:
         List<String> libraryPaths;
     };
 
+    struct OutputMessage
+    {
+        enum class Type
+        {
+            Info,
+            Warning,
+            Error,
+        };
+        enum class Stage
+        {
+            Compile,
+            Link,
+        };
+
+        Type type;                      ///< The type of error
+        Stage stage;                    ///< The stage the error came from
+        String text;                    ///< The text of the error
+        String filePath;                ///< The path the error originated from
+        Int fileLine;                   ///< The line number the error came from
+    };
+
+    struct Output
+    {
+        void reset() { messages.clear();  }
+        List<OutputMessage> messages;
+    };
+
         /// Get the desc of this compiler
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
-    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outResult) = 0;
+    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
 
 protected:
 
@@ -121,23 +148,27 @@ public:
     typedef CPPCompiler Super;
 
     typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
+    typedef void(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
 
-    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outResult) SLANG_OVERRIDE;
+    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc func) :
+    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
         Super(desc),
-        m_func(func)
+        m_calcArgsFunc(calcArgsFunc),
+        m_parseOutputFunc(parseOutputFunc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc func) :
+    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
         Super(desc),
         m_cmdLine(cmdLine),
-        m_func(func)
+        m_calcArgsFunc(calcArgsFunc),
+        m_parseOutputFunc(parseOutputFunc)
     {}
 
-    CalcArgsFunc m_func;
+    CalcArgsFunc m_calcArgsFunc;
+    ParseOutputFunc m_parseOutputFunc;
     CommandLine m_cmdLine;
 };
 
@@ -197,8 +228,13 @@ struct CPPCompilerUtil
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
     static void calcGCCFamilyArgs(const CompileOptions& options, CommandLine& cmdLine);
 
+        /// Parse ExecuteResult into Output
+    static void parseGCCFamilyOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+
         /// Calculate Visual Studio family compilers cmdLine arguments from options
     static void calcVisualStudioArgs(const CompileOptions& options, CommandLine& cmdLine);
+        /// Parse Visual Studio exeRes into CPPCompiler::Output
+    static void parseVisualStudioOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
 
         /// Find a compiler
     static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);

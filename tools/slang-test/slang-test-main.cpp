@@ -1131,9 +1131,8 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.sourceFiles.add(filePath);
     options.modulePath = modulePath;
 
-    ExecuteResult exeRes;
-
-    if (SLANG_FAILED(compiler->compile(options, exeRes)))
+    CPPCompiler::Output output;
+    if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;
     }
@@ -1226,9 +1225,8 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.includePaths.add(".");
 
-    ExecuteResult exeRes;
-
-    if (SLANG_FAILED(compiler->compile(options, exeRes)))
+    CPPCompiler::Output output;
+    if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;
     }

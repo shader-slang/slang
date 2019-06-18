@@ -17,15 +17,19 @@ namespace Slang
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericCPPCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteResult& outResult)
+SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& outOutput)
 {
+    outOutput.reset();
+
     // Copy the command line options
     CommandLine cmdLine(m_cmdLine);
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
-    m_func(options, cmdLine);
+    m_calcArgsFunc(options, cmdLine);
 
-#if 0
+    ExecuteResult exeRes;
+
+#if 1
     // Test
     {
         String line = ProcessUtil::getCommandLineString(cmdLine);
@@ -33,13 +37,15 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, ExecuteRe
     }
 #endif
 
-    SlangResult res = ProcessUtil::execute(cmdLine, outResult);
+    SlangResult res = ProcessUtil::execute(cmdLine, exeRes);
 
-#if 0
+#if 1
     {
-        printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", outResult.standardOutput.getBuffer(), outResult.standardError.getBuffer(), int(outResult.resultCode));
+        printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", exeRes.standardOutput.getBuffer(), exeRes.standardError.getBuffer(), int(exeRes.resultCode));
     }
 #endif
+
+    m_parseOutputFunc(exeRes, outOutput);
 
     return res;
 }
@@ -261,6 +267,37 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     {
         // Note that any escaping of the path is handled in the ProcessUtil::
         cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
+    }
+}
+
+/* static */void CPPCompilerUtil::parseVisualStudioOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+{
+    outOutput.reset();
+
+    for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
+    {
+        fwrite(line.begin(), 1, line.size(), stdout);
+        fprintf(stdout, "\n");
+
+        // c-compile-error.c
+        // e:\git\slang - jsmall - nvidia\tests\cpp - compiler\c - compile - error.c(9) : error C2065 : 'b' : undeclared identifier
+        // e:\git\slang-jsmall-nvidia\tests\cpp-compiler\c - compile - error.c(9) : error C2065 : 'c' : undeclared identifier
+
+
+
+        // Look for a lines
+
+
+    }
+}
+
+/* static */void CPPCompilerUtil::parseGCCFamilyOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+{
+    outOutput.reset();
+
+    for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
+    {
+
     }
 }
 
@@ -515,7 +552,7 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
     CPPCompiler::Desc desc;
     if (SLANG_SUCCEEDED(CPPCompilerUtil::calcGCCFamilyVersion(exeName, desc)))
     {
-        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &CPPCompilerUtil::calcGCCFamilyArgs));
+        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &CPPCompilerUtil::calcGCCFamilyArgs, &CPPCompilerUtil::parseGCCFamilyOutput));
         compilerSet->addCompiler(compiler);
     }
 }
