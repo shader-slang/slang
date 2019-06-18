@@ -558,7 +558,6 @@ void emitSimpleText(
     while (true)
     {
         const auto line = StringUtil::extractLine(content);
-
         if (line.begin() == nullptr)
         {
             break;
@@ -566,11 +565,15 @@ void emitSimpleText(
 
         // Write the line
         fwrite(line.begin(), 1, line.size(), stream);
-        // Write \n if we aren't at the final line
-        if (content.begin() != content.end())
+
+        // Specially handle the 'final line', excluding an empty line after \n.
+        // We can detect, as if input ends with 'cr/lf' combination, content.begin == span.end(), else if content.begin() == nullptr.
+        if (content.begin() == nullptr || content.begin() == span.end())
         {
-            fprintf(stream, "\n");
+            break;
         }
+
+        fprintf(stream, "\n");
     }
 }
 

@@ -79,8 +79,13 @@ struct StringUtil
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 
         /// Returns a line extracted from the start of ioText.
-        /// At the end of all the text a 'special' UnownedStringSlice with a null 'begin' pointer is returned.
-        /// The slice passed in will be modified on output to contain the remaining text, starting at the beginning of the next line. 
+        /// 
+        /// At the end of all the text a 'special' null UnownedStringSlice with a null 'begin' pointer is returned.
+        /// The slice passed in will be modified on output to contain the remaining text, starting at the beginning of the next line.
+        /// As en empty final line is still a line, the special null UnownedStringSlice is the last value ioText after the last valid line is returned.
+        /// 
+        /// NOTE! That behavior is as if line terminators (like \n) act as separators. Thus input of "\n" will return *two* lines - an empty line
+        /// before and then after the \n. 
     static UnownedStringSlice extractLine(UnownedStringSlice& ioText);
     
         /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid

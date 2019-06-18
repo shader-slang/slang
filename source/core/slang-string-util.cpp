@@ -205,11 +205,11 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     char const*const end = ioText.end();
 
     // If we have hit the end then return the 'special' terminator
-    if (begin >= end)
+    if (begin == nullptr)
     {
         return UnownedStringSlice(nullptr, nullptr);
     }
-        
+
     char const* cursor = begin;
     while (cursor < end)
     {
@@ -241,16 +241,19 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         }
     }
 
-    // Set the remaining
-    ioText = UnownedStringSlice(cursor, end);
-    // It must be less than the cursor (because we tested at top, and must have moved at least one char)
-    SLANG_ASSERT(begin < cursor);
+    // There is nothing remaining
+    ioText = UnownedStringSlice(nullptr, nullptr);
+
+    // Could be empty, or the remaining line (without line end terminators of)
+    SLANG_ASSERT(begin <= cursor);
 
     return UnownedStringSlice(begin, cursor);
 }
 
 /* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
 {
+    outLines.clear();
+
     UnownedStringSlice text(textIn);
     while (true)
     {
