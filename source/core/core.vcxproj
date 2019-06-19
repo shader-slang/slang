@@ -180,6 +180,7 @@
     <ClInclude Include="slang-dictionary.h" />
     <ClInclude Include="slang-exception.h" />
     <ClInclude Include="slang-free-list.h" />
+    <ClInclude Include="slang-gcc-compiler-util.h" />
     <ClInclude Include="slang-hash.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-list.h" />
@@ -203,6 +204,7 @@
     <ClInclude Include="slang-token-reader.h" />
     <ClInclude Include="slang-type-traits.h" />
     <ClInclude Include="slang-uint-set.h" />
+    <ClInclude Include="slang-visual-studio-compiler-util.h" />
     <ClInclude Include="slang-writer.h" />
     <ClInclude Include="windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
@@ -210,6 +212,7 @@
     <ClCompile Include="slang-byte-encode-util.cpp" />
     <ClCompile Include="slang-cpp-compiler.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
+    <ClCompile Include="slang-gcc-compiler-util.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />
@@ -226,14 +229,13 @@
     <ClCompile Include="slang-text-io.cpp" />
     <ClCompile Include="slang-token-reader.cpp" />
     <ClCompile Include="slang-uint-set.cpp" />
+    <ClCompile Include="slang-visual-studio-compiler-util.cpp" />
     <ClCompile Include="slang-writer.cpp" />
     <ClCompile Include="windows\slang-win-process-util.cpp" />
     <ClCompile Include="windows\slang-win-visual-studio-util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="core.natvis">
-      <FileType>Document</FileType>
-    </Natvis>
+    <None Include="core.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

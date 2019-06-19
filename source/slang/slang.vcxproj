@@ -297,10 +297,7 @@
     <ClCompile Include="slang.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="..\core\core.natvis" />
-    <Natvis Include="slang.natvis">
-      <FileType>Document</FileType>
-    </Natvis>
+    <None Include="slang.natvis" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang">

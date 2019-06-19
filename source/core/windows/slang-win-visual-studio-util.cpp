@@ -4,6 +4,8 @@
 #include "../slang-process-util.h"
 #include "../slang-string-util.h"
 
+#include "../slang-visual-studio-compiler-util.h"
+
 #ifdef _WIN32
 #   define WIN32_LEAN_AND_MEAN
 #   define NOMINMAX
@@ -291,7 +293,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             CommandLine cmdLine;
             calcExecuteCompilerArgs(versionPath, cmdLine);
             
-            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &CPPCompilerUtil::calcVisualStudioArgs, &CPPCompilerUtil::parseVisualStudioOutput);
+            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &VisualStudioCompilerUtil::calcArgs, &VisualStudioCompilerUtil::parseOutput);
             set->addCompiler(compiler);
         }
     }

@@ -339,23 +339,6 @@ struct CPPCompilerUtil
         Newest,
     };
 
-        /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
-    static SlangResult parseGCCFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc);
-
-        /// Runs the exeName, and extracts the version info into outDesc
-    static SlangResult calcGCCFamilyVersion(const String& exeName, CPPCompiler::Desc& outDesc);
-
-        /// Calculate gcc family compilers (including clang) cmdLine arguments from options
-    static void calcGCCFamilyArgs(const CompileOptions& options, CommandLine& cmdLine);
-
-        /// Parse ExecuteResult into Output
-    static void parseGCCFamilyOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
-
-        /// Calculate Visual Studio family compilers cmdLine arguments from options
-    static void calcVisualStudioArgs(const CompileOptions& options, CommandLine& cmdLine);
-        /// Parse Visual Studio exeRes into CPPCompiler::Output
-    static void parseVisualStudioOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
-
         /// Find a compiler
     static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);
     static CPPCompiler* findCompiler(const List<CPPCompiler*>& compilers, MatchType matchType, const CPPCompiler::Desc& desc);
