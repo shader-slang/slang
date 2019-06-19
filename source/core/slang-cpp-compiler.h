@@ -105,6 +105,7 @@ public:
     {
         enum class Type
         {
+            Unknown,
             Info,
             Warning,
             Error,
@@ -118,13 +119,29 @@ public:
         Type type;                      ///< The type of error
         Stage stage;                    ///< The stage the error came from
         String text;                    ///< The text of the error
+        String code;                    ///< The compiler specific error code
         String filePath;                ///< The path the error originated from
         Int fileLine;                   ///< The line number the error came from
     };
 
     struct Output
     {
-        void reset() { messages.clear();  }
+        void reset() { messages.clear(); result = SLANG_OK; }
+        
+            /// Get the number of messages by type
+        Index getCountByType(OutputMessage::Type type) const
+        {
+            Index count = 0;
+            for (const auto& msg : messages)
+            {
+                count += Index(msg.type == type);
+            }
+            return count;
+        }
+            /// True if there are any messages of the type
+        bool has(OutputMessage::Type type) const { return getCountByType(type) > 0; }
+
+        SlangResult result;
         List<OutputMessage> messages;
     };
 

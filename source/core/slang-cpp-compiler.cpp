@@ -270,24 +270,169 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     }
 }
 
+SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::OutputMessage& outMsg)
+{
+    typedef CPPCompiler::OutputMessage OutputMessage;
+
+    UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
+    if (line.startsWith(linkPrefix))
+    {
+        outMsg.stage = OutputMessage::Stage::Link;
+        outMsg.type = OutputMessage::Type::Info;
+
+        outMsg.text = UnownedStringSlice(line.begin() + linkPrefix.size(), line.end());
+
+        return SLANG_OK;
+    }
+
+    outMsg.stage = OutputMessage::Stage::Compile;
+
+    const char*const start = line.begin();
+    const char*const end = line.end();
+
+    UnownedStringSlice postPath;
+    // Handle the path and line no
+    {
+        const char* cur = start;
+
+        // We have to assume it is a path up to the first : that isn't part of a drive specification
+
+        if ((end - cur > 2) && Path::isDriveSpecification(UnownedStringSlice(start, start + 2)))
+        {
+            // Skip drive spec
+            cur += 2;
+        }
+
+        // Find the first colon after this
+        Index colonIndex = UnownedStringSlice(cur, end).indexOf(':');
+        if (colonIndex < 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Looks like we have a line number
+        if (cur[colonIndex - 1] == ')')
+        {
+            const char* lineNoEnd = cur + colonIndex - 1;
+            const char* lineNoStart = lineNoEnd;
+            while (lineNoStart > start && *lineNoStart != '(')
+            {
+                lineNoStart--;
+            }
+            // Check this appears plausible
+            if (*lineNoStart != '(' || *lineNoEnd != ')')
+            {
+                return SLANG_FAIL;
+            }
+            Int numDigits = 0;
+            Int lineNo = 0;
+            for (const char* digitCur = lineNoStart + 1; digitCur < lineNoEnd; ++digitCur)
+            {
+                char c = *digitCur;
+                if (c >= '0' && c <= '9')
+                {
+                    lineNo = lineNo * 10 + (c - '0');
+                    numDigits++;
+                }
+                else
+                {
+                    return SLANG_FAIL;
+                }
+            }
+            if (numDigits == 0)
+            {
+                return SLANG_FAIL;
+            }
+
+            outMsg.filePath = UnownedStringSlice(start, lineNoStart);
+            outMsg.fileLine = lineNo;
+        }
+        else
+        {
+            outMsg.filePath = UnownedStringSlice(start, cur + colonIndex);
+            outMsg.fileLine = 0;
+        }
+
+        // Save the remaining text in 'postPath'
+        postPath = UnownedStringSlice(cur + colonIndex + 1, end);
+    }
+
+    // Split up the error section
+    UnownedStringSlice postError;
+    {
+        // tests/cpp-compiler/c-compile-link-error.exe : fatal error LNK1120: 1 unresolved externals
+
+        const Index errorColonIndex = postPath.indexOf(':');
+        if (errorColonIndex < 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        const UnownedStringSlice errorSection = UnownedStringSlice(postPath.begin(), postPath.begin() + errorColonIndex);
+        Index errorCodeIndex = errorSection.lastIndexOf(' ');
+        if (errorCodeIndex < 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Extract the code
+        outMsg.code = UnownedStringSlice(errorSection.begin() + errorCodeIndex + 1, errorSection.end());
+        if (outMsg.code.startsWith(UnownedStringSlice::fromLiteral("LNK")))
+        {
+            outMsg.stage = CPPCompiler::OutputMessage::Stage::Link;
+        }
+
+        // Extract the bit before the code
+        UnownedStringSlice typeName = UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim();
+
+        if (typeName == "error" || typeName == "fatal error")
+        {
+            outMsg.type = CPPCompiler::OutputMessage::Type::Error;
+        }
+        else if (typeName == "warning")
+        {
+            outMsg.type = OutputMessage::Type::Warning;
+        }
+        else if (typeName == "info")
+        {
+            outMsg.type = OutputMessage::Type::Info;
+        }
+        else
+        {
+            outMsg.type = OutputMessage::Type::Unknown;
+        }
+
+        // Link codes start with LNK prefix
+        postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
+    }
+
+    outMsg.text = postError;
+
+    return SLANG_OK;
+}
+
 /* static */void CPPCompilerUtil::parseVisualStudioOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
     outOutput.reset();
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {
+#if 0
         fwrite(line.begin(), 1, line.size(), stdout);
         fprintf(stdout, "\n");
+#endif
 
-        // c-compile-error.c
-        // e:\git\slang - jsmall - nvidia\tests\cpp - compiler\c - compile - error.c(9) : error C2065 : 'b' : undeclared identifier
-        // e:\git\slang-jsmall-nvidia\tests\cpp-compiler\c - compile - error.c(9) : error C2065 : 'c' : undeclared identifier
+        CPPCompiler::OutputMessage msg;
+        if (SLANG_SUCCEEDED(_parseVisualStudioLine(line, msg)))
+        {
+            outOutput.messages.add(msg);
+        }
+    }
 
-
-
-        // Look for a lines
-
-
+    // if it has a compilation error.. set on output
+    if (outOutput.has(CPPCompiler::OutputMessage::Type::Error))
+    {
+        outOutput.result = SLANG_FAIL;
     }
 }
 

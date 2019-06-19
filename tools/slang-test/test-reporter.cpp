@@ -120,19 +120,6 @@ void TestReporter::startTest(const String& testName)
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
     m_currentMessage.Clear();
-
-
-#if 1
-    // Useful for debugging
-    switch (m_outputMode)
-    {
-        default:
-        {
-            printf("start test: '%S'\n", testName.toWString().begin());
-            break;
-        }
-    }
-#endif
 }
 
 void TestReporter::endTest()
