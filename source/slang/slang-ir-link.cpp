@@ -13,8 +13,9 @@ namespace Slang
 // TODO: maybe arrange so that codegen is driven from the layout layer
 // instead of the input/request layer.
 EntryPointLayout* findEntryPointLayout(
-    ProgramLayout*      programLayout,
-    EntryPoint*  EntryPoint);
+    ProgramLayout*          programLayout,
+    EntryPoint*             entryPoint,
+    EntryPointGroupLayout** outEntryPointGroupLayout);
 
 struct IRSpecSymbol : RefObject
 {
@@ -783,9 +784,12 @@ IRFunc* specializeIRForEntryPoint(
             if( paramIndex < paramLayoutCount )
             {
                 auto paramLayout = paramsStructLayout->fields[paramIndex];
+
+                auto offsetParamLayout = applyOffsetToVarLayout(paramLayout, entryPointLayout->parametersLayout);
+
                 context->builder->addLayoutDecoration(
                     pp,
-                    paramLayout);
+                    offsetParamLayout);
             }
             else
             {
@@ -1276,6 +1280,33 @@ LinkedIR linkIR(
         context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
     }
 
+    EntryPointGroupLayout* entryPointGroupLayout = nullptr;
+    auto entryPointLayout = findEntryPointLayout(programLayout, entryPoint, &entryPointGroupLayout);
+
+    auto offsetEntryPointLayout = entryPointLayout->getAbsoluteLayout(entryPointGroupLayout);
+
+    // Note: when we are doing the compatibility approach for Falcor, we
+    // can have global-scope symbols that are actually part of the
+    // local root signature (entry point group), so we need to make
+    // sure to apply those layouts appropriately.
+    auto entryPointGroupStructLayout = getScopeStructLayout(entryPointGroupLayout);
+    for(auto entry : entryPointGroupStructLayout->mapVarToLayout)
+    {
+        if(!entry.Key)
+            continue;
+
+        auto mangledName = getMangledName(entry.Key);
+        auto groupVarLayout = entry.Value;
+
+        // We need to "adjust" the layout that was computed for the parameter
+        // because it will be relative to the start of the entry-point group,
+        // rather than absolute.
+        //
+        auto absoluteVarLayout = groupVarLayout->getAbsoluteLayout(entryPointGroupLayout->parametersLayout);
+
+        context->globalVarLayouts.AddIfNotExists(mangledName, absoluteVarLayout);
+    }
+
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
     // for now, clone all unreferenced witness tables
@@ -1289,13 +1320,12 @@ LinkedIR linkIR(
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
     }
 
-    auto entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
     // this step to recursively copy over anything else
     // it might reference.
-    auto irEntryPoint = specializeIRForEntryPoint(context, entryPoint, entryPointLayout);
+    auto irEntryPoint = specializeIRForEntryPoint(context, entryPoint, offsetEntryPointLayout);
 
     // HACK: right now the bindings for global generic parameters are coming in
     // as part of the original IR module, and we need to make sure these get

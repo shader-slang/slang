@@ -48,29 +48,37 @@ enum class BuiltInCOp
 //
 
 EntryPointLayout* findEntryPointLayout(
-    ProgramLayout*  programLayout,
-    EntryPoint*     entryPoint)
+    ProgramLayout*          programLayout,
+    EntryPoint*             entryPoint,
+    EntryPointGroupLayout** outEntryPointGroupLayout = nullptr)
 {
-    for( auto entryPointLayout : programLayout->entryPoints )
+    for( auto entryPointGroupLayout : programLayout->entryPointGroups )
     {
-        if(entryPointLayout->entryPoint->getName() != entryPoint->getName())
-            continue;
+        for( auto entryPointLayout : entryPointGroupLayout->entryPoints )
+        {
+            if(entryPointLayout->entryPoint->getName() != entryPoint->getName())
+                continue;
 
-        // TODO: We need to be careful about this check, since it relies on
-        // the profile information in the layout matching that in the request.
-        //
-        // What we really seem to want here is some dictionary mapping the
-        // `EntryPoint` directly to the `EntryPointLayout`, and maybe
-        // that is precisely what we should build...
-        //
-        if(entryPointLayout->profile != entryPoint->getProfile())
-            continue;
+            // TODO: We need to be careful about this check, since it relies on
+            // the profile information in the layout matching that in the request.
+            //
+            // What we really seem to want here is some dictionary mapping the
+            // `EntryPoint` directly to the `EntryPointLayout`, and maybe
+            // that is precisely what we should build...
+            //
+            if(entryPointLayout->profile != entryPoint->getProfile())
+                continue;
 
-        // TODO: can't easily filter on translation unit here...
-        // Ideally the `EntryPoint` should get filled in with a pointer
-        // the specific function declaration that represents the entry point.
+            // TODO: can't easily filter on translation unit here...
+            // Ideally the `EntryPoint` should get filled in with a pointer
+            // the specific function declaration that represents the entry point.
 
-        return entryPointLayout.Ptr();
+            if( outEntryPointGroupLayout )
+            {
+                *outEntryPointGroupLayout = entryPointGroupLayout;
+            }
+            return entryPointLayout;
+        }
     }
 
     return nullptr;

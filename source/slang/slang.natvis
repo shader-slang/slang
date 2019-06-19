@@ -17,16 +17,10 @@
       <ExpandedItem>decl ? ($T1*)(decl) : ($T1*)0</ExpandedItem>
       <Item Name="[Substitutions]:">"========================="</Item>
       <LinkedListItems>
-        <HeadPointer>substitutions.genericSubstitutions.pointer</HeadPointer>
+        <HeadPointer>substitutions.substitutions.pointer</HeadPointer>
         <NextPointer>outer.pointer</NextPointer>
         <ValueNode>this</ValueNode>
       </LinkedListItems>
-        <LinkedListItems>
-            <HeadPointer>substitutions.globalGenParamSubstitutions.pointer</HeadPointer>
-            <NextPointer>outer.pointer</NextPointer>
-            <ValueNode>this</ValueNode>
-        </LinkedListItems>
-        <Item Name ="thisSubst">substitutions.thisTypeSubstitution</Item>
     </Expand>
   </Type>
     <Type Name="Slang::DeclRefBase">
@@ -66,10 +60,10 @@
         <DisplayString>FuncDecl {nameAndLoc}</DisplayString>
     </Type>
   <Type Name="Slang::Name">
-    <DisplayString>{{name={(char*)(text.buffer.pointer+1), s}}}</DisplayString>
+    <DisplayString>{{name={(char*)(text.m_buffer.pointer+1), s}}}</DisplayString>
   </Type>
   <Type Name="Slang::NameLoc">
-    <DisplayString>{{name={(char*)((*name).text.buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
+    <DisplayString>{{name={(char*)((*name).text.m_buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
   </Type>
   <Type Name="Slang::IRWitnessTableEntry">
     <Expand>

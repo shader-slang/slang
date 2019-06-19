@@ -7,7 +7,7 @@ standard output = {
         {
             "name": "a",
             "bindings": [
-                {"kind": "constantBuffer", "space": 2, "index": 0, "count": 0},
+                {"kind": "constantBuffer", "index": 0, "count": 0},
                 {"kind": "registerSpace", "index": 2}
             ],
             "type": {
@@ -58,7 +58,7 @@ standard output = {
         {
             "name": "b",
             "bindings": [
-                {"kind": "constantBuffer", "space": 3, "index": 0, "count": 0},
+                {"kind": "constantBuffer", "index": 0, "count": 0},
                 {"kind": "registerSpace", "index": 3}
             ],
             "type": {
