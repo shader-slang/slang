@@ -26,36 +26,21 @@ static bool _areEqual(const List<UnownedStringSlice>& lines, const UnownedString
 static bool _checkLines(const UnownedStringSlice& input, const UnownedStringSlice* checkLines, Int checkLinesCount)
 {
     List<UnownedStringSlice> lines;
-    UnownedStringSlice text(input);
-    while (true)
-    {
-        UnownedStringSlice line = StringUtil::extractLine(text);
-        if (line.begin() == nullptr)
-        {
-            return _areEqual(lines, checkLines, checkLinesCount);
-        }
-        lines.add(line);
-    }
+    StringUtil::calcLines(input, lines);
+    return _areEqual(lines, checkLines, checkLinesCount);
 }
 
 static bool _checkLineParser(const UnownedStringSlice& input)
 {
-    UnownedStringSlice remaining(input);
-    for (const auto line : LineParser(input))
+    UnownedStringSlice remaining(input), line;
+    for (const auto parserLine : LineParser(input))
     {
-        UnownedStringSlice extractLine = StringUtil::extractLine(remaining);
-        if (line != extractLine)
+        if (!StringUtil::extractLine(remaining, line) || line != parserLine)
         {
             return false;
         }
-        // Handle hitting the end
-        if (line.begin() == nullptr || extractLine.begin() == nullptr)
-        {
-            return line.begin() == extractLine.begin();
-        }
     }
-
-    return remaining.begin() == nullptr;
+    return StringUtil::extractLine(remaining, line) == false;
 }
 
 static void stringUnitTest()
