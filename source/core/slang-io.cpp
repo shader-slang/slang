@@ -139,10 +139,12 @@ namespace Slang
 		if (path1.getLength() == 0) return path2;
 
         StringBuilder sb;
-        combineBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
+        combineIntoBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
         return sb.ProduceString();
 	}
-    /* static */void Path::combineBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
+
+
+    /* static */void Path::combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
     {
         outBuilder.Clear();
         // Make sure we have the space for the full result
