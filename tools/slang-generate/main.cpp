@@ -554,15 +554,9 @@ void emitSimpleText(
     FILE*               stream,
     StringSpan const&   span)
 {
-    UnownedStringSlice content = span;
-    while (true)
+    UnownedStringSlice content(span), line;
+    while (StringUtil::extractLine(content, line))
     {
-        const auto line = StringUtil::extractLine(content);
-        if (line.begin() == nullptr)
-        {
-            break;
-        }
-
         // Write the line
         fwrite(line.begin(), 1, line.size(), stream);
 
