@@ -86,6 +86,15 @@ static inline SlangReflectionEntryPoint* convert(EntryPointLayout* entryPoint)
     return (SlangReflectionEntryPoint*) entryPoint;
 }
 
+static inline EntryPointGroupLayout* convert(SlangEntryPointGroupLayout* entryPointGroup)
+{
+    return (EntryPointGroupLayout*) entryPointGroup;
+}
+
+static inline SlangEntryPointGroupLayout* convert(EntryPointGroupLayout* entryPointGroup)
+{
+    return (SlangEntryPointGroupLayout*) entryPointGroup;
+}
 
 static inline ProgramLayout* convert(SlangReflection* program)
 {
@@ -596,9 +605,9 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     // TODO: We should extend this API to support getting error messages
     // when type lookup fails.
     //
-    Slang::DiagnosticSink sink;
-    
-    sink.sourceManager = programLayout->getTargetReq()->getLinkage()->getSourceManager();;
+    Slang::DiagnosticSink sink(
+        programLayout->getTargetReq()->getLinkage()->getSourceManager());
+
     RefPtr<Type> result = program->getTypeFromString(name, &sink);
     return (SlangReflectionType*)result.Ptr();
 }
@@ -611,13 +620,9 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto context = convert(reflection);
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, context);
-    RefPtr<TypeLayout> result;
-    if (targetReq->getTypeLayouts().TryGetValue(type, result))
-        return (SlangReflectionTypeLayout*)result.Ptr();
-    result = createTypeLayout(layoutContext, type);
-    targetReq->getTypeLayouts()[type] = result;
-    return (SlangReflectionTypeLayout*)result.Ptr();
+
+    auto typeLayout = targetReq->getTypeLayout(type);
+    return convert(typeLayout);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangReflectionType* inType)
@@ -1071,11 +1076,32 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(SlangReflectionVariableLayo
         space += info->space;
     }
 
-    // Next, deal with any dedicated register-space offset applied to, e.g., a parameter block
-    if (auto spaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
-    {
-        space += spaceInfo->index;
-    }
+    // Note: this code used to try and take a variable with
+    // an offset for `LayoutResourceKind::RegisterSpace` and
+    // add it to the space returned, but that isn't going
+    // to be right in some cases.
+    //
+    // Imageine if we have:
+    //
+    //  struct X { Texture2D y; }
+    //  struct S { Texture2D t; ParmaeterBlock<X> x; }
+    //
+    //  Texture2D gA;
+    //  S gS;
+    //
+    // We expect `gS` to have an offset for `LayoutResourceKind::ShaderResourceView`
+    // of one (since its texture must come after `gA`), and an offset for
+    // `LayoutResourceKind::RegisterSpace` of one (since the default space will be
+    // space zero). It would be incorrect for us to imply that `gS.t` should
+    // be `t1, space1`, though, because the space offset of `gS` doesn't actually
+    // apply to `t`.
+    //
+    // For now we are punting on this issue and leaving it in the hands of the
+    // application to determine when a space offset from an "outer" variable should
+    // apply to the locations of things in an "inner" variable.
+    //
+    // There is no policy we can apply locally in this function that
+    // will Just Work, so the best we can do is try to not lie.
 
     return space;
 }
@@ -1392,7 +1418,7 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangRefl
     auto program = convert(inProgram);
     if(!program) return 0;
 
-    // TODO: improve on dumb linear search
+    // TODO: improve on naive linear search
     for(auto ep : program->entryPoints)
     {
         if(ep->entryPoint->getName()->text == name)
@@ -1402,6 +1428,74 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangRefl
     }
 
     return nullptr;
+}
+
+
+SLANG_API SlangInt spReflection_getEntryPointGroupCount(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if(!program) return 0;
+
+    return program->entryPointGroups.getCount();
+}
+
+SLANG_API SlangEntryPointGroupLayout* spReflection_getEntryPointGroupByIndex(SlangReflection* inProgram, SlangInt index)
+{
+    auto program = convert(inProgram);
+    if(!program) return 0;
+
+    if(index < 0) return nullptr;
+    if(index >= program->entryPointGroups.getCount()) return nullptr;
+
+    return convert(program->entryPointGroups[(int) index].Ptr());
+}
+
+SLANG_API SlangInt spEntryPointGroupLayout_getEntryPointCount(SlangEntryPointGroupLayout* inGroup)
+{
+    auto group = convert(inGroup);
+    if(!group) return 0;
+
+    return group->entryPoints.getCount();
+}
+
+SLANG_API SlangReflectionEntryPoint* spEntryPointGroupLayout_getEntryPointByIndex(SlangEntryPointGroupLayout* inGroup, SlangInt index)
+{
+    auto group = convert(inGroup);
+    if(!group) return 0;
+
+    if(index < 0) return nullptr;
+    if(index >= group->entryPoints.getCount()) return nullptr;
+
+    return convert(group->entryPoints[(int) index].Ptr());
+}
+
+SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getVarLayout(SlangEntryPointGroupLayout* inGroup)
+{
+    auto group = convert(inGroup);
+    if(!group) return 0;
+
+    return convert(group->parametersLayout);
+}
+
+SLANG_API SlangInt spEntryPointGroupLayout_getParameterCount(SlangEntryPointGroupLayout* inGroup)
+{
+    auto groupLayout = convert(inGroup);
+    if(!groupLayout) return 0;
+
+    auto& params = groupLayout->group->getShaderParams();
+    return params.getCount();
+}
+
+SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getParameterByIndex(SlangEntryPointGroupLayout* inGroup, SlangInt index)
+{
+    auto groupLayout = convert(inGroup);
+    if(!groupLayout) return nullptr;
+
+    auto& params = groupLayout->group->getShaderParams();
+    if(index < 0) return nullptr;
+    if(index >= params.getCount()) return nullptr;
+
+    return convert(getScopeStructLayout(groupLayout)->fields[index]);
 }
 
 
@@ -1437,10 +1531,9 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
     auto unspecializedType = convert(inType);
     if(!unspecializedType) return nullptr;
 
-    auto linkage = programLayout->getProgram()->getLinkage();
+    auto linkage = programLayout->getProgram()->getLinkageImpl();
 
-    DiagnosticSink sink;
-    sink.sourceManager = linkage->getSourceManager();
+    DiagnosticSink sink(linkage->getSourceManager());
 
     auto specializedType = linkage->specializeType(unspecializedType, specializationArgCount, (Type* const*) specializationArgs, &sink);
 

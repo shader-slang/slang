@@ -377,6 +377,8 @@ public:
         addResourceUsage(info);
     }
 
+    void removeResourceUsage(LayoutResourceKind kind);
+
     void addResourceUsageFrom(TypeLayout* otherTypeLayout);
 
         /// "Unwrap" any layers of array-ness from this type layout.
@@ -473,6 +475,21 @@ public:
     }
 
     RefPtr<VarLayout> pendingVarLayout;
+
+
+        /// Get the "absolute" layout of this variable, if applicable.
+        ///
+        /// The `parentAbsoluteLayout` must be the absolute layout
+        /// of the parent of this variable.
+        ///
+        /// The absolute layout will be created once and cached on
+        /// future accesses; if `parentAbsoluteLayout` is not
+        /// consistent at different call sites an unexpected
+        /// layout could be returned.
+        ///
+    VarLayout* getAbsoluteLayout(VarLayout* parentAbsoluteLayout);
+
+    RefPtr<VarLayout> m_absoluteLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -650,6 +667,8 @@ public:
 StructTypeLayout* getScopeStructLayout(
     ScopeLayout*  programLayout);
 
+class EntryPointGroupLayout;
+
 // Layout information for a single shader entry point
 // within a program
 //
@@ -682,6 +701,18 @@ public:
         /// These are any tagged union types used by the generic
         /// arguments that this entry point is being compiled with.
     List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
+
+    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
+    EntryPointLayout* getAbsoluteLayout(EntryPointGroupLayout* parentGroup);
+
+    RefPtr<EntryPointLayout> m_absoluteLayout;
+};
+
+class EntryPointGroupLayout : public ScopeLayout
+{
+public:
+    RefPtr<EntryPointGroup> group;
+    List<RefPtr<EntryPointLayout>> entryPoints;
 };
 
 class GenericParamLayout : public Layout
@@ -724,6 +755,10 @@ public:
     // and any entry-point-specific parameter data
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
+
+    // Entry points can also be grouped for layout purposes (e.g., to form
+    // ray-tracing hit groups), so this array represents those groups
+    List<RefPtr<EntryPointGroupLayout>> entryPointGroups;
 
     List<RefPtr<GenericParamLayout>> globalGenericParams;
     Dictionary<String, GenericParamLayout*> globalGenericParamsMap;
@@ -1112,6 +1147,11 @@ int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, Globa
 RefPtr<TypeLayout> applyOffsetToTypeLayout(
     RefPtr<TypeLayout>  oldTypeLayout,
     RefPtr<VarLayout>   offsetVarLayout);
+
+    /// Create a layout like `baseLayout`, but offset by `offsetLayout`
+RefPtr<VarLayout> applyOffsetToVarLayout(
+    VarLayout* baseLayout,
+    VarLayout* offsetLayout);
 
 }
 
