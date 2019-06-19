@@ -550,8 +550,7 @@ namespace Slang
 
     /* static */String Path::getExecutablePath()
     {
-        static String executablePath = _getExecutablePath();
-        return executablePath;
+        return _getExecutablePath();
     }
 
 	Slang::String File::readAllText(const Slang::String& fileName)
