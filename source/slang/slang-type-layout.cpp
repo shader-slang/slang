@@ -1165,6 +1165,83 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     return newTypeLayout;
 }
 
+RefPtr<VarLayout> applyOffsetToVarLayout(
+    VarLayout* baseLayout,
+    VarLayout* offsetLayout)
+{
+    RefPtr<VarLayout> adjustedLayout = new VarLayout();
+    adjustedLayout->typeLayout = baseLayout->typeLayout;
+    adjustedLayout->varDecl = baseLayout->varDecl;
+    adjustedLayout->flags = baseLayout->flags;
+    adjustedLayout->semanticName = baseLayout->semanticName;
+    adjustedLayout->semanticIndex = baseLayout->semanticIndex;
+    adjustedLayout->systemValueSemantic = baseLayout->systemValueSemantic;
+    adjustedLayout->systemValueSemanticIndex = baseLayout->systemValueSemanticIndex;
+    adjustedLayout->stage = baseLayout->stage;
+
+    if( auto basePendingLayout = baseLayout->pendingVarLayout )
+    {
+        if( auto offsetPendingLayout = offsetLayout->pendingVarLayout )
+        {
+            adjustedLayout->pendingVarLayout = applyOffsetToVarLayout(
+                basePendingLayout,
+                offsetPendingLayout);
+        }
+    }
+
+    for( auto baseResInfo : baseLayout->resourceInfos )
+    {
+        auto adjustedResInfo = baseResInfo;
+        if( auto offsetResInfo = offsetLayout->FindResourceInfo(baseResInfo.kind) )
+        {
+            adjustedResInfo.index += offsetResInfo->index;
+            adjustedResInfo.space += offsetResInfo->space;
+        }
+        adjustedLayout->resourceInfos.add(adjustedResInfo);
+    }
+
+    return adjustedLayout;
+}
+
+EntryPointLayout* EntryPointLayout::getAbsoluteLayout(
+    VarLayout* parentLayout)
+{
+    SLANG_ASSERT(parentLayout);
+
+    if(m_absoluteLayout)
+        return m_absoluteLayout;
+
+    RefPtr<EntryPointLayout> adjustedLayout = new EntryPointLayout();
+    adjustedLayout->entryPoint = this->entryPoint;
+    adjustedLayout->flags = this->flags;
+    adjustedLayout->parametersLayout = this->parametersLayout->getAbsoluteLayout(parentLayout);
+    adjustedLayout->profile = this->profile;
+    if( auto baseResultLayout = this->resultLayout )
+    {
+        adjustedLayout->resultLayout = baseResultLayout->getAbsoluteLayout(parentLayout);
+    }
+    adjustedLayout->taggedUnionTypeLayouts = this->taggedUnionTypeLayouts;
+
+    m_absoluteLayout = adjustedLayout;
+    return adjustedLayout;
+}
+
+EntryPointLayout* EntryPointLayout::getAbsoluteLayout(EntryPointGroupLayout* parentGroup)
+{
+    SLANG_ASSERT(parentGroup);
+    return getAbsoluteLayout(parentGroup->parametersLayout);
+}
+
+
+VarLayout* VarLayout::getAbsoluteLayout(VarLayout* parentAbsoluteLayout)
+{
+    if( !m_absoluteLayout )
+    {
+        m_absoluteLayout = applyOffsetToVarLayout(this, parentAbsoluteLayout);
+    }
+    return m_absoluteLayout;
+}
+
 static bool _usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)
 {
     auto resInfo = typeLayout->FindResourceInfo(kind);
@@ -3179,6 +3256,20 @@ RefPtr<TypeLayout> createTypeLayout(
 {
     return _createTypeLayout(context, type).layout;
 }
+
+void TypeLayout::removeResourceUsage(LayoutResourceKind kind)
+{
+    Int infoCount = resourceInfos.getCount();
+    for( Int ii = 0; ii < infoCount; ++ii )
+    {
+        if( resourceInfos[ii].kind == kind )
+        {
+            resourceInfos.removeAt(ii);
+            return;
+        }
+    }
+}
+
 
 void TypeLayout::addResourceUsageFrom(TypeLayout* otherTypeLayout)
 {
