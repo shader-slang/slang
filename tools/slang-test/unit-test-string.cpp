@@ -72,6 +72,15 @@ static void stringUnitTest()
         SLANG_CHECK(_checkLineParser(UnownedStringSlice::fromLiteral("\n")));
         SLANG_CHECK(_checkLineParser(UnownedStringSlice::fromLiteral("")));
     }
+    {
+        Int value;
+        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-10"), value)) && value == -10);
+        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("0"), value)) && value == 0);
+        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-0"), value)) && value == 0);
+
+        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("13824"), value)) && value == 13824);
+        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-13824"), value)) && value == -13824);
+    }
 }
 
 SLANG_UNIT_TEST("String", stringUnitTest);

@@ -270,7 +270,30 @@ SlangResult CPPCompilerUtil::calcGCCFamilyVersion(const String& exeName, CPPComp
     }
 }
 
-SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::OutputMessage& outMsg)
+static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::OutputMessage::Type& outType)
+{
+    typedef CPPCompiler::OutputMessage::Type Type;
+
+    if (in == "error" || in == "fatal error")
+    {
+        outType = Type::Error;
+    }
+    else if (in == "warning")
+    {
+        outType = Type::Warning;
+    }
+    else if (in == "info")
+    {
+        outType = Type::Info;
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::OutputMessage& outMsg)
 {
     typedef CPPCompiler::OutputMessage OutputMessage;
 
@@ -383,24 +406,7 @@ SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::
         }
 
         // Extract the bit before the code
-        UnownedStringSlice typeName = UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim();
-
-        if (typeName == "error" || typeName == "fatal error")
-        {
-            outMsg.type = CPPCompiler::OutputMessage::Type::Error;
-        }
-        else if (typeName == "warning")
-        {
-            outMsg.type = OutputMessage::Type::Warning;
-        }
-        else if (typeName == "info")
-        {
-            outMsg.type = OutputMessage::Type::Info;
-        }
-        else
-        {
-            outMsg.type = OutputMessage::Type::Unknown;
-        }
+        SLANG_RETURN_ON_FAIL(_parseErrorType(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outMsg.type));
 
         // Link codes start with LNK prefix
         postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
@@ -436,13 +442,103 @@ SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::
     }
 }
 
+
+
+static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompiler::OutputMessage& outMsg)
+{
+    /*
+        tests/cpp-compiler/c-compile-error.c: In function ‘int main(int, char**)’:
+        tests/cpp-compiler/c-compile-error.c:8:13: error: ‘b’ was not declared in this scope
+        int a = b + c;
+        ^
+        tests/cpp-compiler/c-compile-error.c:8:17: error: ‘c’ was not declared in this scope
+        int a = b + c;
+        ^
+    */
+
+    /* /tmp/ccS0JCWe.o:c-compile-link-error.c:(.rdata$.refptr.thing[.refptr.thing]+0x0): undefined reference to `thing'
+       collect2: error: ld returned 1 exit status*/
+
+    typedef CPPCompiler::OutputMessage OutputMessage;
+
+    outMsg.stage = OutputMessage::Stage::Compile;
+
+    List<UnownedStringSlice> split;
+    StringUtil::split(line, ':', split);
+
+    if (split.getCount() == 3 && split[2] == "")
+    {
+        if (split[2].trim().startsWith("ld returned"))
+        {
+            outMsg.stage = CPPCompiler::OutputMessage::Stage::Link;
+            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1], outMsg.type));
+            outMsg.text = line;
+            return SLANG_OK;
+        }
+
+        // This is probably a prelude line, we'll just ignore it
+        return SLANG_FAIL;
+    }
+
+    if (split.getCount() == 4)
+    {
+        // Probably a link error, give the source line
+        String ext = Path::getFileExt(split[0]);
+
+        // Maybe a bit fragile -> but probably okay for now
+        if (ext != "o" && ext != "obj")
+        {
+            return SLANG_FAIL;
+        }
+
+        outMsg.filePath = split[1];
+        outMsg.fileLine = 0;
+        outMsg.type = OutputMessage::Type::Error;
+        outMsg.stage = OutputMessage::Stage::Link;
+        outMsg.text = split[3];
+        return SLANG_OK;
+    }
+
+    if (split.getCount() == 5)
+    {
+        // Probably a regular error line
+        SLANG_RETURN_ON_FAIL(_parseErrorType(split[3].trim(), outMsg.type));
+
+        outMsg.filePath = split[0];
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outMsg.fileLine));
+        outMsg.text = split[4];
+
+        return SLANG_OK;
+    }
+
+    return SLANG_FAIL;
+}
+
 /* static */void CPPCompilerUtil::parseGCCFamilyOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
     outOutput.reset();
 
     for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
     {
+        CPPCompiler::OutputMessage msg;
+        if (SLANG_SUCCEEDED(_parseGCCFamilyLine(line, msg)))
+        {
+            outOutput.messages.add(msg);
+        }
+        else
+        {
+            if (outOutput.messages.getCount() > 0)
+            {
+                auto& text = outOutput.messages.getLast().text;
+                text.append("\n");
+                text.append(line);
+            }
+        }
+    }
 
+    if (outOutput.has(CPPCompiler::OutputMessage::Type::Error) || exeRes.resultCode != 0)
+    {
+        outOutput.result = SLANG_FAIL;
     }
 }
 

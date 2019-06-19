@@ -117,6 +117,13 @@ public:
             Link,
         };
 
+        void reset()
+        {
+            type = Type::Unknown;
+            stage = Stage::Compile;
+            fileLine = 0;
+        }
+
         Type type;                      ///< The type of error
         Stage stage;                    ///< The stage the error came from
         String text;                    ///< The text of the error

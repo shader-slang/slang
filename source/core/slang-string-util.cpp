@@ -285,4 +285,45 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
+SLANG_FORCE_INLINE static bool _isDigit(char c)
+{
+    return (c >= '0' && c <= '9');
+}
+
+/* static */SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
+{
+    const char* cur = in.begin();
+    const char* end = in.end();
+
+    bool negate = false;
+    if (cur < end && *cur == '-')
+    {
+        negate = true;
+        cur++;
+    }
+
+    // We need at least one digit
+    if (cur >= end || !_isDigit(*cur))
+    {
+        return SLANG_FAIL;
+    }
+    
+    Int value = *cur++ - '0';
+    // Do the remaining digits
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+        if (!_isDigit(c))
+        {
+            return SLANG_FAIL;
+        }
+        value = value * 10 + (c - '0');
+    }
+
+    value = negate ? -value : value;
+
+    outValue = value;
+    return SLANG_OK;
+}
+
 } // namespace Slang

@@ -94,6 +94,9 @@ struct StringUtil
 
         /// Equal if the lines are equal (in effect a way to ignore differences in line breaks)
     static bool areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
+        /// Convert in to int. Returns SLANG_FAIL on error
+    static SlangResult parseInt(const UnownedStringSlice& in, Int& outValue);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */
