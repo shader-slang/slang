@@ -235,6 +235,12 @@ namespace Slang
             return rs;
         }
 
+        SLANG_FORCE_INLINE void setNull()
+        {
+            releaseReference(pointer);
+            pointer = nullptr;
+        }
+
         /// Get ready for writing (nulls contents)
         SLANG_FORCE_INLINE T** writeRef() { *this = nullptr; return &pointer; }
 
