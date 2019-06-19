@@ -36,6 +36,9 @@ namespace Slang
             /// Combine path sections and store the result in outBuilder
         static void combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder);
 
+            /// Append a path, taking into account path separators onto the end of ioBuilder 
+        static void append(StringBuilder& ioBuilder, const UnownedStringSlice& path);
+
 		static bool createDirectory(const String& path);
 
             /// Accept either style of delimiter
