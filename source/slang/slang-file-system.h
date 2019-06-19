@@ -48,7 +48,7 @@ public:
         const char* path,
         ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() {}
+    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
 
         /// Get a default instance
     static ISlangFileSystemExt* getSingleton() { return &s_singleton; }
@@ -132,9 +132,9 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
         const char* path,
-        ISlangBlob** outCanonicalPath);
+        ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL clearCache();
+    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE;
 
         /// Ctor
     CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);

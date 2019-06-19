@@ -45,16 +45,18 @@ int test(
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> gOutputBuffer;
 
-// Note: while we declare `gStrategy` here, there is no matching
-// line providing input data at this point. That is partly to
-// work around an apparent bug in the test runner, but it is also
-// to reflect the fact that this declaration does not cause a
-// constant buffer binding to be allocated, because just from
-// the declaration of `gStrategy` we cannot tell whether a
-// constant buffer binding is even needed (there might be no
-// uniform/ordinary data).
-//
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
+
+// Note: The current strategy we use for laying out shader
+// parameters in the presence of existential/interface types
+// is to always put global-scope parameters before any
+// entry-point parameters. As a result we need to provide
+// the buffer for the specialized version of `gStrategy`
+// here, and we will go ahead and provide the concrete
+// type argument at the same time.
+//
+//TEST_INPUT: globalExistentialType MyStrategy
+//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(0),glbinding(1)
 
 [numthreads(4, 1, 1)]
 void computeMain(
@@ -81,7 +83,7 @@ void computeMain(
 //
 // Here's the incantation to make the test runner fill in the constant buffer:
 //
-//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(0),glbinding(1)
+//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(1),glbinding(2)
 //
 // So, the value `256` will be used for `extra` and the value `16`
 // will be written to the first four bytes of the concrete value
@@ -134,16 +136,4 @@ struct MyModifier : IModifier
     }
 }
 
-//TEST_INPUT: globalExistentialType MyStrategy
 //TEST_INPUT: entryPointExistentialType MyModifier
-
-// Once the concrete types are plugged in, the compiler can
-// see that `gStrategy` needs a constant buffer register/binding.
-// It will alocate the location for `gStrategy` after all other
-// shader parameters, to ensure that different specializations
-// of the same shader will agree on the locations for all the
-// non-interface-type parameters.
-//
-//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(1),glbinding(2)
-
-

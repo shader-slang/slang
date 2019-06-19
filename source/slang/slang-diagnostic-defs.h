@@ -409,6 +409,8 @@ DIAGNOSTIC(39016, Error, globalUniformsNotSupported, "'$0' is implicitly a globa
 
 DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 
+DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types");
+
 //
 // 4xxxx - IL code generation.
 //

@@ -33,6 +33,12 @@
 
 namespace Slang {
 
+// Allocate static const storage for the various interface IDs that the Slang API needs to expose
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
+static const Guid IID_ISession = SLANG_UUID_ISession;
+static const Guid IID_IGlobalSession = SLANG_UUID_IGlobalSession;
+static const Guid IID_IModule = SLANG_UUID_IModule;
 
 Session::Session()
 {
@@ -89,6 +95,55 @@ Session::Session()
 
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+}
+
+ISlangUnknown* Session::getInterface(const Guid& guid)
+{
+    if(guid == IID_ISlangUnknown || guid == IID_IGlobalSession)
+        return asExternal(this);
+    return nullptr;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
+    slang::SessionDesc const&  desc,
+    slang::ISession**          outSession)
+{
+    RefPtr<Linkage> linkage = new Linkage(this);
+
+    Int targetCount = desc.targetCount;
+    for(Int ii = 0; ii < targetCount; ++ii)
+    {
+        linkage->addTarget(desc.targets[ii]);
+    }
+
+    if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
+    {
+        linkage->m_useFalcorCustomSharedKeywordSemantics = true;
+    }
+
+    linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
+
+    Int searchPathCount = desc.searchPathCount;
+    for(Int ii = 0; ii < searchPathCount; ++ii)
+    {
+        linkage->addSearchPath(desc.searchPaths[ii]);
+    }
+
+    Int macroCount = desc.preprocessorMacroCount;
+    for(Int ii = 0; ii < macroCount; ++ii)
+    {
+        auto& macro = desc.preprocessorMacros[ii];
+        linkage->addPreprocessorDefine(macro.name, macro.value);
+    }
+
+    *outSession = asExternal(linkage.detach());
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
+    char const*     name)
+{
+    return Slang::Profile::LookUp(name).raw;
 }
 
 struct IncludeHandlerImpl : IncludeHandler
@@ -330,9 +385,183 @@ Linkage::Linkage(Session* session)
     setFileSystem(nullptr);
 }
 
-// Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Guid IID_ISlangBlob    = SLANG_UUID_ISlangBlob;
+ISlangUnknown* Linkage::getInterface(const Guid& guid)
+{
+    if(guid == IID_ISlangUnknown || guid == IID_ISession)
+        return asExternal(this);
+
+    return nullptr;
+}
+
+SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL Linkage::getGlobalSession()
+{
+    return asExternal(getSessionImpl());
+}
+
+void Linkage::addTarget(
+    slang::TargetDesc const&  desc)
+{
+    auto targetIndex = addTarget(CodeGenTarget(desc.format));
+    auto target = targets[targetIndex];
+
+    target->floatingPointMode = FloatingPointMode(desc.floatingPointMode);
+    target->targetFlags = desc.flags;
+    target->targetProfile = Profile(desc.profile);
+}
+
+#if 0
+SLANG_NO_THROW SlangInt SLANG_MCALL Linkage::getTargetCount()
+{
+    return targets.getCount();
+}
+
+SLANG_NO_THROW slang::ITarget* SLANG_MCALL Linkage::getTargetByIndex(SlangInt index)
+{
+    if(index < 0) return nullptr;
+    if(index >= targets.getCount()) return nullptr;
+    return asExternal(targets[index]);
+}
+#endif
+
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
+    const char*     moduleName,
+    slang::IBlob**  outDiagnostics)
+{
+    auto name = getNamePool()->getName(moduleName);
+
+    DiagnosticSink sink(getSourceManager());
+    auto module = findOrImportModule(name, SourceLoc(), &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    return asExternal(module);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createProgram(
+    slang::ProgramDesc const& desc,
+    slang::IProgram**         outProgram)
+{
+    RefPtr<Program> program = new Program(this);
+
+    auto itemCount = desc.itemCount;
+    for(SlangInt ii = 0; ii < itemCount; ++ii)
+    {
+        auto& item = desc.items[ii];
+        switch(item.kind)
+        {
+        case slang::ProgramDesc::Item::Kind::Program:
+            {
+                Program* existingProgram = asInternal(item.program);
+                for(auto referencedModule : existingProgram->getModuleDependencies())
+                {
+                    program->addReferencedLeafModule(referencedModule);
+                }
+
+                // TODO: Need to decide whether to include the entry points as well...
+            }
+            break;
+
+        case slang::ProgramDesc::Item::Kind::Module:
+            {
+                Module* module = asInternal(item.module);
+                program->addReferencedModule(module);
+            }
+            break;
+
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    *outProgram = asExternal(program.detach());
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
+    slang::TypeReflection*          inUnspecializedType,
+    slang::SpecializationArg const* specializationArgs,
+    SlangInt                        specializationArgCount,
+    ISlangBlob**                    outDiagnostics)
+{
+    auto unspecializedType = asInternal(inUnspecializedType);
+
+    List<Type*> typeArgs;
+
+    for(Int ii = 0; ii < specializationArgCount; ++ii)
+    {
+        auto& arg = specializationArgs[ii];
+        if(arg.kind != slang::SpecializationArg::Kind::Type)
+            return nullptr;
+
+        typeArgs.add(asInternal(arg.type));
+    }
+
+    DiagnosticSink sink(getSourceManager());
+    auto specializedType = specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    return asExternal(specializedType);
+}
+
+SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
+    slang::TypeReflection*  inType,
+    SlangInt                targetIndex,
+    slang::LayoutRules      rules,
+    ISlangBlob**            outDiagnostics)
+{
+    auto type = asInternal(inType);
+
+    if(targetIndex < 0 || targetIndex >= targets.getCount())
+        return nullptr;
+
+    auto target = targets[targetIndex];
+
+    // TODO: We need a way to pass through the layout rules
+    // that the user requested (e.g., constant buffers vs.
+    // structured buffer rules). Right now the API only
+    // exposes a single case, so this isn't a big deal.
+    //
+    SLANG_UNUSED(rules);
+
+    auto typeLayout = target->getTypeLayout(type);
+
+    // TODO: We currently don't have a path for capturing
+    // errors that occur during layout (e.g., types that
+    // are invalid because of target-specific layout constraints).
+    //
+    SLANG_UNUSED(outDiagnostics);
+
+    return asExternal(typeLayout);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
+    SlangCompileRequest**   outCompileRequest)
+{
+    auto compileRequest = new EndToEndCompileRequest(this);
+    *outCompileRequest = asExternal(compileRequest);
+    return SLANG_OK;
+}
+
+SlangResult Linkage::addSearchPath(
+    char const* path)
+{
+    searchDirectories.searchDirectories.add(Slang::SearchDirectory(path));
+    return SLANG_OK;
+}
+
+SlangResult Linkage::addPreprocessorDefine(
+    char const* name,
+    char const* value)
+{
+    preprocessorDefinitions[name] = value;
+    return SLANG_OK;
+}
+
+SlangResult Linkage::setMatrixLayoutMode(
+    SlangMatrixLayoutMode mode)
+{
+    defaultMatrixLayoutMode = MatrixLayoutMode(mode);
+    return SLANG_OK;
+}
 
 /** Base class for simple blobs.
 */
@@ -386,13 +615,36 @@ ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
 
 Session* TargetRequest::getSession()
 {
-    return linkage->getSession();
+    return linkage->getSessionImpl();
 }
 
 MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
 {
     return linkage->getDefaultMatrixLayoutMode();
 }
+
+TypeLayout* TargetRequest::getTypeLayout(Type* type)
+{
+    // TODO: We are not passing in a `ProgramLayout` here, although one
+    // is nominally required to establish the global ordering of
+    // generic type parameters, which might be referenced from field types.
+    //
+    // The solution here is to make sure that the reflection data for
+    // uses of global generic/existential types does *not* include any
+    // kind of index in that global ordering, and just refers to the
+    // parameter instead (leaving the user to figure out how that
+    // maps to the ordering via some API on the program layout).
+    //
+    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr);
+
+    RefPtr<TypeLayout> result;
+    if (getTypeLayouts().TryGetValue(type, result))
+        return result.Ptr();
+    result = createTypeLayout(layoutContext, type);
+    getTypeLayouts()[type] = result;
+    return result.Ptr();
+}
+
 
 //
 // TranslationUnitRequest
@@ -485,8 +737,7 @@ RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
     Slang::SourceFile* srcFile = localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr);
     
     // We'll use a temporary diagnostic sink  
-    DiagnosticSink sink;
-    sink.sourceManager = &localSourceManager;
+    DiagnosticSink sink(&localSourceManager);
 
     // RAII type to make make sure current SourceManager is restored after parse.
     // Use RAII - to make sure everything is reset even if an exception is thrown.
@@ -521,7 +772,7 @@ RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
         nullptr);
 
     return parseTypeFromSourceFile(
-        getSession(),
+        getSessionImpl(),
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
 
@@ -552,7 +803,7 @@ Type* Program::getTypeFromString(String typeStr, DiagnosticSink* sink)
     for(auto module : getModuleDependencies())
         scopesToTry.add(module->getModuleDecl()->scope);
 
-    auto linkage = getLinkage();
+    auto linkage = getLinkageImpl();
     for(auto& s : scopesToTry)
     {
         RefPtr<Expr> typeExpr = linkage->parseTypeString(
@@ -785,13 +1036,15 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
-    if ((compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
-    {
-        // Generate initial IR for all the translation
-        // units, if we are in a mode where IR is called for.
-        generateIR();
-    }
-
+    // We always generate IR for all the translation units.
+    //
+    // TODO: We may eventually have a mode where we skip
+    // IR codegen and only produce an AST (e.g., for use when
+    // debugging problems in the parser or semantic checking),
+    // but for now there are no cases where not having IR
+    // makes sense.
+    //
+    generateIR();
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -819,9 +1072,23 @@ BackEndCompileRequest::BackEndCompileRequest(
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
     : m_session(session)
+    , m_sink(nullptr)
 {
     m_linkage = new Linkage(session);
+    init();
+}
 
+EndToEndCompileRequest::EndToEndCompileRequest(
+    Linkage* linkage)
+    : m_session(linkage->getSessionImpl())
+    , m_linkage(linkage)
+    , m_sink(nullptr)
+{
+    init();
+}
+
+void EndToEndCompileRequest::init()
+{
     m_sink.sourceManager = m_linkage->getSourceManager();
 
     // Set all the default writers
@@ -919,7 +1186,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
                 entryPointReq->getName(),
                 entryPointReq->getProfile());
 
-            specializedProgram->addEntryPoint(entryPoint);
+            specializedProgram->addEntryPoint(entryPoint, getSink());
         }
     }
 
@@ -1353,6 +1620,12 @@ Module::Module(Linkage* linkage)
     : m_linkage(linkage)
 {}
 
+ISlangUnknown* Module::getInterface(const Guid& guid)
+{
+    if(guid == IID_ISlangUnknown || guid == IID_IModule)
+        return asExternal(this);
+    return nullptr;
+}
 
 void Module::addModuleDependency(Module* module)
 {
@@ -1367,9 +1640,68 @@ void Module::addFilePathDependency(String const& path)
 
 // Program
 
+static const Guid IID_IProgram = SLANG_UUID_IProgram;
+
 Program::Program(Linkage* linkage)
     : m_linkage(linkage)
 {}
+
+ISlangUnknown* Program::getInterface(Guid const& guid)
+{
+    if(guid == IID_ISlangUnknown
+        || guid == IID_IProgram)
+    {
+        return static_cast<slang::IProgram*>(this);
+    }
+
+    return nullptr;
+}
+
+SLANG_NO_THROW slang::ISession* SLANG_MCALL Program::getSession()
+{
+    return m_linkage;
+}
+
+SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL Program::getLayout(
+    Int             targetIndex,
+    slang::IBlob**  outDiagnostics)
+{
+    auto linkage = getLinkageImpl();
+    if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return nullptr;
+    auto target = linkage->targets[targetIndex];
+
+    DiagnosticSink sink(linkage->getSourceManager());
+    auto programLayout = getTargetProgram(target)->getOrCreateLayout(&sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    return asExternal(programLayout);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Program::getEntryPointCode(
+    SlangInt        entryPointIndex,
+    Int             targetIndex,
+    slang::IBlob**  outCode,
+    slang::IBlob**  outDiagnostics)
+{
+    auto linkage = getLinkageImpl();
+    if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager());
+    auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if(entryPointResult.format == ResultFormat::None )
+        return SLANG_FAIL;
+
+    *outCode = entryPointResult.getBlob().detach();
+    return SLANG_OK;
+}
+
 
 void Program::addReferencedModule(Module* module)
 {
@@ -1383,13 +1715,27 @@ void Program::addReferencedLeafModule(Module* module)
     m_filePathDependencyList.addDependency(module);
 }
 
-void Program::addEntryPoint(EntryPoint* entryPoint)
+void Program::addEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
-    m_entryPoints.add(entryPoint);
+    List<RefPtr<EntryPoint>> entryPoints;
+    entryPoints.add(entryPoint);
 
-    for(auto module : entryPoint->getModuleDependencies())
+    RefPtr<EntryPointGroup> entryPointGroup = EntryPointGroup::create(getLinkageImpl(), entryPoints, sink);
+
+    addEntryPointGroup(entryPointGroup);
+}
+
+void Program::addEntryPointGroup(EntryPointGroup* entryPointGroup)
+{
+    m_entryPointGroups.add(entryPointGroup);
+
+    for(auto entryPoint : entryPointGroup->getEntryPoints())
     {
-        addReferencedModule(module);
+        m_entryPoints.add(entryPoint);
+        for(auto module : entryPoint->getModuleDependencies())
+        {
+            addReferencedModule(module);
+        }
     }
 }
 
@@ -1398,7 +1744,7 @@ RefPtr<IRModule> Program::getOrCreateIRModule(DiagnosticSink* sink)
     if(!m_irModule)
     {
         m_irModule = generateIRForProgram(
-            m_linkage->getSession(),
+            m_linkage->getSessionImpl(),
             this,
             sink);
     }
@@ -1466,7 +1812,7 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
 
 Session* CompileRequestBase::getSession()
 {
-    return getLinkage()->getSession();
+    return getLinkage()->getSessionImpl();
 }
 
 static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
@@ -1512,12 +1858,13 @@ void Session::addBuiltinSource(
     String const&           path,
     String const&           source)
 {
-    DiagnosticSink sink;
+    SourceManager* sourceManager = getBuiltinSourceManager();
+
+    DiagnosticSink sink(sourceManager);
     RefPtr<FrontEndCompileRequest> compileRequest = new FrontEndCompileRequest(
         m_builtinLinkage,
         &sink);
 
-    SourceManager* sourceManager = getBuiltinSourceManager();
 
     // Set the source manager on the sink
     sink.sourceManager = sourceManager;
@@ -1611,18 +1958,22 @@ static SlangCompileRequest* convert(Slang::EndToEndCompileRequest* request)
 static Slang::EndToEndCompileRequest* convert(SlangCompileRequest* request)
 { return reinterpret_cast<Slang::EndToEndCompileRequest*>(request); }
 
-static SlangLinkage* convert(Slang::Linkage* linkage)
-{ return reinterpret_cast<SlangLinkage*>(linkage); }
-
-static Slang::Linkage* convert(SlangLinkage* linkage)
-{ return reinterpret_cast<Slang::Linkage*>(linkage); }
-
-static SlangModule* convert(Slang::Module* module)
-{ return reinterpret_cast<SlangModule*>(module); }
-
 SLANG_API SlangSession* spCreateSession(const char*)
 {
     return convert(new Slang::Session());
+}
+
+SLANG_API SlangResult slang_createGlobalSession(
+    SlangInt                apiVersion,
+    slang::IGlobalSession** outGlobalSession)
+{
+    if(apiVersion != 0)
+        return SLANG_E_NOT_IMPLEMENTED;
+
+    Slang::Session* globalSession = new Slang::Session();
+    Slang::ComPtr<slang::IGlobalSession> result(Slang::asExternal(globalSession));
+    *outGlobalSession = result.detach();
+    return SLANG_OK;
 }
 
 SLANG_API void spDestroySession(
@@ -1697,35 +2048,6 @@ SLANG_API SlangResult spSessionCheckPassThroughSupport(
     auto s = convert(session);
     return Slang::checkExternalCompilerSupport(s, Slang::PassThroughMode(passThrough));
 }
-
-
-SLANG_API SlangLinkage* spCreateLinkage(
-    SlangSession* session)
-{
-    auto s = convert(session);
-    auto linkage = new Slang::Linkage(s);
-    return convert(linkage);
-}
-
-SLANG_API void spDestroyLinkage(
-    SlangLinkage* linkage)
-{
-    if(!linkage) return;
-    auto lnk = convert(linkage);
-    delete lnk;
-}
-
-SLANG_API SlangModule* spLoadModule(
-    SlangLinkage* linkage,
-    char const* moduleName)
-{
-    if(!linkage) return nullptr;
-    auto lnk = convert(linkage);
-
-    auto mod = lnk->loadModule(moduleName);
-    return convert(mod);
-}
-
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
@@ -1839,7 +2161,7 @@ SLANG_API void spSetMatrixLayoutMode(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->defaultMatrixLayoutMode = Slang::MatrixLayoutMode(mode);
+    linkage->setMatrixLayoutMode(mode);
 }
 
 SLANG_API void spSetTargetMatrixLayoutMode(
@@ -1932,7 +2254,7 @@ SLANG_API void spAddSearchPath(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->searchDirectories.searchDirectories.add(Slang::SearchDirectory(path));
+    linkage->addSearchPath(path);
 }
 
 SLANG_API void spAddPreprocessorDefine(
@@ -1942,7 +2264,7 @@ SLANG_API void spAddPreprocessorDefine(
 {
     auto req = convert(request);
     auto linkage = req->getLinkage();
-    linkage->preprocessorDefinitions[key] = value;
+    linkage->addPreprocessorDefine(key, value);
 }
 
 SLANG_API char const* spGetDiagnosticOutput(
@@ -2390,6 +2712,18 @@ SLANG_API void const* spGetCompileRequestCode(
 }
 
 // Reflection API
+
+SLANG_API SlangResult spCompileRequest_getProgram(
+    SlangCompileRequest*    request,
+    slang::IProgram**         outProgram)
+{
+    if( !request ) return SLANG_ERROR_INVALID_PARAMETER;
+    auto req = convert(request);
+    auto program = req->getSpecializedProgram();
+
+    *outProgram = Slang::ComPtr<slang::IProgram>(program).detach();
+    return SLANG_OK;
+}
 
 SLANG_API SlangReflection* spGetReflection(
     SlangCompileRequest*    request)
