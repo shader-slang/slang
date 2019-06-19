@@ -1094,7 +1094,7 @@ static String _calcSummary(const CPPCompiler::Output& inOutput)
 
     StringBuilder builder;
 
-    output.appendHasSummary(builder);
+    output.appendSimplifiedSummary(builder);
     return builder;
 }
 

@@ -13,7 +13,7 @@ class CPPCompiler: public RefObject
 {
 public:
     typedef RefObject Super;
-    enum class Type
+    enum class CompilerType
     {
         Unknown,
         VisualStudio,
@@ -41,9 +41,9 @@ public:
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
             /// Ctor
-        Desc(Type inType = Type::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+        Desc(CompilerType inType = CompilerType::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
-        Type type;                      ///< The type of the compiler
+        CompilerType type;                      ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
         Int minorVersion;               ///< Minor version
     };
@@ -123,6 +123,8 @@ public:
             stage = Stage::Compile;
             fileLine = 0;
         }
+        static UnownedStringSlice getTypeText(OutputMessage::Type type);
+
 
         Type type;                      ///< The type of error
         Stage stage;                    ///< The stage the error came from
@@ -134,115 +136,24 @@ public:
 
     struct Output
     {
+            /// Reset to an initial empty state
         void reset() { messages.clear(); result = SLANG_OK; }
         
             /// Get the number of messages by type
-        Index getCountByType(OutputMessage::Type type) const
-        {
-            Index count = 0;
-            for (const auto& msg : messages)
-            {
-                count += Index(msg.type == type);
-            }
-            return count;
-        }
+        Index getCountByType(OutputMessage::Type type) const;
             /// True if there are any messages of the type
         bool has(OutputMessage::Type type) const { return getCountByType(type) > 0; }
 
-        Int countByStage(OutputMessage::Stage stage, Index counts[Int(OutputMessage::Type::CountOf)]) const
-        {
-            Int count = 0;
-            ::memset(counts, 0, sizeof(Index) * Int(OutputMessage::Type::CountOf));
-            for (const auto& msg : messages)
-            {
-                if (msg.stage == stage)
-                {
-                    count++;
-                    counts[Index(msg.type)]++;
-                }
-            }
-            return count++;
-        }
+            /// Stores in outCounts, the amount of messages for the stage of each type
+        Int countByStage(OutputMessage::Stage stage, Index outCounts[Int(OutputMessage::Type::CountOf)]) const;
 
-        static UnownedStringSlice getTypeText(OutputMessage::Type type)
-        {
-            typedef OutputMessage::Type Type;
-            switch (type)
-            {
-                default:            return UnownedStringSlice::fromLiteral("Unknown");
-                case Type::Info:    return UnownedStringSlice::fromLiteral("Info");
-                case Type::Warning: return UnownedStringSlice::fromLiteral("Warning");
-                case Type::Error:   return UnownedStringSlice::fromLiteral("Error");
-            }
-        }
-
-        static void appendCounts(const Index counts[Int(OutputMessage::Type::CountOf)], StringBuilder& out)
-        {
-            for (Index i = 0; i < Int(OutputMessage::Type::CountOf); i++)
-            {
-                if (counts[i] > 0)
-                {
-                    out << getTypeText(OutputMessage::Type(i)) << "(" << counts[i] << ") ";
-                }
-            }
-        }
-        static void appendHas(const Index counts[Int(OutputMessage::Type::CountOf)], StringBuilder& out)
-        {
-            for (Index i = 0; i < Int(OutputMessage::Type::CountOf); i++)
-            {
-                if (counts[i] > 0)
-                {
-                    out << getTypeText(OutputMessage::Type(i)) << " ";
-                }
-            }
-        }
-        void appendSummary(StringBuilder& out) const
-        {
-            Index counts[Int(OutputMessage::Type::CountOf)];
-            if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
-            {
-                out << "Compile: ";
-                appendCounts(counts, out);
-                out << "\n";
-            }
-            if (countByStage(OutputMessage::Stage::Link, counts) > 0)
-            {
-                out << "Link: ";
-                appendCounts(counts, out);
-                out << "\n";
-            }
-        }
+            /// Append a summary to out
+        void appendSummary(StringBuilder& out) const;
             /// Appends a summary that just identifies if there is an error of a type (not a count)
-        void appendHasSummary(StringBuilder& out) const
-        {
-            Index counts[Int(OutputMessage::Type::CountOf)];
-            if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
-            {
-                out << "Compile: ";
-                appendHas(counts, out);
-                out << "\n";
-            }
-            if (countByStage(OutputMessage::Stage::Link, counts) > 0)
-            {
-                out << "Link: ";
-                appendHas(counts, out);
-                out << "\n";
-            }
-        }
-
-        void removeByType(OutputMessage::Type type)
-        {
-            Index count = messages.getCount();
-            for (Index i = 0; i < count; ++i)
-            {
-                if (messages[i].type == type)
-                {
-                    messages.removeAt(i);
-                    i--;
-                    count--;
-                }
-            }
-        }
+        void appendSimplifiedSummary(StringBuilder& out) const;
+        
+            /// Remove all messages of the type
+        void removeByType(OutputMessage::Type type);
 
         SlangResult result;
         List<OutputMessage> messages;

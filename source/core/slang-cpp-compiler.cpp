@@ -19,6 +19,121 @@
 namespace Slang
 {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */UnownedStringSlice CPPCompiler::OutputMessage::getTypeText(OutputMessage::Type type)
+{
+    typedef OutputMessage::Type Type;
+    switch (type)
+    {
+        default:            return UnownedStringSlice::fromLiteral("Unknown");
+        case Type::Info:    return UnownedStringSlice::fromLiteral("Info");
+        case Type::Warning: return UnownedStringSlice::fromLiteral("Warning");
+        case Type::Error:   return UnownedStringSlice::fromLiteral("Error");
+    }
+}
+
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
+
+Index CPPCompiler::Output::getCountByType(OutputMessage::Type type) const
+{
+    Index count = 0;
+    for (const auto& msg : messages)
+    {
+        count += Index(msg.type == type);
+    }
+    return count;
+}
+
+Int CPPCompiler::Output::countByStage(OutputMessage::Stage stage, Index counts[Int(OutputMessage::Type::CountOf)]) const
+{
+    Int count = 0;
+    ::memset(counts, 0, sizeof(Index) * Int(OutputMessage::Type::CountOf));
+    for (const auto& msg : messages)
+    {
+        if (msg.stage == stage)
+        {
+            count++;
+            counts[Index(msg.type)]++;
+        }
+    }
+    return count++;
+}
+
+static void _appendCounts(const Index counts[Int(CPPCompiler::OutputMessage::Type::CountOf)], StringBuilder& out)
+{
+    typedef CPPCompiler::OutputMessage::Type Type;
+
+    for (Index i = 0; i < Int(Type::CountOf); i++)
+    {
+        if (counts[i] > 0)
+        {
+            out << CPPCompiler::OutputMessage::getTypeText(Type(i)) << "(" << counts[i] << ") ";
+        }
+    }
+}
+
+static void _appendSimplified(const Index counts[Int(CPPCompiler::OutputMessage::Type::CountOf)], StringBuilder& out)
+{
+    typedef CPPCompiler::OutputMessage::Type Type;
+    for (Index i = 0; i < Int(Type::CountOf); i++)
+    {
+        if (counts[i] > 0)
+        {
+            out << CPPCompiler::OutputMessage::getTypeText(Type(i)) << " ";
+        }
+    }
+}
+
+void CPPCompiler::Output::appendSummary(StringBuilder& out) const
+{
+    Index counts[Int(OutputMessage::Type::CountOf)];
+    if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
+    {
+        out << "Compile: ";
+        _appendCounts(counts, out);
+        out << "\n";
+    }
+    if (countByStage(OutputMessage::Stage::Link, counts) > 0)
+    {
+        out << "Link: ";
+        _appendCounts(counts, out);
+        out << "\n";
+    }
+}
+
+void CPPCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
+{
+    Index counts[Int(OutputMessage::Type::CountOf)];
+    if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
+    {
+        out << "Compile: ";
+        _appendSimplified(counts, out);
+        out << "\n";
+    }
+    if (countByStage(OutputMessage::Stage::Link, counts) > 0)
+    {
+        out << "Link: ";
+        _appendSimplified(counts, out);
+        out << "\n";
+    }
+}
+
+void CPPCompiler::Output::removeByType(OutputMessage::Type type)
+{
+    Index count = messages.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        if (messages[i].type == type)
+        {
+            messages.removeAt(i);
+            i--;
+            count--;
+        }
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericCPPCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
 SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& outOutput)
@@ -63,19 +178,19 @@ static CPPCompiler::Desc _calcCompiledWithDesc()
 #if SLANG_VC
     desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
 #elif SLANG_CLANG
-    desc.type = CPPCompiler::Type::Clang;
+    desc.type = CPPCompiler::CompilerType::Clang;
     desc.majorVersion = Int(__clang_major__);
     desc.minorVersion = Int(__clang_minor__);
 #elif SLANG_SNC
-    desc.type = CPPCompiler::Type::SNC;
+    desc.type = CPPCompiler::CompilerType::SNC;
 #elif SLANG_GHS
-    desc.type = CPPCompiler::Type::GHS;
+    desc.type = CPPCompiler::CompilerType::GHS;
 #elif SLANG_GCC
-    desc.type = CPPCompiler::Type::GCC;
+    desc.type = CPPCompiler::CompilerType::GCC;
     desc.majorVersion = Int(__GNUC__);
     desc.minorVersion = Int(__GNUC_MINOR__);
 #else
-    desc.type = CPPCompiler::Type::Unknown;
+    desc.type = CPPCompiler::CompilerType::Unknown;
 #endif
 
     return desc;
@@ -98,7 +213,7 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
 {
     Int bestIndex = -1;
 
-    const CPPCompiler::Type type = desc.type;
+    const CPPCompiler::CompilerType type = desc.type;
 
     Int maxVersionValue = 0;
     Int minVersionDiff = 0x7fffffff;
@@ -168,10 +283,10 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     }
 
     // If we are gcc, we can try clang and vice versa
-    if (desc.type == CPPCompiler::Type::GCC || desc.type == CPPCompiler::Type::Clang)
+    if (desc.type == CPPCompiler::CompilerType::GCC || desc.type == CPPCompiler::CompilerType::Clang)
     {
         CPPCompiler::Desc compatible = desc;
-        compatible.type = (compatible.type == CPPCompiler::Type::Clang) ? CPPCompiler::Type::GCC : CPPCompiler::Type::Clang;
+        compatible.type = (compatible.type == CPPCompiler::CompilerType::Clang) ? CPPCompiler::CompilerType::GCC : CPPCompiler::CompilerType::Clang;
 
         compiler = findCompiler(compilers, MatchType::MinGreaterEqual, compatible);
         if (compiler)

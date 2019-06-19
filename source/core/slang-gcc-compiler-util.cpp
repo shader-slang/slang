@@ -70,11 +70,11 @@ SlangResult GCCCompilerUtil::calcVersion(const String& exeName, CPPCompiler::Des
         UnownedStringSlice::fromLiteral("gcc version"),
         UnownedStringSlice::fromLiteral("Apple LLVM version"),
     };
-    const CPPCompiler::Type types[] =
+    const CPPCompiler::CompilerType types[] =
     {
-        CPPCompiler::Type::Clang,
-        CPPCompiler::Type::GCC,
-        CPPCompiler::Type::Clang,
+        CPPCompiler::CompilerType::Clang,
+        CPPCompiler::CompilerType::GCC,
+        CPPCompiler::CompilerType::Clang,
     };
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));

@@ -51,14 +51,11 @@ struct WinVisualStudioUtil
         /// Convert a version number into a string
     static void append(Version version, StringBuilder& outBuilder);
 
-        /// Calculate the command line args
-    static void calcArgs(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
-
         /// Get version as desc
     static CPPCompiler::Desc getDesc(Version version)
     {
         CPPCompiler::Desc desc;
-        desc.type = CPPCompiler::Type::VisualStudio;
+        desc.type = CPPCompiler::CompilerType::VisualStudio;
         desc.majorVersion = Int(version) / 10;
         desc.minorVersion = Int(version) % 10;
         return desc;
