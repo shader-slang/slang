@@ -49,6 +49,9 @@ cbuffer C
    IRandomNumberGenerationStrategy gStrategy;
 }
 
+//TEST_INPUT: globalExistentialType MyStrategy
+//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):dxbinding(1),glbinding(1)
+
 struct Stuff
 {
     IModifier modifier;
@@ -107,21 +110,5 @@ struct MyModifier : IModifier
     }
 }
 
-//TEST_INPUT: globalExistentialType MyStrategy
 //TEST_INPUT: entryPointExistentialType MyModifier
-
-// The concrete types we plug in for `gStrategy` and `modifier`
-// have buffer resources in them, so we need to assign them
-// data. The registers/bindings for these parameters will
-// always come after all other shader parameters, and their
-// relative order will match the relative order of their
-// declarations in the global order that Slang uses for
-// assigning bindings (all globals before all entry point parameters).
-//
-// Here's the data for `gStrategy`:
-//
-//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):dxbinding(1),glbinding(1)
-//
-// Here's the data for `stuff.modifier`:
-//
 //TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):dxbinding(2),glbinding(3)

@@ -1709,8 +1709,7 @@ namespace Slang
         TokenSpan tokenSpan;
         tokenSpan.mBegin = parser->tokenReader.mCursor;
         tokenSpan.mEnd = parser->tokenReader.mEnd;
-        DiagnosticSink newSink;
-        newSink.sourceManager = parser->sink->sourceManager;
+        DiagnosticSink newSink(parser->sink->sourceManager);
         Parser newParser(*parser);
         newParser.sink = &newSink;
         auto speculateParseRs = parseGenericApp(&newParser, base);
@@ -4044,7 +4043,7 @@ namespace Slang
                         suffixType = parser->getSession()->getErrorType();
                     }
                     // `f` suffix -> `float`
-                    if(fCount == 1 && !lCount)
+                    if(fCount == 1 && !lCount && !hCount)
                     {
                         suffixType = parser->getSession()->getFloatType();
                     }
@@ -4054,7 +4053,7 @@ namespace Slang
                         suffixType = parser->getSession()->getDoubleType();
                     }
                     // `h` or `hf` suffix on floating-point literal -> `half`
-                    else if(lCount == 1 && (fCount <= 1))
+                    else if(hCount == 1 && (fCount <= 1))
                     {
                         suffixType = parser->getSession()->getHalfType();
                     }

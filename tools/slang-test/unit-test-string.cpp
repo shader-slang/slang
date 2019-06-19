@@ -26,16 +26,21 @@ static bool _areEqual(const List<UnownedStringSlice>& lines, const UnownedString
 static bool _checkLines(const UnownedStringSlice& input, const UnownedStringSlice* checkLines, Int checkLinesCount)
 {
     List<UnownedStringSlice> lines;
-    UnownedStringSlice text(input);
-    while (true)
+    StringUtil::calcLines(input, lines);
+    return _areEqual(lines, checkLines, checkLinesCount);
+}
+
+static bool _checkLineParser(const UnownedStringSlice& input)
+{
+    UnownedStringSlice remaining(input), line;
+    for (const auto parserLine : LineParser(input))
     {
-        UnownedStringSlice line = StringUtil::extractLine(text);
-        if (line.begin() == nullptr)
+        if (!StringUtil::extractLine(remaining, line) || line != parserLine)
         {
-            return _areEqual(lines, checkLines, checkLinesCount);
+            return false;
         }
-        lines.add(line);
     }
+    return StringUtil::extractLine(remaining, line) == false;
 }
 
 static void stringUnitTest()
@@ -63,24 +68,10 @@ static void stringUnitTest()
     }
 
     {
-        auto text = UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n");
-
-        UnownedStringSlice remaining(text);
-        for (const auto line : LineParser(text))
-        {
-            UnownedStringSlice extractLine = StringUtil::extractLine(remaining);
-
-            SLANG_CHECK(line == extractLine);
-
-            // Handle hitting the end
-            if (line.begin() == nullptr || extractLine.begin() == nullptr)
-            {
-                SLANG_CHECK(line.begin() == extractLine.begin());
-                break;
-            }
-        }
+        SLANG_CHECK(_checkLineParser(UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n")));
+        SLANG_CHECK(_checkLineParser(UnownedStringSlice::fromLiteral("\n")));
+        SLANG_CHECK(_checkLineParser(UnownedStringSlice::fromLiteral("")));
     }
-
 }
 
 SLANG_UNIT_TEST("String", stringUnitTest);

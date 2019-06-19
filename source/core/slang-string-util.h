@@ -78,15 +78,16 @@ struct StringUtil
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 
-        /// Returns a line extracted from the start of ioText.
+        /// Extracts a line and stores the remaining text in ioText, and the line in outLine. Returns true if has a line. 
         /// 
-        /// At the end of all the text a 'special' null UnownedStringSlice with a null 'begin' pointer is returned.
-        /// The slice passed in will be modified on output to contain the remaining text, starting at the beginning of the next line.
-        /// As en empty final line is still a line, the special null UnownedStringSlice is the last value ioText after the last valid line is returned.
+        /// As well as indicating end of text with the return value, at the end of all the text a 'special' null UnownedStringSlice with a null 'begin'
+        /// pointer is also returned as the outLine.
+        /// ioText will be modified to contain the remaining text, starting at the beginning of the next line.
+        /// As an empty final line is still a line, the special null UnownedStringSlice is the last value ioText after the last valid line is returned.
         /// 
         /// NOTE! That behavior is as if line terminators (like \n) act as separators. Thus input of "\n" will return *two* lines - an empty line
         /// before and then after the \n. 
-    static UnownedStringSlice extractLine(UnownedStringSlice& ioText);
+    static bool extractLine(UnownedStringSlice& ioText, UnownedStringSlice& outLine);
     
         /// Given text, splits into lines stored in outLines. NOTE! That lines is only valid as long as textIn remains valid
     static void calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& lines);
@@ -105,14 +106,13 @@ public:
         const UnownedStringSlice* operator->() const { return &m_line; }
         Iterator& operator++()
         {
-            SLANG_ASSERT(m_remaining.begin());
-            m_line = StringUtil::extractLine(m_remaining);
+            StringUtil::extractLine(m_remaining, m_line);
             return *this;
         }
         Iterator operator++(int) { Iterator rs = *this; operator++(); return rs; }
 
-            /// Equal if remaining pointers are equal. Handles termination case correctly.
-        bool operator==(const Iterator& rhs) const { return m_remaining.begin() == rhs.m_remaining.begin() && m_remaining.end() == rhs.m_remaining.end();  }
+            /// Equal if both are at the same m_line address exactly. Handles termination case correctly where line.begin() == nullptr.
+        bool operator==(const Iterator& rhs) const { return m_line.begin() == rhs.m_line.begin();  }
         bool operator !=(const Iterator& rhs) const { return !(*this == rhs); }
 
             /// Ctor
@@ -123,7 +123,7 @@ public:
         UnownedStringSlice m_remaining;
     };
 
-    Iterator begin() const { UnownedStringSlice remaining(m_text);  UnownedStringSlice line = StringUtil::extractLine(remaining); return Iterator(line, remaining);  }
+    Iterator begin() const { UnownedStringSlice remaining(m_text), line;  StringUtil::extractLine(remaining, line); return Iterator(line, remaining);  }
     Iterator end() const { UnownedStringSlice term(nullptr, nullptr); return Iterator(term, term); }
 
         /// Ctor

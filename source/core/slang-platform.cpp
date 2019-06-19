@@ -19,30 +19,38 @@ namespace Slang
 {
 	// SharedLibrary
 
-/* static */SlangResult SharedLibrary::load(const char* filename, SharedLibrary::Handle& handleOut)
+/* static */SlangResult SharedLibrary::load(const char* path, SharedLibrary::Handle& handleOut)
 {
     StringBuilder builder;
-    appendPlatformFileName(UnownedStringSlice(filename), builder);
-    return loadWithPlatformFilename(builder.begin(), handleOut);
+    calcPlatformPath(UnownedStringSlice(path), builder);
+    return loadWithPlatformPath(builder.begin(), handleOut);
 }
 
-/* static */String SharedLibrary::calcPlatformPath(const UnownedStringSlice& path)
+/* static */void SharedLibrary::calcPlatformPath(const UnownedStringSlice& path, StringBuilder& outPath)
 {
     // Work out the shared library name
     String parent = Path::getParentDirectory(path);
     String filename = Path::getFileName(path);
-    
-    StringBuilder builder;
-    SharedLibrary::appendPlatformFileName(filename.getUnownedSlice(), builder);
 
     if (parent.getLength() > 0)
     {
-        return Path::combine(parent, builder);
+        // Work out the filename platform name (as in add .dll say on windows)
+        StringBuilder platformFileNameBuilder;
+        SharedLibrary::appendPlatformFileName(filename.getUnownedSlice(), platformFileNameBuilder);
+
+        Path::combineBuilder(parent.getUnownedSlice(), platformFileNameBuilder.getUnownedSlice(), outPath);
     }
     else
-    {
-        return builder;
+    {     
+        appendPlatformFileName(filename.getUnownedSlice(), outPath);
     }
+}
+
+/* static */String SharedLibrary::calcPlatformPath(const UnownedStringSlice& path)
+{
+    StringBuilder builder;
+    calcPlatformPath(path, builder);
+    return builder.ToString();
 }
 
 #ifdef _WIN32
@@ -80,7 +88,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return SLANG_FAIL;
 }
 
-/* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, SharedLibrary::Handle& handleOut)
+/* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, SharedLibrary::Handle& handleOut)
 {
     handleOut = nullptr;
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
@@ -136,7 +144,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-/* static */SlangResult SharedLibrary::loadWithPlatformFilename(char const* platformFileName, Handle& handleOut)
+/* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, Handle& handleOut)
 {
     handleOut = nullptr;
 

@@ -199,7 +199,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
-/* static */UnownedStringSlice StringUtil::extractLine(UnownedStringSlice& ioText)
+/* static */bool StringUtil::extractLine(UnownedStringSlice& ioText, UnownedStringSlice& outLine)
 {
     char const*const begin = ioText.begin();
     char const*const end = ioText.end();
@@ -207,7 +207,8 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     // If we have hit the end then return the 'special' terminator
     if (begin == nullptr)
     {
-        return UnownedStringSlice(nullptr, nullptr);
+        outLine = UnownedStringSlice(nullptr, nullptr);
+        return false;
     }
 
     char const* cursor = begin;
@@ -234,7 +235,8 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
                 }
 
                 ioText = UnownedStringSlice(cursor, end);
-                return UnownedStringSlice(begin, lineEnd);
+                outLine = UnownedStringSlice(begin, lineEnd);
+                return true;
             }
             default:
                 break;
@@ -247,43 +249,38 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     // Could be empty, or the remaining line (without line end terminators of)
     SLANG_ASSERT(begin <= cursor);
 
-    return UnownedStringSlice(begin, cursor);
+    outLine = UnownedStringSlice(begin, cursor);
+    return true;
 }
 
 /* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
 {
     outLines.clear();
-
-    UnownedStringSlice text(textIn);
-    while (true)
+    UnownedStringSlice text(textIn), line;
+    while (extractLine(text, line))
     {
-        UnownedStringSlice line = extractLine(text);
-        if (line.begin() == nullptr)
-        {
-            return;
-        }
         outLines.add(line);
     }
 }
 
 /* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& inA, const UnownedStringSlice& inB)
 {
-    UnownedStringSlice a(inA);
-    UnownedStringSlice b(inB);
-
+    UnownedStringSlice a(inA), b(inB), lineA, lineB;
+    
     while (true)
     {
-        const UnownedStringSlice lineA = extractLine(a);
-        const UnownedStringSlice lineB = extractLine(b);
+        const auto hasLineA = extractLine(a, lineA);
+        const auto hasLineB = extractLine(b, lineB);
+
+        if (!(hasLineA && hasLineB))
+        {
+            return hasLineA == hasLineB;
+        }
+
+        // The lines must be equal
         if (lineA != lineB)
         {
             return false;
-        }
-
-        // If either has ended, they both must have ended
-        if (lineA.begin() == nullptr || lineB.begin() == nullptr)
-        {
-            return lineA.begin() == lineB.begin();
         }
     }
 }

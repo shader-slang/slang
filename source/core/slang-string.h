@@ -119,8 +119,25 @@ namespace Slang
 
         bool operator==(UnownedStringSlice const& other) const
         {
-            return size() == other.size()
-                && memcmp(begin(), other.begin(), size()) == 0;
+            // Note that memcmp is undefined when passed in null ptrs, so if we want to handle
+            // we need to cover that case.
+            // Can only be nullptr if size is 0.
+            auto thisSize = size();
+            auto otherSize = other.size();
+
+            if (thisSize != otherSize)
+            {
+                return false;
+            }
+
+            const char*const thisChars = begin();
+            const char*const otherChars = other.begin();
+            if (thisChars == otherChars || thisSize == 0)
+            {
+                return true;
+            }
+            SLANG_ASSERT(thisChars && otherChars);
+            return memcmp(thisChars, otherChars, thisSize) == 0;
         }
 
         bool operator==(char const* str) const

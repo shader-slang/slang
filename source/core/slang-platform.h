@@ -15,24 +15,27 @@ namespace Slang
         
         typedef void(*FuncPtr)(void);
 
-            /// Load via an unadorned filename.
+            /// Load via an unadorned path/filename.
             ///
-            /// The unadorned filename here means without any platform specific filename elements. This typically means no extension and no prefix.
+            /// The unadorned path here means without a path without any platform specific filename elements.
+            /// This typically means no extension and no prefix.
             /// On windows this means without the '.dll' extension.
             /// On linux this means without the 'lib' prefix and '.so' extension.
             /// To load with a platform specific filename use the 'loadWithPlatformFilename' API
+            /// Most platforms have a built in mechanism to search for shared libraries, such that
+            /// shared libraries are often just passed by filename.
             /// 
-            /// @param the unadorned filename
+            /// @param the unadorned filename/path
             /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
-        static SlangResult load(const char* filename, Handle& handleOut);
+        static SlangResult load(const char* path, Handle& handleOut);
 
 		    /// Attempt to load a shared library for
 		    /// the current platform. Returns null handle on failure
             /// The platform specific filename can be generated from a call to appendPlatformFileName
             ///
-            /// @param platformFileName the platform specific file name. 
+            /// @param platform the platform specific file name/ or path 
             /// @return Returns a non null handle for the shared library on success. nullptr indicated failure
-        static SlangResult loadWithPlatformFilename(char const* platformFileName, Handle& handleOut);
+        static SlangResult loadWithPlatformPath(char const* platformPath, Handle& handleOut);
 
             /// Unload the library that was returned from load as handle
             /// @param The valid handle returned from load 
@@ -49,6 +52,7 @@ namespace Slang
 
             /// Given a path, calculate that path with the filename replaced with the platform filename (using appendPlatformFilename)
         static String calcPlatformPath(const UnownedStringSlice& path);
+        static void calcPlatformPath(const UnownedStringSlice& path, StringBuilder& outBuilder);
 
         private:
             /// Not constructible!

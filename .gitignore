@@ -5,6 +5,8 @@
 *.VC.db
 *.vcxproj.user
 *.sdf
+*.ilk
+*.obj
 bin/
 intermediate/
 build.*/

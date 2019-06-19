@@ -211,16 +211,10 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     // cache an array of line break locations in the file.
     if (m_lineBreakOffsets.getCount() == 0)
     {
-        UnownedStringSlice content = getContent();
+        UnownedStringSlice content(getContent()), line;
         char const* contentBegin = content.begin();
-      
-        while (true)
+        while (StringUtil::extractLine(content, line))
         {
-            auto line = StringUtil::extractLine(content);
-            if (line.begin() == nullptr)
-            {
-                break;
-            }
             m_lineBreakOffsets.add(uint32_t(line.begin() - contentBegin));
         }
         // Note that we do *not* treat the end of the file as a line
