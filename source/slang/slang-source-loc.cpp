@@ -212,44 +212,17 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     if (m_lineBreakOffsets.getCount() == 0)
     {
         UnownedStringSlice content = getContent();
-
-        char const* begin = content.begin();
-        char const* end = content.end();
-
-        char const* cursor = begin;
-
-        // Treat the beginning of the file as a line break
-        m_lineBreakOffsets.add(0);
-
-        while (cursor != end)
+        char const* contentBegin = content.begin();
+      
+        while (true)
         {
-            int c = *cursor++;
-            switch (c)
+            auto line = StringUtil::extractLine(content);
+            if (line.begin() == nullptr)
             {
-                case '\r': case '\n':
-                {
-                    // When we see a line-break character we need
-                    // to record the line break, but we also need
-                    // to deal with the annoying issue of encodings,
-                    // where a multi-byte sequence might encode
-                    // the line break.
-
-                    // Check to make sure that the EOF hasn't been reached.
-                    if (cursor != end)
-                    {
-                        int d = *cursor;
-                        if ((c ^ d) == ('\r' ^ '\n'))
-                            cursor++;
-                    }
-
-                    m_lineBreakOffsets.add(uint32_t(cursor - begin));
-                    break;
-                }
-                default:
-                    break;
+                break;
             }
+            m_lineBreakOffsets.add(uint32_t(line.begin() - contentBegin));
         }
-
         // Note that we do *not* treat the end of the file as a line
         // break, because otherwise we would report errors like
         // "end of file inside string literal" with a line number

@@ -63,7 +63,7 @@ struct PathInfo
     const String getMostUniqueIdentity() const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
-    static PathInfo makeUnknown() { return PathInfo { Type::Unknown, "unknown", String() }; }
+    static PathInfo makeUnknown() { return PathInfo { Type::Unknown, String(), String() }; }
     static PathInfo makeTokenPaste() { return PathInfo{ Type::TokenPaste, "token paste", String()}; }
     static PathInfo makeNormal(const String& foundPathIn, const String& uniqueIdentity) { SLANG_ASSERT(uniqueIdentity.getLength() > 0 && foundPathIn.getLength() > 0); return PathInfo { Type::Normal, foundPathIn, uniqueIdentity }; }
     static PathInfo makePath(const String& pathIn) { SLANG_ASSERT(pathIn.getLength() > 0); return PathInfo { Type::FoundPath, pathIn, String()}; }
@@ -219,7 +219,7 @@ enum class SourceLocType
 // A source location in a format a human might like to see
 struct HumaneSourceLoc
 {
-    PathInfo pathInfo;
+    PathInfo pathInfo = PathInfo::makeUnknown();
     Int     line = 0;
     Int     column = 0;
 };
