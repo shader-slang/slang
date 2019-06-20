@@ -526,7 +526,7 @@ namespace Slang
 
 		~String()
 		{
-            m_buffer = 0;
+            m_buffer.setNull(); 
 		}
 
 		String & operator=(const String & str)
@@ -995,7 +995,7 @@ namespace Slang
 
 		void Clear()
 		{
-            m_buffer = 0;
+            m_buffer.setNull();
 		}
 	};
 
