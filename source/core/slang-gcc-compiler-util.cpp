@@ -137,17 +137,19 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompil
     List<UnownedStringSlice> split;
     StringUtil::split(line, ':', split);
 
-    if (split.getCount() == 3 && split[2] == "")
+    if (split.getCount() == 3)
     {
         if (split[2].trim().startsWith("ld returned"))
         {
             outMsg.stage = CPPCompiler::OutputMessage::Stage::Link;
-            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1], outMsg.type));
+            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outMsg.type));
             outMsg.text = line;
             return SLANG_OK;
         }
-
-        // This is probably a prelude line, we'll just ignore it
+        else if (split[2] == "")
+        {
+            // This is probably a prelude line, we'll just ignore it
+        }
         return SLANG_FAIL;
     }
 
