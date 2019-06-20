@@ -250,10 +250,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     // Assume it's a continuation
     outLineParseResult = LineParseResult::Continuation;
     return SLANG_OK;
-    
 }
 
-/* static */void GCCCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+/* static */SlangResult GCCCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
@@ -286,11 +285,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
                 break;
             }
             case LineParseResult::Ignore: break;
-            default:
-            {
-                return;
-                //return SLANG_FAIL;
-            }
+            default: return SLANG_FAIL;
         }
         
         // Remember last lines result
@@ -301,6 +296,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         outOutput.result = SLANG_FAIL;
     }
+
+    return SLANG_OK;
 }
 
 /* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)

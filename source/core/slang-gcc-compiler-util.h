@@ -25,7 +25,7 @@ struct GCCCompilerUtil
     static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Parse ExecuteResult into Output
-    static void parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+    static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
 };
 
 }

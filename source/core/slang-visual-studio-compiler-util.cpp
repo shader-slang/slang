@@ -270,7 +270,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
     return SLANG_OK;
 }
 
-/* static */void VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
     outOutput.reset();
 
@@ -293,6 +293,8 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
     {
         outOutput.result = SLANG_FAIL;
     }
+
+    return SLANG_OK;
 }
 
 }

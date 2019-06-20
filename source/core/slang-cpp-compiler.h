@@ -179,7 +179,7 @@ public:
     typedef CPPCompiler Super;
 
     typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
-    typedef void(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
+    typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
 
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
 

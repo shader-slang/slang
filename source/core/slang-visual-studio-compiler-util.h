@@ -18,7 +18,7 @@ struct VisualStudioCompilerUtil
         /// Calculate Visual Studio family compilers cmdLine arguments from options
     static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);
         /// Parse Visual Studio exeRes into CPPCompiler::Output
-    static void parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+    static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
 };
 
 }

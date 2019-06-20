@@ -156,7 +156,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
     }
 #endif
 
-    SlangResult res = ProcessUtil::execute(cmdLine, exeRes);
+    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
 
 #if 0
     {
@@ -164,9 +164,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
     }
 #endif
 
-    m_parseOutputFunc(exeRes, outOutput);
-
-    return res;
+    return m_parseOutputFunc(exeRes, outOutput);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
