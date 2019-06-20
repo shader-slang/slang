@@ -119,6 +119,7 @@ namespace { // anonymous
 
 enum class LineParseResult
 {
+    Single,             ///< It's a single line
     Start,              ///< Line was the start of a message
     Continuation,       ///< Not totally clear, add to previous line if nothing else hit
     Ignore,             ///< Ignore the line
@@ -156,7 +157,16 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
      _main in c-compile-link-error-a83ace.o
      ld: symbol(s) not found for architecture x86_64
      clang: error: linker command failed with exit code 1 (use -v to see invocation) */
-    
+
+     /* /tmp/c-compile-link-error-ccf151.o: In function `main':
+      c-compile-link-error.c:(.text+0x19): undefined reference to `thing'
+     clang: error: linker command failed with exit code 1 (use -v to see invocation)
+     */
+
+     /* /tmp/c-compile-link-error-301c8c.o: In function `main':
+        /home/travis/build/shader-slang/slang/tests/cpp-compiler/c-compile-link-error.c:10: undefined reference to `thing'
+        clang-7: error: linker command failed with exit code 1 (use -v to see invocation)*/
+
     outMsg.stage = OutputMessage::Stage::Compile;
 
     List<UnownedStringSlice> split;
@@ -180,34 +190,46 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     else if (split.getCount() == 3)
     {
         const auto split0 = split[0].trim();
-        const auto split2 = split[2].trim();
+        const auto split1 = split[1].trim();
+        const auto text = split[2].trim();
+
         // Check for special handling for clang
-        if (split0 == UnownedStringSlice::fromLiteral("clang"))
+        if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")))
         {
+            // Extract the type
             SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outMsg.type));
-            
-            auto text = split[2].trim();
+
             if (text.startsWith("linker command failed"))
             {
                 outMsg.stage = OutputMessage::Stage::Link;
             }
-            
+
             outMsg.text = text;
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
-        else if (split2.startsWith("ld returned"))
+        else if (split1.startsWith("(.text"))
+        {
+            // This is a little weak... but looks like it's a link error
+            outMsg.filePath = split[0];
+            outMsg.type = Type::Error;
+            outMsg.stage = OutputMessage::Stage::Link;
+            outMsg.text = text;
+            outLineParseResult = LineParseResult::Single;
+            return SLANG_OK;
+        }
+        else if (text.startsWith("ld returned"))
         {
             outMsg.stage = CPPCompiler::OutputMessage::Stage::Link;
             SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outMsg.type));
             outMsg.text = line;
-            outLineParseResult = LineParseResult::Start;
+            outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
         }
-        else if (split2 == "")
+        else if (text == "")
         {
             // This is probably a prelude line, we'll just ignore it
-            outLineParseResult =LineParseResult::Ignore;
+            outLineParseResult = LineParseResult::Ignore;
             return SLANG_OK;
         }
     }
@@ -272,6 +294,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
                 // It's start of a new message
                 outOutput.messages.add(msg);
                 prevLineResult = LineParseResult::Start;
+                break;
+            }
+            case LineParseResult::Single:
+            {
+                // It's a single message, without anything following
+                outOutput.messages.add(msg);
+                prevLineResult = LineParseResult::Ignore;
                 break;
             }
             case LineParseResult::Continuation:
