@@ -391,8 +391,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     if (options.targetType == TargetType::SharedLibrary)
     {
+#if !SLANG_APPLE_FAMILY
+        // On MacOS, this linker option is not supported. That's ok though in
+        // so far as on MacOS it does report any unfound symbols without the option.
+
         // Linker flag to report any undefined symbols as a link error
         cmdLine.addArg("-Wl,--no-undefined");
+#endif
     }
 
     // Files to compile
