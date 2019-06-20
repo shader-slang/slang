@@ -271,25 +271,31 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             {
                 // It's start of a new message
                 outOutput.messages.add(msg);
+                prevLineResult = LineParseResult::Start;
                 break;
             }
             case LineParseResult::Continuation:
             {
                 if (prevLineResult == LineParseResult::Start || prevLineResult == LineParseResult::Continuation)
                 {
-                    // We are now in a continuation, add to the last
-                    auto& text = outOutput.messages.getLast().text;
-                    text.append("\n");
-                    text.append(line);
+                    if (outOutput.messages.getCount() > 0)
+                    {
+                        // We are now in a continuation, add to the last
+                        auto& text = outOutput.messages.getLast().text;
+                        text.append("\n");
+                        text.append(line);
+                    }
+                    prevLineResult = LineParseResult::Continuation;
                 }
                 break;
             }
-            case LineParseResult::Ignore: break;
+            case LineParseResult::Ignore:
+            {
+                prevLineResult = lineRes;
+                break;
+            }
             default: return SLANG_FAIL;
         }
-        
-        // Remember last lines result
-        prevLineResult = lineRes;
     }
 
     if (outOutput.has(CPPCompiler::OutputMessage::Type::Error) || exeRes.resultCode != 0)

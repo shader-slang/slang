@@ -7,8 +7,8 @@ namespace Slang
 
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)
     {
-        printf("Unexpected: %s\n", message);
-
+        // Can be useful to uncomment during debug when problem is on CI
+        // printf("Unexpected: %s\n", message);
         throw InternalError(message);
     }
 
