@@ -1090,7 +1090,9 @@ static String _calcSummary(const CPPCompiler::Output& inOutput)
 {
     CPPCompiler::Output output(inOutput);
 
+    // We only want to analyse errors for now
     output.removeByType(CPPCompiler::OutputMessage::Type::Info);
+    output.removeByType(CPPCompiler::OutputMessage::Type::Warning);
 
     StringBuilder builder;
 

@@ -115,8 +115,27 @@ static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Ou
     return SLANG_OK;
 }
 
-static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompiler::OutputMessage& outMsg)
+namespace { // anonymous
+
+enum class LineParseResult
 {
+    Start,              ///< Line was the start of a message
+    Continuation,       ///< Not totally clear, add to previous line if nothing else hit
+    Ignore,             ///< Ignore the line
+};
+    
+} // anonymous
+    
+static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParseResult& outLineParseResult, CPPCompiler::OutputMessage& outMsg)
+{
+    typedef CPPCompiler::OutputMessage OutputMessage;
+    typedef OutputMessage::Type Type;
+    
+    // Set to default case
+    outLineParseResult = LineParseResult::Ignore;
+    
+    /* example error output from different scenarios */
+    
     /*
         tests/cpp-compiler/c-compile-error.c: In function ‘int main(int, char**)’:
         tests/cpp-compiler/c-compile-error.c:8:13: error: ‘b’ was not declared in this scope
@@ -130,30 +149,69 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompil
     /* /tmp/ccS0JCWe.o:c-compile-link-error.c:(.rdata$.refptr.thing[.refptr.thing]+0x0): undefined reference to `thing'
        collect2: error: ld returned 1 exit status*/
 
-    typedef CPPCompiler::OutputMessage OutputMessage;
-
+    /*
+     clang: warning: treating 'c' input as 'c++' when in C++ mode, this behavior is deprecated [-Wdeprecated]
+     Undefined symbols for architecture x86_64:
+     "_thing", referenced from:
+     _main in c-compile-link-error-a83ace.o
+     ld: symbol(s) not found for architecture x86_64
+     clang: error: linker command failed with exit code 1 (use -v to see invocation) */
+    
     outMsg.stage = OutputMessage::Stage::Compile;
 
     List<UnownedStringSlice> split;
     StringUtil::split(line, ':', split);
 
-    if (split.getCount() == 3)
+    if (split.getCount() == 2)
     {
-        if (split[2].trim().startsWith("ld returned"))
+        const auto split0 = split[0].trim();
+        if (split0 == UnownedStringSlice::fromLiteral("ld"))
+        {
+            // We'll ignore for now
+            outMsg.stage = OutputMessage::Stage::Link;
+            outMsg.type = Type::Info;
+            outMsg.text = split[1].trim();
+            outLineParseResult = LineParseResult::Start;
+            return SLANG_OK;
+        }
+        outLineParseResult = LineParseResult::Ignore;
+        return SLANG_OK;
+    }
+    else if (split.getCount() == 3)
+    {
+        const auto split0 = split[0].trim();
+        const auto split2 = split[2].trim();
+        // Check for special handling for clang
+        if (split0 == UnownedStringSlice::fromLiteral("clang"))
+        {
+            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outMsg.type));
+            
+            auto text = split[2].trim();
+            if (text.startsWith("linker command failed"))
+            {
+                outMsg.stage = OutputMessage::Stage::Link;
+            }
+            
+            outMsg.text = text;
+            outLineParseResult = LineParseResult::Start;
+            return SLANG_OK;
+        }
+        else if (split2.startsWith("ld returned"))
         {
             outMsg.stage = CPPCompiler::OutputMessage::Stage::Link;
             SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outMsg.type));
             outMsg.text = line;
+            outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
-        else if (split[2] == "")
+        else if (split2 == "")
         {
             // This is probably a prelude line, we'll just ignore it
+            outLineParseResult =LineParseResult::Ignore;
+            return SLANG_OK;
         }
-        return SLANG_FAIL;
     }
-
-    if (split.getCount() == 4)
+    else if (split.getCount() == 4)
     {
         // Probably a link error, give the source line
         String ext = Path::getFileExt(split[0]);
@@ -161,18 +219,22 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompil
         // Maybe a bit fragile -> but probably okay for now
         if (ext != "o" && ext != "obj")
         {
-            return SLANG_FAIL;
+            outLineParseResult = LineParseResult::Ignore;
+            return SLANG_OK;
         }
-
-        outMsg.filePath = split[1];
-        outMsg.fileLine = 0;
-        outMsg.type = OutputMessage::Type::Error;
-        outMsg.stage = OutputMessage::Stage::Link;
-        outMsg.text = split[3];
-        return SLANG_OK;
+        else
+        {
+            outMsg.filePath = split[1];
+            outMsg.fileLine = 0;
+            outMsg.type = OutputMessage::Type::Error;
+            outMsg.stage = OutputMessage::Stage::Link;
+            outMsg.text = split[3];
+            
+            outLineParseResult = LineParseResult::Start;
+            return SLANG_OK;
+        }
     }
-
-    if (split.getCount() == 5)
+    else if (split.getCount() == 5)
     {
         // Probably a regular error line
         SLANG_RETURN_ON_FAIL(_parseErrorType(split[3].trim(), outMsg.type));
@@ -181,32 +243,58 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, CPPCompil
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outMsg.fileLine));
         outMsg.text = split[4];
 
+        outLineParseResult = LineParseResult::Start;
         return SLANG_OK;
     }
-
-    return SLANG_FAIL;
+    
+    // Assume it's a continuation
+    outLineParseResult = LineParseResult::Continuation;
+    return SLANG_OK;
+    
 }
 
 /* static */void GCCCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
+    LineParseResult prevLineResult = LineParseResult::Ignore;
+    
     outOutput.reset();
 
     for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
     {
         CPPCompiler::OutputMessage msg;
-        if (SLANG_SUCCEEDED(_parseGCCFamilyLine(line, msg)))
+        LineParseResult lineRes;
+        
+        SLANG_RETURN_ON_FAIL(_parseGCCFamilyLine(line, lineRes, msg));
+        
+        switch (lineRes)
         {
-            outOutput.messages.add(msg);
-        }
-        else
-        {
-            if (outOutput.messages.getCount() > 0)
+            case LineParseResult::Start:
             {
-                auto& text = outOutput.messages.getLast().text;
-                text.append("\n");
-                text.append(line);
+                // It's start of a new message
+                outOutput.messages.add(msg);
+                break;
+            }
+            case LineParseResult::Continuation:
+            {
+                if (prevLineResult == LineParseResult::Start || prevLineResult == LineParseResult::Continuation)
+                {
+                    // We are now in a continuation, add to the last
+                    auto& text = outOutput.messages.getLast().text;
+                    text.append("\n");
+                    text.append(line);
+                }
+                break;
+            }
+            case LineParseResult::Ignore: break;
+            default:
+            {
+                return;
+                //return SLANG_FAIL;
             }
         }
+        
+        // Remember last lines result
+        prevLineResult = lineRes;
     }
 
     if (outOutput.has(CPPCompiler::OutputMessage::Type::Error) || exeRes.resultCode != 0)
