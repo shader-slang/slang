@@ -81,6 +81,28 @@ static void stringUnitTest()
         SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("13824"), value)) && value == 13824);
         SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-13824"), value)) && value == -13824);
     }
+
+    {
+        UnownedStringSlice values[] = { UnownedStringSlice("hello"), UnownedStringSlice("world"), UnownedStringSlice("!") };
+
+        StringBuilder builder;
+        builder.Clear();
+        StringUtil::join(values, 0, ',', builder);
+        SLANG_CHECK(builder == "");
+
+        builder.Clear();
+        StringUtil::join(values, 1, ',', builder);
+        SLANG_CHECK(builder == "hello");
+
+
+        builder.Clear();
+        StringUtil::join(values, 2, ',', builder);
+        SLANG_CHECK(builder == "hello,world");
+
+        builder.Clear();
+        StringUtil::join(values, 3, UnownedStringSlice("ab"), builder);
+        SLANG_CHECK(builder == "helloabworldab!");
+    }
 }
 
 SLANG_UNIT_TEST("String", stringUnitTest);

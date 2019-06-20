@@ -39,6 +39,45 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
     }
 }
 
+/* static */void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
+{
+    join(values, UnownedStringSlice(&separator, 1), out);
+}
+
+/* static */void StringUtil::join(const List<String>& values, const UnownedStringSlice& separator, StringBuilder& out)
+{
+    const Index count = values.getCount();
+    if (count <= 0)
+    {
+        return;
+    }
+    out.append(values[0]);
+    for (Index i = 1; i < count; i++)
+    {
+        out.append(separator);
+        out.append(values[i]);
+    }
+}
+
+/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, char separator, StringBuilder& out)
+{
+    join(values, valueCount, UnownedStringSlice(&separator, 1), out);
+}
+
+/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, const UnownedStringSlice& separator, StringBuilder& out)
+{
+    if (valueCount <= 0)
+    {
+        return;
+    }
+    out.append(values[0]);
+    for (Index i = 1; i < valueCount; i++)
+    {
+        out.append(separator);
+        out.append(values[i]);
+    }
+}
+
 /* static */int StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
 {
     const char* start = in.begin();

@@ -383,11 +383,16 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     }
 
     // Link options
-    if (0)
+    if (0) // && options.targetType != TargetType::Object)
     {
-        StringBuilder linkOptions;
-        linkOptions << "Wl,";
-        cmdLine.addArg(linkOptions);
+        //linkOptions << "-Wl,";
+        //cmdLine.addArg(linkOptions);
+    }
+
+    if (options.targetType == TargetType::SharedLibrary)
+    {
+        // Linker flag to report any undefined symbols as a link error
+        cmdLine.addArg("-Wl,--no-undefined");
     }
 
     // Files to compile

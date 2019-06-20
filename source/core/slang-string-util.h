@@ -41,6 +41,13 @@ struct StringUtil
         /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
     static void split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);
 
+        /// Append the joining of in items, separated by 'separator' onto out
+    static void join(const List<String>& in, char separator, StringBuilder& out);
+    static void join(const List<String>& in, const UnownedStringSlice& separator, StringBuilder& out);
+
+    static void join(const UnownedStringSlice* values, Index valueCount, char separator, StringBuilder& out);
+    static void join(const UnownedStringSlice* values, Index valueCount, const UnownedStringSlice& separator, StringBuilder& out);
+
         /// Equivalent to doing a split and then finding the index of 'find' on the array
         /// Returns -1 if not found
     static int indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find);
