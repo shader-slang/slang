@@ -7,6 +7,8 @@ namespace Slang
 
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)
     {
+        printf("Unexpected: %s\n", message);
+
         throw InternalError(message);
     }
 
