@@ -104,7 +104,7 @@ static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Ou
     {
         outType = Type::Warning;
     }
-    else if (in == "info")
+    else if (in == "info" || in == "note")
     {
         outType = Type::Info;
     }
