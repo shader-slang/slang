@@ -134,53 +134,52 @@ namespace Slang
 		else
 			return "";
 	}
-	String Path::combine(const String& path1, const String& path2)
-	{
-		if (path1.getLength() == 0) return path2;
-
-        StringBuilder sb;
-        combineBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
-        return sb.ProduceString();
-	}
-    /* static */void Path::combineBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
+	
+    /* static */void Path::append(StringBuilder& ioBuilder, const UnownedStringSlice& path)
     {
-        outBuilder.Clear();
-        // Make sure we have the space for the full result
-        outBuilder.EnsureCapacity(path1.size() + 2 + path2.size());
-
-        if (path1.size() == 0)
+        if (ioBuilder.getLength() == 0)
         {
-            outBuilder.append(path2);
+            ioBuilder.append(path);
             return;
         }
-
-        outBuilder.append(path1);
-
-        // If path1 doesn't end in a delimiter, add one
-        if (!isDelimiter(path1[path1.size() - 1]))
+        if (path.size() > 0)
         {
-            outBuilder.append(kPathDelimiter);
+            // If ioBuilder doesn't end in a delimiter, add one
+            if (!isDelimiter(ioBuilder[ioBuilder.getLength() - 1]))
+            {
+                ioBuilder.append(kPathDelimiter);
+            }
+            // Check that path doesn't start with a path delimiter 
+            SLANG_ASSERT(!isDelimiter(path[0]));
+            // Append the path
+            ioBuilder.append(path);
         }
-
-        // Check that path2 doesn't start with a path delimiter 
-        if (path2.size() > 0)
-        {
-            SLANG_ASSERT(!isDelimiter(path2[0]));
-        }
-        // Append the second path
-        outBuilder.append(path2);
     }
 
+    /* static */void Path::combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder)
+    {
+        outBuilder.Clear();
+        outBuilder.Append(path1);
+        append(outBuilder, path2);
+    }
+
+    String Path::combine(const String& path1, const String& path2)
+    {
+        if (path1.getLength() == 0)
+        {
+            return path2;
+        }
+
+        StringBuilder sb;
+        combineIntoBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
+        return sb.ProduceString();
+    }
 	String Path::combine(const String& path1, const String& path2, const String& path3)
 	{
-		StringBuilder sb(path1.getLength()+path2.getLength()+path3.getLength()+3);
-		sb.Append(path1);
-		if (!path1.endsWith('\\') && !path1.endsWith('/'))
-			sb.Append(kPathDelimiter);
-		sb.Append(path2);
-		if (!path2.endsWith('\\') && !path2.endsWith('/'))
-			sb.Append(kPathDelimiter);
-		sb.Append(path3);
+		StringBuilder sb;
+        sb.append(path1);
+        append(sb, path2.getUnownedSlice());
+        append(sb, path3.getUnownedSlice());
 		return sb.ProduceString();
 	}
 
@@ -550,8 +549,12 @@ namespace Slang
 
     /* static */String Path::getExecutablePath()
     {
-        static String executablePath = _getExecutablePath();
-        return executablePath;
+        // TODO(JS): It would be better if we lazily evaluated this, and then returned the same string on subsequent calls, because it has to do
+        // a fair amount of work depending on target.
+        // This was how previous code worked, with a static variable. Unfortunately this led to a memory leak being reported - because reporting
+        // is done before a global variable is released.
+        // It would be good to have a mechanism that allows 'core' library source free memory in some controlled manner.
+        return _getExecutablePath();
     }
 
 	Slang::String File::readAllText(const Slang::String& fileName)

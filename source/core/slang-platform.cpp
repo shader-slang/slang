@@ -38,7 +38,7 @@ namespace Slang
         StringBuilder platformFileNameBuilder;
         SharedLibrary::appendPlatformFileName(filename.getUnownedSlice(), platformFileNameBuilder);
 
-        Path::combineBuilder(parent.getUnownedSlice(), platformFileNameBuilder.getUnownedSlice(), outPath);
+        Path::combineIntoBuilder(parent.getUnownedSlice(), platformFileNameBuilder.getUnownedSlice(), outPath);
     }
     else
     {     
