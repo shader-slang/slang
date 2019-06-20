@@ -549,8 +549,12 @@ namespace Slang
 
     /* static */String Path::getExecutablePath()
     {
-        static String executablePath = _getExecutablePath();
-        return executablePath;
+        // TODO(JS): It would be better if we lazily evaluated this, and then returned the same string on subsequent calls, because it has to do
+        // a fair amount of work depending on target.
+        // This was how previous code worked, with a static variable. Unfortunately this led to a memory leak being reported - because reporting
+        // is done before a global variable is released.
+        // It would be good to have a mechanism that allows 'core' library source free memory in some controlled manner.
+        return _getExecutablePath();
     }
 
 	Slang::String File::readAllText(const Slang::String& fileName)
