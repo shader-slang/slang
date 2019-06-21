@@ -1086,6 +1086,20 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
+static String _calcSummary(const CPPCompiler::Output& inOutput)
+{
+    CPPCompiler::Output output(inOutput);
+
+    // We only want to analyse errors for now
+    output.removeByType(CPPCompiler::OutputMessage::Type::Info);
+    output.removeByType(CPPCompiler::OutputMessage::Type::Warning);
+
+    StringBuilder builder;
+
+    output.appendSimplifiedSummary(builder);
+    return builder;
+}
+
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
     CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
@@ -1131,15 +1145,23 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.sourceFiles.add(filePath);
     options.modulePath = modulePath;
 
-    ExecuteResult exeRes;
-
-    if (SLANG_FAILED(compiler->compile(options, exeRes)))
+    CPPCompiler::Output output;
+    if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;
     }
 
-    // Execute the binary and see what we get
+    String actualOutput;
+
+    // If the actual compilation failed, then the output will be
+    if (SLANG_FAILED(output.result))
     {
+        actualOutput = _calcSummary(output);
+    }
+    else
+    {
+       // Execute the binary and see what we get
+
         CommandLine cmdLine;
 
         StringBuilder exePath;
@@ -1154,9 +1176,14 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
         }
 
         // Write the output, and compare to expected
-        String actualOutput = getOutput(exeRes);
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
+        actualOutput = getOutput(exeRes);
+    }
 
+    // Write the output
+    Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+    // Check that they are the same
+    {
         // Read the expected
         String expectedOutput;
         try
@@ -1226,43 +1253,74 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.includePaths.add(".");
 
-    ExecuteResult exeRes;
-
-    if (SLANG_FAILED(compiler->compile(options, exeRes)))
+    CPPCompiler::Output output;
+    if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;
     }
 
-    SharedLibrary::Handle handle;
-    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(sharedLibraryPath.getBuffer(), handle)))
+    if (SLANG_FAILED(output.result))
     {
-        return TestResult::Fail;
-    }
+        // Compilation failed
+        String actualOutput = _calcSummary(output);
 
-    const int inValue = 10;
-    const char inBuffer[] = "Hello World!";
+        // Write the output
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-    char buffer[128] = "";
-    int value = 0;
+        // Check that they are the same
+        {
+            // Read the expected
+            String expectedOutput;
+            try
+            {
+                String expectedOutputPath = outputStem + ".expected";
+                expectedOutput = Slang::File::readAllText(expectedOutputPath);
+            }
+            catch (Slang::IOException)
+            {
+            }
 
-    typedef int (*TestFunc)(int intValue, const char* textValue, char* outTextValue);
-
-    // We could capture output if we passed in a ISlangWriter - but for that to work we'd need a 
-    TestFunc testFunc = (TestFunc)SharedLibrary::findFuncByName(handle, "test");
-    if (testFunc)
-    {
-        value = testFunc(inValue, inBuffer, buffer);
+            // Compare if they are the same 
+            if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
+            {
+                context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+                return TestResult::Fail;
+            }
+        }
     }
     else
     {
-        printf("Unable to access 'test' function\n");
-    }
+        SharedLibrary::Handle handle;
+        if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(sharedLibraryPath.getBuffer(), handle)))
+        {
+            return TestResult::Fail;
+        }
 
-    SharedLibrary::unload(handle);
+        const int inValue = 10;
+        const char inBuffer[] = "Hello World!";
 
-    if (!(inValue == value && strcmp(inBuffer, buffer) == 0))
-    {
-        return TestResult::Fail;
+        char buffer[128] = "";
+        int value = 0;
+
+        typedef int (*TestFunc)(int intValue, const char* textValue, char* outTextValue);
+
+        // We could capture output if we passed in a ISlangWriter - but for that to work we'd need a 
+        TestFunc testFunc = (TestFunc)SharedLibrary::findFuncByName(handle, "test");
+        if (testFunc)
+        {
+            value = testFunc(inValue, inBuffer, buffer);
+        }
+        else
+        {
+            printf("Unable to access 'test' function\n");
+        }
+
+        SharedLibrary::unload(handle);
+
+        if (!(inValue == value && strcmp(inBuffer, buffer) == 0))
+        {
+            return TestResult::Fail;
+        }
     }
 
     return TestResult::Pass;

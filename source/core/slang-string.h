@@ -98,10 +98,22 @@ namespace Slang
             return Index(m_end - m_begin);
         }
 
-        int indexOf(char c) const
+        Index indexOf(char c) const
         {
-            const int size = int(m_end - m_begin);
-            for (int i = 0; i < size; ++i)
+            const Index size = int(m_end - m_begin);
+            for (Index i = 0; i < size; ++i)
+            {
+                if (m_begin[i] == c)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        Index lastIndexOf(char c) const
+        {
+            const Index size = Index(m_end - m_begin);
+            for (Index i = size - 1; i >= 0; --i)
             {
                 if (m_begin[i] == c)
                 {
@@ -155,6 +167,9 @@ namespace Slang
 
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
+
+
+        UnownedStringSlice trim() const;
 
         int GetHashCode() const
         {

@@ -39,6 +39,45 @@ static const Guid IID_ISlangBlob = SLANG_UUID_ISlangBlob;
     }
 }
 
+/* static */void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
+{
+    join(values, UnownedStringSlice(&separator, 1), out);
+}
+
+/* static */void StringUtil::join(const List<String>& values, const UnownedStringSlice& separator, StringBuilder& out)
+{
+    const Index count = values.getCount();
+    if (count <= 0)
+    {
+        return;
+    }
+    out.append(values[0]);
+    for (Index i = 1; i < count; i++)
+    {
+        out.append(separator);
+        out.append(values[i]);
+    }
+}
+
+/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, char separator, StringBuilder& out)
+{
+    join(values, valueCount, UnownedStringSlice(&separator, 1), out);
+}
+
+/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, const UnownedStringSlice& separator, StringBuilder& out)
+{
+    if (valueCount <= 0)
+    {
+        return;
+    }
+    out.append(values[0]);
+    for (Index i = 1; i < valueCount; i++)
+    {
+        out.append(separator);
+        out.append(values[i]);
+    }
+}
+
 /* static */int StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
 {
     const char* start = in.begin();
@@ -283,6 +322,47 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
             return false;
         }
     }
+}
+
+SLANG_FORCE_INLINE static bool _isDigit(char c)
+{
+    return (c >= '0' && c <= '9');
+}
+
+/* static */SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
+{
+    const char* cur = in.begin();
+    const char* end = in.end();
+
+    bool negate = false;
+    if (cur < end && *cur == '-')
+    {
+        negate = true;
+        cur++;
+    }
+
+    // We need at least one digit
+    if (cur >= end || !_isDigit(*cur))
+    {
+        return SLANG_FAIL;
+    }
+    
+    Int value = *cur++ - '0';
+    // Do the remaining digits
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+        if (!_isDigit(c))
+        {
+            return SLANG_FAIL;
+        }
+        value = value * 10 + (c - '0');
+    }
+
+    value = negate ? -value : value;
+
+    outValue = value;
+    return SLANG_OK;
 }
 
 } // namespace Slang

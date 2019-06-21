@@ -13,7 +13,7 @@ class CPPCompiler: public RefObject
 {
 public:
     typedef RefObject Super;
-    enum class Type
+    enum class CompilerType
     {
         Unknown,
         VisualStudio,
@@ -41,9 +41,9 @@ public:
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
             /// Ctor
-        Desc(Type inType = Type::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+        Desc(CompilerType inType = CompilerType::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
-        Type type;                      ///< The type of the compiler
+        CompilerType type;                      ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
         Int minorVersion;               ///< Minor version
     };
@@ -101,10 +101,68 @@ public:
         List<String> libraryPaths;
     };
 
+    struct OutputMessage
+    {
+        enum class Type
+        {
+            Unknown,
+            Info,
+            Warning,
+            Error,
+            CountOf,
+        };
+        enum class Stage
+        {
+            Compile,
+            Link,
+        };
+
+        void reset()
+        {
+            type = Type::Unknown;
+            stage = Stage::Compile;
+            fileLine = 0;
+        }
+        static UnownedStringSlice getTypeText(OutputMessage::Type type);
+
+
+        Type type;                      ///< The type of error
+        Stage stage;                    ///< The stage the error came from
+        String text;                    ///< The text of the error
+        String code;                    ///< The compiler specific error code
+        String filePath;                ///< The path the error originated from
+        Int fileLine;                   ///< The line number the error came from
+    };
+
+    struct Output
+    {
+            /// Reset to an initial empty state
+        void reset() { messages.clear(); result = SLANG_OK; }
+        
+            /// Get the number of messages by type
+        Index getCountByType(OutputMessage::Type type) const;
+            /// True if there are any messages of the type
+        bool has(OutputMessage::Type type) const { return getCountByType(type) > 0; }
+
+            /// Stores in outCounts, the amount of messages for the stage of each type
+        Int countByStage(OutputMessage::Stage stage, Index outCounts[Int(OutputMessage::Type::CountOf)]) const;
+
+            /// Append a summary to out
+        void appendSummary(StringBuilder& out) const;
+            /// Appends a summary that just identifies if there is an error of a type (not a count)
+        void appendSimplifiedSummary(StringBuilder& out) const;
+        
+            /// Remove all messages of the type
+        void removeByType(OutputMessage::Type type);
+
+        SlangResult result;
+        List<OutputMessage> messages;
+    };
+
         /// Get the desc of this compiler
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
-    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outResult) = 0;
+    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
 
 protected:
 
@@ -121,23 +179,27 @@ public:
     typedef CPPCompiler Super;
 
     typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
+    typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
 
-    virtual SlangResult compile(const CompileOptions& options, ExecuteResult& outResult) SLANG_OVERRIDE;
+    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc func) :
+    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
         Super(desc),
-        m_func(func)
+        m_calcArgsFunc(calcArgsFunc),
+        m_parseOutputFunc(parseOutputFunc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc func) :
+    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
         Super(desc),
         m_cmdLine(cmdLine),
-        m_func(func)
+        m_calcArgsFunc(calcArgsFunc),
+        m_parseOutputFunc(parseOutputFunc)
     {}
 
-    CalcArgsFunc m_func;
+    CalcArgsFunc m_calcArgsFunc;
+    ParseOutputFunc m_parseOutputFunc;
     CommandLine m_cmdLine;
 };
 
@@ -187,18 +249,6 @@ struct CPPCompilerUtil
         MinAbsolute,
         Newest,
     };
-
-        /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
-    static SlangResult parseGCCFamilyVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc);
-
-        /// Runs the exeName, and extracts the version info into outDesc
-    static SlangResult calcGCCFamilyVersion(const String& exeName, CPPCompiler::Desc& outDesc);
-
-        /// Calculate gcc family compilers (including clang) cmdLine arguments from options
-    static void calcGCCFamilyArgs(const CompileOptions& options, CommandLine& cmdLine);
-
-        /// Calculate Visual Studio family compilers cmdLine arguments from options
-    static void calcVisualStudioArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Find a compiler
     static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);

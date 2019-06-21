@@ -7,9 +7,15 @@ namespace Slang
 
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)
     {
+        // Can be useful to uncomment during debug when problem is on CI
+        // printf("Unexpected: %s\n", message);
         throw InternalError(message);
     }
 
+    SLANG_FORCE_INLINE static bool _isWhiteSpace(char c)
+    {
+        return c == ' ' || c == '\t';
+    }
 
     // OSString
 
@@ -98,6 +104,17 @@ namespace Slang
     bool UnownedStringSlice::endsWith(char const* str) const
     {
         return endsWith(UnownedTerminatedStringSlice(str));
+    }
+
+    
+    UnownedStringSlice UnownedStringSlice::trim() const
+    {
+        const char* start = m_begin;
+        const char* end = m_end;
+
+        while (start < end && _isWhiteSpace(*start)) start++;
+        while (end > start && _isWhiteSpace(end[-1])) end--;
+        return UnownedStringSlice(start, end);
     }
 
 
