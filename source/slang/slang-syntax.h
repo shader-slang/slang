@@ -1132,31 +1132,31 @@ namespace Slang
 
     typedef Dictionary<unsigned int, RefPtr<RefObject>> AttributeArgumentValueDict;
 
-        /// Collects information about existential type parameters and their arguments.
-    struct ExistentialTypeSlots
+    struct SpecializationParam
     {
-            /// For each type parameter, holds the interface/existential type that constrains it.
-        List<RefPtr<Type>> paramTypes;
-
-            /// An argument for an existential type parameter.
-            ///
-            /// Comprises a concrete type and a witness for its conformance to the desired
-            /// interface/existential type for the corresponding parameter.
-            ///
-        struct Arg
+        enum class Flavor
         {
-            RefPtr<Type>    type;
-            RefPtr<Val>     witness;
+            GenericType,
+            GenericValue,
+            ExistentialType,
+            ExistentialValue,
         };
-
-            /// Any arguments provided for the existential type parameters.
-            ///
-            /// It is possible for `args` to be empty even if `paramTypes` is non-empty;
-            /// that situation represents an unspecialized program or entry point.
-            ///
-        List<Arg> args;
+        Flavor              flavor;
+        RefPtr<RefObject>   object;
     };
+    typedef List<SpecializationParam> SpecializationParams;
 
+    struct SpecializationArg
+    {
+        RefPtr<Val> val;
+    };
+    typedef List<SpecializationArg> SpecializationArgs;
+
+    struct ExpandedSpecializationArg : SpecializationArg
+    {
+        RefPtr<Val> witness;
+    };
+    typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 
     // Generate class definition for all syntax classes
 #define SYNTAX_FIELD(TYPE, NAME) TYPE NAME;

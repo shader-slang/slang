@@ -479,7 +479,7 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(ExistentialSpecializedType, Type)
 RAW(
     RefPtr<Type> baseType;
-    ExistentialTypeSlots slots;
+    ExpandedSpecializationArgs args;
 
     virtual String ToString() override;
     virtual bool EqualsImpl(Type * type) override;

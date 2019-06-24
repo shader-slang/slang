@@ -199,10 +199,12 @@ namespace Slang
     //
 
     RefPtr<EntryPoint> EntryPoint::create(
+        Linkage*            linkage,
         DeclRef<FuncDecl>   funcDeclRef,
         Profile             profile)
     {
         RefPtr<EntryPoint> entryPoint = new EntryPoint(
+            linkage,
             funcDeclRef.GetName(),
             profile,
             funcDeclRef);
@@ -210,10 +212,12 @@ namespace Slang
     }
 
     RefPtr<EntryPoint> EntryPoint::createDummyForPassThrough(
+        Linkage*    linkage,
         Name*       name,
         Profile     profile)
     {
         RefPtr<EntryPoint> entryPoint = new EntryPoint(
+            linkage,
             name,
             profile,
             DeclRef<FuncDecl>());
@@ -221,66 +225,16 @@ namespace Slang
     }
 
     EntryPoint::EntryPoint(
+        Linkage*            linkage,
         Name*               name,
         Profile             profile,
         DeclRef<FuncDecl>   funcDeclRef)
-        : m_name(name)
+        : ComponentType(linkage)
+        , m_name(name)
         , m_profile(profile)
         , m_funcDeclRef(funcDeclRef)
     {
-        // In order for later code generation to work, we need to track what
-        // modules each entry point depends on. We will build up the dependency
-        // list here when an `EntryPoint` gets created.
-        //
-        // We know an entry point depends on the module that declared the
-        // entry-point function itself.
-        //
-        // Note: we are carefully handling the case where `module` could
-        // be null, becase of "dummy" entry points created for pass-through
-        // compilation.
-        //
-        if(auto module = getModule())
-        {
-            m_dependencyList.addDependency(module);
-        }
-        //
-        // TODO: We also need to include the modules needed by any generic
-        // arguments in the dependency list, since in the general case they
-        // might come from modules other than the one defining the entry point.
-
-        // The following is a bit of a hack.
-        //
-        // Back-end code generation relies on us having computed layouts for all tagged
-        // unions that end up being used in the code, which means we need a way to find
-        // all such types that get used in a program (and the stuff it imports).
-        //
-        // For now we are assuming a tagged union type only comes into existence
-        // as a (top-level) argument for a generic type parameter, so that we
-        // can check for them here and cache them on the entry point.
-        //
-        // A longer-term strategy might need to consider any (tagged or untagged)
-        // union types that get used inside of a module, and also take
-        // those lists into account.
-        //
-        // An even longer-term strategy would be to allow type layout to
-        // be performed on IR types, so taht we don't need to have front-end
-        // code worrying about this stuff.
-        // 
-        for( auto subst = funcDeclRef.substitutions.substitutions; subst; subst = subst->outer )
-        {
-            if( auto genericSubst = as<GenericSubstitution>(subst) )
-            {
-                for( auto arg : genericSubst->args )
-                {
-                    if( auto taggedUnionType = as<TaggedUnionType>(arg) )
-                    {
-                        m_taggedUnionTypes.add(taggedUnionType);
-                    }
-                }
-            }
-        }
-
-        // Collect any existential-type parameters used by the entry point
+        // Collect any specialization parameters used by the entry point
         //
         _collectShaderParams();
     }
@@ -290,34 +244,74 @@ namespace Slang
         return Slang::getModule(getFuncDecl());
     }
 
-    Linkage* EntryPoint::getLinkage()
+    Index EntryPoint::getSpecializationParamCount()
     {
-        return getModule()->getLinkage();
+        return m_genericSpecializationParams.getCount() + m_existentialSpecializationParams.getCount();
     }
 
-    //
-    // EntryPointGroup
-    //
-
-    RefPtr<EntryPointGroup> EntryPointGroup::create(
-        Linkage*                        linkage,
-        List<RefPtr<EntryPoint>> const& entryPoints,
-        DiagnosticSink*                 sink)
+    SpecializationParam const& EntryPoint::getSpecializationParam(Index index)
     {
-        RefPtr<EntryPointGroup> group = new EntryPointGroup(linkage);
-
-        for( auto entryPoint : entryPoints )
+        auto genericParamCount = m_genericSpecializationParams.getCount();
+        if(index < genericParamCount)
         {
-            for( auto module : entryPoint->getModuleDependencies() )
-            {
-                group->m_dependencyList.addDependency(module);
-            }
-            group->m_entryPoints.add(entryPoint);
+            return m_genericSpecializationParams[index];
         }
+        else
+        {
+            return m_existentialSpecializationParams[index - genericParamCount];
+        }
+    }
 
-        group->_collectShaderParams(sink);
+    Index EntryPoint::getRequirementCount()
+    {
+        // The only requirement of an entry point is the module that contains it.
+        //
+        // TODO: We will eventually want to support the case of an entry
+        // point nested in a `struct` type, in which case there should be
+        // a single requirement representing that outer type (so that multiple
+        // entry points nested under the same type can share the storage
+        // for parameters at that scope).
 
-        return group;
+        // Note: the defensive coding is here because the
+        // "dummy" entry points we create for pass-through
+        // compilation will not have an associated module.
+        //
+        if( auto module = getModule() )
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    RefPtr<ComponentType> EntryPoint::getRequirement(Index index)
+    {
+        SLANG_UNUSED(index);
+        SLANG_ASSERT(index == 0);
+        SLANG_ASSERT(getModule());
+        return getModule();
+    }
+
+    void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+    {
+        visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
+    }
+
+    List<Module*> const& EntryPoint::getModuleDependencies()
+    {
+        if(auto module = getModule())
+            return module->getModuleDependencies();
+
+        static List<Module*> empty;
+        return empty;
+    }
+
+    List<String> const& EntryPoint::getFilePathDependencies()
+    {
+        if(auto module = getModule())
+            return getModule()->getFilePathDependencies();
+        
+        static List<String> empty;
+        return empty;
     }
 
     //
@@ -1949,7 +1943,7 @@ SlangResult dissassembleDXILUsingDXC(
         TargetRequest*          targetReq,
         Int                     entryPointIndex)
     {
-        auto program = compileRequest->getSpecializedProgram();
+        auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
         auto targetProgram = program->getTargetProgram(targetReq);
         auto backEndReq = compileRequest->getBackEndReq();
 
@@ -2024,6 +2018,12 @@ SlangResult dissassembleDXILUsingDXC(
             sink,
             m_program);
 
+        // DEBUGGING HACK:
+        if( m_program->getEntryPoint(entryPointIndex)->getStage() == Stage::ClosestHit )
+        {
+            backEndRequest->shouldDumpIntermediates = true;
+        }
+
         return _createEntryPointResult(
             entryPointIndex,
             backEndRequest,
@@ -2083,7 +2083,7 @@ SlangResult dissassembleDXILUsingDXC(
         if (compileRequest->isCommandLineCompile)
         {
             auto linkage = compileRequest->getLinkage();
-            auto program = compileRequest->getSpecializedProgram();
+            auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
             for (auto targetReq : linkage->targets)
             {
                 Index entryPointCount = program->getEntryPointCount();

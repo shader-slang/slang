@@ -51,9 +51,9 @@ static inline SlangReflectionTypeLayout* convert(TypeLayout* type)
     return (SlangReflectionTypeLayout*) type;
 }
 
-static inline GenericParamLayout* convert(SlangReflectionTypeParameter * typeParam)
+static inline SpecializationParamLayout* convert(SlangReflectionTypeParameter * typeParam)
 {
-    return (GenericParamLayout*)typeParam;
+    return (SpecializationParamLayout*) typeParam;
 }
 
 static inline VarDeclBase* convert(SlangReflectionVariable* var)
@@ -84,16 +84,6 @@ static inline EntryPointLayout* convert(SlangReflectionEntryPoint* entryPoint)
 static inline SlangReflectionEntryPoint* convert(EntryPointLayout* entryPoint)
 {
     return (SlangReflectionEntryPoint*) entryPoint;
-}
-
-static inline EntryPointGroupLayout* convert(SlangEntryPointGroupLayout* entryPointGroup)
-{
-    return (EntryPointGroupLayout*) entryPointGroup;
-}
-
-static inline SlangEntryPointGroupLayout* convert(EntryPointGroupLayout* entryPointGroup)
-{
-    return (SlangEntryPointGroupLayout*) entryPointGroup;
 }
 
 static inline ProgramLayout* convert(SlangReflection* program)
@@ -865,7 +855,7 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
 
     if(auto genericParamTypeLayout = as<GenericParamTypeLayout>(typeLayout))
     {
-        return genericParamTypeLayout->paramIndex;
+        return (int) genericParamTypeLayout->paramIndex;
     }
     else
     {
@@ -1222,7 +1212,7 @@ SLANG_API char const* spReflectionEntryPoint_getName(
     auto entryPointLayout = convert(inEntryPoint);
     if(!entryPointLayout) return 0;
 
-    return getText(entryPointLayout->entryPoint->getName()).begin();
+    return getText(entryPointLayout->entryPoint.GetName()).begin();
 }
 
 SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
@@ -1270,7 +1260,7 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     SlangUInt sizeAlongAxis[3] = { 1, 1, 1 };
 
     // First look for the HLSL case, where we have an attribute attached to the entry point function
-    auto numThreadsAttribute = entryPointFunc->FindModifier<NumThreadsAttribute>();
+    auto numThreadsAttribute = entryPointFunc.getDecl()->FindModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
         sizeAlongAxis[0] = numThreadsAttribute->x;
@@ -1281,7 +1271,7 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     {
         // Fall back to the GLSL case, which requires a search over global-scope declarations
         // to look for as with the `local_size_*` qualifier
-        auto module = as<ModuleDecl>(entryPointFunc->ParentDecl);
+        auto module = as<ModuleDecl>(entryPointFunc.getDecl()->ParentDecl);
         if (module)
         {
             for (auto dd : module->Members)
@@ -1323,11 +1313,43 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
     return (entryPointLayout->flags & EntryPointLayout::Flag::usesAnySampleRateInput) != 0;
 }
 
+SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout)
+        return nullptr;
+
+    return convert(entryPointLayout->parametersLayout);
+}
+
+static bool hasDefaultConstantBuffer(ScopeLayout* layout)
+{
+    auto typeLayout = layout->parametersLayout->getTypeLayout();
+    return as<ParameterGroupTypeLayout>(typeLayout) != nullptr;
+}
+
+SLANG_API int spReflectionEntryPoint_hasDefaultConstantBuffer(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout)
+        return 0;
+
+    return hasDefaultConstantBuffer(entryPointLayout);
+}
+
+
 // SlangReflectionTypeParameter
 SLANG_API char const* spReflectionTypeParameter_GetName(SlangReflectionTypeParameter * inTypeParam)
 {
-    auto typeParam = convert(inTypeParam);
-    return typeParam->decl->getName()->text.getBuffer();
+    auto specializationParam = convert(inTypeParam);
+    if( auto genericParamLayout = as<GenericSpecializationParamLayout>(specializationParam) )
+    {
+        return genericParamLayout->decl->getName()->text.getBuffer();
+    }
+    // TODO: Add case for existential type parameter? They don't have as simple of a notion of "name" as the generic case...
+    return nullptr;
 }
 
 SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParameter * inTypeParam)
@@ -1338,16 +1360,34 @@ SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParamet
 
 SLANG_API unsigned int spReflectionTypeParameter_GetConstraintCount(SlangReflectionTypeParameter* inTypeParam)
 {
-    auto typeParam = convert(inTypeParam);
-    auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
-    return (unsigned int)constraints.getCount();
+    auto specializationParam = convert(inTypeParam);
+    if(auto genericParamLayout = as<GenericSpecializationParamLayout>(specializationParam))
+    {
+        if( auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericParamLayout->decl) )
+        {
+            auto constraints = globalGenericParamDecl->getMembersOfType<GenericTypeConstraintDecl>();
+            return (unsigned int)constraints.getCount();
+        }
+        // TODO: Add case for entry-point generic parameters.
+    }
+    // TODO: Add case for existential type parameters.
+    return 0;
 }
 
 SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(SlangReflectionTypeParameter * inTypeParam, unsigned index)
 {
-    auto typeParam = convert(inTypeParam);
-    auto constraints = typeParam->decl->getMembersOfType<GenericTypeConstraintDecl>();
-    return (SlangReflectionType*)constraints.toArray()[index]->sup.Ptr();
+    auto specializationParam = convert(inTypeParam);
+    if(auto genericParamLayout = as<GenericSpecializationParamLayout>(specializationParam))
+    {
+        if( auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericParamLayout->decl) )
+        {
+            auto constraints = globalGenericParamDecl->getMembersOfType<GenericTypeConstraintDecl>();
+            return (SlangReflectionType*)constraints.toArray()[index]->sup.Ptr();
+        }
+        // TODO: Add case for entry-point generic parameters.
+    }
+    // TODO: Add case for existential type parameters.
+    return 0;
 }
 
 // Shader Reflection
@@ -1379,22 +1419,32 @@ SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflec
 SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection * reflection)
 {
     auto program = convert(reflection);
-    return (unsigned int)program->globalGenericParams.getCount();
+    return (unsigned int) program->specializationParams.getCount();
 }
 
 SLANG_API SlangReflectionTypeParameter* spReflection_GetTypeParameterByIndex(SlangReflection * reflection, unsigned int index)
 {
     auto program = convert(reflection);
-    return (SlangReflectionTypeParameter*)program->globalGenericParams[index].Ptr();
+    return (SlangReflectionTypeParameter*) program->specializationParams[index].Ptr();
 }
 
 SLANG_API SlangReflectionTypeParameter * spReflection_FindTypeParameter(SlangReflection * inProgram, char const * name)
 {
     auto program = convert(inProgram);
     if (!program) return nullptr;
-    GenericParamLayout * result = nullptr;
-    program->globalGenericParamsMap.TryGetValue(name, result);
-    return (SlangReflectionTypeParameter*)result;
+    for( auto& param : program->specializationParams )
+    {
+        auto genericParamLayout = as<GenericSpecializationParamLayout>(param);
+        if(!genericParamLayout)
+            continue;
+
+        if(getText(genericParamLayout->decl->getName()) != UnownedTerminatedStringSlice(name))
+            continue;
+
+        return (SlangReflectionTypeParameter*) genericParamLayout;
+    }
+
+    return 0;
 }
 
 SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* inProgram)
@@ -1421,7 +1471,7 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangRefl
     // TODO: improve on naive linear search
     for(auto ep : program->entryPoints)
     {
-        if(ep->entryPoint->getName()->text == name)
+        if(ep->entryPoint.GetName()->text == name)
         {
             return convert(ep);
         }
@@ -1429,75 +1479,6 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangRefl
 
     return nullptr;
 }
-
-
-SLANG_API SlangInt spReflection_getEntryPointGroupCount(SlangReflection* inProgram)
-{
-    auto program = convert(inProgram);
-    if(!program) return 0;
-
-    return program->entryPointGroups.getCount();
-}
-
-SLANG_API SlangEntryPointGroupLayout* spReflection_getEntryPointGroupByIndex(SlangReflection* inProgram, SlangInt index)
-{
-    auto program = convert(inProgram);
-    if(!program) return 0;
-
-    if(index < 0) return nullptr;
-    if(index >= program->entryPointGroups.getCount()) return nullptr;
-
-    return convert(program->entryPointGroups[(int) index].Ptr());
-}
-
-SLANG_API SlangInt spEntryPointGroupLayout_getEntryPointCount(SlangEntryPointGroupLayout* inGroup)
-{
-    auto group = convert(inGroup);
-    if(!group) return 0;
-
-    return group->entryPoints.getCount();
-}
-
-SLANG_API SlangReflectionEntryPoint* spEntryPointGroupLayout_getEntryPointByIndex(SlangEntryPointGroupLayout* inGroup, SlangInt index)
-{
-    auto group = convert(inGroup);
-    if(!group) return 0;
-
-    if(index < 0) return nullptr;
-    if(index >= group->entryPoints.getCount()) return nullptr;
-
-    return convert(group->entryPoints[(int) index].Ptr());
-}
-
-SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getVarLayout(SlangEntryPointGroupLayout* inGroup)
-{
-    auto group = convert(inGroup);
-    if(!group) return 0;
-
-    return convert(group->parametersLayout);
-}
-
-SLANG_API SlangInt spEntryPointGroupLayout_getParameterCount(SlangEntryPointGroupLayout* inGroup)
-{
-    auto groupLayout = convert(inGroup);
-    if(!groupLayout) return 0;
-
-    auto& params = groupLayout->group->getShaderParams();
-    return params.getCount();
-}
-
-SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getParameterByIndex(SlangEntryPointGroupLayout* inGroup, SlangInt index)
-{
-    auto groupLayout = convert(inGroup);
-    if(!groupLayout) return nullptr;
-
-    auto& params = groupLayout->group->getShaderParams();
-    if(index < 0) return nullptr;
-    if(index >= params.getCount()) return nullptr;
-
-    return convert(getScopeStructLayout(groupLayout)->fields[index]);
-}
-
 
 SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* inProgram)
 {

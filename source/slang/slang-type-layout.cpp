@@ -1222,18 +1222,10 @@ EntryPointLayout* EntryPointLayout::getAbsoluteLayout(
     {
         adjustedLayout->resultLayout = baseResultLayout->getAbsoluteLayout(parentLayout);
     }
-    adjustedLayout->taggedUnionTypeLayouts = this->taggedUnionTypeLayouts;
 
     m_absoluteLayout = adjustedLayout;
     return adjustedLayout;
 }
-
-EntryPointLayout* EntryPointLayout::getAbsoluteLayout(EntryPointGroupLayout* parentGroup)
-{
-    SLANG_ASSERT(parentGroup);
-    return getAbsoluteLayout(parentGroup->parametersLayout);
-}
-
 
 VarLayout* VarLayout::getAbsoluteLayout(VarLayout* parentAbsoluteLayout)
 {
@@ -1933,9 +1925,31 @@ static TypeLayoutResult _createTypeLayout(
     return _createTypeLayout(subContext, type);
 }
 
-int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl)
+RefPtr<Type> findGlobalGenericSpecializationArg(
+    TypeLayoutContext const&    context,
+    GlobalGenericParamDecl*     decl)
 {
-    return (int)genericParameters.findFirstIndex([=](RefPtr<GenericParamLayout> & x) {return x->decl.Ptr() == decl; });
+    RefPtr<Val> arg;
+    context.programLayout->globalGenericArgs.TryGetValue(decl, arg);
+    return arg.as<Type>();
+}
+
+Index findGlobalGenericSpecializationParamIndex(
+    ComponentType*          type,
+    GlobalGenericParamDecl* decl)
+{
+    Index paramCount = type->getSpecializationParamCount();
+    for( Index pp = 0; pp < paramCount; ++pp )
+    {
+        auto param = type->getSpecializationParam(pp);
+        if(param.flavor != SpecializationParam::Flavor::GenericType)
+            continue;
+        if(param.object.Ptr() != decl)
+            continue;
+
+        return pp;
+    }
+    return -1;
 }
 
 // When constructing a new var layout from an existing one,
@@ -2393,6 +2407,37 @@ TypeLayoutResult StructTypeLayoutBuilder::getTypeLayoutResult()
     return TypeLayoutResult(m_typeLayout, m_info);
 }
 
+static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    GlobalGenericParamDecl*     globalGenericParamDecl)
+{
+    SimpleLayoutInfo info;
+    info.alignment = 0;
+    info.size = 0;
+    info.kind = LayoutResourceKind::GenericResource;
+
+    RefPtr<GenericParamTypeLayout> typeLayout = new GenericParamTypeLayout();
+    // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
+    // so we can find the index of this generic param decl in the list
+    typeLayout->type = type;
+    typeLayout->paramIndex = findGlobalGenericSpecializationParamIndex(
+        context.programLayout->getProgram(),
+        globalGenericParamDecl);
+    typeLayout->rules = context.rules;
+    typeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
+
+    return TypeLayoutResult(typeLayout, info);
+}
+
+RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    GlobalGenericParamDecl*     globalGenericParamDecl)
+{
+    return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl).layout;
+}
+
 static TypeLayoutResult _createTypeLayout(
     TypeLayoutContext const&    context,
     Type*                       type)
@@ -2825,7 +2870,7 @@ static TypeLayoutResult _createTypeLayout(
                 // to all the incoming specialized type slots that haven't already
                 // been consumed/claimed by preceding fields.
                 //
-                auto fieldLayoutContext = context.withExistentialTypeSlotsOffsetBy(baseExistentialSlotIndex);
+                auto fieldLayoutContext = context.withSpecializationArgsOffsetBy(baseExistentialSlotIndex);
 
                 TypeLayoutResult fieldResult = _createTypeLayout(
                     fieldLayoutContext,
@@ -2863,22 +2908,25 @@ static TypeLayoutResult _createTypeLayout(
 
             return typeLayoutBuilder.getTypeLayoutResult();
         }
-        else if (auto globalGenParam = declRef.as<GlobalGenericParamDecl>())
+        else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
-            SimpleLayoutInfo info;
-            info.alignment = 0;
-            info.size = 0;
-            info.kind = LayoutResourceKind::GenericResource;
-
-            auto genParamTypeLayout = new GenericParamTypeLayout();
-            // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
-            // so we can find the index of this generic param decl in the list
-            genParamTypeLayout->type = type;
-            genParamTypeLayout->paramIndex = findGenericParam(context.programLayout->globalGenericParams, genParamTypeLayout->getGlobalGenericParamDecl());
-            genParamTypeLayout->rules = rules;
-            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
-
-            return TypeLayoutResult(genParamTypeLayout, info);
+            if( auto concreteType = findGlobalGenericSpecializationArg(
+                context,
+                globalGenericParamDecl) )
+            {
+                // If we know what concrete type has been used to specialize
+                // the global generic type parameter, then we should use
+                // the concrete type instead.
+                //
+                return _createTypeLayout(context, concreteType);
+            }
+            else
+            {
+                // Otherwise we must create a type layout that represents
+                // the generic type parameter itself.
+                //
+                return _createTypeLayoutForGlobalGenericTypeParam(context, type, globalGenericParamDecl);
+            }
         }
         else if (auto assocTypeParam = declRef.as<AssocTypeDecl>())
         {
@@ -2934,9 +2982,11 @@ static TypeLayoutResult _createTypeLayout(
             // If there are any concrete types available, the first one will be
             // the value that should be plugged into the slot we just introduced.
             //
-            if( context.existentialTypeArgCount )
+            if( context.specializationArgCount )
             {
-                RefPtr<Type> concreteType = context.existentialTypeArgs[0].type;
+                auto& specializationArg = context.specializationArgs[0];
+                RefPtr<Type> concreteType = specializationArg.val.as<Type>();
+                SLANG_ASSERT(concreteType);
 
                 RefPtr<TypeLayout> concreteTypeLayout = createTypeLayout(context, concreteType);
 
@@ -3046,9 +3096,9 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if( auto existentialSpecializedType = as<ExistentialSpecializedType>(type) )
     {
-        TypeLayoutContext subContext = context.withExistentialTypeArgs(
-            existentialSpecializedType->slots.args.getCount(),
-            existentialSpecializedType->slots.args.getBuffer());
+        TypeLayoutContext subContext = context.withSpecializationArgs(
+            existentialSpecializedType->args.getBuffer(),
+            existentialSpecializedType->args.getCount());
 
         auto baseTypeLayoutResult = _createTypeLayout(
             subContext,
