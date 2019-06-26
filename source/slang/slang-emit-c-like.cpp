@@ -1533,12 +1533,10 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
     //
     auto linkageDecoration = valueForName->findDecoration<IRLinkageDecoration>();
     SLANG_ASSERT(linkageDecoration);
-    auto mangledName = String(linkageDecoration->getMangledName());
-
-
+    
     // We will use the `MangledLexer` to
     // help us split the original name into its pieces.
-    MangledLexer lexer(mangledName);
+    MangledLexer lexer(linkageDecoration->getMangledName());
     
     // We'll read through the qualified name of the
     // symbol (e.g., `Texture2D<T>.Sample`) and then

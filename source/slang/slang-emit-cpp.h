@@ -19,6 +19,11 @@ public:
     {
         typedef HLSLType ThisType;
 
+        static ThisType makeInvalid()
+        {
+            // I would use kIROp_Invalid, but it's bigger than 8 bits, so nop will do for now
+            return ThisType{ uint8_t(kIROp_Nop), 0, 0, 0};
+        }
         static ThisType makeVec(IROp inElementType, int inCount)
         {
             return ThisType{ uint8_t(kIROp_VectorType), uint8_t(inElementType), uint8_t(inCount), 0 };
@@ -44,6 +49,8 @@ public:
             /// Just fit into a uint32_t
         uint32_t getCompressed() const { return (uint32_t(op) << 24) | (uint32_t(elementType) << 16) | (uint32_t(sizeOrColCount) << 8) | uint32_t(rowCount); }
 
+        bool isInvalid() const { return op == kIROp_Nop; }
+
             /// It's better than a hash in that one to one mapping between 'type' and hash
         UInt GetHashCode() const { return getCompressed(); }
 
@@ -54,6 +61,43 @@ public:
         uint8_t elementType;
         uint8_t sizeOrColCount;
         uint8_t rowCount;
+    };
+
+    struct HLSLFunction
+    {
+        typedef HLSLFunction ThisType;
+
+        UInt GetHashCode() const
+        {
+            auto hash = combineHash(combineHash(int(name), int(argsCount)), int(returnType.GetHashCode()));
+            for (int i = 0; i < argsCount; ++i)
+            {
+                hash = combineHash(hash, int(args[i].GetHashCode()));
+            }
+            return hash;
+        }
+
+        bool operator==(const ThisType& rhs) const
+        {
+            if (name != rhs.name || returnType != rhs.returnType || argsCount != rhs.argsCount)
+            {
+                return false;
+            }
+            for (int i = 0; i < argsCount; ++i)
+            {
+                if (args[i] != rhs.args[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        StringSlicePool::Handle name;
+        HLSLType returnType;
+        HLSLType args[4];
+        uint8_t argsCount;
     };
 
     enum class BuiltInCOp
@@ -79,10 +123,20 @@ protected:
 
     virtual void emitPreprocessorDirectivesImpl();
 
+    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+
+        /// Convert a type into a HLSL built in type. 
+    HLSLType _getHLSLType(IRType* type);
+    HLSLFunction _getHLSLFunc(const UnownedStringSlice& name, IRCall* inst, int operandIndex, int operandCount);
+
+    UnownedStringSlice _getFuncName(const HLSLFunction& func);
+    StringSlicePool::Handle _calcFuncName(const HLSLFunction& func);
+
     UnownedStringSlice _getTypeName(const HLSLType& type);
     StringSlicePool::Handle _calcTypeName(const HLSLType& type);
 
     Dictionary<HLSLType, StringSlicePool::Handle> m_typeNameMap;
+    Dictionary<HLSLFunction, StringSlicePool::Handle> m_funcNameMap;
 
     StringSlicePool m_slicePool;
 };
