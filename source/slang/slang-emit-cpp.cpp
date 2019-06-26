@@ -10,6 +10,154 @@
 
 namespace Slang {
 
+CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
+    Super(desc)
+{
+
+#if 0
+    
+    auto session = desc.compileRequest->getSession();
+
+    auto module = desc.compileRequest->getProgram()->getOrCreateIRModule(nullptr);
+    m_sharedBuilder.session = session;
+    m_sharedBuilder.module = module;
+    m_builder.sharedBuilder = &m_sharedBuilder;
+#endif
+}
+namespace { // anonymous
+
+struct OrderType
+{
+    OrderType(IRType* inType):
+        order(_calcOrder(inType)),
+        type(inType)
+    {
+    }
+
+    OrderType() {}
+
+    static uint32_t _calcOrder(IRType* inType)
+    {
+        switch (inType->op)
+        {
+            case kIROp_VectorType:
+            {
+                IRVectorType* vec = static_cast<IRVectorType*>(inType);
+                return (uint32_t(vec->getElementType()->op) << 8) + uint32_t(GetIntVal(vec->getElementCount()));
+            }
+            case kIROp_MatrixType:
+            {
+                IRMatrixType* mat = static_cast<IRMatrixType*>(inType);
+                return uint32_t(0x01000000) + (uint32_t(mat->getElementType()->op) << 8) + uint32_t(GetIntVal(mat->getColumnCount()) << 4) + uint32_t(GetIntVal(mat->getRowCount()));
+            }
+            default: return 0;
+        }
+    }
+
+    SLANG_FORCE_INLINE bool operator<(const OrderType& rhs) const { return order < rhs.order; }
+    SLANG_FORCE_INLINE bool operator==(const OrderType& rhs) const { return order == rhs.order; }
+    SLANG_FORCE_INLINE bool operator!=(const OrderType& rhs) const { return order == rhs.order; }
+
+    uint32_t order;
+    IRType* type;
+};
+
+
+} // anonymous
+
+void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
+{
+    // Can emit built in type definitions here
+    // Can emit intrinsics here too
+
+    List<OrderType> types;
+    for (const auto keyValue : m_typeNameMap)
+    {
+        IRType* inst = keyValue.Key;
+        if (inst->op == kIROp_VectorType || inst->op == kIROp_MatrixType)
+        {
+            types.add(inst);
+        }
+    }
+
+    // Sort 
+    types.sort();
+
+    // Dump out all of the types in order
+
+    for (const auto& orderType : types)
+    {
+        IRType* type = orderType.type;
+
+        switch (type->op)
+        {
+            case kIROp_VectorType:
+            {
+                IRVectorType* vec = static_cast<IRVectorType*>(type);
+                IRType* elemType = vec->getElementType();
+                int count = int(GetIntVal(vec->getElementCount()));
+
+                SLANG_ASSERT(count > 0 && count < 4);
+
+                UnownedStringSlice typeName = _getTypeName(type);
+                UnownedStringSlice elemName = _getTypeName(elemType);
+
+                const char elemNames[] = "xyzw";
+
+                m_writer->emit("struct ");
+                m_writer->emit(typeName);
+                m_writer->emit("\n{\n");
+                m_writer->indent();
+
+                m_writer->emit(elemName);
+                m_writer->emit(" ");
+                for (int i = 0; i < count; ++i)
+                {
+                    if (i > 0)
+                    {
+                        m_writer->emit(", ");
+                    }
+                    m_writer->emitChar(elemNames[i]);
+                }
+                m_writer->emit(";\n");
+
+                m_writer->dedent();
+                m_writer->emit("};\n\n");
+                break;
+            }
+            case kIROp_MatrixType:
+            {
+                IRMatrixType* mat = static_cast<IRMatrixType*>(type);
+                IRType* elemType = mat->getElementType();
+
+                const auto rowCount = GetIntVal(mat->getRowCount());
+                const auto colCount = GetIntVal(mat->getColumnCount());
+
+                UnownedStringSlice typeName = _getTypeName(type);
+                UnownedStringSlice rowTypeName = _getTypeName(_getVectorType(elemType, int(colCount)));
+
+                m_writer->emit("struct ");
+                m_writer->emit(typeName);
+                m_writer->emit("\n{\n");
+                m_writer->indent();
+
+                m_writer->emit(rowTypeName);
+                m_writer->emit(" rows[");
+                m_writer->emit(rowCount);
+                m_writer->emit("];\n");
+
+                m_writer->dedent();
+                m_writer->emit("};\n\n");
+                break;
+            }
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled type");
+                break;
+            }
+        }
+    }
+}
 
 static IROp _getCType(IROp op)
 {
@@ -33,7 +181,7 @@ static IROp _getCType(IROp op)
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
         {
-            // Promote all these to Int16, we can just vary the call to make these work
+            // Promote all these to Int64, we can just vary the call to make these work
             return kIROp_Int64Type;
         }
         case kIROp_DoubleType:
@@ -60,6 +208,7 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
     {
         case kIROp_BoolType:        return UnownedStringSlice::fromLiteral("B");
         case kIROp_IntType:         return UnownedStringSlice::fromLiteral("I");
+        case kIROp_UIntType:        return UnownedStringSlice::fromLiteral("U");
         case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F");
         case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
         case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
@@ -82,29 +231,91 @@ static UnownedStringSlice _getCTypeName(IROp op)
 }
 #endif
 
-void CPPSourceEmitter::_emitCVecType(IROp op, Int size)
+StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
 {
-    m_writer->emit("Vec");
-    const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-    m_writer->emit(postFix);
-    if (postFix.size() > 1)
+    switch (type->op)
     {
-        m_writer->emit("_");
+        case kIROp_VoidType:
+        case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        {
+            return m_slicePool.add(getDefaultBuiltinTypeName(type->op));
+        }
+        case kIROp_HalfType:    
+        {
+            return m_slicePool.add(getDefaultBuiltinTypeName(kIROp_FloatType));
+        }
+        case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(type);
+            auto vecSize = GetIntVal(vecType->getElementCount());
+
+            StringBuilder builder;
+            builder << "Vec";
+            UnownedStringSlice postFix = _getCTypeVecPostFix(vecType->getElementType()->op);
+
+            builder << postFix;
+            if (postFix.size() > 1)
+            {
+                builder << "_";
+            }
+            builder << vecSize;
+            return m_slicePool.add(builder);
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = (IRMatrixType*)type;
+
+            auto elemType = matType->getElementType();
+
+            const auto rowCount = GetIntVal(matType->getRowCount());
+            const auto colCount = GetIntVal(matType->getColumnCount());
+
+            // Make sure there is the vector name too
+            _getTypeName(_getVectorType(elemType, int(colCount)));
+            
+            StringBuilder builder;
+
+            builder << "Mat";
+            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elemType->op));
+            builder << postFix;
+            if (postFix.size() > 1)
+            {
+                builder << "_";
+            }
+            builder << rowCount;
+            builder << colCount;
+
+            return m_slicePool.add(builder);
+        }
+        default: break;
     }
-    m_writer->emit(size);
+    
+    return StringSlicePool::kNullHandle;
 }
 
-void CPPSourceEmitter::_emitCMatType(IROp op, IRIntegerValue rowCount, IRIntegerValue colCount)
+UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 {
-    m_writer->emit("Mat");
-    const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(op));
-    m_writer->emit(postFix);
-    if (postFix.size() > 1)
+    StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
+    if (m_typeNameMap.TryGetValue(type, handle))
     {
-        m_writer->emit("_");
+        return m_slicePool.getSlice(handle);
     }
-    m_writer->emit(rowCount);
-    m_writer->emit(colCount);
+
+    handle = _calcTypeName(type);
+    m_typeNameMap.Add(type, handle);
+
+    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
+    return m_slicePool.getSlice(handle);
 }
 
 void CPPSourceEmitter::_emitCFunc(BuiltInCOp cop, IRType* type)
@@ -130,12 +341,34 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
 {
     SLANG_UNUSED(irFunc);
     SLANG_UNUSED(entryPointLayout);
-    SLANG_ASSERT(!"Not implemented");
+    //SLANG_ASSERT(!"Not implemented");
+}
+
+IRType* CPPSourceEmitter::_getVectorType(IRType* elemType, int count)
+{
+#if 1
+    SharedIRBuilder sharedBuilder;
+    sharedBuilder.session = m_compileRequest->getSession();
+    sharedBuilder.module = m_module;
+    
+    IRBuilder builder;
+    builder.sharedBuilder = &sharedBuilder;
+
+    IRInst* elemCountInst = builder.getIntValue(builder.getIntType(), count);
+    return builder.getVectorType(elemType, elemCountInst);
+
+#else
+
+    // Construct as a vector type, such that we have in the map
+    IRInst* elemCountInst = m_builder.getIntValue(m_builder.getIntType(), count);
+    return m_builder.getVectorType(elemType, elemCountInst);
+
+#endif
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    _emitCVecType(elementType->op, Int(elementCount));
+    return emitSimpleTypeImpl(_getVectorType(elementType, int(elementCount)));
 }
 
 void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
@@ -154,34 +387,22 @@ void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
-        {
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
-            return;
-        }
         case kIROp_HalfType:
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
         {
-            m_writer->emit("float");
+            UnownedStringSlice slice = _getTypeName(type);
+            m_writer->emit(slice);
             return;
         }
         case kIROp_StructType:
+        {
             m_writer->emit(getName(type));
             return;
-
-        case kIROp_VectorType:
-        {
-            auto vecType = (IRVectorType*)type;
-            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
-            return;
         }
-        case kIROp_MatrixType:
+        case kIROp_HLSLRWStructuredBufferType:
         {
-            auto matType = (IRMatrixType*)type;
-
-            const auto rowCount = GetIntVal(matType->getRowCount());
-            const auto colCount = GetIntVal(matType->getColumnCount());
-
-            _emitCMatType(matType->getElementType()->op, rowCount, colCount);
-
+            m_writer->emit("RWStructuredBuffer");
             return;
         }
     }
@@ -213,6 +434,11 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
                 emitArgs(inst, mode);
             }
             return true;
+        case kIROp_Call:
+        {
+
+            return false;
+        }
         default:
             return false;
     }
