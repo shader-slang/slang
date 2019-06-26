@@ -13,53 +13,40 @@ namespace Slang {
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc)
 {
-
-#if 0
-    
-    auto session = desc.compileRequest->getSession();
-
-    auto module = desc.compileRequest->getProgram()->getOrCreateIRModule(nullptr);
-    m_sharedBuilder.session = session;
-    m_sharedBuilder.module = module;
-    m_builder.sharedBuilder = &m_sharedBuilder;
-#endif
 }
+
+/* static */ UnownedStringSlice CPPSourceEmitter::getBuiltinTypeName(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_IntType:     return UnownedStringSlice("int32_t");
+        case kIROp_UIntType:    return UnownedStringSlice("uint32_t");
+
+        // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
+        case kIROp_HalfType:    return UnownedStringSlice("half");
+
+        default:                return Super::getDefaultBuiltinTypeName(op);
+    }
+}
+
 namespace { // anonymous
 
 struct OrderType
 {
-    OrderType(IRType* inType):
-        order(_calcOrder(inType)),
-        type(inType)
+    OrderType(const CPPSourceEmitter::HLSLType& hlslType):
+        order(hlslType.getOrder()),
+        type(hlslType)
     {
     }
 
     OrderType() {}
-
-    static uint32_t _calcOrder(IRType* inType)
-    {
-        switch (inType->op)
-        {
-            case kIROp_VectorType:
-            {
-                IRVectorType* vec = static_cast<IRVectorType*>(inType);
-                return (uint32_t(vec->getElementType()->op) << 8) + uint32_t(GetIntVal(vec->getElementCount()));
-            }
-            case kIROp_MatrixType:
-            {
-                IRMatrixType* mat = static_cast<IRMatrixType*>(inType);
-                return uint32_t(0x01000000) + (uint32_t(mat->getElementType()->op) << 8) + uint32_t(GetIntVal(mat->getColumnCount()) << 4) + uint32_t(GetIntVal(mat->getRowCount()));
-            }
-            default: return 0;
-        }
-    }
 
     SLANG_FORCE_INLINE bool operator<(const OrderType& rhs) const { return order < rhs.order; }
     SLANG_FORCE_INLINE bool operator==(const OrderType& rhs) const { return order == rhs.order; }
     SLANG_FORCE_INLINE bool operator!=(const OrderType& rhs) const { return order == rhs.order; }
 
     uint32_t order;
-    IRType* type;
+    CPPSourceEmitter::HLSLType type;
 };
 
 
@@ -73,10 +60,10 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     List<OrderType> types;
     for (const auto keyValue : m_typeNameMap)
     {
-        IRType* inst = keyValue.Key;
-        if (inst->op == kIROp_VectorType || inst->op == kIROp_MatrixType)
+        HLSLType type = keyValue.Key;
+        if (type.op == kIROp_VectorType || type.op == kIROp_MatrixType)
         {
-            types.add(inst);
+            types.add(type);
         }
     }
 
@@ -87,16 +74,15 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 
     for (const auto& orderType : types)
     {
-        IRType* type = orderType.type;
+        const auto& type = orderType.type;
 
-        switch (type->op)
+        switch (type.op)
         {
             case kIROp_VectorType:
             {
-                IRVectorType* vec = static_cast<IRVectorType*>(type);
-                IRType* elemType = vec->getElementType();
-                int count = int(GetIntVal(vec->getElementCount()));
-
+                HLSLType elemType = HLSLType::makeBasic(IROp(type.elementType));
+                int count = type.sizeOrColCount;
+                
                 SLANG_ASSERT(count > 0 && count < 4);
 
                 UnownedStringSlice typeName = _getTypeName(type);
@@ -127,15 +113,14 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
             }
             case kIROp_MatrixType:
             {
-                IRMatrixType* mat = static_cast<IRMatrixType*>(type);
-                IRType* elemType = mat->getElementType();
+                const auto rowCount = type.rowCount;
+                const auto colCount = type.sizeOrColCount;
 
-                const auto rowCount = GetIntVal(mat->getRowCount());
-                const auto colCount = GetIntVal(mat->getColumnCount());
+                HLSLType vecType = HLSLType::makeVec(IROp(type.elementType), colCount);
 
                 UnownedStringSlice typeName = _getTypeName(type);
-                UnownedStringSlice rowTypeName = _getTypeName(_getVectorType(elemType, int(colCount)));
-
+                UnownedStringSlice rowTypeName = _getTypeName(vecType);
+                
                 m_writer->emit("struct ");
                 m_writer->emit(typeName);
                 m_writer->emit("\n{\n");
@@ -231,9 +216,9 @@ static UnownedStringSlice _getCTypeName(IROp op)
 }
 #endif
 
-StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
+StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(const HLSLType& type)
 {
-    switch (type->op)
+    switch (IROp(type.op))
     {
         case kIROp_VoidType:
         case kIROp_BoolType:
@@ -248,20 +233,20 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
         case kIROp_FloatType:
         case kIROp_DoubleType:
         {
-            return m_slicePool.add(getDefaultBuiltinTypeName(type->op));
+            return m_slicePool.add(getBuiltinTypeName(IROp(type.op)));
         }
         case kIROp_HalfType:    
         {
-            return m_slicePool.add(getDefaultBuiltinTypeName(kIROp_FloatType));
+            return m_slicePool.add(getBuiltinTypeName(kIROp_FloatType));
         }
         case kIROp_VectorType:
         {
-            auto vecType = static_cast<IRVectorType*>(type);
-            auto vecSize = GetIntVal(vecType->getElementCount());
+            auto vecSize = type.sizeOrColCount;
+            const IROp elemType = IROp(type.elementType);
 
             StringBuilder builder;
             builder << "Vec";
-            UnownedStringSlice postFix = _getCTypeVecPostFix(vecType->getElementType()->op);
+            UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
 
             builder << postFix;
             if (postFix.size() > 1)
@@ -273,20 +258,18 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
         }
         case kIROp_MatrixType:
         {
-            auto matType = (IRMatrixType*)type;
-
-            auto elemType = matType->getElementType();
-
-            const auto rowCount = GetIntVal(matType->getRowCount());
-            const auto colCount = GetIntVal(matType->getColumnCount());
-
+            const IROp elemType = IROp(type.elementType);
+            
+            const auto rowCount = type.rowCount;
+            const auto colCount = type.sizeOrColCount;
+            
             // Make sure there is the vector name too
-            _getTypeName(_getVectorType(elemType, int(colCount)));
+            _getTypeName(HLSLType::makeVec(elemType, colCount));
             
             StringBuilder builder;
 
             builder << "Mat";
-            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elemType->op));
+            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elemType));
             builder << postFix;
             if (postFix.size() > 1)
             {
@@ -303,7 +286,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
     return StringSlicePool::kNullHandle;
 }
 
-UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
+UnownedStringSlice CPPSourceEmitter::_getTypeName(const HLSLType& type)
 {
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
     if (m_typeNameMap.TryGetValue(type, handle))
@@ -344,31 +327,11 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
     //SLANG_ASSERT(!"Not implemented");
 }
 
-IRType* CPPSourceEmitter::_getVectorType(IRType* elemType, int count)
-{
-#if 1
-    SharedIRBuilder sharedBuilder;
-    sharedBuilder.session = m_compileRequest->getSession();
-    sharedBuilder.module = m_module;
-    
-    IRBuilder builder;
-    builder.sharedBuilder = &sharedBuilder;
-
-    IRInst* elemCountInst = builder.getIntValue(builder.getIntType(), count);
-    return builder.getVectorType(elemType, elemCountInst);
-
-#else
-
-    // Construct as a vector type, such that we have in the map
-    IRInst* elemCountInst = m_builder.getIntValue(m_builder.getIntType(), count);
-    return m_builder.getVectorType(elemType, elemCountInst);
-
-#endif
-}
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    return emitSimpleTypeImpl(_getVectorType(elementType, int(elementCount)));
+    UnownedStringSlice name = _getTypeName(HLSLType::makeVec(elementType->op, int(elementCount)));
+    m_writer->emit(name);
 }
 
 void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
@@ -388,10 +351,26 @@ void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        {
+            auto slice = _getTypeName(HLSLType::makeBasic(type->op));
+            m_writer->emit(slice);
+            return;
+        }
         case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(type);
+            auto size = GetIntVal(vecType->getElementCount());
+            auto slice = _getTypeName(HLSLType::makeVec(vecType->getElementType()->op, int(size)));
+            m_writer->emit(slice);
+            return;
+        }
         case kIROp_MatrixType:
         {
-            UnownedStringSlice slice = _getTypeName(type);
+            auto matType = static_cast<IRMatrixType*>(type);
+            auto colCount = GetIntVal(matType->getColumnCount());
+            auto rowCount = GetIntVal(matType->getRowCount());
+
+            UnownedStringSlice slice = _getTypeName(HLSLType::makeMatrix(matType->getElementType()->op, int(rowCount), int(colCount)));
             m_writer->emit(slice);
             return;
         }
