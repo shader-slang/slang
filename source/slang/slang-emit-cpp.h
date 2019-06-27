@@ -19,37 +19,29 @@ public:
     {
         typedef HLSLFunction ThisType;
 
-        UInt GetHashCode() const
-        {
-            auto hash = combineHash(combineHash(int(name), int(argsCount)), int(Slang::GetHashCode(returnType)));
-            for (int i = 0; i < argsCount; ++i)
-            {
-                hash = combineHash(hash, int(Slang::GetHashCode(args[i])));
-            }
-            return hash;
-        }
+        UInt GetHashCode() const { return combineHash(int(name), Slang::GetHashCode(signatureType)); }
 
-        bool operator==(const ThisType& rhs) const
+        bool operator==(const ThisType& rhs) const { return name == rhs.name && returnType == rhs.returnType && signatureType == rhs.signatureType; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        bool isScalar() const
         {
-            if (name != rhs.name || returnType != rhs.returnType || argsCount != rhs.argsCount)
+            int paramCount = int(signatureType->getParamCount());
+            for (int i = 0; i < paramCount; ++i)
             {
-                return false;
-            }
-            for (int i = 0; i < argsCount; ++i)
-            {
-                if (args[i] != rhs.args[i])
+                IRType* paramType = signatureType->getParamType(i);
+                // If any are vec or matrix, then we
+                if (paramType->op == kIROp_MatrixType || paramType->op == kIROp_VectorType)
                 {
                     return false;
                 }
             }
             return true;
         }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         StringSlicePool::Handle name;
         IRType* returnType;
-        IRType* args[4];
-        uint8_t argsCount;
+        IRFuncType* signatureType;              // Same as funcType, but has return type of void
     };
 
     enum class BuiltInCOp
@@ -63,7 +55,8 @@ public:
     static UnownedStringSlice getBuiltinTypeName(IROp op);
 
 protected:
-
+    typedef SlangResult (*EmitFunc)(const HLSLFunction& func, CPPSourceEmitter* emitter);
+    
     void _emitCFunc(BuiltInCOp cop, IRType* type);
 
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
@@ -81,6 +74,7 @@ protected:
     IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
 
     HLSLFunction _getHLSLFunc(const UnownedStringSlice& name, IRCall* inst, int operandIndex, int operandCount);
+    HLSLFunction _getHLSLFunc(const UnownedStringSlice& name, IRInst* inst);
 
     UnownedStringSlice _getFuncName(const HLSLFunction& func);
     StringSlicePool::Handle _calcFuncName(const HLSLFunction& func);

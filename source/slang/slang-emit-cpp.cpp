@@ -340,10 +340,17 @@ UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLFunction& func)
 
 StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLFunction& func)
 {
-    StringBuilder builder;
-    builder << "HLSLIntrinsic::";
-    builder << m_slicePool.getSlice(func.name);
-    return m_slicePool.add(builder);
+    if (func.isScalar())
+    {
+        StringBuilder builder;
+        builder << "HLSLIntrinsic::";
+        builder << m_slicePool.getSlice(func.name);
+        return m_slicePool.add(builder);
+    }
+    else
+    {
+        return func.name;
+    }
 }
 
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
@@ -503,38 +510,53 @@ void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
 CPPSourceEmitter::HLSLFunction CPPSourceEmitter::_getHLSLFunc(const UnownedStringSlice& name, IRCall* inst, int operandIndex, int operandCount)
 {
     HLSLFunction func;
-    func.argsCount = 0;
     func.name = StringSlicePool::kNullHandle;
+    
+    int numOperands = (operandCount - operandIndex);
 
-    const int maxArgs = SLANG_COUNT_OF(func.args);
-    func.argsCount = 0;
-    func.returnType = m_irBuilder.getBasicType(BaseType::Void);
-
-    IRType* retType = inst->getDataType();
-    if (retType)
-    {
-        retType = retType->getCanonicalType();
-    }
-    func.returnType = _cloneType(retType);
-    if (operandCount - operandIndex > maxArgs)
-    {
-        return func;
-    }
+    List<IRType*> argTypes;
+    argTypes.setCount(numOperands);
 
     for (auto i = operandIndex; i < operandCount; ++i)
     {
         IRInst* operand = inst->getOperand(i);
         IRType* type = operand->getDataType();
-        if (type)
-        {
-            func.args[func.argsCount++] = _cloneType(type->getCanonicalType());
-        }
+        argTypes[i - operandIndex] = _cloneType(type->getCanonicalType());
     }
+
+    func.signatureType = m_irBuilder.getFuncType(argTypes, m_irBuilder.getBasicType(BaseType::Void));
+    func.returnType = _cloneType(inst->getDataType()->getCanonicalType());
 
     // Get the name
     func.name = m_slicePool.add(name);
     return func;
 }
+
+CPPSourceEmitter::HLSLFunction CPPSourceEmitter::_getHLSLFunc(const UnownedStringSlice& name, IRInst* inst)
+{
+    HLSLFunction func;
+    func.name = StringSlicePool::kNullHandle;
+
+    int numOperands = int(inst->getOperandCount());
+    
+    List<IRType*> argTypes;
+    argTypes.setCount(numOperands);
+
+    for (int i = 0; i < numOperands; ++i)
+    {
+        IRInst* operand = inst->getOperand(i);
+        IRType* type = operand->getDataType();
+        argTypes[i] = _cloneType(type->getCanonicalType());
+    }
+
+    func.signatureType = m_irBuilder.getFuncType(argTypes, m_irBuilder.getBasicType(BaseType::Void));
+    func.returnType = _cloneType(inst->getDataType()->getCanonicalType());
+
+    // Get the name
+    func.name = m_slicePool.add(name);
+    return func;
+}
+
 
 void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec)
 {
@@ -643,7 +665,7 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
             name = _getFuncName(hlslFunc);
         }
     }
-    
+  
     m_writer->emit(name);
     m_writer->emit("(");
     bool first = true;
@@ -660,7 +682,6 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
-
 
     switch (inst->op)
     {
@@ -679,6 +700,21 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
                 emitArgs(inst, mode);
             }
             return true;
+        case kIROp_Mul_Matrix_Matrix:
+        case kIROp_Mul_Matrix_Vector:
+        case kIROp_Mul_Vector_Matrix:
+        {
+            auto outerPrec = inOuterPrec;
+            auto prec = getInfo(EmitOp::Postfix);
+            bool needClose = maybeEmitParens(outerPrec, prec);
+
+            auto name = _getFuncName(_getHLSLFunc(UnownedStringSlice::fromLiteral("mul"), inst));
+            m_writer->emit(name);
+            emitArgs(inst, mode);
+
+            maybeCloseParens(needClose);
+            return true;
+        }
         case kIROp_Call:
         {
             auto funcValue = inst->getOperand(0);
