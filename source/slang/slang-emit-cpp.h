@@ -10,18 +10,37 @@
 namespace Slang
 {
 
-class CPPSourceEmitter: public CLikeSourceEmitter
+class CPPSourceEmitter;
+
+#define SLANG_CPP_OPERATION(x) \
+        x(Invalid) \
+        x(Init) \
+        x(Broadcast) \
+        x(Splat) \
+        x(Mul) \
+        x(Div) \
+        x(Add) \
+        x(Sub) \
+        \
+        x(VecMatMul)
+
+class CPPEmitHandler: public RefObject
 {
 public:
-    typedef CLikeSourceEmitter Super;
+#define SLANG_CPP_OPERATION_ENUM(x) x,
 
-    struct HLSLFunction
+    enum class Operation
     {
-        typedef HLSLFunction ThisType;
+        SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_ENUM)
+    };
 
-        UInt GetHashCode() const { return combineHash(int(name), Slang::GetHashCode(signatureType)); }
+    struct SpecializedOperation
+    {
+        typedef SpecializedOperation ThisType;
 
-        bool operator==(const ThisType& rhs) const { return name == rhs.name && returnType == rhs.returnType && signatureType == rhs.signatureType; }
+        UInt GetHashCode() const { return combineHash(int(op), Slang::GetHashCode(signatureType)); }
+
+        bool operator==(const ThisType& rhs) const { return op == rhs.op && returnType == rhs.returnType && signatureType == rhs.signatureType; }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         bool isScalar() const
@@ -39,26 +58,68 @@ public:
             return true;
         }
 
-        StringSlicePool::Handle name;
+        Operation op;
         IRType* returnType;
         IRFuncType* signatureType;              // Same as funcType, but has return type of void
     };
 
-    enum class BuiltInCOp
-    {
-        Splat,                  //< Splat a single value to all values of a vector or matrix type
-        Init,                   //< Initialize with parameters (must match the type)
-    };
+    virtual SpecializedOperation getSpecializedOperation(Operation op, IRType*const* argTypes, int argTypesCount, IRType* retType);
+    virtual void useType(IRType* type);
+    virtual void emitCall(const SpecializedOperation& specOp, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
+    virtual void emitType(IRType* type, CPPSourceEmitter* emitter);
+    virtual void emitTypeDefinition(IRType* type, CPPSourceEmitter* emitter);
+    virtual void emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    virtual void emitVectorTypeName(IRType* elementType, int elementCount, CPPSourceEmitter* emitter);
 
-    CPPSourceEmitter(const Desc& desc);
+    virtual void emitPreamble(CPPSourceEmitter* emitter);
+
+    void emitOperationCall(Operation op, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
+    static UnownedStringSlice getName(Operation op);
+
+    Operation getOperationByName(const UnownedStringSlice& slice);
+
+    CPPEmitHandler(const CLikeSourceEmitter::Desc& desc);
 
 protected:
-    typedef SlangResult (*EmitFunc)(const HLSLFunction& func, CPPSourceEmitter* emitter);
-    
-    void _emitCFunc(BuiltInCOp cop, IRType* type);
 
+    IRType* _getVecType(IRType* elementType, int elementCount);
+
+    IRInst* _clone(IRInst* inst);
+    IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
+
+    UnownedStringSlice _getFuncName(const SpecializedOperation& specOp);
+    StringSlicePool::Handle _calcFuncName(const SpecializedOperation& specOp);
+
+    UnownedStringSlice _getTypeName(IRType* type);
+    StringSlicePool::Handle _calcTypeName(IRType* type);
+
+    Dictionary<SpecializedOperation, StringSlicePool::Handle> m_specializeOperationNameMap;
+    Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
+
+    RefPtr<IRModule> m_uniqueModule;            ///< Store types/function sigs etc for output
+    SharedIRBuilder m_sharedIRBuilder;
+    IRBuilder m_irBuilder;
+
+    Dictionary<IRInst*, IRInst*> m_cloneMap;
+
+    Dictionary<IRType*, bool> m_typeEmittedMap;
+
+    StringSlicePool m_slicePool;
+};
+
+class CPPSourceEmitter: public CLikeSourceEmitter
+{
+public:
+    typedef CLikeSourceEmitter Super;
+
+    SourceWriter* getSourceWriter() const { return m_writer; }
+
+    CPPSourceEmitter(const Desc& desc, CPPEmitHandler* emitHandler);
+
+protected:
+    
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
@@ -70,32 +131,7 @@ protected:
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
 
-    IRInst* _clone(IRInst* inst);
-    IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
-
-    HLSLFunction _getHLSLFunc(const UnownedStringSlice& name, IRCall* inst, int operandIndex, int operandCount);
-    HLSLFunction _getHLSLFunc(const UnownedStringSlice& name, IRInst* inst);
-
-    UnownedStringSlice _getFuncName(const HLSLFunction& func);
-    StringSlicePool::Handle _calcFuncName(const HLSLFunction& func);
-
-    IRType* _getVecType(IRType* elementType, int count);
-
-    UnownedStringSlice _getTypeName(IRType* type);
-    StringSlicePool::Handle _calcTypeName(IRType* type);
-    
-    Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
-    Dictionary<HLSLFunction, StringSlicePool::Handle> m_funcNameMap;
-
-    RefPtr<IRModule> m_uniqueModule;            ///< Store types/function sigs etc for output
-    SharedIRBuilder m_sharedIRBuilder;
-    IRBuilder m_irBuilder;
-
-    Dictionary<IRInst*, IRInst*> m_cloneMap;
-
-    IRCloneEnv m_cloneEnv;
-
-    StringSlicePool m_slicePool;
+    RefPtr<CPPEmitHandler> m_emitHandler;
 };
 
 }
