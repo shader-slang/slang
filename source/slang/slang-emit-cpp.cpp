@@ -6,6 +6,8 @@
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
+#include "slang-ir-clone.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -13,6 +15,15 @@ namespace Slang {
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc)
 {
+    m_sharedIRBuilder.module = nullptr;
+    m_sharedIRBuilder.session = desc.compileRequest->getSession();
+
+    m_irBuilder.sharedBuilder = &m_sharedIRBuilder;
+
+    m_uniqueModule = m_irBuilder.createModule();
+    m_sharedIRBuilder.module = m_uniqueModule;
+
+    m_irBuilder.setInsertInto(m_irBuilder.getModule()->getModuleInst());
 }
 
 /* static */ UnownedStringSlice CPPSourceEmitter::getBuiltinTypeName(IROp op)
@@ -29,13 +40,34 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     }
 }
 
+static uint32_t _calcOrder(IRType* type)
+{
+    switch (type->op)
+    {
+        case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(type);
+            return uint32_t(0x01000000) | (uint32_t(vecType->getElementType()->op) << 8) | uint32_t(GetIntVal(vecType->getElementCount()));
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = static_cast<IRMatrixType*>(type);
+            return uint32_t(0x00000000) | (uint32_t(matType->getElementType()->op) << 16) | uint32_t(GetIntVal(matType->getColumnCount()) << 8) | uint32_t(GetIntVal(matType->getRowCount()));
+        }
+        default:
+        {
+            return uint32_t(0x02000000) | uint32_t(type->op);
+        }
+    }
+}
+
 namespace { // anonymous
 
 struct OrderType
 {
-    OrderType(const CPPSourceEmitter::HLSLType& hlslType):
-        order(hlslType.getOrder()),
-        type(hlslType)
+    OrderType(IRType* type):
+        order(_calcOrder(type)),
+        type(type)
     {
     }
 
@@ -46,7 +78,7 @@ struct OrderType
     SLANG_FORCE_INLINE bool operator!=(const OrderType& rhs) const { return order == rhs.order; }
 
     uint32_t order;
-    CPPSourceEmitter::HLSLType type;
+    IRType* type;
 };
 
 
@@ -60,8 +92,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     List<OrderType> types;
     for (const auto keyValue : m_typeNameMap)
     {
-        HLSLType type = keyValue.Key;
-        if (type.op == kIROp_VectorType || type.op == kIROp_MatrixType)
+        IRType* type = keyValue.Key;
+        if (type->op == kIROp_VectorType || type->op == kIROp_MatrixType)
         {
             types.add(type);
         }
@@ -74,19 +106,19 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 
     for (const auto& orderType : types)
     {
-        const auto& type = orderType.type;
+        const auto type = orderType.type;
 
-        switch (type.op)
+        switch (type->op)
         {
             case kIROp_VectorType:
             {
-                HLSLType elemType = HLSLType::makeBasic(IROp(type.elementType));
-                int count = type.sizeOrColCount;
+                auto vecType = static_cast<IRVectorType*>(type);
+                int count = int(GetIntVal(vecType->getElementCount()));
                 
                 SLANG_ASSERT(count > 0 && count < 4);
 
                 UnownedStringSlice typeName = _getTypeName(type);
-                UnownedStringSlice elemName = _getTypeName(elemType);
+                UnownedStringSlice elemName = _getTypeName(vecType->getElementType());
 
                 const char elemNames[] = "xyzw";
 
@@ -113,10 +145,12 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
             }
             case kIROp_MatrixType:
             {
-                const auto rowCount = type.rowCount;
-                const auto colCount = type.sizeOrColCount;
+                auto matType = static_cast<IRMatrixType*>(type);
 
-                HLSLType vecType = HLSLType::makeVec(IROp(type.elementType), colCount);
+                const auto rowCount = int(GetIntVal(matType->getRowCount()));
+                const auto colCount = int(GetIntVal(matType->getColumnCount()));
+                
+                IRType* vecType = _getVecType(matType->getElementType(), colCount);
 
                 UnownedStringSlice typeName = _getTypeName(type);
                 UnownedStringSlice rowTypeName = _getTypeName(vecType);
@@ -217,9 +251,9 @@ static UnownedStringSlice _getCTypeName(IROp op)
 #endif
 
 
-StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(const HLSLType& type)
+StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
 {
-    switch (IROp(type.op))
+    switch (type->op)
     {
         case kIROp_VoidType:
         case kIROp_BoolType:
@@ -234,7 +268,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(const HLSLType& type)
         case kIROp_FloatType:
         case kIROp_DoubleType:
         {
-            return m_slicePool.add(getBuiltinTypeName(IROp(type.op)));
+            return m_slicePool.add(getBuiltinTypeName(type->op));
         }
         case kIROp_HalfType:    
         {
@@ -242,9 +276,10 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(const HLSLType& type)
         }
         case kIROp_VectorType:
         {
-            auto vecSize = type.sizeOrColCount;
-            const IROp elemType = IROp(type.elementType);
-
+            auto vecType = static_cast<IRVectorType*>(type);
+            auto vecCount = int(GetIntVal(vecType->getElementCount()));
+            const IROp elemType = vecType->getElementType()->op;
+            
             StringBuilder builder;
             builder << "Vec";
             UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
@@ -254,23 +289,24 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(const HLSLType& type)
             {
                 builder << "_";
             }
-            builder << vecSize;
+            builder << vecCount;
             return m_slicePool.add(builder);
         }
         case kIROp_MatrixType:
         {
-            const IROp elemType = IROp(type.elementType);
-            
-            const auto rowCount = type.rowCount;
-            const auto colCount = type.sizeOrColCount;
+            auto matType = static_cast<IRMatrixType*>(type);
+
+            auto elementType = matType->getElementType();
+            const auto rowCount = int(GetIntVal(matType->getRowCount()));
+            const auto colCount = int(GetIntVal(matType->getColumnCount()));
             
             // Make sure there is the vector name too
-            _getTypeName(HLSLType::makeVec(elemType, colCount));
+            _getTypeName(_getVecType(elementType, colCount));
             
             StringBuilder builder;
 
             builder << "Mat";
-            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elemType));
+            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
             builder << postFix;
             if (postFix.size() > 1)
             {
@@ -310,8 +346,10 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLFunction& func
     return m_slicePool.add(builder);
 }
 
-UnownedStringSlice CPPSourceEmitter::_getTypeName(const HLSLType& type)
+UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 {
+    SLANG_ASSERT(type->getModule() == m_uniqueModule);
+
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
     if (m_typeNameMap.TryGetValue(type, handle))
     {
@@ -351,14 +389,80 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
     //SLANG_ASSERT(!"Not implemented");
 }
 
+IRType* CPPSourceEmitter::_getVecType(IRType* elementType, int count)
+{
+    SLANG_ASSERT(elementType->getModule() == m_uniqueModule);
+
+    return m_irBuilder.getVectorType(elementType, m_irBuilder.getIntValue(m_irBuilder.getIntType(), count));
+}
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    UnownedStringSlice name = _getTypeName(HLSLType::makeVec(elementType->op, int(elementCount)));
+    UnownedStringSlice name = _getTypeName(_getVecType(_cloneType(elementType), int(elementCount)));
     m_writer->emit(name);
 }
 
-CPPSourceEmitter::HLSLType CPPSourceEmitter::_getHLSLType(IRType* type)
+IRInst* CPPSourceEmitter::_clone(IRInst* inst)
+{
+    SLANG_ASSERT(inst->getModule() != m_uniqueModule);
+
+    if (IRInst*const* newInstPtr = m_cloneMap.TryGetValue(inst))
+    {
+        return *newInstPtr;
+    }
+    
+    // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
+    // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
+    // it's no use
+
+    IRInst* clone = nullptr;
+
+    switch (inst->op)
+    {
+        case kIROp_VoidType:
+        case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        case kIROp_HalfType:
+        {
+            clone = m_irBuilder.getType(inst->op);
+            break;
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = static_cast<IRMatrixType*>(inst);
+            clone = m_irBuilder.getMatrixType(_cloneType(matType->getElementType()), _clone(matType->getColumnCount()), _clone(matType->getRowCount()));
+            break;
+        }
+        case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(inst);
+            clone = m_irBuilder.getVectorType(_cloneType(vecType->getElementType()), _clone(vecType->getElementCount()));
+            break;
+        }
+        case kIROp_IntLit:
+        {
+            auto intLit = static_cast<IRConstant*>(inst);
+            IRType* cloneType = _cloneType(intLit->getDataType());
+            clone = m_irBuilder.getIntValue(cloneType, intLit->value.intVal);
+            break;
+        }
+        default: break;
+    }
+
+    m_cloneMap.Add(inst, clone);
+    return clone;
+}
+
+void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->op)
     {
@@ -375,40 +479,12 @@ CPPSourceEmitter::HLSLType CPPSourceEmitter::_getHLSLType(IRType* type)
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
-        {
-            return HLSLType::makeBasic(type->op);
-        }
+        case kIROp_MatrixType:
         case kIROp_VectorType:
         {
-            auto vecType = static_cast<IRVectorType*>(type);
-            auto size = GetIntVal(vecType->getElementCount());
-            return HLSLType::makeVec(vecType->getElementType()->op, int(size));
+            m_writer->emit(_getTypeName(_cloneType(type)));
+            return;
         }
-        case kIROp_MatrixType:
-        {
-            auto matType = static_cast<IRMatrixType*>(type);
-            auto colCount = GetIntVal(matType->getColumnCount());
-            auto rowCount = GetIntVal(matType->getRowCount());
-
-            return HLSLType::makeMatrix(matType->getElementType()->op, int(rowCount), int(colCount));
-        }
-        default: return HLSLType::makeInvalid();
-    }
-}
-
-void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
-{
-    HLSLType hlslType = _getHLSLType(type);
-
-    if (!hlslType.isInvalid())
-    {
-        auto slice = _getTypeName(hlslType);
-        m_writer->emit(slice);
-        return;
-    }
-
-    switch (type->op)
-    {
         case kIROp_StructType:
         {
             m_writer->emit(getName(type));
@@ -432,19 +508,14 @@ CPPSourceEmitter::HLSLFunction CPPSourceEmitter::_getHLSLFunc(const UnownedStrin
 
     const int maxArgs = SLANG_COUNT_OF(func.args);
     func.argsCount = 0;
-    func.returnType = HLSLType::makeBasic(kIROp_VoidType);
+    func.returnType = m_irBuilder.getBasicType(BaseType::Void);
 
     IRType* retType = inst->getDataType();
     if (retType)
     {
         retType = retType->getCanonicalType();
     }
-    func.returnType = _getHLSLType(retType);
-    if (func.returnType.isInvalid())
-    {
-        return func;
-    }
-
+    func.returnType = _cloneType(retType);
     if (operandCount - operandIndex > maxArgs)
     {
         return func;
@@ -456,15 +527,7 @@ CPPSourceEmitter::HLSLFunction CPPSourceEmitter::_getHLSLFunc(const UnownedStrin
         IRType* type = operand->getDataType();
         if (type)
         {
-            IRType* canonicalType = type->getCanonicalType();
-
-            HLSLType& arg = func.args[func.argsCount];
-            arg = _getHLSLType(canonicalType);
-            if (arg.isInvalid())
-            {
-                return func;
-            }
-            func.argsCount++;
+            func.args[func.argsCount++] = _cloneType(type->getCanonicalType());
         }
     }
 
