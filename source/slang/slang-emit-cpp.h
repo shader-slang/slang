@@ -13,27 +13,44 @@ namespace Slang
 class CPPSourceEmitter;
 
 #define SLANG_CPP_OPERATION(x) \
-        x(Invalid, "") \
-        x(Init, "") \
-        x(Broadcast, "") \
+        x(Invalid, "", -1) \
+        x(Init, "", -1) \
         \
-        x(Mul, "*") \
-        x(Div, "/") \
-        x(Add, "+") \
-        x(Sub, "-") \
-        x(Lsh, "<<") \
-        x(Rsh, ">>") \
-        x(Mod, "%") \
+        x(Mul, "*", 2) \
+        x(Div, "/", 2) \
+        x(Add, "+", 2) \
+        x(Sub, "-", 2) \
+        x(Lsh, "<<", 2) \
+        x(Rsh, ">>", 2) \
+        x(Mod, "%", 2) \
         \
-        x(Swizzle, "") \
+        x(Eql, "==", 2) \
+        x(Neq, "!=", 2) \
+        x(Greater, ">", 2) \
+        x(Less, "<", 2) \
+        x(Geq, ">=", 2) \
+        x(Leq, "<=", 2) \
         \
-        x(Dot, "") \
-        x(VecMatMul, "")
+        x(BitAnd, "&", 2) \
+        x(BitXor, "^", 2) \
+        x(BitOr, "|" , 2) \
+        \
+        x(And, "&&", 2) \
+        x(Or, "||", 2) \
+        \
+        x(Neg, "-", 1) \
+        x(Not, "!", 1) \
+        x(BitNot, "~", 1) \
+        \
+        x(Swizzle, "", -1) \
+        \
+        x(Dot, "", -1) \
+        x(VecMatMul, "", -1)
 
 class CPPEmitHandler: public RefObject
 {
 public:
-#define SLANG_CPP_OPERATION_ENUM(x, op) x,
+#define SLANG_CPP_OPERATION_ENUM(x, op, numOperands) x,
 
     enum class Operation
     {
@@ -44,6 +61,7 @@ public:
     {
         UnownedStringSlice name;
         UnownedStringSlice funcName;
+        int8_t numOperands;                     ///< -1 if can't be handled automatically via amount of params
     };
 
     struct SpecializedOperation
@@ -109,6 +127,7 @@ protected:
     void _emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
     void _emitParameter(char charName, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter);
     void _emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitUnaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
 
     static Dimension _getDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);

@@ -133,7 +133,7 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
 
 static const CPPEmitHandler::OperationInfo s_operationInfos[] =
 {
-#define SLANG_CPP_OPERATION_INFO(x, funcName) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName) },
+#define SLANG_CPP_OPERATION_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
     SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_INFO)
 };
 
@@ -153,6 +153,25 @@ static const CPPEmitHandler::OperationInfo s_operationInfos[] =
         case kIROp_Lsh:     return Operation::Lsh;
         case kIROp_Rsh:     return Operation::Rsh;
         case kIROp_Mod:     return Operation::Mod;
+
+        case kIROp_Eql:     return Operation::Eql;
+        case kIROp_Neq:     return Operation::Neq;
+        case kIROp_Greater: return Operation::Greater;
+        case kIROp_Less:    return Operation::Less;
+        case kIROp_Geq:     return Operation::Geq;
+        case kIROp_Leq:     return Operation::Leq;
+
+        case kIROp_BitAnd:  return Operation::BitAnd;
+        case kIROp_BitXor:  return Operation::BitXor;
+        case kIROp_BitOr:   return Operation::BitOr;
+                
+        case kIROp_And:     return Operation::And;
+        case kIROp_Or:      return Operation::Or;
+
+        case kIROp_Neg:     return Operation::Neg;
+        case kIROp_Not:     return Operation::Not;
+        case kIROp_BitNot:  return Operation::BitNot;
+
         default:            return Operation::Invalid;
     }
 }
@@ -631,6 +650,61 @@ void CPPEmitHandler::_emitBinaryOp(const SpecializedOperation& specOp, CPPSource
     writer->emit("}\n\n");
 }
 
+void CPPEmitHandler::_emitUnaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    auto info = getOperationInfo(specOp.op);
+    auto funcName = info.funcName;
+    SLANG_ASSERT(funcName.size() > 0);
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 1);
+    IRType* paramType0 = funcType->getParamType(0);
+    IRType* retType = specOp.returnType;
+
+    SLANG_ASSERT(paramType0 == retType);
+
+    // If both inputs are scalar, no definition is needed
+
+    const Dimension dim = _getDimension(paramType0, false);
+    
+    // If both basic then we are done
+    if (dim.isScalar())
+    {
+        return;
+    }
+
+    emitType(retType, emitter);
+
+    writer->emit(" operator");
+    writer->emit(funcName);
+    writer->emit("(");
+    _emitParameter('a', paramType0, dim, emitter);
+    writer->emit(")\n{\n");
+    writer->indent();
+
+    emitType(retType, emitter);
+    writer->emit(" r;\n");
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            _emitAccess(UnownedStringSlice::fromLiteral("r"), dim, i, j, writer);
+            writer->emit(" = ");
+            writer->emit(funcName);
+            _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+            writer->emit(";\n");
+        }
+    }
+
+    writer->emit("return r;\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     IRFuncType* funcType = specOp.signatureType;
@@ -703,17 +777,18 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
         {
             return _emitVecMatMul(UnownedStringSlice::fromLiteral("Dot"), specOp, emitter);
         }
-        case Operation::Mul:
-        case Operation::Div:
-        case Operation::Add:
-        case Operation::Sub:
-        case Operation::Lsh:
-        case Operation::Rsh:
-        case Operation::Mod:
+        default:
         {
-            return _emitBinaryOp(specOp, emitter);
+            const auto& info = getOperationInfo(specOp.op);
+            if (info.numOperands == 2)
+            {
+                return _emitBinaryOp(specOp, emitter);
+            }
+            else if(info.numOperands == 1)
+            {
+                return _emitUnaryOp(specOp, emitter);
+            }
         }
-        default: break;
     }
 }
 
@@ -873,38 +948,36 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
             }
             break;
         }
-        case Operation::Mul:
-        case Operation::Div:
-        case Operation::Add:
-        case Operation::Sub:
-        case Operation::Lsh:
-        case Operation::Rsh:
-        case Operation::Mod:
-        {
-            SLANG_ASSERT(numOperands == 2);
-
-            // add that we want a function
-            _getFuncName(specOp);
-            // Just do the default output
-            emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
-            break;
-        }
         default:
         {
-            UnownedStringSlice name = _getFuncName(specOp);
-            writer->emit(name);
-            writer->emitChar('(');
-
-            for (int i = 0; i < numOperands; ++i)
+            const auto& info = getOperationInfo(specOp.op);
+            if (info.numOperands >= 0)
             {
-                if (i > 0)
-                {
-                    writer->emit(", ");
-                }
-                emitter->emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                SLANG_ASSERT(numOperands == info.numOperands);
+                // Make sure that the return type is available
+                useType(specOp.returnType);
+                // add that we want a function
+                _getFuncName(specOp);
+                // Just do the default output
+                emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
             }
+            else
+            {
+                UnownedStringSlice name = _getFuncName(specOp);
+                writer->emit(name);
+                writer->emitChar('(');
 
-            writer->emitChar(')');
+                for (int i = 0; i < numOperands; ++i)
+                {
+                    if (i > 0)
+                    {
+                        writer->emit(", ");
+                    }
+                    emitter->emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                }
+
+                writer->emitChar(')');
+            }
             break;
         }
     }
@@ -1165,20 +1238,6 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             m_emitHandler->emitOperationCall(Operation::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
-        case kIROp_Add:
-        case kIROp_Mul:
-        case kIROp_Sub:
-        case kIROp_Div:
-        case kIROp_Lsh:
-        case kIROp_Rsh:
-        case kIROp_Mod:
-        {
-            Operation op = CPPEmitHandler::getOperation(inst->op);
-            SLANG_ASSERT(op != Operation::Invalid);
-            m_emitHandler->emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
-            return true;
-        }
-        
         case kIROp_Call:
         {
             auto funcValue = inst->getOperand(0);
@@ -1198,7 +1257,13 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         }
         default:
         {
-            
+            Operation op = CPPEmitHandler::getOperation(inst->op);
+            if (op != Operation::Invalid)
+            {
+                m_emitHandler->emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+                return true;
+            }
+
             return false;
         }
     }
