@@ -650,7 +650,7 @@ CPPEmitHandler::SpecializedOperation CPPEmitHandler::getSpecializedOperation(Ope
     return specOp;
 }
 
-void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
+void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
 {
     SLANG_UNUSED(inOuterPrec);
     SourceWriter* writer = emitter->getSourceWriter();
@@ -729,6 +729,64 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, const IRUse* o
             }
             break;
         }
+        case Operation::Swizzle:
+        {
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+            const Index elementCount = Index(swizzleInst->getElementCount());
+
+            if (elementCount == 1)
+            {
+                EmitOpInfo outerPrec(inOuterPrec);
+                // Just access
+                auto prec = getInfo(EmitOp::Postfix);
+                bool needClose = emitter->maybeEmitParens(outerPrec, prec);
+
+                auto ii = (IRSwizzle*)inst;
+                emitter->emitOperand(ii->getBase(), mode, leftSide(outerPrec, prec));
+                writer->emit(".");
+                
+                int elementIndex = int(GetIntVal(swizzleInst->getElementIndex(0)));
+
+                SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+                writer->emitChar(s_elemNames[elementIndex]);
+
+                emitter->maybeCloseParens(needClose);
+            }
+            else
+            {
+                // TODO(JS): Not sure this is correct on the parens handling front
+                IRType* retType = specOp.returnType;
+                emitType(retType, emitter);
+                writer->emit("{");
+
+                for (Index i = 0; i < elementCount; ++i)
+                {
+                    if (i > 0)
+                    {
+                        writer->emit(", ");
+                    }
+
+                    auto outerPrec = getInfo(EmitOp::General);
+
+                    auto prec = getInfo(EmitOp::Postfix);
+                    emitter->emitOperand(swizzleInst->getBase(), mode, leftSide(outerPrec, prec));
+
+                    writer->emit(".");
+
+                    IRInst* irElementIndex = swizzleInst->getElementIndex(i);
+                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                    IRConstant* irConst = (IRConstant*)irElementIndex;
+                    UInt elementIndex = (UInt)irConst->value.intVal;
+                    SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+                    writer->emitChar(s_elemNames[elementIndex]);
+                }
+
+                writer->emit("}");
+            }
+            break;
+        }
         default:
         {
             writer->emit(name);
@@ -779,7 +837,7 @@ StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation
     }
 }
 
-void CPPEmitHandler::emitOperationCall(Operation op, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
+void CPPEmitHandler::emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
 {
     if (operandCount > 8)
     {
@@ -791,7 +849,7 @@ void CPPEmitHandler::emitOperationCall(Operation op, IRUse* operands, int operan
             argTypes[i] = operands[i].get()->getDataType();
         }
         CPPEmitHandler::SpecializedOperation specOp = getSpecializedOperation(op, argTypes.getBuffer(), operandCount, retType);
-        emitCall(specOp, operands, operandCount, mode, inOuterPrec, emitter);
+        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec, emitter);
     }
     else
     {
@@ -802,10 +860,9 @@ void CPPEmitHandler::emitOperationCall(Operation op, IRUse* operands, int operan
             argTypes[i] = operands[i].get()->getDataType();
         }
         CPPEmitHandler::SpecializedOperation specOp = getSpecializedOperation(op, argTypes, operandCount, retType);
-        emitCall(specOp, operands, operandCount, mode, inOuterPrec, emitter);
+        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec, emitter);
     }
 }
-
 
 /* !!!!!!!!!!!!!!!!!!!!!! CPPSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -956,7 +1013,7 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
         {
             IRUse* operands = inst->getOperands() + operandIndex;
 
-            m_emitHandler->emitOperationCall(op, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec, this);
+            m_emitHandler->emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec, this);
             return;
         }
     }
@@ -985,19 +1042,24 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
-            m_emitHandler->emitOperationCall(Operation::Init, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            m_emitHandler->emitOperationCall(Operation::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
         case kIROp_Mul_Matrix_Matrix:
         case kIROp_Mul_Matrix_Vector:
         case kIROp_Mul_Vector_Matrix:
         {
-            m_emitHandler->emitOperationCall(Operation::VecMatMul, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            m_emitHandler->emitOperationCall(Operation::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
         case kIROp_Dot:
         {
-            m_emitHandler->emitOperationCall(Operation::Dot, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            m_emitHandler->emitOperationCall(Operation::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            return true;
+        }
+        case kIROp_swizzle:
+        {
+            m_emitHandler->emitOperationCall(Operation::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
         case kIROp_Call:

@@ -57,7 +57,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     matrix<float, 2, 3> mat = { { 0, 1, 2 }, { 3, 4, 5} };
     vector<float, 2> vec = { float(tid + 1), float(tid + 2) };
 
+
     vector<float, 3> vec2 = mul(vec, mat);
+
+    vec2 += vec2.zyx;
 
     int val = int(tid);
     val = test(val);

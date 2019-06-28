@@ -16,14 +16,15 @@ class CPPSourceEmitter;
         x(Invalid) \
         x(Init) \
         x(Broadcast) \
-        x(Splat) \
+        \
         x(Mul) \
         x(Div) \
         x(Add) \
         x(Sub) \
         \
-        x(Dot) \
+        x(Swizzle) \
         \
+        x(Dot) \
         x(VecMatMul)
 
 class CPPEmitHandler: public RefObject
@@ -67,7 +68,7 @@ public:
 
     virtual SpecializedOperation getSpecializedOperation(Operation op, IRType*const* argTypes, int argTypesCount, IRType* retType);
     virtual void useType(IRType* type);
-    virtual void emitCall(const SpecializedOperation& specOp, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
+    virtual void emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
     virtual void emitType(IRType* type, CPPSourceEmitter* emitter);
     virtual void emitTypeDefinition(IRType* type, CPPSourceEmitter* emitter);
     virtual void emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
@@ -75,7 +76,7 @@ public:
 
     virtual void emitPreamble(CPPSourceEmitter* emitter);
 
-    void emitOperationCall(Operation op, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
+    void emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
     static UnownedStringSlice getName(Operation op);
