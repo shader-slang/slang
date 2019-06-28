@@ -639,24 +639,6 @@ static IRType* _getElementType(IRType* type)
     }
 }
 
-void CPPEmitHandler::_emitParameter(char nameChar, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter)
-{
-    SourceWriter* writer = emitter->getSourceWriter();
-
-    writer->emit("const ");
-    emitType(type, emitter);
-
-    if (dim.isScalar())
-    {
-       writer->emit(" ");
-    }
-    else
-    {
-        writer->emit("& ");
-    }
-    writer->emitChar(nameChar);
-}
-
 void CPPEmitHandler::_emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     auto info = getOperationInfo(specOp.op);
@@ -683,15 +665,10 @@ void CPPEmitHandler::_emitBinaryOp(const SpecializedOperation& specOp, CPPSource
         return;
     }
 
-    emitType(retType, emitter);
-
-    writer->emit(" operator");
-    writer->emit(funcName);
-    writer->emit("(");
-    _emitParameter('a', paramType0, dimA, emitter);
-    writer->emit(", ");
-    _emitParameter('b', paramType1, dimB, emitter);
-    writer->emit(")\n{\n");
+    StringBuilder builder;
+    builder << "operator" << funcName;
+    _emitSignature(builder.getUnownedSlice(), specOp, emitter);
+    writer->emit("\n{\n");
     writer->indent();
 
     emitType(retType, emitter);
@@ -744,13 +721,10 @@ void CPPEmitHandler::_emitUnaryOp(const SpecializedOperation& specOp, CPPSourceE
         return;
     }
 
-    emitType(retType, emitter);
-
-    writer->emit(" operator");
-    writer->emit(funcName);
-    writer->emit("(");
-    _emitParameter('a', paramType0, dim, emitter);
-    writer->emit(")\n{\n");
+    StringBuilder builder;
+    builder << "operator" << funcName;
+    _emitSignature(builder.getUnownedSlice(), specOp, emitter);
+    writer->emit("\n{\n");
     writer->indent();
 
     emitType(retType, emitter);
@@ -774,6 +748,7 @@ void CPPEmitHandler::_emitUnaryOp(const SpecializedOperation& specOp, CPPSourceE
     writer->emit("}\n\n");
 }
 
+
 void CPPEmitHandler::_emitAnyAll(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     IRFuncType* funcType = specOp.signatureType;
@@ -791,14 +766,8 @@ void CPPEmitHandler::_emitAnyAll(const UnownedStringSlice& funcName, const Speci
 
     const Dimension dim = _getDimension(paramType0, false);
 
-    writer->emit(retTypeName);
-
-    writer->emit(" ");
-    writer->emit(funcName);
-    writer->emit("(");
-    _emitParameter('a', paramType0, dim, emitter);
-    writer->emit(")\n{\n");
-
+    _emitSignature(funcName, specOp, emitter);
+    writer->emit("\n{\n");
     writer->indent();
 
     writer->emit("return ");
@@ -850,6 +819,44 @@ void CPPEmitHandler::_emitAnyAll(const UnownedStringSlice& funcName, const Speci
     writer->emit("}\n\n");
 }
 
+void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    IRFuncType* funcType = specOp.signatureType;
+    const int paramsCount = int(funcType->getParamCount());
+    IRType* retType = specOp.returnType;
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    emitType(retType, emitter);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+
+    for (int i = 0; i < paramsCount; ++i)
+    {
+        if (i > 0)
+        {
+            writer->emit(", ");
+        }
+
+        writer->emit("const ");
+        IRType* paramType = funcType->getParamType(i);
+        emitType(paramType, emitter);
+
+        if (dynamicCast<IRBasicType>(paramType))
+        {
+            writer->emit(" ");
+        }
+        else
+        {
+            writer->emit("& ");
+        }
+
+        writer->emitChar(char('a' + i));
+    }
+    writer->emit(")");
+}
+
 void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     IRFuncType* funcType = specOp.signatureType;
@@ -860,15 +867,9 @@ void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const Sp
 
     SourceWriter* writer = emitter->getSourceWriter();
 
-    emitType(retType, emitter);
-    writer->emit(" ");
-    writer->emit(funcName);
-    writer->emit("(");
-    writer->emit("const ");
-    emitType(paramType0, emitter);
-    writer->emit("& a, const ");
-    emitType(paramType1, emitter);
-    writer->emit("& b)\n{\n");
+    _emitSignature(funcName, specOp, emitter);
+
+    writer->emit("\n{\n");
     writer->indent();
 
     emitType(retType, emitter);
@@ -906,6 +907,22 @@ void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const Sp
     writer->emit("}\n\n");
 }
 
+void CPPEmitHandler::_emitCross(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    _emitSignature(funcName, specOp, emitter);
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    writer->emit("\n{\n");
+    writer->indent();
+
+    emitType(specOp.returnType, emitter);
+    writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     SLANG_UNUSED(emitter);
@@ -924,6 +941,7 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
         {
             return _emitAnyAll(_getFuncName(specOp), specOp, emitter);
         }
+        case Operation::Cross:  return _emitCross(_getFuncName(specOp), specOp, emitter);
         default:
         {
             const auto& info = getOperationInfo(specOp.op);
@@ -1150,8 +1168,7 @@ StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation
     if (specOp.isScalar())
     {
         StringBuilder builder;
-        builder << "HLSLIntrinsic::";
-        builder << getOperationInfo(specOp.op).name;
+        builder << getOperationInfo(specOp.op).funcName;
         return m_slicePool.add(builder);
     }
     else

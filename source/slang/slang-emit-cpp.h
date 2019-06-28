@@ -48,8 +48,55 @@ class CPPSourceEmitter;
         x(Swizzle, "", -1) \
         \
         x(Dot, "dot", -1) \
-        x(VecMatMul, "mul", -1) 
-
+        x(VecMatMul, "mul", -1) \
+        \
+        x(Normalize, "normalize", -1) \
+        x(Length, "length", -1) \
+        \
+        x(Sin, "sin", 1) \
+        x(Cos, "cos", 1) \
+        x(Tan, "tan", 1) \
+        \
+        x(ArcSin, "asin", 1) \
+        x(ArcCos, "acos", 1) \
+        x(ArcTan, "atan", 1) \
+        \
+        x(ArcTan2, "atan2", 2) \
+        x(SinCos, "sincos", 3) \
+        \
+        x(Rcp, "rcp", 1) \
+        x(Sign, "sign", 1) \
+        x(Saturate, "saturate", 1) \
+        x(Frac, "frac", 1) \
+        \
+        x(Ceil, "ceil", 1) \
+        x(Floor, "floor", 1) \
+        x(Trunc, "trunc", 1) \
+        \
+        x(Sqrt, "sqrt", 1) \
+        x(RecipSqrt, "rsqrt", 1) \
+        \
+        x(Exp2, "exp2", 1) \
+        x(Exp, "exp", 1) \
+        \
+        x(Abs, "abs", 1) \
+        \
+        x(Min, "min", 2) \
+        x(Max, "max", 2) \
+        x(Pow, "pow", 2) \
+        x(FMod, "fmod", 2) \
+        x(Cross, "cross", 2) \
+        x(Reflect, "reflect", 2) \
+        \
+        x(SmoothStep, "smoothstep", 3) \
+        x(Lerp, "lerp", 3) \
+        x(Clamp, "clamp", 3) \
+        x(Step, "step", 2) \
+        \
+        x(AsFloat, "asfloat", 1) \
+        x(AsInt, "asint", 1) \
+        x(AsUInt, "asuint", 1)
+        
 class CPPEmitHandler: public RefObject
 {
 public:
@@ -128,10 +175,13 @@ public:
 
 protected:
     void _emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitParameter(char charName, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter);
     void _emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
     void _emitUnaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
     void _emitAnyAll(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitCross(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+
+    void _emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    
 
     static Dimension _getDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
