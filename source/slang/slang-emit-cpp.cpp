@@ -12,6 +12,8 @@
 
 namespace Slang {
 
+static const char s_elemNames[] = "xyzw";
+
 #if 0
 static UnownedStringSlice _getCTypeName(IROp op)
 {
@@ -141,6 +143,11 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
 
 CPPEmitHandler::Operation CPPEmitHandler::getOperationByName(const UnownedStringSlice& slice)
 {
+    if (slice == "dot")
+    {
+        return Operation::Dot;
+    }
+
     SLANG_UNUSED(slice);
     return Operation::Invalid;
 }
@@ -167,8 +174,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
             UnownedStringSlice typeName = _getTypeName(type);
             UnownedStringSlice elemName = _getTypeName(vecType->getElementType());
 
-            const char elemNames[] = "xyzw";
-
+           
             writer->emit("struct ");
             writer->emit(typeName);
             writer->emit("\n{\n");
@@ -182,7 +188,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
                 {
                     writer->emit(", ");
                 }
-                writer->emitChar(elemNames[i]);
+                writer->emitChar(s_elemNames[i]);
             }
             writer->emit(";\n");
 
@@ -324,7 +330,14 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
         }
         case kIROp_HLSLRWStructuredBufferType:
         {
-            return m_slicePool.add("RWStructuredBuffer");
+            auto bufType = static_cast<IRHLSLRWStructuredBufferType*>(type);
+
+            StringBuilder builder;
+            builder << "RWStructuredBuffer<";
+            builder << _getTypeName(bufType->getElementType());
+            builder << ">";
+
+            return m_slicePool.add(builder);
         }
         default:
         {
@@ -362,17 +375,20 @@ void CPPEmitHandler::emitPreamble(CPPSourceEmitter* emitter)
     SourceWriter* writer = emitter->getSourceWriter();
 
     writer->emit("\n");
-    writer->emit("#include <inttypes.h>\n");
-    writer->emit("#include <math.h>\n\n");
-
+    writer->emit("#include \"slang-cpp-prelude.h\"\n\n");
+    
     // Emit the type definitions
-    for (const auto keyValue : m_typeNameMap)
+    for (const auto& keyValue : m_typeNameMap)
     {
         emitTypeDefinition(keyValue.Key, emitter);
     }
 
     // Emit all the intrinsics that were used
 
+    for (const auto& keyValue : m_specializeOperationNameMap)
+    {
+        emitSpecializedOperationDefinition(keyValue.Key, emitter);
+    }
 }
 
 IRInst* CPPEmitHandler::_clone(IRInst* inst)
@@ -468,11 +484,140 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
     return clone;
 }
 
+namespace { // anonymous
+struct Dimension
+{
+    int rowCount;
+    int colCount;
+};
+} // anonymous
+
+static Dimension _getDimension(IRType* type, bool vecSwap)
+{
+    switch (type->op)
+    {
+        case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(type);
+            const int elemCount = int(GetIntVal(vecType->getElementCount()));
+            return (!vecSwap) ? Dimension{1, elemCount} : Dimension{ elemCount, 1};
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = static_cast<IRMatrixType*>(type);
+            const int colCount = int(GetIntVal(matType->getColumnCount()));
+            const int rowCount = int(GetIntVal(matType->getRowCount()));
+            return Dimension{rowCount, colCount};
+        }
+        default: return Dimension{1, 1};
+    }
+}
+
+static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
+{
+    writer->emit(name);
+    const int comb = (dimension.colCount > 1 ? 2 : 0) | (dimension.rowCount > 1 ? 1 : 0);
+    switch (comb)
+    {
+        case 0:
+        {
+            break;
+        }
+        case 1:
+        case 2:
+        {
+            // Vector
+            int index = (row > col) ? row : col;
+            writer->emit(".");
+            writer->emitChar(s_elemNames[index]);
+            break;
+        }
+        case 3:
+        {
+            // Matrix
+            writer->emit(".rows[");
+            writer->emit(row);
+            writer->emit("].");
+            writer->emitChar(s_elemNames[col]);
+            break;
+        }
+    }
+}
+
+void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+    IRType* paramType0 = funcType->getParamType(0);
+    IRType* paramType1 = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    emitType(retType, emitter);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    writer->emit("const ");
+    emitType(paramType0, emitter);
+    writer->emit("& a, const ");
+    emitType(paramType1, emitter);
+    writer->emit("&b )\n{\n");
+    writer->indent();
+
+    emitType(retType, emitter);
+    writer->emit(" r;\n");
+
+    Dimension dimA = _getDimension(paramType0, false);
+    Dimension dimB = _getDimension(paramType1, true);
+    Dimension resultDim = _getDimension(retType, paramType1->op == kIROp_VectorType);
+
+    for (int i = 0; i < resultDim.rowCount; ++i)
+    {
+        for (int j = 0; j < resultDim.colCount; ++j)
+        {
+            _emitAccess(UnownedStringSlice::fromLiteral("r"), resultDim, i, j, writer);
+            writer->emit(" = ");
+
+            for (int k = 0; k < dimA.colCount; k++)
+            {
+                if (k > 0)
+                {
+                    writer->emit(" + ");
+                }
+                _emitAccess(UnownedStringSlice::fromLiteral("a"), dimA, i, k, writer);
+                writer->emit(" * ");
+                _emitAccess(UnownedStringSlice::fromLiteral("b"), dimB, k, j, writer);
+            }
+
+            writer->emit(";\n");
+        }
+    }
+
+    writer->emit("return r;\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     SLANG_UNUSED(emitter);
     SLANG_UNUSED(specOp);
-    // Do nothing for now 
+    // Do nothing for now
+
+    switch (specOp.op)
+    {
+        case Operation::VecMatMul:
+        {
+            return _emitVecMatMul(UnownedStringSlice::fromLiteral("VecMatMul"), specOp, emitter);
+        }
+        case Operation::Dot:
+        {
+            return _emitVecMatMul(UnownedStringSlice::fromLiteral("Dot"), specOp, emitter);
+        }
+        default: break;
+    }
 }
 
 IRType* CPPEmitHandler::_getVecType(IRType* elementType, int elementCount)
@@ -809,10 +954,9 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
         CPPEmitHandler::Operation op = m_emitHandler->getOperationByName(name);
         if (op != CPPEmitHandler::Operation::Invalid)
         {
-            const int operandsCount = int(operandCount - operandIndex);
             IRUse* operands = inst->getOperands() + operandIndex;
 
-            m_emitHandler->emitOperationCall(op, operands, int(operandCount), inst->getDataType(), mode, inOuterPrec, this);
+            m_emitHandler->emitOperationCall(op, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec, this);
             return;
         }
     }
@@ -849,6 +993,11 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         case kIROp_Mul_Vector_Matrix:
         {
             m_emitHandler->emitOperationCall(Operation::VecMatMul, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            return true;
+        }
+        case kIROp_Dot:
+        {
+            m_emitHandler->emitOperationCall(Operation::Dot, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
         case kIROp_Call:

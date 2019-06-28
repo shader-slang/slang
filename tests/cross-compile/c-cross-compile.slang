@@ -62,5 +62,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int val = int(tid);
     val = test(val);
 
-    outputBuffer[tid] = val + int(vec2.x + vec2.y + vec2.z);
+    outputBuffer[tid] = val + int(dot(vec2, vec2));
 }

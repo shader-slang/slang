@@ -22,6 +22,8 @@ class CPPSourceEmitter;
         x(Add) \
         x(Sub) \
         \
+        x(Dot) \
+        \
         x(VecMatMul)
 
 class CPPEmitHandler: public RefObject
@@ -83,6 +85,7 @@ public:
     CPPEmitHandler(const CLikeSourceEmitter::Desc& desc);
 
 protected:
+    void _emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
 
     IRType* _getVecType(IRType* elementType, int elementCount);
 
