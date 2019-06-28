@@ -131,13 +131,29 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
     }
 }
 
-/* static */UnownedStringSlice CPPEmitHandler::getName(Operation op)
+static const CPPEmitHandler::OperationInfo s_operationInfos[] =
 {
-#define SLANG_CPP_OPERATION_NAME(x) case Operation::x: return UnownedStringSlice::fromLiteral(#x); 
+#define SLANG_CPP_OPERATION_INFO(x, funcName) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName) },
+    SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_INFO)
+};
+
+/* static */const CPPEmitHandler::OperationInfo& CPPEmitHandler::getOperationInfo(Operation op)
+{
+    return s_operationInfos[int(op)];
+}
+
+/* static */CPPEmitHandler::Operation CPPEmitHandler::getOperation(IROp op)
+{
     switch (op)
     {
-        SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_NAME)
-        default: return UnownedStringSlice::fromLiteral("Unknown!");
+        case kIROp_Add:     return Operation::Add;
+        case kIROp_Mul:     return Operation::Mul;
+        case kIROp_Sub:     return Operation::Sub;
+        case kIROp_Div:     return Operation::Div;
+        case kIROp_Lsh:     return Operation::Lsh;
+        case kIROp_Rsh:     return Operation::Rsh;
+        case kIROp_Mod:     return Operation::Mod;
+        default:            return Operation::Invalid;
     }
 }
 
@@ -174,7 +190,6 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
             UnownedStringSlice typeName = _getTypeName(type);
             UnownedStringSlice elemName = _getTypeName(vecType->getElementType());
 
-           
             writer->emit("struct ");
             writer->emit(typeName);
             writer->emit("\n{\n");
@@ -233,7 +248,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
         }
         default:
         {
-            if (type->op >= kIROp_FirstBasicType && type->op <= kIROp_LastBasicType)
+            if (IRBasicType::isaImpl(type->op))
             {
                 // Don't emit anything for built in types
                 return;
@@ -341,7 +356,7 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
         }
         default:
         {
-            if (type->op >= kIROp_FirstBasicType && type->op <= kIROp_LastBasicType)
+            if (IRBasicType::isaImpl(type->op))
             {
                 return m_slicePool.add(getBuiltinTypeName(type->op));
             }
@@ -440,7 +455,7 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
         }
         default:
         {
-            if (inst->op >= kIROp_FirstBasicType && inst->op <= kIROp_LastBasicType)
+            if (IRBasicType::isaImpl(inst->op))
             {
                 clone = m_irBuilder.getType(inst->op);
             }
@@ -484,15 +499,7 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
     return clone;
 }
 
-namespace { // anonymous
-struct Dimension
-{
-    int rowCount;
-    int colCount;
-};
-} // anonymous
-
-static Dimension _getDimension(IRType* type, bool vecSwap)
+/* static */CPPEmitHandler::Dimension CPPEmitHandler::_getDimension(IRType* type, bool vecSwap)
 {
     switch (type->op)
     {
@@ -513,7 +520,7 @@ static Dimension _getDimension(IRType* type, bool vecSwap)
     }
 }
 
-static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
+/* static */void CPPEmitHandler::_emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
 {
     writer->emit(name);
     const int comb = (dimension.colCount > 1 ? 2 : 0) | (dimension.rowCount > 1 ? 1 : 0);
@@ -544,6 +551,86 @@ static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimensi
     }
 }
 
+void CPPEmitHandler::_emitParameter(char nameChar, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter)
+{
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    writer->emit("const ");
+    emitType(type, emitter);
+
+    if (dim.isScalar())
+    {
+       writer->emit(" ");
+    }
+    else
+    {
+        writer->emit("& ");
+    }
+    writer->emitChar(nameChar);
+}
+
+void CPPEmitHandler::_emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    auto info = getOperationInfo(specOp.op);
+    auto funcName = info.funcName;
+    SLANG_ASSERT(funcName.size() > 0);
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+    IRType* paramType0 = funcType->getParamType(0);
+    IRType* paramType1 = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    // If both inputs are scalar, no definition is needed
+    
+    const Dimension dimA = _getDimension(paramType0, false);
+    const Dimension dimB = _getDimension(paramType1, false);
+    const Dimension resultDim = _getDimension(retType, false);
+
+    // If both basic then we are done
+    if (dimA.isScalar() && dimB.isScalar())
+    {
+        return;
+    }
+
+    emitType(retType, emitter);
+
+    writer->emit(" operator");
+    writer->emit(funcName);
+    writer->emit("(");
+    _emitParameter('a', paramType0, dimA, emitter);
+    writer->emit(", ");
+    _emitParameter('b', paramType1, dimB, emitter);
+    writer->emit(")\n{\n");
+    writer->indent();
+
+    emitType(retType, emitter);
+    writer->emit(" r;\n");
+
+    for (int i = 0; i < resultDim.rowCount; ++i)
+    {
+        for (int j = 0; j < resultDim.colCount; ++j)
+        {
+            _emitAccess(UnownedStringSlice::fromLiteral("r"), resultDim, i, j, writer);
+            writer->emit(" = ");
+
+            _emitAccess(UnownedStringSlice::fromLiteral("a"), dimA, i, j, writer);
+            writer->emit(" ");
+            writer->emit(funcName);
+            writer->emit(" ");
+            _emitAccess(UnownedStringSlice::fromLiteral("b"), dimB, i, j, writer);
+            writer->emit(";\n");
+        }
+    }
+    
+    writer->emit("return r;\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     IRFuncType* funcType = specOp.signatureType;
@@ -562,7 +649,7 @@ void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const Sp
     emitType(paramType0, emitter);
     writer->emit("& a, const ");
     emitType(paramType1, emitter);
-    writer->emit("&b )\n{\n");
+    writer->emit("& b)\n{\n");
     writer->indent();
 
     emitType(retType, emitter);
@@ -616,6 +703,16 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
         {
             return _emitVecMatMul(UnownedStringSlice::fromLiteral("Dot"), specOp, emitter);
         }
+        case Operation::Mul:
+        case Operation::Div:
+        case Operation::Add:
+        case Operation::Sub:
+        case Operation::Lsh:
+        case Operation::Rsh:
+        case Operation::Mod:
+        {
+            return _emitBinaryOp(specOp, emitter);
+        }
         default: break;
     }
 }
@@ -656,12 +753,15 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
     SourceWriter* writer = emitter->getSourceWriter();
 
     // Getting the name means that this op is registered as used
-    UnownedStringSlice name = _getFuncName(specOp);
-
+    
     switch (specOp.op)
     {
         case Operation::Init:
         {
+            // For C++ we don't need an init function
+            // For C we'll need the construct function for the return type
+            //UnownedStringSlice name = _getFuncName(specOp);
+
             IRType* retType = specOp.returnType;
 
             switch (retType->op)
@@ -691,7 +791,6 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                     //int colsCount = int(GetIntVal(matType->getColumnCount()));
                     int rowsCount = int(GetIntVal(matType->getRowCount()));
 
-                    
                     SLANG_ASSERT(rowsCount == numOperands);
 
                     emitType(retType, emitter);
@@ -711,7 +810,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                 }
                 default:
                 {
-                    if (retType->op >= kIROp_FirstBasicType && retType->op <= kIROp_LastBasicType)
+                    if (IRBasicType::isaImpl(retType->op))
                     {
                         SLANG_ASSERT(numOperands == 1);
 
@@ -731,27 +830,14 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
         }
         case Operation::Swizzle:
         {
+            // For C++ we don't need to emit a swizzle function
+            // For C we need a construction function
             auto swizzleInst = static_cast<IRSwizzle*>(inst);
             const Index elementCount = Index(swizzleInst->getElementCount());
 
             if (elementCount == 1)
             {
-                EmitOpInfo outerPrec(inOuterPrec);
-                // Just access
-                auto prec = getInfo(EmitOp::Postfix);
-                bool needClose = emitter->maybeEmitParens(outerPrec, prec);
-
-                auto ii = (IRSwizzle*)inst;
-                emitter->emitOperand(ii->getBase(), mode, leftSide(outerPrec, prec));
-                writer->emit(".");
-                
-                int elementIndex = int(GetIntVal(swizzleInst->getElementIndex(0)));
-
-                SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-                writer->emitChar(s_elemNames[elementIndex]);
-
-                emitter->maybeCloseParens(needClose);
+                emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
             }
             else
             {
@@ -787,8 +873,25 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
             }
             break;
         }
+        case Operation::Mul:
+        case Operation::Div:
+        case Operation::Add:
+        case Operation::Sub:
+        case Operation::Lsh:
+        case Operation::Rsh:
+        case Operation::Mod:
+        {
+            SLANG_ASSERT(numOperands == 2);
+
+            // add that we want a function
+            _getFuncName(specOp);
+            // Just do the default output
+            emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
+            break;
+        }
         default:
         {
+            UnownedStringSlice name = _getFuncName(specOp);
             writer->emit(name);
             writer->emitChar('(');
 
@@ -828,12 +931,12 @@ StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation
     {
         StringBuilder builder;
         builder << "HLSLIntrinsic::";
-        builder << getName(specOp.op);
+        builder << getOperationInfo(specOp.op).name;
         return m_slicePool.add(builder);
     }
     else
     {
-        return m_slicePool.add(getName(specOp.op));
+        return m_slicePool.add(getOperationInfo(specOp.op).name);
     }
 }
 
@@ -1062,6 +1165,20 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             m_emitHandler->emitOperationCall(Operation::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
             return true;
         }
+        case kIROp_Add:
+        case kIROp_Mul:
+        case kIROp_Sub:
+        case kIROp_Div:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_Mod:
+        {
+            Operation op = CPPEmitHandler::getOperation(inst->op);
+            SLANG_ASSERT(op != Operation::Invalid);
+            m_emitHandler->emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            return true;
+        }
+        
         case kIROp_Call:
         {
             auto funcValue = inst->getOperand(0);
@@ -1080,7 +1197,10 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             return false;
         }
         default:
+        {
+            
             return false;
+        }
     }
 }
 

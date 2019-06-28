@@ -226,7 +226,8 @@ public:
     void emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
     void emitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
-    
+    void defaultEmitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+
     BaseType extractBaseType(IRType* inType);
 
     void emitInst(IRInst* inst, IREmitMode mode);

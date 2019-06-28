@@ -13,28 +13,37 @@ namespace Slang
 class CPPSourceEmitter;
 
 #define SLANG_CPP_OPERATION(x) \
-        x(Invalid) \
-        x(Init) \
-        x(Broadcast) \
+        x(Invalid, "") \
+        x(Init, "") \
+        x(Broadcast, "") \
         \
-        x(Mul) \
-        x(Div) \
-        x(Add) \
-        x(Sub) \
+        x(Mul, "*") \
+        x(Div, "/") \
+        x(Add, "+") \
+        x(Sub, "-") \
+        x(Lsh, "<<") \
+        x(Rsh, ">>") \
+        x(Mod, "%") \
         \
-        x(Swizzle) \
+        x(Swizzle, "") \
         \
-        x(Dot) \
-        x(VecMatMul)
+        x(Dot, "") \
+        x(VecMatMul, "")
 
 class CPPEmitHandler: public RefObject
 {
 public:
-#define SLANG_CPP_OPERATION_ENUM(x) x,
+#define SLANG_CPP_OPERATION_ENUM(x, op) x,
 
     enum class Operation
     {
         SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_ENUM)
+    };
+
+    struct OperationInfo
+    {
+        UnownedStringSlice name;
+        UnownedStringSlice funcName;
     };
 
     struct SpecializedOperation
@@ -66,6 +75,14 @@ public:
         IRFuncType* signatureType;              // Same as funcType, but has return type of void
     };
 
+    struct Dimension
+    {
+        bool isScalar() const { return rowCount <= 1 && colCount <= 1; }
+
+        int rowCount;
+        int colCount;
+    };
+
     virtual SpecializedOperation getSpecializedOperation(Operation op, IRType*const* argTypes, int argTypesCount, IRType* retType);
     virtual void useType(IRType* type);
     virtual void emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
@@ -79,7 +96,10 @@ public:
     void emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
-    static UnownedStringSlice getName(Operation op);
+
+    static const OperationInfo& getOperationInfo(Operation op);
+    
+    static Operation getOperation(IROp op);
 
     Operation getOperationByName(const UnownedStringSlice& slice);
 
@@ -87,6 +107,11 @@ public:
 
 protected:
     void _emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitParameter(char charName, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter);
+    void _emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+
+    static Dimension _getDimension(IRType* type, bool vecSwap);
+    static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
 
     IRType* _getVecType(IRType* elementType, int elementCount);
 

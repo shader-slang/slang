@@ -1653,7 +1653,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo 
         maybeCloseParens(needClose);
     }
 }
-    
+
 void CLikeSourceEmitter::emitInstExpr(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     // Try target specific impl first
@@ -1661,7 +1661,11 @@ void CLikeSourceEmitter::emitInstExpr(IRInst* inst, IREmitMode mode, const EmitO
     {
         return;
     }
+    defaultEmitInstExpr(inst, mode, inOuterPrec);
+}
 
+void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+{
     EmitOpInfo outerPrec = inOuterPrec;
     bool needClose = false;
     switch(inst->op)

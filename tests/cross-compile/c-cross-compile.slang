@@ -60,7 +60,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     vector<float, 3> vec2 = mul(vec, mat);
 
-    vec2 += vec2.zyx;
+    vec2 += vec2.zyx * 2;
 
     int val = int(tid);
     val = test(val);
