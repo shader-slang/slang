@@ -934,7 +934,23 @@ struct IRBuilder
 
     IRUndefined* emitUndefined(IRType* type);
 
-
+    IRInst* findOrEmitHoistableInst(
+        IRType*                 type,
+        IROp                    op,
+        UInt                    operandListCount,
+        UInt const*             listOperandCounts,
+        IRInst* const* const*   listOperands);
+    IRInst* findOrEmitHoistableInst(
+        IRType*         type,
+        IROp            op,
+        UInt            operandCount,
+        IRInst* const*  operands);
+    IRInst* findOrEmitHoistableInst(
+        IRType*         type,
+        IROp            op,
+        IRInst*         operand,
+        UInt            operandCount,
+        IRInst* const*  operands);
 
     IRModule* createModule();
 
