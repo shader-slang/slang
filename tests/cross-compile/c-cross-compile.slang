@@ -64,7 +64,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     vector<bool, 3> z = vec2 > 0;
 
-    int val = int(tid) + z.x ? 1 : 0;
+    int val = int(tid) + any(z) ? 1 : 0;
     val = test(val);
 
     outputBuffer[tid] = val + int(dot(vec2, vec2));

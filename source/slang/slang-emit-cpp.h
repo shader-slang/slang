@@ -42,10 +42,13 @@ class CPPSourceEmitter;
         x(Not, "!", 1) \
         x(BitNot, "~", 1) \
         \
+        x(Any, "any", 1) \
+        x(All, "all", 1) \
+        \
         x(Swizzle, "", -1) \
         \
-        x(Dot, "", -1) \
-        x(VecMatMul, "", -1)
+        x(Dot, "dot", -1) \
+        x(VecMatMul, "mul", -1) 
 
 class CPPEmitHandler: public RefObject
 {
@@ -128,6 +131,7 @@ protected:
     void _emitParameter(char charName, IRType* type, const Dimension& dim, CPPSourceEmitter* emitter);
     void _emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
     void _emitUnaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitAnyAll(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
 
     static Dimension _getDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
@@ -153,6 +157,9 @@ protected:
     Dictionary<IRInst*, IRInst*> m_cloneMap;
 
     Dictionary<IRType*, bool> m_typeEmittedMap;
+
+    // Maps from a name to an operation
+    List<Operation> m_operationMap;  
 
     StringSlicePool m_slicePool;
 };

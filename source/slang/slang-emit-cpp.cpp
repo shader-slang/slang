@@ -29,7 +29,37 @@ static UnownedStringSlice _getCTypeName(IROp op)
 }
 #endif
 
-
+static IROp _getTypeStyle(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_VoidType:    
+        case kIROp_BoolType:
+        {
+            return op;
+        }
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+        {
+            // All int like 
+            return kIROp_IntType;
+        }
+        case kIROp_HalfType:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        {
+            // All float like
+            return kIROp_FloatType;
+        }
+        default: return kIROp_Invalid;
+    }
+}
 
 static IROp _getCType(IROp op)
 {
@@ -90,6 +120,12 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!! CPPEmitHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+static const CPPEmitHandler::OperationInfo s_operationInfos[] =
+{
+#define SLANG_CPP_OPERATION_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
+    SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_INFO)
+};
+
 CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
 {
     m_sharedIRBuilder.module = nullptr;
@@ -101,6 +137,30 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
     m_sharedIRBuilder.module = m_uniqueModule;
 
     m_irBuilder.setInsertInto(m_irBuilder.getModule()->getModuleInst());
+
+    // Add all the operations with names (not ops like -, / etc) to the lookup map
+    for (int i = 0; i < SLANG_COUNT_OF(s_operationInfos); ++i)
+    {
+        const auto& info = s_operationInfos[i];
+        UnownedStringSlice slice = info.funcName;
+
+        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
+        {
+            auto handle = m_slicePool.add(slice);
+            Index index = Index(handle);
+            // Make sure there is space
+            if (index >= m_operationMap.getCount())
+            {
+                Index oldSize = m_operationMap.getCount(); 
+                m_operationMap.setCount(index + 1);
+                for (Index j = oldSize; j < index; j++)
+                {
+                    m_operationMap[j] = Operation::Invalid;
+                }
+            }
+            m_operationMap[index] = Operation(i);
+        }
+    }
 }
 
 
@@ -131,11 +191,6 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
     }
 }
 
-static const CPPEmitHandler::OperationInfo s_operationInfos[] =
-{
-#define SLANG_CPP_OPERATION_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
-    SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_INFO)
-};
 
 /* static */const CPPEmitHandler::OperationInfo& CPPEmitHandler::getOperationInfo(Operation op)
 {
@@ -178,12 +233,16 @@ static const CPPEmitHandler::OperationInfo s_operationInfos[] =
 
 CPPEmitHandler::Operation CPPEmitHandler::getOperationByName(const UnownedStringSlice& slice)
 {
-    if (slice == "dot")
+    Index index = m_slicePool.findIndex(slice);
+    if (index >= 0 && index < m_operationMap.getCount())
     {
-        return Operation::Dot;
+        Operation op = m_operationMap[index];
+        if (op != Operation::Invalid)
+        {
+            return op;
+        }
     }
 
-    SLANG_UNUSED(slice);
     return Operation::Invalid;
 }
 
@@ -518,6 +577,16 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
     return clone;
 }
 
+static IRType* _getElementType(IRType* type)
+{
+    switch (type->op)
+    {
+        case kIROp_VectorType:      return static_cast<IRVectorType*>(type)->getElementType();
+        case kIROp_MatrixType:      return static_cast<IRMatrixType*>(type)->getElementType();
+        default:                    return dynamicCast<IRBasicType>(type);
+    }
+}
+
 /* static */CPPEmitHandler::Dimension CPPEmitHandler::_getDimension(IRType* type, bool vecSwap)
 {
     switch (type->op)
@@ -705,6 +774,82 @@ void CPPEmitHandler::_emitUnaryOp(const SpecializedOperation& specOp, CPPSourceE
     writer->emit("}\n\n");
 }
 
+void CPPEmitHandler::_emitAnyAll(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+{
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 1);
+    IRType* paramType0 = funcType->getParamType(0);
+
+    SourceWriter* writer = emitter->getSourceWriter();
+
+    IRType* elementType = _getElementType(paramType0);
+    SLANG_ASSERT(elementType);
+    IRType* retType = specOp.returnType;
+    auto retTypeName = _getTypeName(retType);
+
+    IROp style = _getTypeStyle(elementType->op);
+
+    const Dimension dim = _getDimension(paramType0, false);
+
+    writer->emit(retTypeName);
+
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    _emitParameter('a', paramType0, dim, emitter);
+    writer->emit(")\n{\n");
+
+    writer->indent();
+
+    writer->emit("return ");
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            if (i > 0 || j > 0)
+            {
+                if (specOp.op == Operation::All)
+                {
+                    writer->emit(" && ");
+                }
+                else
+                {
+                    writer->emit(" || ");
+                }
+            }
+
+            switch (style)
+            {
+                case kIROp_BoolType:
+                {
+                    _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+                    break;
+                }
+                case kIROp_IntType:
+                {
+                    writer->emit("(");
+                    _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+                    writer->emit(" != 0)");
+                    break;
+                }
+                case kIROp_FloatType:
+                {
+                    writer->emit("(");
+                    _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+                    writer->emit(" != 0.0)");
+                    break;
+                }
+            }
+        }
+    }
+
+    writer->emit(";\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPEmitHandler::_emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
     IRFuncType* funcType = specOp.signatureType;
@@ -770,12 +915,14 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
     switch (specOp.op)
     {
         case Operation::VecMatMul:
-        {
-            return _emitVecMatMul(UnownedStringSlice::fromLiteral("VecMatMul"), specOp, emitter);
-        }
         case Operation::Dot:
         {
-            return _emitVecMatMul(UnownedStringSlice::fromLiteral("Dot"), specOp, emitter);
+            return _emitVecMatMul(_getFuncName(specOp), specOp, emitter);
+        }
+        case Operation::Any:
+        case Operation::All:
+        {
+            return _emitAnyAll(_getFuncName(specOp), specOp, emitter);
         }
         default:
         {
@@ -1009,7 +1156,18 @@ StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation
     }
     else
     {
-        return m_slicePool.add(getOperationInfo(specOp.op).name);
+        const auto& info = getOperationInfo(specOp.op);
+
+        if (info.funcName.size())
+        {
+            char c = info.funcName[0];
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+            {
+                return m_slicePool.add(info.funcName);
+            }
+        }
+
+        return m_slicePool.add(info.name);
     }
 }
 
@@ -1188,7 +1346,6 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
         if (op != CPPEmitHandler::Operation::Invalid)
         {
             IRUse* operands = inst->getOperands() + operandIndex;
-
             m_emitHandler->emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec, this);
             return;
         }
