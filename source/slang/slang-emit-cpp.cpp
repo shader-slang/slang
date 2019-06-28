@@ -139,7 +139,6 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
     }
 }
 
-
 CPPEmitHandler::Operation CPPEmitHandler::getOperationByName(const UnownedStringSlice& slice)
 {
     SLANG_UNUSED(slice);
@@ -158,23 +157,6 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
 
     switch (type->op)
     {
-        case kIROp_VoidType:
-        case kIROp_BoolType:
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        case kIROp_HalfType:
-        {
-            // Don't emit anything for built in types
-            return;
-        }
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
@@ -245,6 +227,11 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
         }
         default:
         {
+            if (type->op >= kIROp_FirstBasicType && type->op <= kIROp_LastBasicType)
+            {
+                // Don't emit anything for built in types
+                return;
+            }
             SLANG_ASSERT(!"Unhandled type");
             break;
         }
@@ -287,23 +274,9 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
 {
     switch (type->op)
     {
-        case kIROp_VoidType:
-        case kIROp_BoolType:
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        {
-            return m_slicePool.add(getBuiltinTypeName(type->op));
-        }
         case kIROp_HalfType:
         {
+            // Special case half
             return m_slicePool.add(getBuiltinTypeName(kIROp_FloatType));
         }
         case kIROp_VectorType:
@@ -353,7 +326,14 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
         {
             return m_slicePool.add("RWStructuredBuffer");
         }
-        default: break;
+        default:
+        {
+            if (type->op >= kIROp_FirstBasicType && type->op <= kIROp_LastBasicType)
+            {
+                return m_slicePool.add(getBuiltinTypeName(type->op));
+            }
+            break;
+        }
     }
 
     return StringSlicePool::kNullHandle;
@@ -421,23 +401,6 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
 
     switch (inst->op)
     {
-        case kIROp_VoidType:
-        case kIROp_BoolType:
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        case kIROp_HalfType:
-        {
-            clone = m_irBuilder.getType(inst->op);
-            break;
-        }
 #if 0
         case kIROp_MatrixType:
         {
@@ -461,14 +424,41 @@ IRInst* CPPEmitHandler::_clone(IRInst* inst)
         }
         default:
         {
-            auto cloneType = _cloneType(inst->getFullType());
-            
-            Index operandCount = Index(inst->getOperandCount());
-            clone = m_irBuilder.emitIntrinsicInst(cloneType, inst->op, operandCount, nullptr);
-            for (Index i = 0; i < operandCount; ++i)
+            if (inst->op >= kIROp_FirstBasicType && inst->op <= kIROp_LastBasicType)
             {
-                auto cloneOperand = _clone(inst->getOperand(i));
-                clone->getOperands()[i].init(clone, cloneOperand);
+                clone = m_irBuilder.getType(inst->op);
+            }
+            else
+            {
+                IRType* irType = dynamicCast<IRType>(inst);
+                if (irType)
+                {
+                    auto cloneType = _cloneType(inst->getFullType());
+                    Index operandCount = Index(inst->getOperandCount());
+
+                    List<IRInst*> cloneOperands;
+                    cloneOperands.setCount(operandCount);
+
+                    for (Index i = 0; i < operandCount; ++i)
+                    {
+                        cloneOperands[i] = _clone(inst->getOperand(i));
+                    }
+
+                    clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+                }
+                else
+                {
+                    // This cloning style only works on insts that are not unique
+                    auto cloneType = _cloneType(inst->getFullType());
+            
+                    Index operandCount = Index(inst->getOperandCount());
+                    clone = m_irBuilder.emitIntrinsicInst(cloneType, inst->op, operandCount, nullptr);
+                    for (Index i = 0; i < operandCount; ++i)
+                    {
+                        auto cloneOperand = _clone(inst->getOperand(i));
+                        clone->getOperands()[i].init(clone, cloneOperand);
+                    }
+                }
             }
             break;
         }

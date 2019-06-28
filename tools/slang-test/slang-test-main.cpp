@@ -1100,6 +1100,83 @@ static String _calcSummary(const CPPCompiler::Output& inOutput)
     return builder;
 }
 
+static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
+{
+    CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
+    CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
+
+    if (!compiler)
+    {
+        return TestResult::Ignored;
+    }
+
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
+
+    auto filePath999 = input.filePath;
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    cmdLine.addArg(filePath999);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    if (exeRes.resultCode != 0)
+    {
+        return TestResult::Fail;
+    }
+
+    String actualOutput = exeRes.standardOutput;
+    
+    // Make the module name the same as the source file
+    auto filePath = input.filePath;
+    String directory = Path::getParentDirectory(input.outputStem);
+    String moduleName = Path::getFileNameWithoutExt(filePath);
+    String ext = Path::getFileExt(filePath);
+    String modulePath = Path::combine(directory, moduleName);
+
+    // Find the target
+    UnownedStringSlice targetExt = UnownedStringSlice::fromLiteral("c");
+    Index index = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-target"));
+    if (index >= 0 && index + 1 < cmdLine.getArgCount())
+    {
+        targetExt = cmdLine.m_args[index + 1].value.getUnownedSlice();
+    }
+
+    CPPCompiler::CompileOptions options;
+    options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
+    // Create a filename to write this out to
+    String cppSource = modulePath + "." + targetExt;
+    Slang::File::writeAllText(cppSource, actualOutput);
+
+    // Okay we can now try compiling
+
+    // Compile this source
+    options.sourceFiles.add(cppSource);
+    options.modulePath = modulePath;
+
+    CPPCompiler::Output output;
+    if (SLANG_FAILED(compiler->compile(options, output)))
+    {
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
     CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
@@ -2134,6 +2211,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
     { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile}
 };
 
 TestResult runTest(
