@@ -174,23 +174,32 @@ public:
     CPPEmitHandler(const CLikeSourceEmitter::Desc& desc);
 
 protected:
-    void _emitVecMatMul(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitBinaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitUnaryOp(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitAnyAll(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitCross(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+
+    void _emitAryDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+
+    // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
+    void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
 
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
     
+    UnownedStringSlice _getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType, CPPSourceEmitter* emitter);
 
     static Dimension _getDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
-
+    
     IRType* _getVecType(IRType* elementType, int elementCount);
 
     IRInst* _clone(IRInst* inst);
     IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
 
+    StringSlicePool::Handle _calcScalarFuncName(Operation op, IRBasicType* type);
+    UnownedStringSlice _getScalarFuncName(Operation operation, IRBasicType* scalarType);
+    
     UnownedStringSlice _getFuncName(const SpecializedOperation& specOp);
     StringSlicePool::Handle _calcFuncName(const SpecializedOperation& specOp);
 
