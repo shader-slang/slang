@@ -59,7 +59,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 
     vector<float, 3> vec2 = max(sin(mul(vec, mat)), float3(1, 2, -1));
-
+    vector<float, 3> vec3 = mul(vec, mat);
+    
+    float3 vec4 = lerp(vec2, vec3, float3(tid * (1.0f / 4), 1, 1));
+    
     vec2 += (-vec2.zyx) * 2;
     
     vector<bool, 3> z = vec2 > 0;
@@ -67,5 +70,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int val = int(tid) + any(z) ? 1 : 0;
     val = test(val);
 
-    outputBuffer[tid] = val + int(dot(vec2, vec2));
+    outputBuffer[tid] = val + int(dot(vec2, vec4));
 }
