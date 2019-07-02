@@ -916,6 +916,7 @@ void CPPEmitHandler::_emitCrossDefinition(const UnownedStringSlice& funcName, co
     writer->emit("\n{\n");
     writer->indent();
 
+    writer->emit("return ");
     emitType(specOp.returnType, emitter);
     writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
 
@@ -981,7 +982,9 @@ void CPPEmitHandler::_emitNormalizeDefinition(const UnownedStringSlice& funcName
     IRType* dotArgs[] = { paramType0, paramType0 };
     UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType, emitter);
     UnownedStringSlice rsqrtName = _getScalarFuncName(Operation::RecipSqrt, elementType);
-    
+    IRType* vecMulScalarArgs[] = { paramType0, elementType };
+    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0, emitter);
+
     Dimension dimA = _getDimension(paramType0, false);
 
     // Assumes C++
@@ -993,7 +996,8 @@ void CPPEmitHandler::_emitNormalizeDefinition(const UnownedStringSlice& funcName
 
     writer->emit("return ");
 
-    writer->emit("a *  ");
+    // Assumes C++ here
+    writer->emit("a * ");
     writer->emit(rsqrtName);
     writer->emit("(");
     writer->emit(dotFuncName);
@@ -1008,16 +1012,23 @@ void CPPEmitHandler::_emitReflectDefinition(const UnownedStringSlice& funcName, 
     SourceWriter* writer = emitter->getSourceWriter();
 
     IRFuncType* funcType = specOp.signatureType;
-    SLANG_ASSERT(funcType->getParamCount() == 1);
+    SLANG_ASSERT(funcType->getParamCount() == 2);
     IRType* paramType0 = funcType->getParamType(0);
 
     SLANG_ASSERT(paramType0->op == kIROp_VectorType);
 
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
+    // Make sure we have all these functions defined before emtting 
     IRType* dotArgs[] = { paramType0, paramType0 };
     UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType, emitter);
-    
+
+    IRType* subArgs[] = { paramType0, paramType0};
+    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0, emitter);
+
+    IRType* vecMulScalarArgs[] = { paramType0, elementType };
+    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0, emitter);
+
     // Assumes C++
 
     _emitSignature(funcName, specOp, emitter);
@@ -1034,6 +1045,12 @@ void CPPEmitHandler::_emitReflectDefinition(const UnownedStringSlice& funcName, 
 
 void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
 {
+    // Check if it's been emitted already, if not add it.
+    if (!m_operationEmittedMap.AddIfNotExists(specOp, true))
+    {
+        return;
+    }
+
     switch (specOp.op)
     {
         case Operation::VecMatMul:

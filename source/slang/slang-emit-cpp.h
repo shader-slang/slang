@@ -216,6 +216,7 @@ protected:
     Dictionary<IRInst*, IRInst*> m_cloneMap;
 
     Dictionary<IRType*, bool> m_typeEmittedMap;
+    Dictionary<SpecializedOperation, bool> m_operationEmittedMap;
 
     // Maps from a name to an operation
     List<Operation> m_operationMap;  

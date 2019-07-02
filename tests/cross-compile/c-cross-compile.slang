@@ -63,11 +63,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     float3 vec4 = lerp(vec2, vec3, float3(tid * (1.0f / 4), 1, 1));
     
-    vec2 += (-vec2.zyx) * 2;
+    float3 crossVec = normalize(cross(vec4, vec4));
+    
+    vec2 += (-vec2.zyx) * 2 + crossVec * length(crossVec) + reflect(vec4, normalize(crossVec));
     
     vector<bool, 3> z = vec2 > 0;
 
-    int val = int(tid) + any(z) ? 1 : 0;
+    int val = int(tid) + (any(z) ? 1 : 0) + (all(z) ? 2 : 0);
     val = test(val);
 
     outputBuffer[tid] = val + int(dot(vec2, vec4));
