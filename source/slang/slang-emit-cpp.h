@@ -47,11 +47,11 @@ class CPPSourceEmitter;
         \
         x(Swizzle, "", -1) \
         \
-        x(Dot, "dot", -1) \
-        x(VecMatMul, "mul", -1) \
+        x(Dot, "dot", 2) \
+        x(VecMatMul, "mul", 2) \
         \
-        x(Normalize, "normalize", -1) \
-        x(Length, "length", -1) \
+        x(Normalize, "normalize", 1) \
+        x(Length, "length", 1) \
         \
         x(Sin, "sin", 1) \
         x(Cos, "cos", 1) \

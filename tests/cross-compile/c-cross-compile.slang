@@ -70,6 +70,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     vector<bool, 3> z = vec2 > 0;
 
     int val = int(tid) + (any(z) ? 1 : 0) + (all(z) ? 2 : 0);
+    
+    val = asint(asfloat(asuint(asfloat(val))));
+    
     val = test(val);
 
     outputBuffer[tid] = val + int(dot(vec2, vec4));

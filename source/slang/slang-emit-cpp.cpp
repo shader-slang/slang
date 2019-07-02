@@ -1252,20 +1252,26 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
         default:
         {
             const auto& info = getOperationInfo(specOp.op);
-            if (info.numOperands >= 0)
+            // Make sure that the return type is available
+            bool isOperator = _isOperator(info.funcName);
+
+            
+            UnownedStringSlice funcName = _getFuncName(specOp);
+
+            useType(specOp.returnType);
+            // add that we want a function
+            SLANG_ASSERT(numOperands == info.numOperands);
+
+            if (isOperator)
             {
-                SLANG_ASSERT(numOperands == info.numOperands);
-                // Make sure that the return type is available
-                useType(specOp.returnType);
-                // add that we want a function
-                _getFuncName(specOp);
                 // Just do the default output
                 emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
             }
             else
             {
-                UnownedStringSlice name = _getFuncName(specOp);
-                writer->emit(name);
+                
+
+                writer->emit(funcName);
                 writer->emitChar('(');
 
                 for (int i = 0; i < numOperands; ++i)
