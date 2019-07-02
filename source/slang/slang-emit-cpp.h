@@ -10,8 +10,6 @@
 namespace Slang
 {
 
-class CPPSourceEmitter;
-
 #define SLANG_CPP_OPERATION(x) \
         x(Invalid, "", -1) \
         x(Init, "", -1) \
@@ -96,12 +94,14 @@ class CPPSourceEmitter;
         x(AsFloat, "asfloat", 1) \
         x(AsInt, "asint", 1) \
         x(AsUInt, "asuint", 1)
-        
-class CPPEmitHandler: public RefObject
+  
+
+class CPPSourceEmitter: public CLikeSourceEmitter
 {
 public:
-#define SLANG_CPP_OPERATION_ENUM(x, op, numOperands) x,
+    typedef CLikeSourceEmitter Super;
 
+#define SLANG_CPP_OPERATION_ENUM(x, op, numOperands) x,
     enum class Operation
     {
         SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_ENUM)
@@ -153,45 +153,56 @@ public:
 
     virtual SpecializedOperation getSpecializedOperation(Operation op, IRType*const* argTypes, int argTypesCount, IRType* retType);
     virtual void useType(IRType* type);
-    virtual void emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
-    virtual void emitType(IRType* type, CPPSourceEmitter* emitter);
-    virtual void emitTypeDefinition(IRType* type, CPPSourceEmitter* emitter);
-    virtual void emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    virtual void emitVectorTypeName(IRType* elementType, int elementCount, CPPSourceEmitter* emitter);
-
-    virtual void emitPreamble(CPPSourceEmitter* emitter);
-
-    void emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter);
+    virtual void emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
+    virtual void emitTypeDefinition(IRType* type);
+    virtual void emitSpecializedOperationDefinition(const SpecializedOperation& specOp);
+    
+    void emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
 
     static const OperationInfo& getOperationInfo(Operation op);
-    
+
     static Operation getOperation(IROp op);
 
     Operation getOperationByName(const UnownedStringSlice& slice);
 
-    CPPEmitHandler(const CLikeSourceEmitter::Desc& desc);
+    SourceWriter* getSourceWriter() const { return m_writer; }
+
+    CPPSourceEmitter(const Desc& desc);
 
 protected:
-    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
+    virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
 
-    void _emitAryDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+
+    virtual void emitPreprocessorDirectivesImpl();
+
+    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+
+
+    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+
+    void _emitAryDefinition(const SpecializedOperation& specOp);
 
     // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
-    void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
+    void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
 
-    void _emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter);
-    
-    UnownedStringSlice _getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType, CPPSourceEmitter* emitter);
+    void _emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+
+    UnownedStringSlice _getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType);
 
     static Dimension _getDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
-    
+
     IRType* _getVecType(IRType* elementType, int elementCount);
 
     IRInst* _clone(IRInst* inst);
@@ -199,7 +210,7 @@ protected:
 
     StringSlicePool::Handle _calcScalarFuncName(Operation op, IRBasicType* type);
     UnownedStringSlice _getScalarFuncName(Operation operation, IRBasicType* scalarType);
-    
+
     UnownedStringSlice _getFuncName(const SpecializedOperation& specOp);
     StringSlicePool::Handle _calcFuncName(const SpecializedOperation& specOp);
 
@@ -219,34 +230,9 @@ protected:
     Dictionary<SpecializedOperation, bool> m_operationEmittedMap;
 
     // Maps from a name to an operation
-    List<Operation> m_operationMap;  
+    List<Operation> m_operationMap;
 
     StringSlicePool m_slicePool;
-};
-
-class CPPSourceEmitter: public CLikeSourceEmitter
-{
-public:
-    typedef CLikeSourceEmitter Super;
-
-    SourceWriter* getSourceWriter() const { return m_writer; }
-
-    CPPSourceEmitter(const Desc& desc, CPPEmitHandler* emitHandler);
-
-protected:
-    
-    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
-    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
-    virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
-    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
-
-    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
-
-    virtual void emitPreprocessorDirectivesImpl();
-
-    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
-
-    RefPtr<CPPEmitHandler> m_emitHandler;
 };
 
 }

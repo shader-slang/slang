@@ -119,51 +119,16 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!! CPPEmitHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-static const CPPEmitHandler::OperationInfo s_operationInfos[] =
+static const CPPSourceEmitter::OperationInfo s_operationInfos[] =
 {
 #define SLANG_CPP_OPERATION_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
     SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_INFO)
 };
 
-CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
-{
-    m_sharedIRBuilder.module = nullptr;
-    m_sharedIRBuilder.session = desc.compileRequest->getSession();
-
-    m_irBuilder.sharedBuilder = &m_sharedIRBuilder;
-
-    m_uniqueModule = m_irBuilder.createModule();
-    m_sharedIRBuilder.module = m_uniqueModule;
-
-    m_irBuilder.setInsertInto(m_irBuilder.getModule()->getModuleInst());
-
-    // Add all the operations with names (not ops like -, / etc) to the lookup map
-    for (int i = 0; i < SLANG_COUNT_OF(s_operationInfos); ++i)
-    {
-        const auto& info = s_operationInfos[i];
-        UnownedStringSlice slice = info.funcName;
-
-        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
-        {
-            auto handle = m_slicePool.add(slice);
-            Index index = Index(handle);
-            // Make sure there is space
-            if (index >= m_operationMap.getCount())
-            {
-                Index oldSize = m_operationMap.getCount(); 
-                m_operationMap.setCount(index + 1);
-                for (Index j = oldSize; j < index; j++)
-                {
-                    m_operationMap[j] = Operation::Invalid;
-                }
-            }
-            m_operationMap[index] = Operation(i);
-        }
-    }
-}
 
 
-/* static */ UnownedStringSlice CPPEmitHandler::getBuiltinTypeName(IROp op)
+
+/* static */ UnownedStringSlice CPPSourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
     {
@@ -191,12 +156,12 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
 }
 
 
-/* static */const CPPEmitHandler::OperationInfo& CPPEmitHandler::getOperationInfo(Operation op)
+/* static */const CPPSourceEmitter::OperationInfo& CPPSourceEmitter::getOperationInfo(Operation op)
 {
     return s_operationInfos[int(op)];
 }
 
-/* static */CPPEmitHandler::Operation CPPEmitHandler::getOperation(IROp op)
+/* static */CPPSourceEmitter::Operation CPPSourceEmitter::getOperation(IROp op)
 {
     switch (op)
     {
@@ -230,7 +195,7 @@ CPPEmitHandler::CPPEmitHandler(const CLikeSourceEmitter::Desc& desc)
     }
 }
 
-CPPEmitHandler::Operation CPPEmitHandler::getOperationByName(const UnownedStringSlice& slice)
+CPPSourceEmitter::Operation CPPSourceEmitter::getOperationByName(const UnownedStringSlice& slice)
 {
     Index index = m_slicePool.findIndex(slice);
     if (index >= 0 && index < m_operationMap.getCount())
@@ -245,7 +210,7 @@ CPPEmitHandler::Operation CPPEmitHandler::getOperationByName(const UnownedString
     return Operation::Invalid;
 }
 
-void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 {
     IRType* type = _cloneType(inType);
     if (m_typeEmittedMap.TryGetValue(type))
@@ -253,7 +218,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
         return;
     }
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     switch (type->op)
     {
@@ -298,7 +263,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
             IRType* vecType = _getVecType(matType->getElementType(), colCount);
-            emitTypeDefinition(vecType, emitter);
+            emitTypeDefinition(vecType);
 
             UnownedStringSlice typeName = _getTypeName(type);
             UnownedStringSlice rowTypeName = _getTypeName(vecType);
@@ -336,7 +301,7 @@ void CPPEmitHandler::emitTypeDefinition(IRType* inType, CPPSourceEmitter* emitte
     }
 }
 
-UnownedStringSlice CPPEmitHandler::_getTypeName(IRType* inType)
+UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
 {
     // TODO(JS): Arguably this doesn't entirely work.
     // I don't want to _clone a thing that is nominal, and not needed to be generated. But then we have
@@ -368,7 +333,7 @@ UnownedStringSlice CPPEmitHandler::_getTypeName(IRType* inType)
     return m_slicePool.getSlice(handle);
 }
 
-StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
+StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
 {
     switch (type->op)
     {
@@ -457,45 +422,12 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
     return StringSlicePool::kNullHandle;
 }
 
-void CPPEmitHandler::useType(IRType* type)
+void CPPSourceEmitter::useType(IRType* type)
 {
     _getTypeName(type);
 }
 
-void CPPEmitHandler::emitType(IRType* inType, CPPSourceEmitter* emitter)
-{
-    SourceWriter* writer = emitter->getSourceWriter();
-
-    IRType* type = _cloneType(inType);
-
-    UnownedStringSlice slice = _getTypeName(type);
-    writer->emit(slice);
-    
-    //SLANG_DIAGNOSE_UNEXPECTED(emitter->getSink(), SourceLoc(), "unhandled type for cpp target");
-}
-
-void CPPEmitHandler::emitPreamble(CPPSourceEmitter* emitter)
-{
-    SourceWriter* writer = emitter->getSourceWriter();
-
-    writer->emit("\n");
-    writer->emit("#include \"slang-cpp-prelude.h\"\n\n");
-    
-    // Emit the type definitions
-    for (const auto& keyValue : m_typeNameMap)
-    {
-        emitTypeDefinition(keyValue.Key, emitter);
-    }
-
-    // Emit all the intrinsics that were used
-
-    for (const auto& keyValue : m_specializeOperationNameMap)
-    {
-        emitSpecializedOperationDefinition(keyValue.Key, emitter);
-    }
-}
-
-IRInst* CPPEmitHandler::_clone(IRInst* inst)
+IRInst* CPPSourceEmitter::_clone(IRInst* inst)
 {
     if (inst == nullptr)
     {
@@ -599,7 +531,7 @@ static IRBasicType* _getElementType(IRType* type)
     return dynamicCast<IRBasicType>(type);
 }
 
-/* static */CPPEmitHandler::Dimension CPPEmitHandler::_getDimension(IRType* type, bool vecSwap)
+/* static */CPPSourceEmitter::Dimension CPPSourceEmitter::_getDimension(IRType* type, bool vecSwap)
 {
     switch (type->op)
     {
@@ -620,7 +552,7 @@ static IRBasicType* _getElementType(IRType* type)
     }
 }
 
-/* static */void CPPEmitHandler::_emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
+/* static */void CPPSourceEmitter::_emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
 {
     writer->emit(name);
     const int comb = (dimension.colCount > 1 ? 2 : 0) | (dimension.rowCount > 1 ? 1 : 0);
@@ -657,7 +589,7 @@ static bool _isOperator(const UnownedStringSlice& funcName)
     return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
 }
 
-void CPPEmitHandler::_emitAryDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitAryDefinition(const SpecializedOperation& specOp)
 {
     auto info = getOperationInfo(specOp.op);
     auto funcName = info.funcName;
@@ -665,7 +597,7 @@ void CPPEmitHandler::_emitAryDefinition(const SpecializedOperation& specOp, CPPS
 
     const bool isOperator = _isOperator(funcName);
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     IRFuncType* funcType = specOp.signatureType;
     const int numParams = int(funcType->getParamCount());
@@ -694,18 +626,18 @@ void CPPEmitHandler::_emitAryDefinition(const SpecializedOperation& specOp, CPPS
         StringBuilder builder;
         builder << "operator";
         builder << funcName;
-        _emitSignature(builder.getUnownedSlice(), specOp, emitter);
+        _emitSignature(builder.getUnownedSlice(), specOp);
     }
     else
     {
         scalarFuncName = _getScalarFuncName(specOp.op, _getElementType(funcType->getParamType(0)));
-        _emitSignature(funcName, specOp, emitter);
+        _emitSignature(funcName, specOp);
     }
     
     writer->emit("\n{\n");
     writer->indent();
 
-    emitType(retType, emitter);
+    emitType(retType);
     writer->emit(" r;\n");
 
     for (int i = 0; i < retDim.rowCount; ++i)
@@ -761,13 +693,13 @@ void CPPEmitHandler::_emitAryDefinition(const SpecializedOperation& specOp, CPPS
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::_emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
     IRFuncType* funcType = specOp.signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
     IRType* paramType0 = funcType->getParamType(0);
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     IRType* elementType = _getElementType(paramType0);
     SLANG_ASSERT(elementType);
@@ -778,7 +710,7 @@ void CPPEmitHandler::_emitAnyAllDefinition(const UnownedStringSlice& funcName, c
 
     const Dimension dim = _getDimension(paramType0, false);
 
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
     writer->emit("\n{\n");
     writer->indent();
 
@@ -831,15 +763,15 @@ void CPPEmitHandler::_emitAnyAllDefinition(const UnownedStringSlice& funcName, c
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
     IRFuncType* funcType = specOp.signatureType;
     const int paramsCount = int(funcType->getParamCount());
     IRType* retType = specOp.returnType;
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
-    emitType(retType, emitter);
+    emitType(retType);
     writer->emit(" ");
     writer->emit(funcName);
     writer->emit("(");
@@ -857,7 +789,7 @@ void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const Sp
 #if 0
         writer->emit("const ");
 #endif
-        emitType(paramType, emitter);
+        emitType(paramType);
 #if 0
         if (dynamicCast<IRBasicType>(paramType))
         {
@@ -877,7 +809,7 @@ void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const Sp
     writer->emit(")");
 }
 
-void CPPEmitHandler::_emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
     IRFuncType* funcType = specOp.signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 2);
@@ -885,14 +817,14 @@ void CPPEmitHandler::_emitVecMatMulDefinition(const UnownedStringSlice& funcName
     IRType* paramType1 = funcType->getParamType(1);
     IRType* retType = specOp.returnType;
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
 
     writer->emit("\n{\n");
     writer->indent();
 
-    emitType(retType, emitter);
+    emitType(retType);
     writer->emit(" r;\n");
 
     Dimension dimA = _getDimension(paramType0, false);
@@ -927,37 +859,37 @@ void CPPEmitHandler::_emitVecMatMulDefinition(const UnownedStringSlice& funcName
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::_emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
 
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     writer->emit("\n{\n");
     writer->indent();
 
     writer->emit("return ");
-    emitType(specOp.returnType, emitter);
+    emitType(specOp.returnType);
     writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
 
     writer->dedent();
     writer->emit("}\n\n");
 }
 
-UnownedStringSlice CPPEmitHandler::_getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType, CPPSourceEmitter* emitter)
+UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType)
 {
     SpecializedOperation specOp;
     specOp.op = op;
     specOp.returnType = retType;
     specOp.signatureType = m_irBuilder.getFuncType(argCount, argTypes, m_irBuilder.getVoidType());
 
-    emitSpecializedOperationDefinition(specOp, emitter);
+    emitSpecializedOperationDefinition(specOp);
     return  _getFuncName(specOp);
 }
 
-void CPPEmitHandler::_emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     IRFuncType* funcType = specOp.signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
@@ -968,11 +900,11 @@ void CPPEmitHandler::_emitLengthDefinition(const UnownedStringSlice& funcName, c
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType, emitter);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
 
     UnownedStringSlice sqrtName = _getScalarFuncName(Operation::Sqrt, elementType);
 
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
 
     writer->emit("\n{\n");
     writer->indent();
@@ -987,9 +919,9 @@ void CPPEmitHandler::_emitLengthDefinition(const UnownedStringSlice& funcName, c
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {    
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     IRFuncType* funcType = specOp.signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
@@ -1000,16 +932,16 @@ void CPPEmitHandler::_emitNormalizeDefinition(const UnownedStringSlice& funcName
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType, emitter);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
     UnownedStringSlice rsqrtName = _getScalarFuncName(Operation::RecipSqrt, elementType);
     IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0, emitter);
+    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
 
     Dimension dimA = _getDimension(paramType0, false);
 
     // Assumes C++
 
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
 
     writer->emit("\n{\n");
     writer->indent();
@@ -1027,9 +959,9 @@ void CPPEmitHandler::_emitNormalizeDefinition(const UnownedStringSlice& funcName
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::_emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp)
 {
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     IRFuncType* funcType = specOp.signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 2);
@@ -1041,17 +973,17 @@ void CPPEmitHandler::_emitReflectDefinition(const UnownedStringSlice& funcName, 
 
     // Make sure we have all these functions defined before emtting 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType, emitter);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
 
     IRType* subArgs[] = { paramType0, paramType0};
-    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0, emitter);
+    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0);
 
     IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0, emitter);
+    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
 
     // Assumes C++
 
-    _emitSignature(funcName, specOp, emitter);
+    _emitSignature(funcName, specOp);
     writer->emit("\n{\n");
     writer->indent();
 
@@ -1063,7 +995,7 @@ void CPPEmitHandler::_emitReflectDefinition(const UnownedStringSlice& funcName, 
     writer->emit("}\n\n");
 }
 
-void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperation& specOp, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedOperation& specOp)
 {
     // Check if it's been emitted already, if not add it.
     if (!m_operationEmittedMap.AddIfNotExists(specOp, true))
@@ -1076,35 +1008,35 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
         case Operation::VecMatMul:
         case Operation::Dot:
         {
-            return _emitVecMatMulDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitVecMatMulDefinition(_getFuncName(specOp), specOp);
         }
         case Operation::Any:
         case Operation::All:
         {
-            return _emitAnyAllDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitAnyAllDefinition(_getFuncName(specOp), specOp);
         }
         case Operation::Cross:
         {
-            return _emitCrossDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitCrossDefinition(_getFuncName(specOp), specOp);
         }
         case Operation::Normalize:
         {
-            return _emitNormalizeDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitNormalizeDefinition(_getFuncName(specOp), specOp);
         }
         case Operation::Length:
         {
-            return _emitLengthDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitLengthDefinition(_getFuncName(specOp), specOp);
         }
         case Operation::Reflect:
         {
-            return _emitReflectDefinition(_getFuncName(specOp), specOp, emitter);
+            return _emitReflectDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
             const auto& info = getOperationInfo(specOp.op);
             if (info.numOperands >= 1 && info.numOperands <= 3)
             {
-                return _emitAryDefinition(specOp, emitter);
+                return _emitAryDefinition(specOp);
             }
             break;
         }
@@ -1113,18 +1045,13 @@ void CPPEmitHandler::emitSpecializedOperationDefinition(const SpecializedOperati
     SLANG_ASSERT(!"Unhandled");
 }
 
-IRType* CPPEmitHandler::_getVecType(IRType* elementType, int elementCount)
+IRType* CPPSourceEmitter::_getVecType(IRType* elementType, int elementCount)
 {
     elementType = _cloneType(elementType);
     return m_irBuilder.getVectorType(elementType, m_irBuilder.getIntValue(m_irBuilder.getIntType(), elementCount));
 }
 
-void CPPEmitHandler::emitVectorTypeName(IRType* elementType, int elementCount, CPPSourceEmitter* emitter)
-{
-    emitType(_getVecType(elementType, elementCount), emitter);
-}
-
-CPPEmitHandler::SpecializedOperation CPPEmitHandler::getSpecializedOperation(Operation op, IRType*const* inArgTypes, int argTypesCount, IRType* retType)
+CPPSourceEmitter::SpecializedOperation CPPSourceEmitter::getSpecializedOperation(Operation op, IRType*const* inArgTypes, int argTypesCount, IRType* retType)
 {
     SpecializedOperation specOp;
     specOp.op = op;
@@ -1143,10 +1070,10 @@ CPPEmitHandler::SpecializedOperation CPPEmitHandler::getSpecializedOperation(Ope
     return specOp;
 }
 
-void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
-    SourceWriter* writer = emitter->getSourceWriter();
+    SourceWriter* writer = getSourceWriter();
 
     // Getting the name means that this op is registered as used
     
@@ -1165,7 +1092,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                 case kIROp_VectorType:
                 {
                     // Get the type name
-                    emitType(retType, emitter);
+                    emitType(retType);
                     writer->emitChar('{');
 
                     for (int i = 0; i < numOperands; ++i)
@@ -1174,7 +1101,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                         {
                             writer->emit(", ");
                         }
-                        emitter->emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
                     }
 
                     writer->emitChar('}');
@@ -1189,7 +1116,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
 
                     SLANG_ASSERT(rowsCount == numOperands);
 
-                    emitType(retType, emitter);
+                    emitType(retType);
                     writer->emitChar('{');
 
                     for (int j = 0; j < rowsCount; ++j)
@@ -1198,7 +1125,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                         {
                             writer->emit(", ");
                         }
-                        emitter->emitOperand(operands[j].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[j].get(), mode, getInfo(EmitOp::General));
                     }
 
                     writer->emitChar('}');
@@ -1213,7 +1140,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                         writer->emit(getBuiltinTypeName(retType->op));
                         writer->emitChar('(');
 
-                        emitter->emitOperand(operands[0].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[0].get(), mode, getInfo(EmitOp::General));
 
                         writer->emitChar(')');
                         break;
@@ -1233,13 +1160,13 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
 
             if (elementCount == 1)
             {
-                emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
+                defaultEmitInstExpr(inst, mode, inOuterPrec);
             }
             else
             {
                 // TODO(JS): Not sure this is correct on the parens handling front
                 IRType* retType = specOp.returnType;
-                emitType(retType, emitter);
+                emitType(retType);
                 writer->emit("{");
 
                 for (Index i = 0; i < elementCount; ++i)
@@ -1252,7 +1179,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                     auto outerPrec = getInfo(EmitOp::General);
 
                     auto prec = getInfo(EmitOp::Postfix);
-                    emitter->emitOperand(swizzleInst->getBase(), mode, leftSide(outerPrec, prec));
+                    emitOperand(swizzleInst->getBase(), mode, leftSide(outerPrec, prec));
 
                     writer->emit(".");
 
@@ -1284,7 +1211,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
             if (isOperator)
             {
                 // Just do the default output
-                emitter->defaultEmitInstExpr(inst, mode, inOuterPrec);
+                defaultEmitInstExpr(inst, mode, inOuterPrec);
             }
             else
             {
@@ -1297,7 +1224,7 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
                     {
                         writer->emit(", ");
                     }
-                    emitter->emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                    emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
                 }
 
                 writer->emitChar(')');
@@ -1307,19 +1234,19 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
     }
 }
 
-StringSlicePool::Handle CPPEmitHandler::_calcScalarFuncName(Operation op, IRBasicType* type)
+StringSlicePool::Handle CPPSourceEmitter::_calcScalarFuncName(Operation op, IRBasicType* type)
 {
     StringBuilder builder;
     builder << _getTypePrefix(type->op) << "_" << getOperationInfo(op).funcName;
     return m_slicePool.add(builder);
 }
 
-UnownedStringSlice CPPEmitHandler::_getScalarFuncName(Operation op, IRBasicType* type)
+UnownedStringSlice CPPSourceEmitter::_getScalarFuncName(Operation op, IRBasicType* type)
 {
     return m_slicePool.getSlice(_calcScalarFuncName(op, type));
 }
 
-UnownedStringSlice CPPEmitHandler::_getFuncName(const SpecializedOperation& specOp)
+UnownedStringSlice CPPSourceEmitter::_getFuncName(const SpecializedOperation& specOp)
 {
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
     if (m_specializeOperationNameMap.TryGetValue(specOp, handle))
@@ -1334,7 +1261,7 @@ UnownedStringSlice CPPEmitHandler::_getFuncName(const SpecializedOperation& spec
     return m_slicePool.getSlice(handle);
 }
 
-StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation& specOp)
+StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedOperation& specOp)
 {
     if (specOp.isScalar())
     {
@@ -1357,7 +1284,7 @@ StringSlicePool::Handle CPPEmitHandler::_calcFuncName(const SpecializedOperation
     }
 }
 
-void CPPEmitHandler::emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec, CPPSourceEmitter* emitter)
+void CPPSourceEmitter::emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
     if (operandCount > 8)
     {
@@ -1368,8 +1295,8 @@ void CPPEmitHandler::emitOperationCall(Operation op, IRInst* inst, IRUse* operan
             // Hmm.. I'm assuming here that the operands exactly match the usage (ie no casting)
             argTypes[i] = operands[i].get()->getDataType();
         }
-        CPPEmitHandler::SpecializedOperation specOp = getSpecializedOperation(op, argTypes.getBuffer(), operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec, emitter);
+        SpecializedOperation specOp = getSpecializedOperation(op, argTypes.getBuffer(), operandCount, retType);
+        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec);
     }
     else
     {
@@ -1379,17 +1306,49 @@ void CPPEmitHandler::emitOperationCall(Operation op, IRInst* inst, IRUse* operan
             // Hmm.. I'm assuming here that the operands exactly match the usage (ie no casting)
             argTypes[i] = operands[i].get()->getDataType();
         }
-        CPPEmitHandler::SpecializedOperation specOp = getSpecializedOperation(op, argTypes, operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec, emitter);
+        SpecializedOperation specOp = getSpecializedOperation(op, argTypes, operandCount, retType);
+        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec);
     }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!! CPPSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-CPPSourceEmitter::CPPSourceEmitter(const Desc& desc, CPPEmitHandler* emitHandler):
-    Super(desc),
-    m_emitHandler(emitHandler)
+CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
+    Super(desc)
 {
+    m_sharedIRBuilder.module = nullptr;
+    m_sharedIRBuilder.session = desc.compileRequest->getSession();
+
+    m_irBuilder.sharedBuilder = &m_sharedIRBuilder;
+
+    m_uniqueModule = m_irBuilder.createModule();
+    m_sharedIRBuilder.module = m_uniqueModule;
+
+    m_irBuilder.setInsertInto(m_irBuilder.getModule()->getModuleInst());
+
+    // Add all the operations with names (not ops like -, / etc) to the lookup map
+    for (int i = 0; i < SLANG_COUNT_OF(s_operationInfos); ++i)
+    {
+        const auto& info = s_operationInfos[i];
+        UnownedStringSlice slice = info.funcName;
+
+        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
+        {
+            auto handle = m_slicePool.add(slice);
+            Index index = Index(handle);
+            // Make sure there is space
+            if (index >= m_operationMap.getCount())
+            {
+                Index oldSize = m_operationMap.getCount();
+                m_operationMap.setCount(index + 1);
+                for (Index j = oldSize; j < index; j++)
+                {
+                    m_operationMap[j] = Operation::Invalid;
+                }
+            }
+            m_operationMap[index] = Operation(i);
+        }
+    }
 }
 
 void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -1408,21 +1367,22 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    m_emitHandler->emitVectorTypeName(elementType, int(elementCount), this);
+    emitSimpleType(_getVecType(elementType, int(elementCount)));
 }
 
-void CPPSourceEmitter::emitSimpleTypeImpl(IRType* type)
+void CPPSourceEmitter::emitSimpleTypeImpl(IRType* inType)
 {
-    switch (type->op)
+    switch (inType->op)
     {
         case kIROp_StructType:
         {
-            m_writer->emit(getName(type));
+            m_writer->emit(getName(inType));
             break;
         }
         default:
         {
-            m_emitHandler->emitType(type, this);
+            UnownedStringSlice slice = _getTypeName(_cloneType(inType));
+            m_writer->emit(slice);
             break;
         }
     }
@@ -1528,11 +1488,11 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
     }
     else
     {
-        CPPEmitHandler::Operation op = m_emitHandler->getOperationByName(name);
-        if (op != CPPEmitHandler::Operation::Invalid)
+        Operation op = getOperationByName(name);
+        if (op != Operation::Invalid)
         {
             IRUse* operands = inst->getOperands() + operandIndex;
-            m_emitHandler->emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec, this);
+            emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec);
             return;
         }
     }
@@ -1552,7 +1512,6 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
 
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
 {
-    typedef CPPEmitHandler::Operation Operation;
     SLANG_UNUSED(inOuterPrec);
 
     switch (inst->op)
@@ -1561,24 +1520,24 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
-            m_emitHandler->emitOperationCall(Operation::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            emitOperationCall(Operation::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
             return true;
         }
         case kIROp_Mul_Matrix_Matrix:
         case kIROp_Mul_Matrix_Vector:
         case kIROp_Mul_Vector_Matrix:
         {
-            m_emitHandler->emitOperationCall(Operation::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            emitOperationCall(Operation::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
             return true;
         }
         case kIROp_Dot:
         {
-            m_emitHandler->emitOperationCall(Operation::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            emitOperationCall(Operation::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
             return true;
         }
         case kIROp_swizzle:
         {
-            m_emitHandler->emitOperationCall(Operation::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+            emitOperationCall(Operation::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
             return true;
         }
         case kIROp_Call:
@@ -1600,13 +1559,12 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         }
         default:
         {
-            Operation op = CPPEmitHandler::getOperation(inst->op);
+            Operation op = getOperation(inst->op);
             if (op != Operation::Invalid)
             {
-                m_emitHandler->emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec, this);
+                emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
                 return true;
             }
-
             return false;
         }
     }
@@ -1614,7 +1572,23 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
 
 void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 {
-    m_emitHandler->emitPreamble(this);
+    SourceWriter* writer = getSourceWriter();
+
+    writer->emit("\n");
+    writer->emit("#include \"slang-cpp-prelude.h\"\n\n");
+
+    // Emit the type definitions
+    for (const auto& keyValue : m_typeNameMap)
+    {
+        emitTypeDefinition(keyValue.Key);
+    }
+
+    // Emit all the intrinsics that were used
+
+    for (const auto& keyValue : m_specializeOperationNameMap)
+    {
+        emitSpecializedOperationDefinition(keyValue.Key);
+    }
 }
 
 } // namespace Slang

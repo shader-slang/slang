@@ -216,8 +216,7 @@ String emitEntryPoint(
     {
         case SourceStyle::CPP:
         {
-            RefPtr<CPPEmitHandler> handler(new CPPEmitHandler(desc));
-            sourceEmitter = new CPPSourceEmitter(desc, handler);
+            sourceEmitter = new CPPSourceEmitter(desc);
             break;
         }
         case SourceStyle::GLSL:
