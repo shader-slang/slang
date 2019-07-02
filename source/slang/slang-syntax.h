@@ -8,6 +8,8 @@
 #include "slang-type-system-shared.h"
 #include "../../slang.h"
 
+#include "slang-name.h"
+
 #include <assert.h>
 
 namespace Slang
@@ -120,20 +122,46 @@ namespace Slang
             : name(nullptr)
         {}
 
-        explicit NameLoc(Name* name)
-            : name(name)
+        explicit NameLoc(Name* inName)
+            : name(inName)
         {}
 
 
-        NameLoc(Name* name, SourceLoc loc)
-            : name(name)
-            , loc(loc)
+        NameLoc(Name* inName, SourceLoc inLoc)
+            : name(inName)
+            , loc(inLoc)
         {}
 
         NameLoc(Token const& token)
             : name(token.getNameOrNull())
             , loc(token.getLoc())
         {}
+    };
+
+    struct StringSliceLoc
+    {
+        UnownedStringSlice name;
+        SourceLoc loc;
+
+        StringSliceLoc()
+            : name(nullptr)
+        {}
+        explicit StringSliceLoc(const UnownedStringSlice& inName)
+            : name(inName)
+        {}
+        StringSliceLoc(const UnownedStringSlice& inName, SourceLoc inLoc)
+            : name(inName)
+            , loc(inLoc)
+        {}
+        StringSliceLoc(Token const& token)
+            : loc(token.getLoc())
+        {
+            Name* tokenName = token.getNameOrNull();
+            if (tokenName)
+            {
+                name = tokenName->text.getUnownedSlice();
+            }
+        }
     };
 
     // Helper class for iterating over a list of heap-allocated modifiers

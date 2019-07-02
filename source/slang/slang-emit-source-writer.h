@@ -28,7 +28,8 @@ public:
     void emit(const String& text);
     void emit(const UnownedStringSlice& text);
     void emit(Name* name);
-    void emit(const NameLoc& nameAndLoc);    
+    void emit(const NameLoc& nameAndLoc);
+    void emit(const StringSliceLoc& nameAndLoc);
     void emit(IntegerLiteralValue value);
     void emit(UInt value);
     void emit(int value);
@@ -37,9 +38,11 @@ public:
     void emitChar(char c);
 
         /// Emit names (doing so can also advance to a new source location)
+    void emitName(const StringSliceLoc& nameAndLoc);
     void emitName(const NameLoc& nameAndLoc);
     void emitName(Name* name, const SourceLoc& loc);
     void emitName(Name* name);
+
 
         /// Indent the text
     void indent();

@@ -34,7 +34,7 @@ struct CLikeSourceEmitter::EDeclarator
 {
     enum class Flavor
     {
-        name,
+        Name,
         Array,
         UnsizedArray,
     };
@@ -42,9 +42,8 @@ struct CLikeSourceEmitter::EDeclarator
     EDeclarator* next = nullptr;
 
     // Used for `Flavor::name`
-    Name*       name;
-    SourceLoc   loc;
-
+    const StringSliceLoc* nameAndLoc;
+    
     // Used for `Flavor::Array`
     IRInst* elementCount;
 };
@@ -149,8 +148,8 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
 
     switch (declarator->flavor)
     {
-    case EDeclarator::Flavor::name:
-        m_writer->emitName(declarator->name, declarator->loc);
+    case EDeclarator::Flavor::Name:
+        m_writer->emitName(*declarator->nameAndLoc);
         break;
 
     case EDeclarator::Flavor::Array:
@@ -250,39 +249,57 @@ void CLikeSourceEmitter::_emitType(IRType* type, EDeclarator* declarator)
 
 }
 
-void CLikeSourceEmitter::emitType(
-    IRType*             type,
-    SourceLoc const&    typeLoc,
-    Name*               name,
-    SourceLoc const&    nameLoc)
+void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
-    m_writer->advanceToSourceLocation(typeLoc);
+    if (nameAndLoc)
+    {
+        // TODO(JS): No call to the previous version of this method was passing in a typeLoc, so disabled for
+        // now for simplicity
+        //m_writer->advanceToSourceLocation(typeLoc);
 
-    EDeclarator nameDeclarator;
-    nameDeclarator.flavor = EDeclarator::Flavor::name;
-    nameDeclarator.name = name;
-    nameDeclarator.loc = nameLoc;
-    _emitType(type, &nameDeclarator);
+        EDeclarator nameDeclarator;
+        nameDeclarator.flavor = EDeclarator::Flavor::Name;
+        nameDeclarator.nameAndLoc = nameAndLoc;
+        _emitType(type, &nameDeclarator);
+    }
+    else
+    {
+        _emitType(type, nullptr);
+    }
 }
 
 void CLikeSourceEmitter::emitType(IRType* type, Name* name)
 {
-    emitType(type, SourceLoc(), name, SourceLoc());
+    SLANG_ASSERT(name);
+    StringSliceLoc nameAndLoc(name->text.getUnownedSlice());
+    emitType(type, &nameAndLoc);
 }
 
 void CLikeSourceEmitter::emitType(IRType* type, const String& name)
 {
-    // HACK: the rest of the code wants a `Name`,
-    // so we'll create one for a bit...
-    Name tempName;
-    tempName.text = name;
-
-    emitType(type, SourceLoc(), &tempName, SourceLoc());
+    StringSliceLoc nameAndLoc(name.getUnownedSlice());
+    emitType(type, &nameAndLoc);
 }
 
 void CLikeSourceEmitter::emitType(IRType* type)
 {
-    _emitType(type, nullptr);
+    emitType(type, (StringSliceLoc*)nullptr);
+}
+
+void CLikeSourceEmitter::emitType(IRType* type, Name* name, SourceLoc const& nameLoc)
+{
+    SLANG_ASSERT(name);
+
+    StringSliceLoc nameAndLoc;
+    nameAndLoc.loc = nameLoc;
+    nameAndLoc.name = name->text.getUnownedSlice();
+    
+    emitType(type, &nameAndLoc);
+}
+
+void CLikeSourceEmitter::emitType(IRType* type, NameLoc const& nameAndLoc)
+{
+    emitType(type, nameAndLoc.name, nameAndLoc.loc);
 }
 
 //
@@ -321,20 +338,6 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(const String& targe
     case SourceStyle::GLSL: return targetName == "glsl";
     case SourceStyle::HLSL: return targetName == "hlsl";
     }
-}
-
-void CLikeSourceEmitter::emitType(IRType* type, Name* name, SourceLoc const& nameLoc)
-{
-    emitType(
-        type,
-        SourceLoc(),
-        name,
-        nameLoc);
-}
-
-void CLikeSourceEmitter::emitType(IRType* type, NameLoc const& nameAndLoc)
-{
-    emitType(type, nameAndLoc.name, nameAndLoc.loc);
 }
 
 bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration)
