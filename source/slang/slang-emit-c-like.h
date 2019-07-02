@@ -133,14 +133,6 @@ public:
 
     void emitDeclarator(EDeclarator* declarator);
 
-    //void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
-    //void emitTextureType(IRTextureType* texType);
-    //void emitTextureSamplerType(IRTextureSamplerType* type);
-    //void emitImageType(IRGLSLImageType* type);
-    //void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
-    //void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
-    //void emitUntypedBufferType(IRUntypedBufferResourceType* type);
-
     void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
     void emitType(IRType* type, Name* name);
     void emitType(IRType* type, String const& name);

@@ -280,7 +280,6 @@ void CLikeSourceEmitter::emitType(IRType* type, const String& name)
     emitType(type, SourceLoc(), &tempName, SourceLoc());
 }
 
-
 void CLikeSourceEmitter::emitType(IRType* type)
 {
     _emitType(type, nullptr);

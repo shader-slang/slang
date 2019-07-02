@@ -431,6 +431,19 @@ StringSlicePool::Handle CPPEmitHandler::_calcTypeName(IRType* type)
 
             return m_slicePool.add(builder);
         }
+        case kIROp_ArrayType:
+        {
+            auto arrayType = static_cast<IRArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+            int elementCount = int(GetIntVal(arrayType->getElementCount()));
+
+            StringBuilder builder;
+            builder << "Array<";
+            builder << _getTypeName(elementType);
+            builder << ", " << elementCount << ">";
+
+            return m_slicePool.add(builder);
+        }
         default:
         {
             if (IRBasicType::isaImpl(type->op))
@@ -454,7 +467,6 @@ void CPPEmitHandler::emitType(IRType* inType, CPPSourceEmitter* emitter)
     SourceWriter* writer = emitter->getSourceWriter();
 
     IRType* type = _cloneType(inType);
-
 
     UnownedStringSlice slice = _getTypeName(type);
     writer->emit(slice);
@@ -839,10 +851,14 @@ void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const Sp
             writer->emit(", ");
         }
 
-        writer->emit("const ");
+        // We can't pass as const& for vector, scalar, array types, as they are pass by value
+        // For types passed by reference, we should do something different
         IRType* paramType = funcType->getParamType(i);
+#if 0
+        writer->emit("const ");
+#endif
         emitType(paramType, emitter);
-
+#if 0
         if (dynamicCast<IRBasicType>(paramType))
         {
             writer->emit(" ");
@@ -851,6 +867,10 @@ void CPPEmitHandler::_emitSignature(const UnownedStringSlice& funcName, const Sp
         {
             writer->emit("& ");
         }
+#else
+
+        writer->emit(" ");
+#endif
 
         writer->emitChar(char('a' + i));
     }

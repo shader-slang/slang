@@ -3,10 +3,20 @@
 #include <math.h>
 #include <inttypes.h>
 #include <math.h>
+#include <assert.h>
 
 #ifndef M_PI
 #   define M_PI           3.14159265358979323846
 #endif
+
+template <typename T, size_t SIZE>
+struct Array
+{
+    const T& operator[](size_t index) const { assert(index < SIZE); return m_data[index]; }
+    T& operator[](size_t index) const { assert(index < SIZE); return m_data[index]; }
+    
+    T m_data[SIZE];
+};
 
 template <typename T>
 struct RWStructuredBuffer
