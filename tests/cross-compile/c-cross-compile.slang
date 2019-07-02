@@ -65,11 +65,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     float3 crossVec = normalize(cross(vec4, vec4));
     
+    vec2.x = fmod(crossVec.y, crossVec.x);
+    
+    vec2 = fmod(vec2, crossVec);
+    
     vec2 += (-vec2.zyx) * 2 + crossVec * length(crossVec) + reflect(vec4, normalize(crossVec));
     
     vector<bool, 3> z = vec2 > 0;
 
-    int val = int(tid) + (any(z) ? 1 : 0) + (all(z) ? 2 : 0);
+    int val = (int(tid) + (any(z) ? 1 : 0) + (all(z) ? 2 : 0)) % 100;
     
     val = asint(asfloat(asuint(asfloat(val))));
     

@@ -1255,7 +1255,6 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
             // Make sure that the return type is available
             bool isOperator = _isOperator(info.funcName);
 
-            
             UnownedStringSlice funcName = _getFuncName(specOp);
 
             useType(specOp.returnType);
@@ -1269,8 +1268,6 @@ void CPPEmitHandler::emitCall(const SpecializedOperation& specOp, IRInst* inst, 
             }
             else
             {
-                
-
                 writer->emit(funcName);
                 writer->emitChar('(');
 
