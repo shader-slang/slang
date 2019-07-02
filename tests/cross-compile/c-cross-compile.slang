@@ -46,6 +46,16 @@ int test(int val)
     return (val << 4) + int(c);
 }
 
+float sum(float a[3])
+{
+    float total = a[0];
+    for (int i = 1; i < 3; ++i)
+    {
+        total += a[i];
+    }
+    return total;
+}
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> outputBuffer;
 
@@ -54,7 +64,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 
-    matrix<float, 2, 3> mat = { { 0, 1, 2 }, { 3, 4, 5} };
+    float array[3] = { 1, 2, 3};
+
+    matrix<float, 2, 3> mat = { { sum(array), 1, 2 }, { 3, 4, 5} };
     vector<float, 2> vec = { float(tid + 1), float(tid + 2) };
 
 

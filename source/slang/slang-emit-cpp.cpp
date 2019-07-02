@@ -284,8 +284,18 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
             m_typeEmittedMap.Add(type, true);
             break;
         }
+        case kIROp_PtrType:
+        case kIROp_RefType:
+        {
+            // We don't need to output a definition for these types
+            break;
+        }
+        case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
         case kIROp_HLSLRWStructuredBufferType:
         {
+            // We don't need to output a definition for these with C++ templates
+            // For C we may need to (or do casting at point of usage)
             break;
         }
         default:
@@ -1385,6 +1395,18 @@ void CPPSourceEmitter::emitSimpleTypeImpl(IRType* inType)
             m_writer->emit(slice);
             break;
         }
+    }
+}
+
+void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)
+{
+    UnownedStringSlice slice = _getTypeName(type);
+    m_writer->emit(slice);
+
+    if (nameLoc)
+    {
+        m_writer->emit(" ");
+        m_writer->emitName(*nameLoc);
     }
 }
 
