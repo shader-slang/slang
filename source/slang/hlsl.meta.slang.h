@@ -1307,7 +1307,7 @@ SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> si
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Sine and cosine\n")
-SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(T x, out T s, out T c);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType> void sincos(T x, out T s, out T c);\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);\n")
 SLANG_RAW("\n")
