@@ -1231,7 +1231,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);
 
 // Sine and cosine
-__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(T x, out T s, out T c);
+__generic<T : __BuiltinFloatingPointType> void sincos(T x, out T s, out T c);
 __generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);
 
