@@ -143,7 +143,7 @@ public:
         IRFuncType* signatureType;              // Same as funcType, but has return type of void
     };
 
-    struct Dimension
+    struct TypeDimension
     {
         bool isScalar() const { return rowCount <= 1 && colCount <= 1; }
 
@@ -201,8 +201,8 @@ protected:
 
     UnownedStringSlice _getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType);
 
-    static Dimension _getDimension(IRType* type, bool vecSwap);
-    static void _emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer);
+    static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
+    static void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
 
     IRType* _getVecType(IRType* elementType, int elementCount);
 

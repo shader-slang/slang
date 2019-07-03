@@ -566,7 +566,7 @@ static IRBasicType* _getElementType(IRType* type)
     return dynamicCast<IRBasicType>(type);
 }
 
-/* static */CPPSourceEmitter::Dimension CPPSourceEmitter::_getDimension(IRType* type, bool vecSwap)
+/* static */CPPSourceEmitter::TypeDimension CPPSourceEmitter::_getTypeDimension(IRType* type, bool vecSwap)
 {
     switch (type->op)
     {
@@ -574,20 +574,20 @@ static IRBasicType* _getElementType(IRType* type)
         {
             auto vecType = static_cast<IRVectorType*>(type);
             const int elemCount = int(GetIntVal(vecType->getElementCount()));
-            return (!vecSwap) ? Dimension{1, elemCount} : Dimension{ elemCount, 1};
+            return (!vecSwap) ? TypeDimension{1, elemCount} : TypeDimension{ elemCount, 1};
         }
         case kIROp_MatrixType:
         {
             auto matType = static_cast<IRMatrixType*>(type);
             const int colCount = int(GetIntVal(matType->getColumnCount()));
             const int rowCount = int(GetIntVal(matType->getRowCount()));
-            return Dimension{rowCount, colCount};
+            return TypeDimension{rowCount, colCount};
         }
-        default: return Dimension{1, 1};
+        default: return TypeDimension{1, 1};
     }
 }
 
-/* static */void CPPSourceEmitter::_emitAccess(const UnownedStringSlice& name, const Dimension& dimension, int row, int col, SourceWriter* writer)
+/* static */void CPPSourceEmitter::_emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer)
 {
     writer->emit(name);
     const int comb = (dimension.colCount > 1 ? 2 : 0) | (dimension.rowCount > 1 ? 1 : 0);
@@ -639,10 +639,10 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedOperation& specOp)
     SLANG_ASSERT(numParams <= 3);
 
     bool areAllScalar = true;
-    Dimension paramDims[3];
+    TypeDimension paramDims[3];
     for (int i = 0; i < numParams; ++i)
     {
-        paramDims[i]= _getDimension(funcType->getParamType(i), false);
+        paramDims[i]= _getTypeDimension(funcType->getParamType(i), false);
         areAllScalar = areAllScalar && paramDims[i].isScalar();
     }
 
@@ -653,7 +653,7 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedOperation& specOp)
     }
 
     IRType* retType = specOp.returnType;
-    Dimension retDim = _getDimension(retType, false);
+    TypeDimension retDim = _getTypeDimension(retType, false);
 
     UnownedStringSlice scalarFuncName(funcName);
     if (isOperator)
@@ -743,7 +743,7 @@ void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName,
 
     IROp style = _getTypeStyle(elementType->op);
 
-    const Dimension dim = _getDimension(paramType0, false);
+    const TypeDimension dim = _getTypeDimension(paramType0, false);
 
     _emitSignature(funcName, specOp);
     writer->emit("\n{\n");
@@ -862,9 +862,9 @@ void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcNa
     emitType(retType);
     writer->emit(" r;\n");
 
-    Dimension dimA = _getDimension(paramType0, false);
-    Dimension dimB = _getDimension(paramType1, true);
-    Dimension resultDim = _getDimension(retType, paramType1->op == kIROp_VectorType);
+    TypeDimension dimA = _getTypeDimension(paramType0, false);
+    TypeDimension dimB = _getTypeDimension(paramType1, true);
+    TypeDimension resultDim = _getTypeDimension(retType, paramType1->op == kIROp_VectorType);
 
     for (int i = 0; i < resultDim.rowCount; ++i)
     {
@@ -972,7 +972,7 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     IRType* vecMulScalarArgs[] = { paramType0, elementType };
     UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(Operation::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
 
-    Dimension dimA = _getDimension(paramType0, false);
+    TypeDimension dimA = _getTypeDimension(paramType0, false);
 
     // Assumes C++
 
