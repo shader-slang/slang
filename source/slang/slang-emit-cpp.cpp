@@ -117,6 +117,18 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
     }
 }
 
+static bool _isNominal(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_StructType:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!! CPPEmitHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 static const CPPSourceEmitter::OperationInfo s_operationInfos[] =
@@ -218,6 +230,13 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
         return;
     }
 
+    if (type->getModule() != m_uniqueModule)
+    {
+        // If defined in a different module, we assume they are emitted already. (Assumed to
+        // be a nominal type)
+        return;
+    }
+
     SourceWriter* writer = getSourceWriter();
 
     switch (type->op)
@@ -313,20 +332,20 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
 {
-    // TODO(JS): Arguably this doesn't entirely work.
-    // I don't want to _clone a thing that is nominal, and not needed to be generated. But then we have
-    // We don't add it to the map, because the type is form an external module...
-
-    // We don't handle nominally named things
-    switch (inType->op)
+    if (_isNominal(inType->op))
     {
-        case kIROp_StructType:
+        StringSlicePool::Handle handle;
+        // NOTE! This is somewhat unusual -> we are going to add types which aren't cloned and belong to
+        // this module. We *assume* nominal types are de-duped
+        if (!m_typeNameMap.TryGetValue(inType, handle))
         {
-            return UnownedStringSlice::fromLiteral("");
+            auto name = getName(inType);
+            handle = m_slicePool.add(name);
+            m_typeNameMap.Add(inType, handle);
         }
-        default: break;
+        return m_slicePool.getSlice(handle);
     }
-
+    
     IRType* type = _cloneType(inType);
 
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
@@ -450,11 +469,17 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
         return inst;
     }
 
+    if (_isNominal(inst->op))
+    {
+        // If it's nominal we don't bother copying, as we assumed it is already de-duped
+        return inst;
+    }
+    
     if (IRInst*const* newInstPtr = m_cloneMap.TryGetValue(inst))
     {
         return *newInstPtr;
     }
-
+    
     // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
     // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
     // it's no use
@@ -1382,20 +1407,9 @@ void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValu
 
 void CPPSourceEmitter::emitSimpleTypeImpl(IRType* inType)
 {
-    switch (inType->op)
-    {
-        case kIROp_StructType:
-        {
-            m_writer->emit(getName(inType));
-            break;
-        }
-        default:
-        {
-            UnownedStringSlice slice = _getTypeName(_cloneType(inType));
-            m_writer->emit(slice);
-            break;
-        }
-    }
+     
+    UnownedStringSlice slice = _getTypeName(_cloneType(inType));
+    m_writer->emit(slice);
 }
 
 void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)

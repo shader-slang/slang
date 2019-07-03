@@ -56,6 +56,12 @@ float sum(float a[3])
     return total;
 }
 
+struct Thing
+{
+    int a;
+    float b;
+};
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> outputBuffer;
 
@@ -64,7 +70,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 
-    float array[3] = { 1, 2, 3};
+    Thing thing = { 10, -1.0 };
+
+    float array[3] = { thing.a, 2, 3};
+
+    float anotherArray[] = { 1, 2, 5 };
+
+    array[0] += anotherArray[1];
 
     matrix<float, 2, 3> mat = { { sum(array), 1, 2 }, { 3, 4, 5} };
     vector<float, 2> vec = { float(tid + 1), float(tid + 2) };
