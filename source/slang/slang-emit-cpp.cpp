@@ -1396,8 +1396,37 @@ void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformP
 void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
     SLANG_UNUSED(irFunc);
-    SLANG_UNUSED(entryPointLayout);
-    //SLANG_ASSERT(!"Not implemented");
+
+    auto profile = m_effectiveProfile;
+    auto stage = entryPointLayout->profile.GetStage();
+
+    switch (stage)
+    {
+        case Stage::Compute:
+        {
+            static const UInt kAxisCount = 3;
+            UInt sizeAlongAxis[kAxisCount];
+
+            // TODO: this is kind of gross because we are using a public
+            // reflection API function, rather than some kind of internal
+            // utility it forwards to...
+            spReflectionEntryPoint_getComputeThreadGroupSize(
+                (SlangReflectionEntryPoint*)entryPointLayout,
+                kAxisCount,
+                &sizeAlongAxis[0]);
+
+            // TODO(JS): We might want to store this information such that it can be used to execute
+            m_writer->emit("// [numthreads(");
+            for (int ii = 0; ii < 3; ++ii)
+            {
+                if (ii != 0) m_writer->emit(", ");
+                m_writer->emit(sizeAlongAxis[ii]);
+            }
+            m_writer->emit(")]\n");
+            break;
+        }
+        default: break;
+    }
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
@@ -1624,6 +1653,16 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     for (const auto& keyValue : m_specializeOperationNameMap)
     {
         emitSpecializedOperationDefinition(keyValue.Key);
+    }
+
+    // Lets take a look at layout
+
+    ProgramLayout* programLayout = m_programLayout;
+
+    if (programLayout)
+    {
+
+
     }
 }
 
