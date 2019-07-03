@@ -3844,7 +3844,7 @@ namespace Slang
         return true;
     }
 
-    static bool _isNominalOp(IROp op)
+    bool isNominalOp(IROp op)
     {
         // True if the op identity is 'nominal'
         switch (op)
@@ -3883,7 +3883,7 @@ namespace Slang
         }
 
         // If the type is nominal - it can only be the same if the pointer is the same.
-        if (_isNominalOp(opA))
+        if (isNominalOp(opA))
         {
             // The pointer isn't the same (as that was already tested), so cannot be equal
             return false;

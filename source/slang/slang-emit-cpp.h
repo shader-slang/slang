@@ -10,7 +10,7 @@
 namespace Slang
 {
 
-#define SLANG_CPP_OPERATION(x) \
+#define SLANG_CPP_INTRINSIC_OP(x) \
         x(Invalid, "", -1) \
         x(Init, "", -1) \
         \
@@ -101,10 +101,10 @@ class CPPSourceEmitter: public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
-#define SLANG_CPP_OPERATION_ENUM(x, op, numOperands) x,
-    enum class Operation
+#define SLANG_CPP_INTRINSIC_OP_ENUM(x, op, numOperands) x,
+    enum class IntrinsicOp
     {
-        SLANG_CPP_OPERATION(SLANG_CPP_OPERATION_ENUM)
+        SLANG_CPP_INTRINSIC_OP(SLANG_CPP_INTRINSIC_OP_ENUM)
     };
 
     struct OperationInfo
@@ -114,9 +114,9 @@ public:
         int8_t numOperands;                     ///< -1 if can't be handled automatically via amount of params
     };
 
-    struct SpecializedOperation
+    struct SpecializedIntrinsic
     {
-        typedef SpecializedOperation ThisType;
+        typedef SpecializedIntrinsic ThisType;
 
         UInt GetHashCode() const { return combineHash(int(op), Slang::GetHashCode(signatureType)); }
 
@@ -138,7 +138,7 @@ public:
             return true;
         }
 
-        Operation op;
+        IntrinsicOp op;
         IRType* returnType;
         IRFuncType* signatureType;              // Same as funcType, but has return type of void
     };
@@ -151,55 +151,53 @@ public:
         int colCount;
     };
 
-    virtual SpecializedOperation getSpecializedOperation(Operation op, IRType*const* argTypes, int argTypesCount, IRType* retType);
+    virtual SpecializedIntrinsic getSpecializedOperation(IntrinsicOp op, IRType*const* argTypes, int argTypesCount, IRType* retType);
     virtual void useType(IRType* type);
-    virtual void emitCall(const SpecializedOperation& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
+    virtual void emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
     virtual void emitTypeDefinition(IRType* type);
-    virtual void emitSpecializedOperationDefinition(const SpecializedOperation& specOp);
+    virtual void emitSpecializedOperationDefinition(const SpecializedIntrinsic& specOp);
     
-    void emitOperationCall(Operation op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
+    void emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
 
-    static const OperationInfo& getOperationInfo(Operation op);
+    static const OperationInfo& getOperationInfo(IntrinsicOp op);
 
-    static Operation getOperation(IROp op);
+    static IntrinsicOp getOperation(IROp op);
 
-    Operation getOperationByName(const UnownedStringSlice& slice);
+    IntrinsicOp getOperationByName(const UnownedStringSlice& slice);
 
     SourceWriter* getSourceWriter() const { return m_writer; }
 
     CPPSourceEmitter(const Desc& desc);
 
 protected:
-    
+
+    // Implement CLikeSourceEmitter interface
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
-
     virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
-
     virtual void emitPreprocessorDirectivesImpl();
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
 
+    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
-    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
-
-    void _emitAryDefinition(const SpecializedOperation& specOp);
+    void _emitAryDefinition(const SpecializedIntrinsic& specOp);
 
     // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
-    void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
-    void _emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
-    void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
-    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
-    void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
-    void _emitSignature(const UnownedStringSlice& funcName, const SpecializedOperation& specOp);
+    void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
-    UnownedStringSlice _getAndEmitSpecializedOperationDefinition(Operation op, IRType*const* argTypes, Int argCount, IRType* retType);
+    UnownedStringSlice _getAndEmitSpecializedOperationDefinition(IntrinsicOp op, IRType*const* argTypes, Int argCount, IRType* retType);
 
     static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
@@ -209,29 +207,47 @@ protected:
     IRInst* _clone(IRInst* inst);
     IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
 
-    StringSlicePool::Handle _calcScalarFuncName(Operation op, IRBasicType* type);
-    UnownedStringSlice _getScalarFuncName(Operation operation, IRBasicType* scalarType);
+    StringSlicePool::Handle _calcScalarFuncName(IntrinsicOp op, IRBasicType* type);
+    UnownedStringSlice _getScalarFuncName(IntrinsicOp operation, IRBasicType* scalarType);
 
-    UnownedStringSlice _getFuncName(const SpecializedOperation& specOp);
-    StringSlicePool::Handle _calcFuncName(const SpecializedOperation& specOp);
+    UnownedStringSlice _getFuncName(const SpecializedIntrinsic& specOp);
+    StringSlicePool::Handle _calcFuncName(const SpecializedIntrinsic& specOp);
 
     UnownedStringSlice _getTypeName(IRType* type);
     StringSlicePool::Handle _calcTypeName(IRType* type);
 
-    Dictionary<SpecializedOperation, StringSlicePool::Handle> m_specializeOperationNameMap;
+    Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
 
-    RefPtr<IRModule> m_uniqueModule;            ///< Store types/function sigs etc for output
+    /* This is used so as to try and use slangs type system to uniquely identify types and specializations on intrinsice.
+    That we want to have a pointer to a type be unique, and slang supports this through the m_sharedIRBuilder. BUT for this to
+    work all work on the module must use the same sharedIRBuilder, and that appears to not be the case in terms
+    of other passes.
+    Even if it was the case when we may want to add types as part of emitting, we can't use the previously used
+    shared builder, so again we end up with pointers to the same things not being the same thing.
+
+    To work around this we clone types we want to use as keys into the 'unique module'.
+    This is not necessary for all types though - as we assume nominal types *must* have unique pointers (that is the
+    definition of nominal).
+
+    This could be handled in other ways (for example not testing equality on pointer equality). Anyway for now this
+    works, but probably needs to be handled in a better way. The better way may involve having guarantees about equality
+    enabled in other code generation and making de-duping possible in emit code.
+
+    Note that one pro for this approach is that it does not alter the source module. That as it stands it's not necessary
+    for the source module to be immutable, because it is created for emitting and then discarded. 
+     */
+    RefPtr<IRModule> m_uniqueModule;            
     SharedIRBuilder m_sharedIRBuilder;
     IRBuilder m_irBuilder;
 
     Dictionary<IRInst*, IRInst*> m_cloneMap;
 
     Dictionary<IRType*, bool> m_typeEmittedMap;
-    Dictionary<SpecializedOperation, bool> m_operationEmittedMap;
+    Dictionary<SpecializedIntrinsic, bool> m_intrinsicEmittedMap;
 
-    // Maps from a name to an operation
-    List<Operation> m_operationMap;
+    // Maps from a name (in the form of a handle/index from m_slicePool) to an operation
+    List<IntrinsicOp> m_intrinsicOpMap;
 
     StringSlicePool m_slicePool;
 };
