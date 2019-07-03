@@ -180,7 +180,7 @@ protected:
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
-    virtual void emitPreprocessorDirectivesImpl();
+    virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
 
