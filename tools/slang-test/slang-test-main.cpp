@@ -1167,9 +1167,15 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     // Compile this source
     options.sourceFiles.add(cppSource);
     options.modulePath = modulePath;
+    options.targetType = CPPCompiler::TargetType::SharedLibrary;
 
     CPPCompiler::Output output;
     if (SLANG_FAILED(compiler->compile(options, output)))
+    {
+        return TestResult::Fail;
+    }
+
+    if (output.getCountByType(CPPCompiler::OutputMessage::Type::Error) > 0)
     {
         return TestResult::Fail;
     }

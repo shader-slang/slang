@@ -1398,6 +1398,8 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
         }
         default: break;
     }
+
+    m_writer->emit("SLANG_EXPORT\n");
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)

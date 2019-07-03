@@ -9,6 +9,20 @@
 #   define M_PI           3.14159265358979323846
 #endif
 
+#if defined(_MSC_VER)
+#   define SLANG_SHARED_LIB_EXPORT __declspec(dllexport)
+#else 
+#   define SLANG_SHARED_LIB_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
+#endif    
+
+#ifdef __cplusplus    
+#   define SLANG_EXTERN_C extern "C"
+#else
+#   define SLANG_EXTERN_C 
+#endif    
+
+#define SLANG_EXPORT SLANG_EXTERN_C SLANG_SHARED_LIB_EXPORT
+
 template <typename T, size_t SIZE>
 struct FixedArray
 {
