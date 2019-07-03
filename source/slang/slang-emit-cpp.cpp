@@ -413,7 +413,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             int elementCount = int(GetIntVal(arrayType->getElementCount()));
 
             StringBuilder builder;
-            builder << "Array<";
+            builder << "FixedArray<";
             builder << _getTypeName(elementType);
             builder << ", " << elementCount << ">";
 

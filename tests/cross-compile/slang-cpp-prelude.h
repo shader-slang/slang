@@ -10,7 +10,7 @@
 #endif
 
 template <typename T, size_t SIZE>
-struct Array
+struct FixedArray
 {
     const T& operator[](size_t index) const { assert(index < SIZE); return m_data[index]; }
     T& operator[](size_t index) { assert(index < SIZE); return m_data[index]; }
