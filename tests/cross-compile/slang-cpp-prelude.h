@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #ifndef M_PI
 #   define M_PI           3.14159265358979323846
@@ -11,8 +12,9 @@
 
 #if defined(_MSC_VER)
 #   define SLANG_SHARED_LIB_EXPORT __declspec(dllexport)
-#else 
-#   define SLANG_SHARED_LIB_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
+#else
+#   define SLANG_SHARED_LIB_EXPORT __attribute__((__visibility__("default")))
+//#   define SLANG_SHARED_LIB_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
 #endif    
 
 #ifdef __cplusplus    
@@ -110,7 +112,7 @@ float I32_asfloat(int32_t x) { Union32 u; u.i = x; return u.f; }
 
 // ----------------------------- U32 -----------------------------------------
 
-uint32_t U32_abs(uint32_t f) { return (f < 0) ? -f : f; }
+uint32_t U32_abs(uint32_t f) { return f; }
 
 uint32_t U32_min(uint32_t a, uint32_t b) { return a < b ? a : b; }
 uint32_t U32_max(uint32_t a, uint32_t b) { return a > b ? a : b; }
