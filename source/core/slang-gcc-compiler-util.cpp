@@ -338,7 +338,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 /* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     cmdLine.addArg("-fvisibility=hidden");
-    cmdLine.addArg("-std=c++11");
+
+    if (options.sourceType == SourceType::CPP)
+    {
+        cmdLine.addArg("-std=c++11");
+    }
 
     // Use shared libraries
     //cmdLine.addArg("-shared");
