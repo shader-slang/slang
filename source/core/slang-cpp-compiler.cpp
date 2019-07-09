@@ -377,6 +377,19 @@ void CPPCompilerSet::getCompilers(List<CPPCompiler*>& outCompilers) const
     outCompilers.addRange((CPPCompiler*const*)m_compilers.begin(), m_compilers.getCount());
 }
 
+bool CPPCompilerSet::hasCompiler(CPPCompiler::CompilerType compilerType) const
+{
+    for (CPPCompiler* compiler : m_compilers)
+    {
+        const auto& desc = compiler->getDesc();
+        if (desc.type == compilerType)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void CPPCompilerSet::addCompiler(CPPCompiler* compiler)
 {
     const Index index = _findIndex(compiler->getDesc());

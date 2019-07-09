@@ -381,6 +381,17 @@ namespace Slang
         return func;
     }
 
+    CPPCompilerSet* Session::requireCPPCompilerSet()
+    {
+        if (cppCompilerSet == nullptr)
+        {
+            cppCompilerSet = new CPPCompilerSet;
+            CPPCompilerUtil::initializeSet(cppCompilerSet);
+        }
+        SLANG_ASSERT(cppCompilerSet);
+        return cppCompilerSet;
+    }
+
 
     enum class CheckingPhase
     {

@@ -19,6 +19,7 @@ enum class BackendType
     Dxc,
     Fxc,
     Glslang,
+    CPPCompiler,
     CountOf,
 };
 
@@ -30,6 +31,7 @@ struct BackendFlag
         Dxc = 1 << int(BackendType::Dxc),
         Fxc = 1 << int(BackendType::Fxc),
         Glslang = 1 << int(BackendType::Glslang),
+        CPPCompiler = 1 << int(BackendType::CPPCompiler),
     };
 };
 

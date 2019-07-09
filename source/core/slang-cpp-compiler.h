@@ -225,6 +225,9 @@ public:
         /// Set the default compiler
     void setDefaultCompiler(CPPCompiler* compiler) { m_defaultCompiler = compiler;  }
 
+        /// True if has a compiler of the specified type
+    bool hasCompiler(CPPCompiler::CompilerType compilerType) const;
+
 protected:
 
     Index _findIndex(const CPPCompiler::Desc& desc) const;

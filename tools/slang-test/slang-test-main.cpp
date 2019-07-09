@@ -571,6 +571,9 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("dxil-asm", DXIL_ASM)
         CASE("c", C_SOURCE)
         CASE("cpp", CPP_SOURCE)
+        CASE("exe", EXECUTABLE)
+        CASE("sharedlib", SHARED_LIBRARY)
+        CASE("dll", SHARED_LIBRARY)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;

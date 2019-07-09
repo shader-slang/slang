@@ -4,6 +4,8 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
 
+#include "../core/slang-cpp-compiler.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "slang-diagnostics.h"
@@ -57,6 +59,8 @@ namespace Slang
         DXILAssembly        = SLANG_DXIL_ASM,
         CSource             = SLANG_C_SOURCE,
         CPPSource           = SLANG_CPP_SOURCE,
+        Executable          = SLANG_EXECUTABLE,
+        SharedLibrary       = SLANG_SHARED_LIBRARY,
     };
 
     CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
@@ -417,10 +421,14 @@ namespace Slang
 
     enum class PassThroughMode : SlangPassThrough
     {
-        None = SLANG_PASS_THROUGH_NONE,	// don't pass through: use Slang compiler
-        fxc = SLANG_PASS_THROUGH_FXC,	// pass through HLSL to `D3DCompile` API
-        dxc = SLANG_PASS_THROUGH_DXC,	// pass through HLSL to `IDxcCompiler` API
-        glslang = SLANG_PASS_THROUGH_GLSLANG,	// pass through GLSL to `glslang` library
+        None = SLANG_PASS_THROUGH_NONE,	                    ///< don't pass through: use Slang compiler
+        Fxc = SLANG_PASS_THROUGH_FXC,	                    ///< pass through HLSL to `D3DCompile` API
+        Dxc = SLANG_PASS_THROUGH_DXC,	                    ///< pass through HLSL to `IDxcCompiler` API
+        Glslang = SLANG_PASS_THROUGH_GLSLANG,	            ///< pass through GLSL to `glslang` library
+        Clang = SLANG_PASS_THROUGH_CLANG,                   ///< Pass through clang compiler
+        Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
+        VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
+        GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
     };
 
     class SourceFile;
@@ -1493,6 +1501,8 @@ namespace Slang
         RefPtr<Type> stringType;
         RefPtr<Type> enumTypeType;
 
+        RefPtr<CPPCompilerSet> cppCompilerSet;                                          ///< Information about available C/C++ compilers. null unless information is requested (because slow)
+
         ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
         ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
         SlangFuncPtr sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)];
@@ -1566,6 +1576,9 @@ namespace Slang
         ISlangSharedLibrary* getSharedLibrary(SharedLibraryType type) const { return sharedLibraries[int(type)]; }
 
         SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
+
+            /// Finds out what compilers are present and caches the result
+        CPPCompilerSet* requireCPPCompilerSet();
 
         Session();
 

@@ -84,7 +84,9 @@ namespace Slang
     x("dxil", DXIL) \
     x("dxil-asm,dxil-assembly", DXILAssembly) \
     x("c", CSource) \
-    x("cpp", CPPSource)
+    x("cpp", CPPSource) \
+    x("sharedlib,sharedlibrary,dll", SharedLibrary) \
+    x("exe,executable", Executable) 
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -378,7 +380,7 @@ namespace Slang
                 // If no pass through -> that will always work!
                 return SLANG_OK;
             }
-            case PassThroughMode::dxc:
+            case PassThroughMode::Dxc:
             {
 #if SLANG_ENABLE_DXIL_SUPPORT
                 // Must have dxc
@@ -386,7 +388,7 @@ namespace Slang
 #endif
                 break;
             }
-            case PassThroughMode::fxc:
+            case PassThroughMode::Fxc:
             {
 #if SLANG_ENABLE_DXBC_SUPPORT
                 // Must have fxc
@@ -394,12 +396,31 @@ namespace Slang
 #endif
                 break;
             }
-            case PassThroughMode::glslang:
+            case PassThroughMode::Glslang:
             {
 #if SLANG_ENABLE_GLSLANG_SUPPORT
                 return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
 #endif
                 break;
+            }
+            case PassThroughMode::Clang:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::VisualStudio:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::Gcc:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::GenericCCpp:
+            {
+                List<CPPCompiler::Desc> descs;
+                session->requireCPPCompilerSet()->getCompilerDescs(descs);
+
+                return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
         }
         return SLANG_E_NOT_IMPLEMENTED;
@@ -428,23 +449,29 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-                return PassThroughMode::glslang;
+                return PassThroughMode::Glslang;
             }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
             {
-                return PassThroughMode::fxc;
+                return PassThroughMode::Fxc;
             }
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXILAssembly:
             {
-                return PassThroughMode::dxc;
+                return PassThroughMode::Dxc;
             }
             case CodeGenTarget::CPPSource:
             case CodeGenTarget::CSource:
             {
                 // Don't need an external compiler to output C and C++ code
                 return PassThroughMode::None;
+            }
+            case CodeGenTarget::SharedLibrary:
+            case CodeGenTarget::Executable:
+            {
+                // We need some C/C++ compiler
+                return PassThroughMode::GenericCCpp;
             }
 
             default: break;
@@ -533,6 +560,58 @@ namespace Slang
                 compileRequest,
                 entryPoint,
                 CodeGenTarget::HLSL,
+                targetReq);
+        }
+    }
+
+    String emitCPPForEntryPoint(
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq)
+    {
+        if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
+        {
+            // Generate a string that includes the content of
+            // the source file(s), along with a line directive
+            // to ensure that we get reasonable messages
+            // from the downstream compiler when in pass-through
+            // mode.
+
+            StringBuilder codeBuilder;
+            for (auto sourceFile : translationUnit->getSourceFiles())
+            {
+                codeBuilder << "#line 1 \"";
+
+                const String& path = sourceFile->getPathInfo().foundPath;
+
+                for (auto c : path)
+                {
+                    char buffer[] = { c, 0 };
+                    switch (c)
+                    {
+                        default:
+                            codeBuilder << buffer;
+                            break;
+
+                        case '\\':
+                            codeBuilder << "\\\\";
+                    }
+                }
+                codeBuilder << "\"\n";
+
+                codeBuilder << sourceFile->getContent() << "\n";
+            }
+
+            return codeBuilder.ProduceString();
+        }
+        else
+        {
+            return emitEntryPoint(
+                compileRequest,
+                entryPoint,
+                CodeGenTarget::CPPSource,
                 targetReq);
         }
     }
@@ -1028,6 +1107,37 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
+    SlangResult emitCPUBinaryForEntryPoint(
+        BackEndCompileRequest*  slangRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq,
+        List<uint8_t>&          binOut)
+    {
+        binOut.clear();
+
+        String rawCPP = emitCPPForEntryPoint(
+            slangRequest,
+            entryPoint,
+            entryPointIndex,
+            targetReq,
+            endToEndReq);
+        maybeDumpIntermediate(slangRequest, rawCPP.getBuffer(), CodeGenTarget::GLSL);
+
+        auto outputFunc = [](void const* data, size_t size, void* userData)
+        {
+            ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
+        };
+
+        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+
+        // We will need to ouput a file that we will compile. We need temporary files for the
+        // source, and for the target file probly
+
+        return SLANG_OK;
+    }
+
     SlangResult emitSPIRVForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
@@ -1106,6 +1216,23 @@ SlangResult dissassembleDXILUsingDXC(
 
         switch (target)
         {
+        case CodeGenTarget::SharedLibrary:
+        case CodeGenTarget::Executable:
+            {
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
+                    compileRequest,
+                    entryPoint,
+                    entryPointIndex,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
+                    result = CompileResult(code);
+                }
+            }
+            break;
         case CodeGenTarget::HLSL:
             {
                 String code = emitHLSLForEntryPoint(
