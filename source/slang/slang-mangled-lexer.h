@@ -42,7 +42,7 @@ public:
     UInt readParamCount();
 
         /// Ctor
-    SLANG_FORCE_INLINE MangledLexer(String const& str);
+    SLANG_FORCE_INLINE MangledLexer(const UnownedStringSlice& slice);
 
 private:
 
@@ -71,10 +71,10 @@ private:
 };
 
 // -------------------------------------------------------------------------- -
-SLANG_FORCE_INLINE MangledLexer::MangledLexer(String const& str)
-    : m_cursor(str.begin())
-    , m_begin(str.begin())
-    , m_end(str.end())
+SLANG_FORCE_INLINE MangledLexer::MangledLexer(const UnownedStringSlice& slice)
+    : m_cursor(slice.begin())
+    , m_begin(slice.begin())
+    , m_end(slice.end())
 {
     _start();
 }

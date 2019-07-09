@@ -156,6 +156,12 @@ void SourceWriter::emit(const NameLoc& nameAndLoc)
     emit(getText(nameAndLoc.name));
 }
 
+void SourceWriter::emit(const StringSliceLoc& nameAndLoc)
+{
+    advanceToSourceLocation(nameAndLoc.loc);
+    emit(nameAndLoc.name);
+}
+
 void SourceWriter::emitName(Name* name, const SourceLoc& locIn)
 {
     advanceToSourceLocation(locIn);
@@ -165,6 +171,11 @@ void SourceWriter::emitName(Name* name, const SourceLoc& locIn)
 void SourceWriter::emitName(const NameLoc& nameAndLoc)
 {
     emitName(nameAndLoc.name, nameAndLoc.loc);
+}
+
+void SourceWriter::emitName(const StringSliceLoc& nameAndLoc)
+{
+    emit(nameAndLoc);
 }
 
 void SourceWriter::emitName(Name* name)

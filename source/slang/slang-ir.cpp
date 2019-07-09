@@ -1530,8 +1530,7 @@ namespace Slang
     }
 
  
-    IRInst* findOrEmitHoistableInst(
-        IRBuilder*              builder,
+    IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*                 type,
         IROp                    op,
         UInt                    operandListCount,
@@ -1544,7 +1543,7 @@ namespace Slang
             operandCount += listOperandCounts[ii];
         }
 
-        auto& memoryArena = builder->getModule()->memoryArena;
+        auto& memoryArena = getModule()->memoryArena;
         void* cursor = memoryArena.getCursor();
 
         // We are going to create a 'dummy' instruction on the memoryArena
@@ -1581,7 +1580,7 @@ namespace Slang
             IRInstKey key = { inst };
 
             // Ideally we would add if not found, else return if was found instead of testing & then adding.
-            IRInst** found = builder->sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
+            IRInst** found = sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
             SLANG_ASSERT(endCursor == memoryArena.getCursor());
             // If it's found, just return, and throw away the instruction
             if (found)
@@ -1600,7 +1599,7 @@ namespace Slang
                 inst->typeUse.init(inst, type);
             }
 
-            maybeSetSourceLoc(builder, inst);
+            maybeSetSourceLoc(this, inst);
 
             IRUse*const operands = inst->getOperands();
             for (UInt i = 0; i < operandCount; ++i)
@@ -1613,20 +1612,18 @@ namespace Slang
             }
         }
 
-        addHoistableInst(builder, inst);
+        addHoistableInst(this, inst);
 
         return inst;
     }
 
-    IRInst* findOrEmitHoistableInst(
-        IRBuilder*      builder,
+    IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*         type,
         IROp            op,
         UInt            operandCount,
         IRInst* const*  operands)
     {
         return findOrEmitHoistableInst(
-            builder,
             type,
             op,
             1,
@@ -1634,8 +1631,7 @@ namespace Slang
             &operands);
     }
 
-    IRInst* findOrEmitHoistableInst(
-        IRBuilder*      builder,
+    IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*         type,
         IROp            op,
         IRInst*         operand,
@@ -1646,7 +1642,6 @@ namespace Slang
         IRInst* const* lists[] = { &operand, operands };
 
         return findOrEmitHoistableInst(
-            builder,
             type,
             op,
             2,
@@ -1661,7 +1656,6 @@ namespace Slang
         IRInst* const*  operands)
     {
         return (IRType*) findOrEmitHoistableInst(
-            this,
             nullptr,
             op,
             operandCount,
@@ -1806,7 +1800,6 @@ namespace Slang
         IRType*         resultType)
     {
         return (IRFuncType*) findOrEmitHoistableInst(
-            this,
             nullptr,
             kIROp_FuncType,
             resultType,
@@ -1849,7 +1842,6 @@ namespace Slang
         IRType* const*  caseTypes)
     {
         return (IRType*) findOrEmitHoistableInst(
-            this,
             getTypeKind(),
             kIROp_TaggedUnionType,
             caseCount,
@@ -1882,7 +1874,6 @@ namespace Slang
         }
 
         return (IRType*) findOrEmitHoistableInst(
-            this,
             getTypeKind(),
             kIROp_BindExistentialsType,
             baseType,
@@ -3853,7 +3844,7 @@ namespace Slang
         return true;
     }
 
-    static bool _isNominalOp(IROp op)
+    bool isNominalOp(IROp op)
     {
         // True if the op identity is 'nominal'
         switch (op)
@@ -3892,7 +3883,7 @@ namespace Slang
         }
 
         // If the type is nominal - it can only be the same if the pointer is the same.
-        if (_isNominalOp(opA))
+        if (isNominalOp(opA))
         {
             // The pointer isn't the same (as that was already tested), so cannot be equal
             return false;

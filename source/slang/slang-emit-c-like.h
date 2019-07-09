@@ -133,15 +133,7 @@ public:
 
     void emitDeclarator(EDeclarator* declarator);
 
-    //void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount);
-    //void emitTextureType(IRTextureType* texType);
-    //void emitTextureSamplerType(IRTextureSamplerType* type);
-    //void emitImageType(IRGLSLImageType* type);
-    //void emitSamplerStateType(IRSamplerStateTypeBase* samplerStateType);
-    //void emitStructuredBufferType(IRHLSLStructuredBufferTypeBase* type);
-    //void emitUntypedBufferType(IRUntypedBufferResourceType* type);
-
-    void emitType(IRType* type, const SourceLoc& typeLoc, Name* name, const SourceLoc& nameLoc);
+    void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
     void emitType(IRType* type, Name* name);
     void emitType(IRType* type, String const& name);
     void emitType(IRType* type);
@@ -226,7 +218,8 @@ public:
     void emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
 
     void emitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
-    
+    void defaultEmitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+
     BaseType extractBaseType(IRType* inType);
 
     void emitInst(IRInst* inst, IREmitMode mode);
@@ -353,6 +346,7 @@ public:
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
+    virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

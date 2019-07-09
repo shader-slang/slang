@@ -237,6 +237,9 @@ String emitEntryPoint(
         sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, getCodeGenTargetName(target));
         return String();
     }
+
+    // Outside because we want to keep IR in scope whilst we are processing emits
+    LinkedIR linkedIR;
     {
         auto session = targetRequest->getSession();
 
@@ -248,7 +251,7 @@ String emitEntryPoint(
         // modules, and also select between the definitions of
         // any "profile-overloaded" symbols.
         //
-        auto linkedIR = linkIR(
+        linkedIR = linkIR(
             compileRequest,
             entryPoint,
             programLayout,

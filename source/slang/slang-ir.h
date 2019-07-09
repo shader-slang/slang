@@ -1197,6 +1197,10 @@ IRInst* createEmptyInstWithSize(
     IRModule*   module,
     IROp        op,
     size_t      totalSizeInBytes);
+
+    /// True if the op type can be handled 'nominally' meaning that pointer identity is applicable. 
+bool isNominalOp(IROp op);
+
 }
 
 #endif
