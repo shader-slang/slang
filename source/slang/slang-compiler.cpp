@@ -85,8 +85,8 @@ namespace Slang
     x("dxil-asm,dxil-assembly", DXILAssembly) \
     x("c", CSource) \
     x("cpp", CPPSource) \
-    x("sharedlib,sharedlibrary,dll", SharedLibrary) \
-    x("exe,executable", Executable) 
+    x("exe,executable", Executable) \
+    x("sharedlib,sharedlibrary,dll", SharedLibrary) 
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -1568,6 +1568,17 @@ SlangResult dissassembleDXILUsingDXC(
                                 data.begin(),
                                 data.end() - data.begin(), assembly);
                             writeOutputToConsole(writer, assembly);
+                        }
+                        break;
+
+                    case CodeGenTarget::SharedLibrary:
+                        {
+                            WriterHelper(writer).put("SharedLibrary\n");
+                        }
+                        break;
+                    case CodeGenTarget::Executable:
+                        {
+                            WriterHelper(writer).put("Executable\n");
                         }
                         break;
 

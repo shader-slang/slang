@@ -490,24 +490,41 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-static BackendType _toBackendType(const UnownedStringSlice& slice)
+static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
 {
     if (slice == "dxc")
     {
-        return BackendType::Dxc;
+        return SLANG_PASS_THROUGH_DXC;
     }
     else if (slice == "fxc")
     {
-        return BackendType::Fxc;
+        return SLANG_PASS_THROUGH_FXC;
     }
     else if (slice == "glslang")
     {
-        return BackendType::Glslang;
+        return SLANG_PASS_THROUGH_GLSLANG;
     }
-    return BackendType::Unknown;
+    else if (slice == "c" || slice == "cpp")
+    {
+        return SLANG_PASS_THROUGH_GENERIC_C_CPP; 
+    }
+    else if (slice == "clang")
+    {
+        return SLANG_PASS_THROUGH_CLANG;
+    }
+    else if (slice == "gcc")
+    {
+        return SLANG_PASS_THROUGH_GCC;
+    }
+    else if (slice == "vs" || slice == "visualstudio")
+    {
+        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    }
+
+    return SLANG_PASS_THROUGH_NONE;
 }
 
-static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
+static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
     {
@@ -523,34 +540,30 @@ static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
         case SLANG_DXBC:
         case SLANG_DXBC_ASM:
         {
-            return BackendFlag::Fxc;
+            return PassThroughFlag::Fxc;
         }
         case SLANG_SPIRV:
         case SLANG_SPIRV_ASM:
         {
-            return BackendFlag::Glslang;
+            return PassThroughFlag::Glslang;
         }
         case SLANG_DXIL:
         case SLANG_DXIL_ASM:
         {
-            return BackendFlag::Dxc;
+            return PassThroughFlag::Dxc;
         }
+
+        case SLANG_EXECUTABLE:
+        case SLANG_SHARED_LIBRARY:
+        {
+            return PassThroughFlag::Generic_C_CPP;
+        }
+
         default:
         {
             SLANG_ASSERT(!"Unknown type");
             return 0;
         }
-    }
-}
-
-static BackendType _toBackendTypeFromPassThroughType(SlangPassThrough passThru)
-{
-    switch (passThru)
-    {
-        case SLANG_PASS_THROUGH_DXC: return BackendType::Dxc;
-        case SLANG_PASS_THROUGH_FXC: return BackendType::Fxc;
-        case SLANG_PASS_THROUGH_GLSLANG: return BackendType::Glslang;
-        default:                     return BackendType::Unknown;
     }
 }
 
@@ -683,11 +696,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
     if (passThru == SLANG_PASS_THROUGH_NONE)
     {
         // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
     }
     else
     {
-        ioRequirements->addUsed(_toBackendTypeFromPassThroughType(passThru));
+        ioRequirements->addUsed(passThru);
     }
 
     // Add the render api used
@@ -704,7 +717,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsed(_toPassThroughType(passThrough.getUnownedSlice()));
         }
     }
 
@@ -714,7 +727,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
         {
             const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
-            ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
     return SLANG_OK;
@@ -2627,41 +2640,39 @@ SlangResult innerMain(int argc, char** argv)
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
 
+    // An un-categorized test will always belong to the `full` category
+    categorySet.defaultCategory = fullTestCategory;
+
+    
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
 
-    // Might be better if we had an API on slang so we could get what 'pass-through's are available
-    // This works whilst these targets imply the pass-through/backends
+    // Work out what backends/pass-thrus are available
     {
         SlangSession* session = context.getSession();
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_FXC)))
+
+        for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+        {
+            SlangPassThrough passThru = SlangPassThrough(i);
+
+            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            {
+                context.availableBackendFlags |= PassThroughFlags(1) << int(i);
+            }
+        }
+
+        if (context.availableBackendFlags & PassThroughFlag::Fxc)
         {
             fxcCategory = categorySet.add("fxc", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GLSLANG)))
+        if (context.availableBackendFlags & PassThroughFlag::Glslang)
         {
             glslangCategory = categorySet.add("glslang", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_DXC)))
+        if (context.availableBackendFlags & PassThroughFlag::Dxc)
         {
             dxcCategory = categorySet.add("dxc", fullTestCategory);
-        }
-    }
-
-    // An un-categorized test will always belong to the `full` category
-    categorySet.defaultCategory = fullTestCategory;
-
-    // Work out what backends are available
-    {
-        SlangSession* session = context.getSession();
-        const SlangPassThrough passThrus[] = { SLANG_PASS_THROUGH_DXC, SLANG_PASS_THROUGH_FXC, SLANG_PASS_THROUGH_GLSLANG };
-        for (auto passThru: passThrus)
-        {
-            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
-            {
-                context.availableBackendFlags |= BackendFlags(1) << int(_toBackendTypeFromPassThroughType(passThru));
-            }
         }
     }
 

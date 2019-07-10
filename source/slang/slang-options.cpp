@@ -449,6 +449,23 @@ struct OptionsParser
         rawTarget->floatingPointMode = mode;
     }
 
+    static bool _passThroughRequiresStage(PassThroughMode passThrough)
+    {
+        switch (passThrough)
+        {
+            case PassThroughMode::Glslang:
+            case PassThroughMode::Dxc:
+            case PassThroughMode::Fxc:
+            {
+                return true;
+            }
+            default:
+            {
+                return false;
+            }
+        }
+    }
+
     SlangResult parse(
         int             argc,
         char const* const*  argv)
@@ -960,7 +977,7 @@ struct OptionsParser
         // because fxc/dxc/glslang don't have a facility for taking
         // a named entry point and pulling its stage from an attribute.
         //
-        if( requestImpl->passThrough != PassThroughMode::None )
+        if(_passThroughRequiresStage(requestImpl->passThrough) )
         {
             for( auto& rawEntryPoint : rawEntryPoints )
             {

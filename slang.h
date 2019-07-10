@@ -543,6 +543,7 @@ extern "C"
         SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
         SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
         SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, which is decided by the source type
+        SLANG_PASS_THROUGH_COUNT_OF,
     };
 
     /*!
