@@ -1132,7 +1132,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        // We will need to ouput a file that we will compile. We need temporary files for the
+        // We will need to output a file that we will compile. We need temporary files for the
         // source, and for the target file probly
 
         return SLANG_OK;

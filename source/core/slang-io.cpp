@@ -51,6 +51,86 @@ namespace Slang
 #endif
     }
 
+
+#ifdef _WIN32
+    /* static */SlangResult File::generateTemporary(const UnownedStringSlice& inPrefix, Slang::String& outFileName)
+    {
+        // https://docs.microsoft.com/en-us/windows/win32/fileio/creating-and-using-a-temporary-file
+
+        String tempPath;
+        {
+            int count = MAX_PATH + 1;
+            while (true)
+            {
+                char* chars = tempPath.prepareForAppend(count);
+                //  Gets the temp path env string (no guarantee it's a valid path).
+                // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppatha
+                DWORD ret = ::GetTempPathA(count - 1, chars);
+                if (ret == 0)
+                {
+                    return SLANG_FAIL;
+                }
+                if (ret > DWORD(count - 1))
+                {
+                    count = ret + 1;
+                    continue;
+                }
+                tempPath.appendInPlace(chars, count);
+                break;
+            }
+        }
+
+        if (!File::exists(tempPath))
+        {
+            return SLANG_FAIL;
+        }
+
+        const String prefix(inPrefix);
+        String tempFileName;
+
+        {
+            int count = MAX_PATH + 1;
+            char* chars = tempFileName.prepareForAppend(count);
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamea
+            //  Generates a temporary file name. 
+            DWORD ret = ::GetTempFileNameA(tempPath.getBuffer(), prefix.getBuffer(), 0, chars);
+
+            if (ret == 0)
+            {
+                return SLANG_FAIL;
+            }
+            tempFileName.appendInPlace(chars, ::strlen(chars));
+        }
+
+        outFileName = tempFileName;
+        return SLANG_OK;
+    }
+#else
+    /* static */SlangResult File::generateTemporary(const UnownedStringSlice& inPrefix, Slang::String& outFileName)
+    {
+        StringBuilder builder;
+        builder << "/tmp/" << inPrefix << "-XXXXXX";
+
+        List<char> buffer;
+        buffer.setCount(builder.getLength() + 1);
+        ::memcpy(buffer.getBuffer(), builder.getBuffer(), builder.getLength());
+        buffer[builder.getLength()] = 0;
+
+        int handle = mkstemp(buffer.getBuffer());
+        if (handle == -1)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Close the handle..
+        close(handle);
+
+        outFileName = buffer.getBuffer();
+        return SLANG_OK;
+    }
+#endif
+
 	bool File::exists(const String& fileName)
 	{
 #ifdef _WIN32

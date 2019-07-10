@@ -16,6 +16,8 @@ namespace Slang
 		static Slang::List<unsigned char> readAllBytes(const Slang::String& fileName);
 		static void writeAllText(const Slang::String& fileName, const Slang::String& text);
         static SlangResult remove(const String& fileName);
+
+        static SlangResult generateTemporary(const UnownedStringSlice& prefix, Slang::String& outFileName);
 	};
 
 	class Path
