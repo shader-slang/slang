@@ -26,6 +26,10 @@ struct GCCCompilerUtil
 
         /// Parse ExecuteResult into Output
     static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+
+        /// Calculate the output module filename 
+    static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
+
 };
 
 }

@@ -335,6 +335,34 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
+/* static */ SlangResult GCCCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            outPath << SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
+            return SLANG_OK;
+        }
+        case TargetType::Executable:
+        {
+            outPath << options.modulePath;
+            outPath << ProcessUtil::getExecutableSuffix();
+            return SLANG_OK;
+        }
+        case TargetType::Object:
+        {
+            // Will be .o for typical gcc targets
+            outPath << options.modulePath << ".o";
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
+}
+
 /* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     cmdLine.addArg("-fvisibility=hidden");
@@ -368,6 +396,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-g");
     }
 
+
+    StringBuilder moduleFilePath;
+    calcModuleFilePath(options, moduleFilePath);
+
+    cmdLine.addArg("-o");
+    cmdLine.addArg(moduleFilePath);
+
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
@@ -376,22 +411,10 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             cmdLine.addArg("-shared");
             // Position independent
             cmdLine.addArg("-fPIC");
-
-            String sharedLibraryPath = SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
-
-            cmdLine.addArg("-o");
-            cmdLine.addArg(sharedLibraryPath);
             break;
         }
         case TargetType::Executable:
         {
-            cmdLine.addArg("-o");
-
-            StringBuilder builder;
-            builder << options.modulePath;
-            builder << ProcessUtil::getExecutableSuffix();
-
-            cmdLine.addArg(options.modulePath);
             break;
         }
         case TargetType::Object:

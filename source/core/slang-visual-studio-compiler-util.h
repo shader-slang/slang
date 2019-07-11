@@ -19,6 +19,9 @@ struct VisualStudioCompilerUtil
     static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);
         /// Parse Visual Studio exeRes into CPPCompiler::Output
     static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+
+    static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
+
 };
 
 }

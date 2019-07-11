@@ -293,7 +293,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
             CommandLine cmdLine;
             calcExecuteCompilerArgs(versionPath, cmdLine);
             
-            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &VisualStudioCompilerUtil::calcArgs, &VisualStudioCompilerUtil::parseOutput);
+            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &VisualStudioCompilerUtil::calcArgs, &VisualStudioCompilerUtil::parseOutput, &VisualStudioCompilerUtil::calcModuleFilePath);
             set->addCompiler(compiler);
         }
     }

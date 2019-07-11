@@ -10,6 +10,33 @@
 namespace Slang
 {
 
+/* static */ SlangResult VisualStudioCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            outPath << options.modulePath << ".dll";
+            return SLANG_OK;
+        }
+        case TargetType::Executable:
+        {
+            outPath << options.modulePath << ".exe";
+            return SLANG_OK;
+        }
+        case TargetType::Object:
+        {
+            outPath << options.modulePath << ".obj";
+            return SLANG_OK;
+        }
+        default: break;
+    }
+
+    return SLANG_FAIL;
+}
+
 /* static */void VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019

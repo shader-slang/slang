@@ -163,6 +163,8 @@ public:
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
+        /// Given the compilation options and the module name, determines the actual file name used for output
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
 
 protected:
 
@@ -180,26 +182,31 @@ public:
 
     typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
     typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
+    typedef SlangResult(*CalcModuleFilePathFunc)(const CPPCompiler::CompileOptions& options, StringBuilder& outPath);
 
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
+    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
         Super(desc),
         m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc)
+        m_parseOutputFunc(parseOutputFunc),
+        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
+    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
         Super(desc),
         m_cmdLine(cmdLine),
         m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc)
+        m_parseOutputFunc(parseOutputFunc),
+        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
     {}
 
     CalcArgsFunc m_calcArgsFunc;
     ParseOutputFunc m_parseOutputFunc;
+    CalcModuleFilePathFunc m_calcModuleFilePathFunc;
     CommandLine m_cmdLine;
 };
 

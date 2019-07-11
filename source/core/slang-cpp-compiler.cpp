@@ -167,6 +167,11 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
     return m_parseOutputFunc(exeRes, outOutput);
 }
 
+SlangResult GenericCPPCompiler::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    return m_calcModuleFilePathFunc(options, outPath);
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
 
 static CPPCompiler::Desc _calcCompiledWithDesc()
@@ -308,7 +313,7 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
     CPPCompiler::Desc desc;
     if (SLANG_SUCCEEDED(GCCCompilerUtil::calcVersion(exeName, desc)))
     {
-        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &GCCCompilerUtil::calcArgs, &GCCCompilerUtil::parseOutput));
+        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &GCCCompilerUtil::calcArgs, &GCCCompilerUtil::parseOutput, GCCCompilerUtil::calcModuleFilePath));
         compilerSet->addCompiler(compiler);
     }
 }

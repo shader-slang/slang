@@ -1102,6 +1102,25 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
+    struct TemporaryFileSet
+    {
+        void add(const String& path)
+        {
+            if (m_paths.indexOf(path) < 0)
+            {
+                m_paths.add(path);
+            }
+        }
+        ~TemporaryFileSet()
+        {
+            for (const auto& path : m_paths)
+            {
+                File::remove(path);
+            }
+        }
+        List<String> m_paths;
+    };
+
     SlangResult emitCPUBinaryForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
@@ -1111,12 +1130,11 @@ SlangResult dissassembleDXILUsingDXC(
         List<uint8_t>&          binOut)
     {
         binOut.clear();
-
-        
-        CPPCompiler* compiler = nullptr;
-
+      
         CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
 
+        // Determine compiler to use
+        CPPCompiler* compiler = nullptr;
         switch (endToEndReq->passThrough)
         {
             case PassThroughMode::GenericCCpp:
@@ -1147,7 +1165,10 @@ SlangResult dissassembleDXILUsingDXC(
             return SLANG_FAIL;
         }
 
+        TemporaryFileSet temporaryFileSet;
+
         bool useOriginalFile = false;
+
         String sourcePath;
         String sourceContents;
 
@@ -1178,7 +1199,7 @@ SlangResult dissassembleDXILUsingDXC(
                         {
                             String readContents = File::readAllText(sourcePath);
                             // We should see if they are the same
-                            useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());                
+                            useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());
                         }
                         catch (const Slang::IOException&)
                         {
@@ -1215,40 +1236,57 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (!useOriginalFile)
         {
-            sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
-
-            String tmpSourcePath;
-
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), tmpSourcePath));
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), sourcePath));
 
             // Make the temporary filename have the appropriate extension.
             // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extrodinary unlikley
             if (rawSourceLanguage == SourceLanguage::C)
             {
-                tmpSourcePath.append(".c");
+                sourcePath.append(".c");
             }
             else
             {
-                tmpSourcePath.append(".cpp");
+                sourcePath.append(".cpp");
             }
 
-            // We need to know what the source 
-
-            tempFiles.add(tmpSourcePath);
+            // Delete this path at end of execution
+            temporaryFileSet.add(sourcePath);
 
             try
             {
-                File::writeAllText(tmpSourcePath, rawSource);
+                File::writeAllText(sourcePath, rawSource);
             }
             catch (...)
             {
-                // Unable to write temporary file
-                File::remove(tmpSourcePath);
                 return SLANG_FAIL;
             }
         }
 
-        
+        /* 
+        String dstPath;
+        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-binary"), dstPath));
+        */
+
+        CPPCompiler::CompileOptions options;
+
+        // Generate a path a temporary filename for output module
+        String modulePath;
+        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+
+        // I can't add the module path, because I don't know what it will actually be on the output yet
+
+        options.modulePath = modulePath;
+        options.sourceFiles.add(sourcePath);
+
+        StringBuilder moduleFilePath;
+        SLANG_RETURN_ON_FAIL(compiler->calcModuleFilePath(options, moduleFilePath));
+
+        temporaryFileSet.add(moduleFilePath.ProduceString());
+
+        // Need to configure for the compilation
+        CPPCompiler::Output output;
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, output ));
+
 
         return SLANG_OK;
     }
