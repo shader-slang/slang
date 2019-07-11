@@ -1262,31 +1262,56 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
 
-        /* 
-        String dstPath;
-        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-binary"), dstPath));
-        */
-
         CPPCompiler::CompileOptions options;
 
         // Generate a path a temporary filename for output module
         String modulePath;
         SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
 
-        // I can't add the module path, because I don't know what it will actually be on the output yet
-
         options.modulePath = modulePath;
         options.sourceFiles.add(sourcePath);
 
-        StringBuilder moduleFilePath;
-        SLANG_RETURN_ON_FAIL(compiler->calcModuleFilePath(options, moduleFilePath));
+        // Set what kind of target we should build
+        switch (targetReq->target)
+        {
+            case CodeGenTarget::SharedLibrary:
+            {
+                options.targetType = CPPCompiler::TargetType::SharedLibrary;
+                break;
+            }
+            case CodeGenTarget::Executable:
+            {
+                options.targetType = CPPCompiler::TargetType::Executable;
+                break;
+            }
+            default: break;
+        }
 
-        temporaryFileSet.add(moduleFilePath.ProduceString());
+        String moduleFilePath;
+
+        {
+            StringBuilder builder;
+            SLANG_RETURN_ON_FAIL(compiler->calcModuleFilePath(options, builder));
+            moduleFilePath = builder.ProduceString();
+        }
+
+        // Add so it's deleted at the end
+        temporaryFileSet.add(moduleFilePath);
 
         // Need to configure for the compilation
         CPPCompiler::Output output;
         SLANG_RETURN_ON_FAIL(compiler->compile(options, output ));
 
+        // Create the output binary
+        try
+        {
+            // Read the contents of the binary
+            binOut = File::readAllBytes(moduleFilePath);
+        }
+        catch (const Slang::IOException&)
+        {
+            return SLANG_FAIL;
+        }
 
         return SLANG_OK;
     }
