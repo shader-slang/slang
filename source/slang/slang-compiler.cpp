@@ -371,6 +371,22 @@ namespace Slang
         return Stage::Unknown;
     }
 
+    static UnownedStringSlice _getPassThroughAsText(PassThroughMode mode)
+    {
+        switch (mode)
+        {
+            case PassThroughMode::None:     return UnownedStringSlice::fromLiteral("None");
+            case PassThroughMode::Dxc:      return UnownedStringSlice::fromLiteral("Dxc");
+            case PassThroughMode::Fxc:      return UnownedStringSlice::fromLiteral("Fxc");
+            case PassThroughMode::Glslang:  return UnownedStringSlice::fromLiteral("Glslang");
+            case PassThroughMode::Clang:    return UnownedStringSlice::fromLiteral("Clang");
+            case PassThroughMode::VisualStudio: return UnownedStringSlice::fromLiteral("VisualStudio");
+            case PassThroughMode::Gcc:      return UnownedStringSlice::fromLiteral("GCC");
+            case PassThroughMode::GenericCCpp:  return UnownedStringSlice::fromLiteral("Generic C/C++ Compiler");
+            default:                        return UnownedStringSlice::fromLiteral("Unknown");
+        }
+    }
+
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         switch (passThrough)
@@ -512,6 +528,27 @@ namespace Slang
         return translationUnit;
     }
 
+    static void _appendEscapedPath(const UnownedStringSlice& path, StringBuilder& outBuilder)
+    {
+        for (auto c : path)
+        {
+            // TODO(JS): Probably want more sophisticated handling... 
+            if (c == '\\')
+            {
+                outBuilder.appendChar(c);
+            }
+            outBuilder.appendChar(c);
+        }
+    }
+
+    static void _appendCodeWithPath(const UnownedStringSlice& filePath, const UnownedStringSlice& fileContent, StringBuilder& outCodeBuilder)
+    {
+        outCodeBuilder << "#line 1 \"";
+        _appendEscapedPath(filePath, outCodeBuilder);
+        outCodeBuilder << "\"\n";
+        outCodeBuilder << fileContent << "\n";
+    }
+
     String emitHLSLForEntryPoint(
         BackEndCompileRequest*  compileRequest,
         EntryPoint*             entryPoint,
@@ -530,26 +567,7 @@ namespace Slang
             StringBuilder codeBuilder;
             for(auto sourceFile : translationUnit->getSourceFiles())
             {
-                codeBuilder << "#line 1 \"";
-
-                const String& path = sourceFile->getPathInfo().foundPath;
-
-                for(auto c : path)
-                {
-                    char buffer[] = { c, 0 };
-                    switch(c)
-                    {
-                    default:
-                        codeBuilder << buffer;
-                        break;
-
-                    case '\\':
-                        codeBuilder << "\\\\";
-                    }
-                }
-                codeBuilder << "\"\n";
-
-                codeBuilder << sourceFile->getContent() << "\n";
+                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
             }
 
             return codeBuilder.ProduceString();
@@ -582,37 +600,14 @@ namespace Slang
             StringBuilder codeBuilder;
             for (auto sourceFile : translationUnit->getSourceFiles())
             {
-                codeBuilder << "#line 1 \"";
-
-                const String& path = sourceFile->getPathInfo().foundPath;
-
-                for (auto c : path)
-                {
-                    char buffer[] = { c, 0 };
-                    switch (c)
-                    {
-                        default:
-                            codeBuilder << buffer;
-                            break;
-
-                        case '\\':
-                            codeBuilder << "\\\\";
-                    }
-                }
-                codeBuilder << "\"\n";
-
-                codeBuilder << sourceFile->getContent() << "\n";
+                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
             }
 
             return codeBuilder.ProduceString();
         }
         else
         {
-            return emitEntryPoint(
-                compileRequest,
-                entryPoint,
-                CodeGenTarget::CPPSource,
-                targetReq);
+            return emitEntryPoint(compileRequest, entryPoint, CodeGenTarget::CPPSource, targetReq);
         }
     }
 
@@ -790,9 +785,9 @@ namespace Slang
         if(!translationUnitRequest)
             return "slang-generated";
 
-        auto sink = endToEndReq->getSink();
-
         const auto& sourceFiles = translationUnitRequest->getSourceFiles();
+
+        auto sink = endToEndReq->getSink();
 
         const Index numSourceFiles = sourceFiles.getCount();
 
@@ -1117,23 +1112,143 @@ SlangResult dissassembleDXILUsingDXC(
     {
         binOut.clear();
 
-        String rawCPP = emitCPPForEntryPoint(
-            slangRequest,
-            entryPoint,
-            entryPointIndex,
-            targetReq,
-            endToEndReq);
-        maybeDumpIntermediate(slangRequest, rawCPP.getBuffer(), CodeGenTarget::GLSL);
+        
+        CPPCompiler* compiler = nullptr;
 
-        auto outputFunc = [](void const* data, size_t size, void* userData)
+        CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
+
+        switch (endToEndReq->passThrough)
         {
-            ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
-        };
+            case PassThroughMode::GenericCCpp:
+            {
+                compiler = compilerSet->getDefaultCompiler();
+                break;
+            }
+            case PassThroughMode::Clang:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang));
+                break;
+            }
+            case PassThroughMode::VisualStudio:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
+                break;
+            }
+            case PassThroughMode::Gcc:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+                break;
+            }
+        }
 
-        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+        if (!compiler)
+        {
+            slangRequest->getSink()->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+            return SLANG_FAIL;
+        }
 
-        // We will need to output a file that we will compile. We need temporary files for the
-        // source, and for the target file probly
+        bool useOriginalFile = false;
+        String sourcePath;
+        String sourceContents;
+
+        String rawSource;
+
+        SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
+
+        /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
+        to use the original file. We want to do this because we want includes relative to the source file to work, and
+        for that to work most easily we want to use the original file, if there is one */
+        if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
+        {
+            // We are just passing thru, so it's whatever it originally was
+            rawSourceLanguage = translationUnit->sourceLanguage;
+
+            const auto& sourceFiles = translationUnit->getSourceFiles();
+            if (sourceFiles.getCount() == 1)
+            {
+                const SourceFile* sourceFile = sourceFiles[0];
+                const PathInfo& pathInfo = sourceFile->getPathInfo();
+                if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
+                {
+                    sourcePath = pathInfo.foundPath;
+                    // We can see if we can load it
+                    if (File::exists(sourcePath))
+                    {
+                        try
+                        {
+                            String readContents = File::readAllText(sourcePath);
+                            // We should see if they are the same
+                            useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());                
+                        }
+                        catch (const Slang::IOException&)
+                        {
+                        }
+                    }
+                }
+            }
+
+            if (!useOriginalFile)
+            {
+                StringBuilder codeBuilder;
+                for (auto sourceFile : translationUnit->getSourceFiles())
+                {
+                    _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
+                }
+                sourceContents = codeBuilder.ProduceString();
+            }
+        }
+        else
+        {
+            rawSource = emitCPPForEntryPoint(
+                slangRequest,
+                entryPoint,
+                entryPointIndex,
+                targetReq,
+                endToEndReq);
+
+            maybeDumpIntermediate(slangRequest, rawSource.getBuffer(), CodeGenTarget::CPPSource);
+
+            rawSourceLanguage = SourceLanguage::CPP;
+        }
+
+        List<String> tempFiles;
+
+        if (!useOriginalFile)
+        {
+            sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+
+            String tmpSourcePath;
+
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), tmpSourcePath));
+
+            // Make the temporary filename have the appropriate extension.
+            // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extrodinary unlikley
+            if (rawSourceLanguage == SourceLanguage::C)
+            {
+                tmpSourcePath.append(".c");
+            }
+            else
+            {
+                tmpSourcePath.append(".cpp");
+            }
+
+            // We need to know what the source 
+
+            tempFiles.add(tmpSourcePath);
+
+            try
+            {
+                File::writeAllText(tmpSourcePath, rawSource);
+            }
+            catch (...)
+            {
+                // Unable to write temporary file
+                File::remove(tmpSourcePath);
+                return SLANG_FAIL;
+            }
+        }
+
+        
 
         return SLANG_OK;
     }
