@@ -87,6 +87,26 @@ namespace Slang
             /// @return The first element of the path, or empty 
         static UnownedStringSlice getFirstElement(const UnownedStringSlice& path);
 	};
+
+    // Helper class to clean up temporary files on dtor
+    struct TemporaryFileSet
+    {
+        void add(const String& path)
+        {
+            if (m_paths.indexOf(path) < 0)
+            {
+                m_paths.add(path);
+            }
+        }
+        ~TemporaryFileSet()
+        {
+            for (const auto& path : m_paths)
+            {
+                File::remove(path);
+            }
+        }
+        List<String> m_paths;
+    };
 }
 
 #endif

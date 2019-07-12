@@ -4,6 +4,8 @@
 #include "slang-string.h"
 
 #include "../../slang-com-helper.h"
+#include "../../slang-com-ptr.h"
+
 #include "slang-list.h"
 
 namespace Slang
@@ -117,6 +119,12 @@ public:
         Parent(flags | getDefaultFlags(file)),
         m_file(file)
     {}
+
+        /// 
+    static SlangResult create(const char* filePath, const char* writeOptions, WriterFlags flags, ComPtr<ISlangWriter>& outWriter);
+
+    static SlangResult createBinary(const char* filePath, WriterFlags flags, ComPtr<ISlangWriter>& outWriter) { return create(filePath, "wb", flags, outWriter); }
+    static SlangResult createText(const char* filePath, WriterFlags flags, ComPtr<ISlangWriter>& outWriter) { return create(filePath, "w", flags, outWriter); }
 
         /// Dtor
     ~FileWriter();

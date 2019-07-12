@@ -3,6 +3,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-std-writers.h"
+#include "../../source/core/slang-hex-dump-util.h"
 
 #include "../../slang-com-helper.h"
 
@@ -937,6 +938,38 @@ TestResult asTestResult(ToolReturnCode code)
         } \
     }
 
+static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
+{
+    // We need to extract the binary
+    List<uint8_t> data;
+    SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
+
+    // Need to write this off to a temporary file
+    String fileName;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+    fileName.append(ProcessUtil::getExecutableSuffix());
+
+    TemporaryFileSet temporaryFileSet;
+    temporaryFileSet.add(fileName);
+
+    {
+        ComPtr<ISlangWriter> writer;
+        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(fileName.getBuffer(), 0, writer));
+
+        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
+    }
+
+    // Make executable... (for linux/unix like targets)
+
+    // Execute it
+    CommandLine cmdLine;
+    cmdLine.m_executable = fileName;
+    cmdLine.m_executableType = CommandLine::ExecutableType::Path;
+    return ProcessUtil::execute(cmdLine, outExeRes);
+}
+
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -960,6 +993,28 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
+    }
+
+    // See what kind of target it is
+    SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
+    {
+        const auto& args = input.testOptions->args;
+        const Index targetIndex = args.indexOf("-target");
+        if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
+        {
+            target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
+        }
+    }
+
+    // If it's executable we run it and use it's output
+    if (target == SLANG_EXECUTABLE)
+    {
+        ExecuteResult runExeRes;
+        if (SLANG_FAILED(_executeBinary(exeRes.standardOutput.getUnownedSlice(), runExeRes)))
+        {
+            return TestResult::Fail;
+        }
+        exeRes = runExeRes;
     }
 
     String actualOutput = getOutput(exeRes);

@@ -1103,25 +1103,6 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    struct TemporaryFileSet
-    {
-        void add(const String& path)
-        {
-            if (m_paths.indexOf(path) < 0)
-            {
-                m_paths.add(path);
-            }
-        }
-        ~TemporaryFileSet()
-        {
-            for (const auto& path : m_paths)
-            {
-                File::remove(path);
-            }
-        }
-        List<String> m_paths;
-    };
-
     SlangResult emitCPUBinaryForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
@@ -1848,7 +1829,7 @@ SlangResult dissassembleDXILUsingDXC(
 
                     case CodeGenTarget::SharedLibrary:
                     case CodeGenTarget::Executable:
-                        HexDumpUtil::dump(data, 24, writer);
+                        HexDumpUtil::dumpWithMarkers(data, 24, writer);
                         break;
 
                     default:
