@@ -406,6 +406,23 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-g");
     }
 
+    switch (options.floatingPointMode)
+    {
+        case FloatingPointMode::Default: break;
+        case FloatingPointMode::Precise:
+        {
+            //cmdLine.addArg("-fno-unsafe-math-optimizations");
+            break;
+        }
+        case FloatingPointMode::Fast:
+        {
+            // We could enable SSE with -mfpmath=sse
+            // But that would only make sense on a x64/x86 type processor and only if that feature is present (it is on all x64)
+            cmdLine.addArg("-ffast-math");
+            break;
+        }
+    }
+
     StringBuilder moduleFilePath;
     calcModuleFilePath(options, moduleFilePath);
 

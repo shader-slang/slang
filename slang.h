@@ -868,7 +868,7 @@ extern "C"
 
     typedef void(*SlangFuncPtr)(void);
 
-    /** An interface that can be used to encapsulate access to a shared library. An implementaion 
+    /** An interface that can be used to encapsulate access to a shared library. An implementation 
     does not have to implement the library as a shared library. 
     */
     struct ISlangSharedLibrary: public ISlangUnknown

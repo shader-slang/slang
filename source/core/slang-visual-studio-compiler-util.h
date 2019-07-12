@@ -14,6 +14,7 @@ struct VisualStudioCompilerUtil
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
     typedef CPPCompiler::OutputMessage OutputMessage;
+    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
 
         /// Calculate Visual Studio family compilers cmdLine arguments from options
     static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);

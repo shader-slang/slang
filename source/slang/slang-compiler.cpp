@@ -1176,11 +1176,49 @@ SlangResult dissassembleDXILUsingDXC(
 
         SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
 
+        Dictionary<String, String> preprocessorDefinitions;
+        List<String> includePaths;
+
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
         for that to work most easily we want to use the original file, if there is one */
         if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
         {
+            // If it's pass through we accumulate the preprocessor definitions. 
+            for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
+            {
+                preprocessorDefinitions.Add(define.Key, define.Value);
+            }
+            for (auto& define : translationUnit->preprocessorDefinitions)
+            {
+                preprocessorDefinitions.Add(define.Key, define.Value);
+            }
+
+            {
+                /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
+                all makes total sense. If we are generating C++ code from slang, then should we really be using these values -> aren't they what is
+                being set for the *slang* source, not for the C++ generated code. That being the case it implies that there needs to be a mechanism
+                (if there isn't already) to specify such information on a particular pass/pass through etc.
+
+                On invoking DXC for example include paths do not appear to be set at all (even with pass-through).
+                */ 
+
+                auto linkage = targetReq->getLinkage();
+
+                // Add all the search paths
+                
+                const auto searchDirectories = linkage->getSearchDirectories();
+                const SearchDirectoryList* searchList = &searchDirectories;
+                while (searchList)
+                {
+                    for (const auto& searchDirectory : searchList->searchDirectories)
+                    {
+                        includePaths.add(searchDirectory.path);
+                    }
+                    searchList = searchList->parent;
+                }
+            }
+
             // We are just passing thru, so it's whatever it originally was
             rawSourceLanguage = translationUnit->sourceLanguage;
 
@@ -1195,6 +1233,15 @@ SlangResult dissassembleDXILUsingDXC(
                     // We can see if we can load it
                     if (File::exists(sourcePath))
                     {
+                        // Here we look for the file on the regular file system (as opposed to using the 
+                        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
+                        // to the CPP compiler all it is able to (currently) see are files on the file system.
+                        //
+                        // Note that it could be coincidence that the filesystem has a file that's identical in
+                        // contents/name. That being the case though, any includes wouldn't work for a generated
+                        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
+                        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
+                        // file system access.
                         try
                         {
                             String readContents = File::readAllText(sourcePath);
@@ -1239,7 +1286,7 @@ SlangResult dissassembleDXILUsingDXC(
             SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), sourcePath));
 
             // Make the temporary filename have the appropriate extension.
-            // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extrodinary unlikley
+            // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extraordinary unlikely
             if (rawSourceLanguage == SourceLanguage::C)
             {
                 sourcePath.append(".c");
@@ -1300,6 +1347,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         // Need to configure for the compilation
 
+        
         {
             auto linkage = targetReq->getLinkage();
 
@@ -1319,7 +1367,30 @@ SlangResult dissassembleDXILUsingDXC(
                 
                 case DebugInfoLevel::Standard:      options.debugInfoType = CPPCompiler::DebugInfoType::Standard; break; 
                 case DebugInfoLevel::Maximal:       options.debugInfoType = CPPCompiler::DebugInfoType::Maximal; break; 
-                default: SLANG_ASSERT(!"Unhanled debug level"); break;
+                default: SLANG_ASSERT(!"Unhandled debug level"); break;
+            }
+
+            switch( targetReq->floatingPointMode )
+            {
+                case FloatingPointMode::Default:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Default; break;
+                case FloatingPointMode::Precise:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Precise; break;
+                case FloatingPointMode::Fast:       options.floatingPointMode = CPPCompiler::FloatingPointMode::Fast; break;
+                default: SLANG_ASSERT(!"Unhanlde floating point mode");
+            }
+
+            // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
+            options.includePaths = includePaths;
+
+            // Add the specified defines (as calculated earlier - they will only be set if this is a pass through else will be empty)
+            {
+                for(auto& def : preprocessorDefinitions)
+                {
+                    CPPCompiler::Define define;
+                    define.nameWithSig = def.Key;
+                    define.value = def.Value;
+
+                    options.defines.add(define);
+                }
             }
         }
 

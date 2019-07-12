@@ -56,13 +56,20 @@ public:
         Maximal,        ///< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs 
     };
 
-    enum DebugInfoType
+    enum class DebugInfoType
     {
         None,       ///< Don't emit debug information at all. 
         Minimal,    ///< Emit as little debug information as possible, while still supporting stack traces. 
         Standard,   ///< Emit whatever is the standard level of debug information for each target. 
         Maximal,    ///< Emit as much debug information as possible for each target. 
     };
+    enum class FloatingPointMode
+    {
+        Default, 
+        Fast,
+        Precise,
+    };
+
     enum TargetType
     {
         Executable,         ///< Produce an executable
@@ -91,6 +98,7 @@ public:
         DebugInfoType debugInfoType = DebugInfoType::Standard;
         TargetType targetType = TargetType::Executable;
         SourceType sourceType = SourceType::CPP;
+        FloatingPointMode floatingPointMode = FloatingPointMode::Default;
 
         Flags flags = Flag::EnableExceptionHandling;
 

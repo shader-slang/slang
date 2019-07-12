@@ -98,12 +98,33 @@ namespace Slang
         }
         case OptimizationLevel::Maximal:
         {
-            cmdLine.addArg("/O4");
+            cmdLine.addArg("/Ox");
             break;
         }
         default: break;
     }
-    
+
+    switch (options.floatingPointMode)
+    {
+        case FloatingPointMode::Default: break;
+        case FloatingPointMode::Precise:
+        {
+            // precise is default behavior, VS also has 'strict'
+            //
+            // ```/fp:strict has behavior similar to /fp:precise, that is, the compiler preserves the source ordering and rounding properties of floating-point code when
+            // it generates and optimizes object code for the target machine, and observes the standard when handling special values. In addition, the program may safely
+            // access or modify the floating-point environment at runtime.```
+
+            cmdLine.addArg("/fp:precise");
+            break;
+        }
+        case FloatingPointMode::Fast:
+        {
+            cmdLine.addArg("/fp:fast");
+            break;
+        }
+    }
+
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:

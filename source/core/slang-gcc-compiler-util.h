@@ -14,6 +14,7 @@ struct GCCCompilerUtil
     typedef CPPCompiler::TargetType TargetType;
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
+    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
 
         /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
     static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc);
