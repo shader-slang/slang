@@ -1613,7 +1613,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     SourceWriter* writer = getSourceWriter();
 
     writer->emit("\n");
-    writer->emit("#include \"slang-cpp-prelude.h\"\n\n");
+
+    writer->emit("#include <slang-cpp-prelude.h>\n\n");
 
     // Emit the type definitions
     for (const auto& keyValue : m_typeNameMap)

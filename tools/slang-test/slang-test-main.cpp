@@ -1058,6 +1058,33 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     return result;
 }
 
+static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, SharedLibrary::Handle& outSharedLibrary)
+{
+    // We need to extract the binary
+    List<uint8_t> data;
+    SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
+
+    // Need to write this off to a temporary file
+    String fileName;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+
+    // Need to work out the dll name
+    String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());
+    inOutTemporaryFileSet.add(sharedLibraryName);
+
+    {
+        ComPtr<ISlangWriter> writer;
+        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(sharedLibraryName.getBuffer(), 0, writer));
+        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
+    }
+
+    // Make executable... (for linux/unix like targets)
+    //SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
+
+    return SharedLibrary::loadWithPlatformPath(sharedLibraryName.getBuffer(), outSharedLibrary);
+}
+
 TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
 {
     auto outputStem = input.outputStem;
@@ -1080,9 +1107,18 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
         return TestResult::Pass;
     }
 
+    TemporaryFileSet temporaryFileSet;
+    SharedLibrary::Handle sharedLibrary = SharedLibrary::Handle(0);
+    if (SLANG_FAILED(_loadAsSharedLibrary(exeRes.standardOutput.getUnownedSlice(), temporaryFileSet, sharedLibrary)))
+    {
+        return TestResult::Fail;
+    }
 
+    // TODO(JS): Hard coding the handling of the entry function for now...
+    SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
 
-    return TestResult::Ignored;
+    SharedLibrary::unload(sharedLibrary);
+    return func ? TestResult::Pass : TestResult::Fail;
 }
 
 

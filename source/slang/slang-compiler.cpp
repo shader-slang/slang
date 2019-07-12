@@ -1113,6 +1113,8 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto sink = slangRequest->getSink();
 
+        const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+
         binOut.clear();
       
         CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
@@ -1162,7 +1164,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         bool useOriginalFile = false;
 
-        String sourcePath;
+        String compileSourcePath;
         String sourceContents;
 
         String rawSource;
@@ -1222,9 +1224,9 @@ SlangResult dissassembleDXILUsingDXC(
                 const PathInfo& pathInfo = sourceFile->getPathInfo();
                 if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
                 {
-                    sourcePath = pathInfo.foundPath;
+                    compileSourcePath = pathInfo.foundPath;
                     // We can see if we can load it
-                    if (File::exists(sourcePath))
+                    if (File::exists(compileSourcePath))
                     {
                         // Here we look for the file on the regular file system (as opposed to using the 
                         // ISlangFileSystem. This is unfortunate but necessary - because when we call out
@@ -1237,7 +1239,7 @@ SlangResult dissassembleDXILUsingDXC(
                         // file system access.
                         try
                         {
-                            String readContents = File::readAllText(sourcePath);
+                            String readContents = File::readAllText(compileSourcePath);
                             // We should see if they are the same
                             useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());
                         }
@@ -1276,29 +1278,29 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (!useOriginalFile)
         {
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), sourcePath));
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), compileSourcePath));
 
             // Make the temporary filename have the appropriate extension.
             // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extraordinary unlikely
             if (rawSourceLanguage == SourceLanguage::C)
             {
-                sourcePath.append(".c");
+                compileSourcePath.append(".c");
             }
             else
             {
-                sourcePath.append(".cpp");
+                compileSourcePath.append(".cpp");
             }
 
             // Delete this path at end of execution
-            temporaryFileSet.add(sourcePath);
+            temporaryFileSet.add(compileSourcePath);
 
             try
             {
-                File::writeAllText(sourcePath, rawSource);
+                File::writeAllText(compileSourcePath, rawSource);
             }
             catch (...)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, sourcePath);
+                sink->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, compileSourcePath);
                 return SLANG_FAIL;
             }
         }
@@ -1310,7 +1312,7 @@ SlangResult dissassembleDXILUsingDXC(
         SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
 
         options.modulePath = modulePath;
-        options.sourceFiles.add(sourcePath);
+        options.sourceFiles.add(compileSourcePath);
 
         // Set what kind of target we should build
         switch (targetReq->target)
@@ -1341,7 +1343,6 @@ SlangResult dissassembleDXILUsingDXC(
 
         // Need to configure for the compilation
 
-        
         {
             auto linkage = targetReq->getLinkage();
 
@@ -1388,9 +1389,40 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
 
+        // TODO(JS): HACK! We need to include the prelude from somewhere, but where? The generated output
+        // is sitting in some temp directory.
+        // So here, we search all the 'sourceFiles', and try their paths for plausibility, and take the first
+        {
+            auto frontEndReq = endToEndReq->getFrontEndReq();
+            auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
+            auto translationUnit = entryPointReq->getTranslationUnit();
+
+            for (SourceFile* sourceFile : translationUnit->m_sourceFiles)
+            {
+                const auto& pathInfo = sourceFile->getPathInfo();
+
+                if (pathInfo.type == PathInfo::Type::FoundPath ||
+                    pathInfo.type == PathInfo::Type::Normal)
+                {
+                    String originalSourceDirectory = Path::getParentDirectory(pathInfo.foundPath);
+
+                    if (originalSourceDirectory.getLength() && File::exists(originalSourceDirectory))
+                    {
+                        // We can't use this path directly, so make canonical so it is absolute
+                        StringBuilder canonicalPath;
+                        if (SLANG_SUCCEEDED(Path::getCanonical(originalSourceDirectory, canonicalPath)))
+                        {
+                            options.includePaths.add(canonicalPath.ProduceString());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // Compile
         CPPCompiler::Output output;
-        SLANG_RETURN_ON_FAIL(compiler->compile(options, output ));
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, output));
 
         {
             StringBuilder compilerText;
