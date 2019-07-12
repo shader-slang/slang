@@ -961,6 +961,7 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     }
 
     // Make executable... (for linux/unix like targets)
+    SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
 
     // Execute it
     CommandLine cmdLine;

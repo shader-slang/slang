@@ -17,6 +17,8 @@ namespace Slang
 		static void writeAllText(const Slang::String& fileName, const Slang::String& text);
         static SlangResult remove(const String& fileName);
 
+        static SlangResult makeExecutable(const String& fileName);
+
         static SlangResult generateTemporary(const UnownedStringSlice& prefix, Slang::String& outFileName);
 	};
 

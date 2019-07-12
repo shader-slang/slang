@@ -131,6 +131,19 @@ namespace Slang
     }
 #endif
 
+    /* static */SlangResult File::makeExecutable(const String& fileName)
+    {
+#ifdef _WIN32
+        SLANG_UNUSED(fileName);
+        // As long as file extension is executable, it can be executed
+        return SLANG_OK;
+#else
+        const int ret = ::chmod(fileName.getbuffer(), S_IXUSR);
+        return (ret == 0) ? SLANG_OK : SLANG_FAIL;
+#endif
+    }
+
+
 	bool File::exists(const String& fileName)
 	{
 #ifdef _WIN32
