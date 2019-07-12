@@ -138,7 +138,7 @@ namespace Slang
         // As long as file extension is executable, it can be executed
         return SLANG_OK;
 #else
-        const int ret = ::chmod(fileName.getbuffer(), S_IXUSR);
+        const int ret = ::chmod(fileName.getBuffer(), S_IXUSR);
         return (ret == 0) ? SLANG_OK : SLANG_FAIL;
 #endif
     }
