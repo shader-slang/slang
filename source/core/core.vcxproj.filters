@@ -45,6 +45,9 @@
     <ClInclude Include="slang-hash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-hex-dump-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -132,6 +135,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-gcc-compiler-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-hex-dump-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-io.cpp">
