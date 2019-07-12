@@ -974,14 +974,12 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
-
-    auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    cmdLine.addArg(filePath999);
+    cmdLine.addArg(input.filePath);
 
     for( auto arg : input.testOptions->args )
     {
@@ -1059,6 +1057,34 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     return result;
 }
+
+TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+
+
+    return TestResult::Ignored;
+}
+
 
 TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& input)
 {
@@ -2289,7 +2315,8 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
     { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile}
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
+    { "CPU_EXECUTE",                            &runCPUExecuteTest},
 };
 
 TestResult runTest(

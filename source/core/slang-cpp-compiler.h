@@ -40,6 +40,8 @@ public:
             /// Get the version as a value
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
+        void appendAsText(StringBuilder& out) const;
+
             /// Ctor
         Desc(CompilerType inType = CompilerType::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
@@ -177,6 +179,9 @@ public:
         /// Given the compilation options and the module name, determines the actual file name used for output
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
 
+        /// Return the compiler type as name
+    static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
+
 protected:
 
     CPPCompiler(const Desc& desc) :
@@ -284,6 +289,9 @@ struct CPPCompilerUtil
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
     static SlangResult initializeSet(CPPCompilerSet* set);
+
+    
+    
 };
 
 

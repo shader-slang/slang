@@ -815,6 +815,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
         return &kGLSLLayoutRulesFamilyImpl;
 
 
+    case CodeGenTarget::Executable:
+    case CodeGenTarget::SharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     {

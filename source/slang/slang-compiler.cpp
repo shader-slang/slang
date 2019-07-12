@@ -1111,6 +1111,8 @@ SlangResult dissassembleDXILUsingDXC(
         EndToEndCompileRequest* endToEndReq,
         List<uint8_t>&          binOut)
     {
+        auto sink = slangRequest->getSink();
+
         binOut.clear();
       
         CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
@@ -1119,8 +1121,10 @@ SlangResult dissassembleDXILUsingDXC(
         CPPCompiler* compiler = nullptr;
         switch (endToEndReq->passThrough)
         {
+            case PassThroughMode::None:
             case PassThroughMode::GenericCCpp:
             {
+                // If there is no pass through... still need a compiler
                 compiler = compilerSet->getDefaultCompiler();
                 break;
             }
@@ -1143,7 +1147,14 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (!compiler)
         {
-            slangRequest->getSink()->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+            if (endToEndReq->passThrough != PassThroughMode::None)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+            }
+            else
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound);
+            }
             return SLANG_FAIL;
         }
 
@@ -1287,6 +1298,7 @@ SlangResult dissassembleDXILUsingDXC(
             }
             catch (...)
             {
+                sink->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, sourcePath);
                 return SLANG_FAIL;
             }
         }
@@ -1380,7 +1392,46 @@ SlangResult dissassembleDXILUsingDXC(
         CPPCompiler::Output output;
         SLANG_RETURN_ON_FAIL(compiler->compile(options, output ));
 
-        // Create the output binary
+        {
+            StringBuilder compilerText;
+            compiler->getDesc().appendAsText(compilerText);
+
+            StringBuilder builder;
+
+            typedef CPPCompiler::OutputMessage OutputMessage;
+
+            for (const auto& msg : output.messages)
+            {
+                builder.Clear();
+
+                builder << msg.filePath << "(" << msg.fileLine <<"): ";
+
+                if (msg.stage == OutputMessage::Stage::Link)
+                {
+                    builder << "link ";
+                }
+
+                switch (msg.type)
+                {
+                    case OutputMessage::Type::Error:    builder << "error"; break;
+                    case OutputMessage::Type::Unknown:  builder << "warning"; break;
+                    case OutputMessage::Type::Info:     builder << "info"; break;
+                    default: break;
+                }
+
+                builder << " " << msg.code << ": " << msg.text;
+
+                reportExternalCompileError(compilerText.getBuffer(), SLANG_OK, builder.getUnownedSlice(), sink);
+            }
+        }
+
+        // If any errors are emitted, then we are done
+        if (output.has(CPPCompiler::OutputMessage::Type::Error))
+        {
+            return SLANG_FAIL;
+        }
+
+        // Read the binary
         try
         {
             // Read the contents of the binary
@@ -1388,6 +1439,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
         catch (const Slang::IOException&)
         {
+            sink->diagnose(SourceLoc(), Diagnostics::unableToReadFile, moduleFilePath);
             return SLANG_FAIL;
         }
 

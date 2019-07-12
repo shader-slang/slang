@@ -19,6 +19,17 @@
 namespace Slang
 {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
+
+void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
+{
+    out << getCompilerTypeAsText(type);
+    out << " ";
+    out << majorVersion;
+    out << ".";
+    out << minorVersion;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
 
 /* static */UnownedStringSlice CPPCompiler::OutputMessage::getTypeText(OutputMessage::Type type)
@@ -33,6 +44,21 @@ namespace Slang
     }
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */UnownedStringSlice CPPCompiler::getCompilerTypeAsText(CompilerType type)
+{
+    switch (type)
+    {
+        default:
+        case CompilerType::Unknown:     return UnownedStringSlice::fromLiteral("Unknown");
+        case CompilerType::VisualStudio:return UnownedStringSlice::fromLiteral("Visual Studio");
+        case CompilerType::GCC:         return UnownedStringSlice::fromLiteral("GCC");
+        case CompilerType::Clang:       return UnownedStringSlice::fromLiteral("Clang");
+        case CompilerType::SNC:         return UnownedStringSlice::fromLiteral("SNC");
+        case CompilerType::GHS:         return UnownedStringSlice::fromLiteral("GHS");
+    }
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
 
