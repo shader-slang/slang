@@ -1299,6 +1299,31 @@ SlangResult dissassembleDXILUsingDXC(
         temporaryFileSet.add(moduleFilePath);
 
         // Need to configure for the compilation
+
+        {
+            auto linkage = targetReq->getLinkage();
+
+            switch (linkage->optimizationLevel)
+            {
+                case OptimizationLevel::None:       options.optimizationLevel = CPPCompiler::OptimizationLevel::None; break;
+                case OptimizationLevel::Default:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Default;  break;
+                case OptimizationLevel::High:       options.optimizationLevel = CPPCompiler::OptimizationLevel::High;  break;
+                case OptimizationLevel::Maximal:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Maximal;  break;
+                default: SLANG_ASSERT(!"Unhandled optimization level"); break;
+            }
+
+            switch (linkage->debugInfoLevel)
+            {
+                case DebugInfoLevel::None:          options.debugInfoType = CPPCompiler::DebugInfoType::None; break; 
+                case DebugInfoLevel::Minimal:       options.debugInfoType = CPPCompiler::DebugInfoType::Minimal; break; 
+                
+                case DebugInfoLevel::Standard:      options.debugInfoType = CPPCompiler::DebugInfoType::Standard; break; 
+                case DebugInfoLevel::Maximal:       options.debugInfoType = CPPCompiler::DebugInfoType::Maximal; break; 
+                default: SLANG_ASSERT(!"Unhanled debug level"); break;
+            }
+        }
+
+        // Compile
         CPPCompiler::Output output;
         SLANG_RETURN_ON_FAIL(compiler->compile(options, output ));
 

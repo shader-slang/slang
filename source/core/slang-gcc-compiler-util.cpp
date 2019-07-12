@@ -377,15 +377,25 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.optimizationLevel)
     {
-        case OptimizationLevel::Debug:
+        case OptimizationLevel::None:
         {
             // No optimization
             cmdLine.addArg("-O0");
             break;
         }
-        case OptimizationLevel::Normal:
+        case OptimizationLevel::Default:
         {
             cmdLine.addArg("-Os");
+            break;
+        }
+        case OptimizationLevel::High:
+        {
+            cmdLine.addArg("-O2");
+            break;
+        }
+        case OptimizationLevel::Maximal:
+        {
+            cmdLine.addArg("-O4");
             break;
         }
         default: break;
@@ -395,7 +405,6 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         cmdLine.addArg("-g");
     }
-
 
     StringBuilder moduleFilePath;
     calcModuleFilePath(options, moduleFilePath);

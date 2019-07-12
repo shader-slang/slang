@@ -50,15 +50,18 @@ public:
 
     enum class OptimizationLevel
     {
-        Normal,             ///< Normal optimization
-        Debug,              ///< General has no optimizations
+        None,           ///< Don't optimize at all. 
+        Default,        ///< Default optimization level: balance code quality and compilation time. 
+        High,           ///< Optimize aggressively. 
+        Maximal,        ///< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs 
     };
 
     enum DebugInfoType
     {
-        None,               ///< Binary has no debug information
-        Maximum,            ///< Has maximum debug information
-        Normal,             ///< Has normal debug information
+        None,       ///< Don't emit debug information at all. 
+        Minimal,    ///< Emit as little debug information as possible, while still supporting stack traces. 
+        Standard,   ///< Emit whatever is the standard level of debug information for each target. 
+        Maximal,    ///< Emit as much debug information as possible for each target. 
     };
     enum TargetType
     {
@@ -84,8 +87,8 @@ public:
             };
         };
 
-        OptimizationLevel optimizationLevel = OptimizationLevel::Debug;
-        DebugInfoType debugInfoType = DebugInfoType::Normal;
+        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
+        DebugInfoType debugInfoType = DebugInfoType::Standard;
         TargetType targetType = TargetType::Executable;
         SourceType sourceType = SourceType::CPP;
 

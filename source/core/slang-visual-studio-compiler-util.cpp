@@ -57,24 +57,20 @@ namespace Slang
         }
     }
 
-    switch (options.optimizationLevel)
+    switch (options.debugInfoType)
     {
-        case OptimizationLevel::Debug:
+        default:
         {
-            // No optimization
-            cmdLine.addArg("/Od");
-
-            cmdLine.addArg("/MDd");
-            break;
-        }
-        case OptimizationLevel::Normal:
-        {
-            cmdLine.addArg("/O2");
-            // Multithreaded DLL
+            // Multithreaded statically linked runtime library
             cmdLine.addArg("/MD");
             break;
         }
-        default: break;
+        case DebugInfoType::Maximal:
+        {
+            // Multithreaded statically linked *debug* runtime library
+            cmdLine.addArg("/MDd");
+            break;
+        }
     }
 
     // /Fd - followed by name of the pdb file
@@ -83,12 +79,37 @@ namespace Slang
         cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
     }
 
+    switch (options.optimizationLevel)
+    {
+        case OptimizationLevel::None:
+        {
+            // No optimization
+            cmdLine.addArg("/Od");   
+            break;
+        }
+        case OptimizationLevel::Default:
+        {
+            break;
+        }
+        case OptimizationLevel::High:
+        {
+            cmdLine.addArg("/O2");
+            break;
+        }
+        case OptimizationLevel::Maximal:
+        {
+            cmdLine.addArg("/O4");
+            break;
+        }
+        default: break;
+    }
+    
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
         {
             // Create dynamic link library
-            if (options.optimizationLevel == OptimizationLevel::Debug)
+            if (options.debugInfoType == DebugInfoType::None)
             {
                 cmdLine.addArg("/LDd");
             }
