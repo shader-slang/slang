@@ -1292,6 +1292,8 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     CPPCompiler::CompileOptions options;
     options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
 
+    options.includePaths.add("tests/cross-compile");
+
     // Create a filename to write this out to
     String cppSource = modulePath + "." + targetExt;
     Slang::File::writeAllText(cppSource, actualOutput);
