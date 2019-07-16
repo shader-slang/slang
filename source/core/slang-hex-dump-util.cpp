@@ -38,7 +38,7 @@ static const UnownedStringSlice s_end = UnownedStringSlice::fromLiteral("--END--
     while (cur < end)
     {
         size_t count = size_t(end - cur);
-        count = (count > maxBytesPerLine) ? maxBytesPerLine : count;
+        count = (count > size_t(maxBytesPerLine)) ? size_t(maxBytesPerLine) : count;
 
         char* startDst = writer->beginAppendBuffer(maxCharsPerLine);
         char* dst = startDst;
