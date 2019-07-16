@@ -31,6 +31,8 @@ using namespace Slang;
 #include <stdlib.h>
 #include <stdarg.h>
 
+#define SLANG_PRELUDE_NAMESPACE CPPPrelude
+#include "../../tests/cross-compile/slang-cpp-prelude.h"
 
 // Options for a particular test
 struct TestOptions
@@ -1068,7 +1070,6 @@ static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, Tempo
     String fileName;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
 
-
     // Need to work out the dll name
     String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());
     inOutTemporaryFileSet.add(sharedLibraryName);
@@ -1083,6 +1084,19 @@ static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, Tempo
     //SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
 
     return SharedLibrary::loadWithPlatformPath(sharedLibraryName.getBuffer(), outSharedLibrary);
+}
+
+static void _writeBuffer(const CPPPrelude::RWStructuredBuffer<int32_t>& in, StringBuilder& out)
+{
+    for (size_t i = 0; i < in.count; ++i)
+    {
+        if (i > 0)
+        {
+            out << ", ";
+        }
+        out << in[i];
+    }
+    out << "\n";
 }
 
 TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
@@ -1114,13 +1128,67 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
-    // TODO(JS): Hard coding the handling of the entry function for now...
-    SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
+    StringBuilder actualOutput;
 
-    SharedLibrary::unload(sharedLibrary);
-    return func ? TestResult::Pass : TestResult::Fail;
+    // TODO(JS): For moment just assume function name/data/paramters
+    {
+        SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
+        if (!func)
+        {
+            SharedLibrary::unload(sharedLibrary);
+            return TestResult::Fail;
+        }
+
+        typedef void (*Func)(CPPPrelude::Vector<uint32_t,3> threadID, CPPPrelude::RWStructuredBuffer<int32_t> buffer);
+
+        Func runFunc = Func(func);
+        int32_t data[4] = { 0, 0, 0, 0};
+        CPPPrelude::RWStructuredBuffer<int32_t> buffer{data, 4};
+
+        for (Int i = 0; i < 4; ++i)
+        {
+            CPPPrelude::Vector<uint32_t, 3> threadID{ uint32_t(i), 0, 0};
+            runFunc(threadID, buffer);
+        }
+
+        SharedLibrary::unload(sharedLibrary);
+
+        // Write the data
+        _writeBuffer(buffer, actualOutput);
+    }
+
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
+    }
+    catch (Slang::IOException)
+    {
+    }
+
+    TestResult result = TestResult::Pass;
+
+    // Otherwise we compare to the expected output
+    if (actualOutput != expectedOutput)
+    {
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        result = TestResult::Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+    }
+
+    return result;
 }
-
 
 TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& input)
 {
