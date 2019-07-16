@@ -209,6 +209,12 @@ CPPSourceEmitter::IntrinsicOp CPPSourceEmitter::getOperationByName(const Unowned
 
 void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 {
+    if (m_target == CodeGenTarget::CPPSource)
+    {
+        // All types are templates in C++
+        return;
+    }
+
     IRType* type = _cloneType(inType);
     if (m_typeEmittedMap.TryGetValue(type))
     {
@@ -362,17 +368,26 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             auto vecCount = int(GetIntVal(vecType->getElementCount()));
             const IROp elemType = vecType->getElementType()->op;
 
-            StringBuilder builder;
-            builder << "Vec";
-            UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
-
-            builder << postFix;
-            if (postFix.size() > 1)
+            if (m_target == CodeGenTarget::CPPSource)
             {
-                builder << "_";
+                StringBuilder builder;
+                builder << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
+                return m_slicePool.add(builder);
             }
-            builder << vecCount;
-            return m_slicePool.add(builder);
+            else
+            {             
+                StringBuilder builder;
+                builder << "Vec";
+                UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
+
+                builder << postFix;
+                if (postFix.size() > 1)
+                {
+                    builder << "_";
+                }
+                builder << vecCount;
+                return m_slicePool.add(builder);
+            }
         }
         case kIROp_MatrixType:
         {
@@ -382,22 +397,31 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            // Make sure there is the vector name too
-            _getTypeName(_getVecType(elementType, colCount));
-
-            StringBuilder builder;
-
-            builder << "Mat";
-            const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
-            builder << postFix;
-            if (postFix.size() > 1)
+            if (m_target == CodeGenTarget::CPPSource)
             {
-                builder << "_";
+                StringBuilder builder;
+                builder << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
+                return m_slicePool.add(builder);
             }
-            builder << rowCount;
-            builder << colCount;
+            else
+            {
+                // Make sure there is the vector name too
+                _getTypeName(_getVecType(elementType, colCount));
 
-            return m_slicePool.add(builder);
+                StringBuilder builder;
+
+                builder << "Mat";
+                const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
+                builder << postFix;
+                if (postFix.size() > 1)
+                {
+                    builder << "_";
+                }
+                builder << rowCount;
+                builder << colCount;
+
+                return m_slicePool.add(builder);
+            }
         }
         case kIROp_HLSLRWStructuredBufferType:
         {
