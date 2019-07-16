@@ -17,7 +17,7 @@
 #   include <Windows.h>
 #endif
 
-#if defined(__linux__) || defined(__CYGWIN__)
+#if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
 #   include <unistd.h>
 #endif
 
