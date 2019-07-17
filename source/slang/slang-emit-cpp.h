@@ -153,11 +153,11 @@ public:
 
     virtual SpecializedIntrinsic getSpecializedOperation(IntrinsicOp op, IRType*const* argTypes, int argTypesCount, IRType* retType);
     virtual void useType(IRType* type);
-    virtual void emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
+    virtual void emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec);
     virtual void emitTypeDefinition(IRType* type);
     virtual void emitSpecializedOperationDefinition(const SpecializedIntrinsic& specOp);
     
-    void emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec);
+    void emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, const EmitOpInfo& inOuterPrec);
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
 
@@ -179,10 +179,10 @@ protected:
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
-    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
 
-    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec);
 
     void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 

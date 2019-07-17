@@ -228,7 +228,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_Func:
     case kIROp_Generic:
     case kIROp_GlobalVar:
-    case kIROp_GlobalConstant:
     case kIROp_GlobalParam:
     case kIROp_StructKey:
     case kIROp_GlobalGenericParam:
@@ -386,26 +385,6 @@ IRGlobalVar* cloneGlobalVarImpl(
         originalVar);
 
     return clonedVar;
-}
-
-IRGlobalConstant* cloneGlobalConstantImpl(
-    IRSpecContextBase*              context,
-    IRBuilder*                      builder,
-    IRGlobalConstant*               originalVal,
-    IROriginalValuesForClone const& originalValues)
-{
-    auto clonedVal = builder->createGlobalConstant(
-        cloneType(context, originalVal->getFullType()));
-    registerClonedValue(context, clonedVal, originalValues);
-
-    // Clone any code in the body of the constant, since this
-    // represents the initializer.
-    cloneGlobalValueWithCodeCommon(
-        context,
-        clonedVal,
-        originalVal);
-
-    return clonedVal;
 }
 
 void cloneSimpleGlobalValueImpl(
@@ -965,9 +944,6 @@ IRInst* cloneInst(
 
     case kIROp_GlobalVar:
         return cloneGlobalVarImpl(context, builder, cast<IRGlobalVar>(originalInst), originalValues);
-
-    case kIROp_GlobalConstant:
-        return cloneGlobalConstantImpl(context, builder, cast<IRGlobalConstant>(originalInst), originalValues);
 
     case kIROp_GlobalParam:
         return cloneGlobalParamImpl(context, builder, cast<IRGlobalParam>(originalInst), originalValues);

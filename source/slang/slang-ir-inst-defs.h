@@ -179,8 +179,7 @@ INST_RANGE(Type, VoidType, InterfaceType)
     INST_RANGE(GlobalValueWithParams, Func, Generic)
 
     INST(GlobalVar, global_var, 0, 0)
-    INST(GlobalConstant, global_constant, 0, 0)
-INST_RANGE(GlobalValueWithCode, Func, GlobalConstant)
+INST_RANGE(GlobalValueWithCode, Func, GlobalVar)
 
 INST(GlobalParam, global_param, 0, 0)
 

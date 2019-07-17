@@ -502,7 +502,6 @@ void propagateConstExpr(
 
         case kIROp_Func:
         case kIROp_GlobalVar:
-        case kIROp_GlobalConstant:
             {
                 IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) gv;
 
@@ -539,7 +538,6 @@ void propagateConstExpr(
 
         case kIROp_Func:
         case kIROp_GlobalVar:
-        case kIROp_GlobalConstant:
             {
                 IRGlobalValueWithCode* code = (IRGlobalValueWithCode*) ii;
                 validateConstExpr(&context, code);

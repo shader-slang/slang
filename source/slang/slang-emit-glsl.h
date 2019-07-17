@@ -38,7 +38,7 @@ protected:
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
-    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
@@ -63,7 +63,7 @@ protected:
     void _maybeEmitGLSLFlatModifier(IRType* valueType);
 
     void _requireHalf();
-    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst, IREmitMode mode);
+    void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
 };
 
 }
