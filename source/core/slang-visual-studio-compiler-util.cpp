@@ -10,6 +10,33 @@
 namespace Slang
 {
 
+/* static */ SlangResult VisualStudioCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            outPath << options.modulePath << ".dll";
+            return SLANG_OK;
+        }
+        case TargetType::Executable:
+        {
+            outPath << options.modulePath << ".exe";
+            return SLANG_OK;
+        }
+        case TargetType::Object:
+        {
+            outPath << options.modulePath << ".obj";
+            return SLANG_OK;
+        }
+        default: break;
+    }
+
+    return SLANG_FAIL;
+}
+
 /* static */void VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
@@ -30,24 +57,20 @@ namespace Slang
         }
     }
 
-    switch (options.optimizationLevel)
+    switch (options.debugInfoType)
     {
-        case OptimizationLevel::Debug:
+        default:
         {
-            // No optimization
-            cmdLine.addArg("/Od");
-
-            cmdLine.addArg("/MDd");
-            break;
-        }
-        case OptimizationLevel::Normal:
-        {
-            cmdLine.addArg("/O2");
-            // Multithreaded DLL
+            // Multithreaded statically linked runtime library
             cmdLine.addArg("/MD");
             break;
         }
-        default: break;
+        case DebugInfoType::Maximal:
+        {
+            // Multithreaded statically linked *debug* runtime library
+            cmdLine.addArg("/MDd");
+            break;
+        }
     }
 
     // /Fd - followed by name of the pdb file
@@ -56,12 +79,58 @@ namespace Slang
         cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
     }
 
+    switch (options.optimizationLevel)
+    {
+        case OptimizationLevel::None:
+        {
+            // No optimization
+            cmdLine.addArg("/Od");   
+            break;
+        }
+        case OptimizationLevel::Default:
+        {
+            break;
+        }
+        case OptimizationLevel::High:
+        {
+            cmdLine.addArg("/O2");
+            break;
+        }
+        case OptimizationLevel::Maximal:
+        {
+            cmdLine.addArg("/Ox");
+            break;
+        }
+        default: break;
+    }
+
+    switch (options.floatingPointMode)
+    {
+        case FloatingPointMode::Default: break;
+        case FloatingPointMode::Precise:
+        {
+            // precise is default behavior, VS also has 'strict'
+            //
+            // ```/fp:strict has behavior similar to /fp:precise, that is, the compiler preserves the source ordering and rounding properties of floating-point code when
+            // it generates and optimizes object code for the target machine, and observes the standard when handling special values. In addition, the program may safely
+            // access or modify the floating-point environment at runtime.```
+
+            cmdLine.addArg("/fp:precise");
+            break;
+        }
+        case FloatingPointMode::Fast:
+        {
+            cmdLine.addArg("/fp:fast");
+            break;
+        }
+    }
+
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
         {
             // Create dynamic link library
-            if (options.optimizationLevel == OptimizationLevel::Debug)
+            if (options.debugInfoType == DebugInfoType::None)
             {
                 cmdLine.addArg("/LDd");
             }

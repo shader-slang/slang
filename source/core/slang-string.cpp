@@ -361,6 +361,12 @@ namespace Slang
         append(&chr, &chr + 1);
     }
 
+
+    void String::appendChar(char chr)
+    {
+        append(&chr, &chr + 1);
+    }
+
     void String::append(String const& str)
     {
         if (!m_buffer)

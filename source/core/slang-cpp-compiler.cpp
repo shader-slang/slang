@@ -19,6 +19,17 @@
 namespace Slang
 {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
+
+void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
+{
+    out << getCompilerTypeAsText(type);
+    out << " ";
+    out << majorVersion;
+    out << ".";
+    out << minorVersion;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
 
 /* static */UnownedStringSlice CPPCompiler::OutputMessage::getTypeText(OutputMessage::Type type)
@@ -33,6 +44,21 @@ namespace Slang
     }
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */UnownedStringSlice CPPCompiler::getCompilerTypeAsText(CompilerType type)
+{
+    switch (type)
+    {
+        default:
+        case CompilerType::Unknown:     return UnownedStringSlice::fromLiteral("Unknown");
+        case CompilerType::VisualStudio:return UnownedStringSlice::fromLiteral("Visual Studio");
+        case CompilerType::GCC:         return UnownedStringSlice::fromLiteral("GCC");
+        case CompilerType::Clang:       return UnownedStringSlice::fromLiteral("Clang");
+        case CompilerType::SNC:         return UnownedStringSlice::fromLiteral("SNC");
+        case CompilerType::GHS:         return UnownedStringSlice::fromLiteral("GHS");
+    }
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -165,6 +191,11 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
 #endif
 
     return m_parseOutputFunc(exeRes, outOutput);
+}
+
+SlangResult GenericCPPCompiler::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    return m_calcModuleFilePathFunc(options, outPath);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
@@ -308,7 +339,7 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
     CPPCompiler::Desc desc;
     if (SLANG_SUCCEEDED(GCCCompilerUtil::calcVersion(exeName, desc)))
     {
-        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &GCCCompilerUtil::calcArgs, &GCCCompilerUtil::parseOutput));
+        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &GCCCompilerUtil::calcArgs, &GCCCompilerUtil::parseOutput, GCCCompilerUtil::calcModuleFilePath));
         compilerSet->addCompiler(compiler);
     }
 }
@@ -375,6 +406,19 @@ void CPPCompilerSet::getCompilers(List<CPPCompiler*>& outCompilers) const
 {
     outCompilers.clear();
     outCompilers.addRange((CPPCompiler*const*)m_compilers.begin(), m_compilers.getCount());
+}
+
+bool CPPCompilerSet::hasCompiler(CPPCompiler::CompilerType compilerType) const
+{
+    for (CPPCompiler* compiler : m_compilers)
+    {
+        const auto& desc = compiler->getDesc();
+        if (desc.type == compilerType)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void CPPCompilerSet::addCompiler(CPPCompiler* compiler)

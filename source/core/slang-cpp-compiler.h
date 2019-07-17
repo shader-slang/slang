@@ -40,6 +40,8 @@ public:
             /// Get the version as a value
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
+        void appendAsText(StringBuilder& out) const;
+
             /// Ctor
         Desc(CompilerType inType = CompilerType::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
@@ -50,16 +52,26 @@ public:
 
     enum class OptimizationLevel
     {
-        Normal,             ///< Normal optimization
-        Debug,              ///< General has no optimizations
+        None,           ///< Don't optimize at all. 
+        Default,        ///< Default optimization level: balance code quality and compilation time. 
+        High,           ///< Optimize aggressively. 
+        Maximal,        ///< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs 
     };
 
-    enum DebugInfoType
+    enum class DebugInfoType
     {
-        None,               ///< Binary has no debug information
-        Maximum,            ///< Has maximum debug information
-        Normal,             ///< Has normal debug information
+        None,       ///< Don't emit debug information at all. 
+        Minimal,    ///< Emit as little debug information as possible, while still supporting stack traces. 
+        Standard,   ///< Emit whatever is the standard level of debug information for each target. 
+        Maximal,    ///< Emit as much debug information as possible for each target. 
     };
+    enum class FloatingPointMode
+    {
+        Default, 
+        Fast,
+        Precise,
+    };
+
     enum TargetType
     {
         Executable,         ///< Produce an executable
@@ -84,10 +96,11 @@ public:
             };
         };
 
-        OptimizationLevel optimizationLevel = OptimizationLevel::Debug;
-        DebugInfoType debugInfoType = DebugInfoType::Normal;
+        OptimizationLevel optimizationLevel = OptimizationLevel::Default;
+        DebugInfoType debugInfoType = DebugInfoType::Standard;
         TargetType targetType = TargetType::Executable;
         SourceType sourceType = SourceType::CPP;
+        FloatingPointMode floatingPointMode = FloatingPointMode::Default;
 
         Flags flags = Flag::EnableExceptionHandling;
 
@@ -163,6 +176,11 @@ public:
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
+        /// Given the compilation options and the module name, determines the actual file name used for output
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
+
+        /// Return the compiler type as name
+    static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
 
 protected:
 
@@ -180,26 +198,31 @@ public:
 
     typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
     typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
+    typedef SlangResult(*CalcModuleFilePathFunc)(const CPPCompiler::CompileOptions& options, StringBuilder& outPath);
 
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
+    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
         Super(desc),
         m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc)
+        m_parseOutputFunc(parseOutputFunc),
+        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc) :
+    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
         Super(desc),
         m_cmdLine(cmdLine),
         m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc)
+        m_parseOutputFunc(parseOutputFunc),
+        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
     {}
 
     CalcArgsFunc m_calcArgsFunc;
     ParseOutputFunc m_parseOutputFunc;
+    CalcModuleFilePathFunc m_calcModuleFilePathFunc;
     CommandLine m_cmdLine;
 };
 
@@ -224,6 +247,9 @@ public:
     CPPCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
         /// Set the default compiler
     void setDefaultCompiler(CPPCompiler* compiler) { m_defaultCompiler = compiler;  }
+
+        /// True if has a compiler of the specified type
+    bool hasCompiler(CPPCompiler::CompilerType compilerType) const;
 
 protected:
 
@@ -263,6 +289,9 @@ struct CPPCompilerUtil
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
     static SlangResult initializeSet(CPPCompilerSet* set);
+
+    
+    
 };
 
 

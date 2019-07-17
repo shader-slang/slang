@@ -514,6 +514,8 @@ extern "C"
         SLANG_DXIL_ASM,
         SLANG_C_SOURCE,             ///< The C language
         SLANG_CPP_SOURCE,           ///< The C++ language
+        SLANG_EXECUTABLE,           ///< Executable (for hosting CPU/OS)
+        SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
     };
 
     /* A "container format" describes the way that the outputs
@@ -537,6 +539,11 @@ extern "C"
         SLANG_PASS_THROUGH_FXC,
         SLANG_PASS_THROUGH_DXC,
         SLANG_PASS_THROUGH_GLSLANG,
+        SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
+        SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
+        SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
+        SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, which is decided by the source type
+        SLANG_PASS_THROUGH_COUNT_OF,
     };
 
     /*!
@@ -601,6 +608,8 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_SLANG,
         SLANG_SOURCE_LANGUAGE_HLSL,
         SLANG_SOURCE_LANGUAGE_GLSL,
+        SLANG_SOURCE_LANGUAGE_C,
+        SLANG_SOURCE_LANGUAGE_CPP,
     };
 
     typedef unsigned int SlangProfileID;
@@ -859,7 +868,7 @@ extern "C"
 
     typedef void(*SlangFuncPtr)(void);
 
-    /** An interface that can be used to encapsulate access to a shared library. An implementaion 
+    /** An interface that can be used to encapsulate access to a shared library. An implementation 
     does not have to implement the library as a shared library. 
     */
     struct ISlangSharedLibrary: public ISlangUnknown

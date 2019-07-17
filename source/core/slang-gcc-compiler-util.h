@@ -14,6 +14,7 @@ struct GCCCompilerUtil
     typedef CPPCompiler::TargetType TargetType;
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
+    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
 
         /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
     static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, CPPCompiler::Desc& outDesc);
@@ -26,6 +27,10 @@ struct GCCCompilerUtil
 
         /// Parse ExecuteResult into Output
     static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
+
+        /// Calculate the output module filename 
+    static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
+
 };
 
 }

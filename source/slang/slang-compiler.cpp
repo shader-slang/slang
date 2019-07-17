@@ -4,6 +4,7 @@
 #include "../core/slang-platform.h"
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-hex-dump-util.h"
 
 #include "slang-compiler.h"
 #include "slang-lexer.h"
@@ -84,7 +85,9 @@ namespace Slang
     x("dxil", DXIL) \
     x("dxil-asm,dxil-assembly", DXILAssembly) \
     x("c", CSource) \
-    x("cpp", CPPSource)
+    x("cpp", CPPSource) \
+    x("exe,executable", Executable) \
+    x("sharedlib,sharedlibrary,dll", SharedLibrary) 
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -369,6 +372,22 @@ namespace Slang
         return Stage::Unknown;
     }
 
+    static UnownedStringSlice _getPassThroughAsText(PassThroughMode mode)
+    {
+        switch (mode)
+        {
+            case PassThroughMode::None:     return UnownedStringSlice::fromLiteral("None");
+            case PassThroughMode::Dxc:      return UnownedStringSlice::fromLiteral("Dxc");
+            case PassThroughMode::Fxc:      return UnownedStringSlice::fromLiteral("Fxc");
+            case PassThroughMode::Glslang:  return UnownedStringSlice::fromLiteral("Glslang");
+            case PassThroughMode::Clang:    return UnownedStringSlice::fromLiteral("Clang");
+            case PassThroughMode::VisualStudio: return UnownedStringSlice::fromLiteral("VisualStudio");
+            case PassThroughMode::Gcc:      return UnownedStringSlice::fromLiteral("GCC");
+            case PassThroughMode::GenericCCpp:  return UnownedStringSlice::fromLiteral("Generic C/C++ Compiler");
+            default:                        return UnownedStringSlice::fromLiteral("Unknown");
+        }
+    }
+
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         switch (passThrough)
@@ -378,7 +397,7 @@ namespace Slang
                 // If no pass through -> that will always work!
                 return SLANG_OK;
             }
-            case PassThroughMode::dxc:
+            case PassThroughMode::Dxc:
             {
 #if SLANG_ENABLE_DXIL_SUPPORT
                 // Must have dxc
@@ -386,7 +405,7 @@ namespace Slang
 #endif
                 break;
             }
-            case PassThroughMode::fxc:
+            case PassThroughMode::Fxc:
             {
 #if SLANG_ENABLE_DXBC_SUPPORT
                 // Must have fxc
@@ -394,12 +413,31 @@ namespace Slang
 #endif
                 break;
             }
-            case PassThroughMode::glslang:
+            case PassThroughMode::Glslang:
             {
 #if SLANG_ENABLE_GLSLANG_SUPPORT
                 return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
 #endif
                 break;
+            }
+            case PassThroughMode::Clang:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::VisualStudio:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::Gcc:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::GenericCCpp:
+            {
+                List<CPPCompiler::Desc> descs;
+                session->requireCPPCompilerSet()->getCompilerDescs(descs);
+
+                return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
         }
         return SLANG_E_NOT_IMPLEMENTED;
@@ -428,23 +466,29 @@ namespace Slang
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
-                return PassThroughMode::glslang;
+                return PassThroughMode::Glslang;
             }
             case CodeGenTarget::DXBytecode:
             case CodeGenTarget::DXBytecodeAssembly:
             {
-                return PassThroughMode::fxc;
+                return PassThroughMode::Fxc;
             }
             case CodeGenTarget::DXIL:
             case CodeGenTarget::DXILAssembly:
             {
-                return PassThroughMode::dxc;
+                return PassThroughMode::Dxc;
             }
             case CodeGenTarget::CPPSource:
             case CodeGenTarget::CSource:
             {
                 // Don't need an external compiler to output C and C++ code
                 return PassThroughMode::None;
+            }
+            case CodeGenTarget::SharedLibrary:
+            case CodeGenTarget::Executable:
+            {
+                // We need some C/C++ compiler
+                return PassThroughMode::GenericCCpp;
             }
 
             default: break;
@@ -485,6 +529,27 @@ namespace Slang
         return translationUnit;
     }
 
+    static void _appendEscapedPath(const UnownedStringSlice& path, StringBuilder& outBuilder)
+    {
+        for (auto c : path)
+        {
+            // TODO(JS): Probably want more sophisticated handling... 
+            if (c == '\\')
+            {
+                outBuilder.appendChar(c);
+            }
+            outBuilder.appendChar(c);
+        }
+    }
+
+    static void _appendCodeWithPath(const UnownedStringSlice& filePath, const UnownedStringSlice& fileContent, StringBuilder& outCodeBuilder)
+    {
+        outCodeBuilder << "#line 1 \"";
+        _appendEscapedPath(filePath, outCodeBuilder);
+        outCodeBuilder << "\"\n";
+        outCodeBuilder << fileContent << "\n";
+    }
+
     String emitHLSLForEntryPoint(
         BackEndCompileRequest*  compileRequest,
         EntryPoint*             entryPoint,
@@ -503,26 +568,7 @@ namespace Slang
             StringBuilder codeBuilder;
             for(auto sourceFile : translationUnit->getSourceFiles())
             {
-                codeBuilder << "#line 1 \"";
-
-                const String& path = sourceFile->getPathInfo().foundPath;
-
-                for(auto c : path)
-                {
-                    char buffer[] = { c, 0 };
-                    switch(c)
-                    {
-                    default:
-                        codeBuilder << buffer;
-                        break;
-
-                    case '\\':
-                        codeBuilder << "\\\\";
-                    }
-                }
-                codeBuilder << "\"\n";
-
-                codeBuilder << sourceFile->getContent() << "\n";
+                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
             }
 
             return codeBuilder.ProduceString();
@@ -534,6 +580,35 @@ namespace Slang
                 entryPoint,
                 CodeGenTarget::HLSL,
                 targetReq);
+        }
+    }
+
+    String emitCPPForEntryPoint(
+        BackEndCompileRequest*  compileRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq)
+    {
+        if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
+        {
+            // Generate a string that includes the content of
+            // the source file(s), along with a line directive
+            // to ensure that we get reasonable messages
+            // from the downstream compiler when in pass-through
+            // mode.
+
+            StringBuilder codeBuilder;
+            for (auto sourceFile : translationUnit->getSourceFiles())
+            {
+                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
+            }
+
+            return codeBuilder.ProduceString();
+        }
+        else
+        {
+            return emitEntryPoint(compileRequest, entryPoint, CodeGenTarget::CPPSource, targetReq);
         }
     }
 
@@ -711,9 +786,9 @@ namespace Slang
         if(!translationUnitRequest)
             return "slang-generated";
 
-        auto sink = endToEndReq->getSink();
-
         const auto& sourceFiles = translationUnitRequest->getSourceFiles();
+
+        auto sink = endToEndReq->getSink();
 
         const Index numSourceFiles = sourceFiles.getCount();
 
@@ -1028,6 +1103,381 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
+    SlangResult emitCPUBinaryForEntryPoint(
+        BackEndCompileRequest*  slangRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq,
+        List<uint8_t>&          binOut)
+    {
+        auto sink = slangRequest->getSink();
+
+        const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+
+        binOut.clear();
+      
+        CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
+
+        // Determine compiler to use
+        CPPCompiler* compiler = nullptr;
+        switch (endToEndReq->passThrough)
+        {
+            case PassThroughMode::None:
+            case PassThroughMode::GenericCCpp:
+            {
+                // If there is no pass through... still need a compiler
+                compiler = compilerSet->getDefaultCompiler();
+                break;
+            }
+            case PassThroughMode::Clang:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang));
+                break;
+            }
+            case PassThroughMode::VisualStudio:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
+                break;
+            }
+            case PassThroughMode::Gcc:
+            {
+                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+                break;
+            }
+        }
+
+        if (!compiler)
+        {
+            if (endToEndReq->passThrough != PassThroughMode::None)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+            }
+            else
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound);
+            }
+            return SLANG_FAIL;
+        }
+
+        TemporaryFileSet temporaryFileSet;
+
+        bool useOriginalFile = false;
+
+        String compileSourcePath;
+        String sourceContents;
+
+        String rawSource;
+
+        SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
+
+        Dictionary<String, String> preprocessorDefinitions;
+        List<String> includePaths;
+
+        /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
+        to use the original file. We want to do this because we want includes relative to the source file to work, and
+        for that to work most easily we want to use the original file, if there is one */
+        if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
+        {
+            // If it's pass through we accumulate the preprocessor definitions. 
+            for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
+            {
+                preprocessorDefinitions.Add(define.Key, define.Value);
+            }
+            for (auto& define : translationUnit->preprocessorDefinitions)
+            {
+                preprocessorDefinitions.Add(define.Key, define.Value);
+            }
+
+            {
+                /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
+                all makes total sense. If we are generating C++ code from slang, then should we really be using these values -> aren't they what is
+                being set for the *slang* source, not for the C++ generated code. That being the case it implies that there needs to be a mechanism
+                (if there isn't already) to specify such information on a particular pass/pass through etc.
+
+                On invoking DXC for example include paths do not appear to be set at all (even with pass-through).
+                */ 
+
+                auto linkage = targetReq->getLinkage();
+
+                // Add all the search paths
+                
+                const auto searchDirectories = linkage->getSearchDirectories();
+                const SearchDirectoryList* searchList = &searchDirectories;
+                while (searchList)
+                {
+                    for (const auto& searchDirectory : searchList->searchDirectories)
+                    {
+                        includePaths.add(searchDirectory.path);
+                    }
+                    searchList = searchList->parent;
+                }
+            }
+
+            // We are just passing thru, so it's whatever it originally was
+            rawSourceLanguage = translationUnit->sourceLanguage;
+
+            const auto& sourceFiles = translationUnit->getSourceFiles();
+            if (sourceFiles.getCount() == 1)
+            {
+                const SourceFile* sourceFile = sourceFiles[0];
+                const PathInfo& pathInfo = sourceFile->getPathInfo();
+                if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
+                {
+                    compileSourcePath = pathInfo.foundPath;
+                    // We can see if we can load it
+                    if (File::exists(compileSourcePath))
+                    {
+                        // Here we look for the file on the regular file system (as opposed to using the 
+                        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
+                        // to the CPP compiler all it is able to (currently) see are files on the file system.
+                        //
+                        // Note that it could be coincidence that the filesystem has a file that's identical in
+                        // contents/name. That being the case though, any includes wouldn't work for a generated
+                        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
+                        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
+                        // file system access.
+                        try
+                        {
+                            String readContents = File::readAllText(compileSourcePath);
+                            // We should see if they are the same
+                            useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());
+                        }
+                        catch (const Slang::IOException&)
+                        {
+                        }
+                    }
+                }
+            }
+
+            if (!useOriginalFile)
+            {
+                StringBuilder codeBuilder;
+                for (auto sourceFile : translationUnit->getSourceFiles())
+                {
+                    _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
+                }
+                sourceContents = codeBuilder.ProduceString();
+            }
+        }
+        else
+        {
+            rawSource = emitCPPForEntryPoint(
+                slangRequest,
+                entryPoint,
+                entryPointIndex,
+                targetReq,
+                endToEndReq);
+
+            maybeDumpIntermediate(slangRequest, rawSource.getBuffer(), CodeGenTarget::CPPSource);
+
+            rawSourceLanguage = SourceLanguage::CPP;
+        }
+
+        List<String> tempFiles;
+
+        if (!useOriginalFile)
+        {
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), compileSourcePath));
+
+            // Make the temporary filename have the appropriate extension.
+            // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extraordinary unlikely
+            if (rawSourceLanguage == SourceLanguage::C)
+            {
+                compileSourcePath.append(".c");
+            }
+            else
+            {
+                compileSourcePath.append(".cpp");
+            }
+
+            // Delete this path at end of execution
+            temporaryFileSet.add(compileSourcePath);
+
+            try
+            {
+                File::writeAllText(compileSourcePath, rawSource);
+            }
+            catch (...)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, compileSourcePath);
+                return SLANG_FAIL;
+            }
+        }
+
+        CPPCompiler::CompileOptions options;
+
+        // Generate a path a temporary filename for output module
+        String modulePath;
+        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+
+        options.modulePath = modulePath;
+        options.sourceFiles.add(compileSourcePath);
+
+        // Set what kind of target we should build
+        switch (targetReq->target)
+        {
+            case CodeGenTarget::SharedLibrary:
+            {
+                options.targetType = CPPCompiler::TargetType::SharedLibrary;
+                break;
+            }
+            case CodeGenTarget::Executable:
+            {
+                options.targetType = CPPCompiler::TargetType::Executable;
+                break;
+            }
+            default: break;
+        }
+
+        String moduleFilePath;
+
+        {
+            StringBuilder builder;
+            SLANG_RETURN_ON_FAIL(compiler->calcModuleFilePath(options, builder));
+            moduleFilePath = builder.ProduceString();
+        }
+
+        // Add so it's deleted at the end
+        temporaryFileSet.add(moduleFilePath);
+
+        // Need to configure for the compilation
+
+        {
+            auto linkage = targetReq->getLinkage();
+
+            switch (linkage->optimizationLevel)
+            {
+                case OptimizationLevel::None:       options.optimizationLevel = CPPCompiler::OptimizationLevel::None; break;
+                case OptimizationLevel::Default:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Default;  break;
+                case OptimizationLevel::High:       options.optimizationLevel = CPPCompiler::OptimizationLevel::High;  break;
+                case OptimizationLevel::Maximal:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Maximal;  break;
+                default: SLANG_ASSERT(!"Unhandled optimization level"); break;
+            }
+
+            switch (linkage->debugInfoLevel)
+            {
+                case DebugInfoLevel::None:          options.debugInfoType = CPPCompiler::DebugInfoType::None; break; 
+                case DebugInfoLevel::Minimal:       options.debugInfoType = CPPCompiler::DebugInfoType::Minimal; break; 
+                
+                case DebugInfoLevel::Standard:      options.debugInfoType = CPPCompiler::DebugInfoType::Standard; break; 
+                case DebugInfoLevel::Maximal:       options.debugInfoType = CPPCompiler::DebugInfoType::Maximal; break; 
+                default: SLANG_ASSERT(!"Unhandled debug level"); break;
+            }
+
+            switch( targetReq->floatingPointMode )
+            {
+                case FloatingPointMode::Default:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Default; break;
+                case FloatingPointMode::Precise:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Precise; break;
+                case FloatingPointMode::Fast:       options.floatingPointMode = CPPCompiler::FloatingPointMode::Fast; break;
+                default: SLANG_ASSERT(!"Unhanlde floating point mode");
+            }
+
+            // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
+            options.includePaths = includePaths;
+
+            // Add the specified defines (as calculated earlier - they will only be set if this is a pass through else will be empty)
+            {
+                for(auto& def : preprocessorDefinitions)
+                {
+                    CPPCompiler::Define define;
+                    define.nameWithSig = def.Key;
+                    define.value = def.Value;
+
+                    options.defines.add(define);
+                }
+            }
+        }
+
+        // TODO(JS): HACK! We need to include the prelude from somewhere, but where? The generated output
+        // is sitting in some temp directory.
+        // So here, we search all the 'sourceFiles', and try their paths for plausibility, and take the first
+        {
+            auto frontEndReq = endToEndReq->getFrontEndReq();
+            auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
+            auto translationUnit = entryPointReq->getTranslationUnit();
+
+            for (SourceFile* sourceFile : translationUnit->m_sourceFiles)
+            {
+                const auto& pathInfo = sourceFile->getPathInfo();
+
+                if (pathInfo.type == PathInfo::Type::FoundPath ||
+                    pathInfo.type == PathInfo::Type::Normal)
+                {
+                    String originalSourceDirectory = Path::getParentDirectory(pathInfo.foundPath);
+
+                    if (originalSourceDirectory.getLength() && File::exists(originalSourceDirectory))
+                    {
+                        // We can't use this path directly, so make canonical so it is absolute
+                        StringBuilder canonicalPath;
+                        if (SLANG_SUCCEEDED(Path::getCanonical(originalSourceDirectory, canonicalPath)))
+                        {
+                            options.includePaths.add(canonicalPath.ProduceString());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Compile
+        CPPCompiler::Output output;
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, output));
+
+        {
+            StringBuilder compilerText;
+            compiler->getDesc().appendAsText(compilerText);
+
+            StringBuilder builder;
+
+            typedef CPPCompiler::OutputMessage OutputMessage;
+
+            for (const auto& msg : output.messages)
+            {
+                builder.Clear();
+
+                builder << msg.filePath << "(" << msg.fileLine <<"): ";
+
+                if (msg.stage == OutputMessage::Stage::Link)
+                {
+                    builder << "link ";
+                }
+
+                switch (msg.type)
+                {
+                    case OutputMessage::Type::Error:    builder << "error"; break;
+                    case OutputMessage::Type::Unknown:  builder << "warning"; break;
+                    case OutputMessage::Type::Info:     builder << "info"; break;
+                    default: break;
+                }
+
+                builder << " " << msg.code << ": " << msg.text;
+
+                reportExternalCompileError(compilerText.getBuffer(), SLANG_OK, builder.getUnownedSlice(), sink);
+            }
+        }
+
+        // If any errors are emitted, then we are done
+        if (output.has(CPPCompiler::OutputMessage::Type::Error))
+        {
+            return SLANG_FAIL;
+        }
+
+        // Read the binary
+        try
+        {
+            // Read the contents of the binary
+            binOut = File::readAllBytes(moduleFilePath);
+        }
+        catch (const Slang::IOException&)
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::unableToReadFile, moduleFilePath);
+            return SLANG_FAIL;
+        }
+
+        return SLANG_OK;
+    }
+
     SlangResult emitSPIRVForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
@@ -1106,6 +1556,23 @@ SlangResult dissassembleDXILUsingDXC(
 
         switch (target)
         {
+        case CodeGenTarget::SharedLibrary:
+        case CodeGenTarget::Executable:
+            {
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
+                    compileRequest,
+                    entryPoint,
+                    entryPointIndex,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
+                    result = CompileResult(code);
+                }
+            }
+            break;
         case CodeGenTarget::HLSL:
             {
                 String code = emitHLSLForEntryPoint(
@@ -1444,6 +1911,11 @@ SlangResult dissassembleDXILUsingDXC(
                         }
                         break;
 
+                    case CodeGenTarget::SharedLibrary:
+                    case CodeGenTarget::Executable:
+                        HexDumpUtil::dumpWithMarkers(data, 24, writer);
+                        break;
+
                     default:
                         SLANG_UNEXPECTED("unhandled output format");
                         return;
@@ -1753,6 +2225,22 @@ SlangResult dissassembleDXILUsingDXC(
             }
             break;
     #endif
+
+        case CodeGenTarget::CSource:
+            dumpIntermediateText(compileRequest, data, size, ".c");
+            break;
+        case CodeGenTarget::CPPSource:
+            dumpIntermediateText(compileRequest, data, size, ".cpp");
+            break;
+
+        case CodeGenTarget::Executable:
+            // What these should be called is target specific, but just use these exts to make clear for now
+            // for now
+            dumpIntermediateBinary(compileRequest, data, size, ".exe");
+            break;
+        case CodeGenTarget::SharedLibrary:
+            dumpIntermediateBinary(compileRequest, data, size, ".shared-lib");
+            break;
         }
     }
 

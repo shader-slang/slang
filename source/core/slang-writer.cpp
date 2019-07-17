@@ -1,3 +1,5 @@
+#define  _CRT_SECURE_NO_WARNINGS
+
 #include "slang-writer.h"
 
 #include "slang-platform.h"
@@ -165,6 +167,21 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
     }
     return SLANG_FAIL;
 }
+
+/* static */SlangResult FileWriter::create(const char* filePath, const char* writeOptions, WriterFlags flags, ComPtr<ISlangWriter>& outWriter)
+{
+    flags &= ~WriterFlag::IsUnowned;
+
+    FILE* file = fopen(filePath, writeOptions);
+    if (!file)
+    {
+        return SLANG_E_CANNOT_OPEN;
+    }
+
+    outWriter = new FileWriter(file, flags);
+    return SLANG_OK;
+}
+
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! StringWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 

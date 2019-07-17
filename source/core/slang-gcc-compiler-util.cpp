@@ -335,6 +335,34 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
+/* static */ SlangResult GCCCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
+{
+    outPath.Clear();
+
+    switch (options.targetType)
+    {
+        case TargetType::SharedLibrary:
+        {
+            outPath << SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
+            return SLANG_OK;
+        }
+        case TargetType::Executable:
+        {
+            outPath << options.modulePath;
+            outPath << ProcessUtil::getExecutableSuffix();
+            return SLANG_OK;
+        }
+        case TargetType::Object:
+        {
+            // Will be .o for typical gcc targets
+            outPath << options.modulePath << ".o";
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
+}
+
 /* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     cmdLine.addArg("-fvisibility=hidden");
@@ -349,15 +377,25 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.optimizationLevel)
     {
-        case OptimizationLevel::Debug:
+        case OptimizationLevel::None:
         {
             // No optimization
             cmdLine.addArg("-O0");
             break;
         }
-        case OptimizationLevel::Normal:
+        case OptimizationLevel::Default:
         {
             cmdLine.addArg("-Os");
+            break;
+        }
+        case OptimizationLevel::High:
+        {
+            cmdLine.addArg("-O2");
+            break;
+        }
+        case OptimizationLevel::Maximal:
+        {
+            cmdLine.addArg("-O4");
             break;
         }
         default: break;
@@ -368,6 +406,29 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-g");
     }
 
+    switch (options.floatingPointMode)
+    {
+        case FloatingPointMode::Default: break;
+        case FloatingPointMode::Precise:
+        {
+            //cmdLine.addArg("-fno-unsafe-math-optimizations");
+            break;
+        }
+        case FloatingPointMode::Fast:
+        {
+            // We could enable SSE with -mfpmath=sse
+            // But that would only make sense on a x64/x86 type processor and only if that feature is present (it is on all x64)
+            cmdLine.addArg("-ffast-math");
+            break;
+        }
+    }
+
+    StringBuilder moduleFilePath;
+    calcModuleFilePath(options, moduleFilePath);
+
+    cmdLine.addArg("-o");
+    cmdLine.addArg(moduleFilePath);
+
     switch (options.targetType)
     {
         case TargetType::SharedLibrary:
@@ -376,22 +437,10 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             cmdLine.addArg("-shared");
             // Position independent
             cmdLine.addArg("-fPIC");
-
-            String sharedLibraryPath = SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
-
-            cmdLine.addArg("-o");
-            cmdLine.addArg(sharedLibraryPath);
             break;
         }
         case TargetType::Executable:
         {
-            cmdLine.addArg("-o");
-
-            StringBuilder builder;
-            builder << options.modulePath;
-            builder << ProcessUtil::getExecutableSuffix();
-
-            cmdLine.addArg(options.modulePath);
             break;
         }
         case TargetType::Object:

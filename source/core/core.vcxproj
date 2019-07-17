@@ -182,6 +182,7 @@
     <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-gcc-compiler-util.h" />
     <ClInclude Include="slang-hash.h" />
+    <ClInclude Include="slang-hex-dump-util.h" />
     <ClInclude Include="slang-io.h" />
     <ClInclude Include="slang-list.h" />
     <ClInclude Include="slang-math.h" />
@@ -213,6 +214,7 @@
     <ClCompile Include="slang-cpp-compiler.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-gcc-compiler-util.cpp" />
+    <ClCompile Include="slang-hex-dump-util.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />

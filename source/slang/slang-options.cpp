@@ -36,6 +36,26 @@ SlangResult tryReadCommandLineArgument(DiagnosticSink* sink, char const* option,
     return SLANG_OK;
 }
 
+#define SLANG_PASS_THROUGH_TYPES(x) \
+        x(none, NONE) \
+        x(fxc, FXC) \
+        x(dxc, DXC) \
+        x(glslang, GLSLANG) \
+        x(vs, VISUAL_STUDIO) \
+        x(visualstudio, VISUAL_STUDIO) \
+        x(clang, CLANG) \
+        x(gcc, GCC) \
+        x(c, GENERIC_C_CPP) \
+        x(cpp, GENERIC_C_CPP)
+
+static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassThrough& outPassThrough)
+{
+#define SLANG_PASS_THROUGH_TYPE_CHECK(x, y) \
+    if (name == #x) { outPassThrough = SLANG_PASS_THROUGH_##y; return SLANG_OK; }
+    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_CHECK)
+    return SLANG_FAIL;
+}
+
 struct OptionsParser
 {
     SlangSession*           session = nullptr;
@@ -278,6 +298,9 @@ struct OptionsParser
             { ".tesc", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_HULL },
             { ".tese", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_DOMAIN },
             { ".comp", SLANG_SOURCE_LANGUAGE_GLSL,  SLANG_STAGE_COMPUTE },
+
+            { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
+            { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },
         };
 
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)
@@ -360,8 +383,12 @@ struct OptionsParser
         CASE(".spv",        SPIRV);
         CASE(".spv.asm",    SPIRV_ASM);
 
-        CASE(".c",    C_SOURCE);
-        CASE(".cpp",   CPP_SOURCE);
+        CASE(".c",      C_SOURCE);
+        CASE(".cpp",    CPP_SOURCE);
+
+        CASE(".exe",    EXECUTABLE);
+        CASE(".dll",    SHARED_LIBRARY);
+        CASE(".so",     SHARED_LIBRARY);
 
 #undef CASE
 
@@ -420,6 +447,23 @@ struct OptionsParser
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode)
     {
         rawTarget->floatingPointMode = mode;
+    }
+
+    static bool _passThroughRequiresStage(PassThroughMode passThrough)
+    {
+        switch (passThrough)
+        {
+            case PassThroughMode::Glslang:
+            case PassThroughMode::Dxc:
+            case PassThroughMode::Fxc:
+            {
+                return true;
+            }
+            default:
+            {
+                return false;
+            }
+        }
     }
 
     SlangResult parse(
@@ -561,18 +605,13 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (name == "fxc") { passThrough = SLANG_PASS_THROUGH_FXC; }
-                    else if (name == "dxc") { passThrough = SLANG_PASS_THROUGH_DXC; }
-                    else if (name == "glslang") { passThrough = SLANG_PASS_THROUGH_GLSLANG; }
-                    else
+                    if (SLANG_FAILED(_parsePassThrough(name.getUnownedSlice(), passThrough)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
                         return SLANG_FAIL;
                     }
 
-                    spSetPassThrough(
-                        compileRequest,
-                        passThrough);
+                    spSetPassThrough(compileRequest, passThrough);
                 }
                 else if (argStr == "-dxc-path")
                 {
@@ -938,7 +977,7 @@ struct OptionsParser
         // because fxc/dxc/glslang don't have a facility for taking
         // a named entry point and pulling its stage from an attribute.
         //
-        if( requestImpl->passThrough != PassThroughMode::None )
+        if(_passThroughRequiresStage(requestImpl->passThrough) )
         {
             for( auto& rawEntryPoint : rawEntryPoints )
             {

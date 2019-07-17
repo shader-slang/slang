@@ -1399,7 +1399,7 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
         default: break;
     }
 
-    m_writer->emit("SLANG_EXPORT\n");
+    m_writer->emit("SLANG_PRELUDE_EXPORT\n");
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
@@ -1613,7 +1613,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     SourceWriter* writer = getSourceWriter();
 
     writer->emit("\n");
-    writer->emit("#include \"slang-cpp-prelude.h\"\n\n");
+
+    writer->emit("#include <slang-cpp-prelude.h>\n\n");
 
     // Emit the type definitions
     for (const auto& keyValue : m_typeNameMap)

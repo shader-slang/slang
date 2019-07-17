@@ -13,23 +13,18 @@
 
 #include "options.h"
 
-enum class BackendType
+typedef uint32_t PassThroughFlags;
+struct PassThroughFlag
 {
-    Unknown = -1,
-    Dxc,
-    Fxc,
-    Glslang,
-    CountOf,
-};
-
-typedef uint32_t BackendFlags;
-struct BackendFlag
-{
-    enum Enum : uint32_t
+    enum Enum : PassThroughFlags
     {
-        Dxc = 1 << int(BackendType::Dxc),
-        Fxc = 1 << int(BackendType::Fxc),
-        Glslang = 1 << int(BackendType::Glslang),
+        Dxc = 1 << int(SLANG_PASS_THROUGH_DXC),
+        Fxc = 1 << int(SLANG_PASS_THROUGH_FXC),
+        Glslang = 1 << int(SLANG_PASS_THROUGH_GLSLANG),
+        VisualStudio = 1 << int(SLANG_PASS_THROUGH_VISUAL_STUDIO),
+        GCC = 1 << int(SLANG_PASS_THROUGH_GCC),
+        Clang = 1 << int(SLANG_PASS_THROUGH_CLANG),
+        Generic_C_CPP = 1 << int(SLANG_PASS_THROUGH_GENERIC_C_CPP),
     };
 };
 
@@ -37,11 +32,11 @@ struct BackendFlag
 /// back-end availability 
 struct TestRequirements
 {
-    TestRequirements& addUsed(BackendType type)
+    TestRequirements& addUsed(SlangPassThrough type)
     {
-        if (type != BackendType::Unknown)
+        if (type != SLANG_PASS_THROUGH_NONE)
         {
-            usedBackendFlags |= BackendFlags(1) << int(type);
+            usedBackendFlags |= PassThroughFlags(1) << int(type);
         }
         return *this;
     }
@@ -54,7 +49,7 @@ struct TestRequirements
         }
         return *this;
     }
-    TestRequirements& addUsedBackends(BackendFlags flags)
+    TestRequirements& addUsedBackends(PassThroughFlags flags)
     {
         usedBackendFlags |= flags;
         return *this;
@@ -71,7 +66,7 @@ struct TestRequirements
     }
 
     Slang::RenderApiType explicitRenderApi = Slang::RenderApiType::Unknown;     ///< The render api explicitly specified 
-    BackendFlags usedBackendFlags = 0;                                          ///< Used backends
+    PassThroughFlags usedBackendFlags = 0;                                          ///< Used backends
     Slang::RenderApiFlags usedRenderApiFlags = 0;                               ///< Used render api flags (some might be implied)
 };
 
@@ -111,7 +106,7 @@ class TestContext
         /// If set then tests are not run, but their requirements are set 
     TestRequirements* testRequirements = nullptr;
 
-    BackendFlags availableBackendFlags = 0;
+    PassThroughFlags availableBackendFlags = 0;
     Slang::RenderApiFlags availableRenderApiFlags = 0;
     bool isAvailableRenderApiFlagsValid = false;
 

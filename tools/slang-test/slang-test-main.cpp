@@ -3,6 +3,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-std-writers.h"
+#include "../../source/core/slang-hex-dump-util.h"
 
 #include "../../slang-com-helper.h"
 
@@ -30,6 +31,8 @@ using namespace Slang;
 #include <stdlib.h>
 #include <stdarg.h>
 
+#define SLANG_PRELUDE_NAMESPACE CPPPrelude
+#include "../../tests/cross-compile/slang-cpp-prelude.h"
 
 // Options for a particular test
 struct TestOptions
@@ -490,24 +493,41 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-static BackendType _toBackendType(const UnownedStringSlice& slice)
+static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
 {
     if (slice == "dxc")
     {
-        return BackendType::Dxc;
+        return SLANG_PASS_THROUGH_DXC;
     }
     else if (slice == "fxc")
     {
-        return BackendType::Fxc;
+        return SLANG_PASS_THROUGH_FXC;
     }
     else if (slice == "glslang")
     {
-        return BackendType::Glslang;
+        return SLANG_PASS_THROUGH_GLSLANG;
     }
-    return BackendType::Unknown;
+    else if (slice == "c" || slice == "cpp")
+    {
+        return SLANG_PASS_THROUGH_GENERIC_C_CPP; 
+    }
+    else if (slice == "clang")
+    {
+        return SLANG_PASS_THROUGH_CLANG;
+    }
+    else if (slice == "gcc")
+    {
+        return SLANG_PASS_THROUGH_GCC;
+    }
+    else if (slice == "vs" || slice == "visualstudio")
+    {
+        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    }
+
+    return SLANG_PASS_THROUGH_NONE;
 }
 
-static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
+static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
     {
@@ -523,34 +543,30 @@ static BackendFlags _getBackendFlagsForTarget(SlangCompileTarget target)
         case SLANG_DXBC:
         case SLANG_DXBC_ASM:
         {
-            return BackendFlag::Fxc;
+            return PassThroughFlag::Fxc;
         }
         case SLANG_SPIRV:
         case SLANG_SPIRV_ASM:
         {
-            return BackendFlag::Glslang;
+            return PassThroughFlag::Glslang;
         }
         case SLANG_DXIL:
         case SLANG_DXIL_ASM:
         {
-            return BackendFlag::Dxc;
+            return PassThroughFlag::Dxc;
         }
+
+        case SLANG_EXECUTABLE:
+        case SLANG_SHARED_LIBRARY:
+        {
+            return PassThroughFlag::Generic_C_CPP;
+        }
+
         default:
         {
             SLANG_ASSERT(!"Unknown type");
             return 0;
         }
-    }
-}
-
-static BackendType _toBackendTypeFromPassThroughType(SlangPassThrough passThru)
-{
-    switch (passThru)
-    {
-        case SLANG_PASS_THROUGH_DXC: return BackendType::Dxc;
-        case SLANG_PASS_THROUGH_FXC: return BackendType::Fxc;
-        case SLANG_PASS_THROUGH_GLSLANG: return BackendType::Glslang;
-        default:                     return BackendType::Unknown;
     }
 }
 
@@ -571,6 +587,9 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("dxil-asm", DXIL_ASM)
         CASE("c", C_SOURCE)
         CASE("cpp", CPP_SOURCE)
+        CASE("exe", EXECUTABLE)
+        CASE("sharedlib", SHARED_LIBRARY)
+        CASE("dll", SHARED_LIBRARY)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;
@@ -680,11 +699,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
     if (passThru == SLANG_PASS_THROUGH_NONE)
     {
         // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
     }
     else
     {
-        ioRequirements->addUsed(_toBackendTypeFromPassThroughType(passThru));
+        ioRequirements->addUsed(passThru);
     }
 
     // Add the render api used
@@ -701,7 +720,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsed(_toBackendType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsed(_toPassThroughType(passThrough.getUnownedSlice()));
         }
     }
 
@@ -711,7 +730,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
         {
             const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
-            ioRequirements->addUsedBackends(_getBackendFlagsForTarget(target));
+            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
     return SLANG_OK;
@@ -921,17 +940,48 @@ TestResult asTestResult(ToolReturnCode code)
         } \
     }
 
+static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
+{
+    // We need to extract the binary
+    List<uint8_t> data;
+    SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
+
+    // Need to write this off to a temporary file
+    String fileName;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+    fileName.append(ProcessUtil::getExecutableSuffix());
+
+    TemporaryFileSet temporaryFileSet;
+    temporaryFileSet.add(fileName);
+
+    {
+        ComPtr<ISlangWriter> writer;
+        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(fileName.getBuffer(), 0, writer));
+
+        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
+    }
+
+    // Make executable... (for linux/unix like targets)
+    SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
+
+    // Execute it
+    CommandLine cmdLine;
+    cmdLine.m_executable = fileName;
+    cmdLine.m_executableType = CommandLine::ExecutableType::Path;
+    return ProcessUtil::execute(cmdLine, outExeRes);
+}
+
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
-
-    auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    cmdLine.addArg(filePath999);
+    cmdLine.addArg(input.filePath);
 
     for( auto arg : input.testOptions->args )
     {
@@ -944,6 +994,28 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
+    }
+
+    // See what kind of target it is
+    SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
+    {
+        const auto& args = input.testOptions->args;
+        const Index targetIndex = args.indexOf("-target");
+        if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
+        {
+            target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
+        }
+    }
+
+    // If it's executable we run it and use it's output
+    if (target == SLANG_EXECUTABLE)
+    {
+        ExecuteResult runExeRes;
+        if (SLANG_FAILED(_executeBinary(exeRes.standardOutput.getUnownedSlice(), runExeRes)))
+        {
+            return TestResult::Fail;
+        }
+        exeRes = runExeRes;
     }
 
     String actualOutput = getOutput(exeRes);
@@ -963,6 +1035,136 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    TestResult result = TestResult::Pass;
+
+    // Otherwise we compare to the expected output
+    if (actualOutput != expectedOutput)
+    {
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        result = TestResult::Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+    }
+
+    return result;
+}
+
+static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, SharedLibrary::Handle& outSharedLibrary)
+{
+    // We need to extract the binary
+    List<uint8_t> data;
+    SLANG_RETURN_ON_FAIL(HexDumpUtil::parseWithMarkers(hexDump, data));
+
+    // Need to write this off to a temporary file
+    String fileName;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice("slang-test"), fileName));
+
+    // Need to work out the dll name
+    String sharedLibraryName = SharedLibrary::calcPlatformPath(fileName.getUnownedSlice());
+    inOutTemporaryFileSet.add(sharedLibraryName);
+
+    {
+        ComPtr<ISlangWriter> writer;
+        SLANG_RETURN_ON_FAIL(FileWriter::createBinary(sharedLibraryName.getBuffer(), 0, writer));
+        SLANG_RETURN_ON_FAIL(writer->write((const char*)data.getBuffer(), data.getCount()));
+    }
+
+    // Make executable... (for linux/unix like targets)
+    //SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
+
+    return SharedLibrary::loadWithPlatformPath(sharedLibraryName.getBuffer(), outSharedLibrary);
+}
+
+static void _writeBuffer(const CPPPrelude::RWStructuredBuffer<int32_t>& in, StringBuilder& out)
+{
+    for (size_t i = 0; i < in.count; ++i)
+    {
+        if (i > 0)
+        {
+            out << ", ";
+        }
+        out << in[i];
+    }
+    out << "\n";
+}
+
+TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    TemporaryFileSet temporaryFileSet;
+    SharedLibrary::Handle sharedLibrary = SharedLibrary::Handle(0);
+    if (SLANG_FAILED(_loadAsSharedLibrary(exeRes.standardOutput.getUnownedSlice(), temporaryFileSet, sharedLibrary)))
+    {
+        return TestResult::Fail;
+    }
+
+    StringBuilder actualOutput;
+
+    // TODO(JS): For moment just assume function name/data/paramters
+    {
+        SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
+        if (!func)
+        {
+            SharedLibrary::unload(sharedLibrary);
+            return TestResult::Fail;
+        }
+
+        typedef void (*Func)(CPPPrelude::Vector<uint32_t,3> threadID, CPPPrelude::RWStructuredBuffer<int32_t> buffer);
+
+        Func runFunc = Func(func);
+        int32_t data[4] = { 0, 0, 0, 0};
+        CPPPrelude::RWStructuredBuffer<int32_t> buffer{data, 4};
+
+        for (Int i = 0; i < 4; ++i)
+        {
+            CPPPrelude::Vector<uint32_t, 3> threadID{ uint32_t(i), 0, 0};
+            runFunc(threadID, buffer);
+        }
+
+        SharedLibrary::unload(sharedLibrary);
+
+        // Write the data
+        _writeBuffer(buffer, actualOutput);
+    }
+
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
+    }
+    catch (Slang::IOException)
+    {
     }
 
     TestResult result = TestResult::Pass;
@@ -1157,6 +1359,8 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
     CPPCompiler::CompileOptions options;
     options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
+    options.includePaths.add("tests/cross-compile");
 
     // Create a filename to write this out to
     String cppSource = modulePath + "." + targetExt;
@@ -2217,7 +2421,8 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
     { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile}
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
+    { "CPU_EXECUTE",                            &runCPUExecuteTest},
 };
 
 TestResult runTest(
@@ -2624,41 +2829,39 @@ SlangResult innerMain(int argc, char** argv)
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
 
+    // An un-categorized test will always belong to the `full` category
+    categorySet.defaultCategory = fullTestCategory;
+
+    
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
 
-    // Might be better if we had an API on slang so we could get what 'pass-through's are available
-    // This works whilst these targets imply the pass-through/backends
+    // Work out what backends/pass-thrus are available
     {
         SlangSession* session = context.getSession();
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_FXC)))
+
+        for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+        {
+            SlangPassThrough passThru = SlangPassThrough(i);
+
+            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            {
+                context.availableBackendFlags |= PassThroughFlags(1) << int(i);
+            }
+        }
+
+        if (context.availableBackendFlags & PassThroughFlag::Fxc)
         {
             fxcCategory = categorySet.add("fxc", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GLSLANG)))
+        if (context.availableBackendFlags & PassThroughFlag::Glslang)
         {
             glslangCategory = categorySet.add("glslang", fullTestCategory);
         }
-        if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_DXC)))
+        if (context.availableBackendFlags & PassThroughFlag::Dxc)
         {
             dxcCategory = categorySet.add("dxc", fullTestCategory);
-        }
-    }
-
-    // An un-categorized test will always belong to the `full` category
-    categorySet.defaultCategory = fullTestCategory;
-
-    // Work out what backends are available
-    {
-        SlangSession* session = context.getSession();
-        const SlangPassThrough passThrus[] = { SLANG_PASS_THROUGH_DXC, SLANG_PASS_THROUGH_FXC, SLANG_PASS_THROUGH_GLSLANG };
-        for (auto passThru: passThrus)
-        {
-            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
-            {
-                context.availableBackendFlags |= BackendFlags(1) << int(_toBackendTypeFromPassThroughType(passThru));
-            }
         }
     }
 

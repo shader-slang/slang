@@ -3,7 +3,7 @@
 // Define all the various language "profiles" we want to support.
 
 #ifndef LANGUAGE
-#define LANGUAGE(TAG, NAME) /* emptry */
+#define LANGUAGE(TAG, NAME) /* empty */
 #endif
 
 #ifndef LANGUAGE_ALIAS
@@ -47,6 +47,8 @@ LANGUAGE(GLSL_ES,			glsl_es)
 LANGUAGE(GLSL_VK,			glsl_vk)
 LANGUAGE(SPIRV,				spirv)
 LANGUAGE(SPIRV_GL,			spirv_gl)
+LANGUAGE(C,                 c)
+LANGUAGE(CPP,               cpp)
 
 LANGUAGE_ALIAS(GLSL,		glsl_gl)
 LANGUAGE_ALIAS(SPIRV,		spirv_vk)

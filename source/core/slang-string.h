@@ -443,6 +443,9 @@ namespace Slang
         void append(StringSlice const& slice);
         void append(UnownedStringSlice const& slice);
 
+            /// Append a character (to remove ambiguity with other integral types)
+        void appendChar(char chr);
+
 		String(int32_t val, int radix = 10)
 		{
             append(val, radix);
