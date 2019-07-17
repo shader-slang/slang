@@ -63,13 +63,6 @@ public:
         kESemanticMask_Default = kESemanticMask_NoPackOffset,
     };
 
-    // Hack to allow IR emit for global constant to override behavior
-    enum class IREmitMode
-    {
-        Default,
-        GlobalConstant,
-    };
-
     struct IRDeclaratorInfo;
     struct EDeclarator;
     struct ComputeEmitActionsContext;
@@ -184,11 +177,11 @@ public:
     void emitDeclarator(IRDeclaratorInfo* declarator);    
     void emitSimpleValue(IRInst* inst);
     
-    bool shouldFoldInstIntoUseSites(IRInst* inst, IREmitMode mode);
+    bool shouldFoldInstIntoUseSites(IRInst* inst);
 
-    void emitOperand(IRInst* inst, IREmitMode mode, EmitOpInfo const& outerPrec);
+    void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec);
 
-    void emitArgs(IRInst* inst, IREmitMode mode);
+    void emitArgs(IRInst* inst);
 
     
     void emitRateQualifiers(IRInst* value);
@@ -206,23 +199,21 @@ public:
         IRCall*                         inst,
         IRFunc*                         /* func */,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
-        IREmitMode                      mode,
-        EmitOpInfo const&                  inOuterPrec);
+        EmitOpInfo const&               inOuterPrec);
 
     void emitIntrinsicCallExpr(
-        IRCall*         inst,
-        IRFunc*         func,
-        IREmitMode      mode,
-        EmitOpInfo const&  inOuterPrec);
+        IRCall*             inst,
+        IRFunc*             func,
+        EmitOpInfo const&   inOuterPrec);
 
-    void emitCallExpr(IRCall* inst, IREmitMode mode, EmitOpInfo outerPrec);
+    void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
-    void emitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
-    void defaultEmitInstExpr(IRInst* inst, IREmitMode mode, EmitOpInfo const& inOuterPrec);
+    void emitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
+    void defaultEmitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
 
     BaseType extractBaseType(IRType* inType);
 
-    void emitInst(IRInst* inst, IREmitMode mode);
+    void emitInst(IRInst* inst);
 
     void emitSemantics(VarLayout* varLayout);
     void emitSemantics(IRInst* inst);
@@ -302,9 +293,6 @@ public:
 
     void emitGlobalVar(IRGlobalVar* varDecl);
     void emitGlobalParam(IRGlobalParam* varDecl);
-    void emitGlobalConstantInitializer(IRGlobalConstant* valDecl);
-
-    void emitGlobalConstant(IRGlobalConstant* valDecl);
 
     void emitGlobalInst(IRInst* inst);
 
@@ -356,12 +344,12 @@ public:
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
-    virtual bool tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(mode); SLANG_UNUSED(inOuterPrec); return false; }
+    virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(inOuterPrec); return false; }
 
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
-    void _emitInst(IRInst* inst, IREmitMode mode);
+    void _emitInst(IRInst* inst);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
 

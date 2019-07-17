@@ -562,16 +562,18 @@ struct IRGlobalVar : IRGlobalValueWithCode
     }
 };
 
-/// @brief A global constant.
+/// @brief A global shader parameter.
 ///
-/// Represents a global-scope constant value in the IR.
-/// The initializer for the constant is represented by
-/// the code in the basic block(s) nested in this value.
-struct IRGlobalConstant : IRGlobalValueWithCode
-{
-    IR_LEAF_ISA(GlobalConstant)
-};
-
+/// Represents a uniform (as opposed to varying) shader parameter
+/// passed at the global scope (entry-point `uniform` parameters
+/// are encoded as ordinary function parameters.
+///
+/// Note that an `IRGlobalParam` directly represents the value of
+/// the parameter, unlike an `IRGlobalVar`, which represents the
+/// *address* of the value. As a result, global parameters are
+/// immutable, and subject to various SSA simplifications that
+/// do not work for global variables.
+///
 struct IRGlobalParam : IRInst
 {
     IR_LEAF_ISA(GlobalParam)
@@ -956,8 +958,6 @@ struct IRBuilder
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
-        IRType* valueType);
-    IRGlobalConstant* createGlobalConstant(
         IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);

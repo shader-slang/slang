@@ -1076,7 +1076,7 @@ CPPSourceEmitter::SpecializedIntrinsic CPPSourceEmitter::getSpecializedOperation
     return specOp;
 }
 
-void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec)
+void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
     SourceWriter* writer = getSourceWriter();
@@ -1107,7 +1107,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
                         {
                             writer->emit(", ");
                         }
-                        emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[i].get(), getInfo(EmitOp::General));
                     }
 
                     writer->emitChar('}');
@@ -1131,7 +1131,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
                         {
                             writer->emit(", ");
                         }
-                        emitOperand(operands[j].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[j].get(), getInfo(EmitOp::General));
                     }
 
                     writer->emitChar('}');
@@ -1146,7 +1146,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
                         writer->emit(getBuiltinTypeName(retType->op));
                         writer->emitChar('(');
 
-                        emitOperand(operands[0].get(), mode, getInfo(EmitOp::General));
+                        emitOperand(operands[0].get(), getInfo(EmitOp::General));
 
                         writer->emitChar(')');
                         break;
@@ -1166,7 +1166,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
 
             if (elementCount == 1)
             {
-                defaultEmitInstExpr(inst, mode, inOuterPrec);
+                defaultEmitInstExpr(inst, inOuterPrec);
             }
             else
             {
@@ -1185,7 +1185,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
                     auto outerPrec = getInfo(EmitOp::General);
 
                     auto prec = getInfo(EmitOp::Postfix);
-                    emitOperand(swizzleInst->getBase(), mode, leftSide(outerPrec, prec));
+                    emitOperand(swizzleInst->getBase(), leftSide(outerPrec, prec));
 
                     writer->emit(".");
 
@@ -1217,7 +1217,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
             if (isOperator)
             {
                 // Just do the default output
-                defaultEmitInstExpr(inst, mode, inOuterPrec);
+                defaultEmitInstExpr(inst, inOuterPrec);
             }
             else
             {
@@ -1230,7 +1230,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
                     {
                         writer->emit(", ");
                     }
-                    emitOperand(operands[i].get(), mode, getInfo(EmitOp::General));
+                    emitOperand(operands[i].get(), getInfo(EmitOp::General));
                 }
 
                 writer->emitChar(')');
@@ -1290,7 +1290,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
 }
 
-void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, CLikeSourceEmitter::IREmitMode mode, const EmitOpInfo& inOuterPrec)
+void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, const EmitOpInfo& inOuterPrec)
 {
     if (operandCount > 8)
     {
@@ -1302,7 +1302,7 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
             argTypes[i] = operands[i].get()->getDataType();
         }
         SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes.getBuffer(), operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec);
+        emitCall(specOp, inst, operands, operandCount, inOuterPrec);
     }
     else
     {
@@ -1313,7 +1313,7 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
             argTypes[i] = operands[i].get()->getDataType();
         }
         SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, mode, inOuterPrec);
+        emitCall(specOp, inst, operands, operandCount, inOuterPrec);
     }
 }
 
@@ -1426,7 +1426,7 @@ void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)
     }
 }
 
-void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitMode mode, EmitOpInfo const& inOuterPrec)
+void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec)
 {
     auto outerPrec = inOuterPrec;
     bool needClose = false;
@@ -1492,15 +1492,15 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
         auto prec = getInfo(EmitOp::Postfix);
         needClose = maybeEmitParens(outerPrec, prec);
 
-        emitOperand(inst->getOperand(operandIndex++), mode, leftSide(outerPrec, prec));
+        emitOperand(inst->getOperand(operandIndex++), leftSide(outerPrec, prec));
         m_writer->emit("[");
-        emitOperand(inst->getOperand(operandIndex++), mode, getInfo(EmitOp::General));
+        emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
         m_writer->emit("]");
 
         if (operandIndex < operandCount)
         {
             m_writer->emit(" = ");
-            emitOperand(inst->getOperand(operandIndex++), mode, getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
         }
 
         maybeCloseParens(needClose);
@@ -1520,7 +1520,7 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
     if (argCount != paramCount)
     {
         // Looks like a member function call
-        emitOperand(inst->getOperand(operandIndex), mode, leftSide(outerPrec, prec));
+        emitOperand(inst->getOperand(operandIndex), leftSide(outerPrec, prec));
         m_writer->emit(".");
         operandIndex++;
     }
@@ -1530,7 +1530,7 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
         if (op != IntrinsicOp::Invalid)
         {
             IRUse* operands = inst->getOperands() + operandIndex;
-            emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), mode, inOuterPrec);
+            emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), inOuterPrec);
             return;
         }
     }
@@ -1541,14 +1541,14 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, IREmitM
     for (; operandIndex < operandCount; ++operandIndex)
     {
         if (!first) m_writer->emit(", ");
-        emitOperand(inst->getOperand(operandIndex), mode, getInfo(EmitOp::General));
+        emitOperand(inst->getOperand(operandIndex), getInfo(EmitOp::General));
         first = false;
     }
     m_writer->emit(")");
     maybeCloseParens(needClose);
 }
 
-bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
 
@@ -1558,24 +1558,24 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
-            emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
+            emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
             return true;
         }
         case kIROp_Mul_Matrix_Matrix:
         case kIROp_Mul_Matrix_Vector:
         case kIROp_Mul_Vector_Matrix:
         {
-            emitOperationCall(IntrinsicOp::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
+            emitOperationCall(IntrinsicOp::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
             return true;
         }
         case kIROp_Dot:
         {
-            emitOperationCall(IntrinsicOp::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
+            emitOperationCall(IntrinsicOp::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
             return true;
         }
         case kIROp_swizzle:
         {
-            emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
+            emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
             return true;
         }
         case kIROp_Call:
@@ -1589,7 +1589,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             // that we can emit it directly without mangling, etc.
             if (auto irFunc = asTargetIntrinsic(funcValue))
             {
-                emitIntrinsicCallExpr(static_cast<IRCall*>(inst), irFunc, mode, inOuterPrec);
+                emitIntrinsicCallExpr(static_cast<IRCall*>(inst), irFunc, inOuterPrec);
                 return true;
             }
 
@@ -1600,7 +1600,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const 
             IntrinsicOp op = getOperation(inst->op);
             if (op != IntrinsicOp::Invalid)
             {
-                emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), mode, inOuterPrec);
+                emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
                 return true;
             }
             return false;
