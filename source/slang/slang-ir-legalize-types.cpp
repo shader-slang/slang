@@ -1363,10 +1363,6 @@ static LegalVal legalizeGlobalVar(
     IRTypeLegalizationContext*    context,
     IRGlobalVar*                irGlobalVar);
 
-static LegalVal legalizeGlobalConstant(
-    IRTypeLegalizationContext*  context,
-    IRGlobalConstant*           irGlobalConstant);
-
 static LegalVal legalizeGlobalParam(
     IRTypeLegalizationContext*  context,
     IRGlobalParam*              irGlobalParam);
@@ -1399,9 +1395,6 @@ static LegalVal legalizeInst(
 
     case kIROp_GlobalVar:
         return legalizeGlobalVar(context, cast<IRGlobalVar>(inst));
-
-    case kIROp_GlobalConstant:
-        return legalizeGlobalConstant(context, cast<IRGlobalConstant>(inst));
 
     case kIROp_GlobalParam:
         return legalizeGlobalParam(context, cast<IRGlobalParam>(inst));
@@ -1614,17 +1607,6 @@ static LegalVal declareSimpleVar(
 
             irVar = globalVar;
             legalVarVal = LegalVal::simple(irVar);
-        }
-        break;
-
-    case kIROp_GlobalConstant:
-        {
-            auto globalConst = builder->createGlobalConstant(type);
-            globalConst->removeFromParent();
-            globalConst->insertBefore(context->insertBeforeGlobal);
-
-            irVar = globalConst;
-            legalVarVal = LegalVal::simple(globalConst);
         }
         break;
 
@@ -2405,50 +2387,6 @@ static LegalVal legalizeGlobalVar(
             // Remove the old global from the module.
             irGlobalVar->removeFromParent();
             context->replacedInstructions.add(irGlobalVar);
-
-            return newVal;
-        }
-        break;
-    }
-}
-
-static LegalVal legalizeGlobalConstant(
-    IRTypeLegalizationContext*  context,
-    IRGlobalConstant*           irGlobalConstant)
-{
-    // Legalize the type for the variable's value
-    auto legalValueType = legalizeType(
-        context,
-        irGlobalConstant->getFullType());
-
-    switch (legalValueType.flavor)
-    {
-    case LegalType::Flavor::simple:
-        // Easy case: the type is usable as-is, and we
-        // should just do that.
-        irGlobalConstant->setFullType(legalValueType.getSimple());
-        return LegalVal::simple(irGlobalConstant);
-
-    default:
-        {
-            context->insertBeforeGlobal = irGlobalConstant->getNextInst();
-
-            IRGlobalNameInfo globalNameInfo;
-            globalNameInfo.globalVar = irGlobalConstant;
-            globalNameInfo.counter = 0;
-
-            // TODO: need to handle initializer here!
-
-            UnownedStringSlice nameHint = findNameHint(irGlobalConstant);
-            context->builder->setInsertBefore(irGlobalConstant);
-            LegalVal newVal = declareVars(context, kIROp_GlobalConstant, legalValueType, nullptr, LegalVarChain(), nameHint, irGlobalConstant, &globalNameInfo, context->isSpecialType(irGlobalConstant->getDataType()));
-
-            // Register the new value as the replacement for the old
-            registerLegalizedValue(context, irGlobalConstant, newVal);
-
-            // Remove the old global from the module.
-            irGlobalConstant->removeFromParent();
-            context->replacedInstructions.add(irGlobalConstant);
 
             return newVal;
         }

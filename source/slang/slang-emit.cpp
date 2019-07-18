@@ -271,6 +271,15 @@ String emitEntryPoint(
         // un-specialized IR.
         dumpIRIfEnabled(compileRequest, irModule);
 
+        // Replace any global constants with their values.
+        //
+        replaceGlobalConstants(irModule);
+#if 0
+        dumpIRIfEnabled(compileRequest, irModule, "GLOBAL CONSTANTS REPLACED");
+#endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+
+
         // When there are top-level existential-type parameters
         // to the shader, we need to take the side-band information
         // on how the existential "slots" were bound to concrete

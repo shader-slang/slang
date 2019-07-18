@@ -562,21 +562,42 @@ struct IRGlobalVar : IRGlobalValueWithCode
     }
 };
 
-/// @brief A global constant.
+/// @brief A global shader parameter.
 ///
-/// Represents a global-scope constant value in the IR.
-/// The initializer for the constant is represented by
-/// the code in the basic block(s) nested in this value.
-struct IRGlobalConstant : IRGlobalValueWithCode
-{
-    IR_LEAF_ISA(GlobalConstant)
-};
-
+/// Represents a uniform (as opposed to varying) shader parameter
+/// passed at the global scope (entry-point `uniform` parameters
+/// are encoded as ordinary function parameters.
+///
+/// Note that an `IRGlobalParam` directly represents the value of
+/// the parameter, unlike an `IRGlobalVar`, which represents the
+/// *address* of the value. As a result, global parameters are
+/// immutable, and subject to various SSA simplifications that
+/// do not work for global variables.
+///
 struct IRGlobalParam : IRInst
 {
     IR_LEAF_ISA(GlobalParam)
 };
 
+/// @brief A global constnat.
+///
+/// Represents a global constant that may have a name and linkage.
+/// If it has an operand, then this operand is the value of
+/// the constants. If there is no operand, then the instruction
+/// represents an "extern" constant that will be defined in another
+/// module, and which is thus expected to have linkage.
+///
+struct IRGlobalConstant : IRInst
+{
+    IR_LEAF_ISA(GlobalConstant);
+
+    /// Get the value of this global constant, or null if the value is not known.
+    IRInst* getValue()
+    {
+        return getOperandCount() != 0 ? getOperand(0) : nullptr;
+    }
+
+};
 
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRInst
@@ -957,8 +978,6 @@ struct IRBuilder
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
         IRType* valueType);
-    IRGlobalConstant* createGlobalConstant(
-        IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
     IRWitnessTable* createWitnessTable();
@@ -1174,6 +1193,13 @@ struct IRBuilder
         IRInst* tag);
 
     IRInst* emitBitCast(
+        IRType* type,
+        IRInst* val);
+
+    IRGlobalConstant* emitGlobalConstant(
+        IRType* type);
+
+    IRGlobalConstant* emitGlobalConstant(
         IRType* type,
         IRInst* val);
 

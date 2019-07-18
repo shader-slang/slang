@@ -1140,7 +1140,6 @@ void constructSSA(IRModule* module, IRInst* globalVal)
     {
     case kIROp_Func:
     case kIROp_GlobalVar:
-    case kIROp_GlobalConstant:
         constructSSA(module, (IRGlobalValueWithCode*)globalVal);
 
     default:

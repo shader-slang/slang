@@ -2258,18 +2258,6 @@ namespace Slang
         return globalVar;
     }
 
-    IRGlobalConstant* IRBuilder::createGlobalConstant(
-        IRType* valueType)
-    {
-        IRGlobalConstant* globalConstant = createInst<IRGlobalConstant>(
-            this,
-            kIROp_GlobalConstant,
-            valueType);
-        maybeSetSourceLoc(this, globalConstant);
-        addGlobalValue(this, globalConstant);
-        return globalConstant;
-    }
-
     IRGlobalParam* IRBuilder::createGlobalParam(
         IRType* valueType)
     {
@@ -2961,6 +2949,30 @@ namespace Slang
         auto inst = createInst<IRInst>(
             this,
             kIROp_BitCast,
+            type,
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    IRGlobalConstant* IRBuilder::emitGlobalConstant(
+        IRType* type)
+    {
+        auto inst = createInst<IRGlobalConstant>(
+            this,
+            kIROp_GlobalConstant,
+            type);
+        addInst(inst);
+        return inst;
+    }
+
+    IRGlobalConstant* IRBuilder::emitGlobalConstant(
+        IRType* type,
+        IRInst* val)
+    {
+        auto inst = createInst<IRGlobalConstant>(
+            this,
+            kIROp_GlobalConstant,
             type,
             val);
         addInst(inst);
@@ -3712,7 +3724,6 @@ namespace Slang
         {
         case kIROp_Func:
         case kIROp_GlobalVar:
-        case kIROp_GlobalConstant:
         case kIROp_Generic:
             dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst);
             return;
@@ -4297,7 +4308,7 @@ namespace Slang
         case kIROp_StructField:
         case kIROp_Func:
         case kIROp_Generic:
-        case kIROp_GlobalVar:
+        case kIROp_GlobalVar: // Note: the IRGlobalVar represents the *address*, so only a load/store would have side effects
         case kIROp_GlobalConstant:
         case kIROp_GlobalParam:
         case kIROp_StructKey:
@@ -4469,10 +4480,12 @@ namespace Slang
         switch (val->op)
         {
         case kIROp_WitnessTable:
-        case kIROp_GlobalConstant:
         case kIROp_Func:
         case kIROp_Generic:
             return val->getFirstChild() != nullptr;
+
+        case kIROp_GlobalConstant:
+            return cast<IRGlobalConstant>(val)->getValue() != nullptr;
 
         case kIROp_StructType:
         case kIROp_GlobalVar:

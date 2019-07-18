@@ -4122,7 +4122,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
-        auto subContext = nested.getContet();
+        auto subContext = nested.getContext();
         IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // TODO: if a type alias declaration can have linkage,
@@ -4323,7 +4323,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
-        auto subContext = nested.getContet();
+        auto subContext = nested.getContext();
         emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
 
         // Lower the super-type to force its declaration to be lowered.
@@ -4461,31 +4461,106 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
+    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl, IRGenContext* subContext)
+    {
+        auto builder = subContext->irBuilder;
+        auto initExpr = decl->initExpr;
+
+        // We want to be able to support cases where a global constant is defined in
+        // another module and we should not bind to its value at (front-end) compile
+        // time. We handle this by adding a level of indirection where a global constant
+        // is represented as an IR node with zero or one operands. In the zero-operand
+        // case the node represents a global constant with an unknown value (perhaps
+        // an imported constant), while in the one-operand case the operand gives us
+        // the concrete value to use for the constant.
+        //
+        // Using a level of indirection also gives us a well-defined place to attach
+        // annotation information like name hints, since otherwise two constants
+        // with the same value would map to identical IR nodes.
+        //
+        // TODO: For now we detect whether or not to include the value operand based on
+        // whether we see an initial-value expression in the AST declaration, but
+        // eventually we might base this on whether or not the value should be accessible
+        // to the module we are lowering.
+
+        IRInst* irConstant = nullptr;
+        if(!initExpr)
+        {
+            // If we don't know the value we want to use, then we just create
+            // a global constant IR node with the right type.
+            //
+            auto irType = lowerType(subContext, decl->getType());
+            irConstant = builder->emitGlobalConstant(irType);
+        }
+        else
+        {
+            // We lower the value expression directly, which yields a
+            // global instruction to represent the value. There is
+            // no guarantee that this instruction is unique (e.g.,
+            // if we have two different constants definitions both
+            // with the value `5`, then we might have only a single
+            // instruction to represent `5`.
+            //
+            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+
+            // We construct a distinct IR instruction to represent the
+            // constant itself, with the value as an operand.
+            //
+            irConstant = builder->emitGlobalConstant(
+                irInitVal->getFullType(),
+                irInitVal);
+        }
+
+        // All of the attributes/decorations we can attach
+        // belong on the IR constant node.
+        //
+        addLinkageDecoration(context, irConstant, decl);
+        addNameHint(context, irConstant, decl);
+        addVarDecorations(context, irConstant, decl);
+        getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
+
+        // Register the value that was emitted as the value
+        // for any references to the constant from elsewhere
+        // in the code.
+        //
+        auto constantVal = LoweredValInfo::simple(irConstant);
+        setGlobalValue(context, decl, constantVal);
+
+        return constantVal;
+    }
+
+    LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl)
+    {
+        return lowerConstantDeclCommon(decl, context);
+    }
+
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
     {
+        // A non-`static` global is actually a shader parameter in HLSL.
+        //
+        // TODO: We should probably make that case distinct at the AST
+        // level as well, since global shader parameters are fairly
+        // different from global variables.
+        //
         if(isGlobalShaderParameter(decl))
         {
             return lowerGlobalShaderParam(decl);
+        }
+
+        // A `static const` global is actually a compile-time constant.
+        //
+        if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        {
+            return lowerGlobalConstantDecl(decl);
         }
 
         IRType* varType = lowerType(context, decl->getType());
 
         auto builder = getBuilder();
 
-        IRGlobalValueWithCode* irGlobal = nullptr;
-        LoweredValInfo globalVal;
+        IRGlobalValueWithCode* irGlobal = builder->createGlobalVar(varType);
+        LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);
 
-        // a `static const` global is actually a compile-time constant
-        if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
-        {
-            irGlobal = builder->createGlobalConstant(varType);
-            globalVal = LoweredValInfo::simple(irGlobal);
-        }
-        else
-        {
-            irGlobal = builder->createGlobalVar(varType);
-            globalVal = LoweredValInfo::ptr(irGlobal);
-        }
         addLinkageDecoration(context, irGlobal, decl);
         addNameHint(context, irGlobal, decl);
 
@@ -4646,7 +4721,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
-        IRGenContext* getContet() { return &subContextStorage; }
+        IRGenContext* getContext() { return &subContextStorage; }
     };
 
     LoweredValInfo lowerFunctionStaticConstVarDecl(
@@ -4659,37 +4734,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
 
         subBuilder->setInsertInto(subBuilder->getFunc()->getParent());
 
-        IRType* subVarType = lowerType(subContext, decl->getType());
-
-        IRGlobalConstant* irConstant = subBuilder->createGlobalConstant(subVarType);
-        addVarDecorations(subContext, irConstant, decl);
-        addNameHint(context, irConstant, decl);
-        maybeSetRate(context, irConstant, decl);
-        subBuilder->addHighLevelDeclDecoration(irConstant, decl);
-
-        LoweredValInfo constantVal = LoweredValInfo::ptr(irConstant);
-        setValue(context, decl, constantVal);
-
-        if( auto initExpr = decl->initExpr )
-        {
-            NestedContext nestedInitContext(this);
-            auto initBuilder = nestedInitContext.getBuilder();
-            auto initContext = nestedInitContext.getContet();
-
-            initBuilder->setInsertInto(irConstant);
-
-            IRBlock* entryBlock = initBuilder->emitBlock();
-            initBuilder->setInsertInto(entryBlock);
-
-            LoweredValInfo initVal = lowerRValueExpr(initContext, initExpr);
-            initBuilder->emitReturn(getSimpleVal(initContext, initVal));
-        }
-
-        return constantVal;
+        return lowerConstantDeclCommon(decl, subContext);
     }
 
     LoweredValInfo lowerFunctionStaticVarDecl(
@@ -4703,7 +4752,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // of the outer declarations is generic.
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
         subBuilder->setInsertInto(subBuilder->getModule()->getModuleInst());
         emitOuterGenerics(subContext, decl, decl);
 
@@ -4773,7 +4822,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // variable need to be generic as well!
             NestedContext nestedBoolContext(this);
             auto boolBuilder = nestedBoolContext.getBuilder();
-            auto boolContext = nestedBoolContext.getContet();
+            auto boolContext = nestedBoolContext.getContext();
             boolBuilder->setInsertInto(boolBuilder->getModule()->getModuleInst());
             emitOuterGenerics(boolContext, decl, decl);
 
@@ -4909,7 +4958,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
 
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
@@ -4940,7 +4989,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a function that constructs the value given arguments.
         //
         NestedContext nestedContext(this);
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
 
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
@@ -4960,7 +5009,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
         emitOuterGenerics(subContext, decl, decl);
 
         // An `enum` declaration will currently lower directly to its "tag"
@@ -4997,7 +5046,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
 
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
@@ -5527,7 +5576,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContet();
+        auto subContext = nestedContext.getContext();
 
         // The actual `IRFunction` that we emit needs to be nested
         // inside of one `IRGeneric` for every outer `GenericDecl`

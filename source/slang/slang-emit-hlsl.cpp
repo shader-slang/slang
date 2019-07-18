@@ -460,7 +460,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
     _emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
 
-bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const EmitOpInfo& inOuterPrec)
+bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->op)
     {
@@ -480,7 +480,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit(") ");
-                emitOperand(inst->getOperand(0), mode, rightSide(outerPrec, prec));
+                emitOperand(inst->getOperand(0), rightSide(outerPrec, prec));
 
                 maybeCloseParens(needClose);
                 // Handled
@@ -509,7 +509,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, IREmitMode mode, const
             }
 
             m_writer->emit("(");
-            emitOperand(inst->getOperand(0), mode, getInfo(EmitOp::General));
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
