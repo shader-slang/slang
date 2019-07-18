@@ -24,4 +24,13 @@ namespace Slang
         ProgramLayout*          programLayout,
         CodeGenTarget           target,
         TargetRequest*          targetReq);
+
+    // Replace any global constants in the IR module with their
+    // definitions, if possible.
+    //
+    // This pass should always be run shortly after linking the
+    // IR, to ensure that constants with identical values are
+    // treated as identical for the purposes of specialization.
+    //
+    void replaceGlobalConstants(IRModule* module);
 }

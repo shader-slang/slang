@@ -432,6 +432,29 @@ IRGlobalParam* cloneGlobalParamImpl(
     return clonedVal;
 }
 
+IRGlobalConstant* cloneGlobalConstantImpl(
+    IRSpecContextBase*              context,
+    IRBuilder*                      builder,
+    IRGlobalConstant*               originalVal,
+    IROriginalValuesForClone const& originalValues)
+{
+    auto clonedType = cloneType(context, originalVal->getFullType());
+    IRGlobalConstant* clonedVal = nullptr;
+    if(auto originalInitVal = originalVal->getValue())
+    {
+        auto clonedInitVal = cloneValue(context, originalInitVal);
+        clonedVal = builder->emitGlobalConstant(clonedType, clonedInitVal);
+    }
+    else
+    {
+        clonedVal = builder->emitGlobalConstant(clonedType);
+    }
+
+    cloneSimpleGlobalValueImpl(context, originalVal, originalValues, clonedVal);
+
+    return clonedVal;
+}
+
 IRGeneric* cloneGenericImpl(
     IRSpecContextBase*              context,
     IRBuilder*                      builder,
@@ -948,6 +971,9 @@ IRInst* cloneInst(
     case kIROp_GlobalParam:
         return cloneGlobalParamImpl(context, builder, cast<IRGlobalParam>(originalInst), originalValues);
 
+    case kIROp_GlobalConstant:
+        return cloneGlobalConstantImpl(context, builder, cast<IRGlobalConstant>(originalInst), originalValues);
+
     case kIROp_WitnessTable:
         return cloneWitnessTableImpl(context, builder, cast<IRWitnessTable>(originalInst), originalValues);
 
@@ -1360,6 +1386,57 @@ LinkedIR linkIR(
     linkedIR.module = state->irModule;
     linkedIR.entryPoint = irEntryPoint;
     return linkedIR;
+}
+
+struct ReplaceGlobalConstantsPass
+{
+    void process(IRModule* module)
+    {
+        _processInstRec(module->getModuleInst());
+
+        for(auto inst : instsToRemove)
+            inst->removeAndDeallocate();
+    }
+
+    List<IRInst*> instsToRemove;
+
+    void _processInstRec(IRInst* inst)
+    {
+        if( auto globalConstant = as<IRGlobalConstant>(inst) )
+        {
+            if( auto val = globalConstant->getValue() )
+            {
+                // Attempt to transfer the name hint from the global
+                // constant to its value. If multiple constants
+                // have the same value, then the first one will "win"
+                // and transfer its name over.
+                //
+                if( auto nameHint = globalConstant->findDecoration<IRNameHintDecoration>() )
+                {
+                    if( !val->findDecoration<IRNameHintDecoration>() )
+                    {
+                        nameHint->removeFromParent();
+                        nameHint->insertAtStart(val);
+                    }
+                }
+
+                // Replace the global constant
+                globalConstant->replaceUsesWith(val);
+                instsToRemove.add(globalConstant);
+            }
+        }
+
+        for( auto child : inst->getDecorationsAndChildren() )
+        {
+            _processInstRec(child);
+        }
+    }
+};
+
+void replaceGlobalConstants(IRModule* module)
+{
+    ReplaceGlobalConstantsPass pass;
+    pass.process(module);
 }
 
 

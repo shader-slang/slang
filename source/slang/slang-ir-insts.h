@@ -579,6 +579,25 @@ struct IRGlobalParam : IRInst
     IR_LEAF_ISA(GlobalParam)
 };
 
+/// @brief A global constnat.
+///
+/// Represents a global constant that may have a name and linkage.
+/// If it has an operand, then this operand is the value of
+/// the constants. If there is no operand, then the instruction
+/// represents an "extern" constant that will be defined in another
+/// module, and which is thus expected to have linkage.
+///
+struct IRGlobalConstant : IRInst
+{
+    IR_LEAF_ISA(GlobalConstant);
+
+    /// Get the value of this global constant, or null if the value is not known.
+    IRInst* getValue()
+    {
+        return getOperandCount() != 0 ? getOperand(0) : nullptr;
+    }
+
+};
 
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRInst
@@ -1174,6 +1193,13 @@ struct IRBuilder
         IRInst* tag);
 
     IRInst* emitBitCast(
+        IRType* type,
+        IRInst* val);
+
+    IRGlobalConstant* emitGlobalConstant(
+        IRType* type);
+
+    IRGlobalConstant* emitGlobalConstant(
         IRType* type,
         IRInst* val);
 
