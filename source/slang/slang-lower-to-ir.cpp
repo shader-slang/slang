@@ -4463,49 +4463,70 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl, IRGenContext* subContext)
     {
+        auto builder = subContext->irBuilder;
         auto initExpr = decl->initExpr;
+
+        // We want to be able to support cases where a global constant is defined in
+        // another module and we should not bind to its value at (front-end) compile
+        // time. We handle this by adding a level of indirection where a global constant
+        // is represented as an IR node with zero or one operands. In the zero-operand
+        // case the node represents a global constant with an unknown value (perhaps
+        // an imported constant), while in the one-operand case the operand gives us
+        // the concrete value to use for the constant.
+        //
+        // Using a level of indirection also gives us a well-defined place to attach
+        // annotation information like name hints, since otherwise two constants
+        // with the same value would map to identical IR nodes.
+        //
+        // TODO: For now we detect whether or not to include the value operand based on
+        // whether we see an initial-value expression in the AST declaration, but
+        // eventually we might base this on whether or not the value should be accessible
+        // to the module we are lowering.
+
+        IRInst* irConstant = nullptr;
         if(!initExpr)
         {
-            // TODO: what to do in this case?
-            return LoweredValInfo();
+            // If we don't know the value we want to use, then we just create
+            // a global constant IR node with the right type.
+            //
+            auto irType = lowerType(subContext, decl->getType());
+            irConstant = builder->emitGlobalConstant(irType);
         }
-
-        LoweredValInfo initVal = lowerRValueExpr(subContext, decl->initExpr);
-
-        switch(initVal.flavor)
+        else
         {
-        case LoweredValInfo::Flavor::Simple:
-        case LoweredValInfo::Flavor::Subscript:
-            {
-                // If the lowered value is a full instruction,
-                // then we will attach whatever extended information
-                // from the declaration that we can.
-                //
-                // TODO: We might want to introduce a distinct
-                // IR node to represent the constant, just with
-                // an operand for the value, and then simplify
-                // it away in later passes rather than handle
-                // things this way.
-                //
-                auto irInst = initVal.val;
-                addLinkageDecoration(context, irInst, decl);
-                addNameHint(context, irInst, decl);
-                addVarDecorations(context, irInst, decl);
-                getBuilder()->addHighLevelDeclDecoration(irInst, decl);
-            }
-            break;
+            // We lower the value expression directly, which yields a
+            // global instruction to represent the value. There is
+            // no guarantee that this instruction is unique (e.g.,
+            // if we have two different constants definitions both
+            // with the value `5`, then we might have only a single
+            // instruction to represent `5`.
+            //
+            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
-        default:
-            break;
+            // We construct a distinct IR instruction to represent the
+            // constant itself, with the value as an operand.
+            //
+            irConstant = builder->emitGlobalConstant(
+                irInitVal->getFullType(),
+                irInitVal);
         }
+
+        // All of the attributes/decorations we can attach
+        // belong on the IR constant node.
+        //
+        addLinkageDecoration(context, irConstant, decl);
+        addNameHint(context, irConstant, decl);
+        addVarDecorations(context, irConstant, decl);
+        getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
         // in the code.
         //
-        setGlobalValue(context, decl, initVal);
+        auto constantVal = LoweredValInfo::simple(irConstant);
+        setGlobalValue(context, decl, constantVal);
 
-        return initVal;
+        return constantVal;
     }
 
     LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl)

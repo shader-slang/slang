@@ -743,6 +743,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     //
     case kIROp_Var:
     case kIROp_GlobalVar:
+    case kIROp_GlobalConstant:
     case kIROp_GlobalParam:
     case kIROp_Param:
     case kIROp_Func:
@@ -1958,6 +1959,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
         }
+        break;
+
+    case kIROp_GlobalConstant:
+        emitOperand(inst->getOperand(0), outerPrec);
         break;
 
     default:
