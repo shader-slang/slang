@@ -1,0 +1,110 @@
+result code = 0
+standard error = {
+}
+standard output = {
+#pragma pack_matrix(column_major)
+
+#line 10 "tests/cross-compile/c-cross-compile.slang"
+int test_0(int val_0)
+{
+    int c_0;
+    int c_1;
+    int c_2;
+    int _S1;
+
+#line 14
+    if(val_0 > 1)
+    {
+        c_0 = 2;
+    }
+    else
+    {
+        c_0 = 0;
+    }
+
+#line 19
+    if(c_0 == 0)
+    {
+        if((bool) (val_0 & 1))
+        {
+            c_1 = 3;
+        }
+        else
+        {
+            c_1 = c_0;
+        }
+        c_2 = c_1;
+    }
+    else
+    {
+        c_2 = c_0;
+    }
+
+#line 27
+    switch(c_2)
+    {
+    case 0:
+        {
+            _S1 = 1;
+            break;
+        }
+    case 2:
+        {
+            _S1 = 2;
+            break;
+        }
+    case 3:
+        {
+            _S1 = 3;
+            break;
+        }
+    default:
+        {
+            _S1 = -1;
+            break;
+        }
+    }
+
+#line 46
+    return (_S1 << 4) + (int) c_2;
+}
+
+
+#line 70
+RWStructuredBuffer<int > outputBuffer_0 : register(u0);
+
+
+#line 53
+[numthreads(4, 1, 1)]
+void computeMain(vector<uint,3> dispatchThreadID_0 : SV_DISPATCHTHREADID)
+{
+
+#line 55
+    uint tid_0 = dispatchThreadID_0.x;
+
+#line 61
+    vector<float,3> vec2_0 = sin(mul(vector<float,2>((float) (tid_0 + (uint) 1), (float) (tid_0 + (uint) 2)), matrix<float,2,3> (vector<float,3>((float) 0, (float) 1, (float) 2), vector<float,3>((float) 3, (float) 4, (float) 5))));
+
+    vector<float,3> vec2_1 = vec2_0 + -vec2_0.zyx * (float) 2;
+
+
+
+    int _S2 = (int) tid_0;
+
+#line 67
+    bool _S3 = any(vec2_1 > (float) 0);
+    int val_1 = test_0((bool) (_S2 + (int) _S3) ? 1 : 0);
+
+    float _S4 = dot(vec2_1, vec2_1);
+
+#line 70
+    int _S5 = val_1 + (int) _S4;
+
+#line 70
+    outputBuffer_0[tid_0] = _S5;
+
+#line 53
+    return;
+}
+
+}
