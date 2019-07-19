@@ -1359,9 +1359,9 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
 
 void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
+    // We don't need to emit anything here.. just ignore
     SLANG_UNUSED(varDecl);
     SLANG_UNUSED(type);
-    SLANG_ASSERT(!"Not implemented");
 }
 
 void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
