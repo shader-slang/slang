@@ -1,4 +1,5 @@
-//TEST(smoke):CPP_COMPILER_SHARED_LIBRARY: 
+//TEST_DISABLED(smoke):CPP_COMPILER_SHARED_LIBRARY: 
+// Disabled for now because breaks on some CI test targets
 
 //#include <slang.h>
 
