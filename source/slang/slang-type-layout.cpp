@@ -346,6 +346,17 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Conform to C/C++ size is adjusted to the largest alignment
+        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -578,9 +589,112 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
 };
 
+struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+};
+
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
+CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 
+// CPU case
+
+struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
+{
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    {
+        switch (kind)
+        {
+            case ShaderParameterKind::ConstantBuffer:
+                // It's a pointer to the actual uniform data
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::MutableTexture:
+            case ShaderParameterKind::TextureUniformBuffer:
+            case ShaderParameterKind::Texture:
+                // It's a pointer to a texture interface 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                
+            case ShaderParameterKind::StructuredBuffer:            
+            case ShaderParameterKind::MutableStructuredBuffer:
+                // It's a ptr and a size of the amount of elements
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+
+            case ShaderParameterKind::RawBuffer:
+            case ShaderParameterKind::Buffer:
+            case ShaderParameterKind::MutableRawBuffer:
+            case ShaderParameterKind::MutableBuffer:
+                // It's a pointer and a size in bytes
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+
+            case ShaderParameterKind::SamplerState:
+                // It's a pointer
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+ 
+            case ShaderParameterKind::TextureSampler:
+            case ShaderParameterKind::MutableTextureSampler:
+            case ShaderParameterKind::InputRenderTarget:
+                // TODO: how to handle these?
+            default:
+                SLANG_UNEXPECTED("unhandled shader parameter kind");
+                UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+};
+
+
+
+static CPUObjectLayoutRulesImpl kCPUObjectLayoutRulesImpl;
+static CPULayoutRulesImpl kCPULayoutRulesImpl;
+
+LayoutRulesImpl kCPUConstantBufferLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLConstantBufferLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPUStructuredBufferLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLStructuredBufferLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPUVaryingInputLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLVaryingInputLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPUVaryingOutputLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLVaryingOutputLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPURayPayloadParameterLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLRayPayloadParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPUCallablePayloadParameterLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLCallablePayloadParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPUHitAttributesParameterLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
+
+
+
+
+LayoutRulesImpl kCPULayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
 
 // GLSL cases
 
@@ -654,7 +768,7 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
-//
+// HLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -717,7 +831,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-//
+// HLSL Family
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -781,7 +895,61 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kHLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
+// CPU Family
 
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules()
+{
+    return &kCPUConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPUConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // Not clear - just use similar to CPU 
+    return &kCPUConstantBufferLayoutRulesImpl_;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    // Just following HLSLs lead for the moment
+    return &kCPUConstantBufferLayoutRulesImpl_;
+}
 
 //
 
@@ -820,13 +988,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     {
+        // For now lets use some fairly simple CPU binding rules
+
         // We just need to decide here what style of layout is appropriate, in terms of memory
         // and binding. That in terms of the actual binding that will be injected into functions
         // in the form of a BindContext. For now we'll go with HLSL layout -
         // that we may want to rethink that with the use of arrays and binding VK style binding might be
         // more appropriate in some ways.
 
-        return &kHLSLLayoutRulesFamilyImpl;
+        return &kCPULayoutRulesFamilyImpl;
     }
 
     default:
