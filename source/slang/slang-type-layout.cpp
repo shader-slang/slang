@@ -350,6 +350,27 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        switch (baseType)
+        {
+            case BaseType::Bool:
+            {
+                // TODO(JS): Much like ptr this is a problem - in knowing how to return this value. In the past it's been a word
+                // on some compilers for example.
+                // On checking though current compilers (clang, g++, visual studio) it is a single byte
+                return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1, 1 );
+            }
+
+            default: return Super::GetScalarLayout(baseType);
+        }
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        return Super::BeginStructLayout();
+    }
+
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to C/C++ size is adjusted to the largest alignment
@@ -661,39 +682,8 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 static CPUObjectLayoutRulesImpl kCPUObjectLayoutRulesImpl;
 static CPULayoutRulesImpl kCPULayoutRulesImpl;
 
-LayoutRulesImpl kCPUConstantBufferLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLConstantBufferLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPUStructuredBufferLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLStructuredBufferLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPUVaryingInputLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLVaryingInputLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPUVaryingOutputLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLVaryingOutputLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPURayPayloadParameterLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLRayPayloadParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPUCallablePayloadParameterLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLCallablePayloadParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kCPUHitAttributesParameterLayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
-};
-
-
-
-
 LayoutRulesImpl kCPULayoutRulesImpl_ = {
-    &kGLSLLayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+    &kCPULayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
 };
 
 // GLSL cases
@@ -899,12 +889,12 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules()
 {
-    return &kCPUConstantBufferLayoutRulesImpl_;
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
-    return &kCPUConstantBufferLayoutRulesImpl_;
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
@@ -931,7 +921,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules()
 {
     // Not clear - just use similar to CPU 
-    return &kCPUConstantBufferLayoutRulesImpl_;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getRayPayloadParameterRules()
 {
@@ -948,7 +938,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getHitAttributesParameterRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     // Just following HLSLs lead for the moment
-    return &kCPUConstantBufferLayoutRulesImpl_;
+    return &kCPULayoutRulesImpl_;
 }
 
 //

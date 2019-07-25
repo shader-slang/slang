@@ -6,7 +6,7 @@ struct Thing
     float b;
 };
 
-//ConstantBuffer<Thing> thing;
+ConstantBuffer<Thing> thing;
 //Texture2D<float> tex;
 
 [numthreads(4, 1, 1)]

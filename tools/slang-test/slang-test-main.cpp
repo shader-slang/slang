@@ -1314,13 +1314,12 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
 
-    auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    cmdLine.addArg(filePath999);
+    cmdLine.addArg(input.filePath);
 
     for (auto arg : input.testOptions->args)
     {

@@ -392,7 +392,7 @@ public:
 typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
-    HasSemantic = 1 << 1
+    HasSemantic = 1 << 0
 };
 
 // A reified layout for a particular variable, field, etc.
