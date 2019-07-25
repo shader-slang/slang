@@ -369,7 +369,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     if (options.sourceType == SourceType::CPP)
     {
-        cmdLine.addArg("-std=c++11");
+        // Need C++14 for partial specialization
+        cmdLine.addArg("-std=c++14");
     }
 
     // Use shared libraries
