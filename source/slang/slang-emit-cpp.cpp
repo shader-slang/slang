@@ -10,6 +10,58 @@
 
 #include <assert.h>
 
+/*
+ABI
+---
+
+In terms of ABI we need to discuss the variety of variables/resources that need to be defined by the host for appropriate execution
+of the output code. 
+
+https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-variable-syntax
+
+Broadly we could catagorise these as..
+
+1) Varying entry point parameters (or 'varying')
+2) Uniform entry point parameters
+3) Uniform globals 
+4) Thread shared (such as group shared or 'static') or ('thread shared')
+
+On 2 and 3 they are effectively the same, and so for now 2+3 will be referred to together as 'uniforms'.
+They should be copied into a single structure that has a well known order. 
+
+On 1 these are parameters that vary on an invocation. Thus a caller might call many times with same globals structure
+and different varying entry point parameters.
+
+So in order of rate of change
+
+1 : Probably change on every invocation (in the future such an invocation might be behind the API)
+2 + 3 : Changes per group of 'threads' executed together
+4 : Does not change between invocations 
+
+In terms of the ABI therefore we want to be able to execute with pointers to all three of these entries. You *could* combine
+the pointers to 'uniforms' and 'varying' into the 'thread shared', and lose a pointer dereference. Depending how things go we
+may try this. 
+
+To make this work therefore we need to construct 3 structures lets call them
+
+UniformState
+VaryingState
+ThreadSharedState
+
+We can stick pointers to these in a structure lets call it 'Context'. On C++ we could make all the functions 'methods', and then
+we don't need to pass around the context as a parameter. For C this doesn't work, so it might be worth just biting the bullet and
+just adding the context to the output.
+
+Issues:
+
+* How does this work with layout? The layout if it's going to specify offsets will need to know that they will be allocated into each
+of these structs AND that the order they are placed needs to be consistent.
+
+* When variables access one of these sources, we will now need code that will add the dereferencing. Hopefully this can be done by looking
+at the type of the variable, and then adding the appropriate access via part of emit.
+
+*/
+
 namespace Slang {
 
 static const char s_elemNames[] = "xyzw";
