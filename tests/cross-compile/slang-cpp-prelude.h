@@ -504,6 +504,19 @@ struct Vector<T, 4>
     T x, y, z, w;
 };
 
+
+typedef Vector<float, 2> float2;
+typedef Vector<float, 3> float3;
+typedef Vector<float, 4> float4;
+
+typedef Vector<int32_t, 2> int2;
+typedef Vector<int32_t, 3> int3;
+typedef Vector<int32_t, 4> int4;
+
+typedef Vector<uint32_t, 2> uint2;
+typedef Vector<uint32_t, 3> uint3;
+typedef Vector<uint32_t, 4> uint4;
+
 template <typename T, int ROWS, int COLS>
 struct Matrix
 {
@@ -546,23 +559,23 @@ struct ByteAddressBuffer
         assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
         return data[index >> 2]; 
     }
-    Vector<uint32_t, 2> Load2(size_t index) const 
+    uint2 Load2(size_t index) const 
     { 
         assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 2>{data[dataIdx], data[dataIdx + 1]}; 
+        return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
-    Vector<uint32_t, 3> Load3(size_t index) const 
+    uint3 Load3(size_t index) const 
     { 
         assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 3>{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
+        return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
-    Vector<uint32_t, 4> Load4(size_t index) const 
+    uint4 Load4(size_t index) const 
     { 
         assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 4>{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
+        return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     
     const uint32_t* data;
@@ -581,23 +594,23 @@ struct RWByteAddressBuffer
         assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
         return data[index >> 2]; 
     }
-    Vector<uint32_t, 2> Load2(size_t index) const 
+    uint2 Load2(size_t index) const 
     { 
         assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 2>{data[dataIdx], data[dataIdx + 1]}; 
+        return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
-    Vector<uint32_t, 3> Load3(size_t index) const 
+    uint3 Load3(size_t index) const 
     { 
         assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 3>{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
+        return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
-    Vector<uint32_t, 4> Load4(size_t index) const 
+    uint4 Load4(size_t index) const 
     { 
         assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
-        return Vector<uint32_t, 4>{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
+        return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     
     void Store(size_t index, uint32_t v) const 
@@ -605,14 +618,14 @@ struct RWByteAddressBuffer
         assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
         data[index >> 2] = v; 
     }
-    void Store2(size_t index, Vector<uint32_t, 2> v) const 
+    void Store2(size_t index, uint2 v) const 
     { 
         assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
     }
-    void Store3(size_t index, Vector<uint32_t, 3> v) const 
+    void Store3(size_t index, uint3 v) const 
     { 
         assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
@@ -620,7 +633,7 @@ struct RWByteAddressBuffer
         data[dataIdx + 1] = v.y;
         data[dataIdx + 2] = v.z;
     }
-    void Store4(size_t index, Vector<uint32_t, 4> v) const 
+    void Store4(size_t index, uint4 v) const 
     { 
         assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
@@ -634,18 +647,43 @@ struct RWByteAddressBuffer
     size_t sizeInBytes; //< Must be multiple of 4 
 };
 
-// Currently not implemented
-struct ITexture;
+struct ISamplerState;
+struct ISamplerComparisonState;
+
+struct SamplerState
+{
+    ISamplerState* state;
+};
+
+struct SamplerComparisonState
+{
+    ISamplerComparisonState* state;
+};
 
 // Texture
+
+struct ITexture2D
+{
+    virtual void Load(const int3& v, void* out) = 0;
+    virtual void Sample(SamplerState samplerState, const float2& loc, void* out) = 0;
+};
+
 template <typename T>
 struct Texture2D
 {
-    T Load(const Vector<int32_t, 3>& v) const { return T{0}; }
+    T Load(const int3& v) const { T out; texture->Load(v, &out); return out; }
+    T Sample(SamplerState samplerState, const float2& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
     
-    ITexture* texture;              
+    ITexture2D* texture;              
 };
 
+/* Varing input for Compute */
+
+struct ComputeVaryingInput
+{
+    int3 groupID;
+    int3 groupThreadID;
+};
 
 // ----------------------------- F32 -----------------------------------------
 

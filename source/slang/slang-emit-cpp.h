@@ -181,6 +181,7 @@ protected:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
+    virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec);
 

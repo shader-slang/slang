@@ -175,7 +175,7 @@ public:
     String getName(IRInst* inst);
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
-    void emitSimpleValue(IRInst* inst);
+    void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
     
     bool shouldFoldInstIntoUseSites(IRInst* inst);
 
@@ -335,6 +335,7 @@ public:
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
+    virtual void emitSimpleValueImpl(IRInst* inst);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

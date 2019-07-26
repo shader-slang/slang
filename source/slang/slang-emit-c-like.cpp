@@ -705,7 +705,7 @@ void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
     }
 }
 
-void CLikeSourceEmitter::emitSimpleValue(IRInst* inst)
+void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch(inst->op)
     {

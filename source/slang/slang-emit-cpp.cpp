@@ -19,12 +19,20 @@ of the output code.
 
 https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-variable-syntax
 
-Broadly we could catagorise these as..
+Broadly we could categorize these as..
 
 1) Varying entry point parameters (or 'varying')
 2) Uniform entry point parameters
 3) Uniform globals 
-4) Thread shared (such as group shared or 'static') or ('thread shared')
+4) Thread shared (such as group shared) or ('thread shared')
+5) Thread local ('static')
+
+If we can invoke a bunch of threads as a single invocation we could effectively have the ThreadShared not part of the ABI, but something
+that is say allocated on the stack before the threads are kicked off. If we kick of threads individually then we would need to pass this
+in as part of ABI. NOTE that it isn't right in so far as memory barriers etc couldn't work, as each thread would run to completion, but
+we aren't going to worry about barriers for now. 
+
+On 1 - there could be potentially input and outputs (perhaps in out?). On CPU I guess that's fine. 
 
 On 2 and 3 they are effectively the same, and so for now 2+3 will be referred to together as 'uniforms'.
 They should be copied into a single structure that has a well known order. 
@@ -32,21 +40,24 @@ They should be copied into a single structure that has a well known order.
 On 1 these are parameters that vary on an invocation. Thus a caller might call many times with same globals structure
 and different varying entry point parameters.
 
+On 5 - This would be a global that can be set and then accessed within the context of single thread
+
 So in order of rate of change
 
 1 : Probably change on every invocation (in the future such an invocation might be behind the API)
 2 + 3 : Changes per group of 'threads' executed together
 4 : Does not change between invocations 
+5 : Could be placed on the stack, and so not necessarily part of the ABI
 
-In terms of the ABI therefore we want to be able to execute with pointers to all three of these entries. You *could* combine
-the pointers to 'uniforms' and 'varying' into the 'thread shared', and lose a pointer dereference. Depending how things go we
-may try this. 
+For now we are only going to implement something 'Compute shader'-like. Doing so makes the varying parameter always the same.
 
-To make this work therefore we need to construct 3 structures lets call them
+So for now we would need to pass in
 
-UniformState
-VaryingState
-ThreadSharedState
+ComputeVaryingInput - Fixed because we are doing compute shader
+Uniform             - All the uniform data in a big blob, both from uniform entry point parameters, and uniform globals
+
+When called we can have a structure that holds the thread local variables, and these two pointers.
+
 
 We can stick pointers to these in a structure lets call it 'Context'. On C++ we could make all the functions 'methods', and then
 we don't need to pass around the context as a parameter. For C this doesn't work, so it might be worth just biting the bullet and
@@ -547,6 +558,8 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
 
             return m_slicePool.add(builder);
         }
+        case kIROp_SamplerStateType:                return m_slicePool.add("SamplerState");
+        case kIROp_SamplerComparisonStateType:      return m_slicePool.add("SamplerComparisonState");
         default:
         {
             if (IRBasicType::isaImpl(type->op))
@@ -572,6 +585,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
         }
     }
 
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for C/C++ emit");
     return StringSlicePool::kNullHandle;
 }
 
@@ -1546,6 +1560,26 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
     }
 
     m_writer->emit("SLANG_PRELUDE_EXPORT\n");
+}
+
+void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
+{
+    switch (inst->op)
+    {
+        // TODO(JS): This isn't strictly speaking right. In HLSL the default float type is float32.
+        // Here I unconditionally make all literals float32. Really we'd want some other pass to figure
+        // the literal needs to be cast to float (for example to match with whats required for the signiture of
+        // something being called).
+        //
+        // Note that such coercion could be argued as wrong as it would mean that coercions between all float types
+        // would be acceptable. 
+
+        case kIROp_FloatLit:
+            m_writer->emit(((IRConstant*)inst)->value.floatVal);
+            m_writer->emitChar('f');
+            break;
+        default: Super::emitSimpleValueImpl(inst);
+    }
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)

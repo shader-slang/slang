@@ -1,4 +1,4 @@
-//TEST:CPP_COMPILER_COMPILE: -profile cs_5_0 -entry computeMain -target cpp
+//TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 
 struct Thing
 {
@@ -28,14 +28,7 @@ void computeMain(
 {
     uint tid = dispatchThreadID.x;
 
-    // TODO(JS): Doesn't emit correctly on c++ becomes...
-    // Vector<float, 2> loc_0 = Vector<float, 2>{Vector<uint32_t, 2>{dispatchThreadID_0.x, dispatchThreadID_0.y}} * 0.50000000000000000000f;
-    //float2 loc = dispatchThreadID.xy * 0.5f;
-
-    float2 loc = float2(dispatchThreadID.x * 0.5f, dispatchThreadID.y * 0.5f);
-
     float v = s_paramBlock.tex.Load(int3(tid, tid, 0));
-    float s = s_paramBlock.tex.Sample(s_paramBlock.sampler, loc);
    
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s); // + thing.a;
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v); // + thing.a;
 }
