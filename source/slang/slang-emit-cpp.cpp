@@ -353,6 +353,54 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
     return m_slicePool.getSlice(handle);
 }
 
+SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
+{
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            outName << "RW";
+            break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            outName << "RasterizerOrdered";
+            break;
+        case SLANG_RESOURCE_ACCESS_APPEND:
+            outName << "Append";
+            break;
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+            outName << "Consume";
+            break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
+            return SLANG_FAIL;
+    }
+
+    switch (texType->GetBaseShape())
+    {
+        case TextureFlavor::Shape::Shape1D:		outName << "Texture1D";		break;
+        case TextureFlavor::Shape::Shape2D:		outName << "Texture2D";		break;
+        case TextureFlavor::Shape::Shape3D:		outName << "Texture3D";		break;
+        case TextureFlavor::Shape::ShapeCube:	outName << "TextureCube";	break;
+        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+            return SLANG_FAIL;
+    }
+
+    if (texType->isMultisample())
+    {
+        outName << "MS";
+    }
+    if (texType->isArray())
+    {
+        outName << "Array";
+    }
+    outName << "<" << _getTypeName(texType->getElementType()) << " >";
+
+    return SLANG_OK;
+}
+
 StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
 {
     switch (type->op)
@@ -453,6 +501,21 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             {
                 return m_slicePool.add(getBuiltinTypeName(type->op));
             }
+
+            if (auto texType = as<IRTextureTypeBase>(type))
+            {
+                // We don't support TextureSampler, so ignore that
+                if (texType->op != kIROp_TextureSamplerType)
+                {
+                    StringBuilder builder;
+                    if (SLANG_FAILED(_calcTextureTypeName(texType, builder)))
+                    {
+                        return StringSlicePool::kNullHandle;
+                    }
+                    return m_slicePool.add(builder);
+                }
+            }
+
             break;
         }
     }
@@ -1383,9 +1446,16 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
 
 void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    // We don't need to emit anything here.. just ignore
-    SLANG_UNUSED(varDecl);
-    SLANG_UNUSED(type);
+    // Output global parameters
+    auto varLayout = getVarLayout(varDecl);
+    SLANG_RELEASE_ASSERT(varLayout);
+
+    // TODO(JS): Do we need to look at layout in terms of determining the order of output?
+  
+    auto elementType = type->getElementType();
+
+    emitType(elementType, getName(varDecl));
+    m_writer->emit(";\n");
 }
 
 void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)

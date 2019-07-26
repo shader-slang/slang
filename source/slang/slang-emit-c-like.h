@@ -86,13 +86,13 @@ public:
         EmitVarChain*   next;
 
         EmitVarChain()
-            : varLayout(0)
-            , next(0)
+            : varLayout(nullptr)
+            , next(nullptr)
         {}
 
         EmitVarChain(VarLayout* varLayout)
             : varLayout(varLayout)
-            , next(0)
+            , next(nullptr)
         {}
 
         EmitVarChain(VarLayout* varLayout, EmitVarChain* next)

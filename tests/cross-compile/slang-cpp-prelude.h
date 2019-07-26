@@ -634,6 +634,19 @@ struct RWByteAddressBuffer
     size_t sizeInBytes; //< Must be multiple of 4 
 };
 
+// Currently not implemented
+struct ITexture;
+
+// Texture
+template <typename T>
+struct Texture2D
+{
+    T Load(const Vector<int32_t, 3>& v) const { return T{0}; }
+    
+    ITexture* texture;              
+};
+
+
 // ----------------------------- F32 -----------------------------------------
 
 union Union32 

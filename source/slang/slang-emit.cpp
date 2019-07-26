@@ -307,7 +307,7 @@ String emitEntryPoint(
         // parameters of a shader entry point and move them into
         // the global scope instead.
         //
-        moveEntryPointUniformParamsToGlobalScope(irModule);
+        moveEntryPointUniformParamsToGlobalScope(irModule, target);
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif

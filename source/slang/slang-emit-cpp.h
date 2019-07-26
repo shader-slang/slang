@@ -216,6 +216,8 @@ protected:
     UnownedStringSlice _getTypeName(IRType* type);
     StringSlicePool::Handle _calcTypeName(IRType* type);
 
+    SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
+
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
 
