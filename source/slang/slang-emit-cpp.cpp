@@ -1562,6 +1562,84 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
     m_writer->emit("SLANG_PRELUDE_EXPORT\n");
 }
 
+void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
+    auto resultType = func->getResultType();
+
+    auto name = getFuncName(func);
+
+    // Deal with decorations that need
+    // to be emitted as attributes
+    auto entryPointLayout = asEntryPoint(func);
+    if (entryPointLayout)
+    {
+        StringBuilder prefixName;
+        prefixName << "_" << name;
+
+        m_writer->emit("static ");
+        emitType(resultType, prefixName);
+        m_writer->emit("(Context* context)\n");
+    }
+    else
+    {
+        emitType(resultType, name);
+
+        // We are going to ignore the parameters passed and just pass in the Context
+        auto firstParam = func->getFirstParam();
+        for (auto pp = firstParam; pp; pp = pp->getNextParam())
+        {
+            if (pp != firstParam)
+                m_writer->emit(", ");
+
+            emitSimpleFuncParamImpl(pp);
+        }
+        m_writer->emit(")");
+
+        emitSemantics(func);
+    }
+
+    // TODO: encode declaration vs. definition
+    if (isDefinition(func))
+    {
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+
+        // HACK: forward-declare all the local variables needed for the
+        // parameters of non-entry blocks.
+        emitPhiVarDecls(func);
+
+        // Need to emit the operations in the blocks of the function
+        emitFunctionBody(func);
+
+        m_writer->dedent();
+        m_writer->emit("}\n\n");
+    }
+    else
+    {
+        m_writer->emit(";\n\n");
+    }
+
+    if (entryPointLayout && isDefinition(func))
+    {
+        // Emit the actual function
+        emitEntryPointAttributes(func, entryPointLayout);
+        emitType(resultType, name);
+
+        m_writer->emit("(ComputeVaryingInput* varyingInput, UniformState* uniformState)\n{\n");
+        emitSemantics(func);
+
+        m_writer->indent();
+        m_writer->emit("Context context;\n");
+        m_writer->emit("context.uniformState = uniformState;\n");
+        m_writer->emit("context.varyingInput = *varyingInput;\n");
+        m_writer->emit("_");
+        m_writer->emit(name);
+        m_writer->emit("(&context);\n");
+        m_writer->dedent();
+        m_writer->emit("}\n");
+    }
+}
+
 void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)

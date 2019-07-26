@@ -183,6 +183,7 @@ protected:
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
     virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec);
 

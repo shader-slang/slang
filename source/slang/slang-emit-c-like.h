@@ -247,7 +247,7 @@ public:
         /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
-    void emitSimpleFunc(IRFunc* func);
+    void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
     void emitParamType(IRType* type, String const& name);
 
@@ -337,6 +337,7 @@ public:
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module);
+    virtual void emitSimpleFuncImpl(IRFunc* func);
 
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future

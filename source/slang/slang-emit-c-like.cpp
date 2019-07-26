@@ -2528,7 +2528,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     emitSemantics(param);
 }
 
-void CLikeSourceEmitter::emitSimpleFunc(IRFunc* func)
+void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
 
