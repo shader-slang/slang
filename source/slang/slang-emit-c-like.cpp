@@ -3229,7 +3229,7 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
     }
 }
 
-void CLikeSourceEmitter::emitModule(IRModule* module)
+void CLikeSourceEmitter::emitModuleImpl(IRModule* module)
 {
     // The IR will usually come in an order that respects
     // dependencies between global declarations, but this

@@ -1808,15 +1808,99 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     {
         emitSpecializedOperationDefinition(keyValue.Key);
     }
+}
 
-    // Lets take a look at layout
-
-    ProgramLayout* programLayout = m_programLayout;
-
-    if (programLayout)
+static bool _isVariable(IROp op)
+{
+    switch (op)
     {
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+        //case kIROp_Var:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
 
+static bool _isFunction(IROp op)
+{
+    return op == kIROp_Func;
+}
 
+void CPPSourceEmitter::emitModuleImpl(IRModule* module)
+{
+    List<EmitAction> actions;
+    computeEmitActions(module, actions);
+
+    // Emit forward declarations. Don't emit variables that need to be grouped or function definitions (which will ref those types)
+    for (auto action : actions)
+    {
+        switch (action.level)
+        {
+            case EmitAction::Level::ForwardDeclaration:
+                emitFuncDecl(cast<IRFunc>(action.inst));
+                break;
+
+            case EmitAction::Level::Definition:
+                if (_isVariable(action.inst->op) || _isFunction(action.inst->op))
+                {
+                    // Don't emit functions or variables that have to be grouped into structures yet
+                }
+                else
+                {
+                    emitGlobalInst(action.inst);
+                }
+                break;
+        }
+    }
+
+    // Output the global parameters in a 'UniformState' structure
+    {
+        m_writer->emit("struct UniformState\n{\n");
+        m_writer->indent();
+
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+        m_writer->emit("\n");
+        m_writer->dedent();
+        m_writer->emit("\n};\n\n");
+    }
+
+    // Output the 'Context' which will be used for execution
+    {
+        m_writer->emit("struct Context\n{\n");
+        m_writer->indent();
+
+        m_writer->emit("UniformState* uniformState;\n");
+        m_writer->emit("ComputeVaryingInput varyingInput;\n");
+
+        // We should put all the thread locals in here
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
+        m_writer->dedent();
+        m_writer->emit("};\n\n");
+    }
+
+    // Finally output the functions
+    for (auto action : actions)
+    {
+        if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+        {
+            emitGlobalInst(action.inst);
+        }
     }
 }
 

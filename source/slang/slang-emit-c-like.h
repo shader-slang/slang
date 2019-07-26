@@ -305,7 +305,7 @@ public:
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
-    void emitModule(IRModule* module);
+    void emitModule(IRModule* module) { emitModuleImpl(module); }
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -336,6 +336,8 @@ public:
     virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
+    virtual void emitModuleImpl(IRModule* module);
+
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
