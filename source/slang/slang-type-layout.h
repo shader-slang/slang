@@ -17,14 +17,6 @@ class Type;
 
 //
 
-enum class LayoutRule
-{
-    Std140,
-    Std430,
-    HLSLConstantBuffer,
-    HLSLStructuredBuffer,
-};
-
 #if 0
 enum class LayoutRulesFamily
 {
@@ -906,6 +898,8 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
+
+    virtual LayoutRulesImpl* getStructuredBufferRules() = 0;
 };
 
 typedef List<RefPtr<GenericParamLayout>> GenericParamLayouts;

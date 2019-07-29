@@ -590,6 +590,8 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+
+    LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -608,6 +610,8 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    
+    LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
 struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -626,6 +630,7 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
@@ -728,6 +733,11 @@ LayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kGLSLHitAttributesParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kGLSLStructuredBufferLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
+
 // HLSL cases
 
 LayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl_ = {
@@ -758,7 +768,7 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
-// HLSL Family
+// GLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -821,6 +831,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kGLSLStructuredBufferLayoutRulesImpl_;
+}
+
 // HLSL Family
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
@@ -843,6 +858,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kHLSLStructuredBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getTextureBufferRules()
@@ -941,19 +961,9 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
-//
-
-LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
 {
-    switch (rule)
-    {
-    case LayoutRule::Std140:                return &kStd140LayoutRulesImpl_;
-    case LayoutRule::Std430:                return &kStd430LayoutRulesImpl_;
-    case LayoutRule::HLSLConstantBuffer:    return &kHLSLConstantBufferLayoutRulesImpl_;
-    case LayoutRule::HLSLStructuredBuffer:  return &kHLSLStructuredBufferLayoutRulesImpl_;
-    default:
-        return nullptr;
-    }
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
@@ -2004,9 +2014,7 @@ createStructuredBufferTypeLayout(
     typeLayout->elementTypeLayout = elementTypeLayout;
 
     typeLayout->uniformAlignment = info.alignment;
-    SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
-    SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
-
+    
     if( info.size != 0 )
     {
         typeLayout->addResourceUsage(info.kind, info.size);
@@ -2029,8 +2037,7 @@ createStructuredBufferTypeLayout(
 {
     // TODO(tfoley): we should be looking up the appropriate rules
     // via the `LayoutRulesFamily` in use here...
-    auto structuredBufferLayoutRules = GetLayoutRulesImpl(
-        LayoutRule::HLSLStructuredBuffer);
+    auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules();
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout = createTypeLayout(
