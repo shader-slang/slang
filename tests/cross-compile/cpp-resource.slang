@@ -12,6 +12,8 @@ struct AnotherThing
     SamplerState sampler;
 };
 
+static int value;
+
 ParameterBlock<AnotherThing> s_paramBlock;
 
 //ConstantBuffer<Thing> thing;
@@ -38,5 +40,5 @@ void computeMain(
     float v = s_paramBlock.tex.Load(int3(tid, tid, 0));
     float s = s_paramBlock.tex.Sample(s_paramBlock.sampler, loc);
    
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s); // + thing.a;
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value; // + thing.a;
 }

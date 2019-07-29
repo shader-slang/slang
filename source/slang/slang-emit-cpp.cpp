@@ -2048,7 +2048,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitSemantics(func);
 
                 m_writer->indent();
-                m_writer->emit("Context context;\n");
+                // Initialize when constructing so that globals are zeroed
+                m_writer->emit("Context context = {};\n");
                 m_writer->emit("context.uniformState = uniformState;\n");
                 m_writer->emit("context.varyingInput = *varyingInput;\n");
 
