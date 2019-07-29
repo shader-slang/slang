@@ -1585,6 +1585,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     {
         emitType(resultType, name);
 
+        m_writer->emit("(");
         auto firstParam = func->getFirstParam();
         for (auto pp = firstParam; pp; pp = pp->getNextParam())
         {

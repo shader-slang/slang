@@ -2384,6 +2384,21 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
     return numUsed;
 }
 
+static bool _isCPUTarget(CodeGenTarget target)
+{
+    switch (target)
+    {
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CSource:
+        case CodeGenTarget::Executable:
+        case CodeGenTarget::SharedLibrary:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
@@ -2425,115 +2440,119 @@ RefPtr<ProgramLayout> generateParameterBindings(
         generateParameterBindings(&context, parameter);
     }
 
-    // Determine if there are any global-scope parameters that use `Uniform`
-    // resources, and thus need to get packaged into a constant buffer.
-    //
-    // Note: this doesn't account for GLSL's support for "legacy" uniforms
-    // at global scope, which don't get assigned a CB.
+    // On a CPU target, it's okay to have global scope parameters that use Uniform resources
     bool needDefaultConstantBuffer = false;
-    for( auto& parameterInfo : sharedContext.parameters )
+    if (!_isCPUTarget(targetReq->target))
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
-
-        // Does the field have any uniform data?
-        if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
-        {
-            needDefaultConstantBuffer = true;
-            diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
-        }
-    }
-
-    // Next, we want to determine if there are any global-scope parameters
-    // that don't just allocate a whole register space to themselves; these
-    // parameters will need to go into a "default" space, which should always
-    // be the first space we allocate.
-    //
-    // As a starting point, we will definitely need a "default" space if
-    // we are creating a default constant buffer, since it should get
-    // a binding in that "default" space.
-    //
-    bool needDefaultSpace = needDefaultConstantBuffer;
-    if (!needDefaultSpace)
-    {
-        // Next we will look at the global-scope parameters and see if
-        // any of them requires a `register` or `binding` that will
-        // thus need to land in a default space.
+        // Determine if there are any global-scope parameters that use `Uniform`
+        // resources, and thus need to get packaged into a constant buffer.
         //
-        for (auto& parameterInfo : sharedContext.parameters)
+        // Note: this doesn't account for GLSL's support for "legacy" uniforms
+        // at global scope, which don't get assigned a CB.
+       
+        for( auto& parameterInfo : sharedContext.parameters )
         {
             SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
             auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
-            // For each parameter, we will look at each resource it consumes.
-            //
-            for (auto resInfo : firstVarLayout->typeLayout->resourceInfos)
+            // Does the field have any uniform data?
+            if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
-                // We don't care about whole register spaces/sets, since
-                // we don't need to allocate a default space/set for a parameter
-                // that itself consumes a whole space/set.
-                //
-                if( resInfo.kind == LayoutResourceKind::RegisterSpace )
-                    continue;
-
-                // We also don't want to consider resource kinds for which
-                // the variable already has an (explicit) binding, since
-                // the space from the explicit binding will be used, so
-                // that a default space isn't needed.
-                //
-                if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
-                    continue;
-
-                // Otherwise, we have a shader parameter that will need
-                // a default space or set to live in.
-                //
-                needDefaultSpace = true;
-                break;
+                needDefaultConstantBuffer = true;
+                diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
             }
         }
-    }
 
-    // If we need a space for default bindings, then allocate it here.
-    if (needDefaultSpace)
-    {
-        UInt defaultSpace = 0;
-
-        // Check if space #0 has been allocated yet. If not, then we'll
-        // want to use it.
-        if (sharedContext.usedSpaces.contains(0))
+        // Next, we want to determine if there are any global-scope parameters
+        // that don't just allocate a whole register space to themselves; these
+        // parameters will need to go into a "default" space, which should always
+        // be the first space we allocate.
+        //
+        // As a starting point, we will definitely need a "default" space if
+        // we are creating a default constant buffer, since it should get
+        // a binding in that "default" space.
+        //
+        bool needDefaultSpace = needDefaultConstantBuffer;
+        if (!needDefaultSpace)
         {
-            // Somebody has already put things in space zero.
+            // Next we will look at the global-scope parameters and see if
+            // any of them requires a `register` or `binding` that will
+            // thus need to land in a default space.
             //
-            // TODO: There are two cases to handle here:
-            //
-            // 1) If there is any free register ranges in space #0,
-            // then we should keep using it as the default space.
-            //
-            // 2) If somebody went and put an HLSL unsized array into space #0,
-            // *or* if they manually placed something like a paramter block
-            // there (which should consume whole spaces), then we need to
-            // allocate an unused space instead.
-            //
-            // For now we don't deal with the concept of unsized arrays, or
-            // manually assigning parameter blocks to spaces, so we punt
-            // on this and assume case (1).
+            for (auto& parameterInfo : sharedContext.parameters)
+            {
+                SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+                auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
-            defaultSpace = 0;
+                // For each parameter, we will look at each resource it consumes.
+                //
+                for (auto resInfo : firstVarLayout->typeLayout->resourceInfos)
+                {
+                    // We don't care about whole register spaces/sets, since
+                    // we don't need to allocate a default space/set for a parameter
+                    // that itself consumes a whole space/set.
+                    //
+                    if( resInfo.kind == LayoutResourceKind::RegisterSpace )
+                        continue;
+
+                    // We also don't want to consider resource kinds for which
+                    // the variable already has an (explicit) binding, since
+                    // the space from the explicit binding will be used, so
+                    // that a default space isn't needed.
+                    //
+                    if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
+                        continue;
+
+                    // Otherwise, we have a shader parameter that will need
+                    // a default space or set to live in.
+                    //
+                    needDefaultSpace = true;
+                    break;
+                }
+            }
         }
-        else
+
+        // If we need a space for default bindings, then allocate it here.
+        if (needDefaultSpace)
         {
-            // Nobody has used space zero yet, so we need
-            // to make sure to reserve it for defaults.
-            defaultSpace = allocateUnusedSpaces(&context, 1);
+            UInt defaultSpace = 0;
 
-            // The result of this allocation had better be that
-            // we got space #0, or else something has gone wrong.
-            SLANG_ASSERT(defaultSpace == 0);
+            // Check if space #0 has been allocated yet. If not, then we'll
+            // want to use it.
+            if (sharedContext.usedSpaces.contains(0))
+            {
+                // Somebody has already put things in space zero.
+                //
+                // TODO: There are two cases to handle here:
+                //
+                // 1) If there is any free register ranges in space #0,
+                // then we should keep using it as the default space.
+                //
+                // 2) If somebody went and put an HLSL unsized array into space #0,
+                // *or* if they manually placed something like a paramter block
+                // there (which should consume whole spaces), then we need to
+                // allocate an unused space instead.
+                //
+                // For now we don't deal with the concept of unsized arrays, or
+                // manually assigning parameter blocks to spaces, so we punt
+                // on this and assume case (1).
+
+                defaultSpace = 0;
+            }
+            else
+            {
+                // Nobody has used space zero yet, so we need
+                // to make sure to reserve it for defaults.
+                defaultSpace = allocateUnusedSpaces(&context, 1);
+
+                // The result of this allocation had better be that
+                // we got space #0, or else something has gone wrong.
+                SLANG_ASSERT(defaultSpace == 0);
+            }
+
+            sharedContext.defaultSpace = defaultSpace;
         }
-
-        sharedContext.defaultSpace = defaultSpace;
     }
-
     // If there are any global-scope uniforms, then we need to
     // allocate a constant-buffer binding for them here.
     //
