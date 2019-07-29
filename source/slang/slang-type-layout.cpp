@@ -2035,8 +2035,7 @@ createStructuredBufferTypeLayout(
     RefPtr<Type>                structuredBufferType,
     RefPtr<Type>                elementType)
 {
-    // TODO(tfoley): we should be looking up the appropriate rules
-    // via the `LayoutRulesFamily` in use here...
+    // look up the appropriate rules via the `LayoutRulesFamily` 
     auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules();
 
     // Create and save type layout for the buffer contents.

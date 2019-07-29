@@ -1951,6 +1951,18 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
+struct GlobalParamInfo
+{
+    typedef GlobalParamInfo ThisType;
+    bool operator<(const ThisType& rhs) const { return offset < rhs.offset; }
+    bool operator==(const ThisType& rhs) const { return offset == rhs.offset; }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs);  }
+
+    IRInst* inst;
+    UInt offset;
+    UInt size;
+};
+
 void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 {
     List<EmitAction> actions;
@@ -1983,13 +1995,47 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->emit("struct UniformState\n{\n");
         m_writer->indent();
 
+        List<GlobalParamInfo> params;
+
         for (auto action : actions)
         {
             if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
             {
-                emitGlobalInst(action.inst);
+                
+                VarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
+                SLANG_ASSERT(varLayout);
+                const VarLayout::ResourceInfo* varInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+                SLANG_ASSERT(varInfo);
+
+                TypeLayout* typeLayout = varLayout->getTypeLayout();
+                TypeLayout::ResourceInfo* typeInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+
+                GlobalParamInfo paramInfo;
+                paramInfo.inst = action.inst;
+                // Index is the byte offset for uniform
+                paramInfo.offset = varInfo->index;
+                paramInfo.size = typeInfo->count.raw;
+
+                params.add(paramInfo);
             }
         }
+
+        // We want to sort by layout offset, and insert suitable padding
+        params.sort();
+
+        size_t offset = 0;
+        for (const auto& paramInfo : params)
+        {
+            if (offset < paramInfo.offset)
+            {
+                // We want to output some padding 
+            }
+
+            emitGlobalInst(paramInfo.inst);
+            // Set offset after this 
+            offset = paramInfo.offset + paramInfo.size;
+        }
+
         m_writer->emit("\n");
         m_writer->dedent();
         m_writer->emit("\n};\n\n");
@@ -2004,7 +2050,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->emit("ComputeVaryingInput varyingInput;\n");
         m_writer->emit("uint3 dispatchThreadID;\n");
 
-        // We should put all the thread locals in here
+        // Output all the thread locals 
         for (auto action : actions)
         {
             if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)

@@ -65,6 +65,9 @@ struct Thing
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> outputBuffer;
 
+RWStructuredBuffer<int> outputBuffer2;
+
+
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -104,4 +107,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     val = test(val);
 
     outputBuffer[tid] = val + int(dot(vec2, vec4));
+    outputBuffer2[tid] = int(tid);
 }

@@ -218,7 +218,7 @@ public:
     void emitSemantics(VarLayout* varLayout);
     void emitSemantics(IRInst* inst);
 
-    VarLayout* getVarLayout(IRInst* var);
+    static VarLayout* getVarLayout(IRInst* var);
 
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
