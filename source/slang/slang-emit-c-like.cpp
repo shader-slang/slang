@@ -927,7 +927,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
-void CLikeSourceEmitter::emitOperand(IRInst* inst, EmitOpInfo const&  outerPrec)
+void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
 {
     if( shouldFoldInstIntoUseSites(inst) )
     {

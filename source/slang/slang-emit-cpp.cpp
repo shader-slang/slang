@@ -1570,21 +1570,21 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     // Deal with decorations that need
     // to be emitted as attributes
+
+    // We are going to ignore the parameters passed and just pass in the Context
+
     auto entryPointLayout = asEntryPoint(func);
     if (entryPointLayout)
     {
         StringBuilder prefixName;
         prefixName << "_" << name;
-
-        m_writer->emit("static ");
         emitType(resultType, prefixName);
-        m_writer->emit("(Context* context)\n");
+        m_writer->emit("()\n");
     }
     else
     {
         emitType(resultType, name);
 
-        // We are going to ignore the parameters passed and just pass in the Context
         auto firstParam = func->getFirstParam();
         for (auto pp = firstParam; pp; pp = pp->getNextParam())
         {
@@ -1617,26 +1617,6 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     else
     {
         m_writer->emit(";\n\n");
-    }
-
-    if (entryPointLayout && isDefinition(func))
-    {
-        // Emit the actual function
-        emitEntryPointAttributes(func, entryPointLayout);
-        emitType(resultType, name);
-
-        m_writer->emit("(ComputeVaryingInput* varyingInput, UniformState* uniformState)\n{\n");
-        emitSemantics(func);
-
-        m_writer->indent();
-        m_writer->emit("Context context;\n");
-        m_writer->emit("context.uniformState = uniformState;\n");
-        m_writer->emit("context.varyingInput = *varyingInput;\n");
-        m_writer->emit("_");
-        m_writer->emit(name);
-        m_writer->emit("(&context);\n");
-        m_writer->dedent();
-        m_writer->emit("}\n");
     }
 }
 
@@ -1806,6 +1786,8 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpI
     maybeCloseParens(needClose);
 }
 
+
+
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
@@ -1853,6 +1835,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             return false;
         }
+
         default:
         {
             IntrinsicOp op = getOperation(inst->op);
@@ -1885,6 +1868,66 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     for (const auto& keyValue : m_intrinsicNameMap)
     {
         emitSpecializedOperationDefinition(keyValue.Key);
+    }
+}
+
+void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
+{
+    if (shouldFoldInstIntoUseSites(inst))
+    {
+        emitInstExpr(inst, outerPrec);
+        return;
+    }
+
+    switch (inst->op)
+    {
+        case 0: // nothing yet
+        case kIROp_GlobalParam:
+        {
+            // It's in UniformState
+            String name = getName(inst);
+            m_writer->emit("(uniformState->");
+            m_writer->emit(name);
+            m_writer->emit(")");
+            break;
+        }
+        case kIROp_Param:
+        {
+            auto varLayout = getVarLayout(inst);
+
+            if (varLayout)
+            {
+                auto semanticNameSpelling = varLayout->systemValueSemantic;
+                if (semanticNameSpelling.getLength())
+                {
+                    semanticNameSpelling = semanticNameSpelling.toLower();
+
+                    if (semanticNameSpelling == "sv_dispatchthreadid")
+                    {
+                        
+                        m_writer->emit("dispatchThreadID");
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupid")
+                    {
+                        m_writer->emit("varyingInput.groupID");
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupthreadid")
+                    {
+                        m_writer->emit("varyingInput.groupThreadID");
+                        return;
+                    }
+                }
+            }
+
+            ;   // Fall-thru
+        }
+        case kIROp_GlobalVar:
+        default:
+            // GlobalVar should be fine as should just be a member of Context
+            m_writer->emit(getName(inst));
+            break;
     }
 }
 
@@ -1958,6 +2001,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
         m_writer->emit("UniformState* uniformState;\n");
         m_writer->emit("ComputeVaryingInput varyingInput;\n");
+        m_writer->emit("uint3 dispatchThreadID;\n");
 
         // We should put all the thread locals in here
         for (auto action : actions)
@@ -1968,16 +2012,87 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
             }
         }
 
+        // Finally output the functions as methods on the context
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
         m_writer->dedent();
         m_writer->emit("};\n\n");
     }
 
-    // Finally output the functions
+     // Finally we need to output dll entry points
+
     for (auto action : actions)
     {
         if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
         {
-            emitGlobalInst(action.inst);
+            IRFunc* func = as<IRFunc>(action.inst);
+
+            auto entryPointLayout = asEntryPoint(func);
+            if (entryPointLayout)
+            {
+                auto resultType = func->getResultType();
+                auto name = getFuncName(func);
+
+                // Emit the actual function
+                emitEntryPointAttributes(func, entryPointLayout);
+                emitType(resultType, name);
+
+                m_writer->emit("(ComputeVaryingInput* varyingInput, UniformState* uniformState)\n{\n");
+                emitSemantics(func);
+
+                m_writer->indent();
+                m_writer->emit("Context context;\n");
+                m_writer->emit("context.uniformState = uniformState;\n");
+                m_writer->emit("context.varyingInput = *varyingInput;\n");
+
+                // Emit dispatchThreadID
+                if (entryPointLayout->profile.GetStage() == Stage::Compute)
+                {
+                    // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sv-dispatchthreadid
+                    // SV_DispatchThreadID is the sum of SV_GroupID * numthreads and GroupThreadID.
+
+                    static const UInt kAxisCount = 3;
+                    UInt sizeAlongAxis[kAxisCount];
+
+                    // TODO: this is kind of gross because we are using a public
+                    // reflection API function, rather than some kind of internal
+                    // utility it forwards to...
+                    spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*)entryPointLayout, kAxisCount, &sizeAlongAxis[0]);
+
+                    m_writer->emit("context.dispatchThreadID = {\n");
+                    m_writer->indent();
+
+                    StringBuilder builder;
+                    
+                    for (int i = 0; i < kAxisCount; ++i)
+                    {
+                        builder.Clear();
+                        const char elem[2] = {s_elemNames[i], 0};
+                        builder << "varyingInput->groupID." << elem << " * " << sizeAlongAxis[i] << " + varyingInput->groupThreadID." << elem;
+                        if (i < kAxisCount - 1)
+                        {
+                            builder << ",";
+                        }
+                        builder << "\n";
+                        m_writer->emit(builder);
+                    }
+
+                    m_writer->dedent();
+                    m_writer->emit("};\n");
+                }
+
+                m_writer->emit("context._");
+                m_writer->emit(name);
+                m_writer->emit("();\n");
+                m_writer->dedent();
+                m_writer->emit("}\n");
+            }
         }
     }
 }

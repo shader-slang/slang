@@ -681,8 +681,8 @@ struct Texture2D
 
 struct ComputeVaryingInput
 {
-    int3 groupID;
-    int3 groupThreadID;
+    uint3 groupID;
+    uint3 groupThreadID;
 };
 
 // ----------------------------- F32 -----------------------------------------

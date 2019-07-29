@@ -18,11 +18,12 @@ ParameterBlock<AnotherThing> s_paramBlock;
 
 ConstantBuffer<Thing> thing3;
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+RWStructuredBuffer<int> outputBuffer;
+
 [numthreads(4, 1, 1)]
 void computeMain(
     uint3 dispatchThreadID : SV_DispatchThreadID, 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
-    RWStructuredBuffer<int> outputBuffer, 
     uniform Thing thing, 
     uniform Thing thing2)
 {
