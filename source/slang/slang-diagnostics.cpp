@@ -339,11 +339,36 @@ void DiagnosticSink::diagnoseRaw(
     }
 }
 
-
 namespace Diagnostics
 {
 #define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, messageFormat };
 #include "slang-diagnostic-defs.h"
+}
+
+DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
+{
+    // TODO: We should eventually have a more formal system for associating individual
+    // diagnostics, or groups of diagnostics, with user-exposed names for use when
+    // enabling/disabling warnings (or turning warnings into errors, etc.).
+    //
+    // For now we build an ad hoc mapping from string names to corresponding single
+    // diagnostics (not groups).
+    //
+    static const struct
+    {
+        char const*             name;
+        DiagnosticInfo const*   diagnostic;
+    } kDiagnostics[] =
+    {
+        { "overlapping-bindings", &Diagnostics::parameterBindingsOverlap },
+    };
+
+    for( auto& entry : kDiagnostics )
+    {
+        if( name == entry.name )
+            return entry.diagnostic;
+    }
+    return nullptr;
 }
 
 
