@@ -257,6 +257,8 @@ namespace Slang
         DiagnosticSink* m_sink = nullptr;
     };
 
+    DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name);
+
     namespace Diagnostics
     {
 #define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;

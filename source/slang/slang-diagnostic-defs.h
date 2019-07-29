@@ -269,6 +269,7 @@ DIAGNOSTIC(31006, Error, attributeFunctionNotFound, "Could not find function '$0
 
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
+DIAGNOSTIC(31101, Error, unknownDiagnosticName, "unknown diagnostic '$0'")
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 

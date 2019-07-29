@@ -784,6 +784,25 @@ static UInt allocateUnusedSpaces(
     return context->shared->usedSpaces.Allocate(nullptr, count);
 }
 
+static bool shouldDisableDiagnostic(
+    Decl*                   decl,
+    DiagnosticInfo const&   diagnosticInfo)
+{
+    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    {
+        for( auto modifier : dd->modifiers )
+        {
+            auto allowAttr = as<AllowAttribute>(modifier);
+            if(!allowAttr)
+                continue;
+
+            if(allowAttr->diagnostic == &diagnosticInfo)
+                return true;
+        }
+    }
+    return false;
+}
+
 static void addExplicitParameterBinding(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo,
@@ -842,11 +861,26 @@ static void addExplicitParameterBinding(
             auto paramA = parameterInfo->varLayouts[0]->varDecl.getDecl();
             auto paramB = overlappedVarLayout->varDecl.getDecl();
 
-            getSink(context)->diagnose(paramA, Diagnostics::parameterBindingsOverlap,
-                getReflectionName(paramA),
-                getReflectionName(paramB));
+            auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
 
-            getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+            // If *both* of the shader parameters declarations agree
+            // that overlapping bindings should be allowed, then we
+            // will not emit a diagnostic. Otherwise, we will warn
+            // the user because such overlapping bindings are likely
+            // to indicate a programming error.
+            //
+            if(shouldDisableDiagnostic(paramA, diagnosticInfo)
+                && shouldDisableDiagnostic(paramB, diagnosticInfo))
+            {
+            }
+            else
+            {
+                getSink(context)->diagnose(paramA, diagnosticInfo,
+                    getReflectionName(paramA),
+                    getReflectionName(paramB));
+
+                getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+            }
         }
     }
 }

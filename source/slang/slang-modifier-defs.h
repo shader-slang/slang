@@ -461,3 +461,7 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(FormatAttribute, Attribute)
     FIELD(ImageFormat, format)
 END_SYNTAX_CLASS()
+
+SYNTAX_CLASS(AllowAttribute, Attribute)
+    FIELD_INIT(DiagnosticInfo const*, diagnostic, nullptr)
+END_SYNTAX_CLASS()
