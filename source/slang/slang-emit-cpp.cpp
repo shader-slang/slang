@@ -2001,22 +2001,23 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         {
             if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
             {
-                
                 VarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
                 SLANG_ASSERT(varLayout);
                 const VarLayout::ResourceInfo* varInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-                SLANG_ASSERT(varInfo);
-
                 TypeLayout* typeLayout = varLayout->getTypeLayout();
                 TypeLayout::ResourceInfo* typeInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+
+                // TODO(JS): HACK! I would expect to be set, but is apparently not on reflection call
+                // SLANG_ASSERT(varInfo);
 
                 GlobalParamInfo paramInfo;
                 paramInfo.inst = action.inst;
                 // Index is the byte offset for uniform
-                paramInfo.offset = varInfo->index;
-                paramInfo.size = typeInfo->count.raw;
+                paramInfo.offset = varInfo ? varInfo->index : 0;
+                paramInfo.size = typeInfo ? typeInfo->count.raw : 0;
 
                 params.add(paramInfo);
+                
             }
         }
 
