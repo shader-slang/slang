@@ -2934,6 +2934,24 @@ namespace Slang
 
                     formatAttr->format = format;
                 }
+                else if (auto allowAttr = as<AllowAttribute>(attr))
+                {
+                    SLANG_ASSERT(attr->args.getCount() == 1);
+
+                    String diagnosticName;
+                    if(!checkLiteralStringVal(attr->args[0], &diagnosticName))
+                    {
+                        return false;
+                    }
+
+                    auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
+                    if(!diagnosticInfo)
+                    {
+                        getSink()->diagnose(attr->args[0], Diagnostics::unknownDiagnosticName, diagnosticName);
+                    }
+
+                    allowAttr->diagnostic = diagnosticInfo;
+                }
                 else
                 {
                     if(attr->args.getCount() == 0)

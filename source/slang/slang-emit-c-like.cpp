@@ -982,7 +982,20 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     if(as<IRModuleInst>(inst->getParent()))
     {
         // "Ordinary" instructions at module scope are constants
-        m_writer->emit("static const ");
+
+        switch (getSourceStyle())
+        {
+        case SourceStyle::HLSL:
+        case SourceStyle::C:
+        case SourceStyle::CPP:
+            m_writer->emit("static ");
+            break;
+
+        default:
+            break;
+        }
+
+        m_writer->emit("const ");
     }
 
     emitType(type, getName(inst));
