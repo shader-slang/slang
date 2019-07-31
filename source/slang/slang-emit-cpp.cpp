@@ -1516,12 +1516,27 @@ void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformP
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
 
-    // TODO(JS): Do we need to look at layout in terms of determining the order of output?
-  
+    String name = getName(varDecl);
     auto elementType = type->getElementType();
 
-    emitType(elementType, getName(varDecl));
-    m_writer->emit(";\n");
+    switch (type->op)
+    {
+        case kIROp_ConstantBufferType:
+        {
+            UnownedStringSlice typeName = _getTypeName(elementType);
+            m_writer->emit(typeName);
+            m_writer->emit("* ");
+            m_writer->emit(name);
+            m_writer->emit(";\n");
+            break;
+        }
+        default:
+        {            
+            emitType(elementType, name);
+            m_writer->emit(";\n");
+            break;
+        }
+    }
 }
 
 void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
@@ -1887,7 +1902,17 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
         {
             // It's in UniformState
             String name = getName(inst);
-            m_writer->emit("(uniformState->");
+            m_writer->emit("(");
+            switch (inst->getDataType()->op)
+            {
+                case kIROp_ConstantBufferType:
+                {
+                    m_writer->emit("*");
+                    break;
+                }
+                default: break;
+            }
+            m_writer->emit("uniformState->");
             m_writer->emit(name);
             m_writer->emit(")");
             break;
@@ -2017,7 +2042,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 paramInfo.size = typeInfo ? typeInfo->count.raw : 0;
 
                 params.add(paramInfo);
-                
             }
         }
 
