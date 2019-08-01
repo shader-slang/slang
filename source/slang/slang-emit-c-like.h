@@ -339,7 +339,7 @@ public:
     virtual void emitModuleImpl(IRModule* module);
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
-    
+   
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
         // Again necessary for & prefix intrinsics. May be removable in the future

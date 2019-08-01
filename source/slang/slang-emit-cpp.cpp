@@ -1510,6 +1510,29 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     }
 }
 
+bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+{
+    SLANG_UNUSED(varDecl);
+    SLANG_UNUSED(varType);
+
+    switch (varType->op)
+    {
+        case kIROp_StructType:
+        {
+            String name = getName(varDecl);
+
+            UnownedStringSlice typeName = _getTypeName(varType);
+            m_writer->emit(typeName);
+            m_writer->emit("* ");
+            m_writer->emit(name);
+            m_writer->emit(";\n");
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     // Output global parameters
@@ -1521,6 +1544,7 @@ void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformP
 
     switch (type->op)
     {
+        case kIROp_ParameterBlockType:
         case kIROp_ConstantBufferType:
         {
             UnownedStringSlice typeName = _getTypeName(elementType);
@@ -1905,7 +1929,9 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
             m_writer->emit("(");
             switch (inst->getDataType()->op)
             {
+                case kIROp_ParameterBlockType:
                 case kIROp_ConstantBufferType:
+                case kIROp_StructType:
                 {
                     m_writer->emit("*");
                     break;
