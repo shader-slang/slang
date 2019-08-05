@@ -93,7 +93,9 @@ namespace Slang
         \
         x(AsFloat, "asfloat", 1) \
         x(AsInt, "asint", 1) \
-        x(AsUInt, "asuint", 1)
+        x(AsUInt, "asuint", 1) \
+        \
+        x(Construct, "", 1)
   
 
 class CPPSourceEmitter: public CLikeSourceEmitter
@@ -200,6 +202,7 @@ protected:
     void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
@@ -221,6 +224,8 @@ protected:
 
     UnownedStringSlice _getTypeName(IRType* type);
     StringSlicePool::Handle _calcTypeName(IRType* type);
+
+    SlangResult _calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
 
     SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 

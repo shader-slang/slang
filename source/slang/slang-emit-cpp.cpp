@@ -408,7 +408,23 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
         return m_slicePool.getSlice(handle);
     }
 
-    handle = _calcTypeName(type);
+    if (type->op == kIROp_MatrixType)
+    {
+        auto matType = static_cast<IRMatrixType*>(type);
+
+        auto elementType = matType->getElementType();
+        const auto rowCount = int(GetIntVal(matType->getRowCount()));
+        const auto colCount = int(GetIntVal(matType->getColumnCount()));
+
+        // Make sure the vector type the matrix is built on is added
+        useType(_getVecType(elementType, colCount));
+    }
+
+    StringBuilder builder;
+    if (SLANG_SUCCEEDED(_calcTypeName(type, m_target, builder)))
+    {
+        handle = m_slicePool.add(builder);
+    }
 
     m_typeNameMap.Add(type, handle);
 
@@ -464,14 +480,15 @@ SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, S
     return SLANG_OK;
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
+SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
     {
         case kIROp_HalfType:
         {
             // Special case half
-            return m_slicePool.add(getBuiltinTypeName(kIROp_FloatType));
+           out << getBuiltinTypeName(kIROp_FloatType);
+           return SLANG_OK;
         }
         case kIROp_VectorType:
         {
@@ -479,26 +496,23 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             auto vecCount = int(GetIntVal(vecType->getElementCount()));
             const IROp elemType = vecType->getElementType()->op;
 
-            if (m_target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource)
             {
-                StringBuilder builder;
-                builder << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
-                return m_slicePool.add(builder);
+                out << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
             }
             else
             {             
-                StringBuilder builder;
-                builder << "Vec";
+                out << "Vec";
                 UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
 
-                builder << postFix;
+                out << postFix;
                 if (postFix.size() > 1)
                 {
-                    builder << "_";
+                    out << "_";
                 }
-                builder << vecCount;
-                return m_slicePool.add(builder);
+                out << vecCount;
             }
+            return SLANG_OK; 
         }
         case kIROp_MatrixType:
         {
@@ -508,42 +522,32 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            if (m_target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource)
             {
-                StringBuilder builder;
-                builder << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
-                return m_slicePool.add(builder);
+                out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
             }
             else
             {
-                // Make sure there is the vector name too
-                _getTypeName(_getVecType(elementType, colCount));
-
-                StringBuilder builder;
-
-                builder << "Mat";
+                out << "Mat";
                 const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
-                builder << postFix;
+                out  << postFix;
                 if (postFix.size() > 1)
                 {
-                    builder << "_";
+                    out << "_";
                 }
-                builder << rowCount;
-                builder << colCount;
-
-                return m_slicePool.add(builder);
+                out << rowCount;
+                out << colCount;
             }
+            return SLANG_OK;
         }
         case kIROp_HLSLRWStructuredBufferType:
         {
             auto bufType = static_cast<IRHLSLRWStructuredBufferType*>(type);
 
-            StringBuilder builder;
-            builder << "RWStructuredBuffer<";
-            builder << _getTypeName(bufType->getElementType());
-            builder << ">";
-
-            return m_slicePool.add(builder);
+            out << "RWStructuredBuffer<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(bufType->getElementType(), target, out));
+            out << ">";
+            return SLANG_OK;
         }
         case kIROp_ArrayType:
         {
@@ -551,20 +555,27 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             auto elementType = arrayType->getElementType();
             int elementCount = int(GetIntVal(arrayType->getElementCount()));
 
-            StringBuilder builder;
-            builder << "FixedArray<";
-            builder << _getTypeName(elementType);
-            builder << ", " << elementCount << ">";
-
-            return m_slicePool.add(builder);
+            out << "FixedArray<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            out << ", " << elementCount << ">";
+            return SLANG_OK;
         }
-        case kIROp_SamplerStateType:                return m_slicePool.add("SamplerState");
-        case kIROp_SamplerComparisonStateType:      return m_slicePool.add("SamplerComparisonState");
+        case kIROp_SamplerStateType:
+        {
+            out << "SamplerState";
+            return SLANG_OK;
+        }
+        case kIROp_SamplerComparisonStateType:
+        {
+            out << "SamplerComparisonState";
+            return SLANG_OK;
+        }
         default:
         {
             if (IRBasicType::isaImpl(type->op))
             {
-                return m_slicePool.add(getBuiltinTypeName(type->op));
+                out << getBuiltinTypeName(type->op);
+                return SLANG_OK;
             }
 
             if (auto texType = as<IRTextureTypeBase>(type))
@@ -572,12 +583,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
                 // We don't support TextureSampler, so ignore that
                 if (texType->op != kIROp_TextureSamplerType)
                 {
-                    StringBuilder builder;
-                    if (SLANG_FAILED(_calcTextureTypeName(texType, builder)))
-                    {
-                        return StringSlicePool::kNullHandle;
-                    }
-                    return m_slicePool.add(builder);
+                    return _calcTextureTypeName(texType, out);   
                 }
             }
 
@@ -586,7 +592,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
     }
 
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for C/C++ emit");
-    return StringSlicePool::kNullHandle;
+    return SLANG_FAIL;
 }
 
 void CPPSourceEmitter::useType(IRType* type)
@@ -744,8 +750,12 @@ static IRBasicType* _getElementType(IRType* type)
 
 static bool _isOperator(const UnownedStringSlice& funcName)
 {
-    const char c = funcName[0];
-    return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
+    if (funcName.size() > 0)
+    {
+        const char c = funcName[0];
+        return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
+    }
+    return false;
 }
 
 void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
@@ -1118,6 +1128,72 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
+void CPPSourceEmitter::_emitConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+    IRFuncType* funcType = specOp.signatureType;
+
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    emitType(retType);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    emitType(srcType);
+    writer->emitChar(' ');
+    writer->emitChar(char('a' + 0));
+    writer->emit(")");
+
+    writer->emit("\n{\n");
+    writer->indent();
+
+    writer->emit("return ");
+    emitType(retType);
+    writer->emit("{ ");
+
+    IRType* dstElemType = _getElementType(retType);
+    //IRType* srcElemType = _getElementType(srcType);
+
+    TypeDimension dim = _getTypeDimension(srcType, false);
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        if (dim.rowCount > 1)
+        {
+            if (i > 0)
+            {
+                writer->emit(", \n");
+            }
+            writer->emit("{ ");
+        }
+
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            if (j > 0)
+            {
+                writer->emit(", ");
+            }
+
+            emitType(dstElemType);
+            writer->emit("(");
+            _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+            writer->emit(")");
+        }
+        if (dim.rowCount > 1)
+        {
+            writer->emit("}");
+        }
+    }
+
+    writer->emit("};\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {
     SourceWriter* writer = getSourceWriter();
@@ -1189,6 +1265,10 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         case IntrinsicOp::Reflect:
         {
             return _emitReflectDefinition(_getFuncName(specOp), specOp);
+        }
+        case IntrinsicOp::Construct:
+        {
+            return _emitConstructDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
@@ -1431,6 +1511,26 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
     else
     {
+        if (specOp.op == IntrinsicOp::Construct)
+        {
+            // Work out the function name
+            IRFuncType* signatureType = specOp.signatureType;
+            SLANG_ASSERT(signatureType->getParamCount() == 2);
+
+            IRType* dstType = signatureType->getParamType(0);
+            //IRType* srcType = signatureType->getParamType(1);
+
+            StringBuilder builder;
+            builder << "construct_";
+            // I need a function that is called that will construct this
+            if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+            {
+                return StringSlicePool::kNullHandle;
+            }
+
+            return m_slicePool.add(builder);
+        }
+
         const auto& info = getOperationInfo(specOp.op);
         if (info.funcName.size())
         {
@@ -1445,6 +1545,27 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
 
 void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, const EmitOpInfo& inOuterPrec)
 {
+    switch (op)
+    {
+        case IntrinsicOp::Construct:
+        {
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            IRType* argTypes[2] = {inst->getDataType(), inst->getOperand(0)->getDataType() };
+
+            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
+
+            IRFuncType* signatureType = specOp.signatureType;
+            IRType* dstType = signatureType->getParamType(0);
+            IRType* srcType = signatureType->getParamType(1);
+
+            SLANG_ASSERT(srcType != dstType);
+
+            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
+            return;
+        }
+        default: break;
+    }
+
     if (operandCount > 8)
     {
         List<IRType*> argTypes;
@@ -1664,14 +1785,6 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)
     {
-        // TODO(JS): This isn't strictly speaking right. In HLSL the default float type is float32.
-        // Here I unconditionally make all literals float32. Really we'd want some other pass to figure
-        // the literal needs to be cast to float (for example to match with whats required for the signiture of
-        // something being called).
-        //
-        // Note that such coercion could be argued as wrong as it would mean that coercions between all float types
-        // would be acceptable. 
-
         case kIROp_FloatLit:
         {
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
@@ -1845,6 +1958,23 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     switch (inst->op)
     {
         case kIROp_Construct:
+        {
+            IRType* dstType = inst->getDataType();
+            IRType* srcType = inst->getOperand(0)->getDataType();
+
+            if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
+                inst->getOperandCount() == 1 &&
+                srcType->op == dstType->op)
+            {
+                // If it's constructed from a type conversion
+                emitOperationCall(IntrinsicOp::Construct, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+            }
+            else
+            {
+                emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+            }
+            return true;
+        }
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {

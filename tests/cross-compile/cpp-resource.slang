@@ -26,12 +26,8 @@ void computeMain(
     uniform Thing thing2)
 {
     uint tid = dispatchThreadID.x;
-
-    // TODO(JS): Doesn't emit correctly on c++ becomes...
-    // Vector<float, 2> loc_0 = Vector<float, 2>{Vector<uint32_t, 2>{dispatchThreadID_0.x, dispatchThreadID_0.y}} * 0.50000000000000000000f;
-    //float2 loc = dispatchThreadID.xy * 0.5f;
-
-    float2 loc = float2(dispatchThreadID.x * 0.5f, dispatchThreadID.y * 0.5f);
+    
+    float2 loc = dispatchThreadID.xy * 0.5f;
 
     float v = tex.Load(int3(tid, tid, 0));
     float s = tex.Sample(sampler, loc);
