@@ -1128,7 +1128,7 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitConvertConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {
     SourceWriter* writer = getSourceWriter();
     IRFuncType* funcType = specOp.signatureType;
@@ -1266,9 +1266,9 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         {
             return _emitReflectDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Construct:
+        case IntrinsicOp::ConvertConstruct:
         {
-            return _emitConstructDefinition(_getFuncName(specOp), specOp);
+            return _emitConvertConstructDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
@@ -1511,7 +1511,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
     else
     {
-        if (specOp.op == IntrinsicOp::Construct)
+        if (specOp.op == IntrinsicOp::ConvertConstruct)
         {
             // Work out the function name
             IRFuncType* signatureType = specOp.signatureType;
@@ -1521,7 +1521,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
             //IRType* srcType = signatureType->getParamType(1);
 
             StringBuilder builder;
-            builder << "construct_";
+            builder << "convert_";
             // I need a function that is called that will construct this
             if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
             {
@@ -1547,7 +1547,7 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
 {
     switch (op)
     {
-        case IntrinsicOp::Construct:
+        case IntrinsicOp::ConvertConstruct:
         {
             SLANG_ASSERT(inst->getOperandCount() == 1);
             IRType* argTypes[2] = {inst->getDataType(), inst->getOperand(0)->getDataType() };
@@ -1966,8 +1966,10 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
                 inst->getOperandCount() == 1 &&
                 srcType->op == dstType->op)
             {
+                
+                SLANG_ASSERT(_getElementType(dstType) != _getElementType(srcType));
                 // If it's constructed from a type conversion
-                emitOperationCall(IntrinsicOp::Construct, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                emitOperationCall(IntrinsicOp::ConvertConstruct, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
             }
             else
             {

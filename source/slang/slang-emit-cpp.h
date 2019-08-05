@@ -95,7 +95,7 @@ namespace Slang
         x(AsInt, "asint", 1) \
         x(AsUInt, "asuint", 1) \
         \
-        x(Construct, "", 1)
+        x(ConvertConstruct, "", 1)
   
 
 class CPPSourceEmitter: public CLikeSourceEmitter
@@ -202,7 +202,7 @@ protected:
     void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
-    void _emitConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitConvertConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
