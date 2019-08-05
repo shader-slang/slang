@@ -2058,9 +2058,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 TypeLayout* typeLayout = varLayout->getTypeLayout();
                 TypeLayout::ResourceInfo* typeInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
 
-                // TODO(JS): HACK! I would expect to be set, but is apparently not on reflection call
-                // SLANG_ASSERT(varInfo);
-
                 GlobalParamInfo paramInfo;
                 paramInfo.inst = action.inst;
                 // Index is the byte offset for uniform
@@ -2074,12 +2071,15 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         // We want to sort by layout offset, and insert suitable padding
         params.sort();
 
+        int padIndex = 0;
         size_t offset = 0;
         for (const auto& paramInfo : params)
         {
             if (offset < paramInfo.offset)
             {
-                // We want to output some padding 
+                // We want to output some padding
+                StringBuilder builder;
+                builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
             }
 
             emitGlobalInst(paramInfo.inst);

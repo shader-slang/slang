@@ -5,36 +5,8 @@ standard output = {
 {
     "parameters": [
         {
-            "name": "s_paramBlock",
-            "binding": {"kind": "uniform", "offset": 0, "size": 0},
-            "type": {
-                "kind": "parameterBlock",
-                "elementType": {
-                    "kind": "struct",
-                    "name": "AnotherThing",
-                    "fields": [
-                        {
-                            "name": "tex",
-                            "type": {
-                                "kind": "resource",
-                                "baseShape": "texture2D"
-                            },
-                            "binding": {"kind": "uniform", "offset": 8, "size": 8}
-                        },
-                        {
-                            "name": "sampler",
-                            "type": {
-                                "kind": "samplerState"
-                            },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 8}
-                        }
-                    ]
-                }
-            }
-        },
-        {
             "name": "thing3",
-            "binding": {"kind": "uniform", "offset": 0, "size": 0},
+            "binding": {"kind": "uniform", "offset": 0, "size": 8},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -47,7 +19,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "int32"
                             },
-                            "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
                         },
                         {
                             "name": "b",
@@ -55,10 +27,46 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                        },
+                        {
+                            "name": "c",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 8, "size": 4}
                         }
                     ]
                 }
+            }
+        },
+        {
+            "name": "outputBuffer",
+            "binding": {"kind": "uniform", "offset": 8, "size": 16},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        },
+        {
+            "name": "tex",
+            "binding": {"kind": "uniform", "offset": 24, "size": 8},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "sampler",
+            "binding": {"kind": "uniform", "offset": 32, "size": 8},
+            "type": {
+                "kind": "samplerState"
             }
         }
     ],
@@ -80,16 +88,8 @@ standard output = {
                     }
                 },
                 {
-                    "name": "outputBuffer",
-                    "type": {
-                        "kind": "resource",
-                        "baseShape": "structuredBuffer",
-                        "access": "readWrite"
-                    }
-                },
-                {
                     "name": "thing",
-                    "binding": {"kind": "uniform", "offset": 8, "size": 8},
+                    "binding": {"kind": "uniform", "offset": 0, "size": 12},
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
@@ -109,13 +109,21 @@ standard output = {
                                     "scalarType": "float32"
                                 },
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            },
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
                             }
                         ]
                     }
                 },
                 {
                     "name": "thing2",
-                    "binding": {"kind": "uniform", "offset": 16, "size": 8},
+                    "binding": {"kind": "uniform", "offset": 12, "size": 12},
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
@@ -135,6 +143,14 @@ standard output = {
                                     "scalarType": "float32"
                                 },
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            },
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
                             }
                         ]
                     }

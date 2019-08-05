@@ -1431,7 +1431,10 @@ static bool _usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
     /// to the resource usage of a container like a `ConstantBuffer<X>` or
     /// `ParameterBlock<X>`.
     ///
+    /// TODO: letUnformBleedThrough is (hopefully temporary) a hack that was added to enable CPU targets to
+    /// produce workable layout. CPU targets have all bindings/variables laid out as uniforms
 static void _addUnmaskedResourceUsage(
+    bool letUniformBleedThrough, 
     TypeLayout* dstTypeLayout,
     TypeLayout* srcTypeLayout,
     bool        haveFullRegisterSpaceOrSet)
@@ -1442,6 +1445,10 @@ static void _addUnmaskedResourceUsage(
         {
         case LayoutResourceKind::Uniform:
             // Ordinary/uniform resource usage will always be masked.
+            if (letUniformBleedThrough)
+            {
+                dstTypeLayout->addResourceUsage(resInfo);
+            }
             break;
 
         case LayoutResourceKind::RegisterSpace:
@@ -1631,6 +1638,13 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     for( auto elementTypeResInfo : rawElementTypeLayout->resourceInfos )
     {
         auto kind = elementTypeResInfo.kind;
+
+        // TODO: Added to make layout work correctly for CPU target 
+        if(kind == LayoutResourceKind::Uniform)
+        {
+            continue;
+        }
+
         auto elementVarResInfo = elementVarLayout->findOrAddResourceInfo(kind);
 
         // If the container part of things is using the same resource kind
@@ -1696,7 +1710,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // buffer. Its resource usage will only bleed through if we
     // didn't allocate a full `space` or `set`.
     //
-    _addUnmaskedResourceUsage(typeLayout, containerTypeLayout, wantSpaceOrSet);
+    _addUnmaskedResourceUsage(true, typeLayout, containerTypeLayout, wantSpaceOrSet);
 
     // next we turn to the element type, where the cases are slightly
     // more involved (technically we could use this same logic for
@@ -1704,7 +1718,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // just special-case the container).
     //
 
-    _addUnmaskedResourceUsage(typeLayout, rawElementTypeLayout, wantSpaceOrSet);
+    _addUnmaskedResourceUsage(false, typeLayout, rawElementTypeLayout, wantSpaceOrSet);
 
     // At this point we have handled all the complexities that
     // arise for a parameter group that doesn't include interface-type
@@ -1862,8 +1876,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // up the hierarchy.
         //
         RefPtr<TypeLayout> unmaskedPendingDataTypeLayout = new TypeLayout();
-        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
-        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
+        _addUnmaskedResourceUsage(true, unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
+        _addUnmaskedResourceUsage(false, unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
 
         // TODO: we should probably optimize for the case where there is no unmasked
         // usage that needs to be reported out, since it should be a common case.

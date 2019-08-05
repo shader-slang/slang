@@ -6,23 +6,19 @@ struct Thing
     float b;
 };
 
-struct AnotherThing
-{
-    Texture2D<float> tex;
-    SamplerState sampler;
-};
-
 static int value;
 
-ParameterBlock<AnotherThing> s_paramBlock;
-
-//ConstantBuffer<Thing> thing;
+// Don't use parameter block for now
+//ParameterBlock<AnotherThing> s_paramBlock;
 
 ConstantBuffer<Thing> thing3;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 RWStructuredBuffer<int> outputBuffer;
 
+Texture2D<float> tex;
+SamplerState sampler;
+    
 [numthreads(4, 1, 1)]
 void computeMain(
     uint3 dispatchThreadID : SV_DispatchThreadID, 
@@ -37,8 +33,8 @@ void computeMain(
 
     float2 loc = float2(dispatchThreadID.x * 0.5f, dispatchThreadID.y * 0.5f);
 
-    float v = s_paramBlock.tex.Load(int3(tid, tid, 0));
-    float s = s_paramBlock.tex.Sample(s_paramBlock.sampler, loc);
+    float v = tex.Load(int3(tid, tid, 0));
+    float s = tex.Sample(sampler, loc);
    
     outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value; // + thing.a;
 }
