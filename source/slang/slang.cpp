@@ -1799,24 +1799,24 @@ struct EnumerateModulesVisitor : ComponentTypeVisitor
     ComponentType::EnumerateModulesCallback m_callback;
     void* m_userData;
 
-    void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) {}
+    void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) SLANG_OVERRIDE {}
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo*)
+    void visitModule(Module* module, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
     {
         m_callback(module, m_userData);
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
 
-    void visitSpecialized(SpecializedComponentType* specialized)
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         visitChildren(specialized);
     }
 
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(legacy, specializationInfo);
     }
@@ -1840,26 +1840,26 @@ struct EnumerateIRModulesVisitor : ComponentTypeVisitor
     ComponentType::EnumerateIRModulesCallback m_callback;
     void* m_userData;
 
-    void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) {}
+    void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) SLANG_OVERRIDE {}
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo*)
+    void visitModule(Module* module, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
     {
         m_callback(module->getIRModule(), m_userData);
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
 
-    void visitSpecialized(SpecializedComponentType* specialized)
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         visitChildren(specialized);
 
         m_callback(specialized->getIRModule(), m_userData);
     }
 
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(legacy, specializationInfo);
     }

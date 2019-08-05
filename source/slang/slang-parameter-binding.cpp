@@ -2351,13 +2351,13 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
 
     ParameterBindingContext* m_context;
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo)
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
         SLANG_UNUSED(specializationInfo);
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(module);
 
@@ -2373,17 +2373,17 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
 
-    void visitSpecialized(SpecializedComponentType* specialized)
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         specialized->getBaseComponentType()->acceptVisitor(this, specialized->getSpecializationInfo());
     }
 
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // TODO: Need to do something in this case...
         SLANG_UNUSED(legacy);
@@ -2735,13 +2735,13 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // We just wnat to recurse on the children of the composite in order.
         visitChildren(composite, specializationInfo);
     }
 
-    void visitSpecialized(SpecializedComponentType* specialized)
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         // The handling of a specialized component type here is subtle.
         //
@@ -2868,12 +2868,12 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
 
-    void visitSpecialized(SpecializedComponentType* specialized)
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         // Because `SpecializedComponentType` was a special case for `CompleteBindingsVisitor`,
         // it ends up being a special case here too.
