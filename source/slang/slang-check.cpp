@@ -11232,7 +11232,7 @@ static bool doesParameterMatch(
         SpecializationParams specializationParams;
         _collectExistentialSpecializationParamsRec(specializationParams, unspecializedType);
 
-        assert(specializationParams.params.getCount() == argCount);
+        assert(specializationParams.getCount() == argCount);
 
         ExpandedSpecializationArgs specializationArgs;
         for( Int aa = 0; aa < argCount; ++aa )
