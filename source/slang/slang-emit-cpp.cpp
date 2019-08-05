@@ -1673,9 +1673,19 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         // would be acceptable. 
 
         case kIROp_FloatLit:
-            m_writer->emit(((IRConstant*)inst)->value.floatVal);
-            m_writer->emitChar('f');
+        {
+            IRConstant* constantInst = static_cast<IRConstant*>(inst);
+
+            m_writer->emit(constantInst->value.floatVal);
+
+            // If the literal is a float, then we need to add 'f' at end
+            IRType* type = constantInst->getDataType();
+            if (type && type->op == kIROp_FloatType )
+            {
+                m_writer->emitChar('f');
+            }
             break;
+        }
         default: Super::emitSimpleValueImpl(inst);
     }
 }
