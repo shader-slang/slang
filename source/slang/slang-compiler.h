@@ -675,10 +675,10 @@ namespace Slang
             Profile     profile);
 
             /// Get the number of existential type parameters for the entry point.
-        Index getSpecializationParamCount();// { return m_specializationParams.params.getCount(); }
+        Index getSpecializationParamCount() SLANG_OVERRIDE;
 
             /// Get the existential type parameter at `index`.
-        SpecializationParam const& getSpecializationParam(Index index);// { return m_specializationParams.params[index]; }
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE;
 
         Index getRequirementCount() SLANG_OVERRIDE;
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
