@@ -3311,9 +3311,6 @@ namespace Slang
                     checkInterfaceConformancesRec(programNode);
                 }
             }
-
-            if (getSink()->GetErrorCount() != 0)
-                return;
         }
 
         bool doesSignatureMatchRequirement(
@@ -7110,8 +7107,7 @@ namespace Slang
                 {
                     if(context.mode != OverloadResolveContext::Mode::JustTrying)
                     {
-                        // TODO: diagnose a problem here
-                        getSink()->diagnose(context.loc, Diagnostics::unimplemented, "generic constraint not satisfied");
+                        getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                     }
                     return false;
                 }
@@ -9784,7 +9780,7 @@ namespace Slang
         auto entryPointName = entryPointFuncDecl->getName();
 
         auto module = getModule(entryPointFuncDecl);
-        auto linkage = module->getLinkageImpl();
+        auto linkage = module->getLinkage();
 
 
         // Every entry point needs to have a stage specified either via
@@ -10615,7 +10611,7 @@ static bool doesParameterMatch(
     RefPtr<ComponentType> fillRequirements(
         ComponentType* inComponentType)
     {
-        auto linkage = inComponentType->getLinkageImpl();
+        auto linkage = inComponentType->getLinkage();
 
         // We are going to simplify things by solving the problem iteratively.
         // If the current `componentType` has requirements for `A`, `B`, ... etc.
@@ -10860,7 +10856,7 @@ static bool doesParameterMatch(
     {
         SLANG_ASSERT(argCount == getSpecializationParamCount());
 
-        SemanticsVisitor visitor(getLinkageImpl(), sink);
+        SemanticsVisitor visitor(getLinkage(), sink);
 
         RefPtr<Module::ModuleSpecializationInfo> specializationInfo = new Module::ModuleSpecializationInfo();
 
@@ -10945,9 +10941,9 @@ static bool doesParameterMatch(
                             // If no witness was found, then we will be unable to satisfy
                             // the conformances required.
                             sink->diagnose(genericTypeParamDecl,
-                                Diagnostics::typeArgumentDoesNotConformToInterface,
-                                genericTypeParamDecl->nameAndLoc.name,
+                                Diagnostics::typeArgumentForGenericParameterDoesNotConformToInterface,
                                 argType,
+                                genericTypeParamDecl->nameAndLoc.name,
                                 interfaceType);
                         }
 
@@ -10970,7 +10966,7 @@ static bool doesParameterMatch(
                             // If no witness was found, then we will be unable to satisfy
                             // the conformances required.
                             sink->diagnose(SourceLoc(),
-                                Diagnostics::existentialTypeArgumentDoesNotConformToInterface,
+                                Diagnostics::typeArgumentDoesNotConformToInterface,
                                 argType,
                                 interfaceType);
                     }
@@ -10998,7 +10994,7 @@ static bool doesParameterMatch(
         List<SpecializationArg>&    outArgs,
         DiagnosticSink*             sink)
     {
-        auto linkage = componentType->getLinkageImpl();
+        auto linkage = componentType->getLinkage();
 
         auto argCount = argExprs.getCount();
         for(Index ii = 0; ii < argCount; ++ii )
@@ -11033,7 +11029,7 @@ static bool doesParameterMatch(
         auto args = inArgs;
         auto argCount = inArgCount;
 
-        SemanticsVisitor visitor(getLinkageImpl(), sink);
+        SemanticsVisitor visitor(getLinkage(), sink);
 
         // The first N arguments will be for the explicit generic parameters
         // of the entry point (if it has any).
@@ -11084,7 +11080,7 @@ static bool doesParameterMatch(
                 else
                 {
                     // TODO: diagnose a problem here
-                    sink->diagnose(constraintDecl, Diagnostics::unimplemented, "generic constraint not satisfied");
+                    sink->diagnose(constraintDecl, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                     result = SLANG_FAIL;
                     continue;
                 }
@@ -11121,7 +11117,7 @@ static bool doesParameterMatch(
             {
                 // If no witness was found, then we will be unable to satisfy
                 // the conformances required.
-                sink->diagnose(SourceLoc(), Diagnostics::existentialTypeArgumentDoesNotConformToInterface, argType, paramType);
+                sink->diagnose(SourceLoc(), Diagnostics::typeArgumentDoesNotConformToInterface, argType, paramType);
                 result = SLANG_FAIL;
                 continue;
             }

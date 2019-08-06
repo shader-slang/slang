@@ -441,6 +441,12 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL Linkage::createCompositeCompon
     SlangInt                componentTypeCount,
     ISlangBlob**            outDiagnostics)
 {
+    // Attempting to create a "composite" of just one component type should
+    // just return the component type itself, to avoid redundant work.
+    //
+    if( componentTypeCount == 1)
+        return componentTypes[0];
+
     DiagnosticSink sink(getSourceManager());
 
     List<RefPtr<ComponentType>> childComponents;
@@ -786,7 +792,7 @@ Type* ComponentType::getTypeFromString(
     for(auto module : getModuleDependencies())
         scopesToTry.add(module->getModuleDecl()->scope);
 
-    auto linkage = getLinkageImpl();
+    auto linkage = getLinkage();
     for(auto& s : scopesToTry)
     {
         RefPtr<Expr> typeExpr = linkage->parseTypeString(
@@ -1678,7 +1684,7 @@ SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL ComponentType::getLayout(
     Int             targetIndex,
     slang::IBlob**  outDiagnostics)
 {
-    auto linkage = getLinkageImpl();
+    auto linkage = getLinkage();
     if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
         return nullptr;
     auto target = linkage->targets[targetIndex];
@@ -1696,7 +1702,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     slang::IBlob**  outCode,
     slang::IBlob**  outDiagnostics)
 {
-    auto linkage = getLinkageImpl();
+    auto linkage = getLinkage();
     if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
         return SLANG_E_INVALID_ARG;
     auto target = linkage->targets[targetIndex];
@@ -1746,7 +1752,7 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL ComponentType::specialize(
     SlangInt                        specializationArgCount,
     ISlangBlob**                    outDiagnostics)
 {
-    DiagnosticSink sink(getLinkageImpl()->getSourceManager());
+    DiagnosticSink sink(getLinkage()->getSourceManager());
 
     // First let's check if the number of arguments given matches
     // the number of parameters that are present on this component type.
@@ -2058,7 +2064,7 @@ SpecializedComponentType::SpecializedComponentType(
     ComponentType::SpecializationInfo*  specializationInfo,
     List<SpecializationArg> const&      specializationArgs,
     DiagnosticSink*                     sink)
-    : ComponentType(base->getLinkageImpl())
+    : ComponentType(base->getLinkage())
     , m_base(base)
     , m_specializationInfo(specializationInfo)
     , m_specializationArgs(specializationArgs)

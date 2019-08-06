@@ -287,7 +287,7 @@ namespace Slang
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
-        Linkage* getLinkageImpl() { return m_linkage; }
+        Linkage* getLinkage() { return m_linkage; }
 
             /// Get the target-specific version of this program for the given `target`.
             ///
@@ -771,6 +771,8 @@ namespace Slang
         ///
     class Module : public ComponentType, public slang::IModule
     {
+        typedef ComponentType Super;
+
     public:
         SLANG_REF_OBJECT_IUNKNOWN_ALL
 
@@ -781,14 +783,14 @@ namespace Slang
 
         SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE
         {
-            return ComponentType::getSession();
+            return Super::getSession();
         }
 
         SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
             SlangInt        targetIndex,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
         {
-            return ComponentType::getLayout(targetIndex, outDiagnostics);
+            return Super::getLayout(targetIndex, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
@@ -797,7 +799,7 @@ namespace Slang
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
         {
-            return ComponentType::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+            return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
         SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
@@ -805,7 +807,7 @@ namespace Slang
             SlangInt                        specializationArgCount,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
         {
-            return ComponentType::specialize(specializationArgs, specializationArgCount, outDiagnostics);
+            return Super::specialize(specializationArgs, specializationArgCount, outDiagnostics);
         }
 
         //

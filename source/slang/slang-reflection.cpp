@@ -1512,7 +1512,7 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
     auto unspecializedType = convert(inType);
     if(!unspecializedType) return nullptr;
 
-    auto linkage = programLayout->getProgram()->getLinkageImpl();
+    auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager());
 

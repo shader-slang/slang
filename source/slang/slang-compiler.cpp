@@ -2014,15 +2014,9 @@ SlangResult dissassembleDXILUsingDXC(
             return result;
 
         RefPtr<BackEndCompileRequest> backEndRequest = new BackEndCompileRequest(
-            m_program->getLinkageImpl(),
+            m_program->getLinkage(),
             sink,
             m_program);
-
-        // DEBUGGING HACK:
-        if( m_program->getEntryPoint(entryPointIndex)->getStage() == Stage::ClosestHit )
-        {
-            backEndRequest->shouldDumpIntermediates = true;
-        }
 
         return _createEntryPointResult(
             entryPointIndex,

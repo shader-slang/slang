@@ -6471,7 +6471,7 @@ struct SpecializedComponentTypeIRGenContext
     {
         sink = inSink;
 
-        linkage = componentType->getLinkageImpl();
+        linkage = componentType->getLinkage();
         session = linkage->getSessionImpl();
 
         SharedIRGenContext sharedContextStorage(
