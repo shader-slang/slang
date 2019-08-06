@@ -1128,7 +1128,7 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitConvertConstructDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {
     SourceWriter* writer = getSourceWriter();
     IRFuncType* funcType = specOp.signatureType;
@@ -1181,6 +1181,64 @@ void CPPSourceEmitter::_emitConvertConstructDefinition(const UnownedStringSlice&
             writer->emit("(");
             _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
             writer->emit(")");
+        }
+        if (dim.rowCount > 1)
+        {
+            writer->emit("}");
+        }
+    }
+
+    writer->emit("};\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
+void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+    IRFuncType* funcType = specOp.signatureType;
+
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    emitType(retType);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    emitType(srcType);
+    writer->emitChar(' ');
+    writer->emitChar(char('a' + 0));
+    writer->emit(")");
+
+    writer->emit("\n{\n");
+    writer->indent();
+
+    writer->emit("return ");
+    emitType(retType);
+    writer->emit("{ ");
+
+    const TypeDimension dim = _getTypeDimension(retType, false);
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        if (dim.rowCount > 1)
+        {
+            if (i > 0)
+            {
+                writer->emit(", \n");
+            }
+            writer->emit("{ ");
+        }
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            if (j > 0)
+            {
+                writer->emit(", ");
+            }
+            writer->emit("a");
         }
         if (dim.rowCount > 1)
         {
@@ -1266,9 +1324,13 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         {
             return _emitReflectDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::ConvertConstruct:
+        case IntrinsicOp::ConstructConvert:
         {
-            return _emitConvertConstructDefinition(_getFuncName(specOp), specOp);
+            return _emitConstructConvertDefinition(_getFuncName(specOp), specOp);
+        }
+        case IntrinsicOp::ConstructFromScalar:
+        {
+            return _emitConstructFromScalarDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
@@ -1399,7 +1461,18 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
 
             if (elementCount == 1)
             {
-                defaultEmitInstExpr(inst, inOuterPrec);
+                IRInst* baseInst = swizzleInst->getBase();
+                IRType* baseType = baseInst->getDataType();
+
+                if (as<IRBasicType>(baseType))
+                {
+                    // A swizzle on a built in type can only mean .x, which we can't output just output the base
+                    emitOperand(baseInst, inOuterPrec);
+                }
+                else
+                {
+                    defaultEmitInstExpr(inst, inOuterPrec);
+                }
             }
             else
             {
@@ -1511,24 +1584,44 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
     else
     {
-        if (specOp.op == IntrinsicOp::ConvertConstruct)
+        switch (specOp.op)
         {
-            // Work out the function name
-            IRFuncType* signatureType = specOp.signatureType;
-            SLANG_ASSERT(signatureType->getParamCount() == 2);
-
-            IRType* dstType = signatureType->getParamType(0);
-            //IRType* srcType = signatureType->getParamType(1);
-
-            StringBuilder builder;
-            builder << "convert_";
-            // I need a function that is called that will construct this
-            if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+            case IntrinsicOp::ConstructConvert:
             {
-                return StringSlicePool::kNullHandle;
-            }
+                // Work out the function name
+                IRFuncType* signatureType = specOp.signatureType;
+                SLANG_ASSERT(signatureType->getParamCount() == 2);
 
-            return m_slicePool.add(builder);
+                IRType* dstType = signatureType->getParamType(0);
+                //IRType* srcType = signatureType->getParamType(1);
+
+                StringBuilder builder;
+                builder << "convert_";
+                // I need a function that is called that will construct this
+                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                {
+                    return StringSlicePool::kNullHandle;
+                }
+                return m_slicePool.add(builder);
+            }
+            case IntrinsicOp::ConstructFromScalar:
+            {
+                // Work out the function name
+                IRFuncType* signatureType = specOp.signatureType;
+                SLANG_ASSERT(signatureType->getParamCount() == 2);
+
+                IRType* dstType = signatureType->getParamType(0);
+                
+                StringBuilder builder;
+                builder << "constructFromScalar_";
+                // I need a function that is called that will construct this
+                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                {
+                    return StringSlicePool::kNullHandle;
+                }
+                return m_slicePool.add(builder);
+            }
+            default: break;
         }
 
         const auto& info = getOperationInfo(specOp.op);
@@ -1547,7 +1640,19 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
 {
     switch (op)
     {
-        case IntrinsicOp::ConvertConstruct:
+        case IntrinsicOp::ConstructFromScalar:
+        {
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            IRType* dstType = inst->getDataType();
+            IRType* srcType = _getElementType(dstType);
+            IRType* argTypes[2] = { dstType, srcType };
+
+            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
+
+            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
+            return;
+        }
+        case IntrinsicOp::ConstructConvert:
         {
             SLANG_ASSERT(inst->getOperandCount() == 1);
             IRType* argTypes[2] = {inst->getDataType(), inst->getOperand(0)->getDataType() };
@@ -1949,27 +2054,34 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpI
     maybeCloseParens(needClose);
 }
 
-
-
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     SLANG_UNUSED(inOuterPrec);
 
     switch (inst->op)
     {
+        case kIROp_constructVectorFromScalar:
+        {
+            return false;
+        }
         case kIROp_Construct:
         {
             IRType* dstType = inst->getDataType();
             IRType* srcType = inst->getOperand(0)->getDataType();
 
             if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
-                inst->getOperandCount() == 1 &&
-                srcType->op == dstType->op)
+                inst->getOperandCount() == 1)
             {
-                
-                SLANG_ASSERT(_getElementType(dstType) != _getElementType(srcType));
-                // If it's constructed from a type conversion
-                emitOperationCall(IntrinsicOp::ConvertConstruct, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                if (as<IRBasicType>(srcType))
+                {
+                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                }
+                else
+                {
+                    SLANG_ASSERT(_getElementType(dstType) != _getElementType(srcType));
+                    // If it's constructed from a type conversion
+                    emitOperationCall(IntrinsicOp::ConstructConvert, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                }
             }
             else
             {

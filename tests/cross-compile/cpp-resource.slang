@@ -27,10 +27,13 @@ void computeMain(
 {
     uint tid = dispatchThreadID.x;
     
+    int2 fromScalar = tid.x;
+    uint2 another = {};
+    
     float2 loc = dispatchThreadID.xy * 0.5f;
 
     float v = tex.Load(int3(tid, tid, 0));
     float s = tex.Sample(sampler, loc);
    
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value; // + thing.a;
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y); // + thing.a;
 }
