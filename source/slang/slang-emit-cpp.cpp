@@ -1660,10 +1660,9 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
             SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
 
             IRFuncType* signatureType = specOp.signatureType;
-            IRType* dstType = signatureType->getParamType(0);
-            IRType* srcType = signatureType->getParamType(1);
+            SLANG_UNUSED(signatureType);
 
-            SLANG_ASSERT(srcType != dstType);
+            SLANG_ASSERT(signatureType->getParamType(0) != signatureType->getParamType(1));
 
             emitCall(specOp, inst, operands, operandCount, inOuterPrec);
             return;
@@ -2060,10 +2059,12 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
     switch (inst->op)
     {
+#if 0
         case kIROp_constructVectorFromScalar:
         {
             return false;
         }
+#endif
         case kIROp_Construct:
         {
             IRType* dstType = inst->getDataType();
