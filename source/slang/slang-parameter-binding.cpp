@@ -2444,61 +2444,32 @@ static void collectSpecializationParams(
     }
 }
 
-    /// Recursively collect the global shader parameters and entry points in `program`.
-    ///
-    /// This function is used to establish the global ordering of parameters and
-    /// entry points used for layout.
-    ///
-static void collectParameters(
-    ParameterBindingContext*            inContext,
-    ComponentType*                      program,
-    ComponentType::SpecializationInfo*  inSpecializationInfo)
+    /// Visitor used by `collectParameters()`
+struct CollectParametersVisitor : ComponentTypeVisitor
 {
-    // All of the parameters in translation units directly
-    // referenced in the compile request are part of one
-    // logical namespace/"linkage" so that two parameters
-    // with the same name should represent the same
-    // parameter, and get the same binding(s)
+    CollectParametersVisitor(
+        ParameterBindingContext*    context)
+        : m_context(context)
+    {}
 
-    ParameterBindingContext contextData = *inContext;
-    auto context = &contextData;
-    context->stage = Stage::Unknown;
+    ParameterBindingContext* m_context;
 
-    // TODO: This code should be using a `ComponentTypeVisitor`
-    // instead of `as<...>(...)`.
-    //
-    if(auto composite = as<CompositeComponentType>(program))
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        auto specializationInfo = inSpecializationInfo
-            ? as<CompositeComponentType::CompositeSpecializationInfo>(inSpecializationInfo)
-            : nullptr;
-
         // The parameters of a composite component type can
         // be determined by just visiting its children in order.
         //
-        auto childCount = composite->getChildComponentCount();
-        for(Index ii = 0; ii < childCount; ++ii)
-        {
-            auto child = composite->getChildComponent(ii);
-            auto childInfo = specializationInfo
-                ? specializationInfo->childInfos[ii]
-                : nullptr;
-
-            collectParameters(context, child, childInfo);
-        }
+        visitChildren(composite, specializationInfo);
     }
-    else if(auto specialized = as<SpecializedComponentType>(program))
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
         // The parameters of a specialized component type
-        // are just those of its base component type. We
-        // need to be sure to pass down the specialization info,
-        // so that we can compute correct types (and type layouts)
-        // at the leaves.
+        // are just those of its base component type, with
+        // appropriate specialization information passed
+        // along.
         //
-        collectParameters(
-            context,
-            specialized->getBaseComponentType(),
-            specialized->getSpecializationInfo());
+        visitChildren(specialized);
 
         // While we are at it, we will also make note of any
         // tagged-union types that were used as part of the
@@ -2514,16 +2485,14 @@ static void collectParameters(
         {
             SLANG_ASSERT(taggedUnionType);
             auto substType = taggedUnionType;
-            auto typeLayout = createTypeLayout(context->layoutContext, substType);
-            context->shared->programLayout->taggedUnionTypeLayouts.add(typeLayout);
+            auto typeLayout = createTypeLayout(m_context->layoutContext, substType);
+            m_context->shared->programLayout->taggedUnionTypeLayouts.add(typeLayout);
         }
     }
-    else if( auto entryPoint = as<EntryPoint>(program) )
-    {
-        auto specializationInfo = inSpecializationInfo
-            ? as<EntryPoint::EntryPointSpecializationInfo>(inSpecializationInfo)
-            : nullptr;
 
+
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
         // An entry point is a leaf case.
         //
         // In our current model an entry point does not introduce
@@ -2536,15 +2505,16 @@ static void collectParameters(
         // gets enumerated in the right order relative to any global
         // shader parameters.
         //
+
+        ParameterBindingContext contextData = *m_context;
+        auto context = &contextData;
         context->stage = entryPoint->getStage();
+
         collectEntryPointParameters(context, entryPoint, specializationInfo);
     }
-    else if( auto module = as<Module>(program) )
-    {
-        auto specializationInfo = inSpecializationInfo
-            ? as<Module::ModuleSpecializationInfo>(inSpecializationInfo)
-            : nullptr;
 
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
         // A single module represents a leaf case for layout.
         //
         // We will enumerate the (global) shader parameters declared
@@ -2561,16 +2531,18 @@ static void collectParameters(
             auto shaderParamInfo = module->getShaderParam(pp);
             if(specializationArgs)
             {
-                context->layoutContext = context->layoutContext.withSpecializationArgs(
+                m_context->layoutContext = m_context->layoutContext.withSpecializationArgs(
                     specializationArgs,
                     shaderParamInfo.specializationParamCount);
                 specializationArgs += shaderParamInfo.specializationParamCount;
             }
 
-            collectGlobalScopeParameter(context, shaderParamInfo, SubstitutionSet());
+            collectGlobalScopeParameter(m_context, shaderParamInfo, SubstitutionSet());
         }
     }
-    else if( auto legacy = as<LegacyProgram>(program) )
+
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // A legacy program is also a leaf case, and we
         // can enumerate its parameters directly.
@@ -2588,13 +2560,38 @@ static void collectParameters(
         // TODO: eliminate this problem by getting rid of
         // `LegacyProgram`, rather than spend time trying
         // to make this corner case actually work.
+        //
+        SLANG_UNUSED(specializationInfo);
 
         auto paramCount = legacy->getShaderParamCount();
         for(Index pp = 0; pp < paramCount; ++pp)
         {
-            collectGlobalScopeParameter(context, legacy->getShaderParam(pp), SubstitutionSet());
+            collectGlobalScopeParameter(m_context, legacy->getShaderParam(pp), SubstitutionSet());
         }
     }
+};
+
+    /// Recursively collect the global shader parameters and entry points in `program`.
+    ///
+    /// This function is used to establish the global ordering of parameters and
+    /// entry points used for layout.
+    ///
+static void collectParameters(
+    ParameterBindingContext*            inContext,
+    ComponentType*                      program)
+{
+    // All of the parameters in translation units directly
+    // referenced in the compile request are part of one
+    // logical namespace/"linkage" so that two parameters
+    // with the same name should represent the same
+    // parameter, and get the same binding(s)
+
+    ParameterBindingContext contextData = *inContext;
+    auto context = &contextData;
+    context->stage = Stage::Unknown;
+
+    CollectParametersVisitor visitor(context);
+    program->acceptVisitor(&visitor, nullptr);
 }
 
     /// Emit a diagnostic about a uniform parameter at global scope.
@@ -2976,7 +2973,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // parameters laid out and thus act pretty much like global
     // parameters themselves.
     //
-    collectParameters(&context, program, nullptr);
+    collectParameters(&context, program);
 
     // We will also collect basic information on the specialization
     // parameters exposed by the program.

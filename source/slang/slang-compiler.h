@@ -593,8 +593,9 @@ namespace Slang
 
         RefPtr<IRModule> getIRModule() { return m_irModule; }
 
-    protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
+
+    protected:
 
         RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
             SpecializationArg const*    args,

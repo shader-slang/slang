@@ -6457,7 +6457,7 @@ IRModule* generateIRForTranslationUnit(
 }
 
     /// Context for generating IR code to represent a `SpecializedComponentType`
-struct SpecializedComponentTypeIRGenContext
+struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 {
     DiagnosticSink* sink;
     Linkage* linkage;
@@ -6498,114 +6498,85 @@ struct SpecializedComponentTypeIRGenContext
 
         context->irBuilder = builder;
 
-        _processComponentTypeRec(componentType, nullptr);
+        componentType->acceptVisitor(this, nullptr);
 
         return module;
     }
 
-    // TODO: This should be refactored as a `ComponentTypeVisitor`.
-    //
-    void _processComponentTypeRec(
-        ComponentType*                      componentType,
-        ComponentType::SpecializationInfo*  inSpecializationInfo)
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        if( auto entryPoint = as<EntryPoint>(componentType) )
-        {
-            // We need to emit symbols for all of the entry
-            // points in the program; this is especially
-            // important in the case where a generic entry
-            // point is being specialized.
-            //
-            auto specializationInfo = inSpecializationInfo
-                ? as<EntryPoint::EntryPointSpecializationInfo>(inSpecializationInfo)
-                : nullptr;
-            lowerProgramEntryPointToIR(context, entryPoint, specializationInfo);
-        }
-        else if( auto module = as<Module>(componentType) )
-        {
-            // We've hit a leaf module, so we should be able to bind any global
-            // generic type parameters here...
+        // We need to emit symbols for all of the entry
+        // points in the program; this is especially
+        // important in the case where a generic entry
+        // point is being specialized.
+        //
+        lowerProgramEntryPointToIR(context, entryPoint, specializationInfo);
+    }
 
-            auto specializationInfo = inSpecializationInfo
-                ? as<Module::ModuleSpecializationInfo>(inSpecializationInfo)
-                : nullptr;
-
-            if( specializationInfo )
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // We've hit a leaf module, so we should be able to bind any global
+        // generic type parameters here...
+        //
+        if( specializationInfo )
+        {
+            for( auto genericArgInfo : specializationInfo->genericArgs )
             {
-                for( auto genericArgInfo : specializationInfo->genericArgs )
-                {
-                    IRInst* irParam = getSimpleVal(context, ensureDecl(context, genericArgInfo.paramDecl));
-                    IRInst* irVal = lowerSimpleVal(context, genericArgInfo.argVal);
+                IRInst* irParam = getSimpleVal(context, ensureDecl(context, genericArgInfo.paramDecl));
+                IRInst* irVal = lowerSimpleVal(context, genericArgInfo.argVal);
 
-                    // bind `irParam` to `irVal`
-                    builder->emitBindGlobalGenericParam(irParam, irVal);
+                // bind `irParam` to `irVal`
+                builder->emitBindGlobalGenericParam(irParam, irVal);
+            }
+
+            auto shaderParamCount = module->getShaderParamCount();
+            Index existentialArgOffset = 0;
+
+            for( Index ii = 0; ii < shaderParamCount; ++ii )
+            {
+                auto shaderParam = module->getShaderParam(ii);
+                auto specializationArgCount = shaderParam.specializationParamCount;
+
+                IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef));
+                List<IRInst*> irSlotArgs;
+                for( Index jj = 0; jj < specializationArgCount; ++jj )
+                {
+                    auto& specializationArg = specializationInfo->existentialArgs[existentialArgOffset++];
+
+                    auto irType = lowerSimpleVal(context, specializationArg.val);
+                    auto irWitness = lowerSimpleVal(context, specializationArg.witness);
+
+                    irSlotArgs.add(irType);
+                    irSlotArgs.add(irWitness);
                 }
 
-                auto shaderParamCount = module->getShaderParamCount();
-                Index existentialArgOffset = 0;
-
-                for( Index ii = 0; ii < shaderParamCount; ++ii )
-                {
-                    auto shaderParam = module->getShaderParam(ii);
-                    auto specializationArgCount = shaderParam.specializationParamCount;
-
-                    IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef));
-                    List<IRInst*> irSlotArgs;
-                    for( Index jj = 0; jj < specializationArgCount; ++jj )
-                    {
-                        auto& specializationArg = specializationInfo->existentialArgs[existentialArgOffset++];
-
-                        auto irType = lowerSimpleVal(context, specializationArg.val);
-                        auto irWitness = lowerSimpleVal(context, specializationArg.witness);
-
-                        irSlotArgs.add(irType);
-                        irSlotArgs.add(irWitness);
-                    }
-
-                    builder->addBindExistentialSlotsDecoration(
-                        irParam,
-                        irSlotArgs.getCount(),
-                        irSlotArgs.getBuffer());
-                }
+                builder->addBindExistentialSlotsDecoration(
+                    irParam,
+                    irSlotArgs.getCount(),
+                    irSlotArgs.getBuffer());
             }
         }
-        else if(auto composite = as<CompositeComponentType>(componentType))
-        {
-            auto specializationInfo = inSpecializationInfo
-                ? as<CompositeComponentType::CompositeSpecializationInfo>(inSpecializationInfo)
-                : nullptr;
+    }
 
-            // Laying out a composite component type is the same
-            // as laying out each of its children in order.
-            //
-            auto childCount = composite->getChildComponentCount();
-            for(Index ii = 0; ii < childCount; ++ii)
-            {
-                auto child = composite->getChildComponent(ii);
-                auto childInfo = specializationInfo
-                    ? specializationInfo->childInfos[ii]
-                    : nullptr;
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        visitChildren(composite, specializationInfo);
+    }
 
-                _processComponentTypeRec(child, childInfo);
-            }
-        }
-        else if(auto specialized = as<SpecializedComponentType>(componentType))
-        {
-            _processComponentTypeRec(
-                specialized->getBaseComponentType(),
-                specialized->getSpecializationInfo());
-        }
-        else if( auto legacy = as<LegacyProgram>(componentType) )
-        {
-            // TODO: This case should be akin to the `Module` case,
-            // and deal with global-scope specialization parameters
-            // directly.
-            SLANG_UNIMPLEMENTED_X("legacy program case");
-        }
-        else
-        {
-            SLANG_UNIMPLEMENTED_X("unhandled component type");
-        }
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        visitChildren(specialized);
+    }
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // TODO: This case should be akin to the `Module` case,
+        // and deal with global-scope specialization parameters
+        // directly.
+        //
+        SLANG_UNUSED(legacy);
+        SLANG_UNUSED(specializationInfo);
+        SLANG_UNIMPLEMENTED_X("legacy program case");
     }
 };
 
