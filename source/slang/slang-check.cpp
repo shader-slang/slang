@@ -8463,6 +8463,21 @@ namespace Slang
                 context.baseExpr = funcOverloadExpr2->base;
             }
 
+            // TODO: We should have a special case here where an `InvokeExpr`
+            // with a single argument where the base/func expression names
+            // a type should always be treated as an explicit type coercion
+            // (and hence bottleneck through `coerce()`) instead of just
+            // as a constructor call.
+            //
+            // Such a special-case would help us handle cases of identity
+            // casts (casting an expression to the type it already has),
+            // without needing dummy initializer/constructor declarations.
+            //
+            // Handling that special casing here (rather than in, say,
+            // `visitTypeCastExpr`) would allow us to continue to ensure
+            // that `(T) expr` and `T(expr)` continue to be semantically
+            // equivalent in (almost) all cases.
+
             if (!context.bestCandidate)
             {
                 AddOverloadCandidates(funcExpr, context);
@@ -8883,6 +8898,71 @@ namespace Slang
             {
                 arg = CheckExpr(arg);
             }
+
+            // LEGACY FEATURE: As a backwards-compatibility feature
+            // for HLSL, we will allow for a cast to a `struct` type
+            // from a literal zero, with the semantics of default
+            // initialization.
+            //
+            if( auto declRefType = typeExp.type.as<DeclRefType>() )
+            {
+                if(auto structDeclRef = declRefType->declRef.as<StructDecl>())
+                {
+                    if( expr->Arguments.getCount() == 1 )
+                    {
+                        auto arg = expr->Arguments[0];
+                        if( auto intLitArg = arg.as<IntegerLiteralExpr>() )
+                        {
+                            if(getIntegerLiteralValue(intLitArg->token) == 0)
+                            {
+                                // At this point we have confirmed that the cast
+                                // has the right form, so we want to apply our special case.
+                                //
+                                // TODO: If/when we allow for user-defined initializer/constructor
+                                // definitions we would have to be careful here because it is
+                                // possible that the target type has defined an initializer/constructor
+                                // that takes a single `int` parmaeter and means to call that instead.
+                                //
+                                // For now that should be a non-issue, and in a pinch such a user
+                                // could use `T(0)` instead of `(T) 0` to get around this special
+                                // HLSL legacy feature.
+
+                                // We will type-check code like:
+                                //
+                                //      MyStruct s = (MyStruct) 0;
+                                //
+                                // the same as:
+                                //
+                                //      MyStruct s = {};
+                                //
+                                // That is, we construct an empty initializer list, and then coerce
+                                // that initializer list expression to the desired type (letting
+                                // the code for handling initializer lists work out all of the
+                                // details of what is/isn't valid). This choice means we get
+                                // to benefit from the existing codegen support for initializer
+                                // lists, rather than needing the `(MyStruct) 0` idiom to be
+                                // special-cased in later stages of the compiler.
+                                //
+                                // Note: we use an empty initializer list `{}` instead of an
+                                // initializer list with a single zero `{0}`, which is semantically
+                                // significant if the first field of `MyStruct` had its own
+                                // default initializer defined as part of the `struct` definition.
+                                // Basically we have chosen to interpret the "cast from zero" syntax
+                                // as sugar for default initialization, and *not* specifically
+                                // for zero-initialization. That choice could be revisited if
+                                // users express displeasure. For now there isn't enough usage
+                                // of explicit default initializers for `struct` fields to
+                                // make this a major concern (since they aren't supported in HLSL).
+                                //
+                                RefPtr<InitializerListExpr> initListExpr = new InitializerListExpr();
+                                auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+                                return coerce(typeExp.type, initListExpr);
+                            }
+                        }
+                    }
+                }
+            }
+
 
             // Now process this like any other explicit call (so casts
             // and constructor calls are semantically equivalent).
