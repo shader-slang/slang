@@ -34,6 +34,9 @@ void computeMain(
 
     float v = tex.Load(int3(tid, tid, 0));
     float s = tex.Sample(sampler, loc);
-   
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y); // + thing.a;
+    
+    // This should promote the 0.0 into a float2, 
+    float l = tex.Sample(sampler, 0.0);
+    
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y) + int(l); // + thing.a;
 }

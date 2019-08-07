@@ -2059,12 +2059,19 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
     switch (inst->op)
     {
-#if 0
         case kIROp_constructVectorFromScalar:
         {
-            return false;
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            IRType* dstType = inst->getDataType();
+
+            // Check it's a vector
+            SLANG_ASSERT(dstType->op == kIROp_VectorType);
+            // Source must be a scalar
+            SLANG_ASSERT(as<IRBasicType>(inst->getOperand(0)->getDataType()));
+
+            emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+            return true;
         }
-#endif
         case kIROp_Construct:
         {
             IRType* dstType = inst->getDataType();
