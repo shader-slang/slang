@@ -198,6 +198,7 @@ TODO
 * Output C/C++ compiler errors as 'externalCompiler' errors through diagnostic system
 * Improve documentation
 * Output of header files 
+* Mechanism to specify where C/C++ binaries are located
 
 # Internal Slang compiler features
 
