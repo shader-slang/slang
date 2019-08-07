@@ -5,6 +5,9 @@
 #include "slang-visitor.h"
 
 #include "../core/slang-secure-crt.h"
+
+#include "../core/slang-io.h"
+
 #include <assert.h>
 
 namespace Slang
@@ -323,6 +326,28 @@ namespace Slang
         } 
     }
 
+    static PassThroughMode _toPassThroughMode(SharedLibraryType type)
+    {
+        switch (type)
+        {
+            case SharedLibraryType::Dxil:
+            case SharedLibraryType::Dxc:
+            {
+                return PassThroughMode::Dxc;
+            }
+            case SharedLibraryType::Fxc:        return PassThroughMode::Fxc;
+            case SharedLibraryType::Glslang:    return PassThroughMode::Glslang;
+            default: break;
+        }
+
+        return PassThroughMode::None;    
+    }
+
+    void Session::setSharedLibrary(SharedLibraryType type, ISlangSharedLibrary* library)
+    {
+        sharedLibraries[int(type)] = library;
+    }
+
     ISlangSharedLibrary* Session::getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink)
     {
         // If not loaded, try loading it
@@ -336,6 +361,15 @@ namespace Slang
             }
 
             const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
+
+            StringBuilder builder;
+            PassThroughMode passThrough = _toPassThroughMode(type);
+            if (passThrough != PassThroughMode::None && m_passThroughPaths[int(passThrough)].getLength() > 0)
+            {
+                Path::combineIntoBuilder(m_passThroughPaths[int(passThrough)].getUnownedSlice(), UnownedStringSlice(libName), builder);
+                libName = builder.getBuffer();
+            }
+
             if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
             {
                 if (sink)
@@ -386,7 +420,15 @@ namespace Slang
         if (cppCompilerSet == nullptr)
         {
             cppCompilerSet = new CPPCompilerSet;
-            CPPCompilerUtil::initializeSet(cppCompilerSet);
+
+            typedef CPPCompiler::CompilerType CompilerType;
+            CPPCompilerUtil::InitializeSetDesc desc;
+       
+            desc.paths[int(CompilerType::GCC)] = m_passThroughPaths[int(PassThroughMode::Gcc)];
+            desc.paths[int(CompilerType::Clang)] = m_passThroughPaths[int(PassThroughMode::Clang)];
+            desc.paths[int(CompilerType::VisualStudio)] = m_passThroughPaths[int(PassThroughMode::VisualStudio)];
+
+            CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
         }
         SLANG_ASSERT(cppCompilerSet);
         return cppCompilerSet;

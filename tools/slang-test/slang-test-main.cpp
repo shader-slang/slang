@@ -1315,7 +1315,14 @@ static String _calcSummary(const CPPCompiler::Output& inOutput)
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
     CPPCompilerSet* compilerSet = context->getCPPCompilerSet();
-    CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
+    //CPPCompiler* compiler = compilerSet ? compilerSet->getDefaultCompiler() : nullptr;
+    CPPCompiler* compiler = nullptr;
+    if (compilerSet)
+    {
+        CPPCompiler::Desc desc;
+        desc.type = CPPCompiler::CompilerType::Clang;
+        compiler = CPPCompilerUtil::findClosestCompiler(compilerSet, desc);
+    }
 
     if (!compiler)
     {
@@ -1381,6 +1388,8 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     options.sourceFiles.add(cppSource);
     options.modulePath = modulePath;
     options.targetType = CPPCompiler::TargetType::SharedLibrary;
+
+    options.flags |= CPPCompiler::CompileOptions::Flag::Verbose;
 
     CPPCompiler::Output output;
     if (SLANG_FAILED(compiler->compile(options, output)))

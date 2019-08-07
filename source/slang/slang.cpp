@@ -146,6 +146,51 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     return Slang::Profile::LookUp(name).raw;
 }
 
+SLANG_NO_THROW void SLANG_MCALL Session::setPassThroughPath(
+    SlangPassThrough inPassThrough,
+    char const* path)
+{
+    PassThroughMode passThrough = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
+    
+    if (m_passThroughPaths[int(passThrough)] != path)
+    {
+        // If it's changed we should unload any shared libraries that use it
+        switch (passThrough)
+        {
+            case PassThroughMode::Dxc:
+            {
+                setSharedLibrary(SharedLibraryType::Dxc, nullptr);
+                setSharedLibrary(SharedLibraryType::Dxil, nullptr);
+                break;
+            }
+            case PassThroughMode::Fxc:
+            {
+                setSharedLibrary(SharedLibraryType::Fxc, nullptr);
+                break;
+            }
+            case PassThroughMode::Glslang:
+            {
+                setSharedLibrary(SharedLibraryType::Glslang, nullptr);
+                break;
+            }
+            case PassThroughMode::VisualStudio:
+            case PassThroughMode::Gcc:
+            case PassThroughMode::Clang:
+            case PassThroughMode::GenericCCpp:
+            {
+                // If any compiler path set changed, require all to be refreshed
+                cppCompilerSet.setNull();
+                break;
+            }
+            default: break;
+        }
+
+        // Set the path
+        m_passThroughPaths[int(passThrough)] = path;
+    }
+}
+
 struct IncludeHandlerImpl : IncludeHandler
 {
     Linkage*    linkage;
@@ -1981,6 +2026,12 @@ SLANG_API void spDestroySession(
 {
     if(!session) return;
     delete convert(session);
+}
+
+SLANG_API slang::IGlobalSession* spSessionGetGlobalSession(SlangSession* inSession)
+{
+    Slang::Session* session = convert(inSession);
+    return session;
 }
 
 SLANG_API void spAddBuiltins(

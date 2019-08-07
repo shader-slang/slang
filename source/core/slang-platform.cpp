@@ -197,4 +197,52 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 #endif // _WIN32
 
+/* static */PlatformKind PlatformUtil::getPlatformKind()
+{
+#if SLANG_WINRT
+    return PlatformKind::WinRT;
+#elif SLANG_XBOXONE
+    return PlatformKind::XBoxOne;
+#elif SLANG_WIN64
+    return PlatformKind::Win64;
+#elif SLANG_X360
+    return PlatformKind::X360;
+#elif SLANG_WIN32
+    return PlatformKind::Win32;
+#elif SLANG_ANDROID
+    return PlatformKind::Android;
+#elif SLANG_LINUX
+    return PlatformKind::Linux;
+#elif SLANG_IOS
+    return PlatformKind::IOS;
+#elif SLANG_OSX
+    return PlatformKind::OSX;
+#elif SLANG_PS3
+    return PlatformKind::PS3;
+#elif SLANG_SLANG_PS4
+    return PlatformKind::PS4;
+#elif SLANG_PSP2
+    return PlatformKind::PSP2;
+#elif SLANG_WIIU
+    return PlatformKind::WIIU;
+#else
+    return PlatformKind::Unknown;
+#endif
+}
+
+static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
+{
+    0,                                                                                                                  // Unknown
+    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64,                                                    // Windows
+    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64 | PlatformFlag::X360 | PlatformFlag::XBoxOne,       // Microsoft
+    PlatformFlag::Linux | PlatformFlag::Android,                                                                        // Linux
+    PlatformFlag::IOS | PlatformFlag::OSX,                                                                              // Apple
+    PlatformFlag::Linux | PlatformFlag::Android | PlatformFlag::IOS | PlatformFlag::OSX,                                // Unix
+};
+
+/* static */PlatformFlags PlatformUtil::getPlatformFlags(PlatformFamily family)
+{
+    return s_familyFlags[int(family)];
+}
+
 }

@@ -57,6 +57,11 @@ namespace Slang
         }
     }
 
+    if (options.flags & CompileOptions::Flag::Verbose)
+    {
+        // Doesn't appear to be a VS equivalent
+    }
+
     switch (options.debugInfoType)
     {
         default:
@@ -342,6 +347,8 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
 /* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
 {
     outOutput.reset();
+
+    outOutput.rawMessages = exeRes.standardOutput;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {
