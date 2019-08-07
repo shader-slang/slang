@@ -2592,7 +2592,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitParamType(IRType* type, String const& name)
+void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     // An `out` or `inout` parameter will have been
     // encoded as a parameter of pointer type, so

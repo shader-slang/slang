@@ -206,6 +206,7 @@ protected:
     virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
 
@@ -225,6 +226,8 @@ protected:
     void _emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+
+    void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);
 
     UnownedStringSlice _getAndEmitSpecializedOperationDefinition(IntrinsicOp op, IRType*const* argTypes, Int argCount, IRType* retType);
 

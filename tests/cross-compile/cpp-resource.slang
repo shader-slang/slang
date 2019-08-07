@@ -19,6 +19,12 @@ RWStructuredBuffer<int> outputBuffer;
 Texture2D<float> tex;
 SamplerState sampler;
     
+void doSomething(int a, inout float3 v[2])
+{
+    v[0] = float3(float(a));
+    v[1] = float3(float(a + 1));
+}    
+    
 [numthreads(4, 1, 1)]
 void computeMain(
     uint3 dispatchThreadID : SV_DispatchThreadID, 
@@ -38,5 +44,8 @@ void computeMain(
     // This should promote the 0.0 into a float2, 
     float l = tex.Sample(sampler, 0.0);
     
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y) + int(l); // + thing.a;
+    float3 arr[2] = { float3(3), float3(4) };
+    doSomething(int(tid), arr);
+    
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y) + int(l) + int(arr[0].y); // + thing.a;
 }

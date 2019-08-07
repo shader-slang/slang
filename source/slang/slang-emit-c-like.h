@@ -249,7 +249,7 @@ public:
 
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
-    void emitParamType(IRType* type, String const& name);
+    void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
@@ -339,7 +339,8 @@ public:
     virtual void emitModuleImpl(IRModule* module);
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
-   
+    virtual void emitParamTypeImpl(IRType* type, String const& name);
+
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
         // Again necessary for & prefix intrinsics. May be removable in the future

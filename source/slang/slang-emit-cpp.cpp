@@ -1735,6 +1735,43 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     }
 }
 
+void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRType* valueType)
+{
+    StringSliceLoc nameAndLoc(name.getUnownedSlice());
+
+    if (auto refType = as<IRRefType>(type))
+    {
+        m_writer->emit("const ");
+    }
+
+    UnownedStringSlice slice = _getTypeName(valueType);
+    m_writer->emit(slice);
+    m_writer->emit("& ");
+    m_writer->emitName(nameAndLoc);
+}
+
+void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+{
+    // An `out` or `inout` parameter will have been
+    // encoded as a parameter of pointer type, so
+    // we need to decode that here.
+    //
+    if (auto outType = as<IROutType>(type))
+    {
+        return _emitInOutParamType(type, name, outType->getValueType());
+    }
+    else if (auto inOutType = as<IRInOutType>(type))
+    {
+        return _emitInOutParamType(type, name, inOutType->getValueType());
+    }
+    else if (auto refType = as<IRRefType>(type))
+    {
+        return _emitInOutParamType(type, name, refType->getValueType());
+    }
+
+    emitType(type, name);
+}
+
 bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     SLANG_UNUSED(varDecl);
