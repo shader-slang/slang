@@ -44,8 +44,10 @@ void computeMain(
     // This should promote the 0.0 into a float2, 
     float l = tex.Sample(sampler, 0.0);
     
+    float3 m = float(3).xxx;
+    
     float3 arr[2] = { float3(3), float3(4) };
     doSomething(int(tid), arr);
     
-    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y) + int(l) + int(arr[0].y); // + thing.a;
+    outputBuffer[tid] = int(tid * tid) + thing.a + thing3.a + int(v + s) + value + fromScalar.y + int(another.y) + int(m.x) + int(l) + int(arr[0].y); // + thing.a;
 }
