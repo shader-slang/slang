@@ -305,7 +305,7 @@ String emitEntryPoint(
         // parameters of a shader entry point and move them into
         // the global scope instead.
         //
-        moveEntryPointUniformParamsToGlobalScope(irModule);
+        moveEntryPointUniformParamsToGlobalScope(irModule, target);
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif
@@ -361,56 +361,60 @@ String emitEntryPoint(
 #endif
         validateIRModuleIfEnabled(compileRequest, irModule);
 
-        // The Slang language allows interfaces to be used like
-        // ordinary types (including placing them in constant
-        // buffers and entry-point parameter lists), but then
-        // getting them to lay out in a reasonable way requires
-        // us to treat fields/variables with interface type
-        // *as if* they were pointers to heap-allocated "objects."
-        //
-        // Specialization will have replaced fields/variables
-        // with interface types like `IFoo` with fields/variables
-        // with pointer-like types like `ExistentialBox<SomeType>`.
-        //
-        // We need to legalize these pointer-like types away,
-        // which involves two main changes:
-        //
-        //  1. Any `ExistentialBox<...>` fields need to be moved
-        //  out of their enclosing `struct` type, so that the layout
-        //  of the enclosing type is computed as if the field had
-        //  zero size.
-        //
-        //  2. Once an `ExistentialBox<X>` has been floated out
-        //  of its parent and landed somwhere permanent (e.g., either
-        //  a dedicated variable, or a field of constant buffer),
-        //  we need to replace it with just an `X`, after which we
-        //  will have (more) legal shader code.
-        //
-        legalizeExistentialTypeLayout(
-            irModule,
-            sink);
-        eliminateDeadCode(compileRequest, irModule);
-
+        // We don't need the legalize pass for C/C++ based types
+        if (!(sourceStyle == SourceStyle::CPP || sourceStyle == SourceStyle::C))
+        {
+            // The Slang language allows interfaces to be used like
+            // ordinary types (including placing them in constant
+            // buffers and entry-point parameter lists), but then
+            // getting them to lay out in a reasonable way requires
+            // us to treat fields/variables with interface type
+            // *as if* they were pointers to heap-allocated "objects."
+            //
+            // Specialization will have replaced fields/variables
+            // with interface types like `IFoo` with fields/variables
+            // with pointer-like types like `ExistentialBox<SomeType>`.
+            //
+            // We need to legalize these pointer-like types away,
+            // which involves two main changes:
+            //
+            //  1. Any `ExistentialBox<...>` fields need to be moved
+            //  out of their enclosing `struct` type, so that the layout
+            //  of the enclosing type is computed as if the field had
+            //  zero size.
+            //
+            //  2. Once an `ExistentialBox<X>` has been floated out
+            //  of its parent and landed somwhere permanent (e.g., either
+            //  a dedicated variable, or a field of constant buffer),
+            //  we need to replace it with just an `X`, after which we
+            //  will have (more) legal shader code.
+            //
+            legalizeExistentialTypeLayout(
+                irModule,
+                sink);
+            eliminateDeadCode(compileRequest, irModule);
+        
 #if 0
-        dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
+            dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
 #endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
+            validateIRModuleIfEnabled(compileRequest, irModule);
 
-        // Many of our target languages and/or downstream compilers
-        // don't support `struct` types that have resource-type fields.
-        // In order to work around this limitation, we will rewrite the
-        // IR so that any structure types with resource-type fields get
-        // split into a "tuple" that comprises the ordinary fields (still
-        // bundles up as a `struct`) and one element for each resource-type
-        // field (recursively).
-        //
-        // What used to be individual variables/parameters/arguments/etc.
-        // then become multiple variables/parameters/arguments/etc.
-        //
-        legalizeResourceTypes(
-            irModule,
-            sink);
-        eliminateDeadCode(compileRequest, irModule);
+            // Many of our target languages and/or downstream compilers
+            // don't support `struct` types that have resource-type fields.
+            // In order to work around this limitation, we will rewrite the
+            // IR so that any structure types with resource-type fields get
+            // split into a "tuple" that comprises the ordinary fields (still
+            // bundles up as a `struct`) and one element for each resource-type
+            // field (recursively).
+            //
+            // What used to be individual variables/parameters/arguments/etc.
+            // then become multiple variables/parameters/arguments/etc.
+            //
+            legalizeResourceTypes(
+                irModule,
+                sink);
+            eliminateDeadCode(compileRequest, irModule);
+        }
 
         //  Debugging output of legalization
 #if 0

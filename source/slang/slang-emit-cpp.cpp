@@ -10,6 +10,69 @@
 
 #include <assert.h>
 
+/*
+ABI
+---
+
+In terms of ABI we need to discuss the variety of variables/resources that need to be defined by the host for appropriate execution
+of the output code. 
+
+https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-variable-syntax
+
+Broadly we could categorize these as..
+
+1) Varying entry point parameters (or 'varying')
+2) Uniform entry point parameters
+3) Uniform globals 
+4) Thread shared (such as group shared) or ('thread shared')
+5) Thread local ('static')
+
+If we can invoke a bunch of threads as a single invocation we could effectively have the ThreadShared not part of the ABI, but something
+that is say allocated on the stack before the threads are kicked off. If we kick of threads individually then we would need to pass this
+in as part of ABI. NOTE that it isn't right in so far as memory barriers etc couldn't work, as each thread would run to completion, but
+we aren't going to worry about barriers for now. 
+
+On 1 - there could be potentially input and outputs (perhaps in out?). On CPU I guess that's fine. 
+
+On 2 and 3 they are effectively the same, and so for now 2+3 will be referred to together as 'uniforms'.
+They should be copied into a single structure that has a well known order. 
+
+On 1 these are parameters that vary on an invocation. Thus a caller might call many times with same globals structure
+and different varying entry point parameters.
+
+On 5 - This would be a global that can be set and then accessed within the context of single thread
+
+So in order of rate of change
+
+1 : Probably change on every invocation (in the future such an invocation might be behind the API)
+2 + 3 : Changes per group of 'threads' executed together
+4 : Does not change between invocations 
+5 : Could be placed on the stack, and so not necessarily part of the ABI
+
+For now we are only going to implement something 'Compute shader'-like. Doing so makes the varying parameter always the same.
+
+So for now we would need to pass in
+
+ComputeVaryingInput - Fixed because we are doing compute shader
+Uniform             - All the uniform data in a big blob, both from uniform entry point parameters, and uniform globals
+
+When called we can have a structure that holds the thread local variables, and these two pointers.
+
+
+We can stick pointers to these in a structure lets call it 'Context'. On C++ we could make all the functions 'methods', and then
+we don't need to pass around the context as a parameter. For C this doesn't work, so it might be worth just biting the bullet and
+just adding the context to the output.
+
+Issues:
+
+* How does this work with layout? The layout if it's going to specify offsets will need to know that they will be allocated into each
+of these structs AND that the order they are placed needs to be consistent.
+
+* When variables access one of these sources, we will now need code that will add the dereferencing. Hopefully this can be done by looking
+at the type of the variable, and then adding the appropriate access via part of emit.
+
+*/
+
 namespace Slang {
 
 static const char s_elemNames[] = "xyzw";
@@ -345,7 +408,23 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
         return m_slicePool.getSlice(handle);
     }
 
-    handle = _calcTypeName(type);
+    if (type->op == kIROp_MatrixType)
+    {
+        auto matType = static_cast<IRMatrixType*>(type);
+
+        auto elementType = matType->getElementType();
+        const auto rowCount = int(GetIntVal(matType->getRowCount()));
+        const auto colCount = int(GetIntVal(matType->getColumnCount()));
+
+        // Make sure the vector type the matrix is built on is added
+        useType(_getVecType(elementType, colCount));
+    }
+
+    StringBuilder builder;
+    if (SLANG_SUCCEEDED(_calcTypeName(type, m_target, builder)))
+    {
+        handle = m_slicePool.add(builder);
+    }
 
     m_typeNameMap.Add(type, handle);
 
@@ -353,14 +432,63 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
     return m_slicePool.getSlice(handle);
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
+SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
+{
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            outName << "RW";
+            break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            outName << "RasterizerOrdered";
+            break;
+        case SLANG_RESOURCE_ACCESS_APPEND:
+            outName << "Append";
+            break;
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+            outName << "Consume";
+            break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
+            return SLANG_FAIL;
+    }
+
+    switch (texType->GetBaseShape())
+    {
+        case TextureFlavor::Shape::Shape1D:		outName << "Texture1D";		break;
+        case TextureFlavor::Shape::Shape2D:		outName << "Texture2D";		break;
+        case TextureFlavor::Shape::Shape3D:		outName << "Texture3D";		break;
+        case TextureFlavor::Shape::ShapeCube:	outName << "TextureCube";	break;
+        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+            return SLANG_FAIL;
+    }
+
+    if (texType->isMultisample())
+    {
+        outName << "MS";
+    }
+    if (texType->isArray())
+    {
+        outName << "Array";
+    }
+    outName << "<" << _getTypeName(texType->getElementType()) << " >";
+
+    return SLANG_OK;
+}
+
+SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
     {
         case kIROp_HalfType:
         {
             // Special case half
-            return m_slicePool.add(getBuiltinTypeName(kIROp_FloatType));
+           out << getBuiltinTypeName(kIROp_FloatType);
+           return SLANG_OK;
         }
         case kIROp_VectorType:
         {
@@ -368,26 +496,23 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             auto vecCount = int(GetIntVal(vecType->getElementCount()));
             const IROp elemType = vecType->getElementType()->op;
 
-            if (m_target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource)
             {
-                StringBuilder builder;
-                builder << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
-                return m_slicePool.add(builder);
+                out << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
             }
             else
             {             
-                StringBuilder builder;
-                builder << "Vec";
+                out << "Vec";
                 UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
 
-                builder << postFix;
+                out << postFix;
                 if (postFix.size() > 1)
                 {
-                    builder << "_";
+                    out << "_";
                 }
-                builder << vecCount;
-                return m_slicePool.add(builder);
+                out << vecCount;
             }
+            return SLANG_OK; 
         }
         case kIROp_MatrixType:
         {
@@ -397,42 +522,32 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            if (m_target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource)
             {
-                StringBuilder builder;
-                builder << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
-                return m_slicePool.add(builder);
+                out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
             }
             else
             {
-                // Make sure there is the vector name too
-                _getTypeName(_getVecType(elementType, colCount));
-
-                StringBuilder builder;
-
-                builder << "Mat";
+                out << "Mat";
                 const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
-                builder << postFix;
+                out  << postFix;
                 if (postFix.size() > 1)
                 {
-                    builder << "_";
+                    out << "_";
                 }
-                builder << rowCount;
-                builder << colCount;
-
-                return m_slicePool.add(builder);
+                out << rowCount;
+                out << colCount;
             }
+            return SLANG_OK;
         }
         case kIROp_HLSLRWStructuredBufferType:
         {
             auto bufType = static_cast<IRHLSLRWStructuredBufferType*>(type);
 
-            StringBuilder builder;
-            builder << "RWStructuredBuffer<";
-            builder << _getTypeName(bufType->getElementType());
-            builder << ">";
-
-            return m_slicePool.add(builder);
+            out << "RWStructuredBuffer<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(bufType->getElementType(), target, out));
+            out << ">";
+            return SLANG_OK;
         }
         case kIROp_ArrayType:
         {
@@ -440,24 +555,44 @@ StringSlicePool::Handle CPPSourceEmitter::_calcTypeName(IRType* type)
             auto elementType = arrayType->getElementType();
             int elementCount = int(GetIntVal(arrayType->getElementCount()));
 
-            StringBuilder builder;
-            builder << "FixedArray<";
-            builder << _getTypeName(elementType);
-            builder << ", " << elementCount << ">";
-
-            return m_slicePool.add(builder);
+            out << "FixedArray<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            out << ", " << elementCount << ">";
+            return SLANG_OK;
+        }
+        case kIROp_SamplerStateType:
+        {
+            out << "SamplerState";
+            return SLANG_OK;
+        }
+        case kIROp_SamplerComparisonStateType:
+        {
+            out << "SamplerComparisonState";
+            return SLANG_OK;
         }
         default:
         {
             if (IRBasicType::isaImpl(type->op))
             {
-                return m_slicePool.add(getBuiltinTypeName(type->op));
+                out << getBuiltinTypeName(type->op);
+                return SLANG_OK;
             }
+
+            if (auto texType = as<IRTextureTypeBase>(type))
+            {
+                // We don't support TextureSampler, so ignore that
+                if (texType->op != kIROp_TextureSamplerType)
+                {
+                    return _calcTextureTypeName(texType, out);   
+                }
+            }
+
             break;
         }
     }
 
-    return StringSlicePool::kNullHandle;
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for C/C++ emit");
+    return SLANG_FAIL;
 }
 
 void CPPSourceEmitter::useType(IRType* type)
@@ -615,8 +750,12 @@ static IRBasicType* _getElementType(IRType* type)
 
 static bool _isOperator(const UnownedStringSlice& funcName)
 {
-    const char c = funcName[0];
-    return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
+    if (funcName.size() > 0)
+    {
+        const char c = funcName[0];
+        return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
+    }
+    return false;
 }
 
 void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
@@ -989,6 +1128,130 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
+void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+    IRFuncType* funcType = specOp.signatureType;
+
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    emitType(retType);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    emitType(srcType);
+    writer->emitChar(' ');
+    writer->emitChar(char('a' + 0));
+    writer->emit(")");
+
+    writer->emit("\n{\n");
+    writer->indent();
+
+    writer->emit("return ");
+    emitType(retType);
+    writer->emit("{ ");
+
+    IRType* dstElemType = _getElementType(retType);
+    //IRType* srcElemType = _getElementType(srcType);
+
+    TypeDimension dim = _getTypeDimension(srcType, false);
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        if (dim.rowCount > 1)
+        {
+            if (i > 0)
+            {
+                writer->emit(", \n");
+            }
+            writer->emit("{ ");
+        }
+
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            if (j > 0)
+            {
+                writer->emit(", ");
+            }
+
+            emitType(dstElemType);
+            writer->emit("(");
+            _emitAccess(UnownedStringSlice::fromLiteral("a"), dim, i, j, writer);
+            writer->emit(")");
+        }
+        if (dim.rowCount > 1)
+        {
+            writer->emit("}");
+        }
+    }
+
+    writer->emit("};\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
+void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+    IRFuncType* funcType = specOp.signatureType;
+
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(1);
+    IRType* retType = specOp.returnType;
+
+    emitType(retType);
+    writer->emit(" ");
+    writer->emit(funcName);
+    writer->emit("(");
+    emitType(srcType);
+    writer->emitChar(' ');
+    writer->emitChar(char('a' + 0));
+    writer->emit(")");
+
+    writer->emit("\n{\n");
+    writer->indent();
+
+    writer->emit("return ");
+    emitType(retType);
+    writer->emit("{ ");
+
+    const TypeDimension dim = _getTypeDimension(retType, false);
+
+    for (int i = 0; i < dim.rowCount; ++i)
+    {
+        if (dim.rowCount > 1)
+        {
+            if (i > 0)
+            {
+                writer->emit(", \n");
+            }
+            writer->emit("{ ");
+        }
+        for (int j = 0; j < dim.colCount; ++j)
+        {
+            if (j > 0)
+            {
+                writer->emit(", ");
+            }
+            writer->emit("a");
+        }
+        if (dim.rowCount > 1)
+        {
+            writer->emit("}");
+        }
+    }
+
+    writer->emit("};\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {
     SourceWriter* writer = getSourceWriter();
@@ -1060,6 +1323,14 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         case IntrinsicOp::Reflect:
         {
             return _emitReflectDefinition(_getFuncName(specOp), specOp);
+        }
+        case IntrinsicOp::ConstructConvert:
+        {
+            return _emitConstructConvertDefinition(_getFuncName(specOp), specOp);
+        }
+        case IntrinsicOp::ConstructFromScalar:
+        {
+            return _emitConstructFromScalarDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
@@ -1183,47 +1454,40 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
         }
         case IntrinsicOp::Swizzle:
         {
-            // For C++ we don't need to emit a swizzle function
-            // For C we need a construction function
+            // Currently only works for C++ (we use {} constuction) - which means we don't need to generate a function.
+            // For C we need to generate suitable construction function
             auto swizzleInst = static_cast<IRSwizzle*>(inst);
             const Index elementCount = Index(swizzleInst->getElementCount());
 
-            if (elementCount == 1)
-            {
-                defaultEmitInstExpr(inst, inOuterPrec);
-            }
-            else
-            {
-                // TODO(JS): Not sure this is correct on the parens handling front
-                IRType* retType = specOp.returnType;
-                emitType(retType);
-                writer->emit("{");
+            // TODO(JS): Not 100% sure this is correct on the parens handling front
+            IRType* retType = specOp.returnType;
+            emitType(retType);
+            writer->emit("{");
 
-                for (Index i = 0; i < elementCount; ++i)
+            for (Index i = 0; i < elementCount; ++i)
+            {
+                if (i > 0)
                 {
-                    if (i > 0)
-                    {
-                        writer->emit(", ");
-                    }
-
-                    auto outerPrec = getInfo(EmitOp::General);
-
-                    auto prec = getInfo(EmitOp::Postfix);
-                    emitOperand(swizzleInst->getBase(), leftSide(outerPrec, prec));
-
-                    writer->emit(".");
-
-                    IRInst* irElementIndex = swizzleInst->getElementIndex(i);
-                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
-                    IRConstant* irConst = (IRConstant*)irElementIndex;
-                    UInt elementIndex = (UInt)irConst->value.intVal;
-                    SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-                    writer->emitChar(s_elemNames[elementIndex]);
+                    writer->emit(", ");
                 }
 
-                writer->emit("}");
+                auto outerPrec = getInfo(EmitOp::General);
+
+                auto prec = getInfo(EmitOp::Postfix);
+                emitOperand(swizzleInst->getBase(), leftSide(outerPrec, prec));
+
+                writer->emit(".");
+
+                IRInst* irElementIndex = swizzleInst->getElementIndex(i);
+                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                IRConstant* irConst = (IRConstant*)irElementIndex;
+                UInt elementIndex = (UInt)irConst->value.intVal;
+                SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+                writer->emitChar(s_elemNames[elementIndex]);
             }
+
+            writer->emit("}");
             break;
         }
         default:
@@ -1302,6 +1566,46 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
     else
     {
+        switch (specOp.op)
+        {
+            case IntrinsicOp::ConstructConvert:
+            {
+                // Work out the function name
+                IRFuncType* signatureType = specOp.signatureType;
+                SLANG_ASSERT(signatureType->getParamCount() == 2);
+
+                IRType* dstType = signatureType->getParamType(0);
+                //IRType* srcType = signatureType->getParamType(1);
+
+                StringBuilder builder;
+                builder << "convert_";
+                // I need a function that is called that will construct this
+                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                {
+                    return StringSlicePool::kNullHandle;
+                }
+                return m_slicePool.add(builder);
+            }
+            case IntrinsicOp::ConstructFromScalar:
+            {
+                // Work out the function name
+                IRFuncType* signatureType = specOp.signatureType;
+                SLANG_ASSERT(signatureType->getParamCount() == 2);
+
+                IRType* dstType = signatureType->getParamType(0);
+                
+                StringBuilder builder;
+                builder << "constructFromScalar_";
+                // I need a function that is called that will construct this
+                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                {
+                    return StringSlicePool::kNullHandle;
+                }
+                return m_slicePool.add(builder);
+            }
+            default: break;
+        }
+
         const auto& info = getOperationInfo(specOp.op);
         if (info.funcName.size())
         {
@@ -1316,6 +1620,38 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
 
 void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, const EmitOpInfo& inOuterPrec)
 {
+    switch (op)
+    {
+        case IntrinsicOp::ConstructFromScalar:
+        {
+            SLANG_ASSERT(operandCount == 1);
+            IRType* dstType = inst->getDataType();
+            IRType* srcType = _getElementType(dstType);
+            IRType* argTypes[2] = { dstType, srcType };
+
+            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
+
+            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
+            return;
+        }
+        case IntrinsicOp::ConstructConvert:
+        {
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            IRType* argTypes[2] = {inst->getDataType(), inst->getOperand(0)->getDataType() };
+
+            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
+
+            IRFuncType* signatureType = specOp.signatureType;
+            SLANG_UNUSED(signatureType);
+
+            SLANG_ASSERT(signatureType->getParamType(0) != signatureType->getParamType(1));
+
+            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
+            return;
+        }
+        default: break;
+    }
+
     if (operandCount > 8)
     {
         List<IRType*> argTypes;
@@ -1381,11 +1717,94 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     }
 }
 
-void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRType* valueType)
+{
+    StringSliceLoc nameAndLoc(name.getUnownedSlice());
+
+    if (auto refType = as<IRRefType>(type))
+    {
+        m_writer->emit("const ");
+    }
+
+    UnownedStringSlice slice = _getTypeName(valueType);
+    m_writer->emit(slice);
+    m_writer->emit("& ");
+    m_writer->emitName(nameAndLoc);
+}
+
+void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+{
+    // An `out` or `inout` parameter will have been
+    // encoded as a parameter of pointer type, so
+    // we need to decode that here.
+    //
+    if (auto outType = as<IROutType>(type))
+    {
+        return _emitInOutParamType(type, name, outType->getValueType());
+    }
+    else if (auto inOutType = as<IRInOutType>(type))
+    {
+        return _emitInOutParamType(type, name, inOutType->getValueType());
+    }
+    else if (auto refType = as<IRRefType>(type))
+    {
+        return _emitInOutParamType(type, name, refType->getValueType());
+    }
+
+    emitType(type, name);
+}
+
+bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     SLANG_UNUSED(varDecl);
-    SLANG_UNUSED(type);
-    SLANG_ASSERT(!"Not implemented");
+    SLANG_UNUSED(varType);
+
+    switch (varType->op)
+    {
+        case kIROp_StructType:
+        {
+            String name = getName(varDecl);
+
+            UnownedStringSlice typeName = _getTypeName(varType);
+            m_writer->emit(typeName);
+            m_writer->emit("* ");
+            m_writer->emit(name);
+            m_writer->emit(";\n");
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+{
+    // Output global parameters
+    auto varLayout = getVarLayout(varDecl);
+    SLANG_RELEASE_ASSERT(varLayout);
+
+    String name = getName(varDecl);
+    auto elementType = type->getElementType();
+
+    switch (type->op)
+    {
+        case kIROp_ParameterBlockType:
+        case kIROp_ConstantBufferType:
+        {
+            UnownedStringSlice typeName = _getTypeName(elementType);
+            m_writer->emit(typeName);
+            m_writer->emit("* ");
+            m_writer->emit(name);
+            m_writer->emit(";\n");
+            break;
+        }
+        default:
+        {            
+            emitType(elementType, name);
+            m_writer->emit(";\n");
+            break;
+        }
+    }
 }
 
 void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
@@ -1424,6 +1843,87 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLa
     }
 
     m_writer->emit("SLANG_PRELUDE_EXPORT\n");
+}
+
+void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
+    auto resultType = func->getResultType();
+
+    auto name = getFuncName(func);
+
+    // Deal with decorations that need
+    // to be emitted as attributes
+
+    // We are going to ignore the parameters passed and just pass in the Context
+
+    auto entryPointLayout = asEntryPoint(func);
+    if (entryPointLayout)
+    {
+        StringBuilder prefixName;
+        prefixName << "_" << name;
+        emitType(resultType, prefixName);
+        m_writer->emit("()\n");
+    }
+    else
+    {
+        emitType(resultType, name);
+
+        m_writer->emit("(");
+        auto firstParam = func->getFirstParam();
+        for (auto pp = firstParam; pp; pp = pp->getNextParam())
+        {
+            if (pp != firstParam)
+                m_writer->emit(", ");
+
+            emitSimpleFuncParamImpl(pp);
+        }
+        m_writer->emit(")");
+
+        emitSemantics(func);
+    }
+
+    // TODO: encode declaration vs. definition
+    if (isDefinition(func))
+    {
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+
+        // HACK: forward-declare all the local variables needed for the
+        // parameters of non-entry blocks.
+        emitPhiVarDecls(func);
+
+        // Need to emit the operations in the blocks of the function
+        emitFunctionBody(func);
+
+        m_writer->dedent();
+        m_writer->emit("}\n\n");
+    }
+    else
+    {
+        m_writer->emit(";\n\n");
+    }
+}
+
+void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
+{
+    switch (inst->op)
+    {
+        case kIROp_FloatLit:
+        {
+            IRConstant* constantInst = static_cast<IRConstant*>(inst);
+
+            m_writer->emit(constantInst->value.floatVal);
+
+            // If the literal is a float, then we need to add 'f' at end
+            IRType* type = constantInst->getDataType();
+            if (type && type->op == kIROp_FloatType )
+            {
+                m_writer->emitChar('f');
+            }
+            break;
+        }
+        default: Super::emitSimpleValueImpl(inst);
+    }
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
@@ -1578,7 +2078,44 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
     switch (inst->op)
     {
+        case kIROp_constructVectorFromScalar:
+        {
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            IRType* dstType = inst->getDataType();
+
+            // Check it's a vector
+            SLANG_ASSERT(dstType->op == kIROp_VectorType);
+            // Source must be a scalar
+            SLANG_ASSERT(as<IRBasicType>(inst->getOperand(0)->getDataType()));
+
+            emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+            return true;
+        }
         case kIROp_Construct:
+        {
+            IRType* dstType = inst->getDataType();
+            IRType* srcType = inst->getOperand(0)->getDataType();
+
+            if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
+                inst->getOperandCount() == 1)
+            {
+                if (as<IRBasicType>(srcType))
+                {
+                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                }
+                else
+                {
+                    SLANG_ASSERT(_getElementType(dstType) != _getElementType(srcType));
+                    // If it's constructed from a type conversion
+                    emitOperationCall(IntrinsicOp::ConstructConvert, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
+                }
+            }
+            else
+            {
+                emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+            }
+            return true;
+        }
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
@@ -1599,7 +2136,44 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_swizzle:
         {
-            emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+            // For C++ we don't need to emit a swizzle function
+           // For C we need a construction function
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+
+            IRInst* baseInst = swizzleInst->getBase();
+            IRType* baseType = baseInst->getDataType();
+
+            // If we are swizzling from a built in type, 
+            if (as<IRBasicType>(baseType))
+            {
+                // We can swizzle a scalar type to be a vector, or just a scalar
+                IRType* dstType = swizzleInst->getDataType();
+                if (as<IRBasicType>(dstType))
+                {
+                    // If the output is a scalar, then could only have been a .x, which we can just ignore the '.x' part
+                    emitOperand(baseInst, inOuterPrec);
+                }
+                else
+                {
+                    SLANG_ASSERT(dstType->op == kIROp_VectorType);
+                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), 1, dstType, inOuterPrec);
+                }
+            }
+            else
+            {
+                const Index elementCount = Index(swizzleInst->getElementCount());
+                if (elementCount == 1)
+                {
+                    // If just one thing is extracted then the . syntax will just work 
+                    defaultEmitInstExpr(inst, inOuterPrec);
+                }
+                else
+                {
+                    // Will need to generate a swizzle method
+                    emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+                }
+            }
+
             return true;
         }
         case kIROp_Call:
@@ -1619,6 +2193,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             return false;
         }
+
         default:
         {
             IntrinsicOp op = getOperation(inst->op);
@@ -1652,15 +2227,290 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     {
         emitSpecializedOperationDefinition(keyValue.Key);
     }
+}
 
-    // Lets take a look at layout
-
-    ProgramLayout* programLayout = m_programLayout;
-
-    if (programLayout)
+void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
+{
+    if (shouldFoldInstIntoUseSites(inst))
     {
+        emitInstExpr(inst, outerPrec);
+        return;
+    }
 
+    switch (inst->op)
+    {
+        case 0: // nothing yet
+        case kIROp_GlobalParam:
+        {
+            // It's in UniformState
+            String name = getName(inst);
+            m_writer->emit("(");
+            switch (inst->getDataType()->op)
+            {
+                case kIROp_ParameterBlockType:
+                case kIROp_ConstantBufferType:
+                case kIROp_StructType:
+                {
+                    m_writer->emit("*");
+                    break;
+                }
+                default: break;
+            }
+            m_writer->emit("uniformState->");
+            m_writer->emit(name);
+            m_writer->emit(")");
+            break;
+        }
+        case kIROp_Param:
+        {
+            auto varLayout = getVarLayout(inst);
 
+            if (varLayout)
+            {
+                auto semanticNameSpelling = varLayout->systemValueSemantic;
+                if (semanticNameSpelling.getLength())
+                {
+                    semanticNameSpelling = semanticNameSpelling.toLower();
+
+                    if (semanticNameSpelling == "sv_dispatchthreadid")
+                    {
+                        
+                        m_writer->emit("dispatchThreadID");
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupid")
+                    {
+                        m_writer->emit("varyingInput.groupID");
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupthreadid")
+                    {
+                        m_writer->emit("varyingInput.groupThreadID");
+                        return;
+                    }
+                }
+            }
+
+            ;   // Fall-thru
+        }
+        case kIROp_GlobalVar:
+        default:
+            // GlobalVar should be fine as should just be a member of Context
+            m_writer->emit(getName(inst));
+            break;
+    }
+}
+
+static bool _isVariable(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+        //case kIROp_Var:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
+static bool _isFunction(IROp op)
+{
+    return op == kIROp_Func;
+}
+
+struct GlobalParamInfo
+{
+    typedef GlobalParamInfo ThisType;
+    bool operator<(const ThisType& rhs) const { return offset < rhs.offset; }
+    bool operator==(const ThisType& rhs) const { return offset == rhs.offset; }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs);  }
+
+    IRInst* inst;
+    UInt offset;
+    UInt size;
+};
+
+void CPPSourceEmitter::emitModuleImpl(IRModule* module)
+{
+    List<EmitAction> actions;
+    computeEmitActions(module, actions);
+
+    // Emit forward declarations. Don't emit variables that need to be grouped or function definitions (which will ref those types)
+    for (auto action : actions)
+    {
+        switch (action.level)
+        {
+            case EmitAction::Level::ForwardDeclaration:
+                emitFuncDecl(cast<IRFunc>(action.inst));
+                break;
+
+            case EmitAction::Level::Definition:
+                if (_isVariable(action.inst->op) || _isFunction(action.inst->op))
+                {
+                    // Don't emit functions or variables that have to be grouped into structures yet
+                }
+                else
+                {
+                    emitGlobalInst(action.inst);
+                }
+                break;
+        }
+    }
+
+    // Output the global parameters in a 'UniformState' structure
+    {
+        m_writer->emit("struct UniformState\n{\n");
+        m_writer->indent();
+
+        List<GlobalParamInfo> params;
+
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
+            {
+                VarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
+                SLANG_ASSERT(varLayout);
+                const VarLayout::ResourceInfo* varInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+                TypeLayout* typeLayout = varLayout->getTypeLayout();
+                TypeLayout::ResourceInfo* typeInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+
+                GlobalParamInfo paramInfo;
+                paramInfo.inst = action.inst;
+                // Index is the byte offset for uniform
+                paramInfo.offset = varInfo ? varInfo->index : 0;
+                paramInfo.size = typeInfo ? typeInfo->count.raw : 0;
+
+                params.add(paramInfo);
+            }
+        }
+
+        // We want to sort by layout offset, and insert suitable padding
+        params.sort();
+
+        int padIndex = 0;
+        size_t offset = 0;
+        for (const auto& paramInfo : params)
+        {
+            if (offset < paramInfo.offset)
+            {
+                // We want to output some padding
+                StringBuilder builder;
+                builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
+            }
+
+            emitGlobalInst(paramInfo.inst);
+            // Set offset after this 
+            offset = paramInfo.offset + paramInfo.size;
+        }
+
+        m_writer->emit("\n");
+        m_writer->dedent();
+        m_writer->emit("\n};\n\n");
+    }
+
+    // Output the 'Context' which will be used for execution
+    {
+        m_writer->emit("struct Context\n{\n");
+        m_writer->indent();
+
+        m_writer->emit("UniformState* uniformState;\n");
+        m_writer->emit("ComputeVaryingInput varyingInput;\n");
+        m_writer->emit("uint3 dispatchThreadID;\n");
+
+        // Output all the thread locals 
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
+        // Finally output the functions as methods on the context
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
+        m_writer->dedent();
+        m_writer->emit("};\n\n");
+    }
+
+     // Finally we need to output dll entry points
+
+    for (auto action : actions)
+    {
+        if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+        {
+            IRFunc* func = as<IRFunc>(action.inst);
+
+            auto entryPointLayout = asEntryPoint(func);
+            if (entryPointLayout)
+            {
+                auto resultType = func->getResultType();
+                auto name = getFuncName(func);
+
+                // Emit the actual function
+                emitEntryPointAttributes(func, entryPointLayout);
+                emitType(resultType, name);
+
+                m_writer->emit("(ComputeVaryingInput* varyingInput, UniformState* uniformState)\n{\n");
+                emitSemantics(func);
+
+                m_writer->indent();
+                // Initialize when constructing so that globals are zeroed
+                m_writer->emit("Context context = {};\n");
+                m_writer->emit("context.uniformState = uniformState;\n");
+                m_writer->emit("context.varyingInput = *varyingInput;\n");
+
+                // Emit dispatchThreadID
+                if (entryPointLayout->profile.GetStage() == Stage::Compute)
+                {
+                    // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sv-dispatchthreadid
+                    // SV_DispatchThreadID is the sum of SV_GroupID * numthreads and GroupThreadID.
+
+                    static const UInt kAxisCount = 3;
+                    UInt sizeAlongAxis[kAxisCount];
+
+                    // TODO: this is kind of gross because we are using a public
+                    // reflection API function, rather than some kind of internal
+                    // utility it forwards to...
+                    spReflectionEntryPoint_getComputeThreadGroupSize((SlangReflectionEntryPoint*)entryPointLayout, kAxisCount, &sizeAlongAxis[0]);
+
+                    m_writer->emit("context.dispatchThreadID = {\n");
+                    m_writer->indent();
+
+                    StringBuilder builder;
+                    
+                    for (int i = 0; i < kAxisCount; ++i)
+                    {
+                        builder.Clear();
+                        const char elem[2] = {s_elemNames[i], 0};
+                        builder << "varyingInput->groupID." << elem << " * " << sizeAlongAxis[i] << " + varyingInput->groupThreadID." << elem;
+                        if (i < kAxisCount - 1)
+                        {
+                            builder << ",";
+                        }
+                        builder << "\n";
+                        m_writer->emit(builder);
+                    }
+
+                    m_writer->dedent();
+                    m_writer->emit("};\n");
+                }
+
+                m_writer->emit("context._");
+                m_writer->emit(name);
+                m_writer->emit("();\n");
+                m_writer->dedent();
+                m_writer->emit("}\n");
+            }
+        }
     }
 }
 

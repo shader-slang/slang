@@ -17,14 +17,6 @@ class Type;
 
 //
 
-enum class LayoutRule
-{
-    Std140,
-    Std430,
-    HLSLConstantBuffer,
-    HLSLStructuredBuffer,
-};
-
 #if 0
 enum class LayoutRulesFamily
 {
@@ -392,7 +384,7 @@ public:
 typedef unsigned int VarLayoutFlags;
 enum VarLayoutFlag : VarLayoutFlags
 {
-    HasSemantic = 1 << 1
+    HasSemantic = 1 << 0
 };
 
 // A reified layout for a particular variable, field, etc.
@@ -924,6 +916,8 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
+
+    virtual LayoutRulesImpl* getStructuredBufferRules() = 0;
 };
 
 struct TypeLayoutContext

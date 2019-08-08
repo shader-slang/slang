@@ -705,7 +705,7 @@ void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
     }
 }
 
-void CLikeSourceEmitter::emitSimpleValue(IRInst* inst)
+void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch(inst->op)
     {
@@ -927,7 +927,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
-void CLikeSourceEmitter::emitOperand(IRInst* inst, EmitOpInfo const&  outerPrec)
+void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
 {
     if( shouldFoldInstIntoUseSites(inst) )
     {
@@ -2541,7 +2541,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     emitSemantics(param);
 }
 
-void CLikeSourceEmitter::emitSimpleFunc(IRFunc* func)
+void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
 
@@ -2592,7 +2592,7 @@ void CLikeSourceEmitter::emitSimpleFunc(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitParamType(IRType* type, String const& name)
+void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     // An `out` or `inout` parameter will have been
     // encoded as a parameter of pointer type, so
@@ -3242,7 +3242,7 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
     }
 }
 
-void CLikeSourceEmitter::emitModule(IRModule* module)
+void CLikeSourceEmitter::emitModuleImpl(IRModule* module)
 {
     // The IR will usually come in an order that respects
     // dependencies between global declarations, but this

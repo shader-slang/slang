@@ -346,6 +346,38 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        switch (baseType)
+        {
+            case BaseType::Bool:
+            {
+                // TODO(JS): Much like ptr this is a problem - in knowing how to return this value. In the past it's been a word
+                // on some compilers for example.
+                // On checking though current compilers (clang, g++, visual studio) it is a single byte
+                return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1, 1 );
+            }
+
+            default: return Super::GetScalarLayout(baseType);
+        }
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        return Super::BeginStructLayout();
+    }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Conform to C/C++ size is adjusted to the largest alignment
+        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -558,6 +590,8 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+
+    LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
@@ -576,11 +610,86 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules()   override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    
+    LayoutRulesImpl* getStructuredBufferRules() override;
+};
+
+struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
+CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 
+// CPU case
+
+struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
+{
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    {
+        switch (kind)
+        {
+            case ShaderParameterKind::ConstantBuffer:
+                // It's a pointer to the actual uniform data
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::MutableTexture:
+            case ShaderParameterKind::TextureUniformBuffer:
+            case ShaderParameterKind::Texture:
+                // It's a pointer to a texture interface 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                
+            case ShaderParameterKind::StructuredBuffer:            
+            case ShaderParameterKind::MutableStructuredBuffer:
+                // It's a ptr and a size of the amount of elements
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+
+            case ShaderParameterKind::RawBuffer:
+            case ShaderParameterKind::Buffer:
+            case ShaderParameterKind::MutableRawBuffer:
+            case ShaderParameterKind::MutableBuffer:
+                // It's a pointer and a size in bytes
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+
+            case ShaderParameterKind::SamplerState:
+                // It's a pointer
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+ 
+            case ShaderParameterKind::TextureSampler:
+            case ShaderParameterKind::MutableTextureSampler:
+            case ShaderParameterKind::InputRenderTarget:
+                // TODO: how to handle these?
+            default:
+                SLANG_UNEXPECTED("unhandled shader parameter kind");
+                UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+};
+
+
+
+static CPUObjectLayoutRulesImpl kCPUObjectLayoutRulesImpl;
+static CPULayoutRulesImpl kCPULayoutRulesImpl;
+
+LayoutRulesImpl kCPULayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
+};
 
 // GLSL cases
 
@@ -624,6 +733,11 @@ LayoutRulesImpl kGLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kGLSLHitAttributesParameterLayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kGLSLStructuredBufferLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
+
 // HLSL cases
 
 LayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl_ = {
@@ -654,7 +768,7 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLHitAttributesParameterLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
 
-//
+// GLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -717,7 +831,12 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-//
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kGLSLStructuredBufferLayoutRulesImpl_;
+}
+
+// HLSL Family
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -739,6 +858,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kHLSLStructuredBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getTextureBufferRules()
@@ -781,21 +905,65 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kHLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
+// CPU Family
 
-
-//
-
-LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules()
 {
-    switch (rule)
-    {
-    case LayoutRule::Std140:                return &kStd140LayoutRulesImpl_;
-    case LayoutRule::Std430:                return &kStd430LayoutRulesImpl_;
-    case LayoutRule::HLSLConstantBuffer:    return &kHLSLConstantBufferLayoutRulesImpl_;
-    case LayoutRule::HLSLStructuredBuffer:  return &kHLSLStructuredBufferLayoutRulesImpl_;
-    default:
-        return nullptr;
-    }
+    return &kCPULayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPULayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // Not clear - just use similar to CPU 
+    return &kCPULayoutRulesImpl_;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    // Just following HLSLs lead for the moment
+    return &kCPULayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
@@ -820,13 +988,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     {
+        // For now lets use some fairly simple CPU binding rules
+
         // We just need to decide here what style of layout is appropriate, in terms of memory
         // and binding. That in terms of the actual binding that will be injected into functions
         // in the form of a BindContext. For now we'll go with HLSL layout -
         // that we may want to rethink that with the use of arrays and binding VK style binding might be
         // more appropriate in some ways.
 
-        return &kHLSLLayoutRulesFamilyImpl;
+        return &kCPULayoutRulesFamilyImpl;
     }
 
     default:
@@ -1253,7 +1423,10 @@ static bool _usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
     /// to the resource usage of a container like a `ConstantBuffer<X>` or
     /// `ParameterBlock<X>`.
     ///
+    /// TODO: letUnformBleedThrough is (hopefully temporary) a hack that was added to enable CPU targets to
+    /// produce workable layout. CPU targets have all bindings/variables laid out as uniforms
 static void _addUnmaskedResourceUsage(
+    bool letUniformBleedThrough, 
     TypeLayout* dstTypeLayout,
     TypeLayout* srcTypeLayout,
     bool        haveFullRegisterSpaceOrSet)
@@ -1264,6 +1437,10 @@ static void _addUnmaskedResourceUsage(
         {
         case LayoutResourceKind::Uniform:
             // Ordinary/uniform resource usage will always be masked.
+            if (letUniformBleedThrough)
+            {
+                dstTypeLayout->addResourceUsage(resInfo);
+            }
             break;
 
         case LayoutResourceKind::RegisterSpace:
@@ -1453,6 +1630,13 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     for( auto elementTypeResInfo : rawElementTypeLayout->resourceInfos )
     {
         auto kind = elementTypeResInfo.kind;
+
+        // TODO: Added to make layout work correctly for CPU target 
+        if(kind == LayoutResourceKind::Uniform)
+        {
+            continue;
+        }
+
         auto elementVarResInfo = elementVarLayout->findOrAddResourceInfo(kind);
 
         // If the container part of things is using the same resource kind
@@ -1518,7 +1702,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // buffer. Its resource usage will only bleed through if we
     // didn't allocate a full `space` or `set`.
     //
-    _addUnmaskedResourceUsage(typeLayout, containerTypeLayout, wantSpaceOrSet);
+    _addUnmaskedResourceUsage(true, typeLayout, containerTypeLayout, wantSpaceOrSet);
 
     // next we turn to the element type, where the cases are slightly
     // more involved (technically we could use this same logic for
@@ -1526,7 +1710,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // just special-case the container).
     //
 
-    _addUnmaskedResourceUsage(typeLayout, rawElementTypeLayout, wantSpaceOrSet);
+    _addUnmaskedResourceUsage(false, typeLayout, rawElementTypeLayout, wantSpaceOrSet);
 
     // At this point we have handled all the complexities that
     // arise for a parameter group that doesn't include interface-type
@@ -1684,8 +1868,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // up the hierarchy.
         //
         RefPtr<TypeLayout> unmaskedPendingDataTypeLayout = new TypeLayout();
-        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
-        _addUnmaskedResourceUsage(unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
+        _addUnmaskedResourceUsage(true, unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
+        _addUnmaskedResourceUsage(false, unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
 
         // TODO: we should probably optimize for the case where there is no unmasked
         // usage that needs to be reported out, since it should be a common case.
@@ -1836,9 +2020,7 @@ createStructuredBufferTypeLayout(
     typeLayout->elementTypeLayout = elementTypeLayout;
 
     typeLayout->uniformAlignment = info.alignment;
-    SLANG_RELEASE_ASSERT(!typeLayout->FindResourceInfo(LayoutResourceKind::Uniform));
-    SLANG_RELEASE_ASSERT(typeLayout->uniformAlignment == 1);
-
+    
     if( info.size != 0 )
     {
         typeLayout->addResourceUsage(info.kind, info.size);
@@ -1859,10 +2041,8 @@ createStructuredBufferTypeLayout(
     RefPtr<Type>                structuredBufferType,
     RefPtr<Type>                elementType)
 {
-    // TODO(tfoley): we should be looking up the appropriate rules
-    // via the `LayoutRulesFamily` in use here...
-    auto structuredBufferLayoutRules = GetLayoutRulesImpl(
-        LayoutRule::HLSLStructuredBuffer);
+    // look up the appropriate rules via the `LayoutRulesFamily` 
+    auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules();
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout = createTypeLayout(

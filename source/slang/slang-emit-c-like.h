@@ -86,13 +86,13 @@ public:
         EmitVarChain*   next;
 
         EmitVarChain()
-            : varLayout(0)
-            , next(0)
+            : varLayout(nullptr)
+            , next(nullptr)
         {}
 
         EmitVarChain(VarLayout* varLayout)
             : varLayout(varLayout)
-            , next(0)
+            , next(nullptr)
         {}
 
         EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
@@ -175,11 +175,11 @@ public:
     String getName(IRInst* inst);
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
-    void emitSimpleValue(IRInst* inst);
+    void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
     
     bool shouldFoldInstIntoUseSites(IRInst* inst);
 
-    void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec);
+    void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec) { emitOperandImpl(inst, outerPrec); }
 
     void emitArgs(IRInst* inst);
 
@@ -218,7 +218,7 @@ public:
     void emitSemantics(VarLayout* varLayout);
     void emitSemantics(IRInst* inst);
 
-    VarLayout* getVarLayout(IRInst* var);
+    static VarLayout* getVarLayout(IRInst* var);
 
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
@@ -247,9 +247,9 @@ public:
         /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
-    void emitSimpleFunc(IRFunc* func);
+    void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
-    void emitParamType(IRType* type, String const& name);
+    void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
     IRInst* getSpecializedValue(IRSpecialize* specInst);
 
@@ -305,7 +305,7 @@ public:
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
-    void emitModule(IRModule* module);
+    void emitModule(IRModule* module) { emitModuleImpl(module); }
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -335,6 +335,11 @@ public:
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
     virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
+    virtual void emitSimpleValueImpl(IRInst* inst);
+    virtual void emitModuleImpl(IRModule* module);
+    virtual void emitSimpleFuncImpl(IRFunc* func);
+    virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
+    virtual void emitParamTypeImpl(IRType* type, String const& name);
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

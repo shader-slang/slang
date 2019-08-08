@@ -1130,7 +1130,7 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
 
     StringBuilder actualOutput;
 
-    // TODO(JS): For moment just assume function name/data/paramters
+    // TODO(JS): For moment just assume function name/data/parameters
     {
         SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
         if (!func)
@@ -1139,22 +1139,32 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
             return TestResult::Fail;
         }
 
-        typedef void (*Func)(CPPPrelude::Vector<uint32_t,3> threadID, CPPPrelude::RWStructuredBuffer<int32_t> buffer);
+        
+        struct UniformState
+        {
+            CPPPrelude::RWStructuredBuffer<int> buffer;
+        };
+        
+        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, UniformState* uniformState);
 
         Func runFunc = Func(func);
         int32_t data[4] = { 0, 0, 0, 0};
-        CPPPrelude::RWStructuredBuffer<int32_t> buffer{data, 4};
 
+        UniformState state;
+
+        state.buffer = CPPPrelude::RWStructuredBuffer<int32_t>{data, 4};
+
+        CPPPrelude::ComputeVaryingInput varyingInput = {};
         for (Int i = 0; i < 4; ++i)
         {
-            CPPPrelude::Vector<uint32_t, 3> threadID{ uint32_t(i), 0, 0};
-            runFunc(threadID, buffer);
+            varyingInput.groupThreadID.x = uint32_t(i);
+            runFunc(&varyingInput, &state);
         }
 
         SharedLibrary::unload(sharedLibrary);
 
         // Write the data
-        _writeBuffer(buffer, actualOutput);
+        _writeBuffer(state.buffer, actualOutput);
     }
 
     String expectedOutputPath = outputStem + ".expected";
@@ -1314,13 +1324,12 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
 
-    auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    cmdLine.addArg(filePath999);
+    cmdLine.addArg(input.filePath);
 
     for (auto arg : input.testOptions->args)
     {

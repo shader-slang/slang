@@ -10,6 +10,24 @@
 namespace Slang
 {
 
+/* TODO(JS): Note that there are multiple methods to handle 'construction' operations. That is because 'construct' is used as a kind of
+generic 'construction' for built in types including vectors and matrices.
+
+For the moment the cpp emit code, determines what kind of construct is needed, and has special handling for ConstructConvert and
+ConstructFromScalar. 
+
+That currently we do not see constructVectorFromScalar - for example when we do...
+
+int2 fromScalar = 1;
+
+This appears as a construction from an int.
+
+That the better thing to do would be that there were IR instructions for the specific types of construction. I suppose there is a question
+about whether there should be separate instructions for vector/matrix, or emit code should just use the destination type. In practice I think
+it's fine that there isn't an instruction separating vector/matrix. That being the case I guess we arguably don't need constructVectorFromScalar,
+just constructXXXFromScalar. Would be good if there was a suitable name to encompass vector/matrix. 
+*/
+
 #define SLANG_CPP_INTRINSIC_OP(x) \
         x(Invalid, "", -1) \
         x(Init, "", -1) \
@@ -93,7 +111,10 @@ namespace Slang
         \
         x(AsFloat, "asfloat", 1) \
         x(AsInt, "asint", 1) \
-        x(AsUInt, "asuint", 1)
+        x(AsUInt, "asuint", 1) \
+        \
+        x(ConstructConvert, "", 1) \
+        x(ConstructFromScalar, "", 1) 
   
 
 class CPPSourceEmitter: public CLikeSourceEmitter
@@ -181,6 +202,13 @@ protected:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
+    virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
+    virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
+    virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
 
     void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec);
 
@@ -194,8 +222,12 @@ protected:
     void _emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitConstructConvertDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    void _emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+
+    void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);
 
     UnownedStringSlice _getAndEmitSpecializedOperationDefinition(IntrinsicOp op, IRType*const* argTypes, Int argCount, IRType* retType);
 
@@ -215,6 +247,10 @@ protected:
 
     UnownedStringSlice _getTypeName(IRType* type);
     StringSlicePool::Handle _calcTypeName(IRType* type);
+
+    SlangResult _calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
+
+    SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;

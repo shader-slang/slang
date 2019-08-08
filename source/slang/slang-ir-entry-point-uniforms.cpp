@@ -98,6 +98,12 @@ struct MoveEntryPointUniformParametersToGlobalScope
     //
     IRModule* module;
 
+    // The target can determine how a variable is moved out into global scope
+    CodeGenTarget codeGenTarget;
+
+    // If true the target needs constant buffer wrapping (for uniforms say)
+    bool targetNeedsConstantBuffer;
+
     // We will process a whole module by visiting all
     // its global functions, looking for entry points.
     //
@@ -162,7 +168,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // an explicit IR constant buffer for that wrapper, 
         //
         auto entryPointParamsLayout = entryPointLayout->parametersLayout;
-        bool needConstantBuffer = entryPointParamsLayout->typeLayout.is<ParameterGroupTypeLayout>(); 
+        bool needConstantBuffer = targetNeedsConstantBuffer && entryPointParamsLayout->typeLayout.is<ParameterGroupTypeLayout>(); 
 
         // We will set up an IR builder so that we are ready to generate code.
         //
@@ -369,6 +375,10 @@ struct MoveEntryPointUniformParametersToGlobalScope
                 return true;
         }
 
+        // TODO(JS): We probably want a more accurate way of determining if system semantic value
+        // We can use the flags Flag::SemanticValue for one. But main issue with this test, is for some
+        // targets currently (CPU) no resources are consumed. Perhaps this is fixed elsewhere by using a 'notional' resource.
+
         // Varying parameters with "system value" semantics currently show up as
         // consuming no resources, so we need to special-case that here.
         //
@@ -415,10 +425,29 @@ struct MoveEntryPointUniformParametersToGlobalScope
 };
 
 void moveEntryPointUniformParamsToGlobalScope(
-    IRModule*   module)
+    IRModule*   module,
+    CodeGenTarget target)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
+    
     context.module = module;
+    context.codeGenTarget = target;
+    context.targetNeedsConstantBuffer = true;
+
+    // Check if this target needs constant buffer wrapping
+    switch (target)
+    {
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CSource:
+        case CodeGenTarget::Executable:
+        case CodeGenTarget::SharedLibrary:
+        {
+            context.targetNeedsConstantBuffer = false;
+            break;
+        }
+        default: break;
+    }
+
     context.processModule();
 }
 

@@ -2632,6 +2632,21 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
     return numUsed;
 }
 
+static bool _isCPUTarget(CodeGenTarget target)
+{
+    switch (target)
+    {
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CSource:
+        case CodeGenTarget::Executable:
+        case CodeGenTarget::SharedLibrary:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
     /// Keep track of the running global counter for entry points and global parameters visited.
     ///
     /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
@@ -3022,16 +3037,22 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // want to do so through a different feature.
     //
     bool needDefaultConstantBuffer = false;
-    for( auto& parameterInfo : sharedContext.parameters )
-    {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
-        // Does the field have any uniform data?
-        if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+    // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
+    // all resources are 'Uniform')
+    if (!_isCPUTarget(targetReq->target))
+    {
+        for( auto& parameterInfo : sharedContext.parameters )
         {
-            needDefaultConstantBuffer = true;
-            diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
+            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+            auto firstVarLayout = parameterInfo->varLayouts.getFirst();
+
+            // Does the field have any uniform data?
+            if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+            {
+                needDefaultConstantBuffer = true;
+                diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
+            }
         }
     }
 
