@@ -687,20 +687,20 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
         break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
+            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<MaxVertexCountAttribute>())
             {
                 m_writer->emit("layout(max_vertices = ");
                 m_writer->emit(attrib->value);
                 m_writer->emit(") out;\n");
             }
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
+            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
             {
                 m_writer->emit("layout(invocations = ");
                 m_writer->emit(attrib->value);
                 m_writer->emit(") in;\n");
             }
 
-            for (auto pp : entryPointLayout->entryPoint->GetParameters())
+            for (auto pp : entryPointLayout->getFuncDecl()->GetParameters())
             {
                 if (auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {

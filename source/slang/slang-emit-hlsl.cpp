@@ -294,13 +294,13 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
         break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<MaxVertexCountAttribute>())
+            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<MaxVertexCountAttribute>())
             {
                 m_writer->emit("[maxvertexcount(");
                 m_writer->emit(attrib->value);
                 m_writer->emit(")]\n");
             }
-            if (auto attrib = entryPointLayout->entryPoint->FindModifier<InstanceAttribute>())
+            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
             {
                 m_writer->emit("[instance(");
                 m_writer->emit(attrib->value);

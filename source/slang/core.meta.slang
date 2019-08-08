@@ -1314,3 +1314,7 @@ attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsage
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [format(format : String)] : FormatAttribute;
+
+__attributeTarget(Decl)
+attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
+

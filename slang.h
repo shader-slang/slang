@@ -1575,10 +1575,7 @@ extern "C"
     typedef struct SlangProgramLayout SlangProgramLayout;
     typedef struct SlangEntryPoint SlangEntryPoint;
     typedef struct SlangEntryPointLayout SlangEntryPointLayout;
-    typedef struct SlangEntryPointGroupLayout SlangEntryPointGroupLayout;
 
-//    typedef struct SlangReflection                  SlangReflection;
-//    typedef struct SlangReflectionEntryPoint        SlangReflectionEntryPoint;
     typedef struct SlangReflectionModifier          SlangReflectionModifier;
     typedef struct SlangReflectionType              SlangReflectionType;
     typedef struct SlangReflectionTypeLayout        SlangReflectionTypeLayout;
@@ -1904,6 +1901,12 @@ extern "C"
     SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
         SlangReflectionEntryPoint* entryPoint);
 
+    SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
+        SlangReflectionEntryPoint* entryPoint);
+
+    SLANG_API int spReflectionEntryPoint_hasDefaultConstantBuffer(
+        SlangReflectionEntryPoint* entryPoint);
+
     // SlangReflectionTypeParameter
     SLANG_API char const* spReflectionTypeParameter_GetName(SlangReflectionTypeParameter* typeParam);
     SLANG_API unsigned spReflectionTypeParameter_GetIndex(SlangReflectionTypeParameter* typeParam);
@@ -1926,9 +1929,6 @@ extern "C"
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
     SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangReflection* reflection, char const* name);
 
-    SLANG_API SlangInt spReflection_getEntryPointGroupCount(SlangReflection* reflection);
-    SLANG_API SlangEntryPointGroupLayout* spReflection_getEntryPointGroupByIndex(SlangReflection* reflection, SlangInt index);
-
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
@@ -1938,16 +1938,6 @@ extern "C"
         SlangInt                    specializationArgCount,
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
-
-    // Entry point group reflection
-
-    SLANG_API SlangInt spEntryPointGroupLayout_getEntryPointCount(SlangEntryPointGroupLayout* group);
-    SLANG_API SlangReflectionEntryPoint* spEntryPointGroupLayout_getEntryPointByIndex(SlangEntryPointGroupLayout* group, SlangInt index);
-    SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getVarLayout(SlangEntryPointGroupLayout* group);
-
-    SLANG_API SlangInt spEntryPointGroupLayout_getParameterCount(SlangEntryPointGroupLayout* group);
-    SLANG_API SlangReflectionVariableLayout* spEntryPointGroupLayout_getParameterByIndex(SlangEntryPointGroupLayout* group, SlangInt index);
-
 
 #ifdef __cplusplus
 }
@@ -2452,36 +2442,23 @@ namespace slang
         {
             return 0 != spReflectionEntryPoint_usesAnySampleRateInput((SlangReflectionEntryPoint*) this);
         }
-    };
-    typedef EntryPointReflection EntryPointLayout;
-
-    struct EntryPointGroupLayout
-    {
-        SlangInt getEntryPointCount()
-        {
-            return spEntryPointGroupLayout_getEntryPointCount((SlangEntryPointGroupLayout*) this);
-        }
-
-        EntryPointReflection* getEntryPointByIndex(SlangInt index)
-        {
-            return (EntryPointReflection*) spEntryPointGroupLayout_getEntryPointByIndex((SlangEntryPointGroupLayout*) this, index);
-        }
 
         VariableLayoutReflection* getVarLayout()
         {
-            return (VariableLayoutReflection*) spEntryPointGroupLayout_getVarLayout((SlangEntryPointGroupLayout*) this);
+            return (VariableLayoutReflection*) spReflectionEntryPoint_getVarLayout((SlangReflectionEntryPoint*) this);
         }
 
-        SlangInt getParameterCount()
+        TypeLayoutReflection* getTypeLayout()
         {
-            return spEntryPointGroupLayout_getParameterCount((SlangEntryPointGroupLayout*) this);
+            return getVarLayout()->getTypeLayout();
         }
 
-        VariableLayoutReflection* getParameterByIndex(SlangInt index)
+        bool hasDefaultConstantBuffer()
         {
-            return (VariableLayoutReflection*) spEntryPointGroupLayout_getParameterByIndex((SlangEntryPointGroupLayout*) this, index);
+            return spReflectionEntryPoint_hasDefaultConstantBuffer((SlangReflectionEntryPoint*) this) != 0;
         }
     };
+    typedef EntryPointReflection EntryPointLayout;
 
     struct TypeParameterReflection
     {
@@ -2552,16 +2529,6 @@ namespace slang
             return (EntryPointReflection*) spReflection_getEntryPointByIndex((SlangReflection*) this, index);
         }
 
-        SlangInt getEntryPointGroupCount()
-        {
-            return spReflection_getEntryPointGroupCount((SlangReflection*) this);
-        }
-
-        EntryPointGroupLayout* getEntryPointGroupByIndex(SlangInt index)
-        {
-            return (EntryPointGroupLayout*) spReflection_getEntryPointGroupByIndex((SlangReflection*) this, index);
-        }
-
         SlangUInt getGlobalConstantBufferBinding()
         {
             return spReflection_getGlobalConstantBufferBinding((SlangReflection*)this);
@@ -2613,13 +2580,12 @@ namespace slang
 
     typedef ISlangBlob IBlob;
 
+    struct IComponentType;
     struct IGlobalSession;
     struct IModule;
-    struct IProgram;
     struct ISession;
 
     struct SessionDesc;
-    struct ProgramDesc;
     struct SpecializationArg;
     struct TargetDesc;
 
@@ -2763,20 +2729,39 @@ namespace slang
             const char* moduleName,
             IBlob**     outDiagnostics = nullptr) = 0;
 
-            /** Create a program out of existing compiled items.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createProgram(
-            ProgramDesc const& desc,
-            IProgram**         outProgram) = 0;
+            /** Combine multiple component types to create a composite component type.
 
-            /** Specialize a program based on type arguments.
+            The `componentTypes` array must contain `componentTypeCount` pointers
+            to component types that were loaded or created using the same session.
+
+            The shader parameters and specialization parameters of the composite will
+            be the union of those in `componentTypes`. The relative order of child
+            component types is significant, and will affect the order in which
+            parameters are reflected and laid out.
+
+            The entry-point functions of the composite will be the union of those in
+            `componentTypes`, and will follow the ordering of `componentTypes`.
+
+            The requirements of the composite component type will be a subset of
+            those in `componentTypes`. If an entry in `componentTypes` has a requirement
+            that can be satisfied by another entry, then the composition will
+            satisfy the requirement and it will not appear as a requirement of
+            the composite. If multiple entries in `componentTypes` have a requirement
+            for the same type, then only the first such requirement will be retained
+            on the composite. The relative ordering of requirements on the composite
+            will otherwise match that of `componentTypes`.
+
+            If any diagnostics are generated during creation of the composite, they
+            will be written to `outDiagnostics`. If an error is encountered, the
+            function will return null.
+
+            It is an error to create a composite component type that recursively
+            aggregates the a single module more than once.
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL specializeProgram(
-            IProgram*                   program,
-            SlangInt                    specializationArgCount,
-            SpecializationArg const*    specializationArgs,
-            IProgram**                  outSpecializedProgram,
-            ISlangBlob**                outDiagnostics = nullptr) = 0;
+        virtual SLANG_NO_THROW IComponentType* SLANG_MCALL createCompositeComponentType(
+            IComponentType* const*  componentTypes,
+            SlangInt                componentTypeCount,
+            ISlangBlob**            outDiagnostics = nullptr) = 0;
 
             /** Specialize a type based on type arguments.
             */
@@ -2803,6 +2788,131 @@ namespace slang
 
     #define SLANG_UUID_ISession { 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } }
 
+        /** A component type is a unit of shader code layout, reflection, and linking.
+
+        A component type is a unit of shader code that can be included into
+        a linked and compiled shader program. Each component type may have:
+
+        * Zero or more uniform shader parameters, representing textures,
+          buffers, etc. that the code in the component depends on.
+
+        * Zero or more *specialization* parameters, which are type or
+          value parameters that can be used to synthesize specialized
+          versions of the component type.
+
+        * Zero or more entry points, which are the individually invocable
+          kernels that can have final code generated.
+
+        * Zero or more *requirements*, which are other component
+          types on which the component type depends.
+
+        One example of a component type is a module of Slang code:
+
+        * The global-scope shader parameters declared in the module are
+          the parameters when considered as a component type.
+
+        * Any global-scope generic or interface type parameters introduce
+          specialization parameters for the module.
+
+        * A module does not by default include any entry points when
+          considered as a component type (although the code of the
+          module might *declare* some entry points).
+
+        * Any other modules that are `import`ed in the source code
+          become requirements of the module, when considered as a
+          component type.
+
+        An entry point is another example of a component type:
+
+        * The `uniform` parameters of the entry point function are
+          its shader parameters when considered as a component type.
+
+        * Any generic or interface-type parameters of the entry point
+          introduce specialization parameters.
+
+        * An entry point component type exposes a single entry point (itself).
+
+        * An entry point has one requirement for the module in which
+          it was defined.
+
+        Component types can be manipulated in a few ways:
+
+        * Multiple component types can be combined into a composite, which
+          combines all of their code, parameters, etc.
+
+        * A component type can be specialized, by "plugging in" types and
+          values for its specialization parameters.
+
+        * A component type can be laid out for a particular target, giving
+          offsets/bindings to the shader parameters it contains.
+
+        * Generated kernel code can be requested for entry points.
+
+        */
+    struct IComponentType : public ISlangUnknown
+    {
+            /** Get the runtime session that this component type belongs to.
+            */
+        virtual SLANG_NO_THROW ISession* SLANG_MCALL getSession() = 0;
+
+            /** Get the layout for this program for the chosen `targetIndex`.
+
+            The resulting layout will establish offsets/bindings for all
+            of the global and entry-point shader parameters in the
+            component type.
+
+            If this component type has specialization parameters (that is,
+            it is not fully specialized), then the resulting layout may
+            be incomplete, and plugging in arguments for generic specialization
+            parameters may result in a component type that doesn't have
+            a compatible layout. If the component type only uses
+            interface-type specialization parameters, then the layout
+            for a specialization should be compatible with an unspecialized
+            layout (all parameters in the unspecialized layout will have
+            the same offset/binding in the specialized layout).
+
+            If this component type is combined into a composite, then
+            the absolute offsets/bindings of parameters may not stay the same.
+            If the shader parameters in a component type don't make
+            use of explicit binding annotations (e.g., `register(...)`),
+            then the *relative* offset of shader parameters will stay
+            the same when it is used in a composition.
+            */
+        virtual SLANG_NO_THROW ProgramLayout* SLANG_MCALL getLayout(
+            SlangInt    targetIndex = 0,
+            IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Get the compiled code for the entry point at `entryPointIndex` for the chosen `targetIndex`
+
+            Entry point code can only be computed for a component type that
+            has no specialization parameters (it must be fully specialized)
+            and that has no requirements (it must be fully linked).
+
+            If code has not already been generated for the given entry point and target,
+            then a compilation error may be detected, in which case `outDiagnostics`
+            (if non-null) will be filled in with a blob of messages diagnosing the error.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt    entryPointIndex,
+            SlangInt    targetIndex,
+            IBlob**     outCode,
+            IBlob**     outDiagnostics = nullptr) = 0;
+
+            /** Specialize the component by binding its specialization parameters to concrete arguments.
+
+            The `specializationArgs` array must have `specializationArgCount` entries, and
+            this must match the number of specialization parameters on this component type.
+
+            If the specialization arguments are not valid, then the function will return null.
+
+            If any diagnostics (error or warnings) are produced, they will be written to `outDiagnostics`.
+            */
+        virtual SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+            SpecializationArg const*    specializationArgs,
+            SlangInt                    specializationArgCount,
+            ISlangBlob**                outDiagnostics = nullptr) = 0;
+    };
+    #define SLANG_UUID_IComponentType { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
 
         /** A module is the granularity of shader code compilation and loading.
 
@@ -2814,10 +2924,15 @@ namespace slang
         as distinct modules that `M` depends on. There is a directed graph of
         module dependencies, and all modules in the graph must belong to the
         same session (`ISession`).
+
+        A module establishes a namespace for looking up types, functions, etc.
         */
-    struct IModule : public ISlangUnknown
+    struct IModule : public IComponentType
     {
     public:
+        /** Note: eventually operations for looking up types or entry
+        points by name should appear here.
+        */
     };
     
     #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
@@ -2829,69 +2944,18 @@ namespace slang
     {
         enum class Kind : int32_t
         {
-            Unknown,
-            Type,
+            Unknown,    /**< An invalid specialization argument. */
+            Type,       /**< Specialize to a type. */
         };
+
+        /** The kind of specialization argument. */
         Kind kind;
         union
         {
+            /** A type specialization argument, used for `Kind::Type`. */
             TypeReflection* type;
         };
     };
-
-        /** Description of a program to be created.
-        */
-    struct ProgramDesc
-    {
-        struct Item
-        {
-            enum class Kind : int32_t
-            {
-                Program,
-                Module,
-            };
-            Kind kind;
-            union
-            {
-                IProgram*  program;
-                IModule*   module;
-            };
-        };
-
-        Item const* items;
-        SlangInt    itemCount;
-    };
-
-
-        /** A program comprises zero or more modules, entry points, etc. that have been linked together.
-        */
-    struct IProgram : public ISlangUnknown
-    {
-    public:
-            /** Get the runtime session that this program belongs to.
-            */
-        virtual SLANG_NO_THROW ISession* SLANG_MCALL getSession() = 0;
-
-            /** Get the layout for this program for the chosen `targetIndex`
-            */
-        virtual SLANG_NO_THROW ProgramLayout* SLANG_MCALL getLayout(
-            SlangInt    targetIndex = 0,
-            IBlob**     outDiagnostics = nullptr) = 0;
-
-            /** Get the compiled code for the entry point at `entryPointIndex` for the chosen `targetIndex`
-
-            If code has not already been generated for the given entry point and target,
-            then a compilation error may be detected, in which case `outDiagnostics`
-            (if non-null) will be filled in with a blob of messages diagnosing the error.
-            */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
-            SlangInt    entryPointIndex,
-            SlangInt    targetIndex,
-            IBlob**     outCode,
-            IBlob**     outDiagnostics = nullptr) = 0;
-    };
-    
-    #define SLANG_UUID_IProgram { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
 }
 
 #define SLANG_API_VERSION 0
@@ -2913,7 +2977,7 @@ namespace slang
 */
 SLANG_API SlangResult spCompileRequest_getProgram(
     SlangCompileRequest*    request,
-    slang::IProgram**       outProgram);
+    slang::IComponentType** outProgram);
 
 #endif
 

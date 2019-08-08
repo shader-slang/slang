@@ -49,36 +49,34 @@ enum class BuiltInCOp
 
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*          programLayout,
-    EntryPoint*             entryPoint,
-    EntryPointGroupLayout** outEntryPointGroupLayout = nullptr)
+    EntryPoint*             entryPoint)
 {
-    for( auto entryPointGroupLayout : programLayout->entryPointGroups )
+    // TODO: This function shouldn't need to exist, and it
+    // somewhat hampers the capabilities of the compiler (e.g.,
+    // it isn't supported to have a single program contain
+    // two different "instances" of the same entry point).
+    //
+    // Code that cares about layouts should be looking up
+    // the entry point layout by index on a `ProgramLayout`,
+    // knowing that those indices will align with the order
+    // of entry points on the `ComponentType` for the program.
+
+    for( auto entryPointLayout : programLayout->entryPoints )
     {
-        for( auto entryPointLayout : entryPointGroupLayout->entryPoints )
-        {
-            if(entryPointLayout->entryPoint->getName() != entryPoint->getName())
-                continue;
+        if(entryPointLayout->entryPoint.GetName() != entryPoint->getName())
+            continue;
 
-            // TODO: We need to be careful about this check, since it relies on
-            // the profile information in the layout matching that in the request.
-            //
-            // What we really seem to want here is some dictionary mapping the
-            // `EntryPoint` directly to the `EntryPointLayout`, and maybe
-            // that is precisely what we should build...
-            //
-            if(entryPointLayout->profile != entryPoint->getProfile())
-                continue;
+        // TODO: We need to be careful about this check, since it relies on
+        // the profile information in the layout matching that in the request.
+        //
+        // What we really seem to want here is some dictionary mapping the
+        // `EntryPoint` directly to the `EntryPointLayout`, and maybe
+        // that is precisely what we should build...
+        //
+        if(entryPointLayout->profile != entryPoint->getProfile())
+            continue;
 
-            // TODO: can't easily filter on translation unit here...
-            // Ideally the `EntryPoint` should get filled in with a pointer
-            // the specific function declaration that represents the entry point.
-
-            if( outEntryPointGroupLayout )
-            {
-                *outEntryPointGroupLayout = entryPointGroupLayout;
-            }
-            return entryPointLayout;
-        }
+        return entryPointLayout;
     }
 
     return nullptr;

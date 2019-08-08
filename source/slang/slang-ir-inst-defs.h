@@ -206,7 +206,6 @@ INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
-INST(BindGlobalExistentialSlots, bindGlobalExistentialSlots, 0, 0)
 
 INST(Construct, construct, 0, 0)
 
