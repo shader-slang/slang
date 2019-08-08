@@ -518,11 +518,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg(libPath);
     }
 
-    if (options.sourceType == SourceType::CPP)
+    if (options.sourceType == SourceType::CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
         // Make STD libs available
         cmdLine.addArg("-lstdc++");
-	// Make maths lib available
+	    // Make maths lib available
         cmdLine.addArg("-lm");
     }
 }
