@@ -1943,67 +1943,67 @@ namespace Slang
 // abstract over the conversion required for each pair of types.
 //
 
-inline slang::IGlobalSession* asExternal(Session* session)
+SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
 {
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-inline Session* asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
 {
     return static_cast<Session*>(session);
 }
 
-inline slang::ISession* asExternal(Linkage* linkage)
+SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)
 {
     return static_cast<slang::ISession*>(linkage);
 }
 
-inline Module* asInternal(slang::IModule* module)
+SLANG_FORCE_INLINE Module* asInternal(slang::IModule* module)
 {
     return static_cast<Module*>(module);
 }
 
-inline slang::IModule* asExternal(Module* module)
+SLANG_FORCE_INLINE slang::IModule* asExternal(Module* module)
 {
     return static_cast<slang::IModule*>(module);
 }
 
-inline ComponentType* asInternal(slang::IComponentType* componentType)
+SLANG_FORCE_INLINE ComponentType* asInternal(slang::IComponentType* componentType)
 {
     return static_cast<ComponentType*>(componentType);
 }
 
-inline slang::IComponentType* asExternal(ComponentType* componentType)
+SLANG_FORCE_INLINE slang::IComponentType* asExternal(ComponentType* componentType)
 {
     return static_cast<slang::IComponentType*>(componentType);
 }
 
-static inline slang::ProgramLayout* asExternal(ProgramLayout* programLayout)
+SLANG_FORCE_INLINE slang::ProgramLayout* asExternal(ProgramLayout* programLayout)
 {
     return (slang::ProgramLayout*) programLayout;
 }
 
-inline Type* asInternal(slang::TypeReflection* type)
+SLANG_FORCE_INLINE Type* asInternal(slang::TypeReflection* type)
 {
     return reinterpret_cast<Type*>(type);
 }
 
-inline slang::TypeReflection* asExternal(Type* type)
+SLANG_FORCE_INLINE slang::TypeReflection* asExternal(Type* type)
 {
     return reinterpret_cast<slang::TypeReflection*>(type);
 }
 
-inline TypeLayout* asInternal(slang::TypeLayoutReflection* type)
+SLANG_FORCE_INLINE TypeLayout* asInternal(slang::TypeLayoutReflection* type)
 {
     return reinterpret_cast<TypeLayout*>(type);
 }
 
-inline slang::TypeLayoutReflection* asExternal(TypeLayout* type)
+SLANG_FORCE_INLINE slang::TypeLayoutReflection* asExternal(TypeLayout* type)
 {
     return reinterpret_cast<slang::TypeLayoutReflection*>(type);
 }
 
-inline SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
+SLANG_FORCE_INLINE SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
 {
     return reinterpret_cast<SlangCompileRequest*>(request);
 }
