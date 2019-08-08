@@ -6,6 +6,8 @@
 
 #include "slang-process-util.h"
 
+#include "slang-platform.h"
+
 namespace Slang
 {
 
@@ -93,6 +95,7 @@ public:
             enum Enum : Flags
             {
                 EnableExceptionHandling = 0x01,
+                Verbose                 = 0x02, 
             };
         };
 
@@ -103,6 +106,8 @@ public:
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
 
         Flags flags = Flag::EnableExceptionHandling;
+
+        PlatformKind platform = PlatformKind::Unknown;
 
         String modulePath;      ///< The path/name of the output module. Should not have the extension, as that will be added for each of the target types
 
@@ -150,7 +155,7 @@ public:
     struct Output
     {
             /// Reset to an initial empty state
-        void reset() { messages.clear(); result = SLANG_OK; }
+        void reset() { messages.clear(); rawMessages = String(); result = SLANG_OK; }
         
             /// Get the number of messages by type
         Index getCountByType(OutputMessage::Type type) const;
@@ -167,6 +172,8 @@ public:
         
             /// Remove all messages of the type
         void removeByType(OutputMessage::Type type);
+
+        String rawMessages;
 
         SlangResult result;
         List<OutputMessage> messages;
@@ -268,12 +275,21 @@ struct CPPCompilerUtil
     typedef CPPCompiler::TargetType TargetType;
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
+    typedef CPPCompiler::CompilerType CompilerType;
 
     enum class MatchType
     {
         MinGreaterEqual,
         MinAbsolute,
         Newest,
+    };
+
+    struct InitializeSetDesc
+    {
+        const String& getPath(CompilerType type) const { return paths[int(type)]; }
+        void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
+
+        String paths[int(CPPCompiler::CompilerType::CountOf)];
     };
 
         /// Find a compiler
@@ -288,7 +304,7 @@ struct CPPCompilerUtil
     static const CPPCompiler::Desc& getCompiledWithDesc();
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
-    static SlangResult initializeSet(CPPCompilerSet* set);
+    static SlangResult initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set);
 
     
     

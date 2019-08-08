@@ -1067,10 +1067,20 @@ extern "C"
     */
     typedef struct SlangCompileRequest SlangCompileRequest;
 
+    namespace slang {
+    struct IGlobalSession;
+    } // namespace slang
+
     /*!
     @brief Initialize an instance of the Slang library.
     */
     SLANG_API SlangSession* spCreateSession(const char* deprecated = 0);
+
+    /*!
+    @brief Get the global session from the SlangSession 
+    */
+    SLANG_API slang::IGlobalSession* spSessionGetGlobalSession(SlangSession* session);
+
 
     /*!
     @brief Clean up after an instance of the Slang library.
@@ -2646,6 +2656,14 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
             char const*     name) = 0;
+
+            /** Set the path that pass through (aka back end compilers) will
+            be looked from. For back ends that are dlls/shared libraries, it will mean the path will
+            be prefixed with the path when calls are made out to ISlangSharedLibraryLoader.
+            For executables - it will look for executables along the path */
+        virtual void SLANG_MCALL setPassThroughPath(
+            SlangPassThrough passThrough,
+            char const* path) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
