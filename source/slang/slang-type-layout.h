@@ -614,7 +614,7 @@ class GenericParamTypeLayout : public TypeLayout
 {
 public:
     RefPtr<GlobalGenericParamDecl> getGlobalGenericParamDecl();
-    int paramIndex = 0;
+    Index paramIndex = 0;
 };
 
     /// Layout information for a tagged union type.
@@ -659,8 +659,6 @@ public:
 StructTypeLayout* getScopeStructLayout(
     ScopeLayout*  programLayout);
 
-class EntryPointGroupLayout;
-
 // Layout information for a single shader entry point
 // within a program
 //
@@ -674,7 +672,10 @@ class EntryPointLayout : public ScopeLayout
 {
 public:
     // The corresponding function declaration
-    RefPtr<FuncDecl> entryPoint;
+    DeclRef<FuncDecl> entryPoint;
+
+    DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
+    FuncDecl* getFuncDecl() { return entryPoint.getDecl(); }
 
     // The shader profile that was used to compile the entry point
     Profile profile;
@@ -688,30 +689,38 @@ public:
     };
     unsigned flags = 0;
 
-        /// Layouts for all tagged union types required by this entry point.
-        ///
-        /// These are any tagged union types used by the generic
-        /// arguments that this entry point is being compiled with.
-    List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
-
     EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
-    EntryPointLayout* getAbsoluteLayout(EntryPointGroupLayout* parentGroup);
 
     RefPtr<EntryPointLayout> m_absoluteLayout;
 };
 
-class EntryPointGroupLayout : public ScopeLayout
+    /// Reflection/layout information about a specialization parameter
+class SpecializationParamLayout : public Layout
 {
 public:
-    RefPtr<EntryPointGroup> group;
-    List<RefPtr<EntryPointLayout>> entryPoints;
+    Index index;
 };
 
-class GenericParamLayout : public Layout
+    /// Reflection/layout information about a generic specialization parameter
+class GenericSpecializationParamLayout : public SpecializationParamLayout
 {
 public:
-    RefPtr<GlobalGenericParamDecl> decl;
-    int index;
+        /// The declaration of the generic parameter.
+        ///
+        /// Could be any subclass of `Decl` that represents a generic value or type parameter.
+    RefPtr<Decl> decl;
+};
+
+    /// Reflection/layout information about an existential/interface specialization parameter.
+class ExistentialSpecializationParamLayout : public SpecializationParamLayout
+{
+public:
+        /// The type that needs to be specialized.
+        ///
+        /// Currently, this will be an `interface` type that any concrete
+        /// type argument getting plugged in must conform to.
+        ///
+    RefPtr<Type> type;
 };
 
 // Layout information for the global scope of a program
@@ -740,7 +749,7 @@ public:
 
     TargetProgram* getTargetProgram() { return targetProgram; }
     TargetRequest* getTargetReq() { return targetProgram->getTargetReq(); }
-    Program* getProgram() { return targetProgram->getProgram(); }
+    ComponentType* getProgram() { return targetProgram->getProgram(); }
 
 
     // We catalog the requested entry points here,
@@ -748,12 +757,21 @@ public:
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
 
-    // Entry points can also be grouped for layout purposes (e.g., to form
-    // ray-tracing hit groups), so this array represents those groups
-    List<RefPtr<EntryPointGroupLayout>> entryPointGroups;
+        /// Reflection information on (unspecialized) specialization parameters.
+    List<RefPtr<SpecializationParamLayout>> specializationParams;
 
-    List<RefPtr<GenericParamLayout>> globalGenericParams;
-    Dictionary<String, GenericParamLayout*> globalGenericParamsMap;
+        /// Concrete argument values that were provided to specific global generic parameters.
+        ///
+        /// Not useful for reflection, but valuable for code generation.
+        ///
+    Dictionary<GlobalGenericParamDecl*, RefPtr<Val>> globalGenericArgs;
+
+        /// Layouts for all tagged union types required by this program
+        ///
+        /// These are any tagged union types used by the specialization
+        /// arguments that have been used to specialize the program.
+        ///
+    List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
 };
 
 StructTypeLayout* getGlobalStructLayout(
@@ -902,8 +920,6 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getStructuredBufferRules() = 0;
 };
 
-typedef List<RefPtr<GenericParamLayout>> GenericParamLayouts;
-
 struct TypeLayoutContext
 {
     // The layout rules to use (e.g., we compute
@@ -924,10 +940,10 @@ struct TypeLayoutContext
     MatrixLayoutMode    matrixLayoutMode;
 
     // The concrete types (if any) to plug into the currently in-scope
-    // existential type slots.
+    // specialization params.
     //
-    Int                             existentialTypeArgCount = 0;
-    ExistentialTypeSlots::Arg const*    existentialTypeArgs = nullptr;
+    Int                                 specializationArgCount = 0;
+    ExpandedSpecializationArg const*    specializationArgs = nullptr;
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
@@ -946,29 +962,29 @@ struct TypeLayoutContext
         return result;
     }
 
-    TypeLayoutContext withExistentialTypeArgs(
-        Int                             argCount,
-        ExistentialTypeSlots::Arg const*    args) const
+    TypeLayoutContext withSpecializationArgs(
+        ExpandedSpecializationArg const*    args,
+        Int                                 argCount) const
     {
         TypeLayoutContext result = *this;
-        result.existentialTypeArgCount  = argCount;
-        result.existentialTypeArgs      = args;
+        result.specializationArgCount  = argCount;
+        result.specializationArgs      = args;
         return result;
     }
 
-    TypeLayoutContext withExistentialTypeSlotsOffsetBy(
+    TypeLayoutContext withSpecializationArgsOffsetBy(
         Int offset) const
     {
         TypeLayoutContext result = *this;
-        if( existentialTypeArgCount > offset )
+        if( specializationArgCount > offset )
         {
-            result.existentialTypeArgCount  = existentialTypeArgCount - offset;
-            result.existentialTypeArgs      = existentialTypeArgs + offset;
+            result.specializationArgCount  = specializationArgCount - offset;
+            result.specializationArgs      = specializationArgs + offset;
         }
         else
         {
-            result.existentialTypeArgCount  = 0;
-            result.existentialTypeArgs      = nullptr;
+            result.specializationArgCount  = 0;
+            result.specializationArgs      = nullptr;
         }
         return result;
 
@@ -1055,6 +1071,8 @@ public:
         ///
     TypeLayoutResult getTypeLayoutResult();
 
+    UniformLayoutInfo* getStructLayoutInfo() { return &m_info; }
+
 private:
         /// The layout rules being used, if layout has begun.
     LayoutRulesImpl* m_rules = nullptr;
@@ -1133,8 +1151,16 @@ createStructuredBufferTypeLayout(
     RefPtr<Type>                structuredBufferType,
     RefPtr<Type>                elementType);
 
-int findGenericParam(List<RefPtr<GenericParamLayout>> & genericParameters, GlobalGenericParamDecl * decl);
-//
+    /// Create a type layout for an unspecialized `globalGenericParamDecl`.
+RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
+    TypeLayoutContext const&    context,
+    Type*                       type,
+    GlobalGenericParamDecl*     globalGenericParamDecl);
+
+    /// Find the concrete type (if any) that was plugged in for the global generic type parameter `decl`.
+RefPtr<Type> findGlobalGenericSpecializationArg(
+    TypeLayoutContext const&    context,
+    GlobalGenericParamDecl*     decl);
 
 // Given an existing type layout `oldTypeLayout`, apply offsets
 // to any contained fields based on the resource infos in `offsetVarLayout`.

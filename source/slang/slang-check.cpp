@@ -7107,8 +7107,7 @@ namespace Slang
                 {
                     if(context.mode != OverloadResolveContext::Mode::JustTrying)
                     {
-                        // TODO: diagnose a problem here
-                        getSink()->diagnose(context.loc, Diagnostics::unimplemented, "generic constraint not satisfied");
+                        getSink()->diagnose(context.loc, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
                     }
                     return false;
                 }
@@ -9663,15 +9662,15 @@ namespace Slang
         }
     }
 
-        /// Recursively walk `paramDeclRef` and add any required existential slots to `ioSlots`.
-    static void _collectExistentialTypeParamsRec(
-        ExistentialTypeSlots&       ioSlots,
+        /// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to `ioSpecializationParams`.
+    static void _collectExistentialSpecializationParamsRec(
+        SpecializationParams&   ioSpecializationParams,
         DeclRef<VarDeclBase>    paramDeclRef);
 
-        /// Recursively walk `type` and discover any required existential type parameters.
-    static void _collectExistentialTypeParamsRec(
-        ExistentialTypeSlots&   ioSlots,
-        Type*               type)
+        /// Recursively walk `type` and add any existential/interface specialization parameters to `ioSpecializationParams`.
+    static void _collectExistentialSpecializationParamsRec(
+        SpecializationParams&   ioSpecializationParams,
+        Type*                   type)
     {
         // Whether or not something is an array does not affect
         // the number of existential slots it introduces.
@@ -9683,7 +9682,9 @@ namespace Slang
 
         if( auto parameterGroupType = as<ParameterGroupType>(type) )
         {
-            _collectExistentialTypeParamsRec(ioSlots, parameterGroupType->getElementType());
+            _collectExistentialSpecializationParamsRec(
+                ioSpecializationParams,
+                parameterGroupType->getElementType());
             return;
         }
 
@@ -9692,9 +9693,14 @@ namespace Slang
             auto typeDeclRef = declRefType->declRef;
             if( auto interfaceDeclRef = typeDeclRef.as<InterfaceDecl>() )
             {
-                // Each leaf parameter of interface type adds one slot.
+                // Each leaf parameter of interface type adds a specialization
+                // parameter, which determines the concrete type(s) that may
+                // be provided as arguments for that parameter.
                 //
-                ioSlots.paramTypes.add(type);
+                SpecializationParam specializationParam;
+                specializationParam.flavor = SpecializationParam::Flavor::ExistentialType;
+                specializationParam.object = type;
+                ioSpecializationParams.add(specializationParam);
             }
             else if( auto structDeclRef = typeDeclRef.as<StructDecl>() )
             {
@@ -9706,7 +9712,9 @@ namespace Slang
                     if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
                         continue;
 
-                    _collectExistentialTypeParamsRec(ioSlots, fieldDeclRef);
+                    _collectExistentialSpecializationParamsRec(
+                        ioSpecializationParams,
+                        fieldDeclRef);
                 }
             }
         }
@@ -9716,26 +9724,58 @@ namespace Slang
         // element types.
     }
 
-    static void _collectExistentialTypeParamsRec(
-        ExistentialTypeSlots&       ioSlots,
+    static void _collectExistentialSpecializationParamsRec(
+        SpecializationParams&   ioSpecializationParams,
         DeclRef<VarDeclBase>    paramDeclRef)
     {
-        _collectExistentialTypeParamsRec(ioSlots, GetType(paramDeclRef));
+        _collectExistentialSpecializationParamsRec(
+            ioSpecializationParams,
+            GetType(paramDeclRef));
     }
 
 
-        /// Add information about a shader parameter to `ioParams` and `ioSlots`
-    static void _collectExistentialSlotsForShaderParam(
+        /// Collect any interface/existential specialization parameters for `paramDeclRef` into `ioParamInfo` and `ioSpecializationParams`
+    static void _collectExistentialSpecializationParamsForShaderParam(
         ShaderParamInfo&        ioParamInfo,
-        ExistentialTypeSlots&       ioSlots,
+        SpecializationParams&   ioSpecializationParams,
         DeclRef<VarDeclBase>    paramDeclRef)
     {
-        Index startSlot = ioSlots.paramTypes.getCount();
-        _collectExistentialTypeParamsRec(ioSlots, paramDeclRef);
-        Index endSlot = ioSlots.paramTypes.getCount();
+        Index beginParamIndex = ioSpecializationParams.getCount();
+        _collectExistentialSpecializationParamsRec(ioSpecializationParams, paramDeclRef);
+        Index endParamIndex = ioSpecializationParams.getCount();
         
-        ioParamInfo.firstExistentialTypeSlot = UInt(startSlot);
-        ioParamInfo.existentialTypeSlotCount = UInt(endSlot - startSlot);;
+        ioParamInfo.firstSpecializationParamIndex = beginParamIndex;
+        ioParamInfo.specializationParamCount = endParamIndex - beginParamIndex;
+    }
+
+    void EntryPoint::_collectGenericSpecializationParamsRec(Decl* decl)
+    {
+        if(!decl)
+            return;
+
+        _collectGenericSpecializationParamsRec(decl->ParentDecl);
+
+        auto genericDecl = as<GenericDecl>(decl);
+        if(!genericDecl)
+            return;
+
+        for(auto m : genericDecl->Members)
+        {
+            if(auto genericTypeParam = as<GenericTypeParamDecl>(m))
+            {
+                SpecializationParam param;
+                param.flavor = SpecializationParam::Flavor::GenericType;
+                param.object = genericTypeParam;
+                m_genericSpecializationParams.add(param);
+            }
+            else if(auto genericValParam = as<GenericValueParamDecl>(m))
+            {
+                SpecializationParam param;
+                param.flavor = SpecializationParam::Flavor::GenericValue;
+                param.object = genericValParam;
+                m_genericSpecializationParams.add(param);
+            }
+        }
     }
 
         /// Enumerate the existential-type parameters of an `EntryPoint`.
@@ -9744,6 +9784,24 @@ namespace Slang
         ///
     void EntryPoint::_collectShaderParams()
     {
+        // We don't currently treat an entry point as having any
+        // *global* shader parameters.
+        //
+        // TODO: We could probably clean up the code a bit by treating
+        // an entry point as introducing a global shader parameter
+        // that is based on the implicit "parameters struct" type
+        // of the entry point itself.
+
+        // We collect the generic parameters of the entry point,
+        // along with those of any outer generics first.
+        //
+        _collectGenericSpecializationParamsRec(getFuncDecl());
+
+        // After geneic specialization parameters have been collected,
+        // we look through the value parameters of the entry point
+        // function and see if any of them introduce existential/interface
+        // specialization parameters.
+        //
         // Note: we defensively test whether there is a function decl-ref
         // because this routine gets called from the constructor, and
         // a "dummy" entry point will have a null pointer for the function.
@@ -9755,120 +9813,15 @@ namespace Slang
                 ShaderParamInfo shaderParamInfo;
                 shaderParamInfo.paramDeclRef = paramDeclRef;
 
-                _collectExistentialSlotsForShaderParam(
+                _collectExistentialSpecializationParamsForShaderParam(
                     shaderParamInfo,
-                    m_existentialSlots,
+                    m_existentialSpecializationParams,
                     paramDeclRef);
 
                 m_shaderParams.add(shaderParamInfo);
             }
         }
     }
-
-static bool shouldUseFalcorCustomSharedKeywordSemantics(
-    EntryPointGroup*    entryPointGroup)
-{
-    if( !entryPointGroup->getLinkageImpl()->m_useFalcorCustomSharedKeywordSemantics )
-        return false;
-
-    // As a sanity check, if we are being asked to lay out an
-    // empty entry-point group, then don't apply the convention.
-    //
-    if(entryPointGroup->getEntryPointCount() == 0)
-        return false;
-
-    // Otherwise we will look at the first entry point in the group,
-    // and use that to determine whether it looks like we are compiling
-    // ray-tracing shaders or not.
-    //
-    switch( entryPointGroup->getEntryPoint(0)->getStage() )
-    {
-    case Stage::AnyHit:
-    case Stage::Callable:
-    case Stage::ClosestHit:
-    case Stage::Intersection:
-    case Stage::Miss:
-    case Stage::RayGeneration:
-        return true;
-
-    default:
-        return false;
-    }
-}
-
-
-static bool shouldUseFalcorCustomSharedKeywordSemantics(
-    Program*    program)
-{
-    if( !program->getLinkageImpl()->m_useFalcorCustomSharedKeywordSemantics )
-        return false;
-
-    // As a sanity check, if we are being asked to lay out a program
-    // with *no* entry points, then we don't apply the convention.
-    //
-    if(program->getEntryPointGroupCount() == 0)
-        return false;
-
-    // Otherwise we let the first entry-point group determine if we should
-    // apply the policy for the entire program.
-    //
-    // Note: this could lead to confusing results if a `Program` mixes
-    // entry point groups for RT and non-RT pipelines, but that isn't
-    // a scenario we expect to come up and this whole routine is handling
-    // "do what I mean" semantics for legacy behavior.
-    //
-    return shouldUseFalcorCustomSharedKeywordSemantics(program->getEntryPointGroup(0));
-}
-
-
-void EntryPointGroup::_collectShaderParams(DiagnosticSink* sink)
-{
-    // If and only if we are in the special mode for Falcor support
-    // where non-`shared` global shader parameters are actually
-    // supposed to go into the "local root signature," then we
-    // will consider such parameters as if they were entry-point
-    // parameters, attached to the group.
-    //
-    if( shouldUseFalcorCustomSharedKeywordSemantics(this) )
-    {
-        for( auto module : getModuleDependencies() )
-        {
-            auto moduleDecl = module->getModuleDecl();
-            for( auto globalVar : moduleDecl->getMembersOfType<VarDecl>() )
-            {
-                // Don't consider globals that aren't shader parameters.
-                //
-                if(!isGlobalShaderParameter(globalVar))
-                    continue;
-
-                // Don't consider global shader paramters that were marked
-                // `shared`, since that is how global-root-signature parameters
-                // are being specified.
-                //
-                if( globalVar->HasModifier<HLSLEffectSharedModifier>() )
-                    continue;
-
-                auto paramDeclRef = makeDeclRef(globalVar.Ptr());
-
-                ShaderParamInfo shaderParamInfo;
-                shaderParamInfo.paramDeclRef = paramDeclRef;
-
-                ExistentialTypeSlots slots;
-                _collectExistentialSlotsForShaderParam(
-                    shaderParamInfo,
-                    slots,
-                    paramDeclRef);
-
-                if( slots.paramTypes.getCount() != 0 )
-                {
-                    sink->diagnose(globalVar, Diagnostics::typeParametersNotAllowedOnEntryPointGlobal, globalVar);
-                }
-
-                m_shaderParams.add(shaderParamInfo);
-            }
-        }
-    }
-}
 
     // Validate that an entry point function conforms to any additional
     // constraints based on the stage (and profile?) it specifies.
@@ -10015,6 +9968,7 @@ void EntryPointGroup::_collectShaderParams(DiagnosticSink* sink)
         //
         auto compileRequest = entryPointReq->getCompileRequest();
         auto translationUnit = entryPointReq->getTranslationUnit();
+        auto linkage = compileRequest->getLinkage();
         auto sink = compileRequest->getSink();
         auto translationUnitSyntax = translationUnit->getModuleDecl();
 
@@ -10133,8 +10087,8 @@ void EntryPointGroup::_collectShaderParams(DiagnosticSink* sink)
             // a more uniform representation in the AST?
         }
 
-
         RefPtr<EntryPoint> entryPoint = EntryPoint::create(
+            linkage,
             makeDeclRef(entryPointFuncDecl),
             entryPointProfile);
 
@@ -10548,11 +10502,97 @@ static bool doesParameterMatch(
     return true;
 }
 
-        /// Enumerate the existential-type parameters of a `Program`.
-        ///
-        /// Any parameters found will be added to the list of existential slots on `this`.
-        ///
-    void Program::_collectShaderParams(DiagnosticSink* sink)
+    void Module::_collectShaderParams()
+    {
+        auto moduleDecl = m_moduleDecl;
+
+        // We are going to walk the global declarations in the body of the
+        // module, and use those to build up our lists of:
+        //
+        // * Global shader parameters
+        // * Specialization parameters (both generic and interface/existential)
+        // * Requirements (`import`ed modules)
+        //
+        // For requirements, we want to be careful to only
+        // add each required module once (in case the same
+        // module got `import`ed multiple times), so we
+        // will keep a set of the modules we've already
+        // seen and processed.
+        //
+        HashSet<Module*> requiredModuleSet;
+
+        for( auto globalDecl : moduleDecl->Members )
+        {
+            if(auto globalVar = globalDecl.as<VarDecl>())
+            {
+                // We do not want to consider global variable declarations
+                // that don't represents shader parameters. This includes
+                // things like `static` globals and `groupshared` variables.
+                //
+                if(!isGlobalShaderParameter(globalVar))
+                    continue;
+
+                // At this point we know we have a global shader parameter.
+
+                GlobalShaderParamInfo shaderParamInfo;
+                shaderParamInfo.paramDeclRef = makeDeclRef(globalVar.Ptr());
+
+                // We need to consider what specialization parameters
+                // are introduced by this shader parameter. This step
+                // fills in fields on `shaderParamInfo` so that we
+                // can assocaite specialization arguments supplied later
+                // with the correct parameter.
+                //
+                _collectExistentialSpecializationParamsForShaderParam(
+                    shaderParamInfo,
+                    m_specializationParams,
+                    makeDeclRef(globalVar.Ptr()));
+
+                m_shaderParams.add(shaderParamInfo);
+            }
+            else if( auto globalGenericParam = as<GlobalGenericParamDecl>(globalDecl) )
+            {
+                // A global generic type parameter declaration introduces
+                // a suitable specialization parameter.
+                //
+                SpecializationParam specializationParam;
+                specializationParam.flavor = SpecializationParam::Flavor::GenericType;
+                specializationParam.object = globalGenericParam;
+                m_specializationParams.add(specializationParam);
+            }
+            else if( auto importDecl = as<ImportDecl>(globalDecl) )
+            {
+                // An `import` declaration creates a requirement dependency
+                // from this module to another module.
+                //
+                auto importedModule = getModule(importDecl->importedModuleDecl);
+                if(!requiredModuleSet.Contains(importedModule))
+                {
+                    requiredModuleSet.Add(importedModule);
+                    m_requirements.add(importedModule);
+                }
+            }
+        }
+    }
+
+    Index Module::getRequirementCount()
+    {
+        return m_requirements.getCount();
+    }
+
+    RefPtr<ComponentType> Module::getRequirement(Index index)
+    {
+        return m_requirements[index];
+    }
+
+    void Module::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+    {
+        visitor->visitModule(this, as<ModuleSpecializationInfo>(specializationInfo));
+    }
+
+
+        /// Enumerate the parameters of a `LegacyProgram`.
+    void LegacyProgram::_collectShaderParams(DiagnosticSink* sink)
     {
         // We need to collect all of the global shader parameters
         // referenced by the compile request, and for each we
@@ -10568,10 +10608,22 @@ static bool doesParameterMatch(
         // To deal with the first issue, we will maintain a map from a parameter
         // name to the index of an existing parameter with that name.
         //
+        // TODO: Eventually we should deprecate support for the
+        // deduplication feature of `LegaqcyProgram`, at which point
+        // this entire type and all its complications can be eliminated
+        // from the code (that includes a lot of support in the "parameter
+        // binding" step for shader parameters with multiple declarations).
+        // Until that point this type will have a fair amount of duplication
+        // with stuff in `Module` and `CompositeComponentType`.
+
+        // We use a dictionary to keep track of any shader parameter
+        // we've alrady collected with a given name.
+        //
         Dictionary<Name*, Int> mapNameToParamIndex;
 
-        for( auto module : getModuleDependencies() )
+        for( auto translationUnit : m_translationUnits )
         {
+            auto module = translationUnit->getModule();
             auto moduleDecl = module->getModuleDecl();
             for( auto globalVar : moduleDecl->getMembersOfType<VarDecl>() )
             {
@@ -10581,27 +10633,6 @@ static bool doesParameterMatch(
                 //
                 if(!isGlobalShaderParameter(globalVar))
                     continue;
-
-                // HACK: In order to support existing policy in the Falcor
-                // application, we support a custom mode where only
-                // global variables marked as `shared` should be considered
-                // as global shader parameters (that go in the "global
-                // root signature" for DXR).
-                //
-                // TODO: Eliminate this special case once all of the client
-                // application code has been ported to use more general-purpose
-                // Slang mechanisms (e.g., entry-point `uniform` parameters).
-                //
-                if( shouldUseFalcorCustomSharedKeywordSemantics(this) )
-                {
-                    if( !globalVar->HasModifier<HLSLEffectSharedModifier>() )
-                    {
-                        // Skip a non-`shared` global for purposes of enumerating
-                        // shader parameters.
-                        //
-                        continue;
-                    }
-                }
 
                 // This declaration may represent the same logical parameter
                 // as a declaration that came from a different translation unit.
@@ -10646,9 +10677,9 @@ static bool doesParameterMatch(
                 GlobalShaderParamInfo shaderParamInfo;
                 shaderParamInfo.paramDeclRef = makeDeclRef(globalVar.Ptr());
 
-                _collectExistentialSlotsForShaderParam(
+                _collectExistentialSpecializationParamsForShaderParam(
                     shaderParamInfo,
-                    m_globalExistentialSlots,
+                    m_specializationParams,
                     makeDeclRef(globalVar.Ptr()));
 
                 m_shaderParams.add(shaderParamInfo);
@@ -10656,13 +10687,59 @@ static bool doesParameterMatch(
         }
     }
 
-        /// Create a `Program` to represent the compiled code.
+        /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
+    RefPtr<ComponentType> fillRequirements(
+        ComponentType* inComponentType)
+    {
+        auto linkage = inComponentType->getLinkage();
+
+        // We are going to simplify things by solving the problem iteratively.
+        // If the current `componentType` has requirements for `A`, `B`, ... etc.
+        // then we will create a composite of `componentType`, `A`, `B`, ...
+        // and then see if the resulting composite has any requirements.
+        //
+        // This avoids the problem of trying to compute teh transitive closure
+        // of the requirements relationship (while dealing with deduplication,
+        // etc.)
+
+        RefPtr<ComponentType> componentType = inComponentType;
+        for(;;)
+        {
+            auto requirementCount = componentType->getRequirementCount();
+            if(requirementCount == 0)
+                break;
+
+            List<RefPtr<ComponentType>> allComponents;
+            allComponents.add(componentType);
+
+            for(Index rr = 0; rr < requirementCount; ++rr)
+            {
+                auto requirement = componentType->getRequirement(rr);
+                allComponents.add(requirement);
+            }
+
+            componentType = CompositeComponentType::create(
+                linkage,
+                allComponents);
+        }
+        return componentType;
+    }
+
+        /// Create a component type to represent the "global scope" of a compile request.
         ///
-        /// The created program will comprise all of the translation
-        /// units that were compiled as part of the request, as
-        /// well as any entry points in those translation units.
+        /// This component type will include all the modules and their global
+        /// parameters from the compile request, but not anything specific
+        /// to any entry point functions.
         ///
-    RefPtr<Program> createUnspecializedProgram(
+        /// The layout for this component type will thus represent the things that
+        /// a user is likely to want to have stay the same across all compiled
+        /// entry points.
+        ///
+        /// The component type that this function creates is unspecialized, in
+        /// that it doesn't take into account any specialization arguments
+        /// that might have been supplied as part of the compile request.
+        ///
+    RefPtr<ComponentType> createUnspecializedGlobalComponentType(
         FrontEndCompileRequest* compileRequest)
     {
         // We want our resulting program to depend on
@@ -10677,16 +10754,51 @@ static bool doesParameterMatch(
         //
         auto linkage = compileRequest->getLinkage();
         auto sink = compileRequest->getSink();
-        auto program = new Program(linkage);
-        for(auto translationUnit : compileRequest->translationUnits )
+
+        RefPtr<ComponentType> globalComponentType;
+        if(compileRequest->translationUnits.getCount() == 1)
         {
-            program->addReferencedLeafModule(translationUnit->getModule());
+            // The common case is that a compilation only uses
+            // a single translation unit, and thus results in
+            // a single `Module`. We can then use that module
+            // as the component type that represents the global scope.
+            //
+            globalComponentType = compileRequest->translationUnits[0]->getModule();
         }
-        for(auto translationUnit : compileRequest->translationUnits )
+        else
         {
-            program->addReferencedModule(translationUnit->getModule());
+            globalComponentType = new LegacyProgram(
+                linkage,
+                compileRequest->translationUnits,
+                sink);
         }
 
+        return fillRequirements(globalComponentType);
+    }
+
+        /// Create a component type that represents the global scope for a compile request,
+        /// along with any entry point functions.
+        ///
+        /// The resulting component type will include the global-scope information
+        /// first, so its layout will be compatible with the result of
+        /// `createUnspecializedGlobalComponentType`.
+        ///
+        /// The new component type will also add on any entry-point functions
+        /// that were requested and will thus include space for their `uniform` parameters.
+        /// If multiple entry points were requested then they will be given non-overlapping
+        /// parameter bindings, consistent with them being used together in
+        /// a single pipeline state, hit group, etc.
+        ///
+        /// The result of this function is unspecialized and doesn't take into
+        /// account any specialization arguments the user might have supplied.
+        ///
+    RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
+        FrontEndCompileRequest* compileRequest)
+    {
+        auto linkage = compileRequest->getLinkage();
+        auto sink = compileRequest->getSink();
+
+        auto globalComponentType = compileRequest->getGlobalComponentType();
 
         // The validation of entry points here will be modal, and controlled
         // by whether the user specified any entry points directly via
@@ -10698,6 +10810,9 @@ static bool doesParameterMatch(
         // the API or command line.
         //
         bool anyExplicitEntryPoints = compileRequest->getEntryPointReqCount() != 0;
+
+        List<RefPtr<ComponentType>> allComponentTypes;
+        allComponentTypes.add(globalComponentType);
 
         if( anyExplicitEntryPoints )
         {
@@ -10716,8 +10831,9 @@ static bool doesParameterMatch(
                     // but didn't specify any groups (since the current
                     // compilation API doesn't allow for grouping).
                     //
-                    program->addEntryPoint(entryPoint, sink);
                     entryPointReq->getTranslationUnit()->entryPoints.add(entryPoint);
+
+                    allComponentTypes.add(entryPoint);
                 }
             }
 
@@ -10777,6 +10893,7 @@ static bool doesParameterMatch(
                     profile.setStage(entryPointAttr->stage);
 
                     RefPtr<EntryPoint> entryPoint = EntryPoint::create(
+                        linkage,
                         makeDeclRef(funcDecl),
                         profile);
 
@@ -10792,179 +10909,340 @@ static bool doesParameterMatch(
                     // group, so that its entry-point parameters lay out
                     // independent of the others.
                     //
-                    program->addEntryPoint(entryPoint, sink);
                     translationUnit->entryPoints.add(entryPoint);
+
+                    allComponentTypes.add(entryPoint);
                 }
             }
         }
 
-        program->_collectShaderParams(sink);
-
-        return program;
+        if(allComponentTypes.getCount() > 1)
+        {
+            auto composite = CompositeComponentType::create(
+                linkage,
+                allComponentTypes);
+            return composite;
+        }
+        else
+        {
+            return globalComponentType;
+        }
     }
 
-    static void _specializeExistentialTypeParams(
-        Linkage*                    linkage,
-        ExistentialTypeSlots&           ioSlots,
-        List<RefPtr<Expr>> const&   args,
+    RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImpl(
+        SpecializationArg const*    args,
+        Index                       argCount,
         DiagnosticSink*             sink)
     {
-        Index slotCount = ioSlots.paramTypes.getCount();
-        Index argCount = args.getCount();
+        SLANG_ASSERT(argCount == getSpecializationParamCount());
 
-        if( slotCount != argCount )
+        SemanticsVisitor visitor(getLinkage(), sink);
+
+        RefPtr<Module::ModuleSpecializationInfo> specializationInfo = new Module::ModuleSpecializationInfo();
+
+        for( Index ii = 0; ii < argCount; ++ii )
         {
-            sink->diagnose(SourceLoc(), Diagnostics::mismatchExistentialSlotArgCount, slotCount, argCount);
-            return;
+            auto& arg = args[ii];
+            auto& param = m_specializationParams[ii];
+
+            auto argType = arg.val.as<Type>();
+            SLANG_ASSERT(argType);
+
+            switch( param.flavor )
+            {
+            case SpecializationParam::Flavor::GenericType:
+                {
+                    auto genericTypeParamDecl = param.object.as<GlobalGenericParamDecl>();
+                    SLANG_ASSERT(genericTypeParamDecl);
+
+                    // TODO: There is a serious flaw to this checking logic if we ever have cases where
+                    // the constraints on one `type_param` can depend on another `type_param`, e.g.:
+                    //
+                    //      type_param A;
+                    //      type_param B : ISidekick<A>;
+                    //
+                    // In that case, if a user tries to set `B` to `Robin` and `Robin` conforms to
+                    // `ISidekick<Batman>`, then the compiler needs to know whether `A` is being
+                    // set to `Batman` to know whether the setting for `B` is valid. In this limit
+                    // the constraints can be mutually recursive (so `A : IMentor<B>`).
+                    //
+                    // The only way to check things correctly is to validate each conformance under
+                    // a set of assumptions (substitutions) that includes all the type substitutions,
+                    // and possibly also all the other constraints *except* the one to be validated.
+                    //
+                    // We will punt on this for now, and just check each constraint in isolation.
+
+                    // As a quick sanity check, see if the argument that is being supplied for a
+                    // global generic type parameter is a reference to *another* global generic
+                    // type parameter, since that should always be an error.
+                    //
+                    if( auto argDeclRefType = argType.as<DeclRefType>() )
+                    {
+                        auto argDeclRef = argDeclRefType->declRef;
+                        if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
+                        {
+                            if(argGenericParamDeclRef.getDecl() == genericTypeParamDecl)
+                            {
+                                // We are trying to specialize a generic parameter using itself.
+                                sink->diagnose(genericTypeParamDecl,
+                                    Diagnostics::cannotSpecializeGlobalGenericToItself,
+                                    genericTypeParamDecl->getName());
+                                continue;
+                            }
+                            else
+                            {
+                                // We are trying to specialize a generic parameter using a *different*
+                                // global generic type parameter.
+                                sink->diagnose(genericTypeParamDecl,
+                                    Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
+                                    genericTypeParamDecl->getName(),
+                                    argGenericParamDeclRef.GetName());
+                                continue;
+                            }
+                        }
+                    }
+
+                    ModuleSpecializationInfo::GenericArgInfo genericArgInfo;
+                    genericArgInfo.paramDecl = genericTypeParamDecl;
+                    genericArgInfo.argVal = argType;
+                    specializationInfo->genericArgs.add(genericArgInfo);
+
+                    // Walk through the declared constraints for the parameter,
+                    // and check that the argument actually satisfies them.
+                    for(auto constraintDecl : genericTypeParamDecl->getMembersOfType<GenericTypeConstraintDecl>())
+                    {
+                        // Get the type that the constraint is enforcing conformance to
+                        auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraintDecl, nullptr));
+
+                        // Use our semantic-checking logic to search for a witness to the required conformance
+                        auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
+                        if (!witness)
+                        {
+                            // If no witness was found, then we will be unable to satisfy
+                            // the conformances required.
+                            sink->diagnose(genericTypeParamDecl,
+                                Diagnostics::typeArgumentForGenericParameterDoesNotConformToInterface,
+                                argType,
+                                genericTypeParamDecl->nameAndLoc.name,
+                                interfaceType);
+                        }
+
+                        ModuleSpecializationInfo::GenericArgInfo constraintArgInfo;
+                        constraintArgInfo.paramDecl = constraintDecl;
+                        constraintArgInfo.argVal = witness;
+                        specializationInfo->genericArgs.add(constraintArgInfo);
+                    }
+                }
+                break;
+
+            case SpecializationParam::Flavor::ExistentialType:
+                {
+                    auto interfaceType = param.object.as<Type>();
+                    SLANG_ASSERT(interfaceType);
+
+                    auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
+                    if (!witness)
+                    {
+                            // If no witness was found, then we will be unable to satisfy
+                            // the conformances required.
+                            sink->diagnose(SourceLoc(),
+                                Diagnostics::typeArgumentDoesNotConformToInterface,
+                                argType,
+                                interfaceType);
+                    }
+
+                    ExpandedSpecializationArg expandedArg;
+                    expandedArg.val = argType;
+                    expandedArg.witness = witness;
+
+                    specializationInfo->existentialArgs.add(expandedArg);
+                }
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unhandled specialization parameter flavor");
+            }
         }
 
-        SemanticsVisitor visitor(linkage, sink);
+        return specializationInfo;
+    }
 
-        for( Index ii = 0; ii < slotCount; ++ii )
+
+    static void _extractSpecializationArgs(
+        ComponentType*              componentType,
+        List<RefPtr<Expr>> const&   argExprs,
+        List<SpecializationArg>&    outArgs,
+        DiagnosticSink*             sink)
+    {
+        auto linkage = componentType->getLinkage();
+
+        auto argCount = argExprs.getCount();
+        for(Index ii = 0; ii < argCount; ++ii )
         {
-            auto slotType = ioSlots.paramTypes[ii];
-            auto argExpr = args[ii];
+            auto argExpr = argExprs[ii];
+            auto paramInfo = componentType->getSpecializationParam(ii);
+
+            // TODO: We should support non-type arguments here
 
             auto argType = checkProperType(linkage, TypeExp(argExpr), sink);
-            if(!argType)
+            if( !argType )
             {
-                // TODO: Each slot should track a source location and/or a `VarDeclBase`
-                // that names the parameter that the slot corresponds to.
-
-                sink->diagnose(SourceLoc(), Diagnostics::existentialSlotArgNotAType, ii);
-                return;
+                // If no witness was found, then we will be unable to satisfy
+                // the conformances required.
+                sink->diagnose(argExpr,
+                    Diagnostics::expectedAType,
+                    argExpr->type);
+                continue;
             }
 
+            SpecializationArg arg;
+            arg.val = argType;
+            outArgs.add(arg);
+        }
+    }
 
-            auto witness = visitor.tryGetSubtypeWitness(argType, slotType);
+    RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArgsImpl(
+        SpecializationArg const*    inArgs,
+        Index                       inArgCount,
+        DiagnosticSink*             sink)
+    {
+        auto args = inArgs;
+        auto argCount = inArgCount;
+
+        SemanticsVisitor visitor(getLinkage(), sink);
+
+        // The first N arguments will be for the explicit generic parameters
+        // of the entry point (if it has any).
+        //
+        auto genericSpecializationParamCount = getGenericSpecializationParamCount();
+        SLANG_ASSERT(argCount >= genericSpecializationParamCount);
+
+        Result result = SLANG_OK;
+
+        RefPtr<EntryPointSpecializationInfo> info = new EntryPointSpecializationInfo();
+
+        DeclRef<FuncDecl> specializedFuncDeclRef = m_funcDeclRef;
+        if(genericSpecializationParamCount)
+        {
+            // We need to construct a generic application and use
+            // the semantic checking machinery to expand out
+            // the rest of the arguments via inference...
+
+            auto genericDeclRef = m_funcDeclRef.GetParent().as<GenericDecl>();
+            SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
+
+            RefPtr<GenericSubstitution> genericSubst = new GenericSubstitution();
+            genericSubst->outer = genericDeclRef.substitutions.substitutions;
+            genericSubst->genericDecl = genericDeclRef.getDecl();
+
+            for(Index ii = 0; ii < genericSpecializationParamCount; ++ii)
+            {
+                auto specializationArg = args[ii];
+                genericSubst->args.add(specializationArg.val);
+            }
+
+            for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
+            {
+                auto constraintSubst = genericDeclRef.substitutions;
+                constraintSubst.substitutions = genericSubst;
+
+                DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
+                    constraintDecl, constraintSubst);
+
+                auto sub = GetSub(constraintDeclRef);
+                auto sup = GetSup(constraintDeclRef);
+
+                auto subTypeWitness = visitor.tryGetSubtypeWitness(sub, sup);
+                if(subTypeWitness)
+                {
+                    genericSubst->args.add(subTypeWitness);
+                }
+                else
+                {
+                    // TODO: diagnose a problem here
+                    sink->diagnose(constraintDecl, Diagnostics::typeArgumentDoesNotConformToInterface, sub, sup);
+                    result = SLANG_FAIL;
+                    continue;
+                }
+            }
+
+            specializedFuncDeclRef.substitutions.substitutions = genericSubst;
+        }
+
+        info->specializedFuncDeclRef = specializedFuncDeclRef;
+
+        // Once the generic parameters (if any) have been dealt with,
+        // any remaining specialization arguments are for existential/interface
+        // specialization parameters, attached to the value parameters
+        // of the entry point.
+        //
+        args += genericSpecializationParamCount;
+        argCount -= genericSpecializationParamCount;
+
+        auto existentialSpecializationParamCount = getExistentialSpecializationParamCount();
+        SLANG_ASSERT(argCount == existentialSpecializationParamCount);
+
+        for( Index ii = 0; ii < existentialSpecializationParamCount; ++ii )
+        {
+            auto& param = m_existentialSpecializationParams[ii];
+            auto& specializationArg = args[ii];
+
+            // TODO: We need to handle all the cases of "flavor" for the `param`s (not just types)
+
+            auto paramType = param.object.as<Type>();
+            auto argType = specializationArg.val.as<Type>();
+
+            auto witness = visitor.tryGetSubtypeWitness(argType, paramType);
             if (!witness)
             {
                 // If no witness was found, then we will be unable to satisfy
                 // the conformances required.
-                sink->diagnose(SourceLoc(), Diagnostics::existentialSlotArgDoesNotConform, ii, slotType);
-                return;
+                sink->diagnose(SourceLoc(), Diagnostics::typeArgumentDoesNotConformToInterface, argType, paramType);
+                result = SLANG_FAIL;
+                continue;
             }
 
-            ExistentialTypeSlots::Arg arg;
-            arg.type = argType;
-            arg.witness = witness;
-            ioSlots.args.add(arg);
+            ExpandedSpecializationArg expandedArg;
+            expandedArg.val = specializationArg.val;
+            expandedArg.witness = witness;
+            info->existentialSpecializationArgs.add(expandedArg);
         }
+
+        return info;
     }
 
-    void EntryPoint::_specializeExistentialTypeParams(
-        List<RefPtr<Expr>> const&   args,
-        DiagnosticSink*             sink)
-    {
-        Slang::_specializeExistentialTypeParams(getLinkage(), m_existentialSlots, args, sink);
-    }
-
-            /// Create a specialization an existing entry point based on generic arguments.
-    RefPtr<EntryPoint> createSpecializedEntryPoint(
+            /// Create a specialization an existing entry point based on specialization argument expressions.
+    RefPtr<ComponentType> createSpecializedEntryPoint(
         EntryPoint*                 unspecializedEntryPoint,
-        List<RefPtr<Expr>> const&   genericArgs,
-        List<RefPtr<Expr>> const&   existentialArgs,
+        List<RefPtr<Expr>> const&   argExprs,
         DiagnosticSink*             sink)
     {
-        auto linkage = unspecializedEntryPoint->getLinkage();
-
-        // TODO: Need to be careful in case entry point already has a decl-ref,
-        // pertaining to outer specializations (e.g., when entry point was
-        // nested in a generic type.
+        // We need to convert all of the `Expr` arguments
+        // into `SpecializationArg`s, so that we can bottleneck
+        // through the shared logic.
         //
-        auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
+        List<SpecializationArg> args;
+        _extractSpecializationArgs(unspecializedEntryPoint, argExprs, args, sink);
+        if(sink->GetErrorCount())
+            return nullptr;
 
-        SemanticsVisitor semantics(
-            linkage,
+        return unspecializedEntryPoint->specialize(
+            args.getBuffer(),
+            args.getCount(),
             sink);
-
-        DeclRef<FuncDecl> entryPointFuncDeclRef = makeDeclRef(entryPointFuncDecl.Ptr());
-        if( auto genericDecl = as<GenericDecl>(entryPointFuncDecl->ParentDecl) )
-        {
-            // We will construct a suitable `GenericAppExpr` to represent
-            // the user-specified `genericDecl` being applied to the
-            // supplied `genericArgs`, and then use the existing
-            // semantic checking logic that would apply to an explicit
-            // generic application like `F<A,B,C>` if it were
-            // encountered in the source code.
-
-            auto session = linkage->getSessionImpl();
-            auto genericDeclRef = makeDeclRef(genericDecl);
-
-            // The first pieces is a `VarExpr` that refers to `genericDecl`.
-            //
-            // TODO: This would not be needed if we instead parsed
-            // the supplied entry-point name into an expression
-            // earlier in this function.
-            //
-            RefPtr<VarExpr> genericExpr = new VarExpr();
-            genericExpr->declRef = genericDeclRef;
-            genericExpr->type.type = getTypeForDeclRef(session, genericDeclRef);
-
-            // Next we construct the actual `GenericAppExpr`
-            //
-            RefPtr<GenericAppExpr> genericAppExpr = new GenericAppExpr();
-            genericAppExpr->FunctionExpr = genericExpr;
-            genericAppExpr->Arguments = genericArgs;
-
-            // We use the semantics visitor to perform the
-            // actual checking logic (this might report
-            // errors)
-            //
-            auto checkedExpr = semantics.checkGenericAppWithCheckedArgs(genericAppExpr);
-
-            // Now we need to extract an appropriate decl-ref for the entry
-            // point from the `checkedExpr`.
-            //
-            if( auto declRefExpr = checkedExpr.as<DeclRefExpr>() )
-            {
-                // TODO: We should eventually check for the case
-                // where we have a `MemberExpr` or another case of
-                // `DeclRefExpr` that cannot be summarized as just
-                // its decl-ref.
-                //
-                // The basic `VarExpr` and `StaticMemberExpr` cases
-                // should be allow-able.
-
-                entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
-            }
-            else if( semantics.IsErrorExpr(checkedExpr) )
-            {
-                // Any semantic error that occured should have been
-                // reported already.
-                return nullptr;
-            }
-            else
-            {
-                // The result of specializing a reference to a generic
-                // function should always be a `DeclRefExpr`
-                //
-                SLANG_UNEXPECTED("reference to generic decl wasn't a `DeclRefExpr`");
-                UNREACHABLE_RETURN(nullptr);
-            }
-        }
-
-        RefPtr<EntryPoint> specializedEntryPoint = EntryPoint::create(
-            entryPointFuncDeclRef,
-            unspecializedEntryPoint->getProfile());
-
-        // Next we need to validate the existential arguments.
-        specializedEntryPoint->_specializeExistentialTypeParams(existentialArgs, sink);
-
-        return specializedEntryPoint;
     }
 
-        /// Parse an array of strings as generic arguments.
+        /// Parse an array of strings as specialization arguments.
         ///
         /// Names in the strings will be parsed in the context of
         /// the code loaded into the given compile request.
         ///
-    void parseGenericArgStrings(
+    void parseSpecializationArgStrings(
         EndToEndCompileRequest* endToEndReq,
         List<String> const&     genericArgStrings,
         List<RefPtr<Expr>>&     outGenericArgs)
     {
-        auto unspecialiedProgram = endToEndReq->getUnspecializedProgram();
+        auto unspecialiedProgram = endToEndReq->getUnspecializedGlobalComponentType();
 
         // TODO: Building a list of `scopesToTry` here shouldn't
         // be required, since the `Scope` type itself has the ability
@@ -11004,15 +11282,14 @@ static bool doesParameterMatch(
                 }
             }
 
+            if(!argExpr)
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::internalCompilerError, "couldn't parse specialization argument");
+                return;
+            }
+
             outGenericArgs.add(argExpr);
         }
-    }
-
-    void Program::_specializeExistentialTypeParams(
-        List<RefPtr<Expr>> const&   args,
-        DiagnosticSink*             sink)
-    {
-        Slang::_specializeExistentialTypeParams(getLinkageImpl(), m_globalExistentialSlots, args, sink);
     }
 
     Type* Linkage::specializeType(
@@ -11021,334 +11298,93 @@ static bool doesParameterMatch(
         Type* const*    args,
         DiagnosticSink* sink)
     {
+        SLANG_ASSERT(unspecializedType);
+
         // TODO: We should cache and re-use specialized types
         // when the exact same arguments are provided again later.
 
         SemanticsVisitor visitor(this, sink);
 
+        SpecializationParams specializationParams;
+        _collectExistentialSpecializationParamsRec(specializationParams, unspecializedType);
 
-        ExistentialTypeSlots slots;
-        _collectExistentialTypeParamsRec(slots, unspecializedType);
+        assert(specializationParams.getCount() == argCount);
 
-        assert(slots.paramTypes.getCount() == argCount);
-
+        ExpandedSpecializationArgs specializationArgs;
         for( Int aa = 0; aa < argCount; ++aa )
         {
+            auto paramType = specializationParams[aa].object.as<Type>();
             auto argType = args[aa];
 
-            ExistentialTypeSlots::Arg arg;
-            arg.type = argType;
-            arg.witness = visitor.tryGetSubtypeWitness(argType, slots.paramTypes[aa]);
-            slots.args.add(arg);
+            ExpandedSpecializationArg arg;
+            arg.val = argType;
+            arg.witness = visitor.tryGetSubtypeWitness(argType, paramType);
+            specializationArgs.add(arg);
         }
 
         RefPtr<ExistentialSpecializedType> specializedType = new ExistentialSpecializedType();
         specializedType->baseType = unspecializedType;
-        specializedType->slots = slots;
+        specializedType->args = specializationArgs;
 
         m_specializedTypes.add(specializedType);
 
         return specializedType;
     }
 
-    // Shared implementation logic for the `_createSpecializedProgram*` entry points.
-    static RefPtr<Program> _createSpecializedProgramImpl(
+        /// Shared implementation logic for the `_createSpecializedProgram*` entry points.
+    static RefPtr<ComponentType> _createSpecializedProgramImpl(
         Linkage*                    linkage,
-        Program*                    unspecializedProgram,
-        List<RefPtr<Expr>> const&   globalGenericArgs,
-        List<RefPtr<Expr>> const&   globalExistentialArgs,
+        ComponentType*              unspecializedProgram,
+        List<RefPtr<Expr>> const&   specializationArgExprs,
         DiagnosticSink*             sink)
     {
-        // TODO: If there are no specialization arguments,
+        // If there are no specialization arguments,
         // then the the result of specialization should
-        // be the same as the input... *but* we are promising
-        // to return a program without any entry points,
-        // and that screws things up here.
+        // be the same as the input.
         //
-        // For now we just carefully avod this early-exit
-        // if we have any entry points.
-        //
-        // Eventually we should try to revise the model so
-        // that specialization of a program that includes
-        // entry points can make some kind of sense.
-        //
-        if( globalGenericArgs.getCount() == 0
-            && globalExistentialArgs.getCount() == 0
-            && unspecializedProgram->getEntryPointCount() == 0)
+        auto specializationArgCount = specializationArgExprs.getCount();
+        if( specializationArgCount == 0 )
         {
             return unspecializedProgram;
         }
 
-        // The given `unspecializedProgram` should be one that
-        // was checked through the front-end, so that now we
-        // only need to check if the given arguments can satisfy
-        // the requirements of the global generic parameters.
-        //
-        // The new program needs to start off with the same
-        // module dependency list as the original.
-        //
-        RefPtr<Program> specializedProgram = new Program(linkage);
-        for(auto module : unspecializedProgram->getModuleDependencies())
+        auto specializationParamCount = unspecializedProgram->getSpecializationParamCount();
+        if(specializationArgCount != specializationParamCount )
         {
-            specializedProgram->addReferencedLeafModule(module);
-        }
-
-
-        // We will collect all the global generic parameters
-        // defined in the modules being referenced, to find
-        // the global generic parameter signature of the
-        // program.
-        //
-        // TODO: Note that this doesn't handle the case where one
-        // or more of the type *arguments* that we are specifying
-        // ends up requiring additional modules to be referenced,
-        // which might in turn introduce new global generic parameters.
-        //
-        List<RefPtr<GlobalGenericParamDecl>> globalGenericParams;
-        for(auto module : unspecializedProgram->getModuleDependencies())
-        {
-            for(auto param : module->getModuleDecl()->getMembersOfType<GlobalGenericParamDecl>())
-                globalGenericParams.add(param);
-        }
-
-        // Next, we will check whether the supplied arguments can
-        // satisfy those parameters.
-        //
-        // An easy early-out case will be if the number of
-        // arguments isn't correct.
-        //
-        if (globalGenericParams.getCount() != globalGenericArgs.getCount())
-        {
-            sink->diagnose(SourceLoc(), Diagnostics::mismatchGlobalGenericArguments,
-                globalGenericParams.getCount(),
-                globalGenericArgs.getCount());
+            sink->diagnose(SourceLoc(), Diagnostics::mismatchSpecializationArguments,
+                specializationParamCount,
+                specializationArgCount);
             return nullptr;
         }
 
-        // We have an appropriate number of arguments for the global generic parameters,
+        // We have an appropriate number of arguments for the global specialization parameters,
         // and now we need to check that the arguments conform to the declared constraints.
         //
         SemanticsVisitor visitor(linkage, sink);
 
-        // Along the way, we will build up an appropriate set of substitutions to represent
-        // the generic arguments and their conformances.
-        //
-        RefPtr<Substitutions> globalGenericSubsts;
-        auto globalGenericSubstLink = &globalGenericSubsts;
-        //
-        // TODO: There is a serious flaw to this checking logic if we ever have cases where
-        // the constraints on one `type_param` can depend on another `type_param`, e.g.:
-        //
-        //      type_param A;
-        //      type_param B : ISidekick<A>;
-        //
-        // In that case, if a user tries to set `B` to `Robin` and `Robin` conforms to
-        // `ISidekick<Batman>`, then the compiler needs to know whether `A` is being
-        // set to `Batman` to know whether the setting for `B` is valid. In this limit
-        // the constraints can be mutually recursive (so `A : IMentor<B>`).
-        //
-        // The only way to check things correctly is to validate each conformance under
-        // a set of assumptions (substitutions) that includes all the type substitutions,
-        // and possibly also all the other constraints *except* the one to be validated.
-        //
-        // We will punt on this for now, and just check each constraint in isolation.
-        //
-        Index argCounter = 0;
-        for(auto& globalGenericParam : globalGenericParams)
-        {
-            // Get the argument that matches this parameter.
-            Index argIndex = argCounter++;
-            SLANG_ASSERT(argIndex < globalGenericArgs.getCount());
-            auto globalGenericArg = checkProperType(linkage, TypeExp(globalGenericArgs[argIndex]), sink);
-            if (!globalGenericArg)
-            {
-                sink->diagnose(globalGenericParam, Diagnostics::globalGenericArgumentNotAType, globalGenericParam->getName());
-                return nullptr;
-            }
-
-            // As a quick sanity check, see if the argument that is being supplied for a parameter
-            // is just the parameter itself, because this should always be an error:
-            //
-            if( auto argDeclRefType = globalGenericArg.as<DeclRefType>() )
-            {
-                auto argDeclRef = argDeclRefType->declRef;
-                if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
-                {
-                    if(argGenericParamDeclRef.getDecl() == globalGenericParam)
-                    {
-                        // We are trying to specialize a generic parameter using itself.
-                        sink->diagnose(globalGenericParam,
-                            Diagnostics::cannotSpecializeGlobalGenericToItself,
-                            globalGenericParam->getName());
-                        continue;
-                    }
-                    else
-                    {
-                        // We are trying to specialize a generic parameter using a *different*
-                        // global generic type parameter.
-                        sink->diagnose(globalGenericParam,
-                            Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
-                            globalGenericParam->getName(),
-                            argGenericParamDeclRef.GetName());
-                        continue;
-                    }
-                }
-            }
-
-            // Create a substitution for this parameter/argument.
-            RefPtr<GlobalGenericParamSubstitution> subst = new GlobalGenericParamSubstitution();
-            subst->paramDecl = globalGenericParam;
-            subst->actualType = globalGenericArg;
-
-            // Walk through the declared constraints for the parameter,
-            // and check that the argument actually satisfies them.
-            for(auto constraint : globalGenericParam->getMembersOfType<GenericTypeConstraintDecl>())
-            {
-                // Get the type that the constraint is enforcing conformance to
-                auto interfaceType = GetSup(DeclRef<GenericTypeConstraintDecl>(constraint, nullptr));
-
-                // Use our semantic-checking logic to search for a witness to the required conformance
-                auto witness = visitor.tryGetSubtypeWitness(globalGenericArg, interfaceType);
-                if (!witness)
-                {
-                    // If no witness was found, then we will be unable to satisfy
-                    // the conformances required.
-                    sink->diagnose(globalGenericParam,
-                        Diagnostics::typeArgumentDoesNotConformToInterface,
-                        globalGenericParam->nameAndLoc.name,
-                        globalGenericArg,
-                        interfaceType);
-                }
-
-                // Attach the concrete witness for this conformance to the
-                // substutiton
-                GlobalGenericParamSubstitution::ConstraintArg constraintArg;
-                constraintArg.decl = constraint;
-                constraintArg.val = witness;
-                subst->constraintArgs.add(constraintArg);
-            }
-
-            // Add the substitution for this parameter to the global substitution
-            // set that we are building.
-
-            *globalGenericSubstLink = subst;
-            globalGenericSubstLink = &subst->outer;
-        }
+        List<SpecializationArg> specializationArgs;
+        _extractSpecializationArgs(unspecializedProgram, specializationArgExprs, specializationArgs, sink);
         if(sink->GetErrorCount())
             return nullptr;
 
-        specializedProgram->setGlobalGenericSubsitution(globalGenericSubsts);
-
-        return specializedProgram;
-    }
-
-        /// Create a specialized copy of `unspecializedProgram`.
-        ///
-        /// The specialized program will include the entry points
-        /// from the original program (whether thsoe entry points
-        /// are specialized or not).
-        ///
-    static RefPtr<Program> _createSpecializedProgram(
-        Linkage*                    linkage,
-        Program*                    unspecializedProgram,
-        List<RefPtr<Expr>> const&   globalGenericArgs,
-        List<RefPtr<Expr>> const&   globalExistentialArgs,
-        DiagnosticSink*             sink)
-    {
-        auto specializedProgram = _createSpecializedProgramImpl(
-            linkage,
-            unspecializedProgram,
-            globalGenericArgs,
-            globalExistentialArgs,
+        auto specializedProgram = unspecializedProgram->specialize(
+            specializationArgs.getBuffer(),
+            specializationArgs.getCount(),
             sink);
 
-        // We need to ensure that the specialized program has whatever
-        // entry points (and groups) the unspecialized one had.
-        //
-        for( auto entryPointGroup : unspecializedProgram->getEntryPointGroups() )
-        {
-            specializedProgram->addEntryPointGroup(entryPointGroup);
-        }
-
-        // Now deal with the shader parameters and existential arguments
-        //
-        // Note: We should in theory be able to just copy over the shader
-        // parameters and existential slot information from the unspecialized
-        // program. This could save some time, but it would also mean that
-        // the only way to create a specialized program is by creating an
-        // unspecialized on first, which is maybe not always desirable.
-        //
-        specializedProgram->_collectShaderParams(sink);
-        specializedProgram->_specializeExistentialTypeParams(globalExistentialArgs, sink);
-
         return specializedProgram;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::specializeProgram(
-        slang::IProgram*                inUnspecializedProgram,
-        SlangInt                        specializationArgCount,
-        slang::SpecializationArg const* specializationArgs,
-        slang::IProgram**               outSpecializedProgram,
-        ISlangBlob**                    outDiagnostics)
-    {
-        auto unspecializedProgram = asInternal(inUnspecializedProgram);
-
-        if( specializationArgCount == 0 )
-        {
-            *outSpecializedProgram = ComPtr<slang::IProgram>(asExternal(unspecializedProgram)).detach();
-            return SLANG_OK;
-        }
-
-        List<RefPtr<Expr>> globalGenericArgs;
-
-        List<RefPtr<Expr>> globalExistentialArgs;
-        for( Int ii = 0; ii < specializationArgCount; ++ii )
-        {
-            auto& specializationArg = specializationArgs[ii];
-            switch( specializationArg.kind )
-            {
-            case slang::SpecializationArg::Kind::Type:
-                {
-                    auto typeArg = asInternal(specializationArg.type);
-                    RefPtr<SharedTypeExpr> argExpr = new SharedTypeExpr();
-                    argExpr->base = TypeExp(typeArg);
-                    argExpr->type = QualType(getTypeType(typeArg));
-
-                    globalExistentialArgs.add(argExpr);
-                }
-                break;
-
-            default:
-                return SLANG_E_INVALID_ARG;
-            }
-        }
-
-        DiagnosticSink sink(getSourceManager());
-        auto specializedProgram = _createSpecializedProgram(
-            this,
-            unspecializedProgram,
-            globalGenericArgs,
-            globalExistentialArgs,
-            &sink);
-        sink.getBlobIfNeeded(outDiagnostics);
-
-        if(!specializedProgram)
-            return SLANG_FAIL;
-
-        *outSpecializedProgram = ComPtr<slang::IProgram>(asExternal(specializedProgram)).detach();
-        return SLANG_OK;
-    }
-
-        /// Specialize an entry point that was checked by the front-end, based on generic arguments.
+        /// Specialize an entry point that was checked by the front-end, based on specialization arguments.
         ///
-        /// If the end-to-end compile request included generic argument strings
+        /// If the end-to-end compile request included specialization argument strings
         /// for this entry point, then they will be parsed, checked, and used
         /// as arguments to the generic entry point.
         ///
         /// Returns a specialized entry point if everything worked as expected.
         /// Returns null and diagnoses errors if anything goes wrong.
         ///
-    RefPtr<EntryPoint> createSpecializedEntryPoint(
+    RefPtr<ComponentType> createSpecializedEntryPoint(
         EndToEndCompileRequest*                         endToEndReq,
         EntryPoint*                                     unspecializedEntryPoint,
         EndToEndCompileRequest::EntryPointInfo const&   entryPointInfo)
@@ -11359,33 +11395,35 @@ static bool doesParameterMatch(
         // If the user specified generic arguments for the entry point,
         // then we will need to parse the arguments first.
         //
-        List<RefPtr<Expr>> genericArgs;
-        parseGenericArgStrings(
+        List<RefPtr<Expr>> specializationArgExprs;
+        parseSpecializationArgStrings(
             endToEndReq,
-            entryPointInfo.genericArgStrings,
-            genericArgs);
-
-        List<RefPtr<Expr>> existentialArgs;
-        parseGenericArgStrings(
-            endToEndReq,
-            entryPointInfo.existentialArgStrings,
-            existentialArgs);
+            entryPointInfo.specializationArgStrings,
+            specializationArgExprs);
 
         // Next we specialize the entry point function given the parsed
         // generic argument expressions.
         //
         auto entryPoint = createSpecializedEntryPoint(
             unspecializedEntryPoint,
-            genericArgs,
-            existentialArgs,
+            specializationArgExprs,
             sink);
 
         return entryPoint;
     }
 
-        /// Create a specialized program based on the given compile request.
+        /// Create a specialized component type for the global scope of the given compile request.
         ///
-    RefPtr<Program> createSpecializedProgram(
+        /// The specialized program will be consistent with that created by
+        /// `createUnspecializedGlobalComponentType`, and will simply fill in
+        /// its specialization parameters with the arguments (if any) supllied
+        /// as part fo the end-to-end compile request.
+        ///
+        /// The layout of the new component type will be consistent with that
+        /// of the original *if* there are no global generic type parameters
+        /// (only interface/existential parameters).
+        ///
+    RefPtr<ComponentType> createSpecializedGlobalComponentType(
         EndToEndCompileRequest* endToEndReq)
     {
         // The compile request must have already completed front-end processing,
@@ -11393,36 +11431,32 @@ static bool doesParameterMatch(
         // to parse and check any generic arguments that are being supplied for
         // global or entry-point generic parameters.
         //
-        auto unspecializedProgram = endToEndReq->getUnspecializedProgram();
+        auto unspecializedProgram = endToEndReq->getUnspecializedGlobalComponentType();
         auto linkage = endToEndReq->getLinkage();
+        auto sink = endToEndReq->getSink();
 
-        // First, let's parse the generic argument strings that were
-        // provided via the API, so taht we can match them
+        // First, let's parse the specialization argument strings that were
+        // provided via the API, so that we can match them
         // against what was declared in the program.
         //
-        List<RefPtr<Expr>> globalGenericArgs;
-        parseGenericArgStrings(
+        List<RefPtr<Expr>> globalSpecializationArgs;
+        parseSpecializationArgStrings(
             endToEndReq,
-            endToEndReq->globalGenericArgStrings,
-            globalGenericArgs);
+            endToEndReq->globalSpecializationArgStrings,
+            globalSpecializationArgs);
 
-        // Also handle global existential type arguments.
-        List<RefPtr<Expr>> globalExistentialArgs;
-        parseGenericArgStrings(
-            endToEndReq,
-            endToEndReq->globalExistentialSlotArgStrings,
-            globalExistentialArgs);
+        // Don't proceed further if anything failed to parse.
+        if(sink->GetErrorCount())
+            return nullptr;
 
         // Now we create the initial specialized program by
         // applying the global generic arguments (if any) to the
         // unspecialized program.
         //
-        auto sink = endToEndReq->getSink();
         auto specializedProgram = _createSpecializedProgramImpl(
-            endToEndReq->getLinkage(),
+            linkage,
             unspecializedProgram,
-            globalGenericArgs,
-            globalExistentialArgs,
+            globalSpecializationArgs,
             sink);
 
         // If anything went wrong with the global generic
@@ -11450,32 +11484,68 @@ static bool doesParameterMatch(
             endToEndReq->entryPoints.setCount(entryPointCount);
         }
 
-        Index entryPointCounter = 0;
-
-        for( auto unspecializedEntryPointGroup : unspecializedProgram->getEntryPointGroups() )
-        {
-            List<RefPtr<EntryPoint>> specializedEntryPoints;
-            for( auto unspecializedEntryPoint : unspecializedEntryPointGroup->getEntryPoints() )
-            {
-                Index entryPointIndex = entryPointCounter++;
-                auto& entryPointInfo = endToEndReq->entryPoints[entryPointIndex];
-
-                auto specializedEntryPoint = createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
-                specializedEntryPoints.add(specializedEntryPoint);
-            }
-
-            RefPtr<EntryPointGroup> specializedEntryPointGroup = EntryPointGroup::create(linkage, specializedEntryPoints, endToEndReq->getSink());
-            specializedProgram->addEntryPointGroup(specializedEntryPointGroup);
-        }
-
-        // Finalize the information for the specialized program,
-        // now that we have computed its entry point list, etc.
-        //
-        specializedProgram->_collectShaderParams(sink);
-        specializedProgram->_specializeExistentialTypeParams(globalExistentialArgs, sink);
-
         return specializedProgram;
     }
+
+        /// Create a specialized program based on the given compile request.
+        ///
+        /// The specialized program created here includes both the global
+        /// scope for all the translation units involved and all the entry
+        /// points, and it also includes any specialization arguments
+        /// that were supplied.
+        ///
+        /// It is important to note that this function specializes
+        /// the global scope and the entry points in isolation and then
+        /// composes them, and that this can lead to different layout
+        /// from the result of `createUnspecializedGlobalAndEntryPointsComponentType`.
+        ///
+        /// If we have a module `M` with entry point `E`, and each has one
+        /// specialization parameter, then `createUnspecialized...` will yield:
+        ///
+        ///     compose(M,E)
+        ///
+        /// That composed type will have two specialization parameters (the one
+        /// from `M` plus the one from `E`) and so we might specialize it to get:
+        ///
+        ///     specialize(compose(M,E), X, Y)
+        ///
+        /// while if we use `createSpecialized...` we will get:
+        ///
+        ///     compose(specialize(M,X), specialize(E,Y))
+        ///
+        /// While these options are semantically equivalent, they would not lay
+        /// out the same way in memory.
+        ///
+        /// There are many reasons why an application might prefer one over the
+        /// other, and an application that cares should use the more explicit
+        /// APIs to construct what they want. The behavior of this function
+        /// is just to provide a reasonable default for use by end-to-end
+        /// compilation (e.g., from the command line).
+        ///
+    RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
+        EndToEndCompileRequest* endToEndReq)
+    {
+        auto specializedGlobalComponentType = endToEndReq->getSpecializedGlobalComponentType();
+
+        List<RefPtr<ComponentType>> allComponentTypes;
+        allComponentTypes.add(specializedGlobalComponentType);
+
+        auto unspecializedGlobalAndEntryPointsComponentType = endToEndReq->getUnspecializedGlobalAndEntryPointsComponentType();
+        auto entryPointCount = unspecializedGlobalAndEntryPointsComponentType->getEntryPointCount();
+
+        for(Index ii = 0; ii < entryPointCount; ++ii)
+        {
+            auto& entryPointInfo = endToEndReq->entryPoints[ii];
+            auto unspecializedEntryPoint = unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
+
+            auto specializedEntryPoint = createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
+            allComponentTypes.add(specializedEntryPoint);
+        }
+
+        RefPtr<ComponentType> composed = CompositeComponentType::create(endToEndReq->getLinkage(), allComponentTypes);
+        return composed;
+    }
+
 
     void checkTranslationUnit(
         TranslationUnitRequest* translationUnit)
@@ -11488,6 +11558,8 @@ static bool doesParameterMatch(
         // checking that is required on all declarations
         // in the translation unit.
         visitor.checkDecl(translationUnit->getModuleDecl());
+
+        translationUnit->getModule()->_collectShaderParams();
     }
 
 

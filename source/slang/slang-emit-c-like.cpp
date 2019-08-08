@@ -2459,13 +2459,13 @@ String CLikeSourceEmitter::getFuncName(IRFunc* func)
         // name for an entry-point function, but other
         // targets should try to use the original name.
         //
-        // TODO: always use `main`, and have any code
-        // that wraps this know to use `main` instead
-        // of the original entry-point name...
+        // TODO: always use the original name, and
+        // use the appropriate options for glslang to
+        // make it support a non-`main` name.
         //
         if (getSourceStyle() != SourceStyle::GLSL)
         {
-            return getText(entryPointLayout->entryPoint->getName());
+            return getText(entryPointLayout->getFuncDecl()->getName());
         }
 
         //
