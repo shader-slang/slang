@@ -1613,13 +1613,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto irBaseType = lowerType(context, type->baseType);
 
         List<IRInst*> slotArgs;
-        for(auto arg : type->slots.args)
+        for(auto arg : type->args)
         {
-            auto irArgType = lowerType(context, arg.type);
-            auto irArgWitness = lowerSimpleVal(context, arg.witness);
+            auto irArgVal = lowerSimpleVal(context, arg.val);
+            slotArgs.add(irArgVal);
 
-            slotArgs.add(irArgType);
-            slotArgs.add(irArgWitness);
+            if(auto witness = arg.witness)
+            {
+                auto irArgWitness = lowerSimpleVal(context, witness);
+                slotArgs.add(irArgWitness);
+            }
         }
 
         auto irType = getBuilder()->getBindExistentialsType(irBaseType, slotArgs.getCount(), slotArgs.getBuffer());
@@ -6265,13 +6268,18 @@ static void lowerFrontEndEntryPointToIR(
 }
 
 static void lowerProgramEntryPointToIR(
-    IRGenContext*   context,
-    EntryPoint*     entryPoint)
+    IRGenContext*                               context,
+    EntryPoint*                                 entryPoint,
+    EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
+    auto entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
+    if(specializationInfo)
+        entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
+
     // First, lower the entry point like an ordinary function
 
+
     auto session = context->getSession();
-    auto entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
     auto entryPointFuncType = lowerType(context, getFuncType(session, entryPointFuncDeclRef));
 
     auto builder = context->irBuilder;
@@ -6280,7 +6288,6 @@ static void lowerProgramEntryPointToIR(
     auto loweredEntryPointFunc = getSimpleVal(context,
         emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
-    //
     if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
         builder->addExportDecoration(loweredEntryPointFunc, getMangledName(entryPointFuncDeclRef).getUnownedSlice());
@@ -6289,26 +6296,24 @@ static void lowerProgramEntryPointToIR(
     // We may have shader parameters of interface/existential type,
     // which need us to supply concrete type information for specialization.
     //
-    auto existentialTypeArgCount = entryPoint->getExistentialTypeArgCount();
-    if( existentialTypeArgCount )
+    if(specializationInfo && specializationInfo->existentialSpecializationArgs.getCount() != 0)
     {
         List<IRInst*> existentialSlotArgs;
-        for( Index ii = 0; ii < existentialTypeArgCount; ++ii )
+        for(auto arg : specializationInfo->existentialSpecializationArgs )
         {
-            auto arg = entryPoint->getExistentialTypeArg(ii);
 
-            auto irArgType = lowerType(context, arg.type);
-            auto irWitnessTable = lowerSimpleVal(context, arg.witness);
-
+            auto irArgType = lowerSimpleVal(context, arg.val);
             existentialSlotArgs.add(irArgType);
-            existentialSlotArgs.add(irWitnessTable);
+
+            if(auto witness = arg.witness)
+            {
+                auto irWitnessTable = lowerSimpleVal(context, witness);
+                existentialSlotArgs.add(irWitnessTable);
+            }
         }
 
         builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getCount(), existentialSlotArgs.getBuffer());
     }
-
-
-
 }
 
     /// Ensure that `decl` and all relevant declarations under it get emitted.
@@ -6451,97 +6456,136 @@ IRModule* generateIRForTranslationUnit(
     return module;
 }
 
-RefPtr<IRModule> generateIRForProgram(
-    Session*        session,
-    Program*        program,
-    DiagnosticSink* sink)
+    /// Context for generating IR code to represent a `SpecializedComponentType`
+struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 {
-//    auto compileRequest = translationUnit->compileRequest;
+    DiagnosticSink* sink;
+    Linkage* linkage;
+    Session* session;
+    IRGenContext* context;
+    IRBuilder* builder;
 
-    SharedIRGenContext sharedContextStorage(
-        session,
-        sink);
-    SharedIRGenContext* sharedContext = &sharedContextStorage;
-
-    IRGenContext contextStorage(sharedContext);
-    IRGenContext* context = &contextStorage;
-
-    SharedIRBuilder sharedBuilderStorage;
-    SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-    sharedBuilder->module = nullptr;
-    sharedBuilder->session = session;
-
-    IRBuilder builderStorage;
-    IRBuilder* builder = &builderStorage;
-    builder->sharedBuilder = sharedBuilder;
-
-    RefPtr<IRModule> module = builder->createModule();
-    sharedBuilder->module = module;
-
-    context->irBuilder = builder;
-
-    // We need to emit symbols for all of the entry
-    // points in the program; this is especially
-    // important in the case where a generic entry
-    // point is being specialized.
-    //
-    for(auto entryPoint : program->getEntryPoints())
+    RefPtr<IRModule> process(
+        SpecializedComponentType*   componentType,
+        DiagnosticSink*             inSink)
     {
-        lowerProgramEntryPointToIR(context, entryPoint);
+        sink = inSink;
+
+        linkage = componentType->getLinkage();
+        session = linkage->getSessionImpl();
+
+        SharedIRGenContext sharedContextStorage(
+            session,
+            sink);
+        SharedIRGenContext* sharedContext = &sharedContextStorage;
+
+        IRGenContext contextStorage(sharedContext);
+        context = &contextStorage;
+
+        SharedIRBuilder sharedBuilderStorage;
+        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+        sharedBuilder->module = nullptr;
+        sharedBuilder->session = session;
+
+        IRBuilder builderStorage;
+        builder = &builderStorage;
+        builder->sharedBuilder = sharedBuilder;
+
+        RefPtr<IRModule> module = builder->createModule();
+        sharedBuilder->module = module;
+
+        builder->setInsertInto(module->getModuleInst());
+
+        context->irBuilder = builder;
+
+        componentType->acceptVisitor(this, nullptr);
+
+        return module;
     }
 
-
-    // Now lower all the arguments supplied for global generic
-    // type parameters.
-    //
-    for (RefPtr<Substitutions> subst = program->getGlobalGenericSubstitution(); subst; subst = subst->outer)
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        auto gSubst = subst.as<GlobalGenericParamSubstitution>();
-        if(!gSubst)
-            continue;
+        // We need to emit symbols for all of the entry
+        // points in the program; this is especially
+        // important in the case where a generic entry
+        // point is being specialized.
+        //
+        lowerProgramEntryPointToIR(context, entryPoint, specializationInfo);
+    }
 
-        IRInst* typeParam = getSimpleVal(context, ensureDecl(context, gSubst->paramDecl));
-        IRType* typeVal = lowerType(context, gSubst->actualType);
-
-        // bind `typeParam` to `typeVal`
-        builder->emitBindGlobalGenericParam(typeParam, typeVal);
-
-        for (auto& constraintArg : gSubst->constraintArgs)
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // We've hit a leaf module, so we should be able to bind any global
+        // generic type parameters here...
+        //
+        if( specializationInfo )
         {
-            IRInst* constraintParam = getSimpleVal(context, ensureDecl(context, constraintArg.decl));
-            IRInst* constraintVal = lowerSimpleVal(context, constraintArg.val);
+            for( auto genericArgInfo : specializationInfo->genericArgs )
+            {
+                IRInst* irParam = getSimpleVal(context, ensureDecl(context, genericArgInfo.paramDecl));
+                IRInst* irVal = lowerSimpleVal(context, genericArgInfo.argVal);
 
-            // bind `constraintParam` to `constraintVal`
-            builder->emitBindGlobalGenericParam(constraintParam, constraintVal);
+                // bind `irParam` to `irVal`
+                builder->emitBindGlobalGenericParam(irParam, irVal);
+            }
+
+            auto shaderParamCount = module->getShaderParamCount();
+            Index existentialArgOffset = 0;
+
+            for( Index ii = 0; ii < shaderParamCount; ++ii )
+            {
+                auto shaderParam = module->getShaderParam(ii);
+                auto specializationArgCount = shaderParam.specializationParamCount;
+
+                IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef));
+                List<IRInst*> irSlotArgs;
+                for( Index jj = 0; jj < specializationArgCount; ++jj )
+                {
+                    auto& specializationArg = specializationInfo->existentialArgs[existentialArgOffset++];
+
+                    auto irType = lowerSimpleVal(context, specializationArg.val);
+                    auto irWitness = lowerSimpleVal(context, specializationArg.witness);
+
+                    irSlotArgs.add(irType);
+                    irSlotArgs.add(irWitness);
+                }
+
+                builder->addBindExistentialSlotsDecoration(
+                    irParam,
+                    irSlotArgs.getCount(),
+                    irSlotArgs.getBuffer());
+            }
         }
     }
 
-    // We may have shader parameters of interface/existential type,
-    // which need us to supply concrete type information for specialization.
-    //
-    auto existentialTypeArgCount = program->getExistentialTypeArgCount();
-    if( existentialTypeArgCount )
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        List<IRInst*> existentialSlotArgs;
-        for( Index ii = 0; ii < existentialTypeArgCount; ++ii )
-        {
-            auto arg = program->getExistentialTypeArg(ii);
-
-            auto irArgType = lowerType(context, arg.type);
-            auto irWitnessTable = lowerSimpleVal(context, arg.witness);
-
-            existentialSlotArgs.add(irArgType);
-            existentialSlotArgs.add(irWitnessTable);
-        }
-
-        builder->emitBindGlobalExistentialSlots(existentialSlotArgs.getCount(), existentialSlotArgs.getBuffer());
+        visitChildren(composite, specializationInfo);
     }
 
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        visitChildren(specialized);
+    }
 
-    // TODO: Should we apply any of the validation or
-    // mandatory optimization passes here?
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // TODO: This case should be akin to the `Module` case,
+        // and deal with global-scope specialization parameters
+        // directly.
+        //
+        SLANG_UNUSED(legacy);
+        SLANG_UNUSED(specializationInfo);
+        SLANG_UNIMPLEMENTED_X("legacy program case");
+    }
+};
 
-    return module;
+RefPtr<IRModule> generateIRForSpecializedComponentType(
+    SpecializedComponentType*   componentType,
+    DiagnosticSink*             sink)
+{
+    SpecializedComponentTypeIRGenContext context;
+    return context.process(componentType, sink);
 }
 
 } // namespace Slang

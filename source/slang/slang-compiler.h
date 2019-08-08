@@ -116,7 +116,6 @@ namespace Slang
 
     class Linkage;
     class Module;
-    class Program;
     class FrontEndCompileRequest;
     class BackEndCompileRequest;
     class EndToEndCompileRequest;
@@ -146,13 +145,19 @@ namespace Slang
     struct ShaderParamInfo
     {
         DeclRef<VarDeclBase>    paramDeclRef;
-        UInt                    firstExistentialTypeSlot = 0;
-        UInt                    existentialTypeSlotCount = 0;
+        Int                     firstSpecializationParamIndex = 0;
+        Int                     specializationParamCount = 0;
     };
 
         /// Extended information specific to global shader parameters
     struct GlobalShaderParamInfo : ShaderParamInfo
     {
+        // TODO: This type should be eliminated if/when we remove
+        // support for compilation with multiple translation units
+        // that all declare the "same" shader parameter (e.g., a
+        // `cbuffer`) and expect those duplicate declarations
+        // to get the same parameter binding/layout.
+
         // Additional global-scope declarations that are conceptually
         // declaring the "same" parameter as the `paramDeclRef`.
         List<DeclRef<VarDeclBase>> additionalParamDeclRefs;
@@ -203,7 +208,7 @@ namespace Slang
     {
     public:
             /// Get the list of modules that are depended on.
-        List<RefPtr<Module>> const& getModuleList() { return m_moduleList; }
+        List<Module*> const& getModuleList() { return m_moduleList; }
 
             /// Add a module and everything it depends on to the list.
         void addDependency(Module* module);
@@ -214,8 +219,8 @@ namespace Slang
     private:
         void _addDependency(Module* module);
 
-        List<RefPtr<Module>>    m_moduleList;
-        HashSet<Module*>        m_moduleSet;
+        List<Module*>       m_moduleList;
+        HashSet<Module*>    m_moduleSet;
     };
 
         /// Tracks an unordered list of filesystem paths that something depends on
@@ -245,6 +250,375 @@ namespace Slang
         HashSet<String> m_filePathSet;
     };
 
+    class EntryPoint;
+
+    class ComponentType;
+    class ComponentTypeVisitor;
+
+        /// Base class for "component types" that represent the pieces a final
+        /// shader program gets linked together from.
+        ///
+    class ComponentType : public RefObject, public slang::IComponentType
+    {
+    public:
+        //
+        // ISlangUnknown interface
+        //
+
+        SLANG_REF_OBJECT_IUNKNOWN_ALL;
+        ISlangUnknown* getInterface(Guid const& guid);
+
+        //
+        // slang::IComponentType interface
+        //
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE;
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
+            SlangInt        targetIndex,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IBlob**  outCode,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+            slang::SpecializationArg const* specializationArgs,
+            SlangInt                        specializationArgCount,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
+
+            /// Get the linkage (aka "session" in the public API) for this component type.
+        Linkage* getLinkage() { return m_linkage; }
+
+            /// Get the target-specific version of this program for the given `target`.
+            ///
+            /// The `target` must be a target on the `Linkage` that was used to create this program.
+        TargetProgram* getTargetProgram(TargetRequest* target);
+
+            /// Get the number of entry points linked into this component type.
+        virtual Index getEntryPointCount() = 0;
+
+            /// Get one of the entry points linked into this component type.
+        virtual RefPtr<EntryPoint> getEntryPoint(Index index) = 0;
+
+            /// Get the number of global shader parameters linked into this component type.
+        virtual Index getShaderParamCount() = 0;
+
+            /// Get one of the global shader parametesr linked into this component type.
+        virtual GlobalShaderParamInfo getShaderParam(Index index) = 0;
+
+            /// Get the number of (unspecialized) specialization parameters for the component type.
+        virtual Index getSpecializationParamCount() = 0;
+
+            /// Get the specialization parameter at `index`.
+        virtual SpecializationParam const& getSpecializationParam(Index index) = 0;
+
+            /// Get the number of "requirements" that this component type has.
+            ///
+            /// A requirement represents another component type that this component
+            /// needs in order to function correctly. For example, the dependency
+            /// of one module on another module that it `import`s is represented
+            /// as a requirement, as is the dependency of an entry point on the
+            /// module that defines it.
+            ///
+        virtual Index getRequirementCount() = 0;
+
+            /// Get the requirement at `index`.
+        virtual RefPtr<ComponentType> getRequirement(Index index) = 0;
+
+            /// Parse a type from a string, in the context of this component type.
+            ///
+            /// Any names in the string will be resolved using the modules
+            /// referenced by the program.
+            ///
+            /// On an error, returns null and reports diagnostic messages
+            /// to the provided `sink`.
+            ///
+            /// TODO: This function shouldn't be on the base class, since
+            /// it only really makes sense on `Module` and (as a compatibility
+            /// feature) on `LegacyProgram`.
+            ///
+        Type* getTypeFromString(
+            String const&   typeStr,
+            DiagnosticSink* sink);
+
+            /// Get a list of modules that this component type depends on.
+            ///
+        virtual List<Module*> const& getModuleDependencies() = 0;
+
+            /// Get the full list of filesystem paths this component type depends on.
+            ///
+        virtual List<String> const& getFilePathDependencies() = 0;
+
+            /// Callback for use with `enumerateIRModules`
+        typedef void (*EnumerateIRModulesCallback)(IRModule* irModule, void* userData);
+
+            /// Invoke `callback` on all the IR modules that are (transitively) linked into this component type.
+        void enumerateIRModules(EnumerateIRModulesCallback callback, void* userData);
+
+            /// Invoke `callback` on all the IR modules that are (transitively) linked into this component type.
+        template<typename F>
+        void enumerateIRModules(F const& callback)
+        {
+            struct Helper
+            {
+                static void helper(IRModule* irModule, void* userData)
+                {
+                    (*(F*)userData)(irModule);
+                }
+            };
+            enumerateIRModules(&Helper::helper, (void*)&callback);
+        }
+
+            /// Callback for use with `enumerateModules`
+        typedef void (*EnumerateModulesCallback)(Module* module, void* userData);
+
+            /// Invoke `callback` on all the modules that are (transitively) linked into this component type.
+        void enumerateModules(EnumerateModulesCallback callback, void* userData);
+
+            /// Invoke `callback` on all the modules that are (transitively) linked into this component type.
+        template<typename F>
+        void enumerateModules(F const& callback)
+        {
+            struct Helper
+            {
+                static void helper(Module* module, void* userData)
+                {
+                    (*(F*)userData)(module);
+                }
+            };
+            enumerateModules(&Helper::helper, (void*)&callback);
+        }
+
+            /// Side-band information generated when specializing this component type.
+            ///
+            /// Difference subclasses of `ComponentType` are expected to create their
+            /// own subclass of `SpecializationInfo` as the output of `_validateSpecializationArgs`.
+            /// Later, whenever we want to use a specialized component type we will
+            /// also have the `SpecializationInfo` available and will expect it to
+            /// have the correct (subclass-specific) type.
+            ///
+        class SpecializationInfo : public RefObject
+        {
+        };
+
+            /// Validate the given specialization `args` and compute any side-band specialization info.
+            ///
+            /// Any errors will be reported to `sink`, which can thus be used to test
+            /// if the operation was successful.
+            ///
+            /// A null return value is allowed, since not all subclasses require
+            /// custom side-band specialization information.
+            ///
+            /// This function is an implementation detail of `specialize()`.
+            ///
+        virtual RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) = 0;
+
+            /// Validate the given specialization `args` and compute any side-band specialization info.
+            ///
+            /// Any errors will be reported to `sink`, which can thus be used to test
+            /// if the operation was successful.
+            ///
+            /// A null return value is allowed, since not all subclasses require
+            /// custom side-band specialization information.
+            ///
+            /// This function is an implementation detail of `specialize()`.
+            ///
+        RefPtr<SpecializationInfo> _validateSpecializationArgs(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink)
+        {
+            if(argCount == 0) return nullptr;
+            return _validateSpecializationArgsImpl(args, argCount, sink);
+        }
+
+            /// Specialize this component type given `specializationArgs`
+            ///
+            /// Any diagnostics will be reported to `sink`, which can be used
+            /// to determine if the operation was successful. It is allowed
+            /// for this operation to have a non-null return even when an
+            /// error is ecnountered.
+            ///
+        RefPtr<ComponentType> specialize(
+            SpecializationArg const*    specializationArgs,
+            SlangInt                    specializationArgCount,
+            DiagnosticSink*             sink);
+
+            /// Invoke `visitor` on this component type, using the appropriate dynamic type.
+            ///
+            /// This function implements the "visitor pattern" for `ComponentType`.
+            ///
+            /// If the `specializationInfo` argument is non-null, it must be specialization
+            /// information generated for this specific component type by `_validateSpecializationArgs`.
+            /// In that case, appropriately-typed specialization information will be passed
+            /// when invoking the `visitor`.
+            ///
+        virtual void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) = 0;
+
+    protected:
+        ComponentType(Linkage* linkage);
+
+    private:
+        RefPtr<Linkage> m_linkage;
+
+        // Cache of target-specific programs for each target.
+        Dictionary<TargetRequest*, RefPtr<TargetProgram>> m_targetPrograms;
+
+        // Any types looked up dynamically using `getTypeFromString`
+        //
+        // TODO: Remove this. Type lookup should only be supported on `Module`s.
+        //
+        Dictionary<String, RefPtr<Type>> m_types;
+    };
+
+        /// A component type built up from other component types.
+    class CompositeComponentType : public ComponentType
+    {
+    public:
+        static RefPtr<ComponentType> create(
+            Linkage*                            linkage,
+            List<RefPtr<ComponentType>> const&  childComponents);
+
+        List<RefPtr<ComponentType>> const& getChildComponents() { return m_childComponents; };
+        Index getChildComponentCount() { return m_childComponents.getCount(); }
+        RefPtr<ComponentType> getChildComponent(Index index) { return m_childComponents[index]; }
+
+        Index getEntryPointCount() SLANG_OVERRIDE;
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE;
+
+        Index getShaderParamCount() SLANG_OVERRIDE;
+        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE;
+
+        Index getSpecializationParamCount() SLANG_OVERRIDE;
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE;
+
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
+
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+
+        class CompositeSpecializationInfo : public SpecializationInfo
+        {
+        public:
+            List<RefPtr<SpecializationInfo>> childInfos;
+        };
+
+    protected:
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
+
+
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) SLANG_OVERRIDE;
+
+    private:
+        CompositeComponentType(
+            Linkage*                            linkage,
+            List<RefPtr<ComponentType>> const&  childComponents);
+
+        List<RefPtr<ComponentType>> m_childComponents;
+
+        // The following arrays hold the concatenated entry points, parameters,
+        // etc. from the child components. This approach allows for reasonably
+        // fast (constant time) access through operations like `getShaderParam`,
+        // but means that the memory usage of a composite is proportional to
+        // the sum of the memory usage of the children, rather than being fixed
+        // by the number of children (as it would be if we just stored 
+        // `m_childComponents`).
+        //
+        // TODO: We could conceivably build some O(numChildren) arrays that
+        // support binary-search to provide logarithmic-time access to entry
+        // points, parameters, etc. while giving a better overall memory usage.
+        //
+        List<EntryPoint*> m_entryPoints;
+        List<GlobalShaderParamInfo> m_shaderParams;
+        List<SpecializationParam> m_specializationParams;
+        List<ComponentType*> m_requirements;
+
+        ModuleDependencyList m_moduleDependencyList;
+        FilePathDependencyList m_filePathDependencyList;
+    };
+
+        /// A component type created by specializing another component type.
+    class SpecializedComponentType : public ComponentType
+    {
+    public:
+        SpecializedComponentType(
+            ComponentType*                  base,
+            SpecializationInfo*             specializationInfo,
+            List<SpecializationArg> const&  specializationArgs,
+            DiagnosticSink*                 sink);
+
+            /// Get the base (unspecialized) component type that is being specialized.
+        RefPtr<ComponentType> getBaseComponentType() { return m_base; }
+
+        RefPtr<SpecializationInfo> getSpecializationInfo() { return m_specializationInfo; }
+
+            /// Get the number of arguments supplied for existential type parameters.
+            ///
+            /// Note that the number of arguments may not match the number of parameters.
+            /// In particular, an unspecialized entry point may have many parameters, but zero arguments.
+        Index getSpecializationArgCount() { return m_specializationArgs.getCount(); }
+
+            /// Get the existential type argument (type and witness table) at `index`.
+        SpecializationArg const& getSpecializationArg(Index index) { return m_specializationArgs[index]; }
+
+            /// Get an array of all existential type arguments.
+        SpecializationArg const* getSpecializationArgs() { return m_specializationArgs.getBuffer(); }
+
+        Index getEntryPointCount() SLANG_OVERRIDE { return m_base->getEntryPointCount(); }
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { return m_base->getEntryPoint(index); }
+
+        Index getShaderParamCount() SLANG_OVERRIDE { return m_base->getShaderParamCount(); }
+        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_base->getShaderParam(index); }
+
+        Index getSpecializationParamCount() SLANG_OVERRIDE { return 0; }
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); static SpecializationParam dummy; return dummy; }
+
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
+
+            /// TODO: These should include requirements/dependencies for the types
+            /// referenced in the specialization arguments...
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_base->getModuleDependencies(); }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_base->getFilePathDependencies(); }
+
+                    /// Get a list of tagged-union types referenced by the specialization parameters.
+        List<RefPtr<TaggedUnionType>> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
+
+        RefPtr<IRModule> getIRModule() { return m_irModule; }
+
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
+
+    protected:
+
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) SLANG_OVERRIDE
+        {
+            SLANG_UNUSED(args);
+            SLANG_UNUSED(argCount);
+            SLANG_UNUSED(sink);
+            return nullptr;
+        }
+
+    private:
+        RefPtr<ComponentType> m_base;
+        RefPtr<SpecializationInfo> m_specializationInfo;
+        SpecializationArgs m_specializationArgs;
+        RefPtr<IRModule> m_irModule;
+
+        // Any tagged union types that were referenced by the specialization arguments.
+        List<RefPtr<TaggedUnionType>> m_taggedUnionTypes;
+
+    };
+
         /// Describes an entry point for the purposes of layout and code generation.
         ///
         /// This class also tracks any generic arguments to the entry point,
@@ -255,11 +629,12 @@ namespace Slang
         /// `getName()` and `getProfile()` methods should be expected to
         /// return useful data on pass-through entry points.
         ///
-    class EntryPoint : public RefObject
+    class EntryPoint : public ComponentType
     {
     public:
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
+            Linkage*            linkage,
             DeclRef<FuncDecl>   funcDeclRef,
             Profile             profile);
 
@@ -286,55 +661,66 @@ namespace Slang
             /// Get the module that contains the entry point.
         Module* getModule();
 
-            /// Get the linkage that contains the module for this entry point.
-        Linkage* getLinkage();
-
             /// Get a list of modules that this entry point depends on.
             ///
             /// This will include the module that defines the entry point (see `getModule()`),
             /// but may also include modules that are required by its generic type arguments.
             ///
-        List<RefPtr<Module>> getModuleDependencies() { return m_dependencyList.getModuleList(); }
-
-            /// Get a list of tagged-union types referenced by the entry point's generic parameters.
-        List<RefPtr<TaggedUnionType>> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE; // { return getModule()->getModuleDependencies(); }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE; // { return getModule()->getFilePathDependencies(); }
 
             /// Create a dummy `EntryPoint` that is only usable for pass-through compilation.
         static RefPtr<EntryPoint> createDummyForPassThrough(
+            Linkage*    linkage,
             Name*       name,
             Profile     profile);
 
             /// Get the number of existential type parameters for the entry point.
-        Index getExistentialTypeParamCount() { return m_existentialSlots.paramTypes.getCount(); }
+        Index getSpecializationParamCount() SLANG_OVERRIDE;
 
             /// Get the existential type parameter at `index`.
-        Type* getExistentialTypeParam(Index index) { return m_existentialSlots.paramTypes[index]; }
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE;
 
-            /// Get the number of arguments supplied for existential type parameters.
-            ///
-            /// Note that the number of arguments may not match the number of parameters.
-            /// In particular, an unspecialized entry point may have many parameters, but zero arguments.
-        Index getExistentialTypeArgCount() { return m_existentialSlots.args.getCount(); }
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
-            /// Get the existential type argument (type and witness table) at `index`.
-        ExistentialTypeSlots::Arg getExistentialTypeArg(Index index) { return m_existentialSlots.args[index]; }
+        SpecializationParams const& getExistentialSpecializationParams() { return m_existentialSpecializationParams; }
 
-            /// Get an array of all existential type arguments.
-        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_existentialSlots.args.getBuffer(); }
+        Index getGenericSpecializationParamCount() { return m_genericSpecializationParams.getCount(); }
+        Index getExistentialSpecializationParamCount() { return m_existentialSpecializationParams.getCount(); }
 
             /// Get an array of all entry-point shader parameters.
         List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
 
-        void _specializeExistentialTypeParams(
-            List<RefPtr<Expr>> const&   args,
-            DiagnosticSink*             sink);
+        Index getEntryPointCount() SLANG_OVERRIDE { return 1; };
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return this; }
+
+        Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
+        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return GlobalShaderParamInfo(); }
+
+        class EntryPointSpecializationInfo : public SpecializationInfo
+        {
+        public:
+            DeclRef<FuncDecl> specializedFuncDeclRef;
+            List<ExpandedSpecializationArg> existentialSpecializationArgs;
+        };
+
+    protected:
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
+
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) SLANG_OVERRIDE;
 
     private:
         EntryPoint(
+            Linkage*            linkage,
             Name*               name,
             Profile             profile,
             DeclRef<FuncDecl>   funcDeclRef);
 
+        void _collectGenericSpecializationParamsRec(Decl* decl);
         void _collectShaderParams();
 
         // The name of the entry point function (e.g., `main`)
@@ -345,8 +731,8 @@ namespace Slang
         //
         DeclRef<FuncDecl> m_funcDeclRef;
 
-            /// The existential/interface slots associated with the entry point parameter scope.
-        ExistentialTypeSlots m_existentialSlots;
+        SpecializationParams m_genericSpecializationParams;
+        SpecializationParams m_existentialSpecializationParams;
 
             /// Information about entry-point parameters
         List<ShaderParamInfo> m_shaderParams;
@@ -362,61 +748,6 @@ namespace Slang
         // intrinsic to the entry point.
         //
         Profile m_profile;
-
-        // Any tagged union types that were referenced by the generic arguments of the entry point.
-        List<RefPtr<TaggedUnionType>> m_taggedUnionTypes;
-
-        // Modules the entry point depends on.
-        ModuleDependencyList m_dependencyList;
-    };
-
-    class EntryPointGroup : public RefObject
-    {
-    public:
-        static RefPtr<EntryPointGroup> create(
-            Linkage*                        linkage,
-            List<RefPtr<EntryPoint>> const& entryPoints,
-            DiagnosticSink*                 sink);
-
-        Linkage* getLinkageImpl() { return m_linkage; }
-
-            /// Get the number of entry points in the group
-        Index getEntryPointCount() { return m_entryPoints.getCount(); }
-
-            /// Get the entry point at the given `index`.
-        RefPtr<EntryPoint> getEntryPoint(Index index) { return m_entryPoints[index]; }
-
-            /// Get the full ist of entry points in the group.
-        List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
-
-            /// Get a list of modules that this entry point group depends on.
-            ///
-            /// This will include the dependencies of all of the entry points in the group.
-            ///
-        List<RefPtr<Module>> getModuleDependencies() { return m_dependencyList.getModuleList(); }
-
-            /// Get an array of all entry-point-group shader parameters.
-        List<ShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
-
-    private:
-        EntryPointGroup(Linkage* linkage)
-            : m_linkage(linkage)
-        {}
-
-        void _collectShaderParams(DiagnosticSink* sink);
-
-        Linkage* m_linkage;
-        List<RefPtr<EntryPoint>> m_entryPoints;
-
-            /// Information about shader parameters to be associated with the entry-point group itself.
-            ///
-            /// This list captures parameters that logically belong to the group itself, rather than
-            /// to any specific entry point in the group.
-            ///
-        List<ShaderParamInfo> m_shaderParams;
-
-            /// Modules the entry point group depends on.
-        ModuleDependencyList m_dependencyList;
     };
 
     enum class PassThroughMode : SlangPassThrough
@@ -440,18 +771,51 @@ namespace Slang
         /// may span multiple Slang source files), and provides access
         /// to both the AST and IR representations of that code.
         ///
-    class Module : public RefObject, public slang::IModule
+    class Module : public ComponentType, public slang::IModule
     {
+        typedef ComponentType Super;
+
     public:
         SLANG_REF_OBJECT_IUNKNOWN_ALL
 
         ISlangUnknown* getInterface(const Guid& guid);
 
+
+        // Forward `IComponentType` methods
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE
+        {
+            return Super::getSession();
+        }
+
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
+            SlangInt        targetIndex,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getLayout(targetIndex, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IBlob**  outCode,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+            slang::SpecializationArg const* specializationArgs,
+            SlangInt                        specializationArgCount,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::specialize(specializationArgs, specializationArgCount, outDiagnostics);
+        }
+
+        //
+
             /// Create a module (initially empty).
         Module(Linkage* linkage);
-
-            /// Get the parent linkage of this module.
-        Linkage* getLinkage() { return m_linkage; }
 
             /// Get the AST for the module (if it has been parsed)
         ModuleDecl* getModuleDecl() { return m_moduleDecl; }
@@ -460,7 +824,7 @@ namespace Slang
         IRModule* getIRModule() { return m_irModule; }
 
             /// Get the list of other modules this module depends on
-        List<RefPtr<Module>> const& getModuleDependencyList() { return m_moduleDependencyList.getModuleList(); }
+        List<Module*> const& getModuleDependencyList() { return m_moduleDependencyList.getModuleList(); }
 
             /// Get the list of filesystem paths this module depends on
         List<String> const& getFilePathDependencyList() { return m_filePathDependencyList.getFilePathList(); }
@@ -475,7 +839,7 @@ namespace Slang
             ///
             /// This should only be called once, during creation of the module.
             ///
-        void setModuleDecl(ModuleDecl* moduleDecl) { m_moduleDecl = moduleDecl; }
+        void setModuleDecl(ModuleDecl* moduleDecl);// { m_moduleDecl = moduleDecl; }
 
             /// Set the IR for this module.
             ///
@@ -483,15 +847,64 @@ namespace Slang
             ///
         void setIRModule(IRModule* irModule) { m_irModule = irModule; }
 
-    private:
-        // The parent linkage
-        Linkage* m_linkage = nullptr;
+        Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
 
+        Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
+        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
+
+        Index getSpecializationParamCount() SLANG_OVERRIDE { return m_specializationParams.getCount(); }
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { return m_specializationParams[index]; }
+
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
+
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
+
+            /// Collect information on the shader parameters of the module.
+            ///
+            /// This method should only be called once, after the core
+            /// structured of the module (its AST and IR) have been created,
+            /// and before any of the `ComponentType` APIs are used.
+            ///
+            /// TODO: We might eventually consider a non-stateful approach
+            /// to constructing a `Module`.
+            ///
+        void _collectShaderParams();
+
+        class ModuleSpecializationInfo : public SpecializationInfo
+        {
+        public:
+            struct GenericArgInfo
+            {
+                RefPtr<Decl> paramDecl;
+                RefPtr<Val> argVal;
+            };
+
+            List<GenericArgInfo> genericArgs;
+            List<ExpandedSpecializationArg> existentialArgs;
+        };
+
+    protected:
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
+
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) SLANG_OVERRIDE;
+
+    private:
         // The AST for the module
         RefPtr<ModuleDecl>  m_moduleDecl;
 
         // The IR for the module
         RefPtr<IRModule> m_irModule = nullptr;
+
+        List<GlobalShaderParamInfo> m_shaderParams;
+        SpecializationParams m_specializationParams;
+
+        List<Module*> m_requirements;
 
         // List of modules this module depends on
         ModuleDependencyList m_moduleDependencyList;
@@ -651,15 +1064,10 @@ namespace Slang
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL createProgram(
-            slang::ProgramDesc const& desc,
-            slang::IProgram**         outProgram) override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL specializeProgram(
-            slang::IProgram*                   program,
-            SlangInt                    specializationArgCount,
-            slang::SpecializationArg const*    specializationArgs,
-            slang::IProgram**                  outSpecializedProgram,
-            ISlangBlob**                outDiagnostics = nullptr) override;
+        SLANG_NO_THROW slang::IComponentType* SLANG_MCALL createCompositeComponentType(
+            slang::IComponentType* const*  componentTypes,
+            SlangInt                componentTypeCount,
+            ISlangBlob**            outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
             slang::TypeReflection*          type,
             slang::SpecializationArg const* specializationArgs,
@@ -981,202 +1389,133 @@ namespace Slang
             int             translationUnitIndex,
             String const&   path);
 
-        Program* getProgram() { return m_program; }
+            /// Get a component type that represents the global scope of the compile request.
+        ComponentType* getGlobalComponentType()  { return m_globalComponentType; }
+
+            /// Get a component type that represents the global scope of the compile request, plus the requested entry points.
+        ComponentType* getGlobalAndEntryPointsComponentType() { return m_globalAndEntryPointsComponentType; }
 
     private:
-        RefPtr<Program> m_program;
+            /// A component type that includes only the global scopes of the translation unit(s) that were compiled.
+        RefPtr<ComponentType> m_globalComponentType;
+
+            /// A component type that extends the global scopes with all of the entry points that were specified.
+        RefPtr<ComponentType> m_globalAndEntryPointsComponentType;
     };
 
-        /// A collection of code modules and entry points that are intended to be used together.
+        /// A "legacy" program composes multiple translation units from a single compile request,
+        /// and takes care to treat global declarations of the same name from different translation
+        /// units as representing the "same" parameter.
         ///
-        /// A `Program` establishes that certain pieces of code are intended
-        /// to be used togehter so that, e.g., layout can make sure to allocate
-        /// space for the global shader parameters in all referenced modules.
+        /// TODO: This type only exists to support a single requirement: that multiple translation
+        /// units can be compiled in one pass and be guaranteed that the "same" parameter declared
+        /// in different translation units (hence different modules) will get the same layout.
+        /// This feature should be deprecated and removed as soon as possible, since the complexity
+        /// it creates in the codebase is not justified by its limited utility.
         ///
-    class Program : public RefObject, public slang::IProgram
+    class LegacyProgram : public ComponentType
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL;
-        ISlangUnknown* getInterface(Guid const& guid);
+        LegacyProgram(
+            Linkage*                                    linkage,
+            List<RefPtr<TranslationUnitRequest>> const& translationUnits,
+            DiagnosticSink*                             sink);
 
-        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
+        Index getTranslationUnitCount() { return m_translationUnits.getCount(); }
+        RefPtr<TranslationUnitRequest> getTranslationUnit(Index index) { return m_translationUnits[index]; }
 
-        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
-            SlangInt        targetIndex,
-            slang::IBlob**  outDiagnostics) override;
+        Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
-            SlangInt        entryPointIndex,
-            SlangInt        targetIndex,
-            slang::IBlob**  outCode,
-            slang::IBlob**  outDiagnostics) override;
+        Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
+        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
 
+        Index getSpecializationParamCount() SLANG_OVERRIDE { return m_specializationParams.getCount(); }
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { return m_specializationParams[index]; }
 
-            /// Create a new program, initially empty.
-            ///
-            /// All code loaded into the program must come
-            /// from the given `linkage`.
-        Program(
-            Linkage* linkage);
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
-            /// Get the linkage that this program uses.
-        Linkage* getLinkageImpl() { return m_linkage; }
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies.getModuleList(); }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_fileDependencies.getFilePathList(); }
 
-            /// Get the number of entry points added to the program
-        Index getEntryPointCount() { return m_entryPoints.getCount(); }
+    protected:
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
 
-            /// Get the entry point at the given `index`.
-        RefPtr<EntryPoint> getEntryPoint(Index index) { return m_entryPoints[index]; }
-
-            /// Get the full ist of entry points on the program.
-        List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
-
-
-        Index getEntryPointGroupCount() { return m_entryPointGroups.getCount(); }
-        RefPtr<EntryPointGroup> getEntryPointGroup(Index index) { return m_entryPointGroups[index]; }
-        List<RefPtr<EntryPointGroup>> const& getEntryPointGroups() { return m_entryPointGroups; }
-
-
-            /// Get the substitution (if any) that represents how global generics are specialized.
-        RefPtr<Substitutions> getGlobalGenericSubstitution() { return m_globalGenericSubst; }
-
-            /// Get the full list of modules this program depends on
-        List<RefPtr<Module>> getModuleDependencies() { return m_moduleDependencyList.getModuleList(); }
-
-            /// Get the full list of filesystem paths this program depends on
-        List<String> getFilePathDependencies() { return m_filePathDependencyList.getFilePathList(); }
-
-            /// Get the target-specific version of this program for the given `target`.
-            ///
-            /// The `target` must be a target on the `Linkage` that was used to create this program.
-        TargetProgram* getTargetProgram(TargetRequest* target);
-            
-            /// Add a module (and everything it depends on) to the list of references
-        void addReferencedModule(Module* module);
-
-            /// Add a module (but not the things it depends on) to the list of references
-            ///
-            /// This is a compatiblity hack for legacy compiler behavior.
-        void addReferencedLeafModule(Module* module);
-
-
-            /// Add an entry point to the program
-            ///
-            /// This also adds everything the entry point depends on to the list of references.
-            ///
-        void addEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
-
-            /// Add an entry point group to the program
-            ///
-            /// This also adds everything the entry point group depends on to the list of references.
-            ///
-        void addEntryPointGroup(EntryPointGroup* entryPointGroup);
-
-            /// Set the global generic argument substitution to use.
-        void setGlobalGenericSubsitution(RefPtr<Substitutions> subst)
-        {
-            m_globalGenericSubst = subst;
-        }
-
-            /// Parse a type from a string, in the context of this program.
-            ///
-            /// Any names in the string will be resolved using the modules
-            /// referenced by the program.
-            ///
-            /// On an error, returns null and reports diagnostic messages
-            /// to the provided `sink`.
-            ///
-        Type* getTypeFromString(String typeStr, DiagnosticSink* sink);
-
-            /// Get the IR module that represents this program and its entry points.
-            ///
-            /// The IR module for a program tries to be minimal, and in the
-            /// common case will only include symbols with `[import]` declarations
-            /// for the entry point(s) of the program, and any types they
-            /// depend on.
-            ///
-            /// This IR module is intended to be linked against the IR modules
-            /// for all of the dependencies (see `getModuleDependencies()`) to
-            /// provide complete code.
-            ///
-        RefPtr<IRModule> getOrCreateIRModule(DiagnosticSink* sink);
-
-            /// Get the number of existential type parameters for the program.
-        Index getExistentialTypeParamCount() { return m_globalExistentialSlots.paramTypes.getCount(); }
-
-            /// Get the existential type parameter at `index`.
-        Type* getExistentialTypeParam(Index index) { return m_globalExistentialSlots.paramTypes[index]; }
-
-            /// Get the number of arguments supplied for existential type parameters.
-            ///
-            /// Note that the number of arguments may not match the number of parameters.
-            /// In particular, an unspecialized program may have many parameters, but zero arguments.
-        Index getExistentialTypeArgCount() { return m_globalExistentialSlots.args.getCount(); }
-
-            /// Get the existential type argument (type and witness table) at `index`.
-        ExistentialTypeSlots::Arg getExistentialTypeArg(Index index) { return m_globalExistentialSlots.args[index]; }
-
-            /// Get an array of all existential type arguments.
-        ExistentialTypeSlots::Arg const* getExistentialTypeArgs() { return m_globalExistentialSlots.args.getBuffer(); }
-
-            /// Get an array of all global shader parameters.
-        List<GlobalShaderParamInfo> const& getShaderParams() { return m_shaderParams; }
-
-        void _collectShaderParams(DiagnosticSink* sink);
-        void _specializeExistentialTypeParams(
-            List<RefPtr<Expr>> const&   args,
-            DiagnosticSink*             sink);
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const*    args,
+            Index                       argCount,
+            DiagnosticSink*             sink) SLANG_OVERRIDE;
 
     private:
+        void _collectShaderParams(DiagnosticSink* sink);
 
-        // The linakge this program is associated with.
-        //
-        // Note that a `Program` keeps its associated linkage alive,
-        // and not vice versa.
-        //
-        RefPtr<Linkage> m_linkage;
+        List<RefPtr<TranslationUnitRequest>> m_translationUnits;
 
-        // Tracking data for the list of modules dependend on
-        ModuleDependencyList m_moduleDependencyList;
-
-        // Tracking data for the list of filesystem paths dependend on
-        FilePathDependencyList m_filePathDependencyList;
-
-        // Entry points that are part of the program.
-        List<RefPtr<EntryPoint> > m_entryPoints;
-
-        // Entry points that are part of the program.
-        List<RefPtr<EntryPointGroup> > m_entryPointGroups;
-
-        // Specializations for global generic parameters (if any)
-        RefPtr<Substitutions> m_globalGenericSubst;
-
-        // The existential/interface slots associated with the global scope.
-        ExistentialTypeSlots m_globalExistentialSlots;
-
-            /// Information about global shader parameters
+        List<EntryPoint*> m_entryPoints;
         List<GlobalShaderParamInfo> m_shaderParams;
-
-        // Generated IR for this program.
-        RefPtr<IRModule> m_irModule;
-
-        // Cache of target-specific programs for each target.
-        Dictionary<TargetRequest*, RefPtr<TargetProgram>> m_targetPrograms;
-
-        // Any types looked up dynamically using `getTypeFromString`
-        Dictionary<String, RefPtr<Type>> m_types;
+        List<ComponentType*> m_requirements;
+        SpecializationParams m_specializationParams;
+        ModuleDependencyList m_moduleDependencies;
+        FilePathDependencyList m_fileDependencies;
     };
 
-        /// A `Program` specialized for a particular `TargetRequest`
+        /// A visitor for use with `ComponentType`s, allowing dispatch over the concrete subclasses.
+    class ComponentTypeVisitor
+    {
+    public:
+        // The following methods should be overriden in a concrete subclass
+        // to customize how it acts on each of the concrete types of component.
+        //
+        // In cases where the application wants to simply "recurse" on a
+        // composite, specialized, or legacy component type it can use
+        // the `visitChildren` methods below.
+        //
+        virtual void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) = 0;
+        virtual void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) = 0;
+        virtual void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
+        virtual void visitSpecialized(SpecializedComponentType* specialized) = 0;
+        virtual void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
+
+    protected:
+        // These helpers can be used to recurse into the logical children of a
+        // component type, and are useful for the common case where a visitor
+        // only cares about a few leaf cases.
+        //
+        // Note that for a `LegacyProgram` the "children" in this case are the
+        // `Module`s of the translation units that make up the legacy program.
+        // In some cases this is what is desired, but in others it is incorrect
+        // to treat a legacy program as a composition of modules, and instead
+        // it should be treated directly as a leaf case. Clients should make
+        // an informed decision based on an understanding of what `LegacyProgram` is used for.
+        //
+        void visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo);
+        void visitChildren(SpecializedComponentType* specialized);
+        void visitChildren(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo);
+    };
+
+        /// A `TargetProgram` represents a `ComponentType` specialized for a particular `TargetRequest`
+        ///
+        /// TODO: This should probably be renamed to `TargetComponentType`.
+        ///
+        /// By binding a component type to a specific target, a `TargetProgram` allows
+        /// for things like layout to be computed, that fundamentally depend on
+        /// the choice of target.
+        ///
+        /// A `TargetProgram` handles request for compiled kernel code for
+        /// entry point functions. In practice, kernel code can only be
+        /// correctly generated when the underlying `ComponentType` is "fully linked"
+        /// (has no remaining unsatisfied requirements).
+        ///
     class TargetProgram : public RefObject
     {
     public:
         TargetProgram(
-            Program*        program,
+            ComponentType*  componentType,
             TargetRequest*  targetReq);
 
             /// Get the underlying program
-        Program* getProgram() { return m_program; }
+        ComponentType* getProgram() { return m_program; }
 
             /// Get the underlying target
         TargetRequest* getTargetReq() { return m_targetReq; }
@@ -1233,7 +1572,7 @@ namespace Slang
 
     private:
         // The program being compiled or laid out
-        Program* m_program;
+        ComponentType* m_program;
 
         // The target that code/layout will be generated for
         TargetRequest* m_targetReq;
@@ -1254,7 +1593,7 @@ namespace Slang
         BackEndCompileRequest(
             Linkage*        linkage,
             DiagnosticSink* sink,
-            Program*        program = nullptr);
+            ComponentType*  program = nullptr);
 
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
@@ -1264,8 +1603,8 @@ namespace Slang
 
         LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
 
-        Program* getProgram() { return m_program; }
-        void setProgram(Program* program) { m_program = program; }
+        ComponentType* getProgram() { return m_program; }
+        void setProgram(ComponentType* program) { m_program = program; }
 
         // Should R/W images without explicit formats be assumed to have "unknown" format?
         //
@@ -1274,7 +1613,7 @@ namespace Slang
         bool useUnknownImageFormatAsDefault = false;
 
     private:
-        RefPtr<Program> m_program;
+        RefPtr<ComponentType> m_program;
     };
 
         /// A compile request that spans the front and back ends of the compiler
@@ -1312,11 +1651,8 @@ namespace Slang
         // Should we just pass the input to another compiler?
         PassThroughMode passThrough = PassThroughMode::None;
 
-            /// Source code for the generic arguments to use for the global generic parameters of the program.
-        List<String> globalGenericArgStrings;
-
-            /// Types to use to fill global existential "slots"
-        List<String> globalExistentialSlotArgStrings;
+            /// Source code for the specialization arguments to use for the global specialization parameters of the program.
+        List<String> globalSpecializationArgStrings;
 
         bool shouldSkipCodegen = false;
 
@@ -1332,11 +1668,8 @@ namespace Slang
         class EntryPointInfo : public RefObject
         {
         public:
-            /// Source code for the generic arguments to use for the generic parameters of the entry point.
-            List<String> genericArgStrings;
-
-            /// Source code for the type arguments to plug into the existential type "slots" of the entry point
-            List<String> existentialArgStrings;
+                /// Source code for the specialization arguments to use for the specialization parameters of the entry point.
+            List<String> specializationArgStrings;
         };
         List<EntryPointInfo> entryPoints;
 
@@ -1371,8 +1704,15 @@ namespace Slang
 
         FrontEndCompileRequest* getFrontEndReq() { return m_frontEndReq; }
         BackEndCompileRequest* getBackEndReq() { return m_backEndReq; }
-        Program* getUnspecializedProgram() { return getFrontEndReq()->getProgram(); }
-        Program* getSpecializedProgram() { return m_specializedProgram; }
+
+        ComponentType* getUnspecializedGlobalComponentType() { return getFrontEndReq()->getGlobalComponentType(); }
+        ComponentType* getUnspecializedGlobalAndEntryPointsComponentType()
+        {
+            return getFrontEndReq()->getGlobalAndEntryPointsComponentType();
+        }
+
+        ComponentType* getSpecializedGlobalComponentType() { return m_specializedGlobalComponentType; }
+        ComponentType* getSpecializedGlobalAndEntryPointsComponentType() { return m_specializedGlobalAndEntryPointsComponentType; }
 
     private:
         void init();
@@ -1381,8 +1721,8 @@ namespace Slang
         RefPtr<Linkage>                 m_linkage;
         DiagnosticSink                  m_sink;
         RefPtr<FrontEndCompileRequest>  m_frontEndReq;
-        RefPtr<Program>                 m_unspecializedProgram;
-        RefPtr<Program>                 m_specializedProgram;
+        RefPtr<ComponentType>           m_specializedGlobalComponentType;
+        RefPtr<ComponentType>           m_specializedGlobalAndEntryPointsComponentType;
         RefPtr<BackEndCompileRequest>   m_backEndReq;
 
         // For output
@@ -1611,64 +1951,74 @@ namespace Slang
 // abstract over the conversion required for each pair of types.
 //
 
-inline slang::IGlobalSession* asExternal(Session* session)
+SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
 {
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-inline slang::ISession* asExternal(Linkage* linkage)
+SLANG_FORCE_INLINE Session* asInternal(slang::IGlobalSession* session)
+{
+    return static_cast<Session*>(session);
+}
+
+SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)
 {
     return static_cast<slang::ISession*>(linkage);
 }
 
-inline Module* asInternal(slang::IModule* module)
+SLANG_FORCE_INLINE Module* asInternal(slang::IModule* module)
 {
     return static_cast<Module*>(module);
 }
 
-inline slang::IModule* asExternal(Module* module)
+SLANG_FORCE_INLINE slang::IModule* asExternal(Module* module)
 {
     return static_cast<slang::IModule*>(module);
 }
 
-inline Program* asInternal(slang::IProgram* module)
+SLANG_FORCE_INLINE ComponentType* asInternal(slang::IComponentType* componentType)
 {
-    return static_cast<Program*>(module);
+    return static_cast<ComponentType*>(componentType);
 }
 
-inline slang::IProgram* asExternal(Program* module)
+SLANG_FORCE_INLINE slang::IComponentType* asExternal(ComponentType* componentType)
 {
-    return static_cast<slang::IProgram*>(module);
+    return static_cast<slang::IComponentType*>(componentType);
 }
 
-static inline slang::ProgramLayout* asExternal(ProgramLayout* programLayout)
+SLANG_FORCE_INLINE slang::ProgramLayout* asExternal(ProgramLayout* programLayout)
 {
     return (slang::ProgramLayout*) programLayout;
 }
 
-inline Type* asInternal(slang::TypeReflection* type)
+SLANG_FORCE_INLINE Type* asInternal(slang::TypeReflection* type)
 {
     return reinterpret_cast<Type*>(type);
 }
 
-inline slang::TypeReflection* asExternal(Type* type)
+SLANG_FORCE_INLINE slang::TypeReflection* asExternal(Type* type)
 {
     return reinterpret_cast<slang::TypeReflection*>(type);
 }
 
-inline TypeLayout* asInternal(slang::TypeLayoutReflection* type)
+SLANG_FORCE_INLINE TypeLayout* asInternal(slang::TypeLayoutReflection* type)
 {
     return reinterpret_cast<TypeLayout*>(type);
 }
 
-inline slang::TypeLayoutReflection* asExternal(TypeLayout* type)
+SLANG_FORCE_INLINE slang::TypeLayoutReflection* asExternal(TypeLayout* type)
 {
     return reinterpret_cast<slang::TypeLayoutReflection*>(type);
 }
 
-inline SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
+SLANG_FORCE_INLINE SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
 {
     return reinterpret_cast<SlangCompileRequest*>(request);
+}
+
+SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* request)
+{
+    return reinterpret_cast<EndToEndCompileRequest*>(request);
 }
 
 }
