@@ -21,13 +21,6 @@ Result TestContext::init()
     {
         return SLANG_FAIL;
     }
-
-    // Lets see if we can get clang on windows to work
-    slang::IGlobalSession* globSession = spSessionGetGlobalSession(m_session);
-
-    globSession->setPassThroughPath(SLANG_PASS_THROUGH_VISUAL_STUDIO, "error");
-    globSession->setPassThroughPath(SLANG_PASS_THROUGH_CLANG, "C:\\Program Files\\LLVM\\bin");
-
     return SLANG_OK;
 }
 
@@ -105,8 +98,6 @@ CPPCompilerSet* TestContext::getCPPCompilerSet()
         cppCompilerSet = new CPPCompilerSet;
 
         CPPCompilerUtil::InitializeSetDesc desc;
-        desc.paths[int(CPPCompiler::CompilerType::Clang)] = "C:\\Program Files\\LLVM\\bin";
-
         CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
     }
     return cppCompilerSet;
