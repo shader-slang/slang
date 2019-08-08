@@ -2489,7 +2489,9 @@ Session::~Session()
 
 SLANG_API SlangSession* spCreateSession(const char*)
 {
-    return asExternal(new Slang::Session());
+    Slang::RefPtr<Slang::Session> session(new Slang::Session());
+    // Will be returned with a refcount of 1
+    return asExternal(session.detach());
 }
 
 SLANG_API SlangResult slang_createGlobalSession(
@@ -2506,16 +2508,16 @@ SLANG_API SlangResult slang_createGlobalSession(
 }
 
 SLANG_API void spDestroySession(
-    SlangSession*   session)
+    SlangSession*   inSession)
 {
-    if(!session) return;
-    delete Slang::asInternal(session);
-}
+    if(!inSession) return;
 
-SLANG_API slang::IGlobalSession* spSessionGetGlobalSession(SlangSession* inSession)
-{
-    Slang::Session* session = convert(inSession);
-    return session;
+    Slang::Session* session = Slang::asInternal(inSession);
+    // It is assumed there is only a single reference on the session (the one placed
+    // with spCreateSession) if this function is called
+    SLANG_ASSERT(session->debugGetReferenceCount() == 1);
+    // Release
+    session->release();
 }
 
 SLANG_API void spAddBuiltins(

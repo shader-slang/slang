@@ -1081,12 +1081,6 @@ extern "C"
     SLANG_API SlangSession* spCreateSession(const char* deprecated = 0);
 
     /*!
-    @brief Get the global session from the SlangSession 
-    */
-    SLANG_API slang::IGlobalSession* spSessionGetGlobalSession(SlangSession* session);
-
-
-    /*!
     @brief Clean up after an instance of the Slang library.
     */
     SLANG_API void spDestroySession(
