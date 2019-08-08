@@ -1055,10 +1055,14 @@ extern "C"
     
     #define SLANG_UUID_ISlangWriter { 0xec457f0e, 0x9add, 0x4e6b,{ 0x85, 0x1c, 0xd7, 0xfa, 0x71, 0x6d, 0x15, 0xfd } };
 
+    namespace slang {
+    struct IGlobalSession;
+    } // namespace slang
+
     /*!
     @brief An instance of the Slang library.
     */
-    typedef struct SlangSession SlangSession;
+    typedef slang::IGlobalSession SlangSession;
 
     typedef struct SlangProgramLayout SlangProgramLayout;
 

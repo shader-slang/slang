@@ -1608,6 +1608,11 @@ inline slang::IGlobalSession* asExternal(Session* session)
     return static_cast<slang::IGlobalSession*>(session);
 }
 
+inline Session* asInternal(slang::IGlobalSession* session)
+{
+    return static_cast<Session*>(session);
+}
+
 inline slang::ISession* asExternal(Linkage* linkage)
 {
     return static_cast<slang::ISession*>(linkage);
