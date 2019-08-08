@@ -1345,3 +1345,7 @@ SLANG_RAW("attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : Att
 SLANG_RAW("\n")
 SLANG_RAW("__attributeTarget(VarDeclBase)\n")
 SLANG_RAW("attribute_syntax [format(format : String)] : FormatAttribute;\n")
+SLANG_RAW("\n")
+SLANG_RAW("__attributeTarget(Decl)\n")
+SLANG_RAW("attribute_syntax [allow(diagnostic: String)] : AllowAttribute;\n")
+SLANG_RAW("\n")

@@ -8,14 +8,13 @@
 namespace Slang
 {
 
-// Needed for lookup up entry-point layouts.
-//
-// TODO: maybe arrange so that codegen is driven from the layout layer
-// instead of the input/request layer.
+    /// Find a suitable layout for `entryPoint` in `programLayout`.
+    ///
+    /// TODO: This function should be eliminated. See its body
+    /// for an explanation of the problems.
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*          programLayout,
-    EntryPoint*             entryPoint,
-    EntryPointGroupLayout** outEntryPointGroupLayout);
+    EntryPoint*             entryPoint);
 
 struct IRSpecSymbol : RefObject
 {
@@ -339,9 +338,10 @@ IRType* cloneType(
 }
 
 void cloneGlobalValueWithCodeCommon(
-    IRSpecContextBase*      context,
-    IRGlobalValueWithCode*  clonedValue,
-    IRGlobalValueWithCode*  originalValue);
+    IRSpecContextBase*              context,
+    IRGlobalValueWithCode*          clonedValue,
+    IRGlobalValueWithCode*          originalValue,
+    IROriginalValuesForClone const& originalValues);
 
 IRRate* cloneRate(
     IRSpecContextBase*  context,
@@ -382,9 +382,56 @@ IRGlobalVar* cloneGlobalVarImpl(
     cloneGlobalValueWithCodeCommon(
         context,
         clonedVar,
-        originalVar);
+        originalVar,
+        originalValues);
 
     return clonedVar;
+}
+
+    /// Clone certain special decorations for `clonedInst` from its (potentially multiple) definitions.
+    ///
+    /// In most cases, once we've decided on the "best" definition to use for an IR instruction,
+    /// we only want the linking process to use the decorations from the single best definition.
+    /// In some casses, though, the canonical best definition might not have all the information.
+    ///
+    /// A concrete example is the `[bindExistentialsSlots(...)]` decorations for global shader
+    /// parameters and entry points. These decorations are only generated as part of the IR
+    /// associated with a specialization of a program, and not the original IR for the modules
+    /// of the program.
+    ///
+    /// This function scans through all the `originalValues` that were considered for `clonedInst`,
+    /// and copies over any decorations that are allowed to come from a non-"best" definition.
+    /// For a given decoration opcode, only one such decoration will ever be copied, and nothing
+    /// will be copied if the instruction already has a matching decoration (that was cloned
+    /// from the "best" definition).
+    /// 
+static void cloneExtraDecorations(
+    IRSpecContextBase*              context,
+    IRInst*                         clonedInst,
+    IROriginalValuesForClone const& originalValues)
+{
+    IRBuilder builderStorage = *context->builder;
+    IRBuilder* builder = &builderStorage;
+    builder->setInsertInto(clonedInst);
+
+    for(auto sym = originalValues.sym; sym; sym = sym->nextWithSameName)
+    {
+        for(auto decoration : sym->irGlobalValue->getDecorations())
+        {
+            switch(decoration->op)
+            {
+            default:
+                break;
+
+            case kIROp_BindExistentialSlotsDecoration:
+                if(!clonedInst->findDecorationImpl(decoration->op))
+                {
+                    cloneInst(context, builder, decoration);
+                }
+                break;
+            }
+        }
+    }
 }
 
 void cloneSimpleGlobalValueImpl(
@@ -407,6 +454,12 @@ void cloneSimpleGlobalValueImpl(
     {
         cloneInst(context, builder, child);
     }
+
+    // Also clone certain decorations if they appear on *any*
+    // definition of the symbol (not necessarily the one
+    // we picked as the primary/best).
+    //
+    cloneExtraDecorations(context, clonedInst, originalValues);
 }
 
 IRGlobalParam* cloneGlobalParamImpl(
@@ -469,7 +522,8 @@ IRGeneric* cloneGenericImpl(
     cloneGlobalValueWithCodeCommon(
         context,
         clonedVal,
-        originalVal);
+        originalVal,
+        originalValues);
 
     return clonedVal;
 }
@@ -545,7 +599,8 @@ IRInterfaceType* cloneInterfaceTypeImpl(
 void cloneGlobalValueWithCodeCommon(
     IRSpecContextBase*      context,
     IRGlobalValueWithCode*  clonedValue,
-    IRGlobalValueWithCode*  originalValue)
+    IRGlobalValueWithCode*  originalValue,
+    IROriginalValuesForClone const& originalValues)
 {
     // Next we are going to clone the actual code.
     IRBuilder builderStorage = *context->builder;
@@ -553,6 +608,7 @@ void cloneGlobalValueWithCodeCommon(
     builder->setInsertInto(clonedValue);
 
     cloneDecorations(context, clonedValue, originalValue);
+    cloneExtraDecorations(context, clonedValue, originalValues);
 
     // We will walk through the blocks of the function, and clone each of them.
     //
@@ -629,10 +685,11 @@ void checkIRDuplicate(IRInst* inst, IRInst* moduleInst, UnownedStringSlice const
 }
 
 void cloneFunctionCommon(
-    IRSpecContextBase*  context,
-    IRFunc*         clonedFunc,
-    IRFunc*         originalFunc,
-    bool checkDuplicate = true)
+    IRSpecContextBase*              context,
+    IRFunc*                         clonedFunc,
+    IRFunc*                         originalFunc,
+    IROriginalValuesForClone const& originalValues,
+    bool                            checkDuplicate = true)
 {
     // First clone all the simple properties.
     clonedFunc->setFullType(cloneType(context, originalFunc->getFullType()));
@@ -640,7 +697,8 @@ void cloneFunctionCommon(
     cloneGlobalValueWithCodeCommon(
         context,
         clonedFunc,
-        originalFunc);
+        originalFunc,
+        originalValues);
 
     // Shuffle the function to the end of the list, because
     // it needs to follow its dependencies.
@@ -667,7 +725,6 @@ IRInst* specializeGeneric(
 
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext*      context,
-    EntryPoint*         entryPoint,
     EntryPointLayout*   entryPointLayout)
 {
     // We start by looking up the IR symbol that
@@ -679,7 +736,7 @@ IRFunc* specializeIRForEntryPoint(
     // so that the mangled name of the decl-ref is
     // not the same as the mangled name of the decl.
     //
-    auto mangledName = getMangledName(entryPoint->getFuncDeclRef());
+    auto mangledName = getMangledName(entryPointLayout->getFuncDeclRef());
     RefPtr<IRSpecSymbol> sym;
     if (!context->getSymbols().TryGetValue(mangledName, sym))
     {
@@ -947,7 +1004,7 @@ IRFunc* cloneFuncImpl(
 {
     auto clonedFunc = builder->createFunc();
     registerClonedValue(context, clonedFunc, originalValues);
-    cloneFunctionCommon(context, clonedFunc, originalFunc);
+    cloneFunctionCommon(context, clonedFunc, originalFunc, originalValues);
     return clonedFunc;
 }
 
@@ -1227,7 +1284,9 @@ LinkedIR linkIR(
     CodeGenTarget           target,
     TargetRequest*          targetReq)
 {
-    auto sink = compileRequest->getSink();
+    // TODO: We need to make sure that the program we are being asked
+    // to compile has been "resolved" so that it has no outstanding
+    // unsatisfied requirements.
 
     IRSpecializationState stateStorage;
     auto state = &stateStorage;
@@ -1252,12 +1311,11 @@ LinkedIR linkIR(
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
-    auto originalProgramIRModule = program->getOrCreateIRModule(sink);
-    insertGlobalValueSymbols(sharedContext, originalProgramIRModule);
-    for (auto module : program->getModuleDependencies())
+    program->enumerateIRModules([&](IRModule* irModule)
     {
-        insertGlobalValueSymbols(sharedContext, module->getIRModule());
-    }
+        insertGlobalValueSymbols(sharedContext, irModule);
+    });
+
 
     auto context = state->getContext();
     context->shared = sharedContext;
@@ -1282,32 +1340,9 @@ LinkedIR linkIR(
         context->globalVarLayouts.AddIfNotExists(mangledName, globalVarLayout);
     }
 
-    EntryPointGroupLayout* entryPointGroupLayout = nullptr;
-    auto entryPointLayout = findEntryPointLayout(programLayout, entryPoint, &entryPointGroupLayout);
+    auto entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
 
-    auto offsetEntryPointLayout = entryPointLayout->getAbsoluteLayout(entryPointGroupLayout);
-
-    // Note: when we are doing the compatibility approach for Falcor, we
-    // can have global-scope symbols that are actually part of the
-    // local root signature (entry point group), so we need to make
-    // sure to apply those layouts appropriately.
-    auto entryPointGroupStructLayout = getScopeStructLayout(entryPointGroupLayout);
-    for(auto entry : entryPointGroupStructLayout->mapVarToLayout)
-    {
-        if(!entry.Key)
-            continue;
-
-        auto mangledName = getMangledName(entry.Key);
-        auto groupVarLayout = entry.Value;
-
-        // We need to "adjust" the layout that was computed for the parameter
-        // because it will be relative to the start of the entry-point group,
-        // rather than absolute.
-        //
-        auto absoluteVarLayout = groupVarLayout->getAbsoluteLayout(entryPointGroupLayout->parametersLayout);
-
-        context->globalVarLayouts.AddIfNotExists(mangledName, absoluteVarLayout);
-    }
+    auto offsetEntryPointLayout = entryPointLayout;
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
@@ -1316,7 +1351,7 @@ LinkedIR linkIR(
     // TODO: This step should *not* be needed with the current IR
     // specialization approach, so we should consider removing it.
     //
-    for (auto sym :context->getSymbols())
+    for (auto sym : context->getSymbols())
     {
         if (sym.Value->irGlobalValue->op == kIROp_WitnessTable)
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
@@ -1327,28 +1362,31 @@ LinkedIR linkIR(
     // the entry point function itself, and rely on
     // this step to recursively copy over anything else
     // it might reference.
-    auto irEntryPoint = specializeIRForEntryPoint(context, entryPoint, offsetEntryPointLayout);
+    auto irEntryPoint = specializeIRForEntryPoint(context, offsetEntryPointLayout);
 
-    // HACK: right now the bindings for global generic parameters are coming in
-    // as part of the original IR module, and we need to make sure these get
-    // copied over, even if they aren't referenced.
+    // Bindings for global generic parameters are currently represented
+    // as stand-alone global-scope instructions in the IR module for
+    // `SpecializedComponentType`s. These instructions are required for
+    // correct codegen, and so we must make sure to copy them all over,
+    // even though they are not directly referenced.
     //
-    for(auto inst : originalProgramIRModule->getGlobalInsts())
+    // TODO: We should change these to decorations, akin to how
+    // `[bindExistentialSlots(...)]` works, so that they can be attached
+    // to the relevant parameters and cloned via `cloneExtraDecorations`.
+    // In the long run we do not want to *ever* iterate over all the
+    // instructions in all the input modules.
+    //
+    program->enumerateIRModules([&](IRModule* irModule)
     {
-        auto bindInst = as<IRBindGlobalGenericParam>(inst);
-        if(!bindInst)
-            continue;
+        for(auto inst : irModule->getGlobalInsts())
+        {
+            auto bindInst = as<IRBindGlobalGenericParam>(inst);
+            if(!bindInst)
+                continue;
 
-        cloneValue(context, bindInst);
-    }
-
-    for(auto inst : originalProgramIRModule->getGlobalInsts())
-    {
-        if(inst->op != kIROp_BindGlobalExistentialSlots)
-            continue;
-
-        cloneValue(context, inst);
-    }
+            cloneValue(context, bindInst);
+        }
+    });
 
     // HACK: we need to ensure that any tagged union types
     // in the IR module have layout information copied over to them.
@@ -1357,7 +1395,7 @@ LinkedIR linkIR(
     // instructions, since we expected the tagged union type(s) to
     // be referenced by them.
     //
-    for( auto taggedUnionTypeLayout : entryPointLayout->taggedUnionTypeLayouts )
+    for( auto taggedUnionTypeLayout : programLayout->taggedUnionTypeLayouts )
     {
         auto taggedUnionType = taggedUnionTypeLayout->getType();
         auto mangledName = getMangledTypeName(taggedUnionType);
@@ -1377,6 +1415,15 @@ LinkedIR linkIR(
     // we have global variables with initializers, since
     // these should get run whether or not the entry point
     // references them.
+    //
+    // Or alternatively we can define by fiat that the initializers
+    // on global variables get run at an unspecified time between
+    // program startup and the first access to a given global.
+    // Such a definition gives us the freedom to eliminate globals
+    // that are never accessed, while still doing "eager"
+    // initialization for globals that are referenced (instead of
+    // having to add the overhead of lazy initialization a la
+    // function-`static` variables).
 
     // Now that we've cloned the entry point and everything
     // it refers to, we can package up the data we return

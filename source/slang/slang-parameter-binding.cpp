@@ -674,16 +674,22 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout);
 
-// Collect a single declaration into our set of parameters
-static void collectGlobalGenericParameter(
-    ParameterBindingContext*    context,
-    RefPtr<GlobalGenericParamDecl>         paramDecl)
+static RefPtr<VarLayout> _createVarLayout(
+    TypeLayout*             typeLayout,
+    DeclRef<VarDeclBase>    varDeclRef)
 {
-    RefPtr<GenericParamLayout> layout = new GenericParamLayout();
-    layout->decl = paramDecl;
-    layout->index = (int)context->shared->programLayout->globalGenericParams.getCount();
-    context->shared->programLayout->globalGenericParams.add(layout);
-    context->shared->programLayout->globalGenericParamsMap[layout->decl->getName()->text] = layout.Ptr();
+    RefPtr<VarLayout> varLayout = new VarLayout();
+    varLayout->typeLayout = typeLayout;
+    varLayout->varDecl = varDeclRef;
+
+    if(auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
+    {
+        RefPtr<VarLayout> pendingVarLayout = new VarLayout();
+        pendingVarLayout->typeLayout = pendingDataTypeLayout;
+        varLayout->pendingVarLayout = pendingVarLayout;
+    }
+
+    return varLayout;
 }
 
 // Collect a single declaration into our set of parameters
@@ -712,9 +718,7 @@ static void collectGlobalScopeParameter(
         return;
 
     // Now create a variable layout that we can use
-    RefPtr<VarLayout> varLayout = new VarLayout();
-    varLayout->typeLayout = typeLayout;
-    varLayout->varDecl = varDeclRef;
+    RefPtr<VarLayout> varLayout = _createVarLayout(typeLayout, varDeclRef);
 
     // The logic in `check.cpp` that created the `GlobalShaderParamInfo`
     // will have identified any cases where there might be multiple
@@ -748,6 +752,7 @@ static void collectGlobalScopeParameter(
         RefPtr<VarLayout> additionalVarLayout = new VarLayout();
         additionalVarLayout->typeLayout = typeLayout;
         additionalVarLayout->varDecl = additionalVarDeclRef;
+        additionalVarLayout->pendingVarLayout = varLayout->pendingVarLayout;
 
         parameterInfo->varLayouts.add(additionalVarLayout);
     }
@@ -782,6 +787,25 @@ static UInt allocateUnusedSpaces(
     UInt                        count)
 {
     return context->shared->usedSpaces.Allocate(nullptr, count);
+}
+
+static bool shouldDisableDiagnostic(
+    Decl*                   decl,
+    DiagnosticInfo const&   diagnosticInfo)
+{
+    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    {
+        for( auto modifier : dd->modifiers )
+        {
+            auto allowAttr = as<AllowAttribute>(modifier);
+            if(!allowAttr)
+                continue;
+
+            if(allowAttr->diagnostic == &diagnosticInfo)
+                return true;
+        }
+    }
+    return false;
 }
 
 static void addExplicitParameterBinding(
@@ -842,11 +866,26 @@ static void addExplicitParameterBinding(
             auto paramA = parameterInfo->varLayouts[0]->varDecl.getDecl();
             auto paramB = overlappedVarLayout->varDecl.getDecl();
 
-            getSink(context)->diagnose(paramA, Diagnostics::parameterBindingsOverlap,
-                getReflectionName(paramA),
-                getReflectionName(paramB));
+            auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
 
-            getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+            // If *both* of the shader parameters declarations agree
+            // that overlapping bindings should be allowed, then we
+            // will not emit a diagnostic. Otherwise, we will warn
+            // the user because such overlapping bindings are likely
+            // to indicate a programming error.
+            //
+            if(shouldDisableDiagnostic(paramA, diagnosticInfo)
+                && shouldDisableDiagnostic(paramB, diagnosticInfo))
+            {
+            }
+            else
+            {
+                getSink(context)->diagnose(paramA, diagnosticInfo,
+                    getReflectionName(paramA),
+                    getReflectionName(paramB));
+
+                getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+            }
         }
     }
 }
@@ -1736,15 +1775,40 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             return structLayout;
         }
-        else if (auto globalGenericParam = declRef.as<GlobalGenericParamDecl>())
+        else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
-            auto genParamTypeLayout = new GenericParamTypeLayout();
-            // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
-            // so we can find the index of this generic param decl in the list
-            genParamTypeLayout->type = type;
-            genParamTypeLayout->paramIndex = findGenericParam(context->shared->programLayout->globalGenericParams, globalGenericParam.getDecl());
-            genParamTypeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
-            return genParamTypeLayout;
+            auto& layoutContext = context->layoutContext;
+
+            if( auto concreteType = findGlobalGenericSpecializationArg(
+                layoutContext,
+                globalGenericParamDecl) )
+            {
+                // If we know what concrete type has been used to specialize
+                // the global generic type parameter, then we should use
+                // the concrete type instead.
+                //
+                // Note: it should be illegal for the user to use a generic
+                // type parameter in a varying parameter list without giving
+                // it an explicit user-defined semantic. Otherwise, it would be possible
+                // that the concrete type that gets plugged in is a user-defined
+                // `struct` that uses some `SV_` semantics in its definition,
+                // so that any static information about what system values
+                // the entry point uses would be incorrect.
+                //
+                return processEntryPointVaryingParameter(context, concreteType, state, varLayout);
+            }
+            else
+            {
+                // If we don't know a concrete type, then we aren't generating final
+                // code, so the reflection information should show the generic
+                // type parameter.
+                //
+                // We don't make any attempt to assign varying parameter resources
+                // to the generic type, since we can't know how many "slots"
+                // of varying input/output it would consume.
+                //
+                return createTypeLayoutForGlobalGenericTypeParam(layoutContext, type, globalGenericParamDecl);
+            }
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
         {
@@ -1770,15 +1834,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     /// Compute the type layout for a parameter declared directly on an entry point.
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     ParameterBindingContext*        context,
-    SubstitutionSet                 typeSubst,
     DeclRef<VarDeclBase>            paramDeclRef,
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramDeclRefType = GetType(paramDeclRef);
-    SLANG_ASSERT(paramDeclRefType);
-
-    auto paramType = paramDeclRefType->Substitute(typeSubst).as<Type>();
+    auto paramType = GetType(paramDeclRef);
+    SLANG_ASSERT(paramType);
 
     if( paramDeclRef.getDecl()->HasModifier<HLSLUniformModifier>() )
     {
@@ -1906,6 +1967,12 @@ struct ScopeLayoutBuilder
         {
             m_structLayout->mapVarToLayout.Add(firstVarLayout->varDecl.getDecl(), firstVarLayout);
         }
+    }
+
+    void addParameter(
+        RefPtr<VarLayout> varLayout)
+    {
+        _addParameter(varLayout, nullptr);
 
         // Any "pending" items on a field type become "pending" items
         // on the overall `struct` type layout.
@@ -1914,31 +1981,15 @@ struct ScopeLayoutBuilder
         // `struct` layout logic in `type-layout.cpp`. If this gets any
         // more complicated we should see if there is a way to share it.
         //
-        if( auto fieldPendingDataTypeLayout = firstVarLayout->typeLayout->pendingDataTypeLayout )
+        if( auto fieldPendingDataTypeLayout = varLayout->typeLayout->pendingDataTypeLayout )
         {
             m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, m_rules);
-            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(firstVarLayout->varDecl, fieldPendingDataTypeLayout);
+            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(varLayout->varDecl, fieldPendingDataTypeLayout);
 
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
 
-            if( parameterInfo )
-            {
-                for( auto& varLayout : parameterInfo->varLayouts )
-                {
-                    varLayout->pendingVarLayout = fieldPendingDataVarLayout;
-                }
-            }
-            else
-            {
-                firstVarLayout->pendingVarLayout = fieldPendingDataVarLayout;
-            }
+            varLayout->pendingVarLayout = fieldPendingDataVarLayout;
         }
-    }
-
-    void addParameter(
-        RefPtr<VarLayout> varLayout)
-    {
-        _addParameter(varLayout, nullptr);
     }
 
     void addParameter(
@@ -1948,8 +1999,40 @@ struct ScopeLayoutBuilder
         auto firstVarLayout = parameterInfo->varLayouts.getFirst();
 
         _addParameter(firstVarLayout, parameterInfo);
-    }
 
+        // Global parameters will have their non-orindary/uniform
+        // pending data handled by the main parameter binding
+        // logic, but we still need to construct a layout
+        // that includes any pending data.
+        //
+        if(auto fieldPendingVarLayout = firstVarLayout->pendingVarLayout)
+        {
+            auto fieldPendingTypeLayout = fieldPendingVarLayout->typeLayout;
+
+            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, m_rules);
+            m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
+
+            auto fieldUniformLayoutInfo = fieldPendingTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+            LayoutSize fieldUniformSize = fieldUniformLayoutInfo ? fieldUniformLayoutInfo->count : 0;
+            if( fieldUniformSize != 0 )
+            {
+                // Make sure uniform fields get laid out properly...
+
+                UniformLayoutInfo fieldInfo(
+                    fieldUniformSize,
+                    fieldPendingTypeLayout->uniformAlignment);
+
+                LayoutSize uniformOffset = m_rules->AddStructField(
+                    m_pendingDataTypeLayoutBuilder.getStructLayoutInfo(),
+                    fieldInfo);
+
+                fieldPendingVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+            }
+
+            m_pendingDataTypeLayoutBuilder.getTypeLayout()->fields.add(fieldPendingVarLayout);
+        }
+
+    }
 
         // Add a "simple" parameter that cannot have any user-defined
         // register or binding modifiers, so that its layout computation
@@ -2054,21 +2137,48 @@ static ParameterBindingAndKindInfo maybeAllocateConstantBufferBinding(
     return info;
 }
 
+    /// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
+    ///
+    /// This is used when constructing the overall layout for an entry point, to make sure
+    /// that certain kinds of resource usage from the entry point don't "leak" into
+    /// the resource usage of the overall program.
+    ///
+static void removePerEntryPointParameterKinds(
+    TypeLayout* typeLayout)
+{
+    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingInput);
+    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingOutput);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ShaderRecord);
+    typeLayout->removeResourceUsage(LayoutResourceKind::HitAttributes);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialObjectParam);
+    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
+}
+
     /// Iterate over the parameters of an entry point to compute its requirements.
     ///
 static RefPtr<EntryPointLayout> collectEntryPointParameters(
-    ParameterBindingContext*        context,
-    EntryPoint*                     entryPoint,
-    SubstitutionSet                 typeSubst)
+    ParameterBindingContext*                    context,
+    EntryPoint*                                 entryPoint,
+    EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
+
+    // If specialization was applied to the entry point, then the side-band
+    // information that was generated will have a more specialized reference
+    // to the entry point with generic parameters filled in. We should
+    // use that version if it is available.
+    //
+    if(specializationInfo)
+        entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
+
+    auto entryPointType = DeclRefType::Create(context->getLinkage()->getSessionImpl(), entryPointFuncDeclRef);
 
     // We will take responsibility for creating and filling in
     // the `EntryPointLayout` object here.
     //
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
     entryPointLayout->profile = entryPoint->getProfile();
-    entryPointLayout->entryPoint = entryPointFuncDeclRef.getDecl();
+    entryPointLayout->entryPoint = entryPointFuncDeclRef;
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -2079,19 +2189,6 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // establish this entry point as the current one in the context.
     //
     context->entryPointLayout = entryPointLayout;
-
-    // Note: this isn't really the best place for this logic to sit,
-    // but it is the simplest place where we have a direct correspondence
-    // between a single `EntryPoint` and its matching `EntryPointLayout`,
-    // so we'll use it.
-    //
-    for( auto taggedUnionType : entryPoint->getTaggedUnionTypes() )
-    {
-        SLANG_ASSERT(taggedUnionType);
-        auto substType = taggedUnionType->Substitute(typeSubst).as<Type>();
-        auto typeLayout = createTypeLayout(context->layoutContext, substType);
-        entryPointLayout->taggedUnionTypeLayouts.add(typeLayout);
-    }
 
     // We are going to iterate over the entry-point parameters,
     // and while we do so we will go ahead and perform layout/binding
@@ -2115,22 +2212,33 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     ScopeLayoutBuilder scopeBuilder;
     scopeBuilder.beginLayout(context);
     auto paramsStructLayout = scopeBuilder.m_structLayout;
+    paramsStructLayout->type = entryPointType;
 
     for( auto& shaderParamInfo : entryPoint->getShaderParams() )
     {
         auto paramDeclRef = shaderParamInfo.paramDeclRef;
+
+        // Any generic specialization applied to the entry-point function
+        // must also be applied to its parameters.
+        paramDeclRef.substitutions = entryPointFuncDeclRef.substitutions;
 
         // When computing layout for an entry-point parameter,
         // we want to make sure that the layout context has access
         // to the existential type arguments (if any) that were
         // provided for the entry-point existential type parameters (if any).
         //
-        context->layoutContext= context->layoutContext
-            .withExistentialTypeArgs(
-                entryPoint->getExistentialTypeArgCount(),
-                entryPoint->getExistentialTypeArgs())
-            .withExistentialTypeSlotsOffsetBy(
-                shaderParamInfo.firstExistentialTypeSlot);
+        if(specializationInfo)
+        {
+            auto& existentialSpecializationArgs = specializationInfo->existentialSpecializationArgs;
+            auto genericSpecializationParamCount = entryPoint->getGenericSpecializationParamCount();
+
+            context->layoutContext = context->layoutContext
+                .withSpecializationArgs(
+                    existentialSpecializationArgs.getBuffer(),
+                    existentialSpecializationArgs.getCount())
+                .withSpecializationArgsOffsetBy(
+                    shaderParamInfo.firstSpecializationParamIndex - genericSpecializationParamCount);
+        }
 
         // Any error messages we emit during the process should
         // refer to the location of this parameter.
@@ -2149,7 +2257,6 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
         auto paramTypeLayout = computeEntryPointParameterTypeLayout(
             context,
-            typeSubst,
             paramDeclRef,
             paramVarLayout,
             state);
@@ -2170,6 +2277,26 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         //
         scopeBuilder.addSimpleParameter(paramVarLayout);
     }
+
+    // We don't want certain kinds of resource usage within an entry
+    // point to "leak" into the overall resource usage of the entry
+    // point and thus lead to offsetting of successive entry points.
+    //
+    // For example if we have a vertex and a fragment entry point
+    // in the some program, and each has one varying input, then
+    // the both the vertex and fragment varying outputs should have
+    // a location/index of zero. It would be bad if the fragment
+    // input (or whichever entry point comes second in the global
+    // ordering) started at location one, because then it wouldn't
+    // line up correctly with any vertex stage outputs.
+    //
+    // We handle this with a bit of a kludge, by removing the
+    // particular `LayoutResourceKind`s that are susceptible to
+    // this problem from the overall resource usage of the entry
+    // point.
+    //
+    removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
+
     entryPointLayout->parametersLayout = scopeBuilder.endLayout();
 
     // For an entry point with a non-`void` return type, we need to process the
@@ -2178,7 +2305,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
     //
-    auto resultType = GetResultType(entryPointFuncDeclRef)->Substitute(typeSubst).as<Type>();
+    auto resultType = GetResultType(entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
     if( !resultType->Equals(resultType->getSession()->getVoidType()) )
@@ -2192,7 +2319,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         auto resultTypeLayout = processEntryPointVaryingParameterDecl(
             context,
             entryPointFuncDeclRef.getDecl(),
-            resultType->Substitute(typeSubst).as<Type>(),
+            resultType,
             state,
             resultLayout);
 
@@ -2214,26 +2341,244 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     return entryPointLayout;
 }
 
-    /// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
-    ///
-    /// This is used when constructing the layout for an entry point group, to make sure
-    /// that certain kinds of resource usage from the entry point don't "leak" into
-    /// the resource usage of the group.
-    ///
-static void removePerEntryPointParameterKinds(
-    TypeLayout* typeLayout)
+    /// Visitor used by `collectGlobalGenericArguments`
+struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
 {
-    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingInput);
-    typeLayout->removeResourceUsage(LayoutResourceKind::VaryingOutput);
-    typeLayout->removeResourceUsage(LayoutResourceKind::ShaderRecord);
-    typeLayout->removeResourceUsage(LayoutResourceKind::HitAttributes);
-    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialObjectParam);
-    typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
+    CollectGlobalGenericArgumentsVisitor(
+        ParameterBindingContext*    context)
+        : m_context(context)
+    {}
+
+    ParameterBindingContext* m_context;
+
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(entryPoint);
+        SLANG_UNUSED(specializationInfo);
+    }
+
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(module);
+
+        if(!specializationInfo)
+            return;
+
+        for(auto& globalGenericArg : specializationInfo->genericArgs)
+        {
+            if(auto globalGenericTypeParamDecl = as<GlobalGenericParamDecl>(globalGenericArg.paramDecl))
+            {
+                m_context->shared->programLayout->globalGenericArgs.Add(globalGenericTypeParamDecl, globalGenericArg.argVal);
+            }
+        }
+    }
+
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        visitChildren(composite, specializationInfo);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        specialized->getBaseComponentType()->acceptVisitor(this, specialized->getSpecializationInfo());
+    }
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // TODO: Need to do something in this case...
+        SLANG_UNUSED(legacy);
+        SLANG_UNUSED(specializationInfo);
+    }
+};
+
+    /// Collect an ordered list of all the specialization arguments given for global generic specialization parameters in `program`.
+    ///
+    /// This information is used to accelerate the process of mapping a global generic type
+    /// to its definition during type layout.
+    ///
+static void collectGlobalGenericArguments(
+    ParameterBindingContext*    context,
+    ComponentType*              program)
+{
+    CollectGlobalGenericArgumentsVisitor visitor(context);
+    program->acceptVisitor(&visitor, nullptr);
 }
 
+    /// Collect information about the (unspecialized) specialization parameters of `program` into `context`.
+    ///
+    /// This function computes the reflection/layout for for the specialization parameters, so
+    /// that they can be exposed to the API user.
+    ///
+static void collectSpecializationParams(
+    ParameterBindingContext*    context,
+    ComponentType*              program)
+{
+    auto specializationParamCount = program->getSpecializationParamCount();
+    for(Index ii = 0; ii < specializationParamCount; ++ii)
+    {
+        auto specializationParam = program->getSpecializationParam(ii);
+        switch(specializationParam.flavor)
+        {
+        case SpecializationParam::Flavor::GenericType:
+        case SpecializationParam::Flavor::GenericValue:
+            {
+                RefPtr<GenericSpecializationParamLayout> paramLayout = new GenericSpecializationParamLayout();
+                paramLayout->decl = specializationParam.object.as<Decl>();
+                context->shared->programLayout->specializationParams.add(paramLayout);
+            }
+            break;
+
+        case SpecializationParam::Flavor::ExistentialType:
+        case SpecializationParam::Flavor::ExistentialValue:
+            {
+                RefPtr<ExistentialSpecializationParamLayout> paramLayout = new ExistentialSpecializationParamLayout();
+                paramLayout->type = specializationParam.object.as<Type>();
+                context->shared->programLayout->specializationParams.add(paramLayout);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unhandled specialization parameter flavor");
+            break;
+        }
+    }
+}
+
+    /// Visitor used by `collectParameters()`
+struct CollectParametersVisitor : ComponentTypeVisitor
+{
+    CollectParametersVisitor(
+        ParameterBindingContext*    context)
+        : m_context(context)
+    {}
+
+    ParameterBindingContext* m_context;
+
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // The parameters of a composite component type can
+        // be determined by just visiting its children in order.
+        //
+        visitChildren(composite, specializationInfo);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        // The parameters of a specialized component type
+        // are just those of its base component type, with
+        // appropriate specialization information passed
+        // along.
+        //
+        visitChildren(specialized);
+
+        // While we are at it, we will also make note of any
+        // tagged-union types that were used as part of the
+        // specialization arguments, since we need to make
+        // sure that their layout information is computed
+        // and made available for IR code generation.
+        //
+        // Note: this isn't really the best place for this logic to sit,
+        // but it is the simplest place where we can collect all the tagged
+        // union types that get referenced by a program.
+        //
+        for( auto taggedUnionType : specialized->getTaggedUnionTypes() )
+        {
+            SLANG_ASSERT(taggedUnionType);
+            auto substType = taggedUnionType;
+            auto typeLayout = createTypeLayout(m_context->layoutContext, substType);
+            m_context->shared->programLayout->taggedUnionTypeLayouts.add(typeLayout);
+        }
+    }
+
+
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // An entry point is a leaf case.
+        //
+        // In our current model an entry point does not introduce
+        // any global shader parameters, but in practice it effectively
+        // acts a lot like a single global shader parameter named after
+        // the entry point and with a `struct` type that combines
+        // all the `uniform` entry point parameters.
+        //
+        // Later passes will need to make sure that the entry point
+        // gets enumerated in the right order relative to any global
+        // shader parameters.
+        //
+
+        ParameterBindingContext contextData = *m_context;
+        auto context = &contextData;
+        context->stage = entryPoint->getStage();
+
+        collectEntryPointParameters(context, entryPoint, specializationInfo);
+    }
+
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // A single module represents a leaf case for layout.
+        //
+        // We will enumerate the (global) shader parameters declared
+        // in the module and add each to our canonical ordering.
+        //
+        auto paramCount = module->getShaderParamCount();
+
+       ExpandedSpecializationArg* specializationArgs = specializationInfo
+           ? specializationInfo->existentialArgs.getBuffer()
+           : nullptr;
+
+        for(Index pp = 0; pp < paramCount; ++pp)
+        {
+            auto shaderParamInfo = module->getShaderParam(pp);
+            if(specializationArgs)
+            {
+                m_context->layoutContext = m_context->layoutContext.withSpecializationArgs(
+                    specializationArgs,
+                    shaderParamInfo.specializationParamCount);
+                specializationArgs += shaderParamInfo.specializationParamCount;
+            }
+
+            collectGlobalScopeParameter(m_context, shaderParamInfo, SubstitutionSet());
+        }
+    }
+
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // A legacy program is also a leaf case, and we
+        // can enumerate its parameters directly.
+        //
+        // Note: there is a mismatch here where we really
+        // ought to be tracking specialization arguments
+        // for a `LegacyProgram` akin to how they are
+        // tracked for a `Module`, but right now we try
+        // to do it like a `CompositeComponentType`.
+        // As a result we are just ignoring specialization
+        // information here, which will lead to incorrect
+        // results if somebody every uses specialization
+        // together with the "legacy" program case.
+        //
+        // TODO: eliminate this problem by getting rid of
+        // `LegacyProgram`, rather than spend time trying
+        // to make this corner case actually work.
+        //
+        SLANG_UNUSED(specializationInfo);
+
+        auto paramCount = legacy->getShaderParamCount();
+        for(Index pp = 0; pp < paramCount; ++pp)
+        {
+            collectGlobalScopeParameter(m_context, legacy->getShaderParam(pp), SubstitutionSet());
+        }
+    }
+};
+
+    /// Recursively collect the global shader parameters and entry points in `program`.
+    ///
+    /// This function is used to establish the global ordering of parameters and
+    /// entry points used for layout.
+    ///
 static void collectParameters(
-    ParameterBindingContext*        inContext,
-    Program*                        program)
+    ParameterBindingContext*            inContext,
+    ComponentType*                      program)
 {
     // All of the parameters in translation units directly
     // referenced in the compile request are part of one
@@ -2245,105 +2590,8 @@ static void collectParameters(
     auto context = &contextData;
     context->stage = Stage::Unknown;
 
-    auto globalGenericSubst = program->getGlobalGenericSubstitution();
-
-    // We will start by looking for any global generic type parameters.
-
-    for(RefPtr<Module> module : program->getModuleDependencies())
-    {
-        for( auto genParamDecl : module->getModuleDecl()->getMembersOfType<GlobalGenericParamDecl>() )
-        {
-            collectGlobalGenericParameter(context, genParamDecl);
-        }
-    }
-
-    // Once we have enumerated global generic type parameters, we can
-    // begin enumerating shader parameters, starting at the global scope.
-    //
-    // Because we have already enumerated the global generic type parameters,
-    // we will be able to look up the index of a global generic type parameter
-    // when we see it referenced in the type of one of the shader parameters.
-
-    for(auto& globalParamInfo : program->getShaderParams() )
-    {
-        // When computing layout for a global shader parameter,
-        // we want to make sure that the layout context has access
-        // to the existential type arguments (if any) that were
-        // provided for the global existential type parameters (if any).
-        //
-        context->layoutContext= context->layoutContext
-            .withExistentialTypeArgs(
-                program->getExistentialTypeArgCount(),
-                program->getExistentialTypeArgs())
-            .withExistentialTypeSlotsOffsetBy(
-                globalParamInfo.firstExistentialTypeSlot);
-
-        collectGlobalScopeParameter(context, globalParamInfo, globalGenericSubst);
-    }
-
-    // Next consider parameters for entry points
-    for( auto entryPointGroup : program->getEntryPointGroups() )
-    {
-        RefPtr<EntryPointGroupLayout> entryPointGroupLayout = new EntryPointGroupLayout();
-        entryPointGroupLayout->group = entryPointGroup;
-
-        context->shared->programLayout->entryPointGroups.add(entryPointGroupLayout);
-
-
-        ScopeLayoutBuilder scopeBuilder;
-        scopeBuilder.beginLayout(context);
-        auto entryPointGroupParamsStructLayout = scopeBuilder.m_structLayout;
-
-        // First lay out any shader parameters that belong to the group
-        // itself, rather than to its nested entry points.
-        //
-        // This ensures that looking up one of the parameters of the
-        // group by index in its parameters truct will Just Work.
-        //
-        for( auto groupParam : entryPointGroup->getShaderParams() )
-        {
-            auto paramDeclRef = groupParam.paramDeclRef;
-            auto paramType = GetType(paramDeclRef);
-
-            RefPtr<VarLayout> paramVarLayout = new VarLayout();
-            paramVarLayout->varDecl = paramDeclRef;
-
-            auto paramTypeLayout = createTypeLayout(
-                context->layoutContext.with(context->getRulesFamily()->getConstantBufferRules()),
-                paramType);
-            paramVarLayout->typeLayout = paramTypeLayout;
-
-            scopeBuilder.addSimpleParameter(paramVarLayout);
-        }
-
-        for(auto entryPoint : entryPointGroup->getEntryPoints())
-        {
-            // Note: we do not want the entry point group to accumulate
-            // locations for varying input/output parameters: those
-            // should be specific to each entry point.
-            //
-            // We address this issue by manually removing any
-            // layout information for the relevant resource kinds
-            // from the group's layout before adding the parameters
-            // of any entry point for layout.
-            //
-            removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
-
-            context->stage = entryPoint->getStage();
-            auto entryPointLayout = collectEntryPointParameters(context, entryPoint, globalGenericSubst);
-
-            auto entryPointParamsLayout = entryPointLayout->parametersLayout;
-            auto entryPointParamsTypeLayout = entryPointParamsLayout->typeLayout;
-
-            scopeBuilder.addSimpleParameter(entryPointParamsLayout);
-
-            entryPointGroupLayout->entryPoints.add(entryPointLayout);
-        }
-        removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
-
-        entryPointGroupLayout->parametersLayout = scopeBuilder.endLayout();
-    }
-    context->entryPointLayout = nullptr;
+    CollectParametersVisitor visitor(context);
+    program->acceptVisitor(&visitor, nullptr);
 }
 
     /// Emit a diagnostic about a uniform parameter at global scope.
@@ -2384,6 +2632,302 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingConte
     return numUsed;
 }
 
+    /// Keep track of the running global counter for entry points and global parameters visited.
+    ///
+    /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
+    /// needs to proceed in multiple passes, and each pass must both visit the things that
+    /// need layout (parameters and entry points) in the same order in each pass, and must
+    /// also be able to look up the side-band information that flows between passes.
+    ///
+    /// Currently the `ParameterBindingContext` keeps separate arrays for global shader
+    /// parameters and entry points, but in the global ordering for layout they can be
+    /// interleaved. There is also no simple tracking structure that relates a global
+    /// parameter or entry point to its index in those arrays. Instead, we just keep
+    /// running counters during our passes over the program so that we can easily
+    /// compute the linear index of each entry point and global parameter as it
+    /// is encountered.
+    ///
+struct ParameterBindingVisitorCounters
+{
+    Index entryPointCounter = 0;
+    Index globalParamCounter = 0;
+};
+
+    /// Recursive routine to "complete" all binding for parameters and entry points in `componentType`.
+    ///
+    /// This includes allocation of as-yet-unused register/binding ranges to parameters (which
+    /// will then affect the ranges of registers/bindings that are available to subsequent
+    /// parameters), and imporantly *also* includes allocate of space to any "pending"
+    /// data for interface/existential type parameters/fields.
+    ///
+static void _completeBindings(
+    ParameterBindingContext*            context,
+    ComponentType*                      componentType,
+    ParameterBindingVisitorCounters*    ioCounters);
+
+    /// A visitor used by `_completeBindings`.
+    ///
+    /// This visitor walks the structure of a `ComponentType` to ensure that
+    /// any shader parameters (and entry points) it contains that *don't*
+    /// have explicit bindings on them get allocated registers/bindings
+    /// as appropriate.
+    ///
+    /// The main complication of this visitor is how it handles the
+    /// `SpecializedComponentType` case, because a specialized component
+    /// type needs to be handled as an atomic unit that lays out the
+    /// same in all contexts.
+    ///
+struct CompleteBindingsVisitor : ComponentTypeVisitor
+{
+    CompleteBindingsVisitor(ParameterBindingContext* context, ParameterBindingVisitorCounters* counters)
+        : m_context(context)
+        , m_counters(counters)
+    {}
+
+    ParameterBindingContext* m_context;
+    ParameterBindingVisitorCounters* m_counters;
+
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(entryPoint);
+        SLANG_UNUSED(specializationInfo);
+
+        // We compute the index of the entry point in the global ordering,
+        // so we can look up the tracking data in our context. As a result
+        // we don't actually make use of the parameters that were passed in.
+        //
+        auto globalEntryPointIndex = m_counters->entryPointCounter++;
+        auto globalEntryPointInfo = m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
+
+
+        // We mostly treat an entry point like a single shader parameter that
+        // uses its `parametersLayout`.
+        //
+        completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
+    }
+
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(specializationInfo);
+        // A module is a leaf case: we just want to visit each parameter.
+        visitLeafParams(module);
+    }
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(specializationInfo);
+        // A legacy program is a leaf case: we just want to visit each parameter.
+        visitLeafParams(legacy);
+    }
+
+    void visitLeafParams(ComponentType* componentType)
+    {
+        auto paramCount = componentType->getShaderParamCount();
+        for(Index ii = 0; ii < paramCount; ++ii)
+        {
+            auto globalParamIndex = m_counters->globalParamCounter++;
+            auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
+
+            completeBindingsForParameter(m_context, globalParamInfo);
+        }
+    }
+
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        // We just wnat to recurse on the children of the composite in order.
+        visitChildren(composite, specializationInfo);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        // The handling of a specialized component type here is subtle.
+        //
+        // We do *not* simply recurse on the base component type.
+        // Doing so would ensure that the parameters would get
+        // registers/bindings allocated to them, but it wouldn't
+        // allocate space for the "pending" data related to
+        // existential/interface parameters.
+        //
+        // Instead, we recursive through `_completeBindings`,
+        // which has the job of allocating space for the parameters,
+        // and then for any "pending" data required.
+        //
+        // Handling things this way ensures that a particular
+        // `SpecializedComponentType` gets laid out exactly
+        // the same wherever it gets used, rather than
+        // getting laid out differently when it is placed
+        // into different compositions.
+        //
+        auto base = specialized->getBaseComponentType();
+        _completeBindings(m_context, base, m_counters);
+    }
+};
+
+    /// A visitor used by `_completeBindings`.
+    ///
+    /// This visitor is used to follow up after the `CompleteBindingsVisitor`
+    /// any ensure that any "pending" data required by the parameters that
+    /// got laid out now gets a location.
+    ///
+    /// To make a concrete example:
+    ///
+    ///     Texture2D a;
+    ///     IThing    b;
+    ///     Texture2D c;
+    ///
+    /// If these parameters were laid out with `b` specialized to a type
+    /// that contains a single `Texture2D`, then the `CompleteBindingsVisitor`
+    /// would visit `a`, `b`, and then `c` in order. It would give `a` the
+    /// first register/binding available (say, `t0`). It would then make
+    /// a note that due to specialization, `b`, needs a `t` register as well,
+    /// but it *cannot* be allocated just yet, because doing so would change
+    /// the location of `c`, so it is marked as "pending." Then `c` would
+    /// be visited and get `t1`. As a result the registers given to `a`
+    /// and `c` are independent of how `b` gets specialized.
+    ///
+    /// Next, the `FlushPendingDataVisitor` comes through and applies to
+    /// the parameters again. For `a` there is no pending data, but for
+    /// `b` there is a pending request for a `t` register, so it gets allocated
+    /// now (getting `t2`). The `c` parameter then has no pending data, so
+    /// we are done.
+    ///
+    /// *When* the pending data gets flushed is then significant. In general,
+    /// the order in which modules get composed an specialized is signficaint.
+    /// The module above (let's call it `M`) has one specialization parameter
+    /// (for `b`), and if we want to compose it with another module `N` that
+    /// has no specialization parameters, we could compute either:
+    ///
+    ///     compose(specialize(M, SomeType), N)
+    ///
+    /// or:
+    ///
+    ///     specialize(compose(M,N), SomeType)
+    ///
+    /// In the first case, the "pending" data for `M` gets flushed right after `M`,
+    /// so that `specialize(M,SomeType)` can have a consistent layout
+    /// regardless of how it is used. In the second case, the pending data for
+    /// `M` only gets flushed after `N`'s parameters are allocated, thus guaranteeing
+    /// that the `compose(M,N)` part has a consistent layout regardless of what
+    /// type gets plugged in during specialization.
+    ///
+    /// There are trade-offs to be made by an application about which approach
+    /// to prefer, and the compiler supports either policy choice.
+    ///
+struct FlushPendingDataVisitor : ComponentTypeVisitor
+{
+    FlushPendingDataVisitor(ParameterBindingContext* context, ParameterBindingVisitorCounters* counters)
+        : m_context(context)
+        , m_counters(counters)
+    {}
+
+    ParameterBindingContext* m_context;
+    ParameterBindingVisitorCounters* m_counters;
+
+    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(entryPoint);
+        SLANG_UNUSED(specializationInfo);
+
+        auto globalEntryPointIndex = m_counters->entryPointCounter++;
+        auto globalEntryPointInfo = m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
+
+        // We need to allocate space for any "pending" data that
+        // appeared in the entry-point parameter list.
+        //
+        _allocateBindingsForPendingData(m_context, globalEntryPointInfo->parametersLayout->pendingVarLayout);
+    }
+
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(specializationInfo);
+        visitLeafParams(module);
+    }
+
+    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(specializationInfo);
+        visitLeafParams(legacy);
+    }
+
+    void visitLeafParams(ComponentType* componentType)
+    {
+        // In the "leaf" case we just allocate space for any
+        // pending data in the parameters, in order.
+        //
+        auto paramCount = componentType->getShaderParamCount();
+        for(Index ii = 0; ii < paramCount; ++ii)
+        {
+            auto globalParamIndex = m_counters->globalParamCounter++;
+            auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
+            auto firstVarLayout = globalParamInfo->varLayouts[0];
+
+            _allocateBindingsForPendingData(m_context, firstVarLayout->pendingVarLayout);
+        }
+    }
+
+    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        visitChildren(composite, specializationInfo);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        // Because `SpecializedComponentType` was a special case for `CompleteBindingsVisitor`,
+        // it ends up being a special case here too.
+        //
+        // The `CompleteBindings...` pass treated a `SpecializedComponentType`
+        // as an atomic unit. Any "pending" data that came from its parameters
+        // will already have been dealt with, so it would be incorrect for
+        // us to recurse into `specialized`.
+        //
+        // Instead, we just need to *skip* `specialized`, since it was
+        // completely handled already. This isn't quite as simple
+        // as just doing nothing, because our passes are using
+        // some global counters to find the absolute/linear index
+        // of each parameter and entry point as it is encountered.
+        // We will simply bump those counters by the number of
+        // parameters and entry points contained under `specialized`,
+        // which is luckily provided by the `ComponentType` API.
+        // 
+        m_counters->globalParamCounter += specialized->getShaderParamCount();
+        m_counters->entryPointCounter += specialized->getEntryPointCount();
+    }
+
+};
+
+static void _completeBindings(
+    ParameterBindingContext*            context,
+    ComponentType*                      componentType,
+    ParameterBindingVisitorCounters*    ioCounters)
+{
+    ParameterBindingVisitorCounters savedCounters = *ioCounters;
+
+    CompleteBindingsVisitor completeBindingsVisitor(context, ioCounters);
+    componentType->acceptVisitor(&completeBindingsVisitor, nullptr);
+
+    FlushPendingDataVisitor flushVisitor(context, &savedCounters);
+    componentType->acceptVisitor(&flushVisitor, nullptr);
+}
+
+    /// "Complete" binding of parametesr in the given `program`.
+    ///
+    /// Completing binding involves both assigning registers/bindings
+    /// to an parameters that didn't get explicit locations, and then
+    /// also providing locations to any "pending" data that needed
+    /// space allocated (used for existential/interface type parameters).
+    ///
+static void _completeBindings(
+    ParameterBindingContext*    context,
+    ComponentType*              program)
+{
+    // The process of completing binding has a recursive structure,
+    // so we will immediately delegate to a subroutine that handles
+    // the recursion.
+    //
+    ParameterBindingVisitorCounters counters;
+    _completeBindings(context, program, &counters);
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(
     TargetProgram*  targetProgram,
     DiagnosticSink* sink)
@@ -2416,20 +2960,67 @@ RefPtr<ProgramLayout> generateParameterBindings(
     context.shared = &sharedContext;
     context.layoutContext = layoutContext;
 
-    // Walk through AST to discover all the parameters
+    // We want to start by finding out what (if anything) has
+    // been bound to the global generic parameters of the
+    // program, since we need to know these types to compute
+    // layout for parameters that use the generic type parameters.
+    //
+    collectGlobalGenericArguments(&context, program);
+
+    // Next we want to collect a full listing of all the shader
+    // parameters that need to be considered for layout, along
+    // with all of the entry points, which also need their
+    // parameters laid out and thus act pretty much like global
+    // parameters themselves.
+    //
     collectParameters(&context, program);
 
-    // Now walk through the parameters to generate initial binding information
+    // We will also collect basic information on the specialization
+    // parameters exposed by the program.
+    //
+    // Whereas `collectGlobalGenericArguments` was collecting the
+    // concrete types that have been plugged into specialization
+    // parameters, this step is about collecting the *unspecialized*
+    // parameters (if any) for the purposes of reflection.
+    //
+    collectSpecializationParams(&context, program);
+
+    // Once we have a canonical list of all the shader parameters
+    // (and entry points) in need of layout, we will walk through
+    // the parameters that might have explicit binding annotations,
+    // and "reserve" the registers/bindings/etc. that those parameters
+    // declare so that subequent automatic layout steps do not try to
+    // overlap them.
+    //
+    // Along the way we will issue diagnostics if there appear to
+    // be overlapping, conflicting, or inconsistent explicit bindings.
+    //
+    // Note that we do *not* support explicit binding annotations
+    // on entry point parameters, so we only consider global shader
+    // parameters here.
+    //
+    // (Also note that explicit bindings end up being the main
+    // source of complexity in the layout system, and we could greatly
+    // simplify this file by eliminating support for explicit
+    // binding in the future)
+    //
     for( auto& parameter : sharedContext.parameters )
     {
         generateParameterBindings(&context, parameter);
     }
 
-    // Determine if there are any global-scope parameters that use `Uniform`
-    // resources, and thus need to get packaged into a constant buffer.
+    // Once we have a canonical list of all the parameters, we can
+    // detect if there are any global-scope parameters that make use
+    // of `LayoutResourceKind::Uniform`, since such parameters would
+    // need to be packaged into a "default" constant buffer.
+    // The fxc/dxc compilers support this step, and in reflection
+    // refer to the generated constant buffer as `$Globals`.
     //
-    // Note: this doesn't account for GLSL's support for "legacy" uniforms
-    // at global scope, which don't get assigned a CB.
+    // Note that this logic doesn't account for the existance of
+    // "legacy" (non-buffer-bound) uniforms in GLSL for OpenGL.
+    // If we wanted to support legaqcy uniforms we would probably
+    // want to do so through a different feature.
+    //
     bool needDefaultConstantBuffer = false;
     for( auto& parameterInfo : sharedContext.parameters )
     {
@@ -2491,6 +3082,32 @@ RefPtr<ProgramLayout> generateParameterBindings(
                 break;
             }
         }
+
+        // We also need a default space for any entry-point parameters
+        // that consume appropriate resource kinds.
+        //
+        for(auto& entryPoint : sharedContext.programLayout->entryPoints)
+        {
+            auto paramsLayout = entryPoint->parametersLayout;
+            for(auto resInfo : paramsLayout->resourceInfos )
+            {
+                switch(resInfo.kind)
+                {
+                default:
+                    break;
+
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::VaryingInput:
+                case LayoutResourceKind::VaryingOutput:
+                case LayoutResourceKind::HitAttributes:
+                case LayoutResourceKind::RayPayload:
+                    continue;
+                }
+
+                needDefaultSpace = true;
+                break;
+            }
+        }
     }
 
     // If we need a space for default bindings, then allocate it here.
@@ -2541,12 +3158,14 @@ RefPtr<ProgramLayout> generateParameterBindings(
         &context,
         needDefaultConstantBuffer);
 
-    // Now walk through again to actually give everything
-    // ranges of registers...
-    for( auto& parameter : sharedContext.parameters )
-    {
-        completeBindingsForParameter(&context, parameter);
-    }
+    // Now that all of the explicit bindings have been dealt with
+    // and we've also allocate any space/buffer that is required
+    // for global-scope parameters, we will go through the
+    // shader parameters and entry points yet again, in order
+    // to actually allocate specific bindings/registers to
+    // parameters and entry points that need them.
+    //
+    _completeBindings(&context, program);
 
     // Next we need to create a type layout to reflect the information
     // we have collected, and we will use the `ScopeLayoutBuilder`
@@ -2566,104 +3185,6 @@ RefPtr<ProgramLayout> generateParameterBindings(
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
         cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
-    }
-
-    // After we have laid out all the ordinary global parameters,
-    // we need to "flush" out any pending data that was associated with
-    // the global scope as part of dealing with interface-type parameters.
-    //
-    _allocateBindingsForPendingData(&context, globalScopeVarLayout->pendingVarLayout);
-
-    // After we have allocated registers/bindings to everything
-    // in the global scope we will process the parameters
-    // of the entry points.
-    //
-    // Note: at the moment we are laying out *all* information related to global-scope
-    // parameters (including pending data from interface-type parameters) before
-    // anything pertaining to entry points. This is a crucial design choice to
-    // get right, and we might want to revisit it based on experience.
-
-    // In some cases, a user will want to ensure that all the
-    // entry points they compile get non-overlapping
-    // registers/bindings. E.g., if you have a vertex and fragment
-    // shader being compiled together for Vulkan, you probably want distinct
-    // bindings for their entry-point `uniform` parametres, so
-    // that they can be used together.
-    //
-    // In other cases, however, a user probably doesn't want us
-    // to conservatively allocate non-overlapping bindings.
-    // E.g., if they have a bunch of compute shaders in a single
-    // file, then they probably want each compute shader to
-    // compute its parameter layout "from scratch" as if the
-    // others don't exist.
-    //
-    // The way we handle this is by putting the entry points of a
-    // `Program` into groups, and ensuring that within each group
-    // we allocate parameters that don't overlap, but we don't
-    // worry about overlap across groups.
-    //
-    for( auto entryPointGroup : sharedContext.programLayout->entryPointGroups )
-    {
-        // We save off the allocation state as it was before the entry-point
-        // group, so that we can restore it to this state after each group.
-        //
-        // TODO: We probably ought to wrap all the state relevant to allocation
-        // of registers/bindings into a single struct/field so that we only
-        // have one thing to save/restore here even if new state gets added.
-        //
-        auto savedGlobalSpaceUsedRangeSets = sharedContext.globalSpaceUsedRangeSets;
-        auto savedUsedSpaces = sharedContext.usedSpaces;
-
-        // The group will have been allocated a layout that combines the
-        // usage of all of the contained entry-points, so we just need to
-        // allocate the entry-point group to be placed after all the global-scope
-        // parameters.
-        //
-        auto entryPointGroupParamsLayout = entryPointGroup->parametersLayout;
-        completeBindingsForParameter(&context, entryPointGroupParamsLayout);
-
-        _allocateBindingsForPendingData(&context, entryPointGroupParamsLayout->pendingVarLayout);
-
-        // TODO: Should we add the offset information from the group to
-        // the layout information for each entry point (and thence to its parameters)?
-        //
-        // This seems important if we want to allow clients to conveniently
-        // ignore groups when doing their reflection queries.
-
-        // Once we've allocated bindigns for the parameters of entry points
-        // in the group, we restore the state for tracking what register/bindings
-        // are used to where it was before.
-        //
-        sharedContext.globalSpaceUsedRangeSets = savedGlobalSpaceUsedRangeSets;
-        sharedContext.usedSpaces = savedUsedSpaces;
-    }
-
-    // HACK: we want global parameters to not have to deal with offsetting
-    // by the `VarLayout` stored in `globalScopeVarLayout`, so we will scan
-    // through and for any global parameter that used "pending" data, we will manually
-    // offset all of its resource infos to account for where the global pending data
-    // got placed.
-    //
-    // TODO: A more appropriate solution would be to pass the `globalScopeVarLayout`
-    // down into the pass that puts layout information onto global parameters in
-    // the IR, and apply the offsetting there.
-    //
-    for( auto& parameterInfo : sharedContext.parameters )
-    {
-        for( auto varLayout : parameterInfo->varLayouts )
-        {
-            auto pendingVarLayout = varLayout->pendingVarLayout;
-            if(!pendingVarLayout) continue;
-
-            for( auto& resInfo : pendingVarLayout->resourceInfos )
-            {
-                if( auto globalResInfo = globalScopeVarLayout->pendingVarLayout->FindResourceInfo(resInfo.kind) )
-                {
-                    resInfo.index += globalResInfo->index;
-                    resInfo.space += globalResInfo->space;
-                }
-            }
-        }
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;
@@ -2689,7 +3210,7 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 }
 
 void generateParameterBindings(
-    Program*        program,
+    ComponentType*  program,
     TargetRequest*  targetReq,
     DiagnosticSink* sink)
 {

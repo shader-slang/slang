@@ -69,24 +69,8 @@ struct BindExistentialSlots
 
     void processGlobalExistentialSlots()
     {
-        // If there are any global existential slots, we will expect
-        // to find a `bindGlobalExistentialSlots` instruction at module scope.
-        //
-        // We will start out by finding that instruction, if it exists.
-        //
-        IRInst* bindGlobalExistentialSlotsInst = nullptr;
-        for( auto inst : module->getGlobalInsts() )
-        {
-            if( inst->op == kIROp_BindGlobalExistentialSlots )
-            {
-                bindGlobalExistentialSlotsInst = inst;
-                break;
-            }
-        }
-
-        // Now we will start looking for global shader parameters that make
-        // use of existential slots (we can determine this from their
-        // layout).
+        // We will search for global shader parameters that make
+        // use of existential specialization parameters.
         //
         for( auto inst : module->getGlobalInsts() )
         {
@@ -96,23 +80,27 @@ struct BindExistentialSlots
             if(!globalParam)
                 continue;
 
-            // We will delegate to a subroutine for the meat
-            // of the work, since much of it can be shared
-            // with the case for entry-point existential
-            // parameters.
+            // We only care about global shader parameters
+            // that have existential specialization parameters,
+            // and we expect all such parameters to have a
+            // `[bindExistentialSlots(...)]` decoration that
+            // was added during IR linking.
             //
-            processParameter(globalParam, bindGlobalExistentialSlotsInst);
-        }
+            auto bindSlotsInst = globalParam->findDecorationImpl(kIROp_BindExistentialSlotsDecoration);
+            if(!bindSlotsInst)
+                continue;
 
-        // Once we are done looping over global shader parameters,
-        // all of the relevant information from the
-        // `bindGlobalExistentialSlots` instruction will have
-        // been moved to the parameters themselves, so we
-        // can eliminate the binding instruction.
-        //
-        if( bindGlobalExistentialSlotsInst )
-        {
-            bindGlobalExistentialSlotsInst->removeAndDeallocate();
+            replaceTypeUsingExistentialSlots(
+                globalParam,
+                bindSlotsInst->getOperandCount(),
+                bindSlotsInst->getOperands());
+
+            // Once we have propagated the information from
+            // the `[bindExistentialSlots(...)]` decoration
+            // down into the parameter's type, we no longer
+            // need the decoration.
+            //
+            bindSlotsInst->removeAndDeallocate();
         }
     }
 
@@ -150,9 +138,25 @@ struct BindExistentialSlots
         // We then need to process each of the entry-point
         // parameters just like we did for global parameters.
         //
+        // Because the existential slot arguments for *all* of the parameters
+        // are attached in a single `[bindExistentialSlots(...)]` decoration,
+        // we need to carve them up appropriately across the parameters.
+        // The way we do this is a bit of a kludge, in that we track a
+        // single `slotOffset` and increment it for each parameter by the
+        // number of arguments it consumed.
+        //
+        // Note: a better approach here might rely on the layout information
+        // for the parameters, which should directly encode an offset for
+        // the existential specialization parameters it uses. The challenge
+        // with this is that we'd need to correctly interpret the offset
+        // relative to any global-scope specialization parameters or
+        // generic specialization parameters of the entry point.
+        // Ultimately the simplistic counter approach is less complicated.
+        //
+        Index slotOffset = 0;
         for( auto param : func->getParams() )
         {
-            processParameter(param, bindEntryPointExistentialSlotsInst);
+            processEntryPointParameter(param, bindEntryPointExistentialSlotsInst, slotOffset);
         }
 
         // TODO: We would need to consider what to do if
@@ -181,9 +185,10 @@ struct BindExistentialSlots
     // function `param` and a `[bindExistentialSlots(...)]`
     // decoration; both use the same subroutine.
     //
-    void processParameter(
+    void processEntryPointParameter(
         IRInst*     param,
-        IRInst*     bindSlotsInst)
+        IRInst*     bindSlotsInst,
+        Index&      ioSlotOperandOffset)
     {
         // We expect all shader parameters to have layout information,
         // but to be defensive we will skip any that don't.
@@ -206,7 +211,6 @@ struct BindExistentialSlots
         // find out the stating slot, and the information on
         // the type to find out the number of slots.
         //
-        UInt firstSlot = resInfo->index;
         UInt slotCount = 0;
         if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
             slotCount = UInt(typeResInfo->count.getFiniteValue());
@@ -233,7 +237,8 @@ struct BindExistentialSlots
         // this parameter.
         //
         UInt bindOperandCount = bindSlotsInst->getOperandCount();
-        if( 2*(firstSlot + slotCount) > bindOperandCount )
+        UInt slotOperandCount = 2*slotCount;
+        if( (ioSlotOperandOffset + slotOperandCount) > bindOperandCount )
         {
             sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
             return;
@@ -244,7 +249,7 @@ struct BindExistentialSlots
         // keeping in mind that each slot accounts for two
         // operands.
         //
-        auto operandsForInst = bindSlotsInst->getOperands() + firstSlot;
+        auto operandsForInst = bindSlotsInst->getOperands() + ioSlotOperandOffset;
 
         // Once we've found the operands that are relevent to
         // the slots used by `param`, we will defer to a routine
@@ -253,17 +258,17 @@ struct BindExistentialSlots
         //
         replaceTypeUsingExistentialSlots(
             param,
-            slotCount,
+            slotOperandCount,
             operandsForInst);
+
+        ioSlotOperandOffset += slotOperandCount;
     }
 
     void replaceTypeUsingExistentialSlots(
         IRInst*         inst,
-        UInt            slotCount,
+        UInt            slotOperandCount,
         IRUse const*    slotArgs)
     {
-        SLANG_UNUSED(slotCount);
-
         // We are going to alter the type of the
         // given `inst` based on information in
         // the `slotArgs`.
@@ -282,7 +287,6 @@ struct BindExistentialSlots
         // a witness table, so the total number of operands
         // is twice the number of slots we are filling.
         //
-        UInt slotOperandCount = slotCount*2;
         List<IRInst*> slotOperands;
         for(UInt ii = 0; ii < slotOperandCount; ++ii)
             slotOperands.add(slotArgs[ii].get());
