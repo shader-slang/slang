@@ -2766,10 +2766,10 @@ String ExistentialSpecializedType::ToString()
     String result;
     result.append("__ExistentialSpecializedType(");
     result.append(baseType->ToString());
-    for( auto arg : slots.args )
+    for( auto arg : args )
     {
         result.append(", ");
-        result.append(arg.type->ToString());
+        result.append(arg.val->ToString());
     }
     result.append(")");
     return result;
@@ -2784,16 +2784,19 @@ bool ExistentialSpecializedType::EqualsImpl(Type * type)
     if(!baseType->Equals(other->baseType))
         return false;
 
-    auto argCount = slots.args.getCount();
-    if(argCount != other->slots.args.getCount())
+    auto argCount = args.getCount();
+    if(argCount != other->args.getCount())
         return false;
 
     for( Index ii = 0; ii < argCount; ++ii )
     {
-        if(!slots.args[ii].type->Equals(other->slots.args[ii].type))
+        auto arg = args[ii];
+        auto otherArg = other->args[ii];
+
+        if(!arg.val->EqualsVal(otherArg.val))
             return false;
 
-        if(!slots.args[ii].witness->EqualsVal(other->slots.args[ii].witness))
+        if(!areValsEqual(arg.witness, otherArg.witness))
             return false;
     }
     return true;
@@ -2803,12 +2806,26 @@ int ExistentialSpecializedType::GetHashCode()
 {
     Hasher hasher;
     hasher.hashObject(baseType);
-    for(auto arg : slots.args)
+    for(auto arg : args)
     {
-        hasher.hashObject(arg.type);
-        hasher.hashObject(arg.witness);
+        hasher.hashObject(arg.val);
+        if(auto witness = arg.witness)
+            hasher.hashObject(witness);
     }
     return hasher.getResult();
+}
+
+RefPtr<Val> getCanonicalValue(Val* val)
+{
+    if(!val)
+        return nullptr;
+    if(auto type = as<Type>(val))
+    {
+        return type->GetCanonicalType();
+    }
+    // TODO: We may eventually need/want some sort of canonicalization
+    // for non-type values, but for now there is nothing to do.
+    return val;
 }
 
 RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
@@ -2817,18 +2834,20 @@ RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
     canType->setSession(getSession());
 
     canType->baseType = baseType->GetCanonicalType();
-    for( auto paramType : slots.paramTypes )
+    for( auto arg : args )
     {
-        canType->slots.paramTypes.add( paramType->GetCanonicalType() );
-    }
-    for( auto arg : slots.args )
-    {
-        ExistentialTypeSlots::Arg canArg;
-        canArg.type = arg.type->GetCanonicalType();
-        canArg.witness = arg.witness;
-        canType->slots.args.add(canArg);
+        ExpandedSpecializationArg canArg;
+        canArg.val = getCanonicalValue(arg.val);
+        canArg.witness = getCanonicalValue(arg.witness);
+        canType->args.add(canArg);
     }
     return canType;
+}
+
+RefPtr<Val> substituteImpl(Val* val, SubstitutionSet subst, int* ioDiff)
+{
+    if(!val) return nullptr;
+    return val->SubstituteImpl(subst, ioDiff);
 }
 
 RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
@@ -2837,17 +2856,13 @@ RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, in
 
     auto substBaseType = baseType->SubstituteImpl(subst, &diff).as<Type>();
 
-    ExistentialTypeSlots substSlots;
-    for( auto paramType : slots.paramTypes )
+    ExpandedSpecializationArgs substArgs;
+    for( auto arg : args )
     {
-        substSlots.paramTypes.add( paramType->SubstituteImpl(subst, &diff).as<Type>() );
-    }
-    for( auto arg : slots.args )
-    {
-        ExistentialTypeSlots::Arg substArg;
-        substArg.type = arg.type->SubstituteImpl(subst, &diff).as<Type>();
-        substArg.witness = arg.witness->SubstituteImpl(subst, &diff);
-        substSlots.args.add(substArg);
+        ExpandedSpecializationArg substArg;
+        substArg.val = Slang::substituteImpl(arg.val, subst, &diff);
+        substArg.witness = Slang::substituteImpl(arg.witness, subst, &diff);
+        substArgs.add(substArg);
     }
 
     if(!diff)
@@ -2858,7 +2873,7 @@ RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, in
     RefPtr<ExistentialSpecializedType> substType = new ExistentialSpecializedType();
     substType->setSession(getSession());
     substType->baseType = substBaseType;
-    substType->slots = substSlots;
+    substType->args = substArgs;
     return substType;
 }
 
