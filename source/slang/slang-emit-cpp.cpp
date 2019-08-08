@@ -1454,58 +1454,40 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
         }
         case IntrinsicOp::Swizzle:
         {
-            // For C++ we don't need to emit a swizzle function
-            // For C we need a construction function
+            // Currently only works for C++ (we use {} constuction) - which means we don't need to generate a function.
+            // For C we need to generate suitable construction function
             auto swizzleInst = static_cast<IRSwizzle*>(inst);
             const Index elementCount = Index(swizzleInst->getElementCount());
 
-            if (elementCount == 1)
+            // TODO(JS): Not 100% sure this is correct on the parens handling front
+            IRType* retType = specOp.returnType;
+            emitType(retType);
+            writer->emit("{");
+
+            for (Index i = 0; i < elementCount; ++i)
             {
-                IRInst* baseInst = swizzleInst->getBase();
-                IRType* baseType = baseInst->getDataType();
+                if (i > 0)
+                {
+                    writer->emit(", ");
+                }
 
-                if (as<IRBasicType>(baseType))
-                {
-                    // A swizzle on a built in type can only mean .x, which we can't output just output the base
-                    emitOperand(baseInst, inOuterPrec);
-                }
-                else
-                {
-                    defaultEmitInstExpr(inst, inOuterPrec);
-                }
+                auto outerPrec = getInfo(EmitOp::General);
+
+                auto prec = getInfo(EmitOp::Postfix);
+                emitOperand(swizzleInst->getBase(), leftSide(outerPrec, prec));
+
+                writer->emit(".");
+
+                IRInst* irElementIndex = swizzleInst->getElementIndex(i);
+                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                IRConstant* irConst = (IRConstant*)irElementIndex;
+                UInt elementIndex = (UInt)irConst->value.intVal;
+                SLANG_RELEASE_ASSERT(elementIndex < 4);
+
+                writer->emitChar(s_elemNames[elementIndex]);
             }
-            else
-            {
-                // TODO(JS): Not sure this is correct on the parens handling front
-                IRType* retType = specOp.returnType;
-                emitType(retType);
-                writer->emit("{");
 
-                for (Index i = 0; i < elementCount; ++i)
-                {
-                    if (i > 0)
-                    {
-                        writer->emit(", ");
-                    }
-
-                    auto outerPrec = getInfo(EmitOp::General);
-
-                    auto prec = getInfo(EmitOp::Postfix);
-                    emitOperand(swizzleInst->getBase(), leftSide(outerPrec, prec));
-
-                    writer->emit(".");
-
-                    IRInst* irElementIndex = swizzleInst->getElementIndex(i);
-                    SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
-                    IRConstant* irConst = (IRConstant*)irElementIndex;
-                    UInt elementIndex = (UInt)irConst->value.intVal;
-                    SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-                    writer->emitChar(s_elemNames[elementIndex]);
-                }
-
-                writer->emit("}");
-            }
+            writer->emit("}");
             break;
         }
         default:
@@ -1642,7 +1624,7 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
     {
         case IntrinsicOp::ConstructFromScalar:
         {
-            SLANG_ASSERT(inst->getOperandCount() == 1);
+            SLANG_ASSERT(operandCount == 1);
             IRType* dstType = inst->getDataType();
             IRType* srcType = _getElementType(dstType);
             IRType* argTypes[2] = { dstType, srcType };
@@ -2154,7 +2136,44 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_swizzle:
         {
-            emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+            // For C++ we don't need to emit a swizzle function
+           // For C we need a construction function
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+
+            IRInst* baseInst = swizzleInst->getBase();
+            IRType* baseType = baseInst->getDataType();
+
+            // If we are swizzling from a built in type, 
+            if (as<IRBasicType>(baseType))
+            {
+                // We can swizzle a scalar type to be a vector, or just a scalar
+                IRType* dstType = swizzleInst->getDataType();
+                if (as<IRBasicType>(dstType))
+                {
+                    // If the output is a scalar, then could only have been a .x, which we can just ignore the '.x' part
+                    emitOperand(baseInst, inOuterPrec);
+                }
+                else
+                {
+                    SLANG_ASSERT(dstType->op == kIROp_VectorType);
+                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), 1, dstType, inOuterPrec);
+                }
+            }
+            else
+            {
+                const Index elementCount = Index(swizzleInst->getElementCount());
+                if (elementCount == 1)
+                {
+                    // If just one thing is extracted then the . syntax will just work 
+                    defaultEmitInstExpr(inst, inOuterPrec);
+                }
+                else
+                {
+                    // Will need to generate a swizzle method
+                    emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+                }
+            }
+
             return true;
         }
         case kIROp_Call:
