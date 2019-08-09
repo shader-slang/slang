@@ -84,6 +84,27 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public RefObject
     SharedLibrary::Handle m_sharedLibraryHandle = nullptr;
 };
 
+class TemporarySharedLibrary : public DefaultSharedLibrary
+{
+public:
+    typedef DefaultSharedLibrary Super;
+
+        /// Get the path to the shared library
+    const String& getPath() const { return m_path; }
+
+        /// Ctor
+    TemporarySharedLibrary(const SharedLibrary::Handle sharedLibraryHandle, const String& path):
+        Super(sharedLibraryHandle),
+        m_path(path)
+    {
+    }
+
+    virtual ~TemporarySharedLibrary();
+
+protected:
+    String m_path;
+};
+
 class ConfigurableSharedLibraryLoader: public ISlangSharedLibraryLoader, public RefObject
 {
 public:

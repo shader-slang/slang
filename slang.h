@@ -558,6 +558,9 @@ extern "C"
         /* Skip code generation step, just check the code and generate layout */
         SLANG_COMPILE_FLAG_NO_CODEGEN           = 1 << 4,
 
+        /* If enabled for a CPU shared library target, it is loaded. */
+        SLANG_COMPILE_FLAG_LOAD_SHARED_LIBRARY  = 1 << 5, 
+
         /* Deprecated flags: kept around to allow existing applications to
         compile. Note that the relevant features will still be left in
         their default state. */
@@ -1210,6 +1213,8 @@ extern "C"
         int                     targetIndex,
         SlangTargetFlags        flags);
 
+
+
     /*!
     @brief Set the floating point mode (e.g., precise or fast) to use a target.
     */
@@ -1547,6 +1552,7 @@ extern "C"
 
     /** Get the output code associated with a specific entry point.
 
+    @param request   The request 
     @param entryPointIndex The index of the entry point to get code for.
     @param targetIndex The index of the target to get code for (default: zero).
     @param outBlob A pointer that will receive the blob of code
@@ -1560,13 +1566,34 @@ extern "C"
         int                     targetIndex,
         ISlangBlob**            outBlob);
 
+    /** Get the shared library associated with a specific entry point.
+
+    NOTE! Requires a compilation is for SharedLibrary target (ie CPU), and the
+    flag FLAG_COMPILE_LOAD_SHARED_LIBRARY is set. 
+
+    @param request          The request 
+    @param entryPointIndex  The index of the entry point to get code for.
+    @param targetIndex      The index of the target to get code for (default: zero).
+    @param outBlob          A pointer that will receive the blob of code
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spGetEntryPointSharedLibrary(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangSharedLibrary**   outSharedLibrary);
+
     /** Get the output bytecode associated with an entire compile request.
 
     The lifetime of the output pointer is the same as `request`.
+
+    DEPRECIATED: No longer outputs anything. 
     */
     SLANG_API void const* spGetCompileRequestCode(
         SlangCompileRequest*    request,
         size_t*                 outSize);
+
+
 
     /*
     Forward declarations of types used in the reflection interface;
