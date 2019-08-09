@@ -42,18 +42,19 @@ To make it possible for slang to produce CPU code, we now need a mechanism to co
 In the API the `SlangCompileTarget`s are 
 
 ```
-SLANG_C_SOURCE,             ///< The C language
-SLANG_CPP_SOURCE,           ///< The C++ language
+SLANG_C_SOURCE             ///< The C language
+SLANG_CPP_SOURCE           ///< The C++ language
 ```        
    
 If a CPU binary is required this can be specified as a `SlangCompileTarget` of 
    
 ```   
-SLANG_EXECUTABLE,           ///< Executable (for hosting CPU/OS)
-SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
+SLANG_EXECUTABLE           ///< Executable (for hosting CPU/OS)
+SLANG_SHARED_LIBRARY       ///< A shared library/Dll (for hosting CPU/OS)
+SLANG_HOST_CALLABLE        ///< A CPU target that makes the compiled code available to be run immediately
 ```
 
-These can also be specified on the slang command line as `-target exe` and `-target dll` or `-target sharedlib`.
+These can also be specified on the slang command line as `-target exe` and `-target dll` or `-target sharedlib`. `-target callable` or `-target host-callable` is also possible, but is typically not very useful from the command line, other than to test such code is avaiable for host execution.
 
 In order to be able to use the slang code on CPU, there needs to be binding via values passed to a function that the C/C++ code will produce and export. How this works is described in the ABI section. 
 
@@ -64,9 +65,23 @@ Under the covers when slang is used to generate a binary via a C/C++ compiler, i
 Executing CPU Code
 ==================
 
-When slang produces shared libraries/dlls or exes to files they can be executed fairly simply - perhaps on some targets requiring just the execute is enabled on the file. That working through the file system like this can be awkward, and assumes that the binaries sland produces are always files, which they many not necessarily be. 
+In typically slang operation when code is compiled it produces either source or a binary that can then be loaded by another API such as a rendering API. With CPU code the binary produced could be saved to a file and then executed as an exe or a shared library/dll. In practice though it is not uncommon to want to be able to execute compiled code immediately. Having to save off to a file and then load again can be awkward. It is also not necessarily the case that code needs to be saved to a file to be executed. 
 
-To avoid these issues slang has a mechanism to compile to what appears like a loaded shared library.
+To handle being able call code directly, code can be compiled using the SLANG_HOST_CALLABLE code target type. To access the code that has been produced use the function
+
+```
+    SLANG_API SlangResult spGetEntryPointHostCallable(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangSharedLibrary**   outSharedLibrary);
+```        
+
+This outputs a `ISlangSharedLibrary` which whilst in scope, any contained functions remain available (even if the request or session go out of scope). The contained functions can then be accessed via the `findFuncByName` method on the `ISlangSharedLibrary` interface.
+
+The returned function pointer should be cast to the appropriate function signature before calling. For entry points - the function will appear under the same name as the entry point name. See the ABI section for what is the appropriate signature for entry points. 
+
+For pass through compilation of C/C++ this mechanism allows any functions marked for export to be directly queried. 
 
 ABI
 ===

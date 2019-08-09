@@ -3194,7 +3194,7 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spGetEntryPointSharedLibrary(
+SLANG_API SlangResult spGetEntryPointHostCallable(
     SlangCompileRequest*    request,
     int                     entryPointIndex,
     int                     targetIndex,

@@ -516,6 +516,7 @@ extern "C"
         SLANG_CPP_SOURCE,           ///< The C++ language
         SLANG_EXECUTABLE,           ///< Executable (for hosting CPU/OS)
         SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
+        SLANG_HOST_CALLABLE,        ///< A CPU target that makes the compiled code available to be run immediately
     };
 
     /* A "container format" describes the way that the outputs
@@ -557,9 +558,6 @@ extern "C"
 
         /* Skip code generation step, just check the code and generate layout */
         SLANG_COMPILE_FLAG_NO_CODEGEN           = 1 << 4,
-
-        /* If enabled for a CPU shared library target, it is loaded. */
-        SLANG_COMPILE_FLAG_LOAD_SHARED_LIBRARY  = 1 << 5, 
 
         /* Deprecated flags: kept around to allow existing applications to
         compile. Note that the relevant features will still be left in
@@ -1566,18 +1564,19 @@ extern "C"
         int                     targetIndex,
         ISlangBlob**            outBlob);
 
-    /** Get the shared library associated with a specific entry point.
+    /** Get entry point 'callable' functions accessible through the ISlangSharedLibrary interface.
 
-    NOTE! Requires a compilation is for SharedLibrary target (ie CPU), and the
-    flag FLAG_COMPILE_LOAD_SHARED_LIBRARY is set. 
+    That the functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
 
+    NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+    
     @param request          The request 
     @param entryPointIndex  The index of the entry point to get code for.
     @param targetIndex      The index of the target to get code for (default: zero).
-    @param outBlob          A pointer that will receive the blob of code
+    @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried on.
     @returns                A `SlangResult` to indicate success or failure.
     */
-    SLANG_API SlangResult spGetEntryPointSharedLibrary(
+    SLANG_API SlangResult spGetEntryPointHostCallable(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
         int                     targetIndex,

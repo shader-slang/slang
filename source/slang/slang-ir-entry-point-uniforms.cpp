@@ -441,6 +441,7 @@ void moveEntryPointUniformParamsToGlobalScope(
         case CodeGenTarget::CSource:
         case CodeGenTarget::Executable:
         case CodeGenTarget::SharedLibrary:
+        case CodeGenTarget::HostCallable:
         {
             context.targetNeedsConstantBuffer = false;
             break;

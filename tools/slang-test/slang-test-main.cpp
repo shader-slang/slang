@@ -556,6 +556,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             return PassThroughFlag::Dxc;
         }
 
+        case SLANG_HOST_CALLABLE:
         case SLANG_EXECUTABLE:
         case SLANG_SHARED_LIBRARY:
         {
@@ -590,6 +591,8 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("exe", EXECUTABLE)
         CASE("sharedlib", SHARED_LIBRARY)
         CASE("dll", SHARED_LIBRARY)
+        CASE("callable", HOST_CALLABLE)
+        CASE("host-callable", HOST_CALLABLE)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;

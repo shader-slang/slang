@@ -61,6 +61,7 @@ namespace Slang
         CPPSource           = SLANG_CPP_SOURCE,
         Executable          = SLANG_EXECUTABLE,
         SharedLibrary       = SLANG_SHARED_LIBRARY,
+        HostCallable        = SLANG_HOST_CALLABLE,
     };
 
     CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);

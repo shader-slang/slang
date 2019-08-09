@@ -87,7 +87,8 @@ namespace Slang
     x("c", CSource) \
     x("cpp", CPPSource) \
     x("exe,executable", Executable) \
-    x("sharedlib,sharedlibrary,dll", SharedLibrary) 
+    x("sharedlib,sharedlibrary,dll", SharedLibrary) \
+    x("callable,host-callable", HostCallable)
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -514,6 +515,7 @@ namespace Slang
                 // Don't need an external compiler to output C and C++ code
                 return PassThroughMode::None;
             }
+            case CodeGenTarget::HostCallable:
             case CodeGenTarget::SharedLibrary:
             case CodeGenTarget::Executable:
             {
@@ -1349,6 +1351,7 @@ SlangResult dissassembleDXILUsingDXC(
         // Set what kind of target we should build
         switch (targetReq->target)
         {
+            case CodeGenTarget::HostCallable:
             case CodeGenTarget::SharedLibrary:
             {
                 options.targetType = CPPCompiler::TargetType::SharedLibrary;
@@ -1495,9 +1498,8 @@ SlangResult dissassembleDXILUsingDXC(
             return SLANG_FAIL;
         }
 
-        // Look at the flags to figure what to do
-
-        if ((endToEndReq->getFrontEndReq()->compileFlags & SLANG_COMPILE_FLAG_LOAD_SHARED_LIBRARY) && targetReq->target == CodeGenTarget::SharedLibrary)
+        // If callable we need to load the shared library
+        if (targetReq->target == CodeGenTarget::HostCallable)
         {
             // Try loading the shared library
             SharedLibrary::Handle handle;
@@ -1607,6 +1609,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         switch (target)
         {
+        case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::Executable:
             {
@@ -1622,7 +1625,7 @@ SlangResult dissassembleDXILUsingDXC(
                     sharedLibrary,
                     code)))
                 {
-                    if ((endToEndReq->getFrontEndReq()->compileFlags & SLANG_COMPILE_FLAG_LOAD_SHARED_LIBRARY) && (target == CodeGenTarget::SharedLibrary))
+                    if (target == CodeGenTarget::HostCallable)
                     {
                         result = CompileResult(sharedLibrary);
                     }
@@ -2302,6 +2305,7 @@ SlangResult dissassembleDXILUsingDXC(
             // for now
             dumpIntermediateBinary(compileRequest, data, size, ".exe");
             break;
+        case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
             dumpIntermediateBinary(compileRequest, data, size, ".shared-lib");
             break;
