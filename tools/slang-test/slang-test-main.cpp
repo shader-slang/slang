@@ -1217,6 +1217,8 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
+    bool isCPUTest = input.testOptions->command.startsWith("CPU_");
+
     CommandLine cmdLine;
     
     cmdLine.setExecutablePath(Path::combine(options.binDir, String("slang-reflection-test") + ProcessUtil::getExecutableSuffix()));
@@ -1236,6 +1238,15 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     }
 
     String actualOutput = getOutput(exeRes);
+
+    if (isCPUTest)
+    {
+#if SLANG_PTR_IS_32
+        outputStem.append(".32");
+#else
+        outputStem.append(".64");
+#endif
+    }
 
     String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
@@ -2417,6 +2428,7 @@ static const TestCommandInfo s_testCommandInfos[] =
 {
     { "SIMPLE",                                 &runSimpleTest},
     { "REFLECTION",                             &runReflectionTest},
+    { "CPU_REFLECTION",                         &runReflectionTest},
     { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},
     { "COMPARE_HLSL",                           &runHLSLComparisonTest},
     { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest},
