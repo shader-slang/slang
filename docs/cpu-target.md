@@ -106,7 +106,7 @@ struct UniformState
 };   
 ```
 
-For C++ targets, the templated types are defined in the slang-cpp-prelude.h that is included. Note that `slang-cpp-prelude.h` *MUST* currently be within the search path passed to the compiler. By default with the CPU code-generation, the file path to the slang file is included as a 'system' include path, such that placing the slang-cpp-prelude.h file in the same directory as the slang source file should mean that it is found. 
+For C++ targets, the templated types are defined in the slang-cpp-prelude.h that is included. Note that `slang-cpp-prelude.h` *MUST* currently be within the search path passed to the compiler. By default with CPU code-generation, the file path to the slang file is included as a 'system' include path, such that placing the `slang-cpp-prelude.h` file in the same directory as the slang source file should mean that it is found. 
 
 ConstantBuffers will become pointers to the type they hold (as thing3_0 is in the above structure).
  
