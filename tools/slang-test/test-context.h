@@ -93,6 +93,7 @@ class TestContext
 
         /// Get compiler factory
     Slang::CPPCompilerSet* getCPPCompilerSet();
+    Slang::CPPCompiler* getDefaultCPPCompiler();
 
         /// Ctor
     TestContext();

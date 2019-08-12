@@ -100,3 +100,10 @@ CPPCompilerSet* TestContext::getCPPCompilerSet()
     }
     return cppCompilerSet;
 }
+
+Slang::CPPCompiler* TestContext::getDefaultCPPCompiler()
+{
+    CPPCompilerSet* set = getCPPCompilerSet();
+    return set ? set->getDefaultCompiler() : nullptr;
+}
+
