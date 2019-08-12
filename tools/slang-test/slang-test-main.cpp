@@ -1372,39 +1372,49 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     String ext = Path::getFileExt(filePath);
     String modulePath = Path::combine(directory, moduleName);
 
-    // Find the target
     UnownedStringSlice targetExt = UnownedStringSlice::fromLiteral("c");
+
+    // Find the target
     Index index = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-target"));
     if (index >= 0 && index + 1 < cmdLine.getArgCount())
     {
         targetExt = cmdLine.m_args[index + 1].value.getUnownedSlice();
     }
 
-    CPPCompiler::CompileOptions options;
-    options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
-
-    options.includePaths.add("tests/cross-compile");
-
-    // Create a filename to write this out to
-    String cppSource = modulePath + "." + targetExt;
-    Slang::File::writeAllText(cppSource, actualOutput);
-
-    // Okay we can now try compiling
-
-    // Compile this source
-    options.sourceFiles.add(cppSource);
-    options.modulePath = modulePath;
-    options.targetType = CPPCompiler::TargetType::SharedLibrary;
-
-    CPPCompiler::Output output;
-    if (SLANG_FAILED(compiler->compile(options, output)))
+    // If output was C/C++ we should try compiling
+    if (targetExt == "c" || targetExt == "cpp")
     {
-        return TestResult::Fail;
+        CPPCompiler::CompileOptions options;
+        options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
+        options.includePaths.add("tests/cross-compile");
+
+        // Create a filename to write this out to
+        String cppSource = modulePath + "." + targetExt;
+        Slang::File::writeAllText(cppSource, actualOutput);
+
+        // Okay we can now try compiling
+
+        // Compile this source
+        options.sourceFiles.add(cppSource);
+        options.modulePath = modulePath;
+        options.targetType = CPPCompiler::TargetType::SharedLibrary;
+
+        CPPCompiler::Output output;
+        if (SLANG_FAILED(compiler->compile(options, output)))
+        {
+            return TestResult::Fail;
+        }
+
+        if (output.getCountByType(CPPCompiler::OutputMessage::Type::Error) > 0)
+        {
+            return TestResult::Fail;
+        }
     }
-
-    if (output.getCountByType(CPPCompiler::OutputMessage::Type::Error) > 0)
+    else
     {
-        return TestResult::Fail;
+        // Can only be callable
+        SLANG_ASSERT(targetExt == "callable" || targetExt == "host-callable");
     }
 
     return TestResult::Pass;
