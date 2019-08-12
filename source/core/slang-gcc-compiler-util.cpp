@@ -363,7 +363,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_FAIL;
 }
 
-/* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
+/* static */SlangResult GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     cmdLine.addArg("-fvisibility=hidden");
 
@@ -513,6 +513,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 	// Make maths lib available
         cmdLine.addArg("-lm");
     }
+
+    return SLANG_OK;
 }
 
 }

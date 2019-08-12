@@ -191,38 +191,31 @@ protected:
     Desc m_desc;
 };
 
-class GenericCPPCompiler : public CPPCompiler
+class CommandLineCPPCompiler : public CPPCompiler
 {
 public:
     typedef CPPCompiler Super;
 
-    typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
-    typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
-    typedef SlangResult(*CalcModuleFilePathFunc)(const CPPCompiler::CompileOptions& options, StringBuilder& outPath);
-
+    // CPPCompiler
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
-    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE;
+    
+    // Functions to be implemented for a specific CommandLine    
+    virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) = 0;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
-        Super(desc),
-        m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc),
-        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
+    CommandLineCPPCompiler(const Desc& desc, const String& exeName) :
+        Super(desc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
+    CommandLineCPPCompiler(const Desc& desc, const CommandLine& cmdLine) :
         Super(desc),
-        m_cmdLine(cmdLine),
-        m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc),
-        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
+        m_cmdLine(cmdLine)
     {}
 
-    CalcArgsFunc m_calcArgsFunc;
-    ParseOutputFunc m_parseOutputFunc;
-    CalcModuleFilePathFunc m_calcModuleFilePathFunc;
+    CommandLineCPPCompiler(const Desc& desc):Super(desc) {}
+
     CommandLine m_cmdLine;
 };
 

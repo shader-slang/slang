@@ -37,7 +37,7 @@ namespace Slang
     return SLANG_FAIL;
 }
 
-/* static */void VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
+/* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
@@ -190,6 +190,8 @@ namespace Slang
         // Note that any escaping of the path is handled in the ProcessUtil::
         cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
     }
+
+    return SLANG_OK;
 }
 
 static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::OutputMessage::Type& outType)

@@ -23,7 +23,7 @@ struct GCCCompilerUtil
     static SlangResult calcVersion(const String& exeName, CPPCompiler::Desc& outDesc);
 
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
-    static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);
+    static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Parse ExecuteResult into Output
     static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
@@ -31,6 +31,26 @@ struct GCCCompilerUtil
         /// Calculate the output module filename 
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
 
+};
+
+class GCCCPPCompiler : public CommandLineCPPCompiler
+{
+public:
+    typedef CommandLineCPPCompiler Super;
+
+    virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE
+    {
+        return GCCCompilerUtil::calcArgs(options, cmdLine);
+    }
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) SLANG_OVERRIDE
+    {
+        return GCCCompilerUtil::parseOutput(exeResult, output);
+    }
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE
+    {
+        return GCCCompilerUtil::calcModuleFilePath(options, outPath);
+    }
+    GCCCPPCompiler(const Desc& desc):Super(desc) {}
 };
 
 }
