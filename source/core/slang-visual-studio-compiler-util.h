@@ -6,24 +6,34 @@
 namespace Slang
 {
 
-struct VisualStudioCompilerUtil
-{
-    typedef CPPCompiler::CompileOptions CompileOptions;
-    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
-    typedef CPPCompiler::TargetType TargetType;
-    typedef CPPCompiler::DebugInfoType DebugInfoType;
-    typedef CPPCompiler::SourceType SourceType;
-    typedef CPPCompiler::OutputMessage OutputMessage;
-    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
 
+struct VisualStudioCompilerUtil : public CPPCompilerBaseUtil
+{
         /// Calculate Visual Studio family compilers cmdLine arguments from options
-    static void calcArgs(const CompileOptions& options, CommandLine& cmdLine);
+    static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
         /// Parse Visual Studio exeRes into CPPCompiler::Output
     static SlangResult parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput);
 
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
 
+    static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
 };
+
+class VisualStudioCPPCompiler : public CommandLineCPPCompiler
+{
+public:
+    typedef CommandLineCPPCompiler Super;
+    typedef VisualStudioCompilerUtil Util;
+
+    // CommandLineCPPCompiler impl  - just forwards to the Util
+    virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags productFlags, List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, productFlags, outPaths); }
+
+    VisualStudioCPPCompiler(const Desc& desc):Super(desc) {}
+};
+
 
 }
 

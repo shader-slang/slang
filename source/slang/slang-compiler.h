@@ -61,6 +61,7 @@ namespace Slang
         CPPSource           = SLANG_CPP_SOURCE,
         Executable          = SLANG_EXECUTABLE,
         SharedLibrary       = SLANG_SHARED_LIBRARY,
+        HostCallable        = SLANG_HOST_CALLABLE,
     };
 
     CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
@@ -84,7 +85,8 @@ namespace Slang
     {
         None,
         Text,
-        Binary
+        Binary,
+        SharedLibrary,
     };
 
     // When storing the layout for a matrix-type
@@ -122,22 +124,25 @@ namespace Slang
     class TranslationUnitRequest;
 
     // Result of compiling an entry point.
-    // Should only ever be string OR binary.
+    // Should only ever be string, binary or shared library
     class CompileResult
     {
     public:
         CompileResult() = default;
         CompileResult(String const& str) : format(ResultFormat::Text), outputString(str) {}
         CompileResult(List<uint8_t> const& buffer) : format(ResultFormat::Binary), outputBinary(buffer) {}
+        CompileResult(ISlangSharedLibrary* inSharedLibrary) : format(ResultFormat::SharedLibrary), sharedLibrary(inSharedLibrary) {}
 
         void append(CompileResult const& result);
 
-        ComPtr<ISlangBlob> getBlob();
+        SlangResult getBlob(ComPtr<ISlangBlob>& outBlob);
+        SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
 
         ResultFormat format = ResultFormat::None;
         String outputString;
         List<uint8_t> outputBinary;
 
+        ComPtr<ISlangSharedLibrary> sharedLibrary;
         ComPtr<ISlangBlob> blob;
     };
 

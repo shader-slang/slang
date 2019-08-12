@@ -152,6 +152,27 @@ public:
         Int fileLine;                   ///< The line number the error came from
     };
 
+    typedef uint32_t ProductFlags;
+    struct ProductFlag
+    {
+        enum Enum : ProductFlags
+        {
+            Debug               = 0x1,                ///< Used by debugger during execution
+            Execution           = 0x2,                ///< Required for execution
+            Compile             = 0x4,                ///< A product *required* for compilation
+            Miscellaneous       = 0x8,                ///< Anything else
+            All                 = 0xf,                ///< All the flags
+        };
+    };
+
+    enum class Product
+    {
+        DebugRun,
+        Run,
+        CompileTemporary,
+        All,
+    };
+
     struct Output
     {
             /// Reset to an initial empty state
@@ -185,6 +206,10 @@ public:
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
         /// Given the compilation options and the module name, determines the actual file name used for output
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
+        /// Given options determines the paths to products produced (including the 'moduleFilePath').
+        /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
+        /// be produced, such that can be removed on completion.
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths) = 0;
 
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
@@ -198,38 +223,31 @@ protected:
     Desc m_desc;
 };
 
-class GenericCPPCompiler : public CPPCompiler
+class CommandLineCPPCompiler : public CPPCompiler
 {
 public:
     typedef CPPCompiler Super;
 
-    typedef void(*CalcArgsFunc)(const CPPCompiler::CompileOptions& options, CommandLine& cmdLine);
-    typedef SlangResult(*ParseOutputFunc)(const ExecuteResult& exeResult, Output& output);
-    typedef SlangResult(*CalcModuleFilePathFunc)(const CPPCompiler::CompileOptions& options, StringBuilder& outPath);
-
+    // CPPCompiler
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
-    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE;
+    
+    // Functions to be implemented for a specific CommandLine    
+    virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) = 0;
 
-    GenericCPPCompiler(const Desc& desc, const String& exeName, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
-        Super(desc),
-        m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc),
-        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
+    CommandLineCPPCompiler(const Desc& desc, const String& exeName) :
+        Super(desc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    GenericCPPCompiler(const Desc& desc, const CommandLine& cmdLine, CalcArgsFunc calcArgsFunc, ParseOutputFunc parseOutputFunc, CalcModuleFilePathFunc calcModuleFilePathFunc) :
+    CommandLineCPPCompiler(const Desc& desc, const CommandLine& cmdLine) :
         Super(desc),
-        m_cmdLine(cmdLine),
-        m_calcArgsFunc(calcArgsFunc),
-        m_parseOutputFunc(parseOutputFunc),
-        m_calcModuleFilePathFunc(calcModuleFilePathFunc)
+        m_cmdLine(cmdLine)
     {}
 
-    CalcArgsFunc m_calcArgsFunc;
-    ParseOutputFunc m_parseOutputFunc;
-    CalcModuleFilePathFunc m_calcModuleFilePathFunc;
+    CommandLineCPPCompiler(const Desc& desc):Super(desc) {}
+
     CommandLine m_cmdLine;
 };
 
@@ -268,7 +286,8 @@ protected:
     List<RefPtr<CPPCompiler>> m_compilers;
 };
 
-struct CPPCompilerUtil
+/* Only purpose of having base-class here is to make all the CPPCompiler types available directly in derived Utils */
+struct CPPCompilerBaseUtil
 {
     typedef CPPCompiler::CompileOptions CompileOptions;
     typedef CPPCompiler::OptimizationLevel OptimizationLevel;
@@ -277,6 +296,14 @@ struct CPPCompilerUtil
     typedef CPPCompiler::SourceType SourceType;
     typedef CPPCompiler::CompilerType CompilerType;
 
+    typedef CPPCompiler::OutputMessage OutputMessage;
+    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
+    typedef CPPCompiler::ProductFlag ProductFlag;
+    typedef CPPCompiler::ProductFlags ProductFlags;
+};
+
+struct CPPCompilerUtil: public CPPCompilerBaseUtil
+{
     enum class MatchType
     {
         MinGreaterEqual,
@@ -304,12 +331,8 @@ struct CPPCompilerUtil
     static const CPPCompiler::Desc& getCompiledWithDesc();
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
-    static SlangResult initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set);
-
-    
-    
+    static SlangResult initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set);    
 };
-
 
 }
 

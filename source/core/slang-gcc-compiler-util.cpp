@@ -357,8 +357,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
         case TargetType::Object:
         {
+#if __CYGWIN__
+            outPath << options.modulePath << ".obj";
+#else
             // Will be .o for typical gcc targets
             outPath << options.modulePath << ".o";
+#endif
             return SLANG_OK;
         }
     }
@@ -366,7 +370,21 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_FAIL;
 }
 
-/* static */void GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
+/* static */SlangResult GCCCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
+{
+    outPaths.clear();
+
+    if (flags & ProductFlag::Execution)
+    {
+        StringBuilder builder;
+        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
+        outPaths.add(builder);
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
     
@@ -525,6 +543,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 	    // Make maths lib available
         cmdLine.addArg("-lm");
     }
+
+    return SLANG_OK;
 }
 
 }

@@ -56,6 +56,18 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
+TemporarySharedLibrary::~TemporarySharedLibrary()
+{
+    if (m_sharedLibraryHandle)
+    {
+        // We have to unload if we want to be able to remove
+        SharedLibrary::unload(m_sharedLibraryHandle);
+        m_sharedLibraryHandle = nullptr;
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
 ISlangUnknown* DefaultSharedLibrary::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangSharedLibrary) ? static_cast<ISlangSharedLibrary*>(this) : nullptr;
@@ -63,7 +75,10 @@ ISlangUnknown* DefaultSharedLibrary::getInterface(const Guid& guid)
 
 DefaultSharedLibrary::~DefaultSharedLibrary()
 {
-    SharedLibrary::unload(m_sharedLibraryHandle);
+    if (m_sharedLibraryHandle)
+    {
+        SharedLibrary::unload(m_sharedLibraryHandle);
+    }
 }
 
 SlangFuncPtr DefaultSharedLibrary::findFuncByName(char const* name)
