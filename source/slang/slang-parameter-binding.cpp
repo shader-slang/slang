@@ -2640,6 +2640,7 @@ static bool _isCPUTarget(CodeGenTarget target)
         case CodeGenTarget::CSource:
         case CodeGenTarget::Executable:
         case CodeGenTarget::SharedLibrary:
+        case CodeGenTarget::HostCallable:
         {
             return true;
         }

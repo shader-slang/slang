@@ -290,10 +290,8 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         VersionPath versionPath;
         if (!set->getCompiler(desc) && SLANG_SUCCEEDED(_find(i, versionPath)))
         {
-            CommandLine cmdLine;
-            calcExecuteCompilerArgs(versionPath, cmdLine);
-            
-            RefPtr<GenericCPPCompiler> compiler = new GenericCPPCompiler(desc, cmdLine, &VisualStudioCompilerUtil::calcArgs, &VisualStudioCompilerUtil::parseOutput, &VisualStudioCompilerUtil::calcModuleFilePath);
+            RefPtr<CommandLineCPPCompiler> compiler = new VisualStudioCPPCompiler(desc);
+            calcExecuteCompilerArgs(versionPath, compiler->m_cmdLine);
             set->addCompiler(compiler);
         }
     }

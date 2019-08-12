@@ -1716,7 +1716,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     if(entryPointResult.format == ResultFormat::None )
         return SLANG_FAIL;
 
-    *outCode = entryPointResult.getBlob().detach();
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(entryPointResult.getBlob(blob));
+    *outCode = blob.detach();
     return SLANG_OK;
 }
 
@@ -3140,29 +3142,28 @@ SLANG_API void const* spGetEntryPointCode(
     return data;
 }
 
-SLANG_API SlangResult spGetEntryPointCodeBlob(
-        SlangCompileRequest*    request,
-        int                     entryPointIndex,
-        int                     targetIndex,
-        ISlangBlob**            outBlob)
+static SlangResult _getEntryPointResult(
+    SlangCompileRequest*    request,
+    int                     entryPointIndex,
+    int                     targetIndex,
+    Slang::CompileResult**  outCompileResult)
 {
     using namespace Slang;
-    if(!request) return SLANG_ERROR_INVALID_PARAMETER;
-    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
-
+    if (!request) return SLANG_ERROR_INVALID_PARAMETER;
+    
     auto req = Slang::asInternal(request);
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
 
     Index targetCount = linkage->targets.getCount();
-    if((targetIndex < 0) || (targetIndex >= targetCount))
+    if ((targetIndex < 0) || (targetIndex >= targetCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
     }
     auto targetReq = linkage->targets[targetIndex];
 
     Index entryPointCount = req->entryPoints.getCount();
-    if((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
+    if ((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;
     }
@@ -3170,12 +3171,44 @@ SLANG_API SlangResult spGetEntryPointCodeBlob(
 
 
     auto targetProgram = program->getTargetProgram(targetReq);
-    if(!targetProgram)
+    if (!targetProgram)
         return SLANG_FAIL;
-    Slang::CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
+    *outCompileResult = &targetProgram->getExistingEntryPointResult(entryPointIndex);
+    return SLANG_OK;
+}
 
-    auto blob = result.getBlob();
+SLANG_API SlangResult spGetEntryPointCodeBlob(
+        SlangCompileRequest*    request,
+        int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangBlob**            outBlob)
+{
+    using namespace Slang;
+    if(!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(_getEntryPointResult(request, entryPointIndex, targetIndex, &compileResult));
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(compileResult->getBlob(blob));
     *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spGetEntryPointHostCallable(
+    SlangCompileRequest*    request,
+    int                     entryPointIndex,
+    int                     targetIndex,
+    ISlangSharedLibrary**   outSharedLibrary)
+{
+    using namespace Slang;
+    if (!outSharedLibrary) return SLANG_ERROR_INVALID_PARAMETER;
+
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(_getEntryPointResult(request, entryPointIndex, targetIndex, &compileResult));
+
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
+    *outSharedLibrary = sharedLibrary.detach();
     return SLANG_OK;
 }
 

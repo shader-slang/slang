@@ -93,12 +93,31 @@ namespace Slang
     // Helper class to clean up temporary files on dtor
     struct TemporaryFileSet
     {
+        void remove(const String& path)
+        {
+            if (const Index index = m_paths.indexOf(path) >= 0)
+            {
+                m_paths.removeAt(index);
+            }
+        }
+
         void add(const String& path)
         {
             if (m_paths.indexOf(path) < 0)
             {
                 m_paths.add(path);
             }
+        }
+        void add(const List<String>& paths)
+        {
+            for (const auto& path : paths)
+            {
+                add(path);
+            }
+        }
+        void clear()
+        {
+            m_paths.clear();
         }
         ~TemporaryFileSet()
         {

@@ -160,9 +160,9 @@ void CPPCompiler::Output::removeByType(OutputMessage::Type type)
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericCPPCompiler !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineCPPCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& outOutput)
+SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Output& outOutput)
 {
     outOutput.reset();
 
@@ -170,7 +170,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
     CommandLine cmdLine(m_cmdLine);
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
-    m_calcArgsFunc(options, cmdLine);
+    SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
 
     ExecuteResult exeRes;
 
@@ -190,12 +190,7 @@ SlangResult GenericCPPCompiler::compile(const CompileOptions& options, Output& o
     }
 #endif
 
-    return m_parseOutputFunc(exeRes, outOutput);
-}
-
-SlangResult GenericCPPCompiler::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
-{
-    return m_calcModuleFilePathFunc(options, outPath);
+    return parseOutput(exeRes, outOutput);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
@@ -339,7 +334,8 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
     CPPCompiler::Desc desc;
     if (SLANG_SUCCEEDED(GCCCompilerUtil::calcVersion(exeName, desc)))
     {
-        RefPtr<CPPCompiler> compiler(new GenericCPPCompiler(desc, exeName, &GCCCompilerUtil::calcArgs, &GCCCompilerUtil::parseOutput, GCCCompilerUtil::calcModuleFilePath));
+        RefPtr<CommandLineCPPCompiler> compiler(new GCCCPPCompiler(desc));
+        compiler->m_cmdLine.setExecutableFilename(exeName);
         compilerSet->addCompiler(compiler);
     }
 }

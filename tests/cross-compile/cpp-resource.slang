@@ -1,4 +1,4 @@
-//TEST:CPP_COMPILER_COMPILE: -profile cs_5_0 -entry computeMain -target cpp
+//TEST(shared-library):CPP_COMPILER_COMPILE: -profile cs_5_0 -entry computeMain -target callable
 
 struct Thing
 {

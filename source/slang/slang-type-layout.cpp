@@ -982,7 +982,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::SPIRVAssembly:
         return &kGLSLLayoutRulesFamilyImpl;
 
-
+    case CodeGenTarget::HostCallable:
     case CodeGenTarget::Executable:
     case CodeGenTarget::SharedLibrary:
     case CodeGenTarget::CPPSource:

@@ -37,7 +37,40 @@ namespace Slang
     return SLANG_FAIL;
 }
 
-/* static */void VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
+/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
+{
+    outPaths.clear();
+
+    if (flags & ProductFlag::Execution)
+    {
+        StringBuilder builder;
+        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
+        outPaths.add(builder);
+    }
+    if (flags & ProductFlag::Miscellaneous)
+    {
+        outPaths.add(options.modulePath + ".ilk");
+
+        if (options.targetType == TargetType::SharedLibrary)
+        {
+            outPaths.add(options.modulePath + ".exp");
+            outPaths.add(options.modulePath + ".lib");
+        }
+    }
+    if (flags & ProductFlag::Compile)
+    {
+        outPaths.add(options.modulePath + ".obj");
+    }
+    if (flags & ProductFlag::Debug)
+    {
+        // TODO(JS): Could try and determine based on debug information
+        outPaths.add(options.modulePath + ".pdb");
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
@@ -190,6 +223,8 @@ namespace Slang
         // Note that any escaping of the path is handled in the ProcessUtil::
         cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
     }
+
+    return SLANG_OK;
 }
 
 static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::OutputMessage::Type& outType)
