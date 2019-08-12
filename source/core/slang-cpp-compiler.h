@@ -147,6 +147,27 @@ public:
         Int fileLine;                   ///< The line number the error came from
     };
 
+    typedef uint32_t ProductFlags;
+    struct ProductFlag
+    {
+        enum Enum : ProductFlags
+        {
+            Debug               = 0x1,                ///< Used by debugger during execution
+            Execution           = 0x2,                ///< Required for execution
+            Compile             = 0x4,                ///< A product *required* for compilation
+            Miscellaneous       = 0x8,                ///< Anything else
+            All                 = 0xf,                ///< All the flags
+        };
+    };
+
+    enum class Product
+    {
+        DebugRun,
+        Run,
+        CompileTemporary,
+        All,
+    };
+
     struct Output
     {
             /// Reset to an initial empty state
@@ -178,6 +199,10 @@ public:
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
         /// Given the compilation options and the module name, determines the actual file name used for output
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
+        /// Given options determines the paths to products produced (including the 'moduleFilePath').
+        /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
+        /// be produced, such that can be removed on completion.
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths) = 0;
 
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
@@ -254,7 +279,8 @@ protected:
     List<RefPtr<CPPCompiler>> m_compilers;
 };
 
-struct CPPCompilerUtil
+/* Only purpose of having base-class here is to make all the CPPCompiler types available directly in derived Utils */
+struct CPPCompilerBaseUtil
 {
     typedef CPPCompiler::CompileOptions CompileOptions;
     typedef CPPCompiler::OptimizationLevel OptimizationLevel;
@@ -262,6 +288,15 @@ struct CPPCompilerUtil
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
 
+    typedef CPPCompiler::SourceType SourceType;
+    typedef CPPCompiler::OutputMessage OutputMessage;
+    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
+    typedef CPPCompiler::ProductFlag ProductFlag;
+    typedef CPPCompiler::ProductFlags ProductFlags;
+};
+
+struct CPPCompilerUtil: public CPPCompilerBaseUtil
+{
     enum class MatchType
     {
         MinGreaterEqual,
@@ -282,11 +317,7 @@ struct CPPCompilerUtil
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
     static SlangResult initializeSet(CPPCompilerSet* set);
-
-    
-    
 };
-
 
 }
 

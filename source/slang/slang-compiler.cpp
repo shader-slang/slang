@@ -1373,8 +1373,13 @@ SlangResult dissassembleDXILUsingDXC(
             moduleFilePath = builder.ProduceString();
         }
 
-        // Add so it's deleted at the end
-        temporaryFileSet.add(moduleFilePath);
+        // Find all the files that will be produced
+        TemporaryFileSet productFileSet;
+        {
+            List<String> paths;
+            SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, CPPCompiler::ProductFlag::All, paths));
+            productFileSet.add(paths);
+        }
 
         // Need to configure for the compilation
 
@@ -1508,16 +1513,30 @@ SlangResult dissassembleDXILUsingDXC(
                 sink->diagnose(SourceLoc(), Diagnostics::unableToReadFile, moduleFilePath);
                 return SLANG_FAIL;
             }
-            outSharedLib = new TemporarySharedLibrary(handle, moduleFilePath);
-
-            // We need to remove from temporary list, as the shared library will now handle deletion
-            temporaryFileSet.remove(moduleFilePath);
+            RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, moduleFilePath));
+            sharedLib->m_temporaryFileSet = productFileSet;
+            productFileSet.clear();
         }
         else
         {
             // Read the binary
             try
             {
+                // TODO(JS): We have a problem here.. productFileSet will clear up all temporaries
+                // and although we return the binary here (through outBin), we don't return debug info
+                // which is separate (say with a pdb). To work around this we reevaluate productFileSet,
+                // so we don't include debug info. The executable will presumably be reconstructed from
+                // outBin
+                // The problem is that these files have no specific lifetime (unlike with HostCallable).
+
+                CPPCompiler::ProductFlags flags = CPPCompiler::ProductFlag::All;
+                flags &= ~CPPCompiler::ProductFlag::Debug;
+
+                List<String> paths;
+                SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, flags, paths));
+                productFileSet.clear();
+                productFileSet.add(paths);
+
                 // Read the contents of the binary
                 outBin = File::readAllBytes(moduleFilePath);
             }

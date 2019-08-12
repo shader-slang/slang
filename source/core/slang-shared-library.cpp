@@ -64,11 +64,6 @@ TemporarySharedLibrary::~TemporarySharedLibrary()
         SharedLibrary::unload(m_sharedLibraryHandle);
         m_sharedLibraryHandle = nullptr;
     }
-    // When released we delete the temporary
-    if (m_path.getLength())
-    {
-        File::remove(m_path);
-    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/

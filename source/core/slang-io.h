@@ -108,6 +108,17 @@ namespace Slang
                 m_paths.add(path);
             }
         }
+        void add(const List<String>& paths)
+        {
+            for (const auto& path : paths)
+            {
+                add(path);
+            }
+        }
+        void clear()
+        {
+            m_paths.clear();
+        }
         ~TemporaryFileSet()
         {
             for (const auto& path : m_paths)

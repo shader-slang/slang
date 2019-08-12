@@ -5,6 +5,7 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-io.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-common.h"
 #include "../core/slang-dictionary.h"
@@ -100,6 +101,9 @@ public:
     }
 
     virtual ~TemporarySharedLibrary();
+
+        /// Any files specified in this set will be deleted on exit
+    TemporaryFileSet m_temporaryFileSet;
 
 protected:
     String m_path;
