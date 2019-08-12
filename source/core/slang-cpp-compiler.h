@@ -288,7 +288,6 @@ struct CPPCompilerBaseUtil
     typedef CPPCompiler::DebugInfoType DebugInfoType;
     typedef CPPCompiler::SourceType SourceType;
 
-    typedef CPPCompiler::SourceType SourceType;
     typedef CPPCompiler::OutputMessage OutputMessage;
     typedef CPPCompiler::FloatingPointMode FloatingPointMode;
     typedef CPPCompiler::ProductFlag ProductFlag;
