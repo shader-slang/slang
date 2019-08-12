@@ -96,7 +96,9 @@ CPPCompilerSet* TestContext::getCPPCompilerSet()
     if (!cppCompilerSet)
     {
         cppCompilerSet = new CPPCompilerSet;
-        CPPCompilerUtil::initializeSet(cppCompilerSet);
+
+        CPPCompilerUtil::InitializeSetDesc desc;
+        CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
     }
     return cppCompilerSet;
 }

@@ -762,9 +762,10 @@ namespace Slang
         Dxc = SLANG_PASS_THROUGH_DXC,	                    ///< pass through HLSL to `IDxcCompiler` API
         Glslang = SLANG_PASS_THROUGH_GLSLANG,	            ///< pass through GLSL to `glslang` library
         Clang = SLANG_PASS_THROUGH_CLANG,                   ///< Pass through clang compiler
-        Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
+        Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
         GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
+        CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
 
     class SourceFile;
@@ -1790,6 +1791,9 @@ namespace Slang
         SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
             char const*     name) override;
 
+        SLANG_NO_THROW void SLANG_MCALL setPassThroughPath(
+            SlangPassThrough passThrough,
+            char const* path) override;
 
 
         enum class SharedLibraryFuncType
@@ -1916,6 +1920,8 @@ namespace Slang
 
             /// Will try to load the library by specified name (using the set loader), if not one already available.
         ISlangSharedLibrary* getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink);
+            /// Will unload the specified shared library if it's currently loaded 
+        void setSharedLibrary(SharedLibraryType type, ISlangSharedLibrary* library);
 
             /// Gets a shared library by type, or null if not loaded
         ISlangSharedLibrary* getSharedLibrary(SharedLibraryType type) const { return sharedLibraries[int(type)]; }
@@ -1936,6 +1942,8 @@ namespace Slang
     private:
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
+
+        String m_passThroughPaths[int(PassThroughMode::CountOf)];               ///< Paths for each pass through
     };
 
 

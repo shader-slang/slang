@@ -7,6 +7,58 @@
 
 namespace Slang
 {
+    enum class PlatformKind
+    {
+        Unknown,
+        WinRT,
+        XBoxOne,
+        Win64,
+        Win32,
+        X360,
+        Android,
+        Linux,
+        IOS,
+        OSX,
+        PS3,
+        PS4,
+        PSP2,
+        WIIU,
+        CountOf,
+    };
+
+    typedef uint32_t PlatformFlags;
+    struct PlatformFlag
+    {
+        enum Enum
+        {
+            Unknown = 1 << int(PlatformKind::Unknown),
+            WinRT = 1 << int(PlatformKind::WinRT),
+            XBoxOne = 1 << int(PlatformKind::XBoxOne),
+            Win64 = 1 << int(PlatformKind::Win64),
+            Win32 = 1 << int(PlatformKind::Win32),
+            X360 = 1 << int(PlatformKind::X360),
+            Android = 1 << int(PlatformKind::Android),
+            Linux = 1 << int(PlatformKind::Linux),
+            IOS = 1 << int(PlatformKind::IOS),
+            OSX = 1 << int(PlatformKind::OSX),
+            PS3 = 1 << int(PlatformKind::PS3),
+            PS4 = 1 << int(PlatformKind::PS4),
+            PSP2 = 1 << int(PlatformKind::PSP2),
+            WIIU = 1 << int(PlatformKind::WIIU),
+        };
+    };
+
+    enum class PlatformFamily
+    {
+        Unknown,
+        Windows,
+        Microsoft,
+        Linux,
+        Apple,
+        Unix,
+        CountOf,
+    };
+
 	// Interface for working with shared libraries
 	// in a platform-independent fashion.
 	struct SharedLibrary
@@ -66,6 +118,16 @@ namespace Slang
             /// @param builderOut Append the string produced to builderOut
             /// @return SLANG_OK if string is found and appended. Fail otherwise. SLANG_E_NOT_IMPLEMENTED if there is no impl for this platform.
         static SlangResult appendResult(SlangResult res, StringBuilder& builderOut);
+
+            /// Get the platform kind as determined at compile time
+        static PlatformKind getPlatformKind();
+
+            /// Get the platforms that make up a family
+        static PlatformFlags getPlatformFlags(PlatformFamily family);
+
+            /// True if the kind is part of the family
+        static bool isFamily(PlatformFamily family, PlatformKind kind) { return (getPlatformFlags(family) & (PlatformFlags(1) << int(kind))) != 0; }
+
     };
 
 #ifndef _MSC_VER
