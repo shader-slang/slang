@@ -279,10 +279,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
     outOutput.reset();
+    outOutput.rawMessages = exeRes.standardError;
 
     for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
     {
         CPPCompiler::OutputMessage msg;
+        msg.reset();
+
         LineParseResult lineRes;
         
         SLANG_RETURN_ON_FAIL(_parseGCCFamilyLine(line, lineRes, msg));
@@ -383,6 +386,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
 /* static */SlangResult GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
+    PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
+    
     cmdLine.addArg("-fvisibility=hidden");
 
     if (options.sourceType == SourceType::CPP)
@@ -390,9 +395,6 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         // Need C++14 for partial specialization
         cmdLine.addArg("-std=c++14");
     }
-
-    // Use shared libraries
-    //cmdLine.addArg("-shared");
 
     switch (options.optimizationLevel)
     {
@@ -425,6 +427,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-g");
     }
 
+    if (options.flags & CompileOptions::Flag::Verbose)
+    {
+        cmdLine.addArg("-v");
+    }
+
     switch (options.floatingPointMode)
     {
         case FloatingPointMode::Default: break;
@@ -454,8 +461,12 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         {
             // Shared library
             cmdLine.addArg("-shared");
-            // Position independent
-            cmdLine.addArg("-fPIC");
+
+            if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
+            {
+                // Position independent
+                cmdLine.addArg("-fPIC");
+            }
             break;
         }
         case TargetType::Executable:
@@ -500,13 +511,14 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     if (options.targetType == TargetType::SharedLibrary)
     {
-#if !SLANG_APPLE_FAMILY
-        // On MacOS, this linker option is not supported. That's ok though in
-        // so far as on MacOS it does report any unfound symbols without the option.
+        if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
+        {
+            // On MacOS, this linker option is not supported. That's ok though in
+            // so far as on MacOS it does report any unfound symbols without the option.
 
-        // Linker flag to report any undefined symbols as a link error
-        cmdLine.addArg("-Wl,--no-undefined");
-#endif
+            // Linker flag to report any undefined symbols as a link error
+            cmdLine.addArg("-Wl,--no-undefined");
+        }
     }
 
     // Files to compile
@@ -524,11 +536,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg(libPath);
     }
 
-    if (options.sourceType == SourceType::CPP)
+    if (options.sourceType == SourceType::CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
         // Make STD libs available
         cmdLine.addArg("-lstdc++");
-	// Make maths lib available
+	    // Make maths lib available
         cmdLine.addArg("-lm");
     }
 

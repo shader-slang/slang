@@ -327,10 +327,14 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-// Have to do this conditionally because unreferenced static functions are a warning on VC, and warnings are errors.
-#if !SLANG_WINDOWS_FAMILY
-static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compilerSet)
+static void _addGCCFamilyCompiler(const String& path, const String& inExeName, CPPCompilerSet* compilerSet)
 {
+    String exeName(inExeName);
+    if (path.getLength() > 0)
+    {
+        exeName = Path::combine(path, inExeName);
+    }
+
     CPPCompiler::Desc desc;
     if (SLANG_SUCCEEDED(GCCCompilerUtil::calcVersion(exeName, desc)))
     {
@@ -339,7 +343,6 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
         compilerSet->addCompiler(compiler);
     }
 }
-#endif
 
 /* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc)
 {
@@ -353,14 +356,14 @@ static void _addGCCFamilyCompiler(const String& exeName, CPPCompilerSet* compile
     return findClosestCompiler(compilers, desc);
 }
 
-/* static */SlangResult CPPCompilerUtil::initializeSet(CPPCompilerSet* set)
+/* static */SlangResult CPPCompilerUtil::initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set)
 {
 #if SLANG_WINDOWS_FAMILY
     WinVisualStudioUtil::find(set);
-#else
-    _addGCCFamilyCompiler("clang", set);
-    _addGCCFamilyCompiler("g++", set);
 #endif
+
+    _addGCCFamilyCompiler(desc.getPath(CompilerType::Clang), "clang", set);
+    _addGCCFamilyCompiler(desc.getPath(CompilerType::GCC), "g++", set);
 
     // Set the default to the compiler closest to how this source was compiled
     set->setDefaultCompiler(findClosestCompiler(set, getCompiledWithDesc()));

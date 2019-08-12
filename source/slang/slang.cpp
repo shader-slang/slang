@@ -146,6 +146,51 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     return Slang::Profile::LookUp(name).raw;
 }
 
+SLANG_NO_THROW void SLANG_MCALL Session::setPassThroughPath(
+    SlangPassThrough inPassThrough,
+    char const* path)
+{
+    PassThroughMode passThrough = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
+    
+    if (m_passThroughPaths[int(passThrough)] != path)
+    {
+        // If it's changed we should unload any shared libraries that use it
+        switch (passThrough)
+        {
+            case PassThroughMode::Dxc:
+            {
+                setSharedLibrary(SharedLibraryType::Dxc, nullptr);
+                setSharedLibrary(SharedLibraryType::Dxil, nullptr);
+                break;
+            }
+            case PassThroughMode::Fxc:
+            {
+                setSharedLibrary(SharedLibraryType::Fxc, nullptr);
+                break;
+            }
+            case PassThroughMode::Glslang:
+            {
+                setSharedLibrary(SharedLibraryType::Glslang, nullptr);
+                break;
+            }
+            case PassThroughMode::VisualStudio:
+            case PassThroughMode::Gcc:
+            case PassThroughMode::Clang:
+            case PassThroughMode::GenericCCpp:
+            {
+                // If any compiler path set changed, require all to be refreshed
+                cppCompilerSet.setNull();
+                break;
+            }
+            default: break;
+        }
+
+        // Set the path
+        m_passThroughPaths[int(passThrough)] = path;
+    }
+}
+
 struct IncludeHandlerImpl : IncludeHandler
 {
     Linkage*    linkage;
@@ -2446,7 +2491,9 @@ Session::~Session()
 
 SLANG_API SlangSession* spCreateSession(const char*)
 {
-    return asExternal(new Slang::Session());
+    Slang::RefPtr<Slang::Session> session(new Slang::Session());
+    // Will be returned with a refcount of 1
+    return asExternal(session.detach());
 }
 
 SLANG_API SlangResult slang_createGlobalSession(
@@ -2463,10 +2510,16 @@ SLANG_API SlangResult slang_createGlobalSession(
 }
 
 SLANG_API void spDestroySession(
-    SlangSession*   session)
+    SlangSession*   inSession)
 {
-    if(!session) return;
-    delete Slang::asInternal(session);
+    if(!inSession) return;
+
+    Slang::Session* session = Slang::asInternal(inSession);
+    // It is assumed there is only a single reference on the session (the one placed
+    // with spCreateSession) if this function is called
+    SLANG_ASSERT(session->debugGetReferenceCount() == 1);
+    // Release
+    session->release();
 }
 
 SLANG_API void spAddBuiltins(
