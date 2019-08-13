@@ -1363,26 +1363,21 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
         return TestResult::Pass;
     }
 
+    // Dump out what happened
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, getOutput(exeRes));
+    }
+
     if (exeRes.resultCode != 0)
     {
         return TestResult::Fail;
     }
 
-    // Check for any errors
-    if (exeRes.standardError.indexOf("error") >= 0 || exeRes.standardOutput.indexOf("error") >= 0)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, getOutput(exeRes));
-        return TestResult::Fail;
-    }
-
-    String actualOutput = exeRes.standardOutput;
- 
     String modulePath = _calcModulePath(input);
     
-    UnownedStringSlice targetExt = UnownedStringSlice::fromLiteral("c");
-
     // Find the target
+    UnownedStringSlice targetExt = UnownedStringSlice::fromLiteral("c");
     Index index = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-target"));
     if (index >= 0 && index + 1 < cmdLine.getArgCount())
     {
@@ -1396,6 +1391,8 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
         options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
 
         options.includePaths.add("tests/cross-compile");
+
+        String actualOutput = exeRes.standardOutput;
 
         // Create a filename to write this out to
         String cppSource = modulePath + "." + targetExt;
@@ -1427,6 +1424,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
     return TestResult::Pass;
 }
+
 static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
     CPPCompiler* compiler = context->getDefaultCPPCompiler();

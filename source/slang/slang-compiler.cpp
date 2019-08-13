@@ -1346,6 +1346,9 @@ SlangResult dissassembleDXILUsingDXC(
 
         CPPCompiler::CompileOptions options;
 
+        // Set the source type
+        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
         // Generate a path a temporary filename for output module
         String modulePath;
         SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
