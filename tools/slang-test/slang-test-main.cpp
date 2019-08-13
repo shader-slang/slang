@@ -1368,6 +1368,14 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
+    // Check for any errors
+    if (exeRes.standardError.indexOf("error") >= 0 || exeRes.standardOutput.indexOf("error") >= 0)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, getOutput(exeRes));
+        return TestResult::Fail;
+    }
+
     String actualOutput = exeRes.standardOutput;
  
     String modulePath = _calcModulePath(input);
