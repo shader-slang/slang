@@ -6,9 +6,8 @@
    
 #if defined(_MSC_VER)
 #   define DLL_EXPORT __declspec(dllexport)
-#else 
-//#   define DLL_EXPORT 
-#   define DLL_EXPORT __attribute__ ((dllexport)) __attribute__((__visibility__("default")))
+#else  
+#   define DLL_EXPORT  __attribute__((__visibility__("default")))
 #endif    
 
 #ifdef __cplusplus    
