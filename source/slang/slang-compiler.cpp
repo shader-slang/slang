@@ -1345,6 +1345,9 @@ SlangResult dissassembleDXILUsingDXC(
         String modulePath;
         SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
 
+        // Remove the temporary path/file when done
+        temporaryFileSet.add(modulePath);
+
         options.modulePath = modulePath;
         options.sourceFiles.add(compileSourcePath);
 
