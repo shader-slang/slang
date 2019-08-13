@@ -119,7 +119,7 @@ public:
         List<String> libraryPaths;
     };
 
-    struct OutputMessage
+    struct Diagnostic
     {
         enum class Type
         {
@@ -141,7 +141,7 @@ public:
             stage = Stage::Compile;
             fileLine = 0;
         }
-        static UnownedStringSlice getTypeText(OutputMessage::Type type);
+        static UnownedStringSlice getTypeText(Diagnostic::Type type);
 
 
         Type type;                      ///< The type of error
@@ -160,7 +160,10 @@ public:
             Debug               = 0x1,                ///< Used by debugger during execution
             Execution           = 0x2,                ///< Required for execution
             Compile             = 0x4,                ///< A product *required* for compilation
-            Miscellaneous       = 0x8,                ///< Anything else
+            Miscellaneous       = 0x8,                ///< Anything else    
+        };
+        enum Mask : ProductFlags
+        {
             All                 = 0xf,                ///< All the flags
         };
     };
@@ -176,28 +179,28 @@ public:
     struct Output
     {
             /// Reset to an initial empty state
-        void reset() { messages.clear(); rawMessages = String(); result = SLANG_OK; }
+        void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
         
-            /// Get the number of messages by type
-        Index getCountByType(OutputMessage::Type type) const;
-            /// True if there are any messages of the type
-        bool has(OutputMessage::Type type) const { return getCountByType(type) > 0; }
+            /// Get the number of diagnostics by type
+        Index getCountByType(Diagnostic::Type type) const;
+            /// True if there are any diagnostics  of the type
+        bool has(Diagnostic::Type type) const { return getCountByType(type) > 0; }
 
-            /// Stores in outCounts, the amount of messages for the stage of each type
-        Int countByStage(OutputMessage::Stage stage, Index outCounts[Int(OutputMessage::Type::CountOf)]) const;
+            /// Stores in outCounts, the amount of diagnostics for the stage of each type
+        Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Type::CountOf)]) const;
 
             /// Append a summary to out
         void appendSummary(StringBuilder& out) const;
             /// Appends a summary that just identifies if there is an error of a type (not a count)
         void appendSimplifiedSummary(StringBuilder& out) const;
         
-            /// Remove all messages of the type
-        void removeByType(OutputMessage::Type type);
+            /// Remove all diagnostics of the type
+        void removeByType(Diagnostic::Type type);
 
-        String rawMessages;
+        String rawDiagnostics;
 
         SlangResult result;
-        List<OutputMessage> messages;
+        List<Diagnostic> diagnostics;
     };
 
         /// Get the desc of this compiler
@@ -296,7 +299,7 @@ struct CPPCompilerBaseUtil
     typedef CPPCompiler::SourceType SourceType;
     typedef CPPCompiler::CompilerType CompilerType;
 
-    typedef CPPCompiler::OutputMessage OutputMessage;
+    typedef CPPCompiler::Diagnostic Diagnostic;
     typedef CPPCompiler::FloatingPointMode FloatingPointMode;
     typedef CPPCompiler::ProductFlag ProductFlag;
     typedef CPPCompiler::ProductFlags ProductFlags;

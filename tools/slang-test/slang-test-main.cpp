@@ -1317,8 +1317,8 @@ static String _calcSummary(const CPPCompiler::Output& inOutput)
     CPPCompiler::Output output(inOutput);
 
     // We only want to analyse errors for now
-    output.removeByType(CPPCompiler::OutputMessage::Type::Info);
-    output.removeByType(CPPCompiler::OutputMessage::Type::Warning);
+    output.removeByType(CPPCompiler::Diagnostic::Type::Info);
+    output.removeByType(CPPCompiler::Diagnostic::Type::Warning);
 
     StringBuilder builder;
 
@@ -1406,7 +1406,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
             return TestResult::Fail;
         }
 
-        if (output.getCountByType(CPPCompiler::OutputMessage::Type::Error) > 0)
+        if (output.getCountByType(CPPCompiler::Diagnostic::Type::Error) > 0)
         {
             return TestResult::Fail;
         }

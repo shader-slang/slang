@@ -1470,35 +1470,35 @@ SlangResult dissassembleDXILUsingDXC(
 
             StringBuilder builder;
 
-            typedef CPPCompiler::OutputMessage OutputMessage;
+            typedef CPPCompiler::Diagnostic Diagnostic;
 
-            for (const auto& msg : output.messages)
+            for (const auto& diagnostic : output.diagnostics)
             {
                 builder.Clear();
 
-                builder << msg.filePath << "(" << msg.fileLine <<"): ";
+                builder << diagnostic.filePath << "(" << diagnostic.fileLine <<"): ";
 
-                if (msg.stage == OutputMessage::Stage::Link)
+                if (diagnostic.stage == Diagnostic::Stage::Link)
                 {
                     builder << "link ";
                 }
 
-                switch (msg.type)
+                switch (diagnostic.type)
                 {
-                    case OutputMessage::Type::Error:    builder << "error"; break;
-                    case OutputMessage::Type::Unknown:  builder << "warning"; break;
-                    case OutputMessage::Type::Info:     builder << "info"; break;
+                    case Diagnostic::Type::Error:    builder << "error"; break;
+                    case Diagnostic::Type::Unknown:  builder << "warning"; break;
+                    case Diagnostic::Type::Info:     builder << "info"; break;
                     default: break;
                 }
 
-                builder << " " << msg.code << ": " << msg.text;
+                builder << " " << diagnostic.code << ": " << diagnostic.text;
 
                 reportExternalCompileError(compilerText.getBuffer(), SLANG_OK, builder.getUnownedSlice(), sink);
             }
         }
 
         // If any errors are emitted, then we are done
-        if (output.has(CPPCompiler::OutputMessage::Type::Error))
+        if (output.has(CPPCompiler::Diagnostic::Type::Error))
         {
             return SLANG_FAIL;
         }
