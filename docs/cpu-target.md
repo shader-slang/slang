@@ -15,10 +15,9 @@ Slang has preliminary support for producing CPU source and binaries.
 
 These limitations apply to Slang source, with C/C++ the limitations are whatever the compiler requires
 
-* Only supports 64 bit targets (specifically it assumes all pointers are 64 bit)
 * Barriers are not supported (making these work would require an ABI change)
 * Atomics are not supported
-* Complex resource types (such as say Texture2d) are work in progress
+* Complex resource types (such as Texture2d) are work in progress
 * Out of bounds access to resources has undefined behavior 
 * ParameterBlocks are not currently supported
 
@@ -37,7 +36,9 @@ SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, whic
 
 Sometimes it is not important which C/C++ compiler is used, and this can be specified via the 'Generic C/C++' option. This will aim to use the compiler that is most likely binary compatible with the compiler that was used to build the slang binary being used. 
 
-To make it possible for slang to produce CPU code, we now need a mechanism to convert slang code into C/C++. The first iteration only supports C++ generation. If source is desired instead of a binary this can be specified via the SlangCompileTarget. These can be specified on the slangc command line as `-target c` or `-target cpp`
+To make it possible for slang to produce CPU code, we now need a mechanism to convert slang code into C/C++. The first iteration only supports C++ generation. If source is desired instead of a binary this can be specified via the SlangCompileTarget. These can be specified on the slangc command line as `-target c` or `-target cpp`.
+
+Note that when using the 'pass through' mode for a CPU based target it is currently necessary to set an entry point, even though it's basically ignored. 
 
 In the API the `SlangCompileTarget`s are 
 
@@ -65,7 +66,7 @@ Under the covers when slang is used to generate a binary via a C/C++ compiler, i
 Executing CPU Code
 ==================
 
-In typically slang operation when code is compiled it produces either source or a binary that can then be loaded by another API such as a rendering API. With CPU code the binary produced could be saved to a file and then executed as an exe or a shared library/dll. In practice though it is not uncommon to want to be able to execute compiled code immediately. Having to save off to a file and then load again can be awkward. It is also not necessarily the case that code needs to be saved to a file to be executed. 
+In typical slang operation when code is compiled it produces either source or a binary that can then be loaded by another API such as a rendering API. With CPU code the binary produced could be saved to a file and then executed as an exe or a shared library/dll. In practice though it is not uncommon to want to be able to execute compiled code immediately. Having to save off to a file and then load again can be awkward. It is also not necessarily the case that code needs to be saved to a file to be executed. 
 
 To handle being able call code directly, code can be compiled using the SLANG_HOST_CALLABLE code target type. To access the code that has been produced use the function
 
