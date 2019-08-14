@@ -690,6 +690,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             passThru = SLANG_PASS_THROUGH_GLSLANG;
             break;
+        case RenderApiType::CPU:
+            target = SLANG_HOST_CALLABLE;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+            passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+            break;
     }
 
     SlangSourceLanguage sourceLanguage = nativeLanguage;
@@ -779,6 +784,12 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
         for (int i = 0; i < int(RenderApiType::CountOf); ++i)
         {
             const RenderApiType apiType = RenderApiType(i);
+
+            if (apiType == RenderApiType::CPU)
+            {
+                availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                continue;
+            }
 
             // See if it's possible the api is available
             if (RenderApiUtil::calcHasApi(apiType))
@@ -2656,7 +2667,7 @@ void runTestsOnFile(
     const RenderApiFlags availableRenderApiFlags = apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
 
     // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis  && availableRenderApiFlags)
+    if (context->options.synthesizedTestApis && availableRenderApiFlags)
     {
         List<TestDetails> synthesizedTests;
 

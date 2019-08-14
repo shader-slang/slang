@@ -18,7 +18,7 @@ struct ShaderCompilerUtil
         SlangPassThrough        passThrough;
         char const*             profile;
         const char**            args;
-        int                     argCount; 
+        int                     argCount;
     };
 
     struct Output
@@ -54,7 +54,7 @@ struct ShaderCompilerUtil
         SlangSession* session = nullptr;
     };
 
-    static SlangResult compileProgram(const Input& input, const ShaderCompileRequest& request, SlangSession* session, Output& out);
+    static SlangResult compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out);
 };
 
 

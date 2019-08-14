@@ -399,6 +399,7 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         case RendererType::OpenGl:          return UnownedStringSlice::fromLiteral("OpenGL");
         case RendererType::Vulkan:          return UnownedStringSlice::fromLiteral("Vulkan");
         case RendererType::Unknown:         return UnownedStringSlice::fromLiteral("Unknown");
+        case RendererType::CPU:             return UnownedStringSlice::fromLiteral("CPU");
         default:                            return UnownedStringSlice::fromLiteral("?!?");
     }
 }

@@ -6,7 +6,7 @@
 namespace renderer_test
 {
     using namespace Slang;
-    void ShaderInputLayout::Parse(const char * source)
+    void ShaderInputLayout::parse(const char * source)
     {
         entries.clear();
         globalGenericTypeArguments.clear();

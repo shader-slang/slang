@@ -80,7 +80,7 @@ public:
     Slang::List<Slang::String> globalExistentialTypeArguments;
     Slang::List<Slang::String> entryPointExistentialTypeArguments;
     int numRenderTargets = 1;
-    void Parse(const char * source);
+    void parse(const char * source);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);

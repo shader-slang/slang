@@ -11,10 +11,7 @@
 
 namespace renderer_test {
 
-//&gOptions.slangArgs[0], gOptions.slangArgCount));
-// shaderProgram = renderer->createProgram(desc);
-
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(const Input& input, const ShaderCompileRequest& request, SlangSession* session, Output& out)
+/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     out.reset();
 
