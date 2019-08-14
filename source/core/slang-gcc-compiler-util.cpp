@@ -185,11 +185,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             return SLANG_OK;
         }
 
-        if (SLANG_SUCCEEDED(_parseErrorType(split0, outMsg.type)))
+        if (SLANG_SUCCEEDED(_parseErrorType(split0, outDiagnostic.type)))
         {
             // Command line errors can be just contain 'error:' etc. Can be seen on apple/clang
-            outMsg.stage = OutputMessage::Stage::Compile;
-            outMsg.text = split[1].trim();
+            outDiagnostic.stage = Diagnostic::Stage::Compile;
+            outDiagnostic.text = split[1].trim();
             outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
         }
