@@ -1481,15 +1481,15 @@ SlangResult dissassembleDXILUsingDXC(
 
             StringBuilder builder;
 
-            typedef CPPCompiler::OutputMessage OutputMessage;
+            typedef CPPCompiler::Diagnostic Diagnostic;
 
-            for (const auto& msg : output.messages)
+            for (const auto& diagnostic : output.diagnostics)
             {
                 builder.Clear();
 
-                builder << msg.filePath << "(" << msg.fileLine <<"): ";
+                builder << diagnostic.filePath << "(" << diagnostic.fileLine <<"): ";
 
-                if (msg.stage == OutputMessage::Stage::Link)
+                if (diagnostic.stage == Diagnostic::Stage::Link)
                 {
                     builder << "link ";
                 }
@@ -1497,22 +1497,22 @@ SlangResult dissassembleDXILUsingDXC(
                 // 
                 Severity severity = Severity::Error;
                 
-                switch (msg.type)
+                switch (diagnostic.type)
                 {
-                    case OutputMessage::Type::Unknown:
-                    case OutputMessage::Type::Error:
+                    case Diagnostic::Type::Unknown:
+                    case Diagnostic::Type::Error:
                     {
                         severity = Severity::Error;
                         builder << "error";
                         break;
                     }
-                    case OutputMessage::Type::Warning:
+                    case Diagnostic::Type::Warning:
                     {
                         severity = Severity::Warning;
                         builder << "warning";
                         break;
                     }
-                    case OutputMessage::Type::Info:
+                    case Diagnostic::Type::Info:
                     {
                         severity = Severity::Note;
                         builder << "info";
@@ -1521,14 +1521,14 @@ SlangResult dissassembleDXILUsingDXC(
                     default: break;
                 }
 
-                builder << " " << msg.code << ": " << msg.text;
+                builder << " " << diagnostic.code << ": " << diagnostic.text;
 
                 reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
             }
         }
 
         // If any errors are emitted, then we are done
-        if (output.has(CPPCompiler::OutputMessage::Type::Error))
+        if (output.has(CPPCompiler::Diagnostic::Type::Error))
         {
             return SLANG_FAIL;
         }
