@@ -66,6 +66,7 @@ enum class RendererType
     DirectX12,
     OpenGl,
     Vulkan,
+    CPU,
     CountOf,
 };
 
@@ -85,6 +86,7 @@ enum class BindingStyle
     DirectX,
     OpenGl,
     Vulkan,
+    CPU,
     CountOf,
 };
 

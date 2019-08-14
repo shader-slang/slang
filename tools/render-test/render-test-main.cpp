@@ -200,7 +200,7 @@ class RenderTestApp
 
 		// At initialization time, we are going to load and compile our Slang shader
 		// code, and then create the API objects we need for rendering.
-	Result initialize(Renderer* renderer, ShaderCompiler* shaderCompiler);
+	Result initialize(SlangSession* session, Renderer* renderer, const ShaderCompilerUtil::Input& input);
 	void runCompute();
 	void renderFrame();
 	void finalize();
@@ -213,7 +213,7 @@ class RenderTestApp
 
 	protected:
 		/// Called in initialize
-	Result initializeShaders(ShaderCompiler* shaderCompiler);
+	Result _initializeShaders(SlangSession* session, Renderer* renderer, const ShaderCompilerUtil::Input& input);
 
 	// variables for state to be used for rendering...
 	uintptr_t m_constantBufferSize, m_computeResultBufferSize;
@@ -227,6 +227,8 @@ class RenderTestApp
     RefPtr<PipelineState>   m_pipelineState;
 	RefPtr<BindingStateImpl>    m_bindingState;
 
+    ComPtr<ISlangSharedLibrary> m_cpuShaderProgram;
+
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
 };
@@ -236,48 +238,49 @@ static const char vertexEntryPointName[]    = "vertexMain";
 static const char fragmentEntryPointName[]  = "fragmentMain";
 static const char computeEntryPointName[]	= "computeMain";
 
-SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shaderCompiler)
+SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const ShaderCompilerUtil::Input& input)
 {
-    SLANG_RETURN_ON_FAIL(initializeShaders(shaderCompiler));
+    SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, input));
 
     m_numAddedConstantBuffers = 0;
 	m_renderer = renderer;
 
     // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
+    m_constantBufferSize = 16 * sizeof(float);
+
+    if (renderer == nullptr)
     {
-        m_constantBufferSize = 16 * sizeof(float);
-
-        BufferResource::Desc constantBufferDesc;
-        constantBufferDesc.init(m_constantBufferSize);
-        constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
-
-        m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
-        if (!m_constantBuffer)
-            return SLANG_FAIL;
+        return SLANG_OK;
     }
 
+    BufferResource::Desc constantBufferDesc;
+    constantBufferDesc.init(m_constantBufferSize);
+    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+
+    m_constantBuffer = renderer->createBufferResource(Resource::Usage::ConstantBuffer, constantBufferDesc);
+    if (!m_constantBuffer)
+        return SLANG_FAIL;
+
+    //! Hack -> if doing a graphics test, add an extra binding for our dynamic constant buffer
+    //
+    // TODO: Should probably be more sophisticated than this - with 'dynamic' constant buffer/s binding always being specified
+    // in the test file
+    RefPtr<BufferResource> addedConstantBuffer;
+    switch(gOptions.shaderType)
     {
-        //! Hack -> if doing a graphics test, add an extra binding for our dynamic constant buffer
-        //
-        // TODO: Should probably be more sophisticated than this - with 'dynamic' constant buffer/s binding always being specified
-        // in the test file
-        RefPtr<BufferResource> addedConstantBuffer;
-        switch(gOptions.shaderType)
-        {
-        default:
-            break;
+    default:
+        break;
 
-        case Options::ShaderProgramType::Graphics:
-        case Options::ShaderProgramType::GraphicsCompute:
-            addedConstantBuffer = m_constantBuffer;
-            m_numAddedConstantBuffers++;
-            break;
-        }
-
-        BindingStateImpl* bindingState = nullptr;
-        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBindingState(m_shaderInputLayout, m_renderer, addedConstantBuffer, &bindingState));
-        m_bindingState = bindingState;
+    case Options::ShaderProgramType::Graphics:
+    case Options::ShaderProgramType::GraphicsCompute:
+        addedConstantBuffer = m_constantBuffer;
+        m_numAddedConstantBuffers++;
+        break;
     }
+
+    BindingStateImpl* bindingState = nullptr;
+    SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBindingState(m_shaderInputLayout, m_renderer, addedConstantBuffer, &bindingState));
+    m_bindingState = bindingState;
 
     // Do other initialization that doesn't depend on the source language.
 
@@ -336,7 +339,7 @@ SlangResult RenderTestApp::initialize(Renderer* renderer, ShaderCompiler* shader
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
-Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
+Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, const ShaderCompilerUtil::Input& input)
 {
 	// Read in the source code
 	char const* sourcePath = gOptions.sourcePath;
@@ -391,9 +394,21 @@ Result RenderTestApp::initializeShaders(ShaderCompiler* shaderCompiler)
 	compileRequest.entryPointGenericTypeArguments = m_shaderInputLayout.entryPointGenericTypeArguments;
 	compileRequest.globalExistentialTypeArguments = m_shaderInputLayout.globalExistentialTypeArguments;
 	compileRequest.entryPointExistentialTypeArguments = m_shaderInputLayout.entryPointExistentialTypeArguments;
-	m_shaderProgram = shaderCompiler->compileProgram(compileRequest);
 
-    return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
+    {
+        ShaderCompilerUtil::Output output;
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileProgram(input, compileRequest, session, output));
+
+        if (renderer)
+        {
+            m_shaderProgram = renderer->createProgram(output.desc);
+            return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
+        }
+        else
+        {
+            return spGetEntryPointHostCallable(output.request, 0, 0, m_cpuShaderProgram.writeRef());
+        }
+    }
 }
 
 void RenderTestApp::renderFrame()
@@ -506,63 +521,93 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 	Slang::RefPtr<Renderer> renderer;
 
+    ShaderCompilerUtil::Input input;
+    
+    input.profile = "";
+    input.target = SLANG_TARGET_NONE;
+    input.args = &gOptions.slangArgs[0];
+    input.argCount = gOptions.slangArgCount;
+
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
-	SlangCompileTarget slangTarget = SLANG_TARGET_NONE;
-    SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
+	SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
     char const* profileName = "";
 	switch (gOptions.rendererType)
 	{
 		case RendererType::DirectX11:
 			renderer = createD3D11Renderer();
-			slangTarget = SLANG_DXBC;
+			input.target = SLANG_DXBC;
+            input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
-            profileName = "sm_5_0";
+            
 			break;
 
 		case RendererType::DirectX12:
 			renderer = createD3D12Renderer();
-			slangTarget = SLANG_DXBC;
+			input.target = SLANG_DXBC;
+            input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
             slangPassThrough = SLANG_PASS_THROUGH_FXC;
-            profileName = "sm_5_0";
+            
             if( gOptions.useDXIL )
             {
-                slangTarget = SLANG_DXIL;
+                input.target = SLANG_DXIL;
+                input.profile = "sm_6_0";
                 slangPassThrough = SLANG_PASS_THROUGH_DXC;
-                profileName = "sm_6_0";
             }
 			break;
 
 		case RendererType::OpenGl:
 			renderer = createGLRenderer();
-			slangTarget = SLANG_GLSL;
+			input.target = SLANG_GLSL;
+            input.profile = "glsl_430";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
-            profileName = "glsl_430";
 			break;
 
 		case RendererType::Vulkan:
 			renderer = createVKRenderer();
-			slangTarget = SLANG_SPIRV;
+			input.target = SLANG_SPIRV;
+            input.profile = "glsl_430";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
             slangPassThrough = SLANG_PASS_THROUGH_GLSLANG;
-            profileName = "glsl_430";
 			break;
-
+        case RendererType::CPU:
+            input.target = SLANG_HOST_CALLABLE;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+            slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+            break;
 		default:
 			fprintf(stderr, "error: unexpected\n");
 			return SLANG_FAIL;
 	}
 
-    
+    switch (gOptions.inputLanguageID)
+    {
+        case Options::InputLanguageID::Slang:
+            input.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+            input.passThrough = SLANG_PASS_THROUGH_NONE;
+            break;
+
+        case Options::InputLanguageID::Native:
+            input.sourceLanguage = nativeLanguage;
+            input.passThrough = slangPassThrough;
+            break;
+
+        default:
+            break;
+    }
+
+    // Use the profile name set on options if set
+    input.profile = gOptions.profileName ? gOptions.profileName : input.profile;
+
     StringBuilder rendererName;
     rendererName << "[" << RendererUtil::toText(gOptions.rendererType) << "] ";
     if (gOptions.adapter.getLength())
     {
         rendererName << "'" << gOptions.adapter << "'";
     }
-
 
     if (!renderer)
     {
@@ -607,35 +652,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         }
     }
 
-    // Use the profile name set on options if set
-    profileName = gOptions.profileName ? gOptions.profileName : profileName;
-
-    ShaderCompiler shaderCompiler;
-    shaderCompiler.renderer = renderer;
-    shaderCompiler.target = slangTarget;
-    shaderCompiler.profile = profileName;
-    shaderCompiler.slangSession = session;
-
-	switch (gOptions.inputLanguageID)
-	{
-		case Options::InputLanguageID::Slang:
-            shaderCompiler.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
-            shaderCompiler.passThrough = SLANG_PASS_THROUGH_NONE;
-			break;
-
-        case Options::InputLanguageID::Native:
-            shaderCompiler.sourceLanguage = nativeLanguage;
-            shaderCompiler.passThrough = slangPassThrough;
-			break;
-
-		default:
-			break;
-	}
 
 	{
 		RenderTestApp app;
 
-		SLANG_RETURN_ON_FAIL(app.initialize(renderer, &shaderCompiler));
+		SLANG_RETURN_ON_FAIL(app.initialize(session, renderer, input));
 
         window->show();
 

@@ -11,19 +11,24 @@
 
 namespace renderer_test {
 
-RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
-    ShaderCompileRequest const& request)
-{
-    SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
+//&gOptions.slangArgs[0], gOptions.slangArgCount));
+// shaderProgram = renderer->createProgram(desc);
 
-    spSetCodeGenTarget(slangRequest, target);
-    spSetTargetProfile(slangRequest, 0,
-        spFindProfile(slangSession, profile));
+/* static */ SlangResult ShaderCompilerUtil::compileProgram(const Input& input, const ShaderCompileRequest& request, SlangSession* session, Output& out)
+{
+    out.reset();
+
+    SlangCompileRequest* slangRequest = spCreateCompileRequest(session);
+    out.request = slangRequest;
+    out.session = session;
+
+    spSetCodeGenTarget(slangRequest, input.target);
+    spSetTargetProfile(slangRequest, 0, spFindProfile(session, input.profile));
 
     // Define a macro so that shader code in a test can detect what language we
     // are nominally working with.
     char const* langDefine = nullptr;
-    switch (sourceLanguage)
+    switch (input.sourceLanguage)
     {
     case SLANG_SOURCE_LANGUAGE_GLSL:
         spAddPreprocessorDefine(slangRequest, "__GLSL__", "1");
@@ -41,14 +46,14 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
         break;
     }
 
-    if (passThrough != SLANG_PASS_THROUGH_NONE)
+    if (input.passThrough != SLANG_PASS_THROUGH_NONE)
     {
-        spSetPassThrough(slangRequest, passThrough);
+        spSetPassThrough(slangRequest, input.passThrough);
     }
 
     // Process any additional command-line options specified for Slang using
     // the `-xslang <arg>` option to `render-test`.
-    SLANG_RETURN_NULL_ON_FAIL(spProcessCommandLineArguments(slangRequest, &gOptions.slangArgs[0], gOptions.slangArgCount));
+    SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, input.args, input.argCount)); 
 
     int computeTranslationUnit = 0;
     int vertexTranslationUnit = 0;
@@ -56,6 +61,8 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
     char const* vertexEntryPointName = request.vertexShader.name;
     char const* fragmentEntryPointName = request.fragmentShader.name;
     char const* computeEntryPointName = request.computeShader.name;
+
+    const auto sourceLanguage = input.sourceLanguage;
 
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL)
     {
@@ -90,8 +97,6 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
         computeTranslationUnit = translationUnit;
     }
 
-
-    RefPtr<ShaderProgram> shaderProgram;
 
     Slang::List<const char*> rawGlobalTypeNames;
     for (auto typeName : request.globalGenericTypeArguments)
@@ -146,12 +151,7 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
             kernelDesc.codeBegin = code;
             kernelDesc.codeEnd = code + codeSize;
 
-            ShaderProgram::Desc desc;
-            desc.pipelineType = PipelineType::Compute;
-            desc.kernels = &kernelDesc;
-            desc.kernelCount = 1;
-
-            shaderProgram = renderer->createProgram(desc);
+            out.set(PipelineType::Compute, &kernelDesc, 1);
         }
     }
     else
@@ -189,21 +189,11 @@ RefPtr<ShaderProgram> ShaderCompiler::compileProgram(
             kernelDescs[1].codeBegin = fragmentCode;
             kernelDescs[1].codeEnd = fragmentCode + fragmentCodeSize;
 
-            ShaderProgram::Desc desc;
-            desc.pipelineType = PipelineType::Graphics;
-            desc.kernels = &kernelDescs[0];
-            desc.kernelCount = kDescCount;
-
-            shaderProgram = renderer->createProgram(desc);
+            out.set(PipelineType::Graphics, kernelDescs, kDescCount);
         }
     }
-    // We clean up the Slang compilation context and result *after*
-    // we have run the downstream compiler, because Slang
-    // owns the memory allocation for the generated text, and will
-    // free it when we destroy the compilation result.
-    spDestroyCompileRequest(slangRequest);
-    
-    return shaderProgram;
+
+    return SLANG_OK;
 }
 
 } // renderer_test

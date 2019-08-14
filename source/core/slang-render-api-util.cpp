@@ -17,6 +17,7 @@ namespace Slang {
     { RenderApiType::Vulkan, "vk,vulkan",       ""},
     { RenderApiType::D3D12,  "dx12,d3d12",      ""},
     { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
+    { RenderApiType::CPU,    "cpu",             ""},
 };
 
 static int _calcAvailableApis()
@@ -265,7 +266,8 @@ static bool _canLoadSharedLibrary(const char* libName)
         case RenderApiType::OpenGl:    return _canLoadSharedLibrary("opengl32");
         case RenderApiType::Vulkan:    return _canLoadSharedLibrary("vulkan-1");
         case RenderApiType::D3D11:     return _canLoadSharedLibrary("d3d11"); 
-        case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12"); 
+        case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12");
+        case RenderApiType::CPU:       return true;
         default: break; 
     }
 #elif SLANG_UNIX_FAMILY
@@ -274,6 +276,10 @@ static bool _canLoadSharedLibrary(const char* libName)
     {
         case RenderApiType::OpenGl:
         case RenderApiType::Vulkan:
+        {
+            return true;
+        }
+        case RenderApiType::CPU:
         {
             return true;
         }

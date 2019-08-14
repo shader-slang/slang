@@ -69,6 +69,7 @@ const Resource::DescBase& Resource::getDescBase() const
     BindingStyle::DirectX,      // DirectX12,
     BindingStyle::OpenGl,       // OpenGl,
     BindingStyle::Vulkan,       // Vulkan
+    BindingStyle::CPU,          // CPU
 };
 
 /* static */void RendererUtil::compileTimeAsserts()
