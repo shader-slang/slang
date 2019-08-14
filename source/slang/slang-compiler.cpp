@@ -1497,7 +1497,7 @@ SlangResult dissassembleDXILUsingDXC(
                 // 
                 Severity severity = Severity::Error;
                 
-                switch (msg.type)
+                switch (diagnostic.type)
                 {
                     case Diagnostic::Type::Unknown:
                     case Diagnostic::Type::Error:
