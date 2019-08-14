@@ -768,7 +768,7 @@ namespace Slang
         return result;
     }
 
-    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
+    void reportExternalCompileError(const char* compilerName, Severity severity, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
     {
         StringBuilder builder;
         if (compilerName)
@@ -792,10 +792,15 @@ namespace Slang
             PlatformUtil::appendResult(res, builder);
         }
 
+        sink->diagnoseRaw(severity, builder.getUnownedSlice());
+    }
+
+    void reportExternalCompileError(const char* compilerName, SlangResult res, const UnownedStringSlice& diagnostic, DiagnosticSink* sink)
+    {
         // TODO(tfoley): need a better policy for how we translate diagnostics
         // back into the Slang world (although we should always try to generate
         // HLSL that doesn't produce any diagnostics...)
-        sink->diagnoseRaw(SLANG_FAILED(res) ? Severity::Error : Severity::Warning, builder.getUnownedSlice());
+        reportExternalCompileError(compilerName, SLANG_FAILED(res) ? Severity::Error : Severity::Warning, res, diagnostic, sink);
     }
 
     static String _getDisplayPath(DiagnosticSink* sink, SourceFile* sourceFile)
@@ -1341,9 +1346,15 @@ SlangResult dissassembleDXILUsingDXC(
 
         CPPCompiler::CompileOptions options;
 
+        // Set the source type
+        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
         // Generate a path a temporary filename for output module
         String modulePath;
         SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+
+        // Remove the temporary path/file when done
+        temporaryFileSet.add(modulePath);
 
         options.modulePath = modulePath;
         options.sourceFiles.add(compileSourcePath);
@@ -1483,17 +1494,36 @@ SlangResult dissassembleDXILUsingDXC(
                     builder << "link ";
                 }
 
-                switch (diagnostic.type)
+                // 
+                Severity severity = Severity::Error;
+                
+                switch (msg.type)
                 {
-                    case Diagnostic::Type::Error:    builder << "error"; break;
-                    case Diagnostic::Type::Unknown:  builder << "warning"; break;
-                    case Diagnostic::Type::Info:     builder << "info"; break;
+                    case Diagnostic::Type::Unknown:
+                    case Diagnostic::Type::Error:
+                    {
+                        severity = Severity::Error;
+                        builder << "error";
+                        break;
+                    }
+                    case Diagnostic::Type::Warning:
+                    {
+                        severity = Severity::Warning;
+                        builder << "warning";
+                        break;
+                    }
+                    case Diagnostic::Type::Info:
+                    {
+                        severity = Severity::Note;
+                        builder << "info";
+                        break;
+                    }
                     default: break;
                 }
 
                 builder << " " << diagnostic.code << ": " << diagnostic.text;
 
-                reportExternalCompileError(compilerText.getBuffer(), SLANG_OK, builder.getUnownedSlice(), sink);
+                reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
             }
         }
 

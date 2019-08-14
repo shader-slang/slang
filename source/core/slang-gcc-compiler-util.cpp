@@ -184,6 +184,16 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
+
+        if (SLANG_SUCCEEDED(_parseErrorType(split0, outMsg.type)))
+        {
+            // Command line errors can be just contain 'error:' etc. Can be seen on apple/clang
+            outMsg.stage = OutputMessage::Stage::Compile;
+            outMsg.text = split[1].trim();
+            outLineParseResult = LineParseResult::Single;
+            return SLANG_OK;
+        }
+
         outLineParseResult = LineParseResult::Ignore;
         return SLANG_OK;
     }
@@ -193,8 +203,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         const auto split1 = split[1].trim();
         const auto text = split[2].trim();
 
-        // Check for special handling for clang
-        if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")))
+        // Check for special handling for clang (Can be Clang or clang apparently)
+        if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")) ||
+            split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) )
         {
             // Extract the type
             SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outDiagnostic.type));
@@ -387,11 +398,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 /* static */SlangResult GCCCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
-    
-    cmdLine.addArg("-fvisibility=hidden");
-
+        
     if (options.sourceType == SourceType::CPP)
     {
+        cmdLine.addArg("-fvisibility=hidden");
+
         // Need C++14 for partial specialization
         cmdLine.addArg("-std=c++14");
     }
