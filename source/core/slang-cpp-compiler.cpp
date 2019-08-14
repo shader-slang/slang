@@ -32,9 +32,9 @@ void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice CPPCompiler::OutputMessage::getTypeText(OutputMessage::Type type)
+/* static */UnownedStringSlice CPPCompiler::Diagnostic::getTypeText(Diagnostic::Type type)
 {
-    typedef OutputMessage::Type Type;
+    typedef Diagnostic::Type Type;
     switch (type)
     {
         default:            return UnownedStringSlice::fromLiteral("Unknown");
@@ -62,66 +62,66 @@ void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
 
-Index CPPCompiler::Output::getCountByType(OutputMessage::Type type) const
+Index CPPCompiler::Output::getCountByType(Diagnostic::Type type) const
 {
     Index count = 0;
-    for (const auto& msg : messages)
+    for (const auto& msg : diagnostics)
     {
         count += Index(msg.type == type);
     }
     return count;
 }
 
-Int CPPCompiler::Output::countByStage(OutputMessage::Stage stage, Index counts[Int(OutputMessage::Type::CountOf)]) const
+Int CPPCompiler::Output::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
 {
     Int count = 0;
-    ::memset(counts, 0, sizeof(Index) * Int(OutputMessage::Type::CountOf));
-    for (const auto& msg : messages)
+    ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Type::CountOf));
+    for (const auto& diagnostic : diagnostics)
     {
-        if (msg.stage == stage)
+        if (diagnostic.stage == stage)
         {
             count++;
-            counts[Index(msg.type)]++;
+            counts[Index(diagnostic.type)]++;
         }
     }
     return count++;
 }
 
-static void _appendCounts(const Index counts[Int(CPPCompiler::OutputMessage::Type::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(CPPCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef CPPCompiler::OutputMessage::Type Type;
+    typedef CPPCompiler::Diagnostic::Type Type;
 
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << CPPCompiler::OutputMessage::getTypeText(Type(i)) << "(" << counts[i] << ") ";
+            out << CPPCompiler::Diagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
         }
     }
 }
 
-static void _appendSimplified(const Index counts[Int(CPPCompiler::OutputMessage::Type::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(CPPCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef CPPCompiler::OutputMessage::Type Type;
+    typedef CPPCompiler::Diagnostic::Type Type;
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << CPPCompiler::OutputMessage::getTypeText(Type(i)) << " ";
+            out << CPPCompiler::Diagnostic::getTypeText(Type(i)) << " ";
         }
     }
 }
 
 void CPPCompiler::Output::appendSummary(StringBuilder& out) const
 {
-    Index counts[Int(OutputMessage::Type::CountOf)];
-    if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Type::CountOf)];
+    if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         out << "Compile: ";
         _appendCounts(counts, out);
         out << "\n";
     }
-    if (countByStage(OutputMessage::Stage::Link, counts) > 0)
+    if (countByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         out << "Link: ";
         _appendCounts(counts, out);
@@ -131,14 +131,14 @@ void CPPCompiler::Output::appendSummary(StringBuilder& out) const
 
 void CPPCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
 {
-    Index counts[Int(OutputMessage::Type::CountOf)];
-    if (countByStage(OutputMessage::Stage::Compile, counts) > 0)
+    Index counts[Int(Diagnostic::Type::CountOf)];
+    if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         out << "Compile: ";
         _appendSimplified(counts, out);
         out << "\n";
     }
-    if (countByStage(OutputMessage::Stage::Link, counts) > 0)
+    if (countByStage(Diagnostic::Stage::Link, counts) > 0)
     {
         out << "Link: ";
         _appendSimplified(counts, out);
@@ -146,14 +146,14 @@ void CPPCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
     }
 }
 
-void CPPCompiler::Output::removeByType(OutputMessage::Type type)
+void CPPCompiler::Output::removeByType(Diagnostic::Type type)
 {
-    Index count = messages.getCount();
+    Index count = diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
     {
-        if (messages[i].type == type)
+        if (diagnostics[i].type == type)
         {
-            messages.removeAt(i);
+            diagnostics.removeAt(i);
             i--;
             count--;
         }
