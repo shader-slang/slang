@@ -63,6 +63,28 @@ private:
     static OSFileSystem s_singleton;
 };
 
+// A class that turns a files-ystem into a 'loadFile' style that only implements ISlangFileSystem interface
+class LoadFileFileSystem : public ISlangFileSystem, RefObject 
+{
+public:
+    // ISlangUnknown 
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+    // ISlangFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
+        char const*     path,
+        ISlangBlob**    outBlob) SLANG_OVERRIDE
+    {
+        return m_fileSystem->loadFile(path, outBlob);
+    }
+
+    LoadFileFileSystem(ISlangFileSystem* fileSystem):m_fileSystem(fileSystem) {}
+    virtual ~LoadFileFileSystem() {}
+    ISlangUnknown* getInterface(const Guid& guid);
+
+    ComPtr<ISlangFileSystem> m_fileSystem;
+};
+
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
 as well as emulation of methods if only has ISlangFileSystem interface. Will query capabilities
 of the interface on the constructor.

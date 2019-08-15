@@ -36,6 +36,13 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
     return SLANG_OK;
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! LoadOnlyFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+ISlangUnknown* LoadFileFileSystem::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem ) ? static_cast<ISlangFileSystem*>(this) : nullptr;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 /* static */OSFileSystem OSFileSystem::s_singleton; 
