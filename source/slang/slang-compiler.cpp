@@ -1546,6 +1546,8 @@ SlangResult dissassembleDXILUsingDXC(
             RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, moduleFilePath));
             sharedLib->m_temporaryFileSet = productFileSet;
             productFileSet.clear();
+
+            outSharedLib = sharedLib;
         }
         else
         {
