@@ -433,6 +433,11 @@ convention for interface methods.
 
 /* --------------- END From slang.h  ----------------- */
 
+// TODO(JS): Hack! Output C++ code from slang can copy unitialized variables. 
+#if SLANG_VC
+#   pragma warning(disable : 4700)
+#endif
+
 #include <math.h>
 #include <assert.h>
 #include <stdlib.h>
