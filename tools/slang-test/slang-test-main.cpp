@@ -787,7 +787,10 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
             if (apiType == RenderApiType::CPU)
             {
+                // TODO(JS): Only enable CPU on Windows for now
+#if SLANG_WINDOWS_FAMILY
                 availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+#endif
                 continue;
             }
 

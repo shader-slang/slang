@@ -281,8 +281,7 @@ static bool _canLoadSharedLibrary(const char* libName)
         }
         case RenderApiType::CPU:
         {
-            // TODO(JS): Disable for now as render-test doesn't run on linux yet
-            return false;
+            return true;
         }
         default: break; 
     }
