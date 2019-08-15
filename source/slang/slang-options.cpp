@@ -816,8 +816,7 @@ struct OptionsParser
                     }
                     else if (name == "load-file")
                     {
-                        ComPtr<ISlangFileSystem> fileSystem(new LoadFileFileSystem(OSFileSystem::getSingleton()));
-                        spSetFileSystem(compileRequest, fileSystem);
+                        spSetFileSystem(compileRequest, OSFileSystem::getSingleton());
                     }
                     else
                     {

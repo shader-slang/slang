@@ -11,7 +11,8 @@
 namespace Slang
 {
 
-class OSFileSystem : public ISlangFileSystemExt
+// Implementation of ISlangFileSystemExt for the OS
+class OSFileSystemExt : public ISlangFileSystemExt
 {
 public:
     // ISlangUnknown 
@@ -55,34 +56,41 @@ public:
 
 private:
         /// Make so not constructible
-    OSFileSystem() {}
-    virtual ~OSFileSystem() {}
+    OSFileSystemExt() {}
+    virtual ~OSFileSystemExt() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
 
-    static OSFileSystem s_singleton;
+    static OSFileSystemExt s_singleton;
 };
 
-// A class that turns a files-ystem into a 'loadFile' style that only implements ISlangFileSystem interface
-class LoadFileFileSystem : public ISlangFileSystem, RefObject 
+// Implementation of ISlangFileSystem for the OS (ie only has simplified interface of just loadFile)
+class OSFileSystem : public ISlangFileSystem
 {
 public:
-    // ISlangUnknown 
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+        // ISlangUnknown 
+    SLANG_IUNKNOWN_QUERY_INTERFACE
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
         char const*     path,
         ISlangBlob**    outBlob) SLANG_OVERRIDE
     {
-        return m_fileSystem->loadFile(path, outBlob);
+        // Can just use OsFileSystemExt impl
+        return OSFileSystemExt::getSingleton()->loadFile(path, outBlob);
     }
 
-    LoadFileFileSystem(ISlangFileSystem* fileSystem):m_fileSystem(fileSystem) {}
-    virtual ~LoadFileFileSystem() {}
-    ISlangUnknown* getInterface(const Guid& guid);
+     static ISlangFileSystem* getSingleton() { return &s_singleton; }
 
-    ComPtr<ISlangFileSystem> m_fileSystem;
+private:
+    /// Make so not constructible
+        OSFileSystem() {}
+    virtual ~OSFileSystem() {}
+
+    ISlangUnknown* getInterface(const Guid& guid);
+    static OSFileSystem s_singleton;
 };
 
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
