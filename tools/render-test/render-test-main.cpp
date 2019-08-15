@@ -17,7 +17,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO(JS): We need to put the prelude into a better place
+#define SLANG_PRELUDE_NAMESPACE CPPPrelude
+#include "../../tests/cross-compile/slang-cpp-prelude.h"
+
 #include "../../source/core/slang-test-tool-util.h"
+#include "../../source/core/slang-memory-arena.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -314,6 +319,95 @@ static SlangResult _compile(SlangSession* session, const String& sourcePath, Opt
     return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.compileOutput);
 }
 
+static SlangResult _handleResource(slang::TypeReflection* type, ShaderInputLayoutEntry& src, void* dst)
+{
+    auto shape = type->getResourceShape();
+    auto access = type->getResourceAccess();
+
+    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+    {
+        default:
+            assert(!"unhandled case");
+            break;
+        case SLANG_TEXTURE_1D:
+        case SLANG_TEXTURE_2D:
+        case SLANG_TEXTURE_3D:
+        case SLANG_TEXTURE_CUBE:
+        case SLANG_TEXTURE_BUFFER:
+        {
+            return SLANG_FAIL;
+        }
+        case SLANG_STRUCTURED_BUFFER:
+        {
+            // TODO(JS): I guess this is questionable - because sizeof(unsigned int) != sizeof(uint32_t) necessarily
+            CPPPrelude::StructuredBuffer<uint32_t>& dstBuf = *(CPPPrelude::StructuredBuffer<uint32_t>*)dst;
+            dstBuf.data = src.bufferData.getBuffer();
+            dstBuf.count = src.bufferData.getCount();
+            break;
+        }
+        case SLANG_BYTE_ADDRESS_BUFFER:
+        {
+            CPPPrelude::ByteAddressBuffer& dstBuf = *(CPPPrelude::ByteAddressBuffer*)dst;
+            dstBuf.data = src.bufferData.getBuffer();
+            dstBuf.sizeInBytes = src.bufferData.getCount() * sizeof(unsigned int);
+
+            break;
+        }
+    }
+    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+    {
+        
+    }
+    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
+    {
+ 
+    }
+
+    if (access != SLANG_RESOURCE_ACCESS_READ)
+    {
+        switch (access)
+        {
+            default:
+                assert(!"unhandled case");
+                break;
+
+            case SLANG_RESOURCE_ACCESS_READ:
+                break;
+
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:      break;
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  break;
+            case SLANG_RESOURCE_ACCESS_APPEND:          break;
+            case SLANG_RESOURCE_ACCESS_CONSUME:         break;
+        }
+ 
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _writeBindings(const ShaderInputLayout& layout, const String& fileName)
+{
+    FILE * f = fopen(fileName.getBuffer(), "wb");
+    if (!f)
+    {
+        return SLANG_FAIL;
+    }
+
+    for (auto entry : layout.entries)
+    {
+        if (entry.isOutput)
+        {
+            auto ptr = entry.bufferData.getBuffer();
+            const int size = int(entry.bufferData.getCount());
+            for (int i = 0; i < size; ++i)
+            {
+                fprintf(f, "%X\n", ptr[i]);
+            }
+        }
+    }
+    fclose(f);
+    return SLANG_OK;
+}
+
 static SlangResult _doCPUCompute(SlangSession* session, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
     CompileOutput output;
@@ -323,8 +417,199 @@ static SlangResult _doCPUCompute(SlangSession* session, Options::ShaderProgramTy
     SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(output.compileOutput.request, 0, 0, sharedLibrary.writeRef()));
 
     // Use reflection to find the entry point name
+    auto request = output.compileOutput.request;
 
-    return SLANG_OK;
+    struct UniformState;
+    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, UniformState* uniformState);
+
+    auto reflection = (slang::ShaderReflection*) spGetReflection(request);
+
+    slang::EntryPointReflection* entryPoint = nullptr;
+    Func func = nullptr;
+    {
+     
+        auto entryPointCount = reflection->getEntryPointCount();
+        SLANG_ASSERT(entryPointCount == 1);
+
+        entryPoint = reflection->getEntryPointByIndex(0);
+
+        const char* entryPointName = entryPoint->getName();
+        func = (Func) sharedLibrary->findFuncByName(entryPointName);
+
+        if (!func)
+        {
+            return SLANG_FAIL;
+        }
+    }
+    // Okay we need to find all of the bindings and match up to those in the layout
+
+    ShaderInputLayout& layout = output.layout;
+
+    // For general storage
+    MemoryArena arena;
+    arena.init(1024);
+    List<void*> uniformState;
+
+    {
+        int parameterCount = reflection->getParameterCount();
+
+        for (int i = 0; i < parameterCount; ++i)
+        {
+            auto parameter = reflection->getParameterByIndex(i);
+
+            const char* paramName = parameter->getName();
+
+            const Index entryIndex = layout.findEntryIndexByName(paramName);
+            if (entryIndex < 0)
+            {
+                return SLANG_FAIL;
+            }
+
+            auto stage = parameter->getStage();
+
+            auto typeLayout = parameter->getTypeLayout();
+            auto categoryCount = parameter->getCategoryCount();
+
+            SLANG_ASSERT(categoryCount == 1);
+
+            // Only dealing one category per item right now
+            auto category = parameter->getCategoryByIndex(0);
+
+            auto offset = parameter->getOffset(category);
+            auto space = parameter->getBindingSpace(category);
+            auto count = typeLayout->getSize(category);
+
+            size_t end = offset + count;
+            if (uniformState.getCount() * sizeof(void*) < end)
+            {
+                uniformState.setCount(end / sizeof(void*));
+            }
+
+            void* dstEntry = ((uint8_t*)uniformState.getBuffer()) + offset;
+            auto& srcEntry = layout.entries[entryIndex];
+
+            switch (typeLayout->getKind())
+            {
+                default:
+                    break;
+
+                case slang::TypeReflection::Kind::Array:
+                {
+                    auto arrayTypeLayout = typeLayout;
+                    auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
+                    auto elementCount = int(arrayTypeLayout->getElementCount());
+
+                    if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
+                    {
+                        int elementStride = int(arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+                        SLANG_UNUSED(elementStride);
+                    }
+                    SLANG_UNUSED(elementTypeLayout);
+                    SLANG_UNUSED(elementCount);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Struct:
+                {
+                    auto structTypeLayout = typeLayout;                    
+                    auto name = structTypeLayout->getName();
+                    SLANG_UNUSED(name);
+
+                    auto fieldCount = structTypeLayout->getFieldCount();
+                    for (uint32_t ff = 0; ff < fieldCount; ++ff)
+                    {
+                        auto field = structTypeLayout->getFieldByIndex(ff);
+                        SLANG_UNUSED(field);
+                    }
+                    auto type = structTypeLayout->getType();
+                    SLANG_UNUSED(type);
+                    break;
+                }
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::TextureBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::ShaderStorageBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::GenericTypeParameter:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Interface:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                } 
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    // Some resource types (notably structured buffers)
+                    // encode layout information for their result/element
+                    // type, but others don't. We need to check for
+                    // the relevant cases here.
+                    //
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    if ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
+                    {
+                        _handleResource(typeLayout->getType(), srcEntry, dstEntry);
+
+                    }
+                    else
+                    {
+                        //emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    SlangUInt numThreadsPerAxis[3];
+    entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
+
+    {
+        CPPPrelude::ComputeVaryingInput varying;
+        varying.groupID = {};
+
+        for (int z = 0; z < numThreadsPerAxis[2]; ++z)
+        {
+            varying.groupThreadID.z = z;
+            for (int y = 0; y < numThreadsPerAxis[1]; ++y)
+            {
+                varying.groupThreadID.y = y;
+                for (int x = 0; x < numThreadsPerAxis[0]; ++x)
+                {
+                    varying.groupThreadID.x = x;
+
+                    func(&varying, (UniformState*)uniformState.getBuffer());
+                }
+            }
+        }
+    }
+
+    // Dump everything out that was write (we wrote in place!)
+    return _writeBindings(layout, gOptions.outputPath);
 }
 
 SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
