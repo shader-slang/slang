@@ -2365,17 +2365,17 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     // Set the fileSystem
     fileSystem = inFileSystem;
 
-    // Set up fileSystemExt appropriately
+    // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystem::getSingleton());
+        fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
     }
     else
     {
-        // See if we have the interface 
+        // See if we have the full ISlangFileSystemExt interface, if we do just use it
         inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
 
-        // If not wrap with WrapFileSytem that keeps the old behavior
+        // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
         if (!fileSystemExt)
         {
             // Construct a wrapper to emulate the extended interface behavior

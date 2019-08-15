@@ -36,9 +36,18 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
     return SLANG_OK;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!! IncludeFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! OSFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */OSFileSystem OSFileSystem::s_singleton; 
+/* static */OSFileSystem OSFileSystem::s_singleton;
+
+ISlangUnknown* OSFileSystem::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem ) ? static_cast<ISlangFileSystem*>(this) : nullptr;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!! OSFileSystemExt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+/* static */OSFileSystemExt OSFileSystemExt::s_singleton; 
 
 template <typename T>
 static ISlangFileSystemExt* _getInterface(T* ptr, const Guid& guid)
@@ -46,7 +55,7 @@ static ISlangFileSystemExt* _getInterface(T* ptr, const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt) ? static_cast<ISlangFileSystemExt*>(ptr) : nullptr;
 }
 
-ISlangUnknown* OSFileSystem::getInterface(const Guid& guid)
+ISlangUnknown* OSFileSystemExt::getInterface(const Guid& guid)
 {
     return _getInterface(this, guid); 
 }
@@ -62,13 +71,13 @@ static String _fixPathDelimiters(const char* pathIn)
 #endif
 }
 
-SlangResult OSFileSystem::getFileUniqueIdentity(const char* pathIn, ISlangBlob** outUniqueIdentity)
+SlangResult OSFileSystemExt::getFileUniqueIdentity(const char* pathIn, ISlangBlob** outUniqueIdentity)
 {
     // By default we use the canonical path to uniquely identify a file
     return getCanonicalPath(pathIn, outUniqueIdentity);
 }
 
-SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult OSFileSystemExt::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     String canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(_fixPathDelimiters(path), canonicalPath));
@@ -76,25 +85,25 @@ SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCan
     return SLANG_OK;
 }
 
-SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
+SlangResult OSFileSystemExt::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
 {
     String simplifiedPath = Path::simplify(_fixPathDelimiters(pathIn));
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
 
-SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult OSFileSystemExt::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     // Don't need to fix delimiters - because combine path handles both path delimiter types
     return _calcCombinedPath(fromPathType, fromPath, path, pathOut);
 }
 
-SlangResult SLANG_MCALL OSFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
+SlangResult SLANG_MCALL OSFileSystemExt::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
     return Path::getPathType(_fixPathDelimiters(pathIn), pathTypeOut);
 }
 
-SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
+SlangResult OSFileSystemExt::loadFile(char const* pathIn, ISlangBlob** outBlob)
 {
     // Default implementation that uses the `core` libraries facilities for talking to the OS filesystem.
     //
