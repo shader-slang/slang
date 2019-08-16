@@ -408,10 +408,10 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const String&
     return SLANG_OK;
 }
 
-static SlangResult _doCPUCompute(SlangSession* session, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
+static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
     CompileOutput output;
-    SLANG_RETURN_ON_FAIL(_compile(session, gOptions.sourcePath, shaderType, input, output));
+    SLANG_RETURN_ON_FAIL(_compile(session, sourcePath, shaderType, input, output));
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(output.compileOutput.request, 0, 0, sharedLibrary.writeRef()));
@@ -462,6 +462,22 @@ static SlangResult _doCPUCompute(SlangSession* session, Options::ShaderProgramTy
             const Index entryIndex = layout.findEntryIndexByName(paramName);
             if (entryIndex < 0)
             {
+                auto& outStream = StdWriters::getOut();
+
+                int numNamed = 0;
+                for (const auto& entry : layout.entries)
+                {
+                    numNamed += int(entry.name.getLength() > 0);
+                }
+
+                if (layout.entries.getCount() > 0 && numNamed == 0)
+                {
+                    outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
+                }
+                else
+                {
+                    outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), paramName);
+                }
                 return SLANG_FAIL;
             }
 
@@ -964,7 +980,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
     if (!renderer)
     {
-        SLANG_RETURN_ON_FAIL(_doCPUCompute(session, gOptions.shaderType, input));
+        SLANG_RETURN_ON_FAIL(_doCPUCompute(session, gOptions.sourcePath, gOptions.shaderType, input));
         return SLANG_OK;
     }
 
