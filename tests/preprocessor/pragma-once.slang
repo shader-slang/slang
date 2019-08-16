@@ -1,4 +1,5 @@
 //TEST(smoke):SIMPLE:
+//TEST(smoke):SIMPLE: -file-system load-file
 
 // Test support for `#pragma once`
 

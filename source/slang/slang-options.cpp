@@ -8,6 +8,8 @@
 #include "slang-compiler.h"
 #include "slang-profile.h"
 
+#include "slang-file-system.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -632,7 +634,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
                     addSharedLibraryPath(SharedLibraryType::Fxc, name);
                 }
-                else if (argStr[1] == 'D')
+                else if (argStr.getLength() >= 2 && argStr[1] == 'D')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -DFOO
@@ -677,7 +679,7 @@ struct OptionsParser
                             "");
                     }
                 }
-                else if (argStr[1] == 'I')
+                else if (argStr.getLength() >= 2 && argStr[1] == 'I')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -IFOO
@@ -802,6 +804,25 @@ struct OptionsParser
                 else if( argStr == "-default-image-format-unknown" )
                 {
                     requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
+                }
+                else if (argStr == "-file-system")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                    if (name == "default")
+                    {
+                        spSetFileSystem(compileRequest, nullptr);
+                    }
+                    else if (name == "load-file")
+                    {
+                        spSetFileSystem(compileRequest, OSFileSystem::getSingleton());
+                    }
+                    else
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownFileSystemOption, name);
+                        return SLANG_FAIL;
+                    }
                 }
                 else if (argStr == "--")
                 {

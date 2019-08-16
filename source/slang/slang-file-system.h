@@ -11,7 +11,8 @@
 namespace Slang
 {
 
-class OSFileSystem : public ISlangFileSystemExt
+// Implementation of ISlangFileSystemExt for the OS
+class OSFileSystemExt : public ISlangFileSystemExt
 {
 public:
     // ISlangUnknown 
@@ -55,11 +56,40 @@ public:
 
 private:
         /// Make so not constructible
-    OSFileSystem() {}
-    virtual ~OSFileSystem() {}
+    OSFileSystemExt() {}
+    virtual ~OSFileSystemExt() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
 
+    static OSFileSystemExt s_singleton;
+};
+
+// Implementation of ISlangFileSystem for the OS (ie only has simplified interface of just loadFile)
+class OSFileSystem : public ISlangFileSystem
+{
+public:
+        // ISlangUnknown 
+    SLANG_IUNKNOWN_QUERY_INTERFACE
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ISlangFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
+        char const*     path,
+        ISlangBlob**    outBlob) SLANG_OVERRIDE
+    {
+        // Can just use OsFileSystemExt impl
+        return OSFileSystemExt::getSingleton()->loadFile(path, outBlob);
+    }
+
+     static ISlangFileSystem* getSingleton() { return &s_singleton; }
+
+private:
+    /// Make so not constructible
+        OSFileSystem() {}
+    virtual ~OSFileSystem() {}
+
+    ISlangUnknown* getInterface(const Guid& guid);
     static OSFileSystem s_singleton;
 };
 
