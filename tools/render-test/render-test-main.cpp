@@ -19,9 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO(JS): We need to put the prelude into a better place
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../prelude/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-types.h"
 
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-memory-arena.h"

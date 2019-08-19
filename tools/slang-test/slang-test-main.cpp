@@ -32,7 +32,7 @@ using namespace Slang;
 #include <stdarg.h>
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../prelude/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-types.h"
 
 // Options for a particular test
 struct TestOptions
