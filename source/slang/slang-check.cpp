@@ -5359,6 +5359,11 @@ namespace Slang
 
             CASE(+); // TODO: this can also be unary...
             CASE(*);
+            CASE(<<);
+            CASE(>>);
+            CASE(&);
+            CASE(|);
+            CASE(^);
 #undef CASE
 
             // binary operators with chance of divide-by-zero
