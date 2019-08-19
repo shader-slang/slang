@@ -1803,7 +1803,7 @@ namespace Slang
             SlangPassThrough passThrough,
             char const* path) override;
 
-        SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
+        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(
             SlangPassThrough inPassThrough,
             char const* prelude) override;
 
