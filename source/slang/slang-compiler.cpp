@@ -574,21 +574,6 @@ namespace Slang
         return translationUnit;
     }
 
-    static TranslationUnitRequest* _getTranslationUnit(
-        EndToEndCompileRequest* endToEndReq,
-        Int                     entryPointIndex)
-    {
-        // If there isn't an end-to-end compile going on,
-        // there can be no pass-through.
-        //
-        if (!endToEndReq) return nullptr;
-
-        auto frontEndReq = endToEndReq->getFrontEndReq();
-        auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
-        auto translationUnit = entryPointReq->getTranslationUnit();
-        return translationUnit;
-    }
-
     static void _appendEscapedPath(const UnownedStringSlice& path, StringBuilder& outBuilder)
     {
         for (auto c : path)
@@ -1329,28 +1314,6 @@ SlangResult dissassembleDXILUsingDXC(
         }
         else
         {
-            // TODO(JS): This is a hack for two reasons
-            // * That we just inject the source path for C/C++ include paths if we find the file
-            // * We should access the files through the ISlangFileSystem
-
-            translationUnit = _getTranslationUnit(endToEndReq, entryPointIndex);
-
-            const auto& sourceFiles = translationUnit->getSourceFiles();
-            if (sourceFiles.getCount() == 1)
-            {
-                const SourceFile* sourceFile = sourceFiles[0];
-                const PathInfo& pathInfo = sourceFile->getPathInfo();
-                if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal || pathInfo.type == PathInfo::Type::FromString)
-                {
-                    String canonicalPath;
-                    if (File::exists(pathInfo.foundPath) && SLANG_SUCCEEDED(Path::getCanonical(pathInfo.foundPath, canonicalPath)))
-                    {
-                        String sourceDir = Path::getParentDirectory(canonicalPath);
-                        includePaths.add(sourceDir);                        
-                    }
-                }
-            }
-
             rawSource = emitCPPForEntryPoint(
                 slangRequest,
                 entryPoint,
@@ -1486,37 +1449,6 @@ SlangResult dissassembleDXILUsingDXC(
                     define.value = def.Value;
 
                     options.defines.add(define);
-                }
-            }
-        }
-
-        // TODO(JS): HACK! We need to include the prelude from somewhere, but where? The generated output
-        // is sitting in some temp directory.
-        // So here, we search all the 'sourceFiles', and try their paths for plausibility, and take the first
-        {
-            auto frontEndReq = endToEndReq->getFrontEndReq();
-            auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
-            auto translationUnit = entryPointReq->getTranslationUnit();
-
-            for (SourceFile* sourceFile : translationUnit->m_sourceFiles)
-            {
-                const auto& pathInfo = sourceFile->getPathInfo();
-
-                if (pathInfo.type == PathInfo::Type::FoundPath ||
-                    pathInfo.type == PathInfo::Type::Normal)
-                {
-                    String originalSourceDirectory = Path::getParentDirectory(pathInfo.foundPath);
-
-                    if (originalSourceDirectory.getLength() && File::exists(originalSourceDirectory))
-                    {
-                        // We can't use this path directly, so make canonical so it is absolute
-                        StringBuilder canonicalPath;
-                        if (SLANG_SUCCEEDED(Path::getCanonical(originalSourceDirectory, canonicalPath)))
-                        {
-                            options.includePaths.add(canonicalPath.ProduceString());
-                            break;
-                        }
-                    }
                 }
             }
         }
