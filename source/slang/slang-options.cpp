@@ -816,7 +816,13 @@ struct OptionsParser
                     }
                     else if (name == "load-file")
                     {
+                        // OSFileSystem just implements loadFile interface, so will be wrapped with CacheFileSystem internally
                         spSetFileSystem(compileRequest, OSFileSystem::getSingleton());
+                    }
+                    else if (name == "os")
+                    {
+                        // OSFileSystemExt implements the ISlangFileSystemExt interface - and will be used directly
+                        spSetFileSystem(compileRequest, OSFileSystemExt::getSingleton());
                     }
                     else
                     {
