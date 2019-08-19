@@ -61,6 +61,8 @@ public:
     bool isOutput = false;
     int hlslBinding = -1;
     Slang::List<int> glslBinding;
+
+    Slang::String name;                     ///< Optional name. Useful for binding through reflection.
 };
 
 struct TextureData
@@ -80,7 +82,10 @@ public:
     Slang::List<Slang::String> globalExistentialTypeArguments;
     Slang::List<Slang::String> entryPointExistentialTypeArguments;
     int numRenderTargets = 1;
-    void Parse(const char * source);
+
+    Slang::Index findEntryIndexByName(const Slang::String& name) const;
+
+    void parse(const char * source);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);

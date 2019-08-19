@@ -15,6 +15,7 @@ enum class RenderApiType
     Vulkan,
     D3D12,
     D3D11,
+    CPU,
     CountOf,
 };
 
@@ -27,6 +28,7 @@ struct RenderApiFlag
         Vulkan = 1 << int(RenderApiType::Vulkan),
         D3D12 = 1 << int(RenderApiType::D3D12),
         D3D11 = 1 << int(RenderApiType::D3D11),
+        CPU   = 1 << int(RenderApiType::CPU),
         AllOf = (1 << int(RenderApiType::CountOf)) - 1                   ///< All bits set
     };
 };
