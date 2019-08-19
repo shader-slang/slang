@@ -65,8 +65,6 @@ struct OptionsParser
 
     Slang::EndToEndCompileRequest*  requestImpl = nullptr;
 
-    Slang::RefPtr<Slang::ConfigurableSharedLibraryLoader> sharedLibraryLoader;
-    
     // A "translation unit" represents one or more source files
     // that are processed as a single entity when it comes to
     // semantic checking.
@@ -181,15 +179,6 @@ struct OptionsParser
     List<RawTarget> rawTargets;
 
     RawTarget defaultTarget;
-
-    void addSharedLibraryPath(SharedLibraryType libType, const String& path)
-    {
-        if (!sharedLibraryLoader)
-        {
-            sharedLibraryLoader = new ConfigurableSharedLibraryLoader;
-        }
-        sharedLibraryLoader->addEntry(libType, ConfigurableSharedLibraryLoader::changePath, path);
-    }
 
     int addTranslationUnit(
         SlangSourceLanguage language,
@@ -615,25 +604,6 @@ struct OptionsParser
 
                     spSetPassThrough(compileRequest, passThrough);
                 }
-                else if (argStr == "-dxc-path")
-                {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    addSharedLibraryPath(SharedLibraryType::Dxc, name);
-                    addSharedLibraryPath(SharedLibraryType::Dxil, name);
-                }
-                else if (argStr == "-glslang-path")
-                {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    addSharedLibraryPath(SharedLibraryType::Glslang, name);
-                }
-                else if (argStr == "-fxc-path")
-                {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    addSharedLibraryPath(SharedLibraryType::Fxc, name);
-                }
                 else if (argStr.getLength() >= 2 && argStr[1] == 'D')
                 {
                     // The value to be defined might be part of the same option, as in:
@@ -816,7 +786,13 @@ struct OptionsParser
                     }
                     else if (name == "load-file")
                     {
+                        // OSFileSystem just implements loadFile interface, so will be wrapped with CacheFileSystem internally
                         spSetFileSystem(compileRequest, OSFileSystem::getSingleton());
+                    }
+                    else if (name == "os")
+                    {
+                        // OSFileSystemExt implements the ISlangFileSystemExt interface - and will be used directly
+                        spSetFileSystem(compileRequest, OSFileSystemExt::getSingleton());
                     }
                     else
                     {
@@ -836,6 +812,24 @@ struct OptionsParser
                 }
                 else
                 {
+                    if (argStr.endsWith("-path"))
+                    {
+                        Index index = argStr.lastIndexOf('-');
+                        if (index >= 0)
+                        {
+                            String name;
+                            SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                            String slice = argStr.subString(1, index - 1);
+                            SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                            if (SLANG_SUCCEEDED(_parsePassThrough(slice.getUnownedSlice(), passThrough)))
+                            {
+                                session->setPassThroughPath(passThrough, name.getBuffer());
+                                continue;
+                            }
+                        }
+                    }
+
                     sink->diagnose(SourceLoc(), Diagnostics::unknownCommandLineOption, argStr);
                     // TODO: print a usage message
                     return SLANG_FAIL;
@@ -1352,11 +1346,6 @@ struct OptionsParser
             }
         }
 
-        if (sharedLibraryLoader)
-        {
-            spSessionSetSharedLibraryLoader(session, sharedLibraryLoader);
-        }
-        
         return (sink->GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
