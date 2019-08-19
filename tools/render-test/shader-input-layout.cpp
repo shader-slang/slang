@@ -6,7 +6,23 @@
 namespace renderer_test
 {
     using namespace Slang;
-    void ShaderInputLayout::Parse(const char * source)
+
+
+    Index ShaderInputLayout::findEntryIndexByName(const String& name) const
+    {
+        const Index count = Index(entries.getCount());
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto& entry = entries[i];
+            if (entry.name == name)
+            {
+                return Index(i);
+            }
+        }
+        return -1;
+    }
+
+    void ShaderInputLayout::parse(const char * source)
     {
         entries.clear();
         globalGenericTypeArguments.clear();
@@ -267,6 +283,18 @@ namespace renderer_test
                                     parser.ReadToken();
                                     entry.isOutput = true;
                                 }
+                                else if (parser.LookAhead("name"))
+                                {
+                                    parser.ReadToken();
+                                    Token nameToken = parser.ReadToken();
+
+                                    if (nameToken.Type != TokenType::Identifier)
+                                    {
+                                        throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                                    }
+                                    entry.name = nameToken.Content;
+                                }
+
                                 if (parser.LookAhead(","))
                                     parser.Read(",");
                             }

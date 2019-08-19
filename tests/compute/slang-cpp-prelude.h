@@ -805,6 +805,7 @@ SLANG_FORCE_INLINE int32_t I32_max(int32_t a, int32_t b) { return a > b ? a : b;
 SLANG_FORCE_INLINE int32_t I32_clamp(int32_t x, int32_t min, int32_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
 
 SLANG_FORCE_INLINE float I32_asfloat(int32_t x) { Union32 u; u.i = x; return u.f; }
+SLANG_FORCE_INLINE uint32_t I32_asuint(int32_t x) { return uint32_t(x); } 
 
 // ----------------------------- U32 -----------------------------------------
 
@@ -816,6 +817,7 @@ SLANG_FORCE_INLINE uint32_t U32_max(uint32_t a, uint32_t b) { return a > b ? a :
 SLANG_FORCE_INLINE uint32_t U32_clamp(uint32_t x, uint32_t min, uint32_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
 
 SLANG_FORCE_INLINE float U32_asfloat(uint32_t x) { Union32 u; u.u = x; return u.f; }
+SLANG_FORCE_INLINE uint32_t U32_asint(int32_t x) { return uint32_t(x); } 
 
 #ifdef SLANG_PRELUDE_NAMESPACE
 } 

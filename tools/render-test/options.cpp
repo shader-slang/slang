@@ -28,6 +28,7 @@ static gfx::RendererType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::D3D12: return gfx::RendererType::DirectX12;
     case RenderApiType::OpenGl: return gfx::RendererType::OpenGl;
     case RenderApiType::Vulkan: return gfx::RendererType::Vulkan;
+    case RenderApiType::CPU:    return gfx::RendererType::CPU;
     default: return gfx::RendererType::Unknown;
     }
 }

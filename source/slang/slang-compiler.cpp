@@ -561,6 +561,21 @@ namespace Slang
         return translationUnit;
     }
 
+    static TranslationUnitRequest* _getTranslationUnit(
+        EndToEndCompileRequest* endToEndReq,
+        Int                     entryPointIndex)
+    {
+        // If there isn't an end-to-end compile going on,
+        // there can be no pass-through.
+        //
+        if (!endToEndReq) return nullptr;
+
+        auto frontEndReq = endToEndReq->getFrontEndReq();
+        auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
+        auto translationUnit = entryPointReq->getTranslationUnit();
+        return translationUnit;
+    }
+
     static void _appendEscapedPath(const UnownedStringSlice& path, StringBuilder& outBuilder)
     {
         for (auto c : path)
@@ -1301,6 +1316,28 @@ SlangResult dissassembleDXILUsingDXC(
         }
         else
         {
+            // TODO(JS): This is a hack for two reasons
+            // * That we just inject the source path for C/C++ include paths if we find the file
+            // * We should access the files through the ISlangFileSystem
+
+            translationUnit = _getTranslationUnit(endToEndReq, entryPointIndex);
+
+            const auto& sourceFiles = translationUnit->getSourceFiles();
+            if (sourceFiles.getCount() == 1)
+            {
+                const SourceFile* sourceFile = sourceFiles[0];
+                const PathInfo& pathInfo = sourceFile->getPathInfo();
+                if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal || pathInfo.type == PathInfo::Type::FromString)
+                {
+                    String canonicalPath;
+                    if (File::exists(pathInfo.foundPath) && SLANG_SUCCEEDED(Path::getCanonical(pathInfo.foundPath, canonicalPath)))
+                    {
+                        String sourceDir = Path::getParentDirectory(canonicalPath);
+                        includePaths.add(sourceDir);                        
+                    }
+                }
+            }
+
             rawSource = emitCPPForEntryPoint(
                 slangRequest,
                 entryPoint,
@@ -1547,6 +1584,7 @@ SlangResult dissassembleDXILUsingDXC(
             sharedLib->m_temporaryFileSet = productFileSet;
             productFileSet.clear();
 
+            // Output the shared library
             outSharedLib = sharedLib;
         }
         else
