@@ -7,7 +7,7 @@
 enum Color
 {
     Red,
-    Green = 2,
+    Green = (1 << 1),
     Blue,
 }
 
