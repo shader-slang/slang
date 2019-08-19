@@ -723,7 +723,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $1, $3)$z\")\n";
+                    sb << "__target_intrinsic(glsl, \"$c" << glslFuncName << "($0, $1, $2)$z\")\n";
                 }
                 else
                 {
