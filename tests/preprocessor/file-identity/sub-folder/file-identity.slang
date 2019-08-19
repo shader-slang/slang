@@ -1,6 +1,6 @@
 //TEST(smoke):SIMPLE:
 //TEST(smoke):SIMPLE: -file-system load-file
-
+//TEST(smoke):SIMPLE: -file-system os
 
 #include "../b.h"
 #include "../c.h"
