@@ -69,6 +69,7 @@ const Resource::DescBase& Resource::getDescBase() const
     BindingStyle::DirectX,      // DirectX12,
     BindingStyle::OpenGl,       // OpenGl,
     BindingStyle::Vulkan,       // Vulkan
+    BindingStyle::CPU,          // CPU
 };
 
 /* static */void RendererUtil::compileTimeAsserts()
@@ -398,6 +399,7 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         case RendererType::OpenGl:          return UnownedStringSlice::fromLiteral("OpenGL");
         case RendererType::Vulkan:          return UnownedStringSlice::fromLiteral("Vulkan");
         case RendererType::Unknown:         return UnownedStringSlice::fromLiteral("Unknown");
+        case RendererType::CPU:             return UnownedStringSlice::fromLiteral("CPU");
         default:                            return UnownedStringSlice::fromLiteral("?!?");
     }
 }

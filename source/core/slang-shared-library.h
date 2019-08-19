@@ -122,7 +122,7 @@ public:
 
         /// Function to replace the the path with entryString
     static Result replace(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut);
-        /// Function to change the path using the entryStrinct
+        /// Function to change the path using the entryString
     static Result changePath(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut);
 
     void addEntry(const String& libName, Func func, const String& entryString) { m_entryMap.Add(libName, Entry{ func, entryString} ); }

@@ -1,10 +1,12 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
+
 void writeArray(inout float3 a[4])
 {
     a[0] = float3(1, 1, 1);
