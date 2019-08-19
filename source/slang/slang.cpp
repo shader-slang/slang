@@ -146,14 +146,14 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     return Slang::Profile::LookUp(name).raw;
 }
 
-SLANG_NO_THROW void SLANG_MCALL Session::setPassThroughPath(
+SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
     SlangPassThrough inPassThrough,
     char const* path)
 {
     PassThroughMode passThrough = PassThroughMode(inPassThrough);
     SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
     
-    if (m_passThroughPaths[int(passThrough)] != path)
+    if (m_downstreamCompilerPaths[int(passThrough)] != path)
     {
         // If it's changed we should unload any shared libraries that use it
         switch (passThrough)
@@ -187,8 +187,18 @@ SLANG_NO_THROW void SLANG_MCALL Session::setPassThroughPath(
         }
 
         // Set the path
-        m_passThroughPaths[int(passThrough)] = path;
+        m_downstreamCompilerPaths[int(passThrough)] = path;
     }
+}
+
+SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
+    SlangPassThrough inPassThrough,
+    char const* prelude)
+{
+    PassThroughMode passThrough = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
+
+    m_downstreamCompilerPreludes[int(passThrough)] = prelude;
 }
 
 struct IncludeHandlerImpl : IncludeHandler

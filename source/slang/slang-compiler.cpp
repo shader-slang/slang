@@ -474,7 +474,7 @@ namespace Slang
         return SLANG_E_NOT_IMPLEMENTED;
     }
 
-    static PassThroughMode _getExternalCompilerRequiredForTarget(CodeGenTarget target)
+    PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     {
         switch (target)
         {
@@ -530,9 +530,22 @@ namespace Slang
         return PassThroughMode::None;
     }
 
+    PassThroughMode getPassThroughModeForCPPCompiler(CPPCompiler::CompilerType type)
+    {
+        typedef CPPCompiler::CompilerType CompilerType;
+
+        switch (type)
+        {
+            case CompilerType::VisualStudio:        return PassThroughMode::VisualStudio;
+            case CompilerType::GCC:                 return PassThroughMode::Gcc;
+            case CompilerType::Clang:               return PassThroughMode::Clang;
+            default:                                return PassThroughMode::None;
+        }
+    }
+
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
     {
-        const PassThroughMode mode = _getExternalCompilerRequiredForTarget(target);
+        const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
         return (mode != PassThroughMode::None) ?
             checkExternalCompilerSupport(session, mode) :
             SLANG_OK;

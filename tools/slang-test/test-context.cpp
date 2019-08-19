@@ -21,6 +21,7 @@ Result TestContext::init()
     {
         return SLANG_FAIL;
     }
+
     return SLANG_OK;
 }
 

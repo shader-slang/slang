@@ -364,9 +364,9 @@ namespace Slang
 
             StringBuilder builder;
             PassThroughMode passThrough = _toPassThroughMode(type);
-            if (passThrough != PassThroughMode::None && m_passThroughPaths[int(passThrough)].getLength() > 0)
+            if (passThrough != PassThroughMode::None && m_downstreamCompilerPaths[int(passThrough)].getLength() > 0)
             {
-                Path::combineIntoBuilder(m_passThroughPaths[int(passThrough)].getUnownedSlice(), UnownedStringSlice(libName), builder);
+                Path::combineIntoBuilder(m_downstreamCompilerPaths[int(passThrough)].getUnownedSlice(), UnownedStringSlice(libName), builder);
                 libName = builder.getBuffer();
             }
 
@@ -424,9 +424,9 @@ namespace Slang
             typedef CPPCompiler::CompilerType CompilerType;
             CPPCompilerUtil::InitializeSetDesc desc;
        
-            desc.paths[int(CompilerType::GCC)] = m_passThroughPaths[int(PassThroughMode::Gcc)];
-            desc.paths[int(CompilerType::Clang)] = m_passThroughPaths[int(PassThroughMode::Clang)];
-            desc.paths[int(CompilerType::VisualStudio)] = m_passThroughPaths[int(PassThroughMode::VisualStudio)];
+            desc.paths[int(CompilerType::GCC)] = m_downstreamCompilerPaths[int(PassThroughMode::Gcc)];
+            desc.paths[int(CompilerType::Clang)] = m_downstreamCompilerPaths[int(PassThroughMode::Clang)];
+            desc.paths[int(CompilerType::VisualStudio)] = m_downstreamCompilerPaths[int(PassThroughMode::VisualStudio)];
 
             CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
         }

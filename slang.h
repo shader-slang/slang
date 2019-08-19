@@ -517,6 +517,7 @@ extern "C"
         SLANG_EXECUTABLE,           ///< Executable (for hosting CPU/OS)
         SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
         SLANG_HOST_CALLABLE,        ///< A CPU target that makes the compiled code available to be run immediately
+        SLANG_TARGET_COUNT_OF,
     };
 
     /* A "container format" describes the way that the outputs
@@ -2647,13 +2648,27 @@ namespace slang
         virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
             char const*     name) = 0;
 
-            /** Set the path that pass through (aka back end compilers) will
-            be looked from. For back ends that are dlls/shared libraries, it will mean the path will
+            /** Set the path that downstream compilers (aka back end compilers) will
+            be looked from.
+            @param passThrough Identifies the downstream compiler
+            @param path The path to find the downstream compiler (shared library/dll/executable)
+
+            For back ends that are dlls/shared libraries, it will mean the path will
             be prefixed with the path when calls are made out to ISlangSharedLibraryLoader.
             For executables - it will look for executables along the path */
-        virtual void SLANG_MCALL setPassThroughPath(
+        virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPath(
             SlangPassThrough passThrough,
             char const* path) = 0;
+
+            /** Set the 'prelude' for generated code for a 'downstream compiler'.
+            @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
+            @param preludeText The text added pre-pended verbatim before the generated source
+
+            That for pass-through usage, prelude is not pre-pended, preludes are for code generation only. 
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(
+            SlangPassThrough passThrough,
+            const char* preludeText) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

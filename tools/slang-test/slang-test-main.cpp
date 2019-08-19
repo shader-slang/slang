@@ -32,7 +32,7 @@ using namespace Slang;
 #include <stdarg.h>
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../tests/cross-compile/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-prelude.h"
 
 // Options for a particular test
 struct TestOptions
@@ -1386,54 +1386,6 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     if (exeRes.resultCode != 0)
     {
         return TestResult::Fail;
-    }
-
-    String modulePath = _calcModulePath(input);
-    
-    // Find the target
-    UnownedStringSlice targetExt = UnownedStringSlice::fromLiteral("c");
-    Index index = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-target"));
-    if (index >= 0 && index + 1 < cmdLine.getArgCount())
-    {
-        targetExt = cmdLine.m_args[index + 1].value.getUnownedSlice();
-    }
-
-    // If output was C/C++ we should try compiling
-    if (targetExt == "c" || targetExt == "cpp")
-    {
-        CPPCompiler::CompileOptions options;
-        options.sourceType = (targetExt == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
-
-        options.includePaths.add("tests/cross-compile");
-
-        String actualOutput = exeRes.standardOutput;
-
-        // Create a filename to write this out to
-        String cppSource = modulePath + "." + targetExt;
-        Slang::File::writeAllText(cppSource, actualOutput);
-
-        // Okay we can now try compiling
-
-        // Compile this source
-        options.sourceFiles.add(cppSource);
-        options.modulePath = modulePath;
-        options.targetType = CPPCompiler::TargetType::SharedLibrary;
-
-        CPPCompiler::Output output;
-        if (SLANG_FAILED(compiler->compile(options, output)))
-        {
-            return TestResult::Fail;
-        }
-
-        if (output.getCountByType(CPPCompiler::Diagnostic::Type::Error) > 0)
-        {
-            return TestResult::Fail;
-        }
-    }
-    else
-    {
-        // Can only be callable
-        SLANG_ASSERT(targetExt == "callable" || targetExt == "host-callable");
     }
 
     return TestResult::Pass;
@@ -2852,6 +2804,8 @@ SlangResult innerMain(int argc, char** argv)
     // The context holds useful things used during testing
     TestContext context;
     SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))
+
+    TestToolUtil::setSessionDefaultPrelude(argv[0], context.getSession());
 
     auto& categorySet = context.categorySet;
 

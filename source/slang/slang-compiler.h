@@ -62,6 +62,7 @@ namespace Slang
         Executable          = SLANG_EXECUTABLE,
         SharedLibrary       = SLANG_SHARED_LIBRARY,
         HostCallable        = SLANG_HOST_CALLABLE,
+        CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
     CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
@@ -1057,6 +1058,13 @@ namespace Slang
     ///
     ComPtr<ISlangBlob> createRawBlob(void const* data, size_t size);
 
+
+        /// Given a target returns the required downstream compiler
+    PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
+
+    PassThroughMode getPassThroughModeForCPPCompiler(CPPCompiler::CompilerType type);
+
+
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {
@@ -1791,10 +1799,13 @@ namespace Slang
         SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
             char const*     name) override;
 
-        SLANG_NO_THROW void SLANG_MCALL setPassThroughPath(
+        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPath(
             SlangPassThrough passThrough,
             char const* path) override;
 
+        SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
+            SlangPassThrough inPassThrough,
+            char const* prelude) override;
 
         enum class SharedLibraryFuncType
         {
@@ -1928,6 +1939,9 @@ namespace Slang
 
         SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
 
+            /// Get the downstream compiler prelude
+        const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
+
             /// Finds out what compilers are present and caches the result
         CPPCompilerSet* requireCPPCompilerSet();
 
@@ -1943,7 +1957,8 @@ namespace Slang
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 
-        String m_passThroughPaths[int(PassThroughMode::CountOf)];               ///< Paths for each pass through
+        String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];              ///< Paths for each pass through
+        String m_downstreamCompilerPreludes[int(PassThroughMode::CountOf)];             ///< Prelude for each type of target
     };
 
 

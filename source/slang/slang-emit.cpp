@@ -540,6 +540,31 @@ String emitEntryPoint(
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
 
+    {
+        Session* session = compileRequest->getSession();
+
+        // Get the downstream compiler needed for final target
+        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(targetRequest->target);
+
+        // If generic CPP work out what compiler will actually be used
+        if (passThru == PassThroughMode::GenericCCpp)
+        {
+            CPPCompilerSet* compilerSet = session->requireCPPCompilerSet();
+            CPPCompiler* compiler = compilerSet->getDefaultCompiler();
+            if (compiler)
+            {
+                passThru = getPassThroughModeForCPPCompiler(compiler->getDesc().type);
+            }
+        }
+
+        // If there is a prelude emit it
+        const auto& prelude = compileRequest->getSession()->getDownstreamCompilerPrelude(passThru);
+        if (prelude.getLength() > 0)
+        {
+            sourceWriter.emit(prelude.getUnownedSlice());
+        }
+    }
+
     // There may be global-scope modifiers that we should emit now
     sourceEmitter->emitPreprocessorDirectives();
 
