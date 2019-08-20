@@ -630,51 +630,9 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
         return inst;
     }
 
-#if 0
     // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
     // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
     // it's no use
-
-    // For nominal types their 'nominality' is purely the instruction pointer itself. So we can
-    // just use an empty definition to gain uniqueness, which is all we care about here.
-    if (isNominalOp(inst->op))
-    {
-        IRInst* clone = nullptr;
-        switch (inst->op)
-        {
-            case kIROp_StructType:      clone = m_irBuilder.createStructType();           break;
-            case kIROp_InterfaceType:   clone = m_irBuilder.createInterfaceType();        break;
-            case kIROp_Generic:         clone = m_irBuilder.createGeneric();              break;
-            default: break;
-        }
-        SLANG_ASSERT(clone);
-
-        // Add to the module
-        m_irBuilder.addInst(clone);
-
-        // Add the mapping
-        m_cloneMap.Add(inst, clone);
-
-        // The only other thing we care about is the name, because that might be needed when the type is output
-        IRNameHintDecoration* nameDecor = inst->findDecoration<IRNameHintDecoration>();
-        if (nameDecor)
-        {
-            IRNameHintDecoration* cloneNameDecor = as<IRNameHintDecoration>(_clone(nameDecor));
-
-            IRBuilder builder;
-            builder.sharedBuilder = &m_sharedIRBuilder;
-            if(auto first = clone->getFirstDecorationOrChild())
-                builder.setInsertBefore(first);
-            else
-                builder.setInsertInto(clone);
-
-            builder.addInst(cloneNameDecor);
-        }
-
-        // Return the new cloned inst
-        return clone;
-    }
-#endif
 
     IRInst* clone = nullptr;
     switch (inst->op)

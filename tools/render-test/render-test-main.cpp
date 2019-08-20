@@ -504,6 +504,12 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     ShaderInputLayout& layout = output.layout;
 
+    // TODO(JS):
+    // We need a better way to handle all of this.
+    // * There needs to be a mechanism to allocate space
+    // * A mechanism to set the binding (what do we set the elementCount to? It should be the buffer size divided by the element size)
+    // * If we are using an output buffer, we need to write out based on the allocated buffer NOT the one in layout
+
     // For general storage
     MemoryArena arena;
     arena.init(1024);
