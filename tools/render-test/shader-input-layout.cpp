@@ -286,6 +286,13 @@ namespace renderer_test
                                 else if (parser.LookAhead("name"))
                                 {
                                     parser.ReadToken();
+
+                                    // Optionally consume '=' 
+                                    if (parser.NextToken().Type == TokenType::OpAssign)
+                                    {
+                                        parser.ReadToken();
+                                    }
+
                                     Token nameToken = parser.ReadToken();
 
                                     if (nameToken.Type != TokenType::Identifier)
