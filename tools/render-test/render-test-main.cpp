@@ -397,16 +397,74 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const String&
     {
         if (entry.isOutput)
         {
-            auto ptr = entry.bufferData.getBuffer();
+            unsigned int* ptr = entry.bufferData.getBuffer();
             const int size = int(entry.bufferData.getCount());
             for (int i = 0; i < size; ++i)
             {
-                fprintf(f, "%X\n", ptr[i]);
+                unsigned int v = ptr[i];
+
+                fprintf(f, "%X\n", v);
             }
         }
     }
     fclose(f);
     return SLANG_OK;
+}
+
+static size_t _calcTypeSizeInBytes(slang::TypeLayoutReflection* typeLayout)
+{
+    switch (typeLayout->getKind())
+    {
+        case slang::TypeReflection::Kind::Array:
+        {
+            auto arrayTypeLayout = typeLayout;
+            auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
+            auto elementCount = int(arrayTypeLayout->getElementCount());
+
+            size_t elementStride = 0;
+            if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
+            {
+                elementStride = arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+            }
+            else
+            {
+                elementStride =  _calcTypeSizeInBytes(elementTypeLayout);
+            }
+            return elementCount * elementStride;
+        }
+        case slang::TypeReflection::Kind::Struct:
+        {            
+            const SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM;
+
+            size_t maxSize = 0;
+
+            auto structTypeLayout = typeLayout;
+            auto fieldCount = structTypeLayout->getFieldCount();
+            for (uint32_t ff = 0; ff < fieldCount; ++ff)
+            {
+                auto field = structTypeLayout->getFieldByIndex(ff);
+
+                auto offset = field->getOffset(category);
+                auto sizeInBytes = field->getTypeLayout()->getSize(category);
+
+                size_t end = offset + sizeInBytes;
+
+                maxSize = (end > maxSize) ? end : maxSize;
+            }
+            auto type = structTypeLayout->getType();
+            SLANG_UNUSED(type);
+
+            return maxSize;
+            break;
+        }
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        {
+            return _calcTypeSizeInBytes(typeLayout->getElementTypeLayout());
+            break;
+        }
+        default: break;
+    }
+    return 0;
 }
 
 static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
@@ -544,7 +602,20 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 case slang::TypeReflection::Kind::ConstantBuffer:
                 {
                     auto elementTypeLayout = typeLayout->getElementTypeLayout();
-                    SLANG_UNUSED(elementTypeLayout);
+                    // We need to work out the size and initialize it.
+                    size_t size = _calcTypeSizeInBytes(elementTypeLayout);
+
+                    void* constantData = arena.allocateAligned(size, 16);
+                    ::memset(constantData, 0, size);
+
+                    if (srcEntry.bufferData.getCount() > 0)
+                    {
+                        size_t srcSize = srcEntry.bufferData.getCount() * sizeof(uint32_t);
+                        srcSize = (srcSize > size) ? size : srcSize;
+                        ::memcpy(constantData, srcEntry.bufferData.getBuffer(), srcSize);
+                    }
+
+                    *(void**)dstEntry = constantData;
                     break;
                 }
                 case slang::TypeReflection::Kind::ParameterBlock:
@@ -590,7 +661,6 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                     if ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
                     {
                         _handleResource(typeLayout->getType(), srcEntry, dstEntry);
-
                     }
                     else
                     {

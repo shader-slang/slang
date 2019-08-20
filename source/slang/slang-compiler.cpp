@@ -1529,6 +1529,11 @@ SlangResult dissassembleDXILUsingDXC(
             sharedLib->m_temporaryFileSet = productFileSet;
             productFileSet.clear();
 
+            // Copy the paths in the temporary file set
+            // We particularly want to do this to keep the source
+            sharedLib->m_temporaryFileSet.add(temporaryFileSet.m_paths);
+            temporaryFileSet.clear();
+
             // Output the shared library
             outSharedLib = sharedLib;
         }

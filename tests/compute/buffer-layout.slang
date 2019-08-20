@@ -3,10 +3,10 @@
 // The goal of this test is to make sure that constant and structured
 // buffers obey the rules we expect of the each target API.
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
