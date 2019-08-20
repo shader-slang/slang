@@ -2,6 +2,7 @@
 
 // Confirm that an associated type can be declared nested in its parent.
 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
@@ -48,7 +49,7 @@ int test(int val)
 	return helper(strategy, val);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]

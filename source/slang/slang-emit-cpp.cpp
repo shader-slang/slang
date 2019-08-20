@@ -385,21 +385,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 }
 
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
-{
-    if (isNominalOp(inType->op))
-    {
-        StringSlicePool::Handle handle;
-        // NOTE! This is somewhat unusual -> we are going to add types which aren't cloned and belong to
-        // m_uniqueModule. We *assume* nominal types are de-duped
-        if (!m_typeNameMap.TryGetValue(inType, handle))
-        {
-            auto name = getName(inType);
-            handle = m_slicePool.add(name);
-            m_typeNameMap.Add(inType, handle);
-        }
-        return m_slicePool.getSlice(handle);
-    }
-    
+{ 
     IRType* type = _cloneType(inType);
 
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
@@ -572,6 +558,12 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
         }
         default:
         {
+            if (isNominalOp(type->op))
+            {
+                out << getName(type);
+                return SLANG_OK;
+            }
+
             if (IRBasicType::isaImpl(type->op))
             {
                 out << getBuiltinTypeName(type->op);
@@ -607,29 +599,84 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
         return nullptr;
     }
 
+    IRModule* module = inst->getModule();
+    // All inst's must belong to a module
+    SLANG_ASSERT(module);
+
     // If it's in this module then we don't need to clone
-    if (inst->getModule() == m_uniqueModule)
+    if (module == m_uniqueModule)
     {
         return inst;
     }
 
-    if (isNominalOp(inst->op))
-    {
-        // If it's nominal we don't bother copying, as we assumed it is already de-duped
-        return inst;
-    }
-    
     if (IRInst*const* newInstPtr = m_cloneMap.TryGetValue(inst))
     {
         return *newInstPtr;
     }
-    
+
+    if (isNominalOp(inst->op))
+    {
+        // TODO(JS)
+        // This is arguably problematic - I'm adding an instruction from another module to the map, to be it's self.
+        // I did have code which created a copy of the nominal instruction and name hint, but because nominality means
+        // 'same address' other code would generate a different name for that instruction (say as compared to being a member in
+        // the original instruction)
+        //
+        // Because I use findOrAddInst which doesn't hoist instructions, the hoisting doesn't rely on parenting, that would
+        // break.
+
+        // If nominal, we just use the original inst
+        m_cloneMap.Add(inst, inst);
+        return inst;
+    }
+
+#if 0
     // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
     // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
     // it's no use
 
-    IRInst* clone = nullptr;
+    // For nominal types their 'nominality' is purely the instruction pointer itself. So we can
+    // just use an empty definition to gain uniqueness, which is all we care about here.
+    if (isNominalOp(inst->op))
+    {
+        IRInst* clone = nullptr;
+        switch (inst->op)
+        {
+            case kIROp_StructType:      clone = m_irBuilder.createStructType();           break;
+            case kIROp_InterfaceType:   clone = m_irBuilder.createInterfaceType();        break;
+            case kIROp_Generic:         clone = m_irBuilder.createGeneric();              break;
+            default: break;
+        }
+        SLANG_ASSERT(clone);
 
+        // Add to the module
+        m_irBuilder.addInst(clone);
+
+        // Add the mapping
+        m_cloneMap.Add(inst, clone);
+
+        // The only other thing we care about is the name, because that might be needed when the type is output
+        IRNameHintDecoration* nameDecor = inst->findDecoration<IRNameHintDecoration>();
+        if (nameDecor)
+        {
+            IRNameHintDecoration* cloneNameDecor = as<IRNameHintDecoration>(_clone(nameDecor));
+
+            IRBuilder builder;
+            builder.sharedBuilder = &m_sharedIRBuilder;
+            if(auto first = clone->getFirstDecorationOrChild())
+                builder.setInsertBefore(first);
+            else
+                builder.setInsertInto(clone);
+
+            builder.addInst(cloneNameDecor);
+        }
+
+        // Return the new cloned inst
+        return clone;
+    }
+#endif
+
+    IRInst* clone = nullptr;
     switch (inst->op)
     {
         case kIROp_IntLit:
@@ -637,6 +684,12 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
             auto intLit = static_cast<IRConstant*>(inst);
             IRType* cloneType = _cloneType(intLit->getDataType());
             clone = m_irBuilder.getIntValue(cloneType, intLit->value.intVal);
+            break;
+        }
+        case kIROp_StringLit:
+        {
+            auto stringLit = static_cast<IRStringLit*>(inst);
+            clone =  m_irBuilder.getStringValue(stringLit->getStringSlice());
             break;
         }
         default:
@@ -661,7 +714,12 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
                         cloneOperands[i] = _clone(inst->getOperand(i));
                     }
 
-                    clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+                    //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+
+                    UInt operandCounts[1] = { UInt(operandCount) };
+                    IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
+
+                    clone = m_irBuilder.findOrAddInst(cloneType, inst->op, 1, operandCounts, listOperands);
                 }
                 else
                 {
