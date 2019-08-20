@@ -13,13 +13,14 @@
 
 #include "shader-renderer-util.h"
 
+#include "../source/core/slang-io.h"
+
 #include "shader-input-layout.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO(JS): We need to put the prelude into a better place
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../tests/cross-compile/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-types.h"
 
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-memory-arena.h"
@@ -1059,6 +1060,8 @@ int main(int argc, char**  argv)
     using namespace Slang;
     SlangSession* session = spCreateSession(nullptr);
 
+    TestToolUtil::setSessionDefaultPrelude(argv[0], session);
+    
     auto stdWriters = StdWriters::initDefaultSingleton();
     
     SlangResult res = innerMain(stdWriters, session, argc, argv);

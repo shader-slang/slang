@@ -81,6 +81,7 @@ int MAIN(int argc, char** argv)
     SlangResult res;
     {
         SlangSession* session = spCreateSession(nullptr);
+        TestToolUtil::setSessionDefaultPrelude(argv[0], session);
 
         auto stdWriters = StdWriters::initDefaultSingleton();
         

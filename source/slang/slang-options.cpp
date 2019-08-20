@@ -824,7 +824,7 @@ struct OptionsParser
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
                             if (SLANG_SUCCEEDED(_parsePassThrough(slice.getUnownedSlice(), passThrough)))
                             {
-                                session->setPassThroughPath(passThrough, name.getBuffer());
+                                session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;
                             }
                         }
