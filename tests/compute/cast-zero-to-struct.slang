@@ -4,6 +4,7 @@
 // to a `struct` type works.
 
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
 struct S
 {
@@ -24,7 +25,7 @@ int test(int val)
 	return t.x + t.y*16;
 }
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]

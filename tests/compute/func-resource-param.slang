@@ -7,13 +7,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-dx12 -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cpu -compute
 
 //NO_TEST:SIMPLE:-target glsl -entry computeMain -stage compute -validate-ir -dump-ir
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 16 32 48], stride=4):dxbinding(1),glbinding(1)
+//TEST_INPUT:ubuffer(data=[0 16 32 48], stride=4):dxbinding(1),glbinding(1),name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
 int helper(RWStructuredBuffer<int> buffer, int index)

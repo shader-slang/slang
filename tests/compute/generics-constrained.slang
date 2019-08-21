@@ -1,5 +1,5 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST(smoke,compute):COMPARE_COMPUTE:-cpu
 
 // Use interface constraints on a generic parameter
 
@@ -27,6 +27,7 @@ float testHelp(T helper)
 	return helper.getHelp();
 }
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer : register(u0);
 
 
