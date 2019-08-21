@@ -6,6 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 
 // First we will define some fake interfaces for testing.
 // Let's pretend we are doing some kind of random number
@@ -74,7 +75,7 @@ int test(
 //
 // We'll start with the buffer for writing the test output.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 // Now we'll define a global shader parameter for the

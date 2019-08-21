@@ -466,6 +466,26 @@ SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, S
     return SLANG_OK;
 }
 
+static UnownedStringSlice _getResourceTypePrefix(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_HLSLStructuredBufferType:            return UnownedStringSlice::fromLiteral("StructuredBuffer");
+        case kIROp_HLSLRWStructuredBufferType:          return UnownedStringSlice::fromLiteral("RWStructuredBuffer");
+        case kIROp_HLSLRWByteAddressBufferType:         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
+        case kIROp_HLSLByteAddressBufferType:           return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+        case kIROp_SamplerStateType:                    return UnownedStringSlice::fromLiteral("SamplerState");
+        case kIROp_SamplerComparisonStateType:                  return UnownedStringSlice::fromLiteral("SamplerComparisonState");
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   return UnownedStringSlice::fromLiteral("RasterizerOrderedStructuredBuffer"); 
+        case kIROp_HLSLAppendStructuredBufferType:              return UnownedStringSlice::fromLiteral("AppendStructuredBuffer");            
+        case kIROp_HLSLConsumeStructuredBufferType:             return UnownedStringSlice::fromLiteral("ConsumeStructuredBuffer");           
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return UnownedStringSlice::fromLiteral("RasterizerOrderedByteAddressBuffer");
+        case kIROp_RaytracingAccelerationStructureType:         return UnownedStringSlice::fromLiteral("RaytracingAccelerationStructure");   
+
+        default:                                        return UnownedStringSlice();
+    }
+}
+
 SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
@@ -526,25 +546,6 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             }
             return SLANG_OK;
         }
-        case kIROp_HLSLRWStructuredBufferType:
-        {
-            auto bufType = static_cast<IRHLSLRWStructuredBufferType*>(type);
-
-            out << "RWStructuredBuffer<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(bufType->getElementType(), target, out));
-            out << ">";
-            return SLANG_OK;
-        }
-        case kIROp_HLSLRWByteAddressBufferType:
-        {
-            out << "RWByteAddressBuffer";
-            return SLANG_OK;
-        }
-        case kIROp_HLSLByteAddressBufferType:
-        {
-            out << "ByteAddressBuffer";
-            return SLANG_OK;
-        }
         case kIROp_ArrayType:
         {
             auto arrayType = static_cast<IRArrayType*>(type);
@@ -554,16 +555,6 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             out << "FixedArray<";
             SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
             out << ", " << elementCount << ">";
-            return SLANG_OK;
-        }
-        case kIROp_SamplerStateType:
-        {
-            out << "SamplerState";
-            return SLANG_OK;
-        }
-        case kIROp_SamplerComparisonStateType:
-        {
-            out << "SamplerComparisonState";
             return SLANG_OK;
         }
         default:
@@ -586,6 +577,47 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
                 if (texType->op != kIROp_TextureSamplerType)
                 {
                     return _calcTextureTypeName(texType, out);   
+                }
+            }
+
+            // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
+            {
+                UnownedStringSlice prefix = _getResourceTypePrefix(type->op);
+                if (prefix.size() > 0)
+                {
+                    auto oldWriter = m_writer;
+                    SourceManager* sourceManager = oldWriter->getSourceManager();
+
+                    // TODO(JS): This is a bit of a hack. We don't want to emit the result here,
+                    // so we replace the writer, write out the type, grab the contents, and restore the writer
+
+                    SourceWriter writer(sourceManager, LineDirectiveMode::None);
+                    m_writer = &writer;
+
+                    m_writer->emit(prefix);
+
+                    // TODO(JS).
+                    // Assumes ordering of types matches ordering of operands.
+
+                    UInt operandCount = type->getOperandCount();
+                    if (operandCount)
+                    {
+                        m_writer->emit("<");
+                        for (UInt ii = 0; ii < operandCount; ++ii)
+                        {
+                            if (ii != 0)
+                            {
+                                m_writer->emit(", ");
+                            }
+                            emitVal(type->getOperand(ii), getInfo(EmitOp::General));
+                        }
+                        m_writer->emit(">");
+                    }
+
+                    out << writer.getContent();
+
+                    m_writer = oldWriter;
+                    return SLANG_OK;
                 }
             }
 
@@ -1114,6 +1146,42 @@ void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName,
     writer->emit("}\n\n");
 }
 
+void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(0);
+
+    IRType* retType = specOp.returnType;
+    emitType(retType);
+    m_writer->emit("& ");
+
+    writer->emit(funcName);
+    writer->emit("(");
+
+    emitType(funcType->getParamType(0));
+    writer->emit("& a,  ");
+    emitType(funcType->getParamType(1));
+    writer->emit(" b)\n{\n");
+
+    writer->indent();
+
+    IRVectorType* vectorType = as<IRVectorType>(srcType);
+    Int vecSize = GetIntVal(vectorType->getElementCount());
+
+    writer->emit("assert(b >= 0 && b < ");
+    writer->emit(vecSize);
+    writer->emit(");\n");
+
+    writer->emit("return (&a.x)[b];\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {    
     SourceWriter* writer = getSourceWriter();
@@ -1357,6 +1425,10 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         case IntrinsicOp::ConstructFromScalar:
         {
             return _emitConstructFromScalarDefinition(_getFuncName(specOp), specOp);
+        }
+        case IntrinsicOp::GetAt:
+        {
+            return _emitGetAtDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
@@ -1628,6 +1700,14 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
                     return StringSlicePool::kNullHandle;
                 }
                 return m_slicePool.add(builder);
+            }
+            case IntrinsicOp::GetAt:
+            {
+                return m_slicePool.add(UnownedStringSlice::fromLiteral("getAt"));
+            }
+            case IntrinsicOp::SetAt:
+            {
+                return m_slicePool.add(UnownedStringSlice::fromLiteral("setAt"));
             }
             default: break;
         }
@@ -2219,7 +2299,18 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             return false;
         }
-
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
+        {
+            IRInst* target = inst->getOperand(0);
+            if (target->getDataType()->op == kIROp_VectorType)
+            {
+                // Specially handle this
+                emitOperationCall(IntrinsicOp::GetAt, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+                return true;
+            }
+            return false;
+        }
         default:
         {
             IntrinsicOp op = getOperation(inst->op);

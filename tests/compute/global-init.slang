@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(0),glbinding(0),out
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
 // Test that a global variable (not a shader parameter)
 // with an initializer works.
@@ -11,6 +11,7 @@ int test(int inVal)
 	return inVal + gVar;
 }
 
+//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]

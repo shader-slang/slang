@@ -1,7 +1,8 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0], stride=4):dxbinding(0),glbinding(0),out
+
 //TEST_INPUT:type Wrapper<Impl>
 
+//TEST_INPUT:ubuffer(data=[0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IBase

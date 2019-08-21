@@ -1,5 +1,6 @@
 // init-list-defaults.slang
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
 // Confirm that initializer lists correctly default-initialize elements past those specified.
 
@@ -22,7 +23,7 @@ int test(int inVal)
 		+ (inVal+1)*4096;
 }
 
-//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]
