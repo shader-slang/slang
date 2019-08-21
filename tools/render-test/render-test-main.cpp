@@ -320,72 +320,35 @@ static SlangResult _compile(SlangSession* session, const String& sourcePath, Opt
     return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.compileOutput);
 }
 
-static SlangResult _handleResource(slang::TypeReflection* type, ShaderInputLayoutEntry& src, void* dst)
+struct MemoryInfo
 {
-    auto shape = type->getResourceShape();
-    auto access = type->getResourceAccess();
+    MemoryInfo() :data(nullptr), size(0) {}
+    uint8_t* data;
+    size_t size;
+};
 
-    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
-    {
-        default:
-            assert(!"unhandled case");
-            break;
-        case SLANG_TEXTURE_1D:
-        case SLANG_TEXTURE_2D:
-        case SLANG_TEXTURE_3D:
-        case SLANG_TEXTURE_CUBE:
-        case SLANG_TEXTURE_BUFFER:
-        {
-            return SLANG_FAIL;
-        }
-        case SLANG_STRUCTURED_BUFFER:
-        {
-            // TODO(JS): I guess this is questionable - because sizeof(unsigned int) != sizeof(uint32_t) necessarily
-            CPPPrelude::StructuredBuffer<uint32_t>& dstBuf = *(CPPPrelude::StructuredBuffer<uint32_t>*)dst;
-            dstBuf.data = src.bufferData.getBuffer();
-            dstBuf.count = src.bufferData.getCount();
-            break;
-        }
-        case SLANG_BYTE_ADDRESS_BUFFER:
-        {
-            CPPPrelude::ByteAddressBuffer& dstBuf = *(CPPPrelude::ByteAddressBuffer*)dst;
-            dstBuf.data = src.bufferData.getBuffer();
-            dstBuf.sizeInBytes = src.bufferData.getCount() * sizeof(unsigned int);
+static MemoryInfo _allocateMemory(MemoryArena& arena, size_t size, List<unsigned int>& initialContents)
+{
+    MemoryInfo info;
 
-            break;
-        }
-    }
-    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+    // Use 16 byte alignment so works for all common types including typical simd
+    void* data = arena.allocateAligned(size, 16);
+    ::memset(data, 0, size);
+
+    if (initialContents.getCount() > 0)
     {
-        
-    }
-    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
-    {
- 
+        size_t initialSize = initialContents.getCount() * sizeof(unsigned int);
+        initialSize = (initialSize > size) ? size : initialSize;
+
+        ::memcpy(data, initialContents.getBuffer(), initialSize);
     }
 
-    if (access != SLANG_RESOURCE_ACCESS_READ)
-    {
-        switch (access)
-        {
-            default:
-                assert(!"unhandled case");
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ_WRITE:      break;
-            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  break;
-            case SLANG_RESOURCE_ACCESS_APPEND:          break;
-            case SLANG_RESOURCE_ACCESS_CONSUME:         break;
-        }
- 
-    }
-    return SLANG_OK;
+    info.data = (uint8_t*)data;
+    info.size = size;
+    return info;
 }
 
-static SlangResult _writeBindings(const ShaderInputLayout& layout, const String& fileName)
+static SlangResult _writeBindings(const ShaderInputLayout& layout, const List<MemoryInfo>& infos, const String& fileName)
 {
     FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
@@ -393,12 +356,21 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const String&
         return SLANG_FAIL;
     }
 
-    for (auto entry : layout.entries)
+    const auto& entries = layout.entries;
+
+    for (int i = 0; i < entries.getCount(); ++i)
     {
+        const auto& entry = entries[i];
         if (entry.isOutput)
         {
-            unsigned int* ptr = entry.bufferData.getBuffer();
+            const auto& info = infos[i];
+
+            unsigned int* ptr = (unsigned int*)info.data;
+
             const int size = int(entry.bufferData.getCount());
+            // Must be the same size or less thatn allocated buffer
+            SLANG_ASSERT(size * sizeof(unsigned int) <= info.size);
+
             for (int i = 0; i < size; ++i)
             {
                 unsigned int v = ptr[i];
@@ -411,61 +383,8 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const String&
     return SLANG_OK;
 }
 
-static size_t _calcTypeSizeInBytes(slang::TypeLayoutReflection* typeLayout)
-{
-    switch (typeLayout->getKind())
-    {
-        case slang::TypeReflection::Kind::Array:
-        {
-            auto arrayTypeLayout = typeLayout;
-            auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
-            auto elementCount = int(arrayTypeLayout->getElementCount());
 
-            size_t elementStride = 0;
-            if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
-            {
-                elementStride = arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
-            }
-            else
-            {
-                elementStride =  _calcTypeSizeInBytes(elementTypeLayout);
-            }
-            return elementCount * elementStride;
-        }
-        case slang::TypeReflection::Kind::Struct:
-        {            
-            const SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM;
 
-            size_t maxSize = 0;
-
-            auto structTypeLayout = typeLayout;
-            auto fieldCount = structTypeLayout->getFieldCount();
-            for (uint32_t ff = 0; ff < fieldCount; ++ff)
-            {
-                auto field = structTypeLayout->getFieldByIndex(ff);
-
-                auto offset = field->getOffset(category);
-                auto sizeInBytes = field->getTypeLayout()->getSize(category);
-
-                size_t end = offset + sizeInBytes;
-
-                maxSize = (end > maxSize) ? end : maxSize;
-            }
-            auto type = structTypeLayout->getType();
-            SLANG_UNUSED(type);
-
-            return maxSize;
-            break;
-        }
-        case slang::TypeReflection::Kind::ConstantBuffer:
-        {
-            return _calcTypeSizeInBytes(typeLayout->getElementTypeLayout());
-            break;
-        }
-        default: break;
-    }
-    return 0;
-}
 
 static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
@@ -513,6 +432,11 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     // For general storage
     MemoryArena arena;
     arena.init(1024);
+
+    // We have a memory info for each of the layouts
+    List<MemoryInfo> memoryInfos;
+    memoryInfos.setCount(layout.entries.getCount());
+
     List<void*> uniformState;
 
     {
@@ -607,21 +531,13 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 }
                 case slang::TypeReflection::Kind::ConstantBuffer:
                 {
+                    SLANG_ASSERT(typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) == sizeof(void*));
                     auto elementTypeLayout = typeLayout->getElementTypeLayout();
-                    // We need to work out the size and initialize it.
-                    size_t size = _calcTypeSizeInBytes(elementTypeLayout);
+                    const size_t elementSize = elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-                    void* constantData = arena.allocateAligned(size, 16);
-                    ::memset(constantData, 0, size);
-
-                    if (srcEntry.bufferData.getCount() > 0)
-                    {
-                        size_t srcSize = srcEntry.bufferData.getCount() * sizeof(uint32_t);
-                        srcSize = (srcSize > size) ? size : srcSize;
-                        ::memcpy(constantData, srcEntry.bufferData.getBuffer(), srcSize);
-                    }
-
-                    *(void**)dstEntry = constantData;
+                    const MemoryInfo info = _allocateMemory(arena, elementSize, srcEntry.bufferData);
+                    memoryInfos[entryIndex] = info;
+                    *(void**)dstEntry = info.data;
                     break;
                 }
                 case slang::TypeReflection::Kind::ParameterBlock:
@@ -656,22 +572,70 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 } 
                 case slang::TypeReflection::Kind::Resource:
                 {
-                    // Some resource types (notably structured buffers)
-                    // encode layout information for their result/element
-                    // type, but others don't. We need to check for
-                    // the relevant cases here.
-                    //
                     auto type = typeLayout->getType();
                     auto shape = type->getResourceShape();
 
-                    if ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
+                    //auto access = type->getResourceAccess();
+
+                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                     {
-                        _handleResource(typeLayout->getType(), srcEntry, dstEntry);
+                        default:
+                            assert(!"unhandled case");
+                            break;
+                        case SLANG_TEXTURE_1D:
+                        case SLANG_TEXTURE_2D:
+                        case SLANG_TEXTURE_3D:
+                        case SLANG_TEXTURE_CUBE:
+                        case SLANG_TEXTURE_BUFFER:
+                        {
+                            return SLANG_FAIL;
+                        }
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                            size_t elementSize = elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+
+                            // We don't know the size of the buffer, but we can work it out, based on what is initialized
+
+                            size_t srcBufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
+                            const int numElements = int((srcBufferSize + elementSize - 1) / elementSize);
+
+                            size_t bufferSize = numElements * elementSize;
+                            SLANG_ASSERT(bufferSize >= srcBufferSize);
+
+                            const MemoryInfo info = _allocateMemory(arena, bufferSize, srcEntry.bufferData);
+                            memoryInfos[entryIndex] = info;
+
+                            // TODO(JS): I guess this is questionable - because sizeof(unsigned int) != sizeof(uint32_t) necessarily
+                            CPPPrelude::StructuredBuffer<uint32_t>& dstBuf = *(CPPPrelude::StructuredBuffer<uint32_t>*)dstEntry;
+                            dstBuf.data = (uint32_t*)info.data;
+                            dstBuf.count = numElements;
+                            break;
+                        }
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        {
+                            CPPPrelude::ByteAddressBuffer& dstBuf = *(CPPPrelude::ByteAddressBuffer*)dstEntry;
+
+                            Index numElements = srcEntry.bufferData.getCount();
+                            size_t bufferSize = sizeof(uint32_t) * numElements;
+
+                            const MemoryInfo info = _allocateMemory(arena, bufferSize, srcEntry.bufferData);
+                            memoryInfos[entryIndex] = info;
+
+                            dstBuf.data = srcEntry.bufferData.getBuffer();
+                            dstBuf.sizeInBytes = bufferSize;
+                            break;
+                        }
                     }
-                    else
+                    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
                     {
-                        //emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+
                     }
+                    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
+                    {
+
+                    }
+
                     break;
                 }
             }
@@ -702,7 +666,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     }
 
     // Dump everything out that was write (we wrote in place!)
-    return _writeBindings(layout, gOptions.outputPath);
+    return _writeBindings(layout, memoryInfos, gOptions.outputPath);
 }
 
 SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
