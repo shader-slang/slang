@@ -15,6 +15,8 @@
 
 #include "../source/core/slang-io.h"
 
+#include "core/slang-token-reader.h"
+
 #include "shader-input-layout.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -384,7 +386,20 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const List<Me
 }
 
 
-
+static slang::VariableLayoutReflection* _getParameterByName(slang::ShaderReflection* reflection, const char* name)
+{
+    const int parameterCount = reflection->getParameterCount();
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto parameter = reflection->getParameterByIndex(i);
+        const char* paramName = parameter->getName();
+        if (strcmp(name, paramName) == 0)
+        {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
 
 static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
@@ -405,7 +420,6 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     slang::EntryPointReflection* entryPoint = nullptr;
     Func func = nullptr;
     {
-     
         auto entryPointCount = reflection->getEntryPointCount();
         SLANG_ASSERT(entryPointCount == 1);
 
@@ -423,12 +437,6 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     ShaderInputLayout& layout = output.layout;
 
-    // TODO(JS):
-    // We need a better way to handle all of this.
-    // * There needs to be a mechanism to allocate space
-    // * A mechanism to set the binding (what do we set the elementCount to? It should be the buffer size divided by the element size)
-    // * If we are using an output buffer, we need to write out based on the allocated buffer NOT the one in layout
-
     // For general storage
     MemoryArena arena;
     arena.init(1024);
@@ -440,7 +448,10 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     List<void*> uniformState;
 
     {
-        int parameterCount = reflection->getParameterCount();
+        auto& outStream = StdWriters::getOut();
+        
+#if 0
+        //int parameterCount = reflection->getParameterCount();
 
         for (int i = 0; i < parameterCount; ++i)
         {
@@ -469,20 +480,121 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 }
                 return SLANG_FAIL;
             }
+#endif
 
-            auto stage = parameter->getStage();
 
-            auto typeLayout = parameter->getTypeLayout();
-            auto categoryCount = parameter->getCategoryCount();
+        auto& entries = layout.entries;
 
-            SLANG_ASSERT(categoryCount == 1);
+        for (int entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
+        {
+            auto& entry = entries[entryIndex];
+
+            if (entry.name.getLength() == 0)
+            {
+                outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
+                return SLANG_FAIL;
+            }
+
+            // We will parse the 'name' as may be path to a resource
+            TokenReader parser(entry.name);
+
+            size_t offset = 0;
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            {
+                Token nameToken = parser.ReadToken();
+                if (nameToken.Type != TokenType::Identifier)
+                {
+                    outStream.print("Invalid input syntax at line %d", int(parser.NextToken().Position.Line));
+                    return SLANG_FAIL;
+                }
+                auto parameter = _getParameterByName(reflection, nameToken.Content.getBuffer());
+                if (!parameter)
+                {
+                    outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), entry.name.getBuffer());
+                    return SLANG_FAIL;
+                }
+
+                typeLayout = parameter->getTypeLayout();
+                offset = parameter->getOffset();
+            }
+
+            while (!parser.IsEnd())
+            {
+                Token token = parser.NextToken(0);
+
+                if (token.Type == TokenType::LBracket)
+                {
+                    parser.ReadToken();
+                    int index = parser.ReadInt();
+                    SLANG_ASSERT(index >= 0);
+                    parser.ReadMatchingToken(TokenType::RBracket);
+
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    auto elementCount = int(typeLayout->getElementCount());
+
+                    SLANG_ASSERT(index < elementCount);
+
+                    typeLayout = elementTypeLayout;
+                    offset += elementTypeLayout->getSize() * index;
+                }
+                else if (token.Type == TokenType::Dot)
+                {
+                    parser.ReadToken();
+                    Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
+
+                    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+                    {
+                        slang::VariableLayoutReflection* varLayout = nullptr;
+                        auto fieldCount = typeLayout->getFieldCount();
+                        for (uint32_t ff = 0; ff < fieldCount; ++ff)
+                        {
+                            auto field = typeLayout->getFieldByIndex(ff);
+                            if (identifierToken.Content == field->getName())
+                            {
+                                varLayout = field;
+                                break;
+                            }
+                        }
+
+                        if (varLayout == nullptr)
+                        {
+                            outStream.print("Couldn't field %s\n", identifierToken.Content.getBuffer());
+                            return SLANG_FAIL;
+                        }
+
+                        offset += varLayout->getOffset();
+                        typeLayout = varLayout->getTypeLayout();
+                    }
+                    else
+                    {
+                        outStream.print("Couldn't field %s\n", identifierToken.Content.getBuffer());
+                        return SLANG_FAIL;
+                    }
+                }
+                else if (token.Type == TokenType::Comma)
+                {
+                    // Break out
+                    break;
+                }
+                else
+                {
+                    throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                }
+            }
+
+            //auto stage = parameter->getStage();
+
+            //auto typeLayout = parameter->getTypeLayout();
+            //auto categoryCount = parameter->getCategoryCount();
+
+           // SLANG_ASSERT(categoryCount == 1);
 
             // Only dealing one category per item right now
-            auto category = parameter->getCategoryByIndex(0);
+            //auto category = parameter->getCategoryByIndex(0);
 
-            auto offset = parameter->getOffset(category);
-            auto space = parameter->getBindingSpace(category);
-            auto count = typeLayout->getSize(category);
+            //auto offset = parameter->getOffset(category);
+            //auto space = parameter->getBindingSpace(category);
+            auto count = typeLayout->getSize();
 
             size_t end = offset + count;
             if (uniformState.getCount() * sizeof(void*) < end)

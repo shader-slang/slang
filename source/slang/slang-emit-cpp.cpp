@@ -1170,7 +1170,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
     writer->indent();
 
     IRVectorType* vectorType = as<IRVectorType>(srcType);
-    Int vecSize = GetIntVal(vectorType->getElementCount());
+    int vecSize = int(GetIntVal(vectorType->getElementCount()));
 
     writer->emit("assert(b >= 0 && b < ");
     writer->emit(vecSize);

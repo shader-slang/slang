@@ -189,6 +189,15 @@ namespace Slang
         {
             tokenPtr -= count;
         }
+        Token ReadMatchingToken(TokenType type)
+        {
+            auto token = ReadToken();
+            if (token.Type != type)
+            {
+                throw TextFormatException("Text parsing error: unexpected token.");
+            }
+            return token;
+        }
         Token ReadToken()
         {
             if (tokenPtr < (int)tokens.getCount())

@@ -293,13 +293,47 @@ namespace renderer_test
                                         parser.ReadToken();
                                     }
 
-                                    Token nameToken = parser.ReadToken();
+                                    StringBuilder builder;
 
+                                    Token nameToken = parser.ReadToken();
                                     if (nameToken.Type != TokenType::Identifier)
                                     {
                                         throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
                                     }
-                                    entry.name = nameToken.Content;
+                                    builder << nameToken.Content;
+
+                                    while (!parser.IsEnd())
+                                    {
+                                        Token token = parser.NextToken(0);
+
+                                        if (token.Type == TokenType::LBracket)
+                                        {
+                                            parser.ReadToken();
+                                            int index = parser.ReadInt();
+                                            SLANG_ASSERT(index >= 0);
+                                            parser.ReadMatchingToken(TokenType::RBracket);
+
+                                            builder << "[" << index << "]";
+                                        }
+                                        else if (token.Type == TokenType::Dot)
+                                        {
+                                            parser.ReadToken();
+                                            Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
+
+                                            builder << "." << identifierToken.Content; 
+                                        }
+                                        else if (token.Type == TokenType::Comma)
+                                        {
+                                            // Break out
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                                        }
+                                    }
+
+                                    entry.name = builder;
                                 }
 
                                 if (parser.LookAhead(","))
