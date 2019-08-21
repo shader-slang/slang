@@ -622,7 +622,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                             const MemoryInfo info = _allocateMemory(arena, bufferSize, srcEntry.bufferData);
                             memoryInfos[entryIndex] = info;
 
-                            dstBuf.data = srcEntry.bufferData.getBuffer();
+                            dstBuf.data = (uint32_t*)info.data;
                             dstBuf.sizeInBytes = bufferSize;
                             break;
                         }

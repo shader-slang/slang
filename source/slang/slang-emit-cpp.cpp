@@ -535,6 +535,16 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             out << ">";
             return SLANG_OK;
         }
+        case kIROp_HLSLRWByteAddressBufferType:
+        {
+            out << "RWByteAddressBuffer";
+            return SLANG_OK;
+        }
+        case kIROp_HLSLByteAddressBufferType:
+        {
+            out << "ByteAddressBuffer";
+            return SLANG_OK;
+        }
         case kIROp_ArrayType:
         {
             auto arrayType = static_cast<IRArrayType*>(type);
