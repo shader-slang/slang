@@ -60,7 +60,7 @@ int test(int val)
     return ((a*N + b) * N + c) * N + d;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(2),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(2),out,name=buffer
 RWStructuredBuffer<int> buffer;
 
 [numthreads(12, 1, 1)]
