@@ -1307,9 +1307,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M
 
 // Shader model 6.0 stuff
 
-__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);
+__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
 __generic<T : __BuiltinType> T QuadReadAcrossX(T localValue);
 __generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossX(vector<T,N> localValue);
