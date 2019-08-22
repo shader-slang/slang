@@ -439,7 +439,8 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     // For general storage
     MemoryArena arena;
-    arena.init(1024);
+    // 1k blocks with minimum 16 byte alignment
+    arena.init(1024, 16);
 
     // We have a memory info for each of the layouts
     List<MemoryInfo> memoryInfos;
@@ -449,40 +450,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     {
         auto& outStream = StdWriters::getOut();
-        
-#if 0
-        //int parameterCount = reflection->getParameterCount();
-
-        for (int i = 0; i < parameterCount; ++i)
-        {
-            auto parameter = reflection->getParameterByIndex(i);
-
-            const char* paramName = parameter->getName();
-
-            const Index entryIndex = layout.findEntryIndexByName(paramName);
-            if (entryIndex < 0)
-            {
-                auto& outStream = StdWriters::getOut();
-
-                int numNamed = 0;
-                for (const auto& entry : layout.entries)
-                {
-                    numNamed += int(entry.name.getLength() > 0);
-                }
-
-                if (layout.entries.getCount() > 0 && numNamed == 0)
-                {
-                    outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
-                }
-                else
-                {
-                    outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), paramName);
-                }
-                return SLANG_FAIL;
-            }
-#endif
-
-
+       
         auto& entries = layout.entries;
 
         for (int entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
@@ -582,18 +550,6 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 }
             }
 
-            //auto stage = parameter->getStage();
-
-            //auto typeLayout = parameter->getTypeLayout();
-            //auto categoryCount = parameter->getCategoryCount();
-
-           // SLANG_ASSERT(categoryCount == 1);
-
-            // Only dealing one category per item right now
-            //auto category = parameter->getCategoryByIndex(0);
-
-            //auto offset = parameter->getOffset(category);
-            //auto space = parameter->getBindingSpace(category);
             auto count = typeLayout->getSize();
 
             size_t end = offset + count;
@@ -761,13 +717,13 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
         CPPPrelude::ComputeVaryingInput varying;
         varying.groupID = {};
 
-        for (int z = 0; z < numThreadsPerAxis[2]; ++z)
+        for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
         {
             varying.groupThreadID.z = z;
-            for (int y = 0; y < numThreadsPerAxis[1]; ++y)
+            for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
             {
                 varying.groupThreadID.y = y;
-                for (int x = 0; x < numThreadsPerAxis[0]; ++x)
+                for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
                 {
                     varying.groupThreadID.x = x;
 
