@@ -42,19 +42,19 @@ void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
     // Ensure it's alignment is at least kMinAlignment 
     alignment = (alignment < kMinAlignment) ? kMinAlignment : alignment;
 
+    const size_t alignMask = alignment - 1;
+
+    // Make sure the payload is rounded up to the alignment
+    blockPayloadSize = (blockPayloadSize + alignMask) & ~alignMask;
+
     m_blockPayloadSize = blockPayloadSize;
-    size_t blockAllocSize = blockPayloadSize;
 
     // If alignment required is larger then the backing allocators then
     // make larger to ensure when alignment correction takes place it will be aligned
-    if (alignment > kMinAlignment)
-    {
-        blockAllocSize += alignment;
-    }
-
+    const size_t blockAllocSize = (alignment > kMinAlignment) ? (blockPayloadSize + alignment) : blockPayloadSize;
+    
     m_blockAllocSize = blockAllocSize;
     m_blockAlignment = alignment;
-
     m_availableBlocks = nullptr;
     
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
@@ -217,12 +217,17 @@ MemoryArena::Block* MemoryArena::_newNormalBlock()
         return block;
     }
 
-    return _newBlock(m_blockAllocSize, m_blockAlignment);
+    Block* block = _newBlock(m_blockAllocSize, m_blockAlignment);
+    // Check that every normal block has m_blockPayloadSize space
+    assert(size_t(block->m_end - block->m_start) >= m_blockPayloadSize);
+    return block;
 }
 
 MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
 {
     assert(alignment >= m_blockAlignment);
+    // Alignment must be a power of 2
+    assert(((alignment - 1) & alignment) == 0);
 
     // Allocate block
     Block* block = (Block*)m_blockFreeList.allocate();
@@ -289,9 +294,10 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     //
     // An improvement might be to have some abstraction that sits on top that can do this tracking (or have the blocks
     // themselves record if they alias over a previously used block - but we don't bother with this here.
-    if (allocSize > m_blockAllocSize)
+    // If the alignment is greater than regular alignment we need to handle specially
+    if (allocSize > m_blockPayloadSize || (alignment > m_blockAlignment && allocSize + alignment > m_blockPayloadSize)) 
     {
-        // This is an odd-sized block so just allocate the whole thing
+        // This is an odd-sized block so just allocate the whole thing.
         block = _newBlock(allocSize, alignment);
     }
     else
@@ -310,10 +316,11 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     // Make the current block 
     _addCurrentBlock(block);
 
-    // Allocated memory is just the start of this block
-    uint8_t* memory = m_current;
-    // It must already be aligned
-    assert((size_t(m_current) & alignMask) == 0);
+    // Align the memory    
+    uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
+
+    // It must be aligned
+    assert((size_t(memory) & alignMask) == 0);
 
     // Do the aligned allocation (which must fit) by aligning the pointer
     // It must fit if the previous code is correct...
