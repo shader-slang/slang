@@ -1,8 +1,9 @@
+//TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
 
 // Test type checking of associatedtype and typedef
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IBase
@@ -40,7 +41,6 @@ U.RetT test<U:IBase>(U.RetT val)
     U.SubTypeT sb = obj.setVal(val);
     return obj.getVal(sb);
 }
-
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

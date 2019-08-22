@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
 // Access fields of a `struct` type from within a "method" by
 // using an implicit `this` expression.
@@ -14,8 +14,8 @@ struct A
 	}
 };
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer : register(u0);
-
 
 float test(float inVal)
 {

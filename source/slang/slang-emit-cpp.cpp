@@ -385,21 +385,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 }
 
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
-{
-    if (isNominalOp(inType->op))
-    {
-        StringSlicePool::Handle handle;
-        // NOTE! This is somewhat unusual -> we are going to add types which aren't cloned and belong to
-        // m_uniqueModule. We *assume* nominal types are de-duped
-        if (!m_typeNameMap.TryGetValue(inType, handle))
-        {
-            auto name = getName(inType);
-            handle = m_slicePool.add(name);
-            m_typeNameMap.Add(inType, handle);
-        }
-        return m_slicePool.getSlice(handle);
-    }
-    
+{ 
     IRType* type = _cloneType(inType);
 
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
@@ -480,6 +466,26 @@ SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, S
     return SLANG_OK;
 }
 
+static UnownedStringSlice _getResourceTypePrefix(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_HLSLStructuredBufferType:            return UnownedStringSlice::fromLiteral("StructuredBuffer");
+        case kIROp_HLSLRWStructuredBufferType:          return UnownedStringSlice::fromLiteral("RWStructuredBuffer");
+        case kIROp_HLSLRWByteAddressBufferType:         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
+        case kIROp_HLSLByteAddressBufferType:           return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+        case kIROp_SamplerStateType:                    return UnownedStringSlice::fromLiteral("SamplerState");
+        case kIROp_SamplerComparisonStateType:                  return UnownedStringSlice::fromLiteral("SamplerComparisonState");
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   return UnownedStringSlice::fromLiteral("RasterizerOrderedStructuredBuffer"); 
+        case kIROp_HLSLAppendStructuredBufferType:              return UnownedStringSlice::fromLiteral("AppendStructuredBuffer");            
+        case kIROp_HLSLConsumeStructuredBufferType:             return UnownedStringSlice::fromLiteral("ConsumeStructuredBuffer");           
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return UnownedStringSlice::fromLiteral("RasterizerOrderedByteAddressBuffer");
+        case kIROp_RaytracingAccelerationStructureType:         return UnownedStringSlice::fromLiteral("RaytracingAccelerationStructure");   
+
+        default:                                        return UnownedStringSlice();
+    }
+}
+
 SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
@@ -540,15 +546,6 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             }
             return SLANG_OK;
         }
-        case kIROp_HLSLRWStructuredBufferType:
-        {
-            auto bufType = static_cast<IRHLSLRWStructuredBufferType*>(type);
-
-            out << "RWStructuredBuffer<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(bufType->getElementType(), target, out));
-            out << ">";
-            return SLANG_OK;
-        }
         case kIROp_ArrayType:
         {
             auto arrayType = static_cast<IRArrayType*>(type);
@@ -560,18 +557,14 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             out << ", " << elementCount << ">";
             return SLANG_OK;
         }
-        case kIROp_SamplerStateType:
-        {
-            out << "SamplerState";
-            return SLANG_OK;
-        }
-        case kIROp_SamplerComparisonStateType:
-        {
-            out << "SamplerComparisonState";
-            return SLANG_OK;
-        }
         default:
         {
+            if (isNominalOp(type->op))
+            {
+                out << getName(type);
+                return SLANG_OK;
+            }
+
             if (IRBasicType::isaImpl(type->op))
             {
                 out << getBuiltinTypeName(type->op);
@@ -584,6 +577,47 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
                 if (texType->op != kIROp_TextureSamplerType)
                 {
                     return _calcTextureTypeName(texType, out);   
+                }
+            }
+
+            // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
+            {
+                UnownedStringSlice prefix = _getResourceTypePrefix(type->op);
+                if (prefix.size() > 0)
+                {
+                    auto oldWriter = m_writer;
+                    SourceManager* sourceManager = oldWriter->getSourceManager();
+
+                    // TODO(JS): This is a bit of a hack. We don't want to emit the result here,
+                    // so we replace the writer, write out the type, grab the contents, and restore the writer
+
+                    SourceWriter writer(sourceManager, LineDirectiveMode::None);
+                    m_writer = &writer;
+
+                    m_writer->emit(prefix);
+
+                    // TODO(JS).
+                    // Assumes ordering of types matches ordering of operands.
+
+                    UInt operandCount = type->getOperandCount();
+                    if (operandCount)
+                    {
+                        m_writer->emit("<");
+                        for (UInt ii = 0; ii < operandCount; ++ii)
+                        {
+                            if (ii != 0)
+                            {
+                                m_writer->emit(", ");
+                            }
+                            emitVal(type->getOperand(ii), getInfo(EmitOp::General));
+                        }
+                        m_writer->emit(">");
+                    }
+
+                    out << writer.getContent();
+
+                    m_writer = oldWriter;
+                    return SLANG_OK;
                 }
             }
 
@@ -607,29 +641,42 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
         return nullptr;
     }
 
+    IRModule* module = inst->getModule();
+    // All inst's must belong to a module
+    SLANG_ASSERT(module);
+
     // If it's in this module then we don't need to clone
-    if (inst->getModule() == m_uniqueModule)
+    if (module == m_uniqueModule)
     {
         return inst;
     }
 
-    if (isNominalOp(inst->op))
-    {
-        // If it's nominal we don't bother copying, as we assumed it is already de-duped
-        return inst;
-    }
-    
     if (IRInst*const* newInstPtr = m_cloneMap.TryGetValue(inst))
     {
         return *newInstPtr;
     }
-    
+
+    if (isNominalOp(inst->op))
+    {
+        // TODO(JS)
+        // This is arguably problematic - I'm adding an instruction from another module to the map, to be it's self.
+        // I did have code which created a copy of the nominal instruction and name hint, but because nominality means
+        // 'same address' other code would generate a different name for that instruction (say as compared to being a member in
+        // the original instruction)
+        //
+        // Because I use findOrAddInst which doesn't hoist instructions, the hoisting doesn't rely on parenting, that would
+        // break.
+
+        // If nominal, we just use the original inst
+        m_cloneMap.Add(inst, inst);
+        return inst;
+    }
+
     // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
     // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
     // it's no use
 
     IRInst* clone = nullptr;
-
     switch (inst->op)
     {
         case kIROp_IntLit:
@@ -637,6 +684,12 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
             auto intLit = static_cast<IRConstant*>(inst);
             IRType* cloneType = _cloneType(intLit->getDataType());
             clone = m_irBuilder.getIntValue(cloneType, intLit->value.intVal);
+            break;
+        }
+        case kIROp_StringLit:
+        {
+            auto stringLit = static_cast<IRStringLit*>(inst);
+            clone =  m_irBuilder.getStringValue(stringLit->getStringSlice());
             break;
         }
         default:
@@ -661,7 +714,12 @@ IRInst* CPPSourceEmitter::_clone(IRInst* inst)
                         cloneOperands[i] = _clone(inst->getOperand(i));
                     }
 
-                    clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+                    //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+
+                    UInt operandCounts[1] = { UInt(operandCount) };
+                    IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
+
+                    clone = m_irBuilder.findOrAddInst(cloneType, inst->op, 1, operandCounts, listOperands);
                 }
                 else
                 {
@@ -1088,6 +1146,42 @@ void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName,
     writer->emit("}\n\n");
 }
 
+void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+
+    IRFuncType* funcType = specOp.signatureType;
+    SLANG_ASSERT(funcType->getParamCount() == 2);
+
+    IRType* srcType = funcType->getParamType(0);
+
+    IRType* retType = specOp.returnType;
+    emitType(retType);
+    m_writer->emit("& ");
+
+    writer->emit(funcName);
+    writer->emit("(");
+
+    emitType(funcType->getParamType(0));
+    writer->emit("& a,  ");
+    emitType(funcType->getParamType(1));
+    writer->emit(" b)\n{\n");
+
+    writer->indent();
+
+    IRVectorType* vectorType = as<IRVectorType>(srcType);
+    int vecSize = int(GetIntVal(vectorType->getElementCount()));
+
+    writer->emit("assert(b >= 0 && b < ");
+    writer->emit(vecSize);
+    writer->emit(");\n");
+
+    writer->emit("return (&a.x)[b];\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
 {    
     SourceWriter* writer = getSourceWriter();
@@ -1332,10 +1426,16 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         {
             return _emitConstructFromScalarDefinition(_getFuncName(specOp), specOp);
         }
+        case IntrinsicOp::GetAt:
+        {
+            return _emitGetAtDefinition(_getFuncName(specOp), specOp);
+        }
         default:
         {
             const auto& info = getOperationInfo(specOp.op);
-            if (info.numOperands >= 1 && info.numOperands <= 3)
+            const int paramCount = (info.numOperands < 0) ? int(specOp.signatureType->getParamCount()) : info.numOperands;
+
+            if (paramCount >= 1 && paramCount <= 3)
             {
                 return _emitAryDefinition(specOp);
             }
@@ -1500,7 +1600,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
 
             useType(specOp.returnType);
             // add that we want a function
-            SLANG_ASSERT(numOperands == info.numOperands);
+            SLANG_ASSERT(info.numOperands < 0 || numOperands == info.numOperands);
 
             if (isOperator)
             {
@@ -1602,6 +1702,14 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
                     return StringSlicePool::kNullHandle;
                 }
                 return m_slicePool.add(builder);
+            }
+            case IntrinsicOp::GetAt:
+            {
+                return m_slicePool.add(UnownedStringSlice::fromLiteral("getAt"));
+            }
+            case IntrinsicOp::SetAt:
+            {
+                return m_slicePool.add(UnownedStringSlice::fromLiteral("setAt"));
             }
             default: break;
         }
@@ -2193,7 +2301,18 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             return false;
         }
-
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
+        {
+            IRInst* target = inst->getOperand(0);
+            if (target->getDataType()->op == kIROp_VectorType)
+            {
+                // Specially handle this
+                emitOperationCall(IntrinsicOp::GetAt, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+                return true;
+            }
+            return false;
+        }
         default:
         {
             IntrinsicOp op = getOperation(inst->op);

@@ -955,6 +955,13 @@ struct IRBuilder
 
     IRUndefined* emitUndefined(IRType* type);
 
+    IRInst* findOrAddInst(
+         IRType*                 type,
+         IROp                    op,
+         UInt                    operandListCount,
+         UInt const*             listOperandCounts,
+         IRInst* const* const*   listOperands);
+
     IRInst* findOrEmitHoistableInst(
         IRType*                 type,
         IROp                    op,

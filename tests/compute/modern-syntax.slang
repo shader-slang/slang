@@ -1,5 +1,6 @@
 // modern-syntax.slang
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute
 
 // This file exists to confirm that declarations using "modern"
 // syntax are handled correctly by the compiler front-end.
@@ -14,7 +15,7 @@ func test(val: MyInt) -> MyInt
 	return tmp;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]

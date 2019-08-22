@@ -15,6 +15,8 @@
 
 #include "../source/core/slang-io.h"
 
+#include "core/slang-token-reader.h"
+
 #include "shader-input-layout.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -320,72 +322,35 @@ static SlangResult _compile(SlangSession* session, const String& sourcePath, Opt
     return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.compileOutput);
 }
 
-static SlangResult _handleResource(slang::TypeReflection* type, ShaderInputLayoutEntry& src, void* dst)
+struct MemoryInfo
 {
-    auto shape = type->getResourceShape();
-    auto access = type->getResourceAccess();
+    MemoryInfo() :data(nullptr), size(0) {}
+    uint8_t* data;
+    size_t size;
+};
 
-    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
-    {
-        default:
-            assert(!"unhandled case");
-            break;
-        case SLANG_TEXTURE_1D:
-        case SLANG_TEXTURE_2D:
-        case SLANG_TEXTURE_3D:
-        case SLANG_TEXTURE_CUBE:
-        case SLANG_TEXTURE_BUFFER:
-        {
-            return SLANG_FAIL;
-        }
-        case SLANG_STRUCTURED_BUFFER:
-        {
-            // TODO(JS): I guess this is questionable - because sizeof(unsigned int) != sizeof(uint32_t) necessarily
-            CPPPrelude::StructuredBuffer<uint32_t>& dstBuf = *(CPPPrelude::StructuredBuffer<uint32_t>*)dst;
-            dstBuf.data = src.bufferData.getBuffer();
-            dstBuf.count = src.bufferData.getCount();
-            break;
-        }
-        case SLANG_BYTE_ADDRESS_BUFFER:
-        {
-            CPPPrelude::ByteAddressBuffer& dstBuf = *(CPPPrelude::ByteAddressBuffer*)dst;
-            dstBuf.data = src.bufferData.getBuffer();
-            dstBuf.sizeInBytes = src.bufferData.getCount() * sizeof(unsigned int);
+static MemoryInfo _allocateMemory(MemoryArena& arena, size_t size, List<unsigned int>& initialContents)
+{
+    MemoryInfo info;
 
-            break;
-        }
-    }
-    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+    // Use 16 byte alignment so works for all common types including typical simd
+    void* data = arena.allocateAligned(size, 16);
+    ::memset(data, 0, size);
+
+    if (initialContents.getCount() > 0)
     {
-        
-    }
-    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
-    {
- 
+        size_t initialSize = initialContents.getCount() * sizeof(unsigned int);
+        initialSize = (initialSize > size) ? size : initialSize;
+
+        ::memcpy(data, initialContents.getBuffer(), initialSize);
     }
 
-    if (access != SLANG_RESOURCE_ACCESS_READ)
-    {
-        switch (access)
-        {
-            default:
-                assert(!"unhandled case");
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ_WRITE:      break;
-            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  break;
-            case SLANG_RESOURCE_ACCESS_APPEND:          break;
-            case SLANG_RESOURCE_ACCESS_CONSUME:         break;
-        }
- 
-    }
-    return SLANG_OK;
+    info.data = (uint8_t*)data;
+    info.size = size;
+    return info;
 }
 
-static SlangResult _writeBindings(const ShaderInputLayout& layout, const String& fileName)
+static SlangResult _writeBindings(const ShaderInputLayout& layout, const List<MemoryInfo>& infos, const String& fileName)
 {
     FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
@@ -393,20 +358,47 @@ static SlangResult _writeBindings(const ShaderInputLayout& layout, const String&
         return SLANG_FAIL;
     }
 
-    for (auto entry : layout.entries)
+    const auto& entries = layout.entries;
+
+    for (int i = 0; i < entries.getCount(); ++i)
     {
+        const auto& entry = entries[i];
         if (entry.isOutput)
         {
-            auto ptr = entry.bufferData.getBuffer();
+            const auto& info = infos[i];
+
+            unsigned int* ptr = (unsigned int*)info.data;
+
             const int size = int(entry.bufferData.getCount());
+            // Must be the same size or less thatn allocated buffer
+            SLANG_ASSERT(size * sizeof(unsigned int) <= info.size);
+
             for (int i = 0; i < size; ++i)
             {
-                fprintf(f, "%X\n", ptr[i]);
+                unsigned int v = ptr[i];
+
+                fprintf(f, "%X\n", v);
             }
         }
     }
     fclose(f);
     return SLANG_OK;
+}
+
+
+static slang::VariableLayoutReflection* _getParameterByName(slang::ShaderReflection* reflection, const char* name)
+{
+    const int parameterCount = reflection->getParameterCount();
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto parameter = reflection->getParameterByIndex(i);
+        const char* paramName = parameter->getName();
+        if (strcmp(name, paramName) == 0)
+        {
+            return parameter;
+        }
+    }
+    return nullptr;
 }
 
 static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
@@ -428,7 +420,6 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     slang::EntryPointReflection* entryPoint = nullptr;
     Func func = nullptr;
     {
-     
         auto entryPointCount = reflection->getEntryPointCount();
         SLANG_ASSERT(entryPointCount == 1);
 
@@ -448,53 +439,118 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     // For general storage
     MemoryArena arena;
-    arena.init(1024);
+    // 1k blocks with minimum 16 byte alignment
+    arena.init(1024, 16);
+
+    // We have a memory info for each of the layouts
+    List<MemoryInfo> memoryInfos;
+    memoryInfos.setCount(layout.entries.getCount());
+
     List<void*> uniformState;
 
     {
-        int parameterCount = reflection->getParameterCount();
+        auto& outStream = StdWriters::getOut();
+       
+        auto& entries = layout.entries;
 
-        for (int i = 0; i < parameterCount; ++i)
+        for (int entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
         {
-            auto parameter = reflection->getParameterByIndex(i);
+            auto& entry = entries[entryIndex];
 
-            const char* paramName = parameter->getName();
-
-            const Index entryIndex = layout.findEntryIndexByName(paramName);
-            if (entryIndex < 0)
+            if (entry.name.getLength() == 0)
             {
-                auto& outStream = StdWriters::getOut();
-
-                int numNamed = 0;
-                for (const auto& entry : layout.entries)
-                {
-                    numNamed += int(entry.name.getLength() > 0);
-                }
-
-                if (layout.entries.getCount() > 0 && numNamed == 0)
-                {
-                    outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
-                }
-                else
-                {
-                    outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), paramName);
-                }
+                outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
                 return SLANG_FAIL;
             }
 
-            auto stage = parameter->getStage();
+            // We will parse the 'name' as may be path to a resource
+            TokenReader parser(entry.name);
 
-            auto typeLayout = parameter->getTypeLayout();
-            auto categoryCount = parameter->getCategoryCount();
+            size_t offset = 0;
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            {
+                Token nameToken = parser.ReadToken();
+                if (nameToken.Type != TokenType::Identifier)
+                {
+                    outStream.print("Invalid input syntax at line %d", int(parser.NextToken().Position.Line));
+                    return SLANG_FAIL;
+                }
+                auto parameter = _getParameterByName(reflection, nameToken.Content.getBuffer());
+                if (!parameter)
+                {
+                    outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), entry.name.getBuffer());
+                    return SLANG_FAIL;
+                }
 
-            SLANG_ASSERT(categoryCount == 1);
+                typeLayout = parameter->getTypeLayout();
+                offset = parameter->getOffset();
+            }
 
-            // Only dealing one category per item right now
-            auto category = parameter->getCategoryByIndex(0);
+            while (!parser.IsEnd())
+            {
+                Token token = parser.NextToken(0);
 
-            auto offset = parameter->getOffset(category);
-            auto space = parameter->getBindingSpace(category);
-            auto count = typeLayout->getSize(category);
+                if (token.Type == TokenType::LBracket)
+                {
+                    parser.ReadToken();
+                    int index = parser.ReadInt();
+                    SLANG_ASSERT(index >= 0);
+                    parser.ReadMatchingToken(TokenType::RBracket);
+
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    auto elementCount = int(typeLayout->getElementCount());
+
+                    SLANG_ASSERT(index < elementCount);
+
+                    typeLayout = elementTypeLayout;
+                    offset += elementTypeLayout->getSize() * index;
+                }
+                else if (token.Type == TokenType::Dot)
+                {
+                    parser.ReadToken();
+                    Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
+
+                    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+                    {
+                        slang::VariableLayoutReflection* varLayout = nullptr;
+                        auto fieldCount = typeLayout->getFieldCount();
+                        for (uint32_t ff = 0; ff < fieldCount; ++ff)
+                        {
+                            auto field = typeLayout->getFieldByIndex(ff);
+                            if (identifierToken.Content == field->getName())
+                            {
+                                varLayout = field;
+                                break;
+                            }
+                        }
+
+                        if (varLayout == nullptr)
+                        {
+                            outStream.print("Couldn't field %s\n", identifierToken.Content.getBuffer());
+                            return SLANG_FAIL;
+                        }
+
+                        offset += varLayout->getOffset();
+                        typeLayout = varLayout->getTypeLayout();
+                    }
+                    else
+                    {
+                        outStream.print("Couldn't field %s\n", identifierToken.Content.getBuffer());
+                        return SLANG_FAIL;
+                    }
+                }
+                else if (token.Type == TokenType::Comma)
+                {
+                    // Break out
+                    break;
+                }
+                else
+                {
+                    throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                }
+            }
+
+            auto count = typeLayout->getSize();
 
             size_t end = offset + count;
             if (uniformState.getCount() * sizeof(void*) < end)
@@ -543,8 +599,13 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 }
                 case slang::TypeReflection::Kind::ConstantBuffer:
                 {
+                    SLANG_ASSERT(typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) == sizeof(void*));
                     auto elementTypeLayout = typeLayout->getElementTypeLayout();
-                    SLANG_UNUSED(elementTypeLayout);
+                    const size_t elementSize = elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+
+                    const MemoryInfo info = _allocateMemory(arena, elementSize, srcEntry.bufferData);
+                    memoryInfos[entryIndex] = info;
+                    *(void**)dstEntry = info.data;
                     break;
                 }
                 case slang::TypeReflection::Kind::ParameterBlock:
@@ -579,23 +640,70 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                 } 
                 case slang::TypeReflection::Kind::Resource:
                 {
-                    // Some resource types (notably structured buffers)
-                    // encode layout information for their result/element
-                    // type, but others don't. We need to check for
-                    // the relevant cases here.
-                    //
                     auto type = typeLayout->getType();
                     auto shape = type->getResourceShape();
 
-                    if ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
+                    //auto access = type->getResourceAccess();
+
+                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                     {
-                        _handleResource(typeLayout->getType(), srcEntry, dstEntry);
+                        default:
+                            assert(!"unhandled case");
+                            break;
+                        case SLANG_TEXTURE_1D:
+                        case SLANG_TEXTURE_2D:
+                        case SLANG_TEXTURE_3D:
+                        case SLANG_TEXTURE_CUBE:
+                        case SLANG_TEXTURE_BUFFER:
+                        {
+                            return SLANG_FAIL;
+                        }
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                            size_t elementSize = elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+
+                            // We don't know the size of the buffer, but we can work it out, based on what is initialized
+
+                            size_t srcBufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
+                            const int numElements = int((srcBufferSize + elementSize - 1) / elementSize);
+
+                            size_t bufferSize = numElements * elementSize;
+                            SLANG_ASSERT(bufferSize >= srcBufferSize);
+
+                            const MemoryInfo info = _allocateMemory(arena, bufferSize, srcEntry.bufferData);
+                            memoryInfos[entryIndex] = info;
+
+                            // TODO(JS): I guess this is questionable - because sizeof(unsigned int) != sizeof(uint32_t) necessarily
+                            CPPPrelude::StructuredBuffer<uint32_t>& dstBuf = *(CPPPrelude::StructuredBuffer<uint32_t>*)dstEntry;
+                            dstBuf.data = (uint32_t*)info.data;
+                            dstBuf.count = numElements;
+                            break;
+                        }
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        {
+                            CPPPrelude::ByteAddressBuffer& dstBuf = *(CPPPrelude::ByteAddressBuffer*)dstEntry;
+
+                            Index numElements = srcEntry.bufferData.getCount();
+                            size_t bufferSize = sizeof(uint32_t) * numElements;
+
+                            const MemoryInfo info = _allocateMemory(arena, bufferSize, srcEntry.bufferData);
+                            memoryInfos[entryIndex] = info;
+
+                            dstBuf.data = (uint32_t*)info.data;
+                            dstBuf.sizeInBytes = bufferSize;
+                            break;
+                        }
+                    }
+                    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+                    {
 
                     }
-                    else
+                    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
                     {
-                        //emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+
                     }
+
                     break;
                 }
             }
@@ -609,13 +717,13 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
         CPPPrelude::ComputeVaryingInput varying;
         varying.groupID = {};
 
-        for (int z = 0; z < numThreadsPerAxis[2]; ++z)
+        for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
         {
             varying.groupThreadID.z = z;
-            for (int y = 0; y < numThreadsPerAxis[1]; ++y)
+            for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
             {
                 varying.groupThreadID.y = y;
-                for (int x = 0; x < numThreadsPerAxis[0]; ++x)
+                for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
                 {
                     varying.groupThreadID.x = x;
 
@@ -626,7 +734,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     }
 
     // Dump everything out that was write (we wrote in place!)
-    return _writeBindings(layout, gOptions.outputPath);
+    return _writeBindings(layout, memoryInfos, gOptions.outputPath);
 }
 
 SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)

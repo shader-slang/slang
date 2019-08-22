@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:
-
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
 struct Test
 {
@@ -16,6 +15,7 @@ uint test(uint val)
 	return val + t.b;
 }
 
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]

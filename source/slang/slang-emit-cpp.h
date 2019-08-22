@@ -110,11 +110,15 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(Step, "step", 2) \
         \
         x(AsFloat, "asfloat", 1) \
-        x(AsInt, "asint", 1) \
-        x(AsUInt, "asuint", 1) \
+        x(AsInt, "asint", -1) \
+        x(AsUInt, "asuint", -1) \
+        x(AsDouble, "asdouble", 2) \
         \
         x(ConstructConvert, "", 1) \
-        x(ConstructFromScalar, "", 1) 
+        x(ConstructFromScalar, "", 1) \
+        \
+        x(GetAt, "", 2) \
+        x(SetAt, "", 3)
   
 
 class CPPSourceEmitter: public CLikeSourceEmitter
@@ -224,7 +228,8 @@ protected:
     void _emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitConstructConvertDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
     void _emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
-
+    void _emitGetAtDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
+    
     void _emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
     void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);

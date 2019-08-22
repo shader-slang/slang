@@ -1528,7 +1528,6 @@ namespace Slang
         keyInst.value.ptrVal = value;
         return (IRPtrLit*) findOrEmitConstant(this, keyInst);
     }
-
  
     IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*                 type,
@@ -1616,6 +1615,93 @@ namespace Slang
 
         return inst;
     }
+
+    IRInst* IRBuilder::findOrAddInst(
+        IRType*                 type,
+        IROp                    op,
+        UInt                    operandListCount,
+        UInt const*             listOperandCounts,
+        IRInst* const* const*   listOperands)
+    {
+        UInt operandCount = 0;
+        for (UInt ii = 0; ii < operandListCount; ++ii)
+        {
+            operandCount += listOperandCounts[ii];
+        }
+
+        auto& memoryArena = getModule()->memoryArena;
+        void* cursor = memoryArena.getCursor();
+
+        // We are going to create a 'dummy' instruction on the memoryArena
+        // which can be used as a key for lookup, so see if we
+        // already have an equivalent instruction available to use.
+        size_t keySize = sizeof(IRInst) + operandCount * sizeof(IRUse);
+        IRInst* inst = (IRInst*)memoryArena.allocateAndZero(keySize);
+
+        void* endCursor = memoryArena.getCursor();
+        // Mark as 'unused' cos it is unused on release builds. 
+        SLANG_UNUSED(endCursor);
+
+        new(inst) IRInst();
+        inst->op = op;
+        inst->typeUse.usedValue = type;
+        inst->operandCount = (uint32_t)operandCount;
+
+        // Don't link up as we may free (if we already have this key)
+        {
+            IRUse* operand = inst->getOperands();
+            for (UInt ii = 0; ii < operandListCount; ++ii)
+            {
+                UInt listOperandCount = listOperandCounts[ii];
+                for (UInt jj = 0; jj < listOperandCount; ++jj)
+                {
+                    operand->usedValue = listOperands[ii][jj];
+                    operand++;
+                }
+            }
+        }
+
+        // Find or add the key/inst
+        {
+            IRInstKey key = { inst };
+
+            // Ideally we would add if not found, else return if was found instead of testing & then adding.
+            IRInst** found = sharedBuilder->globalValueNumberingMap.TryGetValueOrAdd(key, inst);
+            SLANG_ASSERT(endCursor == memoryArena.getCursor());
+            // If it's found, just return, and throw away the instruction
+            if (found)
+            {
+                memoryArena.rewindToCursor(cursor);
+                return *found;
+            }
+        }
+
+        // Make the lookup 'inst' instruction into 'proper' instruction. Equivalent to
+        // IRInst* inst = createInstImpl<IRInst>(builder, op, type, 0, nullptr, operandListCount, listOperandCounts, listOperands);
+        {
+            if (type)
+            {
+                inst->typeUse.usedValue = nullptr;
+                inst->typeUse.init(inst, type);
+            }
+
+            maybeSetSourceLoc(this, inst);
+
+            IRUse*const operands = inst->getOperands();
+            for (UInt i = 0; i < operandCount; ++i)
+            {
+                IRUse& operand = operands[i];
+                auto value = operand.usedValue;
+
+                operand.usedValue = nullptr;
+                operand.init(inst, value);
+            }
+        }
+
+        addInst(inst);
+        return inst;
+    }
+
 
     IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*         type,
