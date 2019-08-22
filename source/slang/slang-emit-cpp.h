@@ -110,9 +110,9 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(Step, "step", 2) \
         \
         x(AsFloat, "asfloat", 1) \
-        x(AsInt, "asint", 1) \
-        x(AsUInt, "asuint", 1) \
-        x(AsDouble, "asdouble", 1) \
+        x(AsInt, "asint", -1) \
+        x(AsUInt, "asuint", -1) \
+        x(AsDouble, "asdouble", 2) \
         \
         x(ConstructConvert, "", 1) \
         x(ConstructFromScalar, "", 1) \

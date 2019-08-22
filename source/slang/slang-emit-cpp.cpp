@@ -1433,7 +1433,9 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
         default:
         {
             const auto& info = getOperationInfo(specOp.op);
-            if (info.numOperands >= 1 && info.numOperands <= 3)
+            const int paramCount = (info.numOperands < 0) ? int(specOp.signatureType->getParamCount()) : info.numOperands;
+
+            if (paramCount >= 1 && paramCount <= 3)
             {
                 return _emitAryDefinition(specOp);
             }
@@ -1598,7 +1600,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
 
             useType(specOp.returnType);
             // add that we want a function
-            SLANG_ASSERT(numOperands == info.numOperands);
+            SLANG_ASSERT(info.numOperands < 0 || numOperands == info.numOperands);
 
             if (isOperator)
             {
