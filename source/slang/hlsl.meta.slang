@@ -1307,61 +1307,67 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M
 
 // Shader model 6.0 stuff
 
-uint GlobalOrderedCountIncrement(uint countToAppendForThisLane);
+__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
-__generic<T : __BuiltinType> T QuadReadLaneAt(T sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, int quadLaneID);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, int quadLaneID);
+__generic<T : __BuiltinType> T QuadReadAcrossX(T localValue);
+__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossX(vector<T,N> localValue);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadSwapX(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapX(vector<T,N> localValue);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapX(matrix<T,N,M> localValue);
+__generic<T : __BuiltinType> T QuadReadAcrossY(T localValue);
+__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossY(vector<T,N> localValue);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinType> T QuadSwapY(T localValue);
-__generic<T : __BuiltinType, let N : int> vector<T,N> QuadSwapY(vector<T,N> localValue);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadSwapY(matrix<T,N,M> localValue);
+__generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue);
+__generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinIntegerType> T WaveAllBitAnd(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitAnd(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitAnd(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> T WaveActiveBitAnd(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitAnd(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> T WaveAllBitOr(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitOr(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitOr(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> T WaveActiveBitOr(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitOr(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitOr(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> T WaveAllBitXor(T expr);
-__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveAllBitXor(vector<T,N> expr);
-__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveAllBitXor(matrix<T,N,M> expr);
+__generic<T : __BuiltinIntegerType> T WaveActiveBitXor(T expr);
+__generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitXor(vector<T,N> expr);
+__generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitXor(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveAllMax(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMax(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMax(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> T WaveActiveMax(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveMax(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveMax(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveAllMin(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllMin(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllMin(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> T WaveActiveMin(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveMin(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveMin(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveAllProduct(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllProduct(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllProduct(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> T WaveActiveProduct(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveProduct(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveProduct(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveAllSum(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveAllSum(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveAllSum(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> T WaveActiveSum(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveSum(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveSum(matrix<T,N,M> expr);
 
-bool WaveAllEqual(bool expr);
-bool WaveAllTrue(bool expr);
-bool WaveAnyTrue(bool expr);
+__generic<T : __BuiltinType> bool WaveActiveAllEqual(T value);
+__generic<T : __BuiltinType, let N : int> vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
 
-uint64_t WaveBallot(bool expr);
+__generic<T : __BuiltinType> uint4 WaveMatch(T value);
+__generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
+__generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,N,M> value);
+
+bool WaveActiveAllTrue(bool condition);
+bool WaveActiveAnyTrue(bool condition);
+
+uint4 WaveActiveBallot(bool condition);
+uint WaveActiveCountBits(bool value);
 
 uint WaveGetLaneCount();
 uint WaveGetLaneIndex();
-uint WaveGetOrderedIndex();
-
-bool WaveIsHelperLane();
-
-bool WaveOnce();
+bool WaveIsFirstLane();
 
 __generic<T : __BuiltinArithmeticType> T WavePrefixProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixProduct(vector<T,N> expr);
@@ -1371,13 +1377,37 @@ __generic<T : __BuiltinArithmeticType> T WavePrefixSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> T WaveReadFirstLane(T expr);
-__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadFirstLane(vector<T,N> expr);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadFirstLane(matrix<T,N,M> expr);
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitAnd(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> T WaveReadLaneAt(T expr, int laneIndex);
-__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneAt(vector<T,N> expr, int laneIndex);
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> expr, int laneIndex);
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitOr(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr);
+
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitXor(T expr);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr);
+
+uint WavePrefixCountBits(bool value);
+uint WaveMultiPrefixCountBits(bool value, uint4 mask);
+
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixProduct(T value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask);
+
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixSum(T value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
+
+__generic<T : __BuiltinType> T WaveReadLaneFirst(T expr);
+__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneFirst(vector<T,N> expr);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
+
+__generic<T : __BuiltinType> T WaveReadLaneAt(T value, int lane);
+__generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
+__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> value, int lane);
+
 
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
