@@ -179,6 +179,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cpu-memory-binding.h" />
     <ClInclude Include="options.h" />
     <ClInclude Include="png-serialize-util.h" />
     <ClInclude Include="shader-input-layout.h" />
@@ -186,6 +187,7 @@
     <ClInclude Include="slang-support.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cpu-memory-binding.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="png-serialize-util.cpp" />
     <ClCompile Include="render-test-main.cpp" />

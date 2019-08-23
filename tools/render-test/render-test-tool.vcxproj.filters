@@ -24,6 +24,7 @@
     <ClInclude Include="slang-support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cpu-memory-binding.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="options.cpp">
@@ -44,5 +45,6 @@
     <ClCompile Include="slang-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cpu-memory-binding.cpp" />
   </ItemGroup>
 </Project>

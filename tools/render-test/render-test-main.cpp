@@ -27,6 +27,8 @@
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-memory-arena.h"
 
+#include "cpu-memory-binding.h"
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
@@ -401,6 +403,7 @@ static slang::VariableLayoutReflection* _getParameterByName(slang::ShaderReflect
     return nullptr;
 }
 
+
 static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
     CompileOutput output;
@@ -433,6 +436,12 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
             return SLANG_FAIL;
         }
     }
+
+    {
+        CPUMemoryBinding binding;
+        binding.init(reflection);
+    }
+
     // Okay we need to find all of the bindings and match up to those in the layout
 
     ShaderInputLayout& layout = output.layout;

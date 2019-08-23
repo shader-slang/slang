@@ -1,4 +1,7 @@
+//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //TEST(compute):COMPARE_COMPUTE:
+
 
 //TEST_INPUT:cbuffer(data=[1 2 3 4]):dxbinding(0),glbinding(0)
 //TEST_INPUT:Texture2D(size=4, content = one) : dxbinding(0),glbinding(0)
