@@ -250,16 +250,18 @@ SlangResult CPUMemoryBinding::setBufferContents(const Location& location, const 
     auto typeLayout = location.m_typeLayout;
     uint8_t* cur = location.m_cur;
 
-    size_t bufferSize = typeLayout->getSize();
-
-    sizeInBytes = (sizeInBytes > bufferSize) ? bufferSize : sizeInBytes;
-
     const auto kind = typeLayout->getKind();
     switch (kind)
     {
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
-            memcpy(cur, initialData, sizeInBytes);
+            typeLayout = typeLayout->getElementTypeLayout();
+
+            size_t bufferSize = typeLayout->getSize();
+            sizeInBytes = (sizeInBytes > bufferSize) ? bufferSize : sizeInBytes;
+
+            void* buffer = *(void**)cur;
+            memcpy(buffer, initialData, sizeInBytes);
             return SLANG_OK;
         }
         default: break;
