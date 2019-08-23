@@ -166,7 +166,7 @@ SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
     hi = uint32_t(u.u >> 32);
 }
 
-SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, uint32_t& hi)
+SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
 {
     Union64 u;
     u.d = d;
