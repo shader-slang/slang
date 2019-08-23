@@ -9,6 +9,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpu-memory-binding.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -24,9 +27,11 @@
     <ClInclude Include="slang-support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cpu-memory-binding.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cpu-memory-binding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,6 +50,5 @@
     <ClCompile Include="slang-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cpu-memory-binding.cpp" />
   </ItemGroup>
 </Project>
