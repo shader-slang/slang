@@ -186,27 +186,33 @@ CPUMemoryBinding::Location CPUMemoryBinding::toField(const Location& location, c
     auto typeLayout = location.m_typeLayout;
     uint8_t* cur = location.m_cur;
 
-    // Strip constantBuffer wrapping 
-    if (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
+    // Strip constantBuffer wrapping
     {
-        // Follow the pointer
-        cur = *(uint8_t**)cur;
-        typeLayout = typeLayout->getElementTypeLayout();
-    }
-    
-    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
-    {
-        slang::VariableLayoutReflection* varLayout = nullptr;
-        auto fieldCount = typeLayout->getFieldCount();
-        for (uint32_t ff = 0; ff < fieldCount; ++ff)
+        const auto kind = typeLayout->getKind();
+        if (kind == slang::TypeReflection::Kind::ConstantBuffer)
         {
-            auto field = typeLayout->getFieldByIndex(ff);
-            if (strcmp(field->getName(), name) == 0)
+            // Follow the pointer
+            cur = *(uint8_t**)cur;
+            typeLayout = typeLayout->getElementTypeLayout();
+        }
+    }
+
+    {
+        const auto kind = typeLayout->getKind();
+        if (kind == slang::TypeReflection::Kind::Struct)
+        {
+            slang::VariableLayoutReflection* varLayout = nullptr;
+            auto fieldCount = typeLayout->getFieldCount();
+            for (uint32_t ff = 0; ff < fieldCount; ++ff)
             {
-                Location newLocation;
-                newLocation.m_cur = cur + field->getOffset();
-                newLocation.m_typeLayout = field->getTypeLayout();
-                return newLocation;
+                auto field = typeLayout->getFieldByIndex(ff);
+                if (strcmp(field->getName(), name) == 0)
+                {
+                    Location newLocation;
+                    newLocation.m_cur = cur + field->getOffset();
+                    newLocation.m_typeLayout = field->getTypeLayout();
+                    return newLocation;
+                }
             }
         }
     }
@@ -224,19 +230,29 @@ CPUMemoryBinding::Location CPUMemoryBinding::toIndex(const Location& location, i
     auto typeLayout = location.m_typeLayout;
     uint8_t* cur = location.m_cur;
 
-    auto elementTypeLayout = typeLayout->getElementTypeLayout();
-    auto elementCount = int(typeLayout->getElementCount());
-
-    if (index < 0 || index >= elementCount)
+    const auto kind = typeLayout->getKind();
+    switch (kind)
     {
-        SLANG_ASSERT(index < elementCount);
-        return Location();
+        case slang::TypeReflection::Kind::Array:
+        {
+            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            auto elementCount = int(typeLayout->getElementCount());
+
+            if (index < 0 || index >= elementCount)
+            {
+                SLANG_ASSERT(index < elementCount);
+                return Location();
+            }
+
+            Location newLocation;
+            newLocation.m_typeLayout = elementTypeLayout;
+            newLocation.m_cur = cur + elementTypeLayout->getSize() * index;
+            return newLocation;
+        }
+        default: break;
     }
 
-    Location newLocation;
-    newLocation.m_typeLayout = elementTypeLayout;
-    newLocation.m_cur = cur + elementTypeLayout->getSize() * index;
-    return location;
+    return Location();
 }
 
 

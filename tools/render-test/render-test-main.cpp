@@ -499,7 +499,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                     location = binding.toIndex(location, index);
                     if (location.isInvalid())
                     {
-                        outStream.print("Unable to find entry in '%d' in '%s'\n", index, entry.name);
+                        outStream.print("Unable to find entry in '%d' in '%s'\n", index, entry.name.getBuffer());
                         return SLANG_FAIL;
                     }
                     parser.ReadMatchingToken(TokenType::RBracket);
@@ -512,7 +512,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                     location = binding.toField(location, identifierToken.Content.getBuffer());
                     if (location.isInvalid())
                     {
-                        outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), entry.name);
+                        outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), entry.name.getBuffer());
                         return SLANG_FAIL;
                     }
                 }
