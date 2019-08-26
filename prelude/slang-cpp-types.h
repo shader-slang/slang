@@ -212,6 +212,7 @@ struct ITexture2D
 {
     virtual void Load(const int3& v, void* out) = 0;
     virtual void Sample(SamplerState samplerState, const float2& loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float2& loc, float level, void* out) = 0;
 };
 
 template <typename T>
@@ -219,6 +220,7 @@ struct Texture2D
 {
     T Load(const int3& v) const { T out; texture->Load(v, &out); return out; }
     T Sample(SamplerState samplerState, const float2& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float2& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
     
     ITexture2D* texture;              
 };
