@@ -133,7 +133,7 @@ SLANG_FORCE_INLINE uint32_t I32_asuint(int32_t x) { return uint32_t(x); }
 SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi )
 {
     Union64 u;
-    u.i = (int64_t(hi) << 32) | low;
+    u.u = (uint64_t(hi) << 32) | uint32_t(low);
     return u.d;
 }
 
@@ -166,7 +166,7 @@ SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
     hi = uint32_t(u.u >> 32);
 }
 
-SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, uint32_t& hi)
+SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
 {
     Union64 u;
     u.d = d;
