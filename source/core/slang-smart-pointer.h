@@ -249,8 +249,27 @@ namespace Slang
 
     private:
         T* pointer;
-        
 	};
+
+    // Helper type for implementing weak pointers. The object being pointed at weakly creates a WeakSink object
+    // that other objects can reference and share. When the object is destroyed it detaches the sink
+    // doing so will make other users call to 'get' return null. Thus any user of the WeakSink, must check if the weakly pointed to
+    // things pointer is nullptr before using.
+    template <typename T>
+    class WeakSink : public RefObject
+    {
+    public:
+        WeakSink(T* ptr):
+            m_ptr(ptr)
+        {
+        }
+
+        SLANG_FORCE_INLINE T* get() const { return m_ptr; }
+        SLANG_FORCE_INLINE void detach() { m_ptr = nullptr; }
+
+    private:
+        T* m_ptr;
+    };
 }
 
 #endif
