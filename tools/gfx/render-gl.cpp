@@ -133,17 +133,6 @@ public:
         kMaxVertexStreams = 16,
         kMaxDescriptorSetCount = 8,
     };
-
-    struct WeakGLRenderer: public RefObject
-    {
-        WeakGLRenderer(GLRenderer* renderer):
-            m_renderer(renderer)
-        {
-        }
-
-        GLRenderer* m_renderer;
-    };
-
     struct VertexAttributeFormat
     {
         GLint       componentCount;
@@ -170,7 +159,7 @@ public:
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakGLRenderer* renderer, GLuint id, GLenum target):
+        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer, GLuint id, GLenum target):
             Parent(desc),
 			m_renderer(renderer),
 			m_handle(id),
@@ -179,14 +168,14 @@ public:
 		{}
 		~BufferResourceImpl()
 		{
-			if (m_renderer->m_renderer)
+			if (auto renderer = m_renderer->get())
 			{
-				m_renderer->m_renderer->glDeleteBuffers(1, &m_handle);
+				renderer->glDeleteBuffers(1, &m_handle);
 			}
 		}
 
         Usage m_initialUsage;
-		RefPtr<WeakGLRenderer> m_renderer;
+		RefPtr<WeakSink<GLRenderer> > m_renderer;
 		GLuint m_handle;
         GLenum m_target;
 	};
@@ -196,7 +185,7 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakGLRenderer* renderer):
+        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer):
             Parent(desc),
             m_initialUsage(initialUsage),
             m_renderer(renderer)
@@ -214,7 +203,7 @@ public:
          }
 
         Usage m_initialUsage;
-        RefPtr<WeakGLRenderer> m_renderer;
+        RefPtr<WeakSink<GLRenderer> > m_renderer;
         GLenum m_target;
         GLuint m_handle;
     };
@@ -296,21 +285,21 @@ public:
 	class ShaderProgramImpl : public ShaderProgram
 	{
 	public:
-		ShaderProgramImpl(WeakGLRenderer* renderer, GLuint id):
+		ShaderProgramImpl(WeakSink<GLRenderer>* renderer, GLuint id):
 			m_renderer(renderer),
 			m_id(id)
 		{
 		}
 		~ShaderProgramImpl()
 		{
-			if (m_renderer->m_renderer)
+			if (auto renderer = m_renderer->get())
 			{
-				m_renderer->m_renderer->glDeleteProgram(m_id);
+				renderer->glDeleteProgram(m_id);
 			}
 		}
 
 		GLuint m_id;
-		RefPtr<WeakGLRenderer> m_renderer;
+		RefPtr<WeakSink<GLRenderer> > m_renderer;
 	};
 
     class PipelineStateImpl : public PipelineState
@@ -355,7 +344,7 @@ public:
     float   m_clearColor[4] = { 0, 0, 0, 0 };
 
     RefPtr<PipelineStateImpl> m_currentPipelineState;
-    RefPtr<WeakGLRenderer> m_weakRenderer;
+    RefPtr<WeakSink<GLRenderer> > m_weakRenderer;
 
     RefPtr<DescriptorSetImpl>   m_boundDescriptorSets[kMaxDescriptorSetCount];
 
@@ -421,7 +410,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
 
 GLRenderer::GLRenderer()
 {
-    m_weakRenderer = new WeakGLRenderer(this);
+    m_weakRenderer = new WeakSink<GLRenderer>(this);
 }
 
 GLRenderer::~GLRenderer()
@@ -429,12 +418,12 @@ GLRenderer::~GLRenderer()
     // We can destroy things whilst in this state
     m_currentPipelineState.setNull();
 
-    // By resetting the weak pointer, other objects accessing through WeakGLRenderer will no longer
+    // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no longer
     // be able to access this object which is entering a 'being destroyed' to 'destroyed' state
     if (m_weakRenderer)
     {
-        SLANG_ASSERT(m_weakRenderer->m_renderer == this);
-        m_weakRenderer->m_renderer = nullptr;
+        SLANG_ASSERT(m_weakRenderer->get() == this);
+        m_weakRenderer->detach();
     }
 }
 
