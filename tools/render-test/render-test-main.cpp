@@ -879,7 +879,9 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 	// Parse command-line options
 	SLANG_RETURN_ON_FAIL(parseOptions(argcIn, argvIn, StdWriters::getError()));
 
-
+    // Declare window pointer before renderer, such that window is released after renderer
+    RefPtr<renderer_test::Window> window;
+    // Renderer is constructed (later) using the window
 	Slang::RefPtr<Renderer> renderer;
 
     ShaderCompilerUtil::Input input;
@@ -970,8 +972,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         rendererName << "'" << gOptions.adapter << "'";
     }
 
-    RefPtr<renderer_test::Window> window;
-
+    
     if (renderer)
     {
         Renderer::Desc desc;
