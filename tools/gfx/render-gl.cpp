@@ -124,13 +124,15 @@ public:
     virtual void waitForGpu() override {}
     virtual RendererType getRendererType() const override { return RendererType::OpenGl; }
 
+    GLRenderer();
+    ~GLRenderer();
+
     protected:
     enum
     {
         kMaxVertexStreams = 16,
         kMaxDescriptorSetCount = 8,
     };
-
     struct VertexAttributeFormat
     {
         GLint       componentCount;
@@ -157,7 +159,7 @@ public:
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer, GLuint id, GLenum target):
+        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer, GLuint id, GLenum target):
             Parent(desc),
 			m_renderer(renderer),
 			m_handle(id),
@@ -166,14 +168,14 @@ public:
 		{}
 		~BufferResourceImpl()
 		{
-			if (m_renderer)
+			if (auto renderer = m_renderer->get())
 			{
-				m_renderer->glDeleteBuffers(1, &m_handle);
+				renderer->glDeleteBuffers(1, &m_handle);
 			}
 		}
 
         Usage m_initialUsage;
-		GLRenderer* m_renderer;
+		RefPtr<WeakSink<GLRenderer> > m_renderer;
 		GLuint m_handle;
         GLenum m_target;
 	};
@@ -183,7 +185,7 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Usage initialUsage, const Desc& desc, GLRenderer* renderer):
+        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer):
             Parent(desc),
             m_initialUsage(initialUsage),
             m_renderer(renderer)
@@ -201,7 +203,7 @@ public:
          }
 
         Usage m_initialUsage;
-        GLRenderer* m_renderer;
+        RefPtr<WeakSink<GLRenderer> > m_renderer;
         GLenum m_target;
         GLuint m_handle;
     };
@@ -283,21 +285,21 @@ public:
 	class ShaderProgramImpl : public ShaderProgram
 	{
 	public:
-		ShaderProgramImpl(GLRenderer* renderer, GLuint id):
+		ShaderProgramImpl(WeakSink<GLRenderer>* renderer, GLuint id):
 			m_renderer(renderer),
 			m_id(id)
 		{
 		}
 		~ShaderProgramImpl()
 		{
-			if (m_renderer)
+			if (auto renderer = m_renderer->get())
 			{
-				m_renderer->glDeleteProgram(m_id);
+				renderer->glDeleteProgram(m_id);
 			}
 		}
 
 		GLuint m_id;
-		GLRenderer* m_renderer;
+		RefPtr<WeakSink<GLRenderer> > m_renderer;
 	};
 
     class PipelineStateImpl : public PipelineState
@@ -342,8 +344,7 @@ public:
     float   m_clearColor[4] = { 0, 0, 0, 0 };
 
     RefPtr<PipelineStateImpl> m_currentPipelineState;
-//	RefPtr<ShaderProgramImpl> m_boundShaderProgram;
-//    RefPtr<InputLayoutImpl> m_boundInputLayout;
+    RefPtr<WeakSink<GLRenderer> > m_weakRenderer;
 
     RefPtr<DescriptorSetImpl>   m_boundDescriptorSets[kMaxDescriptorSetCount];
 
@@ -403,6 +404,26 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
             break;
         default:
             break;
+    }
+}
+
+
+GLRenderer::GLRenderer()
+{
+    m_weakRenderer = new WeakSink<GLRenderer>(this);
+}
+
+GLRenderer::~GLRenderer()
+{
+    // We can destroy things whilst in this state
+    m_currentPipelineState.setNull();
+
+    // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no longer
+    // be able to access this object which is entering a 'being destroyed' to 'destroyed' state
+    if (m_weakRenderer)
+    {
+        SLANG_ASSERT(m_weakRenderer->get() == this);
+        m_weakRenderer->detach();
     }
 }
 
@@ -759,7 +780,7 @@ Result GLRenderer::createTextureResource(Resource::Usage initialUsage, const Tex
     const GLenum format = info.format;
     const GLenum formatType = info.formatType;
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(initialUsage, srcDesc, this));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(initialUsage, srcDesc, m_weakRenderer));
 
     GLenum target = 0;
     GLuint handle = 0;
@@ -920,7 +941,7 @@ Result GLRenderer::createBufferResource(Resource::Usage initialUsage, const Buff
 
     glBufferData(target, descIn.sizeInBytes, initData, usage);
 
-    RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(initialUsage, desc, this, bufferID, target);
+    RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(initialUsage, desc, m_weakRenderer, bufferID, target);
     *outResource = resourceImpl.detach();
     return SLANG_OK;
 }
@@ -1449,7 +1470,7 @@ Result GLRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
         return SLANG_FAIL;
     }
 
-    *outProgram = new ShaderProgramImpl(this, programID);
+    *outProgram = new ShaderProgramImpl(m_weakRenderer, programID);
     return SLANG_OK;
 }
 
