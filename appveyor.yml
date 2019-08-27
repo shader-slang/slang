@@ -85,6 +85,7 @@ after_build:
       7z a "$env:SLANG_BINARY_ARCHIVE" slang.h
       7z a "$env:SLANG_BINARY_ARCHIVE" slang-com-helper.h
       7z a "$env:SLANG_BINARY_ARCHIVE" slang-com-ptr.h
+      7z a "$env:SLANG_BINARY_ARCHIVE" prelude\*.h
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.dll
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang.lib
       7z a "$env:SLANG_BINARY_ARCHIVE" bin\*\*\slang-glslang.dll
@@ -96,6 +97,7 @@ after_build:
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang-com-helper.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" slang-com-ptr.h
+      7z a "$env:SLANG_SOURCE_ARCHIVE" prelude\*.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.h
       7z a "$env:SLANG_SOURCE_ARCHIVE" source\*\*.cpp
       7z a "$env:SLANG_SOURCE_ARCHIVE" docs\*.md
