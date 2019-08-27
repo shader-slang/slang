@@ -21,8 +21,23 @@ struct CPUMemoryBinding
         bool isValid() const { return m_cur != nullptr; }
         bool isInvalid() const { return m_cur == nullptr; }
 
+        Location toField(const char* name) const;
+        Location toIndex(int index) const;
+
+        slang::TypeLayoutReflection* getTypeLayout() const { return m_typeLayout; }
+        uint8_t* getPtr() const { return m_cur; }
+
         Location():m_cur(nullptr) {}
 
+        static Location make(slang::TypeLayoutReflection* typeLayout, uint8_t* ptr)
+        {
+            Location loc;
+            loc.m_typeLayout = typeLayout;
+            loc.m_cur = ptr;
+            return loc;
+        }
+
+    protected:
         slang::TypeLayoutReflection* m_typeLayout;
         uint8_t* m_cur;
     };
@@ -31,14 +46,10 @@ struct CPUMemoryBinding
 
     Location find(const char* name);
 
-    Location toField(const Location& location, const char* name);
-    Location toIndex(const Location& location, int index);
-
     SlangResult setBufferContents(const Location& location, const void* initialData, size_t sizeInBytes);
     SlangResult setNewBuffer(const Location& location, const void* initialData, size_t sizeInBytes, Buffer& outBuffer);
     SlangResult setObject(const Location& location, void* object);
     SlangResult setInplace(const Location& location, const void* data, size_t sizeInBytes);
-
     SlangResult init(slang::ShaderReflection* reflection);
     CPUMemoryBinding();
 
