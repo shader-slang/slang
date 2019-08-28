@@ -80,6 +80,8 @@ Options
 
 For completeness, here are the options that `slangc` currently accepts:
 
+* `-v`: Displays the build version. This is the contents of `git describe --tags`. It is typically only set from automated builds (such as distros available on github). A user build will by default be 'unknown'. 
+
 * `-D <name>[=<value>]`: Insert a preprocessor macro definition
   * The space between `-D` and `<name>` is optional
   * If no `<value>` is specified, Slang will define the macro with an empty value

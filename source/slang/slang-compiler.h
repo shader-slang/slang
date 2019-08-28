@@ -1807,6 +1807,8 @@ namespace Slang
             SlangPassThrough inPassThrough,
             char const* prelude) override;
 
+        SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
+
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,

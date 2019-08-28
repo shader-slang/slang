@@ -2669,6 +2669,15 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
+
+            /** Get the build version 'tag' string. The string is the same as produced via `git describe --tags`
+            for the project. If Slang is built separately from the automated build scripts
+            the contents will by default be 'unknown'. Any string can be set by changing the
+            contents of 'slang-tag-version.h' file and recompiling the project.
+
+            @return The build tag string
+            */
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

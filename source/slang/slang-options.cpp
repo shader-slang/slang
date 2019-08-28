@@ -800,6 +800,10 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
                 }
+                else if (argStr == "-v")
+                {
+                    sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
