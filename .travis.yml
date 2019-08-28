@@ -46,7 +46,7 @@ before_deploy: |
   export SLANG_ARCH_NAME=`uname -p`
   export SLANG_TAG=${TRAVIS_TAG#v}
   export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
-  zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h prelude/*.h
+  zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h prelude/*.h
 
 # We are going to deploy to GitHub Releases
 # on a successful build from a tag, but only
