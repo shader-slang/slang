@@ -12,12 +12,12 @@ init:
       {
         $env:SLANG_VERSION = "dev-$($env:APPVEYOR_REPO_COMMIT.Substring(0, 7))"
       }
-      git describe --tags | %{$_ -replace "^", "#define SLANG_TAG_VERSION """ -replace "$", """"} > slang-tag-version.h
-
+      
 # The project uses a submodule for the "glslang" dependency,
 # so we need to make sure to pull that before building.
 install:
   - git submodule update --init --recursive
+  - ps: git describe --tags | %{$_ -replace "^", "#define SLANG_TAG_VERSION """ -replace "$", """"} > slang-tag-version.h 
 
 # We want to build the full matrix of platforms and configurations
 # that we support on Windows.
