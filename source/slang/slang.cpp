@@ -1,4 +1,5 @@
 #include "../../slang.h"
+#include "../../slang-tag-version.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
@@ -199,6 +200,11 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
     SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
 
     m_downstreamCompilerPreludes[int(passThrough)] = prelude;
+}
+
+SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
+{
+    return SLANG_TAG_VERSION;
 }
 
 struct IncludeHandlerImpl : IncludeHandler
