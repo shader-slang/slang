@@ -496,7 +496,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                     int index = parser.ReadInt();
                     SLANG_ASSERT(index >= 0);
 
-                    location = binding.toIndex(location, index);
+                    location = location.toIndex(index);
                     if (location.isInvalid())
                     {
                         outStream.print("Unable to find entry in '%d' in '%s'\n", index, entry.name.getBuffer());
@@ -509,7 +509,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                     parser.ReadToken();
                     Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
 
-                    location = binding.toField(location, identifierToken.Content.getBuffer());
+                    location = location.toField(identifierToken.Content.getBuffer());
                     if (location.isInvalid())
                     {
                         outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), entry.name.getBuffer());
@@ -529,7 +529,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
             auto& srcEntry = layout.entries[entryIndex];
 
-            auto typeLayout = location.m_typeLayout;
+            auto typeLayout = location.getTypeLayout();
             const auto kind = typeLayout->getKind();
             switch (kind)
             {
@@ -593,7 +593,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
                             break;
                         case SLANG_TEXTURE_2D:
                         {
-                            slang::TypeReflection* typeReflection = location.m_typeLayout->getResourceResultType();
+                            slang::TypeReflection* typeReflection = location.getTypeLayout()->getResourceResultType();
 
                             int count = 1;
                             if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)

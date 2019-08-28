@@ -168,23 +168,18 @@ CPUMemoryBinding::Location CPUMemoryBinding::find(const char* name)
     {
         return Location();
     }
-
-    Location location;
-    location.m_cur = m_rootBuffer.m_data + varLayout->getOffset();
-    location.m_typeLayout = varLayout->getTypeLayout();
-
-    return location;
+    return Location::make(varLayout->getTypeLayout(), m_rootBuffer.m_data + varLayout->getOffset());
 }
 
-CPUMemoryBinding::Location CPUMemoryBinding::toField(const Location& location, const char* name)
+CPUMemoryBinding::Location CPUMemoryBinding::Location::toField(const char* name) const
 {
-    if (!location.isValid())
+    if (!isValid())
     {
-        return location;
+        return *this;
     }
 
-    auto typeLayout = location.m_typeLayout;
-    uint8_t* cur = location.m_cur;
+    auto typeLayout = m_typeLayout;
+    uint8_t* cur = m_cur;
 
     // Strip constantBuffer wrapping
     {
@@ -208,10 +203,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::toField(const Location& location, c
                 auto field = typeLayout->getFieldByIndex(ff);
                 if (strcmp(field->getName(), name) == 0)
                 {
-                    Location newLocation;
-                    newLocation.m_cur = cur + field->getOffset();
-                    newLocation.m_typeLayout = field->getTypeLayout();
-                    return newLocation;
+                    return make(field->getTypeLayout(), cur + field->getOffset());
                 }
             }
         }
@@ -220,15 +212,15 @@ CPUMemoryBinding::Location CPUMemoryBinding::toField(const Location& location, c
     return Location();
 }
 
-CPUMemoryBinding::Location CPUMemoryBinding::toIndex(const Location& location, int index)
+CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
 {
-    if (!location.isValid())
+    if (!isValid())
     {
-        return location;
+        return *this;
     }
 
-    auto typeLayout = location.m_typeLayout;
-    uint8_t* cur = location.m_cur;
+    auto typeLayout = m_typeLayout;
+    uint8_t* cur = m_cur;
 
     const auto kind = typeLayout->getKind();
     switch (kind)
@@ -236,7 +228,8 @@ CPUMemoryBinding::Location CPUMemoryBinding::toIndex(const Location& location, i
         case slang::TypeReflection::Kind::Array:
         {
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            auto elementCount = int(typeLayout->getElementCount());
+            const auto elementCount = int(typeLayout->getElementCount());
+            const auto elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
             if (index < 0 || index >= elementCount)
             {
@@ -244,10 +237,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::toIndex(const Location& location, i
                 return Location();
             }
 
-            Location newLocation;
-            newLocation.m_typeLayout = elementTypeLayout;
-            newLocation.m_cur = cur + elementTypeLayout->getSize() * index;
-            return newLocation;
+            return Location::make(elementTypeLayout, cur + elementStride * index);
         }
         default: break;
     }
@@ -263,8 +253,8 @@ SlangResult CPUMemoryBinding::setBufferContents(const Location& location, const 
         return SLANG_FAIL;
     }
 
-    auto typeLayout = location.m_typeLayout;
-    uint8_t* cur = location.m_cur;
+    auto typeLayout = location.getTypeLayout();
+    uint8_t* cur = location.getPtr();
 
     const auto kind = typeLayout->getKind();
     switch (kind)
@@ -292,8 +282,8 @@ SlangResult CPUMemoryBinding::setNewBuffer(const Location& location, const void*
         return SLANG_FAIL;
     }
 
-    auto typeLayout = location.m_typeLayout;
-    uint8_t* cur = location.m_cur;
+    auto typeLayout = location.getTypeLayout();
+    uint8_t* cur = location.getPtr();
 
     const auto kind = typeLayout->getKind();
     switch (kind)
@@ -357,8 +347,8 @@ SlangResult CPUMemoryBinding::setObject(const Location& location, void* object)
         return SLANG_FAIL;
     }
 
-    auto typeLayout = location.m_typeLayout;
-    uint8_t* cur = location.m_cur;
+    auto typeLayout = location.getTypeLayout();
+    uint8_t* cur = location.getPtr();
 
     const auto kind = typeLayout->getKind();
     switch (kind)
@@ -441,9 +431,9 @@ SlangResult CPUMemoryBinding::setInplace(const Location& location, const void* d
         return SLANG_FAIL;
     }
 
-    size_t dstSize = location.m_typeLayout->getSize();
+    size_t dstSize = location.getTypeLayout()->getSize();
     sizeInBytes = (sizeInBytes > dstSize) ? dstSize : sizeInBytes;
-    memcpy(location.m_cur, data, sizeInBytes);
+    memcpy(location.getPtr(), data, sizeInBytes);
     return SLANG_OK;
 }
 
