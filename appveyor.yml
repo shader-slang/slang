@@ -12,6 +12,7 @@ init:
       {
         $env:SLANG_VERSION = "dev-$($env:APPVEYOR_REPO_COMMIT.Substring(0, 7))"
       }
+      git describe --tags | %{$_ -replace "^", "#define SLANG_TAG_VERSION """ -replace "$", """"} > slang-tag-version.h
 
 # The project uses a submodule for the "glslang" dependency,
 # so we need to make sure to pull that before building.
