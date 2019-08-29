@@ -242,6 +242,7 @@ TODO
 * Complete support (in terms of interfaces) for 'complex' resource types - such as Texture
 * Parameter block support (the difficulty is around layout)
 * Output of header files 
+* Output multiple entry points
 
 # Internal Slang compiler features
 

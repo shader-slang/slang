@@ -70,11 +70,12 @@ SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection, int entr
         }
         SLANG_ASSERT(rootSizeInBytes == globalConstantBuffer);
 
-        // Allocate the root (0 is the root)
-        m_rootBuffer = _allocateBuffer(rootSizeInBytes);
-
-        // Create default empty constant buffers
+        if (rootSizeInBytes)
         {
+            // Allocate the 'root' buffer
+            m_rootBuffer = _allocateBuffer(rootSizeInBytes);
+
+            // Create default empty constant buffers
             uint8_t*const buffer = m_rootBuffer.m_data;
             for (int i = 0; i < parameterCount; ++i)
             {
@@ -119,9 +120,10 @@ SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection, int entr
             entryPointParamsSizeInBytes = (endOffset > entryPointParamsSizeInBytes) ? endOffset : entryPointParamsSizeInBytes; 
         }
 
-        m_entryPointBuffer = _allocateBuffer(entryPointParamsSizeInBytes);
-
+        if (entryPointParamsSizeInBytes)
         {
+            m_entryPointBuffer = _allocateBuffer(entryPointParamsSizeInBytes);
+
             uint8_t*const buffer = m_entryPointBuffer.m_data;
             for (int i = 0; i < parameterCount; ++i)
             {
