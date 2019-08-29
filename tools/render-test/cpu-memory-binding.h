@@ -27,16 +27,14 @@ struct CPUMemoryBinding
         slang::TypeLayoutReflection* getTypeLayout() const { return m_typeLayout; }
         uint8_t* getPtr() const { return m_cur; }
 
-        Location():m_cur(nullptr) {}
-
-        static Location make(slang::TypeLayoutReflection* typeLayout, uint8_t* ptr)
+        SLANG_FORCE_INLINE Location():m_typeLayout(nullptr), m_cur(nullptr) {}
+      
+        SLANG_FORCE_INLINE Location(slang::TypeLayoutReflection* typeLayout, uint8_t* ptr):
+            m_typeLayout(typeLayout),
+            m_cur(ptr)
         {
-            Location loc;
-            loc.m_typeLayout = typeLayout;
-            loc.m_cur = ptr;
-            return loc;
         }
-
+        
     protected:
         slang::TypeLayoutReflection* m_typeLayout;
         uint8_t* m_cur;

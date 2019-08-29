@@ -168,7 +168,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::find(const char* name)
     {
         return Location();
     }
-    return Location::make(varLayout->getTypeLayout(), m_rootBuffer.m_data + varLayout->getOffset());
+    return Location(varLayout->getTypeLayout(), m_rootBuffer.m_data + varLayout->getOffset());
 }
 
 CPUMemoryBinding::Location CPUMemoryBinding::Location::toField(const char* name) const
@@ -203,7 +203,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toField(const char* name)
                 auto field = typeLayout->getFieldByIndex(ff);
                 if (strcmp(field->getName(), name) == 0)
                 {
-                    return make(field->getTypeLayout(), cur + field->getOffset());
+                    return Location(field->getTypeLayout(), cur + field->getOffset());
                 }
             }
         }
@@ -237,7 +237,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
                 return Location();
             }
 
-            return Location::make(elementTypeLayout, cur + elementStride * index);
+            return Location(elementTypeLayout, cur + elementStride * index);
         }
         default: break;
     }
