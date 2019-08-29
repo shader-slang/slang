@@ -2607,7 +2607,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitEntryPointAttributes(func, entryPointLayout);
                 emitType(resultType, name);
 
-                m_writer->emit("(ComputeVaryingInput* varyingInput, EntryPointParams* params, UniformState* uniformState)\n{\n");
+                m_writer->emit("(ComputeVaryingInput* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)\n{\n");
                 emitSemantics(func);
 
                 m_writer->indent();

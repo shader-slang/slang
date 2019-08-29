@@ -421,7 +421,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
     auto request = output.compileOutput.request;
 
     struct UniformState;
-    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::EntryPointParams* params, UniformState* uniformState);
+    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* params, UniformState* uniformState);
 
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
@@ -646,7 +646,7 @@ static SlangResult _doCPUCompute(SlangSession* session, const String& sourcePath
 
     {
         UniformState* uniformState = (UniformState*)binding.m_rootBuffer.m_data;
-        CPPPrelude::EntryPointParams* params = (CPPPrelude::EntryPointParams*)binding.m_entryPointBuffer.m_data;
+        CPPPrelude::UniformEntryPointParams* params = (CPPPrelude::UniformEntryPointParams*)binding.m_entryPointBuffer.m_data;
 
         CPPPrelude::ComputeVaryingInput varying;
         varying.groupID = {};

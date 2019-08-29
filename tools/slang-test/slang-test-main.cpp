@@ -1162,7 +1162,7 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
             CPPPrelude::RWStructuredBuffer<int> buffer;
         };
         
-        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::EntryPointParams* params, UniformState* uniformState);
+        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* params, UniformState* uniformState);
 
         Func runFunc = Func(func);
         int32_t data[4] = { 0, 0, 0, 0};
