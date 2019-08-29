@@ -241,8 +241,6 @@ TODO
 
 * Complete support (in terms of interfaces) for 'complex' resource types - such as Texture
 * Parameter block support (the difficulty is around layout)
-* Split out entry point uniforms into a separate pointer passed to the entry point
-* Improve documentation
 * Output of header files 
 
 # Internal Slang compiler features
