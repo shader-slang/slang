@@ -510,13 +510,31 @@ if isTargetWindows then
         
         systemversion "10.0.14393.0"
 
+        removefiles { "tools/render-test/cpu-render-test-main.cpp" }
+    
         -- For Windows targets, we want to copy d3dcompiler_47.dll,
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
        
 end
-            
+  
+toolSharedLibrary "cpu-render-test"
+    uuid "5701695E-7324-4B4D-977A-8D56C2A041B1"
+    
+    includedirs { ".", "external", "source", "tools/gfx" }
+    links { "core", "slang", "gfx" }
+    
+    addSourceDir("tools/render-test")
+    
+    removefiles { "tools/render-test/render-test-main.cpp" }
+    
+    if isTargetWindows then
+        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+    end 
 --
 -- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.

@@ -10,6 +10,12 @@
 #include <stdio.h>
 
 namespace renderer_test {
+using namespace Slang;
+
+// Entry point name to use for vertex/fragment shader
+static const char vertexEntryPointName[] = "vertexMain";
+static const char fragmentEntryPointName[] = "fragmentMain";
+static const char computeEntryPointName[] = "computeMain";
 
 /* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
@@ -191,6 +197,80 @@ namespace renderer_test {
     }
 
     return SLANG_OK;
+}
+
+/* static */SlangResult ShaderCompilerUtil::readSource(const String& inSourcePath, List<char>& outSourceText)
+{
+    // Read in the source code
+    FILE* sourceFile = fopen(inSourcePath.getBuffer(), "rb");
+    if (!sourceFile)
+    {
+        fprintf(stderr, "error: failed to open '%s' for reading\n", inSourcePath.getBuffer());
+        return SLANG_FAIL;
+    }
+    fseek(sourceFile, 0, SEEK_END);
+    size_t sourceSize = ftell(sourceFile);
+    fseek(sourceFile, 0, SEEK_SET);
+
+    outSourceText.setCount(sourceSize + 1);
+    fread(outSourceText.getBuffer(), sourceSize, 1, sourceFile);
+    fclose(sourceFile);
+    outSourceText[sourceSize] = 0;
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
+{
+    List<char> sourceText;
+    SLANG_RETURN_ON_FAIL(readSource(sourcePath, sourceText));
+
+    output.sourcePath = sourcePath;
+
+    auto& layout = output.layout;
+
+    // Default the amount of renderTargets based on shader type
+    switch (shaderType)
+    {
+        default:
+            layout.numRenderTargets = 1;
+            break;
+
+        case Options::ShaderProgramType::Compute:
+            layout.numRenderTargets = 0;
+            break;
+    }
+
+    // Parse the layout
+    layout.parse(sourceText.getBuffer());
+
+    // Setup SourceInfo
+    ShaderCompileRequest::SourceInfo sourceInfo;
+    sourceInfo.path = sourcePath.getBuffer();
+    sourceInfo.dataBegin = sourceText.getBuffer();
+    // Subtract 1 because it's zero terminated
+    sourceInfo.dataEnd = sourceText.getBuffer() + sourceText.getCount() - 1;
+
+    ShaderCompileRequest compileRequest;
+    compileRequest.source = sourceInfo;
+    if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
+    {
+        compileRequest.vertexShader.source = sourceInfo;
+        compileRequest.vertexShader.name = vertexEntryPointName;
+        compileRequest.fragmentShader.source = sourceInfo;
+        compileRequest.fragmentShader.name = fragmentEntryPointName;
+    }
+    else
+    {
+        compileRequest.computeShader.source = sourceInfo;
+        compileRequest.computeShader.name = computeEntryPointName;
+    }
+    compileRequest.globalGenericTypeArguments = layout.globalGenericTypeArguments;
+    compileRequest.entryPointGenericTypeArguments = layout.entryPointGenericTypeArguments;
+    compileRequest.globalExistentialTypeArguments = layout.globalExistentialTypeArguments;
+    compileRequest.entryPointExistentialTypeArguments = layout.entryPointExistentialTypeArguments;
+
+    return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.output);
 }
 
 } // renderer_test
