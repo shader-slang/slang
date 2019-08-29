@@ -232,6 +232,9 @@ struct ComputeVaryingInput
     uint3 groupThreadID;
 };
 
+/* Actual content of this type is dependent on the entry point parameters */
+struct EntryPointParams;
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 }
 #endif
