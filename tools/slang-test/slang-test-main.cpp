@@ -802,7 +802,11 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
             if (apiType == RenderApiType::CPU)
             {
-                availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                // Check that the session has the generic C/CPP compiler availability - which is all we should need for CPU target
+                if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(context->getSession(), SLANG_PASS_THROUGH_GENERIC_C_CPP)))
+                {
+                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                }
                 continue;
             }
 
