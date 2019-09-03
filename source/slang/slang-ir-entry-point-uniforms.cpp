@@ -248,6 +248,9 @@ struct MoveEntryPointUniformParametersToGlobalScope
                     // an instance of `paramStructType`.
                     //
                     globalParam = builder->createGlobalParam(paramStructType);
+
+                    // Mark that this global comes from the entry point
+                    builder->addEntryPointDecoration(globalParam);
                 }
 
                 // No matter what, the global shader parameter should have the layout

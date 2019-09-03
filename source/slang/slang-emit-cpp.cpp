@@ -2358,24 +2358,38 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
     {
         case 0: // nothing yet
         case kIROp_GlobalParam:
-        {
-            // It's in UniformState
+        {            
             String name = getName(inst);
-            m_writer->emit("(");
-            switch (inst->getDataType()->op)
+
+            if (inst->findDecorationImpl(kIROp_EntryPointDecoration))
             {
-                case kIROp_ParameterBlockType:
-                case kIROp_ConstantBufferType:
-                case kIROp_StructType:
-                {
-                    m_writer->emit("*");
-                    break;
-                }
-                default: break;
+                // It's an entry point parameter
+                // The parameter is held in a struct so always deref
+                m_writer->emit("(*");
+                m_writer->emit(name);
+                m_writer->emit(")");
             }
-            m_writer->emit("uniformState->");
-            m_writer->emit(name);
-            m_writer->emit(")");
+            else
+            {
+                // It's in UniformState
+                m_writer->emit("(");
+
+                switch (inst->getDataType()->op)
+                {
+                    case kIROp_ParameterBlockType:
+                    case kIROp_ConstantBufferType:
+                    case kIROp_StructType:
+                    {
+                        m_writer->emit("*");
+                        break;
+                    }
+                    default: break;
+                }
+
+                m_writer->emit("uniformState->");
+                m_writer->emit(name);
+                m_writer->emit(")");
+            }
             break;
         }
         case kIROp_Param:
@@ -2476,6 +2490,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         }
     }
 
+    IRGlobalParam* entryPointGlobalParams = nullptr;
+
     // Output the global parameters in a 'UniformState' structure
     {
         m_writer->emit("struct UniformState\n{\n");
@@ -2487,6 +2503,16 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         {
             if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
             {
+                auto inst = action.inst;
+
+                if (inst->findDecorationImpl(kIROp_EntryPointDecoration))
+                {
+                    // Should only be one instruction marked this way
+                    SLANG_ASSERT(entryPointGlobalParams == nullptr);
+                    entryPointGlobalParams = as<IRGlobalParam>(inst);
+                    continue;
+                }
+
                 VarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
                 SLANG_ASSERT(varLayout);
                 const VarLayout::ResourceInfo* varInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
@@ -2536,6 +2562,11 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->emit("ComputeVaryingInput varyingInput;\n");
         m_writer->emit("uint3 dispatchThreadID;\n");
 
+        if (entryPointGlobalParams)
+        {
+            emitGlobalInst(entryPointGlobalParams);
+        }
+
         // Output all the thread locals 
         for (auto action : actions)
         {
@@ -2576,7 +2607,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitEntryPointAttributes(func, entryPointLayout);
                 emitType(resultType, name);
 
-                m_writer->emit("(ComputeVaryingInput* varyingInput, UniformState* uniformState)\n{\n");
+                m_writer->emit("(ComputeVaryingInput* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)\n{\n");
                 emitSemantics(func);
 
                 m_writer->indent();
@@ -2585,6 +2616,20 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 m_writer->emit("context.uniformState = uniformState;\n");
                 m_writer->emit("context.varyingInput = *varyingInput;\n");
 
+                if (entryPointGlobalParams)
+                {
+                    auto varDecl = entryPointGlobalParams;
+                    auto rawType = varDecl->getDataType();
+
+                    auto varType = rawType;
+
+                    m_writer->emit("context.");
+                    m_writer->emit(getName(varDecl));
+                    m_writer->emit(" =  (");
+                    emitType(varType);
+                    m_writer->emit("*)params; \n");
+                }
+                
                 // Emit dispatchThreadID
                 if (entryPointLayout->profile.GetStage() == Stage::Compute)
                 {

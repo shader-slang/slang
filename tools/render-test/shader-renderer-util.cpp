@@ -223,6 +223,7 @@ static RefPtr<SamplerState> _createSamplerState(
     for (Index i = 0; i < numEntries; i++)
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
+        SLANG_ASSERT(srcEntry.isCPUOnly == false);
 
         const BindingStateImpl::RegisterRange registerSet = calcRegisterRange(renderer, srcEntry);
         if (!registerSet.isValid())
