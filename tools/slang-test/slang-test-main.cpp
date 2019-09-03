@@ -1162,7 +1162,7 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
             CPPPrelude::RWStructuredBuffer<int> buffer;
         };
         
-        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, UniformState* uniformState);
+        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* params, UniformState* uniformState);
 
         Func runFunc = Func(func);
         int32_t data[4] = { 0, 0, 0, 0};
@@ -1175,7 +1175,7 @@ TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
         for (Int i = 0; i < 4; ++i)
         {
             varyingInput.groupThreadID.x = uint32_t(i);
-            runFunc(&varyingInput, &state);
+            runFunc(&varyingInput, nullptr, &state);
         }
 
         SharedLibrary::unload(sharedLibrary);
