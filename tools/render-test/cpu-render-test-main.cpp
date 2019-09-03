@@ -36,11 +36,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     input.args = &gOptions.slangArgs[0];
     input.argCount = gOptions.slangArgCount;
 
-	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
-	SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
+    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
+    SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
     char const* profileName = "";
-	switch (gOptions.rendererType)
-	{
+    switch (gOptions.rendererType)
+    {
         case RendererType::CPU:
             input.target = SLANG_HOST_CALLABLE;
             input.profile = "";
