@@ -547,6 +547,10 @@ tool "gfx"
     -- rather than a stand-alone executable.
     kind "StaticLib"
 
+    filter { "system:linux" }
+	-- might be able to do pic(true)
+        buildoptions{"-fPIC"}
+
     includedirs { ".", "external", "source", "external/imgui" }
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
