@@ -1730,7 +1730,11 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
+TestResult generateHLSLBaseline(
+    TestContext* context,
+    TestInput& input,
+    char const* targetFormat,
+    char const* passThroughName)
 {
     auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
@@ -1746,9 +1750,9 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     }
 
     cmdLine.addArg("-target");
-    cmdLine.addArg("dxbc-assembly");
+    cmdLine.addArg(targetFormat);
     cmdLine.addArg("-pass-through");
-    cmdLine.addArg("fxc");
+    cmdLine.addArg(passThroughName);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -1771,7 +1775,18 @@ TestResult generateHLSLBaseline(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
+TestResult generateHLSLBaseline(
+    TestContext* context,
+    TestInput& input)
+{
+    return generateHLSLBaseline(context, input, "dxbc-assembly", "fxc");
+}
+
+static TestResult _runHLSLComparisonTest(
+    TestContext* context,
+    TestInput& input,
+    char const* targetFormat,
+    char const* passThroughName)
 {
     auto filePath999 = input.filePath;
     auto outputStem = input.outputStem;
@@ -1780,7 +1795,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     String expectedOutputPath = outputStem + ".expected";
 
     // Generate the expected output using standard HLSL compiler
-    generateHLSLBaseline(context, input);
+    generateHLSLBaseline(context, input, targetFormat, passThroughName);
 
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
 
@@ -1799,7 +1814,7 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     cmdLine.addArg("__SLANG__");
 
     cmdLine.addArg("-target");
-    cmdLine.addArg("dxbc-assembly");
+    cmdLine.addArg(targetFormat);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -1875,6 +1890,20 @@ TestResult runHLSLComparisonTest(TestContext* context, TestInput& input)
     }
 
     return result;
+}
+
+static TestResult runDXBCComparisonTest(
+    TestContext* context,
+    TestInput& input)
+{
+    return _runHLSLComparisonTest(context, input, "dxbc-assembly", "fxc");
+}
+
+static TestResult runDXILComparisonTest(
+    TestContext* context,
+    TestInput& input)
+{
+    return _runHLSLComparisonTest(context, input, "dxil-assembly", "dxc");
 }
 
 TestResult doGLSLComparisonTestRun(TestContext* context,
@@ -2405,7 +2434,8 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "REFLECTION",                             &runReflectionTest},
     { "CPU_REFLECTION",                         &runReflectionTest},
     { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},
-    { "COMPARE_HLSL",                           &runHLSLComparisonTest},
+    { "COMPARE_HLSL",                           &runDXBCComparisonTest},
+    { "COMPARE_DXIL",                           &runDXILComparisonTest},
     { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest},
     { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest},
     { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest},
