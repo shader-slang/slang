@@ -15,7 +15,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-static const Options gDefaultOptions;
+static const Options gDefaultOptions = Options();
 
 Options gOptions;
 

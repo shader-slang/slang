@@ -118,7 +118,7 @@ static CPUResource* _newOneTexture2D(int elemCount)
     List<RefPtr<CPUResource> > resources;
 
     {
-        auto& outStream = StdWriters::getOut();
+        auto outStream = StdWriters::getOut();
         auto& entries = layout.entries;
         buffers.setCount(entries.getCount());
 
