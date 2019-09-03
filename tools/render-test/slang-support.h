@@ -34,6 +34,12 @@ struct ShaderCompilerUtil
         }
         void reset()
         {
+            {
+                desc.pipelineType = PipelineType::Unknown;
+                desc.kernels = nullptr;
+                desc.kernelCount = 0;
+            }
+
             kernelDescs.clear();
             if (request && session)
             {

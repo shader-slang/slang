@@ -107,7 +107,7 @@ static CPUResource* _newOneTexture2D(int elemCount)
 
     auto& binding = outContext.binding;
 
-    binding.init(reflection);
+    binding.init(reflection, 0);
 
     auto& buffers = outContext.buffers;
     buffers.clear();
@@ -320,7 +320,7 @@ static CPUResource* _newOneTexture2D(int elemCount)
     // Use reflection to find the entry point name
     
     struct UniformState;
-    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, UniformState* uniformState);
+    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
 
     slang::EntryPointReflection* entryPoint = nullptr;
     Func func = nullptr;
@@ -344,6 +344,7 @@ static CPUResource* _newOneTexture2D(int elemCount)
 
     {
         UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+        CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
 
         CPPPrelude::ComputeVaryingInput varying;
         varying.groupID = {};
@@ -358,7 +359,7 @@ static CPUResource* _newOneTexture2D(int elemCount)
                 {
                     varying.groupThreadID.x = x;
 
-                    func(&varying, uniformState);
+                    func(&varying, uniformEntryPointParams, uniformState);
                 }
             }
         }

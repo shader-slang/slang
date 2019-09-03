@@ -22,6 +22,40 @@ namespace renderer_test
         return -1;
     }
 
+    static bool _isCPUTarget(SlangCompileTarget target)
+    {
+        switch (target)
+        {
+            case SLANG_C_SOURCE:
+            case SLANG_CPP_SOURCE:
+            case SLANG_EXECUTABLE:
+            case SLANG_SHARED_LIBRARY:
+            case SLANG_HOST_CALLABLE:
+            {
+                return true;
+            }
+            default: return false;
+        }
+    }
+
+    void ShaderInputLayout::updateForTarget(SlangCompileTarget target)
+    {
+        if (!_isCPUTarget(target))
+        {
+            int count = int(entries.getCount());
+            for (int i = 0; i < count; ++i)
+            {
+                auto& entry = entries[i];
+                if (entry.isCPUOnly)
+                {
+                    entries.removeAt(i);
+                    i--;
+                    count--;
+                }
+            }
+        }
+    }
+
     void ShaderInputLayout::parse(const char * source)
     {
         entries.clear();
@@ -257,7 +291,12 @@ namespace renderer_test
                             parser.Read(":");
                             while (!parser.IsEnd())
                             {
-                                if (parser.LookAhead("dxbinding"))
+                                if (parser.LookAhead("isCPUOnly"))
+                                {
+                                    entry.isCPUOnly = true;
+                                    parser.ReadToken();
+                                }
+                                else if (parser.LookAhead("dxbinding"))
                                 {
                                     parser.ReadToken();
                                     parser.Read("(");

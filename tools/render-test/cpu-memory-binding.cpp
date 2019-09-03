@@ -42,46 +42,105 @@ CPUMemoryBinding::Buffer CPUMemoryBinding::_allocateBuffer(size_t size, const vo
     return buffer;
 }
 
-SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection)
+SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection, int entryPointIndex)
 {
     m_reflection = reflection;
     m_rootBuffer = Buffer();
+    m_entryPointBuffer = Buffer();
 
     m_allBuffers.clear();
     m_arena.deallocateAll();
-
-    size_t globalConstantBuffer = reflection->getGlobalConstantBufferSize();
-
-    size_t rootSizeInBytes = 0;
-    const int parameterCount = reflection->getParameterCount();
-    for (int i = 0; i < parameterCount; ++i)
+    
     {
-        auto parameter = reflection->getParameterByIndex(i);
+        size_t globalConstantBuffer = reflection->getGlobalConstantBufferSize();
 
-        auto offset = parameter->getOffset();
-
-        auto typeLayout = parameter->getTypeLayout();
-        auto sizeInBytes = typeLayout->getSize();
-
-        size_t endOffset = offset + sizeInBytes;
-
-        rootSizeInBytes = (endOffset > rootSizeInBytes) ? endOffset : rootSizeInBytes;        
-    }
-    SLANG_ASSERT(rootSizeInBytes == globalConstantBuffer);
-
-    // Allocate the root (0 is the root)
-    m_rootBuffer = _allocateBuffer(rootSizeInBytes);
-
-    {
-        uint8_t*const buffer = m_rootBuffer.m_data;
+        size_t rootSizeInBytes = 0;
+        const int parameterCount = reflection->getParameterCount();
         for (int i = 0; i < parameterCount; ++i)
         {
             auto parameter = reflection->getParameterByIndex(i);
+
             auto offset = parameter->getOffset();
 
             auto typeLayout = parameter->getTypeLayout();
-            Buffer paramBuffer;
-            SLANG_RETURN_ON_FAIL(_add(parameter, typeLayout, buffer + offset, paramBuffer));
+            auto sizeInBytes = typeLayout->getSize();
+
+            size_t endOffset = offset + sizeInBytes;
+
+            rootSizeInBytes = (endOffset > rootSizeInBytes) ? endOffset : rootSizeInBytes;        
+        }
+        SLANG_ASSERT(rootSizeInBytes == globalConstantBuffer);
+
+        if (rootSizeInBytes)
+        {
+            // Allocate the 'root' buffer
+            m_rootBuffer = _allocateBuffer(rootSizeInBytes);
+
+            // Create default empty constant buffers
+            uint8_t*const buffer = m_rootBuffer.m_data;
+            for (int i = 0; i < parameterCount; ++i)
+            {
+                auto parameter = reflection->getParameterByIndex(i);
+                auto offset = parameter->getOffset();
+
+                auto typeLayout = parameter->getTypeLayout();
+                Buffer paramBuffer;
+                SLANG_RETURN_ON_FAIL(_add(parameter, typeLayout, buffer + offset, paramBuffer));
+            }
+        }
+    }
+
+    {
+        auto entryPointCount = reflection->getEntryPointCount();
+        if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
+        {
+            SLANG_ASSERT(!"Entry point index out of range");
+            return SLANG_FAIL;
+        }
+        
+        m_entryPoint = reflection->getEntryPointByIndex(entryPointIndex);
+        size_t entryPointParamsSizeInBytes = 0;
+
+        const int parameterCount = int(m_entryPoint->getParameterCount());
+        for (int i = 0 ; i < parameterCount; i++)
+        {
+            slang::VariableLayoutReflection* parameter = m_entryPoint->getParameterByIndex(i);
+
+            // If has a semantic, then isn't uniform parameter
+            if (auto semanticName = parameter->getSemanticName())
+            {
+                continue;
+            }
+
+            auto offset = parameter->getOffset();
+
+            auto typeLayout = parameter->getTypeLayout();
+            auto sizeInBytes = typeLayout->getSize();
+
+            size_t endOffset = offset + sizeInBytes;
+            entryPointParamsSizeInBytes = (endOffset > entryPointParamsSizeInBytes) ? endOffset : entryPointParamsSizeInBytes; 
+        }
+
+        if (entryPointParamsSizeInBytes)
+        {
+            m_entryPointBuffer = _allocateBuffer(entryPointParamsSizeInBytes);
+
+            uint8_t*const buffer = m_entryPointBuffer.m_data;
+            for (int i = 0; i < parameterCount; ++i)
+            {
+                auto parameter = m_entryPoint->getParameterByIndex(i);
+                // If has a semantic, then isn't uniform parameter
+                if (auto semanticName = parameter->getSemanticName())
+                {
+                    continue;
+                }
+
+                auto offset = parameter->getOffset();
+
+                auto typeLayout = parameter->getTypeLayout();
+                Buffer paramBuffer;
+                SLANG_RETURN_ON_FAIL(_add(parameter, typeLayout, buffer + offset, paramBuffer));
+            }
         }
     }
 
@@ -158,17 +217,42 @@ slang::VariableLayoutReflection* CPUMemoryBinding::getParameterByName(const char
             return parameter;
         }
     }
+    
     return nullptr;
+}
+
+slang::VariableLayoutReflection* CPUMemoryBinding::getEntryPointParameterByName(const char* name)
+{
+    const int parameterCount = int(m_entryPoint->getParameterCount());
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto parameter = m_entryPoint->getParameterByIndex(i);
+        // If has a semantic we will ignore
+        if (parameter->getSemanticName())
+        {
+            continue;
+        }
+        if (strcmp(parameter->getName(), name) == 0)
+        {
+            return parameter;
+        }
+    }
+    return nullptr;   
 }
 
 CPUMemoryBinding::Location CPUMemoryBinding::find(const char* name)
 {
     auto varLayout = getParameterByName(name);
-    if (varLayout == nullptr)
+    if (varLayout)
     {
-        return Location();
+        return Location::make(varLayout->getTypeLayout(), m_rootBuffer.m_data + varLayout->getOffset());
     }
-    return Location::make(varLayout->getTypeLayout(), m_rootBuffer.m_data + varLayout->getOffset());
+    varLayout = getEntryPointParameterByName(name);
+    if (varLayout)
+    {
+        return Location::make(varLayout->getTypeLayout(), m_entryPointBuffer.m_data + varLayout->getOffset());
+    }
+    return Location();
 }
 
 CPUMemoryBinding::Location CPUMemoryBinding::Location::toField(const char* name) const

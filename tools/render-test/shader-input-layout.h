@@ -59,6 +59,7 @@ public:
     InputBufferDesc bufferDesc;
     InputSamplerDesc samplerDesc;
     bool isOutput = false;
+    bool isCPUOnly = false;
     int hlslBinding = -1;
     Slang::List<int> glslBinding;
 
@@ -85,7 +86,9 @@ public:
 
     Slang::Index findEntryIndexByName(const Slang::String& name) const;
 
-    void parse(const char * source);
+    void updateForTarget(SlangCompileTarget target);
+
+    void parse(const char* source);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);

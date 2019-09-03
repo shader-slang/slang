@@ -144,7 +144,9 @@ static const char computeEntryPointName[] = "computeMain";
         {
             fprintf(stderr, "%s", diagnostics);
         }
-        if (SLANG_SUCCEEDED(res))
+
+        SLANG_RETURN_ON_FAIL(res);
+
         {
             size_t codeSize = 0;
             char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPoint, &codeSize);
@@ -172,7 +174,9 @@ static const char computeEntryPointName[] = "computeMain";
 //            OutputDebugStringA(diagnostics);
             fprintf(stderr, "%s", diagnostics);
         }
-        if (SLANG_SUCCEEDED(res))
+
+        SLANG_RETURN_ON_FAIL(res);
+
         {
             size_t vertexCodeSize = 0;
             char const* vertexCode = (char const*) spGetEntryPointCode(slangRequest, vertexEntryPoint, &vertexCodeSize);
@@ -243,6 +247,7 @@ static const char computeEntryPointName[] = "computeMain";
 
     // Parse the layout
     layout.parse(sourceText.getBuffer());
+    layout.updateForTarget(input.target);
 
     // Setup SourceInfo
     ShaderCompileRequest::SourceInfo sourceInfo;
