@@ -94,6 +94,8 @@ struct Thing { int a; int b; }
 
 Texture2D<float> tex;
 SamplerState sampler;
+RWStructuredBuffer<int> outputBuffer;        
+ConstantBuffer<Thing> thing3;        
         
 [numthreads(4, 1, 1)]
 void computeMain(
@@ -108,13 +110,13 @@ void computeMain(
 When compiled into a shared library/dll - how is it invoked? The entry point is exported with a signiture 
 
 ```
-void computeMain(ComputeVaryingInput* varyingInput, UniformState* uniformState);
+void computeMain(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformParams, UniformState* uniformState);
 ```
 
-The UniformState struct typically varies by shader, and holds all of the bindings. Where these are located can be determined by reflection. For example 
+The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following... 
 
 ```
-struct _S1
+struct UniformEntryPointParams
 {
     Thing thing;
     Thing thing2;
@@ -122,15 +124,14 @@ struct _S1
 
 struct UniformState
 {
-    Thing* thing3;
-    RWStructuredBuffer<int32_t> outputBuffer;
     Texture2D<float > tex;
     SamplerState sampler;
-    _S1* _S2;
+    RWStructuredBuffer<int32_t> outputBuffer;
+    Thing* thing3;
 };   
 ```
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```.
+Notice that of the entry point parameters `dispatchThreadID` is not part of UniformEntryPointParams and this is because it is not uniform.
 
 ConstantBuffers will become pointers to the type they hold (as `thing3` is in the above structure).
  
@@ -143,9 +144,7 @@ StructuredBuffer/RWStructuredBuffer/ByteAddressBuffer/RWByteAddressBuffer become
 
 Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`.  
 
-The `_S1` struct in the example above (which may have different names) is actually a struct that holds all of the entry point uniforms if there are any, in this case
-
-Note that the this pointer is not directly reflected (although layout of uniform paramters in the struct are). Currently this pointer is just placed after all the other reflected bindings.  
+The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```.
 
 ## Prelude
 
@@ -242,9 +241,8 @@ TODO
 
 * Complete support (in terms of interfaces) for 'complex' resource types - such as Texture
 * Parameter block support (the difficulty is around layout)
-* Split out entry point uniforms into a separate pointer passed to the entry point
-* Improve documentation
 * Output of header files 
+* Output multiple entry points
 
 # Internal Slang compiler features
 

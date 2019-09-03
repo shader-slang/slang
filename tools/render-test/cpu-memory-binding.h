@@ -41,6 +41,8 @@ struct CPUMemoryBinding
     };
     
     slang::VariableLayoutReflection* getParameterByName(const char* name);
+    slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
+
 
     Location find(const char* name);
 
@@ -48,7 +50,7 @@ struct CPUMemoryBinding
     SlangResult setNewBuffer(const Location& location, const void* initialData, size_t sizeInBytes, Buffer& outBuffer);
     SlangResult setObject(const Location& location, void* object);
     SlangResult setInplace(const Location& location, const void* data, size_t sizeInBytes);
-    SlangResult init(slang::ShaderReflection* reflection);
+    SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex);
     CPUMemoryBinding();
 
     Buffer _allocateBuffer(size_t size);
@@ -59,11 +61,15 @@ struct CPUMemoryBinding
     Slang::MemoryArena m_arena;    ///< Storage for buffers
 
     Buffer m_rootBuffer;
+    Buffer m_entryPointBuffer;
 
     slang::ShaderReflection* m_reflection;
     
     // All buffers
     Slang::List<Buffer> m_allBuffers;
+
+    slang::EntryPointReflection* m_entryPoint;
+    int m_entryPointIndex;
 };
 
 } // renderer_test
