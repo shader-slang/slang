@@ -12,7 +12,7 @@
 #include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
 
-#include "OGLCompilersDll/InitializeDll.h"
+#include "OGLCompilersDLL/InitializeDll.h"
 
 #include "../../slang.h"
 
