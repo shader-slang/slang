@@ -12,6 +12,8 @@
 #include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
 
+#include "OGLCompilersDll/InitializeDll.h"
+
 #include "../../slang.h"
 
 #if 0
@@ -190,6 +192,44 @@ static int glslang_dissassembleSPIRV(glslang_CompileRequest* request)
     return 0;
 }
 
+// We need a per process initialization
+class ProcessInitializer
+{
+public:
+    ProcessInitializer()
+    {
+        m_isInitialized = false;
+    }
+
+    bool init()
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        if (!m_isInitialized)
+        {
+            if (!glslang::InitializeProcess())
+            {
+                return false;
+            }
+            m_isInitialized = true;
+        }
+        return true;
+    }
+
+    ~ProcessInitializer()
+    {
+        // We *assume* will only be called once dll is detatched and that will be on a single thread
+        if (m_isInitialized)
+        {
+            glslang::FinalizeProcess();
+        }
+    }
+
+    std::mutex m_mutex;
+    bool m_isInitialized = false;
+};
+
+static ProcessInitializer s_processInitializer;
+
 extern "C"
 #ifdef _MSC_VER
 _declspec(dllexport)
@@ -198,7 +238,16 @@ __attribute__((__visibility__("default")))
 #endif
 int glslang_compile(glslang_CompileRequest* request)
 {
-    glslang::InitializeProcess();
+    if (!s_processInitializer.init())
+    {
+        // Failed
+        return 1;
+    }
+    if (!glslang::InitThread())
+    {
+        // Failed
+        return 1;
+    }
 
     int result = 0;
     switch(request->action)
@@ -215,8 +264,6 @@ int glslang_compile(glslang_CompileRequest* request)
         result = glslang_dissassembleSPIRV(request);
         break;
     }
-
-    glslang::FinalizeProcess();
 
     return result;
 }
