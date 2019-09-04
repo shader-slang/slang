@@ -228,8 +228,6 @@ public:
     bool m_isInitialized = false;
 };
 
-static ProcessInitializer s_processInitializer;
-
 extern "C"
 #ifdef _MSC_VER
 _declspec(dllexport)
@@ -238,7 +236,8 @@ __attribute__((__visibility__("default")))
 #endif
 int glslang_compile(glslang_CompileRequest* request)
 {
-    if (!s_processInitializer.init())
+    static ProcessInitializer g_processInitializer;
+    if (!g_processInitializer.init())
     {
         // Failed
         return 1;
