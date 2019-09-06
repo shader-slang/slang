@@ -49,14 +49,8 @@ using namespace Slang;
 }
 
 
-struct CPUResource : public RefObject
-{
-    void* getInterface() const { return m_interface; }
-    void* m_interface;
-};
-
 template <int COUNT>
-struct OneTexture2D : public CPUResource, public CPPPrelude::ITexture2D
+struct OneTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
 {
     void setOne(void* out)
     {
@@ -86,7 +80,7 @@ struct OneTexture2D : public CPUResource, public CPPPrelude::ITexture2D
     }
 };
 
-static CPUResource* _newOneTexture2D(int elemCount)
+static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 {
     switch (elemCount)
     {
@@ -114,8 +108,6 @@ static CPUResource* _newOneTexture2D(int elemCount)
 
     // Okay we need to find all of the bindings and match up to those in the layout
     const ShaderInputLayout& layout = compilationAndLayout.layout;
-
-    List<RefPtr<CPUResource> > resources;
 
     {
         auto outStream = StdWriters::getOut();
@@ -267,8 +259,8 @@ static CPUResource* _newOneTexture2D(int elemCount)
                                 count = int(typeReflection->getElementCount());
                             }
 
-                            RefPtr<CPUResource> resource = _newOneTexture2D(count);
-                            resources.add(resource);
+                            RefPtr<Resource> resource = _newOneTexture2D(count);
+                            outContext.m_resources.add(resource);
 
                             SLANG_RETURN_ON_FAIL(binding.setObject(location, resource->getInterface()));
                             break;

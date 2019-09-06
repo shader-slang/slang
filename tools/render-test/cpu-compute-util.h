@@ -5,16 +5,26 @@
 #include "slang-support.h"
 #include "options.h"
 
+#include "../../source/core/slang-smart-pointer.h"
+
 namespace renderer_test {
 
 struct CPUComputeUtil
 {
+    struct Resource : public RefObject
+    {
+        void* getInterface() const { return m_interface; }
+        void* m_interface;
+    };
+
     struct Context
     {
             /// Holds the binding information
         CPUMemoryBinding binding;
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
         List<CPUMemoryBinding::Buffer> buffers;
+            /// Holds the resources created (in calcBindings)
+        List<RefPtr<Resource> > m_resources;
     };
 
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
