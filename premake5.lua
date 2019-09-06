@@ -512,9 +512,10 @@ if isTargetWindows then
 
         removefiles { "tools/render-test/cpu-render-test-main.cpp" }
     
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}
        
 end
@@ -530,9 +531,10 @@ toolSharedLibrary "cpu-render-test"
     removefiles { "tools/render-test/render-test-main.cpp" }
     
     if isTargetWindows then
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
     end 
 --
@@ -558,9 +560,10 @@ tool "gfx"
     if isTargetWindows then
         systemversion "10.0.14393.0"
 
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-        -- directory into the output directory.
+        -- directory into the output directory. 
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
     else
          removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
