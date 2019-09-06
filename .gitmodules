@@ -12,4 +12,4 @@
 	url = https://github.com/ocornut/imgui.git
 [submodule "external/slang-binaries"]
 	path = external/slang-binaries
-	url = http://github.com/shader-slang/slang-binaries
+	url = https://github.com/shader-slang/slang-binaries
