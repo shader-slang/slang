@@ -543,16 +543,12 @@ toolSharedLibrary "cpu-render-test"
 -- It depends on teh `core` library, so we need to declare that:
 --
 
-tool "gfx"
+tool "gfx" 
     uuid "222F7498-B40C-4F3F-A704-DDEB91A4484A"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.
     kind "StaticLib"
-
-    filter { "system:linux" }
-	-- might be able to do pic(true)
-        buildoptions{"-fPIC"}
-
+    
     includedirs { ".", "external", "source", "external/imgui" }
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
@@ -573,6 +569,10 @@ tool "gfx"
 	if os.target() == "macosx" then
 		removefiles { "tools/gfx/render-vk.cpp", "tools/gfx/vk-device-queue.cpp", "tools/gfx/vk-api.cpp", "tools/gfx/vk-module.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/vk-util.cpp" }
 	end
+    
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
     
 --
 -- The `slangc` command-line application is just a very thin wrapper
