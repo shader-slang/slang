@@ -183,6 +183,7 @@ SlangResult CPUMemoryBinding::_add(slang::VariableLayoutReflection* varLayout, s
             }
             break;
         }
+        case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
             SLANG_ASSERT(typeLayout->getSize() == sizeof(void*));
@@ -269,7 +270,8 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toField(const char* name)
     // Strip constantBuffer wrapping
     {
         const auto kind = typeLayout->getKind();
-        if (kind == slang::TypeReflection::Kind::ConstantBuffer)
+        if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
+            kind == slang::TypeReflection::Kind::ParameterBlock)
         {
             // Follow the pointer
             cur = *(uint8_t**)cur;
@@ -344,6 +346,7 @@ SlangResult CPUMemoryBinding::setBufferContents(const Location& location, const 
     const auto kind = typeLayout->getKind();
     switch (kind)
     {
+        case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
             typeLayout = typeLayout->getElementTypeLayout();
@@ -373,6 +376,7 @@ SlangResult CPUMemoryBinding::setNewBuffer(const Location& location, const void*
     const auto kind = typeLayout->getKind();
     switch (kind)
     {
+        case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
             // All should be allocated (!)
@@ -441,12 +445,6 @@ SlangResult CPUMemoryBinding::setObject(const Location& location, void* object)
         default:
             break;
 
-        case slang::TypeReflection::Kind::ParameterBlock:
-        {
-            auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            SLANG_UNUSED(elementTypeLayout);
-            break;
-        }
         case slang::TypeReflection::Kind::TextureBuffer:
         {
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
