@@ -174,7 +174,7 @@ SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Outpu
 
     ExecuteResult exeRes;
 
-#if 0
+#if 1
     // Test
     {
         String line = ProcessUtil::getCommandLineString(cmdLine);
@@ -184,7 +184,7 @@ SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Outpu
 
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
 
-#if 0
+#if 1
     {
         printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", exeRes.standardOutput.getBuffer(), exeRes.standardError.getBuffer(), int(exeRes.resultCode));
     }
