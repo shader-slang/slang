@@ -174,7 +174,7 @@ SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Outpu
 
     ExecuteResult exeRes;
 
-#if 1
+#if 1  
     // Test
     {
         String line = ProcessUtil::getCommandLineString(cmdLine);
