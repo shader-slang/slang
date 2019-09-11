@@ -407,6 +407,18 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-std=c++14");
     }
 
+
+#if SLANG_PROCESSOR_X86
+    if (platformKind == PlatformKind::Win32 || platformKind == PlatformKind::Linux32)
+    {
+        /* Used to specify the processor more broadly. For a x86 binary we need to make sure we build x86 (as opposed to x64) builds
+        when on an x64 system.
+        -m32
+        -m64*/
+        cmdLine.addArg("-m32");
+    }
+#endif
+
     switch (options.optimizationLevel)
     {
         case OptimizationLevel::None:
