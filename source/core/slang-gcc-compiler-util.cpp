@@ -407,16 +407,18 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-std=c++14");
     }
 
-
+    // TODO(JS): Here we always set -m32 on x86. It could be argued it is only necessary when creating a shared library
+    // but if we create an object file, we don't know what to choose because we don't know what final usage is.
+    // It could also be argued that the platformKind could define the actual desired target - but as it stands
+    // we only have a target of 'Linux' (as opposed to Win32/64). Really it implies we need an arch enumeration too.
+    //
+    // For now we just make X86 binaries try and produce x86 compatible binaries as fixes the immediate problems.
 #if SLANG_PROCESSOR_X86
-    if (platformKind == PlatformKind::Win32 || platformKind == PlatformKind::Linux32)
-    {
-        /* Used to specify the processor more broadly. For a x86 binary we need to make sure we build x86 (as opposed to x64) builds
-        when on an x64 system.
-        -m32
-        -m64*/
-        cmdLine.addArg("-m32");
-    }
+    /* Used to specify the processor more broadly. For a x86 binary we need to make sure we build x86 builds
+    even when on an x64 system.
+    -m32
+    -m64*/
+    cmdLine.addArg("-m32");
 #endif
 
     switch (options.optimizationLevel)

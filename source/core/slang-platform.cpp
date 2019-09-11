@@ -239,9 +239,9 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
     0,                                                                                                                  // Unknown
     PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64,                                                    // Windows
     PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64 | PlatformFlag::X360 | PlatformFlag::XBoxOne,       // Microsoft
-    PlatformFlag::Linux32 | PlatformFlag::Linux64 | PlatformFlag::Android,                                              // Linux
+    PlatformFlag::Linux | PlatformFlag::Android,                                                                        // Linux
     PlatformFlag::IOS | PlatformFlag::OSX,                                                                              // Apple
-    PlatformFlag::Linux32 | PlatformFlag::Linux64 | PlatformFlag::Android | PlatformFlag::IOS | PlatformFlag::OSX,      // Unix
+    PlatformFlag::Linux | PlatformFlag::Android | PlatformFlag::IOS | PlatformFlag::OSX,                                // Unix
 };
 
 /* static */PlatformFlags PlatformUtil::getPlatformFlags(PlatformFamily family)
