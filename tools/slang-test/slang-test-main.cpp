@@ -2870,8 +2870,7 @@ SlangResult innerMain(int argc, char** argv)
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-    auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
-
+    
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
@@ -2948,17 +2947,6 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());
-    }
-
-    // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
-    // That when C/C++ code is compiled, it does so for the test systems arch not for the build system
-    // This leads to shared library not being loadable, so we need to disable such tests that have this requirement
-    if (options.outputMode == TestOutputMode::TeamCity)
-    {
-#if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86
-        // Disable shared library requiring tests
-        options.excludeCategories.Add(sharedLibraryCategory, sharedLibraryCategory);
-#endif
     }
 
     if( options.includeCategories.Count() == 0 )

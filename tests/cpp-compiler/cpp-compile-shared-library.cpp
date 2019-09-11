@@ -1,4 +1,4 @@
-//TEST(smoke,shared-library):CPP_COMPILER_SHARED_LIBRARY: 
+//TEST(smoke):CPP_COMPILER_SHARED_LIBRARY: 
 
 #include <stdlib.h>
 #include <stdio.h>
