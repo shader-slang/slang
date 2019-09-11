@@ -212,11 +212,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 #elif SLANG_ANDROID
     return PlatformKind::Android;
 #elif SLANG_LINUX
-#   if SLANG_PTR_IS_32
-    return PlatformKind::Linux32;
-#   else
-    return PlatformKind::Linux64;
-#   endif
+    return PlatformKind::Linux;
 #elif SLANG_IOS
     return PlatformKind::IOS;
 #elif SLANG_OSX
