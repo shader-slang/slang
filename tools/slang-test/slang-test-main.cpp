@@ -802,6 +802,11 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
             if (apiType == RenderApiType::CPU)
             {
+                if ((context->availableBackendFlags & PassThroughFlag::Generic_C_CPP) == 0)
+                {
+                    continue;
+                }
+
                 // Check that the session has the generic C/CPP compiler availability - which is all we should need for CPU target
                 if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(context->getSession(), SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
@@ -1420,6 +1425,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
+        context->testRequirements->addUsed(PassThroughFlag::Generic_C_CPP);
         return TestResult::Pass;
     }
 
@@ -1535,6 +1541,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
+        context->testRequirements->addUsed(PassThroughFlag::Generic_C_CPP);
         return TestResult::Pass;
     }
 
@@ -2848,6 +2855,22 @@ void runTestsInDirectory(
     }
 }
 
+static void _disableCPPBackends(TestContext* context)
+{
+    const SlangPassThrough cppPassThrus[] =
+    {
+        SLANG_PASS_THROUGH_GENERIC_C_CPP,
+        SLANG_PASS_THROUGH_VISUAL_STUDIO,
+        SLANG_PASS_THROUGH_CLANG,
+        SLANG_PASS_THROUGH_GCC,
+    };
+
+    for (auto passThru : cppPassThrus)
+    {
+        context->availableBackendFlags &= ~(PassThroughFlags(1) << int(passThru));
+    }
+}
+
 
 SlangResult innerMain(int argc, char** argv)
 {
@@ -2882,7 +2905,6 @@ SlangResult innerMain(int argc, char** argv)
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
-    
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
@@ -2926,6 +2948,16 @@ SlangResult innerMain(int argc, char** argv)
     SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
     
     Options& options = context.options;
+
+    if (options.outputMode == TestOutputMode::TeamCity)
+    {
+        // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
+        // That we rely on having compilation tools present such that on x64 systems we can build x86 binaries, and that appears to
+        // not be the case.
+#if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86
+        _disableCPPBackends();
+#endif
+    }
 
     if (options.subCommand.getLength())
     {
