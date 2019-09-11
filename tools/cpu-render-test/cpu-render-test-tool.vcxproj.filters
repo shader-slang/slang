@@ -9,51 +9,51 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cpu-compute-util.h">
+    <ClInclude Include="..\render-test\cpu-compute-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cpu-memory-binding.h">
+    <ClInclude Include="..\render-test\cpu-memory-binding.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="options.h">
+    <ClInclude Include="..\render-test\options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="png-serialize-util.h">
+    <ClInclude Include="..\render-test\png-serialize-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader-input-layout.h">
+    <ClInclude Include="..\render-test\shader-input-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader-renderer-util.h">
+    <ClInclude Include="..\render-test\shader-renderer-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-support.h">
+    <ClInclude Include="..\render-test\slang-support.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cpu-compute-util.cpp">
+    <ClCompile Include="..\render-test\cpu-compute-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cpu-memory-binding.cpp">
+    <ClCompile Include="..\render-test\cpu-memory-binding.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="options.cpp">
+    <ClCompile Include="..\render-test\cpu-render-test-main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="png-serialize-util.cpp">
+    <ClCompile Include="..\render-test\options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="render-test-main.cpp">
+    <ClCompile Include="..\render-test\png-serialize-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="shader-input-layout.cpp">
+    <ClCompile Include="..\render-test\shader-input-layout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="shader-renderer-util.cpp">
+    <ClCompile Include="..\render-test\shader-renderer-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-support.cpp">
+    <ClCompile Include="..\render-test\slang-support.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

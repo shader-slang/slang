@@ -510,25 +510,45 @@ if isTargetWindows then
         
         systemversion "10.0.14393.0"
 
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        removefiles { "tools/render-test/cpu-render-test-main.cpp" }
+    
+        -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
-        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}
        
 end
-            
+  
+toolSharedLibrary "cpu-render-test"
+    uuid "5701695E-7324-4B4D-977A-8D56C2A041B1"
+    
+    includedirs { ".", "external", "source", "tools/gfx" }
+    links { "core", "slang", "gfx" }
+    
+    addSourceDir("tools/render-test")
+    
+    removefiles { "tools/render-test/render-test-main.cpp" }
+    
+    if isTargetWindows then
+        -- For Windows targets, we want to copy 
+        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
+        -- directory into the output directory.
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+    end 
 --
 -- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.
 -- It depends on teh `core` library, so we need to declare that:
 --
 
-tool "gfx"
+tool "gfx" 
     uuid "222F7498-B40C-4F3F-A704-DDEB91A4484A"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.
     kind "StaticLib"
-
+    
     includedirs { ".", "external", "source", "external/imgui" }
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
@@ -536,9 +556,10 @@ tool "gfx"
     if isTargetWindows then
         systemversion "10.0.14393.0"
 
-        -- For Windows targets, we want to copy d3dcompiler_47.dll,
+        -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-        -- directory into the output directory.
+        -- directory into the output directory. 
+        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
     else
          removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
@@ -548,6 +569,10 @@ tool "gfx"
 	if os.target() == "macosx" then
 		removefiles { "tools/gfx/render-vk.cpp", "tools/gfx/vk-device-queue.cpp", "tools/gfx/vk-api.cpp", "tools/gfx/vk-module.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/vk-util.cpp" }
 	end
+    
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
     
 --
 -- The `slangc` command-line application is just a very thin wrapper

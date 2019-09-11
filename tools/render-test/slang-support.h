@@ -6,6 +6,7 @@
 #include <slang.h>
 
 #include "shader-input-layout.h"
+#include "options.h"
 
 namespace renderer_test {
 
@@ -33,6 +34,12 @@ struct ShaderCompilerUtil
         }
         void reset()
         {
+            {
+                desc.pipelineType = PipelineType::Unknown;
+                desc.kernels = nullptr;
+                desc.kernelCount = 0;
+            }
+
             kernelDescs.clear();
             if (request && session)
             {
@@ -52,7 +59,19 @@ struct ShaderCompilerUtil
         ShaderProgram::Desc desc;
         SlangCompileRequest* request = nullptr;
         SlangSession* session = nullptr;
+
     };
+
+    struct OutputAndLayout
+    {
+        Output output;
+        ShaderInputLayout layout;
+        Slang::String sourcePath;
+    };
+
+    static SlangResult compileWithLayout(SlangSession* session, const Slang::String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
+
+    static SlangResult readSource(const Slang::String& inSourcePath, List<char>& outSourceText);
 
     static SlangResult compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out);
 };

@@ -46,6 +46,7 @@ SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection, int entr
 {
     m_reflection = reflection;
     m_rootBuffer = Buffer();
+    m_entryPointBuffer = Buffer();
 
     m_allBuffers.clear();
     m_arena.deallocateAll();

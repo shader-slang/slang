@@ -440,6 +440,23 @@ namespace renderer_test
         }
     }
 
+    template <typename F>
+    void _iteratePixels(int dimension, int size, unsigned int * buffer, F f)
+    {
+        if (dimension == 1)
+            for (int i = 0; i < size; i++)
+                buffer[i] = f(i, 0, 0);
+        else if (dimension == 2)
+            for (int i = 0; i < size; i++)
+                for (int j = 0; j < size; j++)
+                    buffer[i*size + j] = f(j, i, 0);
+        else if (dimension == 3)
+            for (int i = 0; i < size; i++)
+                for (int j = 0; j < size; j++)
+                    for (int k = 0; k < size; k++)
+                        buffer[i*size*size + j * size + k] = f(k, j, i);
+    };
+
     void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputDesc)
     {
         int arrLen = inputDesc.arrayLength;
@@ -453,21 +470,6 @@ namespace renderer_test
         output.textureSize = inputDesc.size;
         output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
         output.dataBuffer.setCount(output.mipLevels * output.arraySize);
-        auto iteratePixels = [&](int dimension, int size, unsigned int * buffer, auto f)
-        {
-            if (dimension == 1)
-                for (int i = 0; i < size; i++)
-                    buffer[i] = f(i, 0, 0);
-            else if (dimension == 2)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        buffer[i*size + j] = f(j, i, 0);
-            else if (dimension == 3)
-                for (int i = 0; i < size; i++)
-                    for (int j = 0; j < size; j++)
-                        for (int k = 0; k < size; k++)
-                            buffer[i*size*size + j*size + k] = f(k, j, i);
-        };
 
         int slice = 0;
         for (int i = 0; i < arraySize; i++)
@@ -482,7 +484,7 @@ namespace renderer_test
                     bufferLen *= size*size;
                 dataBuffer[slice].setCount(bufferLen);
 
-                iteratePixels(inputDesc.dimension, size, dataBuffer[slice].getBuffer(), [&](int x, int y, int z) -> unsigned int
+                _iteratePixels(inputDesc.dimension, size, dataBuffer[slice].getBuffer(), [&](int x, int y, int z) -> unsigned int
                 {
                     if (inputDesc.content == InputTextureContent::Zero)
                     {
