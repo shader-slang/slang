@@ -2955,7 +2955,7 @@ SlangResult innerMain(int argc, char** argv)
         // That we rely on having compilation tools present such that on x64 systems we can build x86 binaries, and that appears to
         // not be the case.
 #if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86
-        _disableCPPBackends();
+        _disableCPPBackends(&context);
 #endif
     }
 
