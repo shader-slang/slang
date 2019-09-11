@@ -711,11 +711,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
     }
     else
     {
-        ioRequirements->addUsed(passThru);
+        ioRequirements->addUsedBackEnd(passThru);
     }
 
     // Add the render api used
-    ioRequirements->addUsed(renderApiType);
+    ioRequirements->addUsedRenderApi(renderApiType);
 
     return SLANG_OK;
 }
@@ -728,7 +728,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsed(_toPassThroughType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(_toPassThroughType(passThrough.getUnownedSlice()));
         }
     }
 
@@ -1425,7 +1425,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
-        context->testRequirements->addUsed(PassThroughFlag::Generic_C_CPP);
+        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
@@ -1541,7 +1541,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
-        context->testRequirements->addUsed(PassThroughFlag::Generic_C_CPP);
+        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
