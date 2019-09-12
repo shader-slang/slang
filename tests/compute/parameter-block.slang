@@ -1,7 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-cpu
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
-//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(1),glbinding(1)
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=block0.buffer
+//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(1),glbinding(1),name=block1.buffer
 
 // Ensure that Slang `ParameterBlock` type is lowered
 // to HLSL in the fashion that we expect.
