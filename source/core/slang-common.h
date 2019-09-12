@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-#include <cstdint>
+#include <stdint.h>
 
 #ifdef __GNUC__
 #define CORE_LIB_ALIGN_16(x) x __attribute__((aligned(16)))
