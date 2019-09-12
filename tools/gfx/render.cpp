@@ -426,9 +426,6 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         {
             return &createGLRenderer;
         }
-#endif
-
-#if (SLANG_LINUX || SLANG_WINDOWS_FAMILY) && !__CYGWIN__
         case RendererType::Vulkan:
         {
             return &createVKRenderer;

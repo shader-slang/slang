@@ -560,7 +560,7 @@ tool "gfx"
         --addSourceDir "tools/gfx/open-gl"
     else
         -- Linux like
-        addSourceDir "tools/gfx/vulkan"
+        --addSourceDir "tools/gfx/vulkan"
         --addSourceDir "tools/gfx/open-gl"
     end
         
