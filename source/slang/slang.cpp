@@ -508,7 +508,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     //
     if( componentTypeCount == 1)
     {
-        *outCompositeComponentType = componentTypes[0];
+        auto componentType = componentTypes[0];
+        componentType->addRef();
+        *outCompositeComponentType = componentType;
         return SLANG_OK;
     }
 
