@@ -186,6 +186,7 @@
     <ClInclude Include="shader-input-layout.h" />
     <ClInclude Include="shader-renderer-util.h" />
     <ClInclude Include="slang-support.h" />
+    <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cpu-compute-util.cpp" />
@@ -196,6 +197,8 @@
     <ClCompile Include="shader-input-layout.cpp" />
     <ClCompile Include="shader-renderer-util.cpp" />
     <ClCompile Include="slang-support.cpp" />
+    <ClCompile Include="window.cpp" />
+    <ClCompile Include="windows\win-window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\source\core\core.vcxproj">

@@ -510,7 +510,8 @@ toolSharedLibrary "render-test"
     removefiles { "tools/render-test/cpu-render-test-main.cpp" }
     
     if isTargetWindows then    
-
+        addSourceDir "tools/render-test/windows"
+        
         systemversion "10.0.14393.0"
      
         -- For Windows targets, we want to copy 

@@ -19,22 +19,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "window.h"
+
 #include "../../source/core/slang-test-tool-util.h"
 
 #include "cpu-compute-util.h"
-
-#if 1
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
-
-#endif
 
 namespace renderer_test {
 
@@ -42,188 +31,6 @@ using Slang::Result;
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
-
-class WindowListener : public RefObject
-{
-public:
-    virtual Result update() = 0;
-};
-
-class Window: public RefObject
-{
-public:
-    SlangResult initialize(int width, int height);
-
-    void show();
-
-    void* getHandle() const { return m_hwnd; }
-
-    void postQuit() { m_isQuitting = true; }
-
-    bool isQuitting() const { return m_isQuitting; }
-
-        /// Run the event loop. Events will be sent to the WindowListener
-    SlangResult runLoop(WindowListener* listener);
-
-    Window() {}
-    ~Window();
-
-    static LRESULT CALLBACK windowProc(HWND    windowHandle,
-        UINT    message,
-        WPARAM  wParam,
-        LPARAM  lParam);
-
-protected:
-
-    bool m_isQuitting = false;
-
-    HINSTANCE m_hinst = nullptr;
-    HWND m_hwnd = nullptr;
-
-    DWORD m_quitValue = 0;
-};
-
-//
-// We use a bare-minimum window procedure to get things up and running.
-//
-
-/* static */LRESULT CALLBACK Window::windowProc(
-    HWND    windowHandle,
-    UINT    message,
-    WPARAM  wParam,
-    LPARAM  lParam)
-{
-    switch (message)
-    {
-    case WM_CLOSE:
-        PostQuitMessage(0);
-        return 0;
-    }
-
-    return DefWindowProcW(windowHandle, message, wParam, lParam);
-}
-
-static ATOM _getWindowClassAtom(HINSTANCE hinst)
-{
-    static ATOM s_windowClassAtom;
-
-    if (s_windowClassAtom)
-    {
-        return s_windowClassAtom;
-    }
-    WNDCLASSEXW windowClassDesc;
-    windowClassDesc.cbSize = sizeof(windowClassDesc);
-    windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-    windowClassDesc.lpfnWndProc = &Window::windowProc;
-    windowClassDesc.cbClsExtra = 0;
-    windowClassDesc.cbWndExtra = 0;
-    windowClassDesc.hInstance = hinst;
-    windowClassDesc.hIcon = 0;
-    windowClassDesc.hCursor = 0;
-    windowClassDesc.hbrBackground = 0;
-    windowClassDesc.lpszMenuName = 0;
-    windowClassDesc.lpszClassName = L"SlangRenderTest";
-    windowClassDesc.hIconSm = 0;
-    s_windowClassAtom = RegisterClassExW(&windowClassDesc);
-        
-    return s_windowClassAtom;
-}
-
-SlangResult Window::initialize(int widthIn, int heightIn)
-{
-    // Do initial window-creation stuff here, rather than in the renderer-specific files
-
-    m_hinst = GetModuleHandleA(0);
-
-    // First we register a window class.
-    ATOM windowClassAtom = _getWindowClassAtom(m_hinst);
-    if (!windowClassAtom)
-    {
-        fprintf(stderr, "error: failed to register window class\n");
-        return SLANG_FAIL;
-    }
-
-    // Next, we create a window using that window class.
-
-    // We will create a borderless window since our screen-capture logic in GL
-    // seems to get thrown off by having to deal with a window frame.
-    DWORD windowStyle = WS_POPUP;
-    DWORD windowExtendedStyle = 0;
-
-    RECT windowRect = { 0, 0, widthIn, heightIn };
-    AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
-
-    {
-        auto width = windowRect.right - windowRect.left;
-        auto height = windowRect.bottom - windowRect.top;
-
-        LPWSTR windowName = L"Slang Render Test";
-        m_hwnd = CreateWindowExW(
-            windowExtendedStyle,
-            (LPWSTR)windowClassAtom,
-            windowName,
-            windowStyle,
-            0, 0, // x, y
-            width, height,
-            NULL, // parent
-            NULL, // menu
-            m_hinst,
-            NULL);
-    }
-    if (!m_hwnd)
-    {
-        fprintf(stderr, "error: failed to create window\n");
-        return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
-}
-
-
-void Window::show()
-{
-    // Once initialization is all complete, we show the window...
-    int showCommand = SW_SHOW;
-    ShowWindow(m_hwnd, showCommand);
-}
-
-SlangResult Window::runLoop(WindowListener* listener)
-{
-    // ... and enter the event loop:
-    while (!m_isQuitting)
-    {
-        MSG message;
-        int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
-        if (result != 0)
-        {
-            if (message.message == WM_QUIT)
-            {
-                m_quitValue = (int)message.wParam;
-                return SLANG_OK;
-            }
-
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
-        else
-        {
-            if (listener)
-            {
-                SLANG_RETURN_ON_FAIL(listener->update());
-            }
-        }
-    }
-
-    return SLANG_OK;
-}
-
-Window::~Window()
-{
-    if (m_hwnd)
-    {
-        DestroyWindow(m_hwnd);
-    }
-}
 
 //
 // For the purposes of a small example, we will define the vertex data for a
@@ -687,10 +494,10 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         desc.height = gWindowHeight;
         desc.adapter = gOptions.adapter;
 
-        window = new renderer_test::Window;
+        window = renderer_test::Window::create();
         SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
 
-        SlangResult res = renderer->initialize(desc, (HWND)window->getHandle());
+        SlangResult res = renderer->initialize(desc, window->getHandle());
         if (SLANG_FAILED(res))
         {
             if (!gOptions.onlyStartup)
