@@ -287,9 +287,10 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
-        SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+        SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
+            slang::IComponentType**         outSpecializedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
@@ -810,12 +811,17 @@ namespace Slang
             return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
         }
 
-        SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+        SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             slang::SpecializationArg const* specializationArgs,
             SlangInt                        specializationArgCount,
+            slang::IComponentType**         outSpecializedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
         {
-            return Super::specialize(specializationArgs, specializationArgCount, outDiagnostics);
+            return Super::specialize(
+                specializationArgs,
+                specializationArgCount,
+                outSpecializedComponentType,
+                outDiagnostics);
         }
 
         //
@@ -1077,10 +1083,11 @@ namespace Slang
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::IComponentType* SLANG_MCALL createCompositeComponentType(
-            slang::IComponentType* const*  componentTypes,
-            SlangInt                componentTypeCount,
-            ISlangBlob**            outDiagnostics = nullptr) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
+            slang::IComponentType* const*   componentTypes,
+            SlangInt                        componentTypeCount,
+            slang::IComponentType**         outCompositeComponentType,
+            ISlangBlob**                    outDiagnostics = nullptr) override;
         SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
             slang::TypeReflection*          type,
             slang::SpecializationArg const* specializationArgs,
@@ -1408,12 +1415,16 @@ namespace Slang
             /// Get a component type that represents the global scope of the compile request, plus the requested entry points.
         ComponentType* getGlobalAndEntryPointsComponentType() { return m_globalAndEntryPointsComponentType; }
 
+        List<RefPtr<ComponentType>> const& getUnspecializedEntryPoints() { return m_unspecializedEntryPoints; }
+
     private:
             /// A component type that includes only the global scopes of the translation unit(s) that were compiled.
         RefPtr<ComponentType> m_globalComponentType;
 
             /// A component type that extends the global scopes with all of the entry points that were specified.
         RefPtr<ComponentType> m_globalAndEntryPointsComponentType;
+
+        List<RefPtr<ComponentType>> m_unspecializedEntryPoints;
     };
 
         /// A "legacy" program composes multiple translation units from a single compile request,
@@ -1727,6 +1738,11 @@ namespace Slang
         ComponentType* getSpecializedGlobalComponentType() { return m_specializedGlobalComponentType; }
         ComponentType* getSpecializedGlobalAndEntryPointsComponentType() { return m_specializedGlobalAndEntryPointsComponentType; }
 
+        ComponentType* getSpecializedEntryPointComponentType(Index index)
+        {
+            return m_specializedEntryPoints[index];
+        }
+
     private:
         void init();
 
@@ -1736,6 +1752,7 @@ namespace Slang
         RefPtr<FrontEndCompileRequest>  m_frontEndReq;
         RefPtr<ComponentType>           m_specializedGlobalComponentType;
         RefPtr<ComponentType>           m_specializedGlobalAndEntryPointsComponentType;
+        List<RefPtr<ComponentType>>     m_specializedEntryPoints;
         RefPtr<BackEndCompileRequest>   m_backEndReq;
 
         // For output
