@@ -501,42 +501,25 @@ toolSharedLibrary "slang-reflection-test"
 -- TODO: Fix that requirement.
 --
 
-if isTargetWindows then    
-    toolSharedLibrary "render-test"
-        uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
-        
-        includedirs { ".", "external", "source", "tools/gfx" }
-        links { "core", "slang", "gfx" }
-        
-        systemversion "10.0.14393.0"
-
-        removefiles { "tools/render-test/cpu-render-test-main.cpp" }
-    
-        -- For Windows targets, we want to copy 
-        -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
-        -- directory into the output directory.
-        -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
-        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}
-       
-end
-  
-toolSharedLibrary "cpu-render-test"
-    uuid "5701695E-7324-4B4D-977A-8D56C2A041B1"
+toolSharedLibrary "render-test"
+    uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
     
     includedirs { ".", "external", "source", "tools/gfx" }
     links { "core", "slang", "gfx" }
+   
+    removefiles { "tools/render-test/cpu-render-test-main.cpp" }
     
-    addSourceDir("tools/render-test")
-    
-    removefiles { "tools/render-test/render-test-main.cpp" }
-    
-    if isTargetWindows then
+    if isTargetWindows then    
+
+        systemversion "10.0.14393.0"
+     
         -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
         -- directory into the output directory.
         -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
-        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
-    end 
+        postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}    
+    end
+  
 --
 -- `gfx` is a utility library for doing GPU rendering
 -- and compute, which is used by both our testing and exmaples.
@@ -561,15 +544,25 @@ tool "gfx"
         -- directory into the output directory. 
         -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/"'}
+        
+        addSourceDir "tools/gfx/vulkan"
+        addSourceDir "tools/gfx/open-gl"
+        addSourceDir "tools/gfx/d3d" 
+        addSourceDir "tools/gfx/d3d11"
+        addSourceDir "tools/gfx/d3d12"
+        
+        addSourceDir "tools/gfx/windows"
+        
+    elseif targetDetail == "mingw" or targetDetail == "cygwin" then
+        -- Don't support any render techs...
+    elseif os.target() == "macosx" then
+        addSourceDir "tools/gfx/open-gl"
     else
-         removefiles { "tools/gfx/circular-resource-heap-d3d12.cpp", "tools/gfx/d3d-util.cpp", "tools/gfx/descriptor-heap-d3d12.cpp", "tools/gfx/render-d3d11.cpp", "tools/gfx/render-d3d12.cpp", "tools/gfx/render-gl.cpp", "tools/gfx/resource-d3d12.cpp", "tools/gfx/render-vk.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/window.cpp" }
+        -- Linux like
+        addSourceDir "tools/gfx/vulkan"
+        addSourceDir "tools/gfx/open-gl"
     end
-
-	-- Remove VK from OSX gfx build
-	if os.target() == "macosx" then
-		removefiles { "tools/gfx/render-vk.cpp", "tools/gfx/vk-device-queue.cpp", "tools/gfx/vk-api.cpp", "tools/gfx/vk-module.cpp", "tools/gfx/vk-swap-chain.cpp", "tools/gfx/vk-util.cpp" }
-	end
-    
+        
     filter { "system:linux" }
         -- might be able to do pic(true)
         buildoptions{"-fPIC"}

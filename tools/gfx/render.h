@@ -972,6 +972,8 @@ inline void Renderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt st
 /// Functions that are around Renderer and it's types
 struct RendererUtil
 {
+    typedef Renderer* (*CreateFunc)();
+
         /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
         /// Given a renderer type, gets a projection style
@@ -985,6 +987,9 @@ struct RendererUtil
 
         /// Get as text
     static Slang::UnownedStringSlice toText(RendererType type);
+
+        /// Given a type returns a function that can construct it, or nullptr if there isn't one
+    static CreateFunc getCreateFunc(RendererType type);
 
     private:
     static void compileTimeAsserts();

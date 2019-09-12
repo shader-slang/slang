@@ -8,9 +8,9 @@
 #include "../../slang-com-ptr.h"
 #include "../../source/core/slang-list.h"
 
-#include "flag-combiner.h"
+#include "../flag-combiner.h"
 
-#include "render.h"
+#include "../render.h"
 
 #include <D3Dcommon.h>
 #include <DXGIFormat.h>

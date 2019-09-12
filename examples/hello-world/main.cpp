@@ -33,7 +33,7 @@
 // design choices in their abstraction layer.
 //
 #include "gfx/render.h"
-#include "gfx/render-d3d11.h"
+#include "gfx/d3d11/render-d3d11.h"
 #include "gfx/window.h"
 using namespace gfx;
 

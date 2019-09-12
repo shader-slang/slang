@@ -9,13 +9,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="circular-resource-heap-d3d12.h">
+    <ClInclude Include="d3d\d3d-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="d3d-util.h">
+    <ClInclude Include="d3d11\render-d3d11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="descriptor-heap-d3d12.h">
+    <ClInclude Include="d3d12\circular-resource-heap-d3d12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d12\descriptor-heap-d3d12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d12\render-d3d12.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d3d12\resource-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="flag-combiner.h">
@@ -27,22 +36,10 @@
     <ClInclude Include="model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="render-d3d11.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-d3d12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-gl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="render-vk.h">
+    <ClInclude Include="open-gl\render-gl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="render.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resource-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="surface.h">
@@ -51,19 +48,22 @@
     <ClInclude Include="vector-math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vk-api.h">
+    <ClInclude Include="vulkan\render-vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vk-device-queue.h">
+    <ClInclude Include="vulkan\vk-api.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vk-module.h">
+    <ClInclude Include="vulkan\vk-device-queue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vk-swap-chain.h">
+    <ClInclude Include="vulkan\vk-module.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vk-util.h">
+    <ClInclude Include="vulkan\vk-swap-chain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vulkan\vk-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="window.h">
@@ -71,13 +71,22 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="circular-resource-heap-d3d12.cpp">
+    <ClCompile Include="d3d\d3d-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="d3d-util.cpp">
+    <ClCompile Include="d3d11\render-d3d11.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="descriptor-heap-d3d12.cpp">
+    <ClCompile Include="d3d12\circular-resource-heap-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d12\descriptor-heap-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d12\render-d3d12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="d3d12\resource-d3d12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="flag-combiner.cpp">
@@ -89,43 +98,34 @@
     <ClCompile Include="model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="render-d3d11.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-gl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="render-vk.cpp">
+    <ClCompile Include="open-gl\render-gl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="render.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="resource-d3d12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="surface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vk-api.cpp">
+    <ClCompile Include="vulkan\render-vk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vk-device-queue.cpp">
+    <ClCompile Include="vulkan\vk-api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vk-module.cpp">
+    <ClCompile Include="vulkan\vk-device-queue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vk-swap-chain.cpp">
+    <ClCompile Include="vulkan\vk-module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vk-util.cpp">
+    <ClCompile Include="vulkan\vk-swap-chain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="window.cpp">
+    <ClCompile Include="vulkan\vk-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\win-window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

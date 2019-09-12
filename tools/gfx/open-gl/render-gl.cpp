@@ -2,7 +2,7 @@
 #include "render-gl.h"
 
 //WORKING:#include "options.h"
-#include "render.h"
+#include "../render.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +10,7 @@
 #include "core/slang-secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
-#include "surface.h"
+#include "../surface.h"
 
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation

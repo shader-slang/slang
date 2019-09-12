@@ -4,9 +4,9 @@
 #include "render-d3d12.h"
 
 //WORKING:#include "options.h"
-#include "render.h"
+#include "../render.h"
 
-#include "surface.h"
+#include "../surface.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -26,13 +26,13 @@
 #include <d3dcompiler.h>
 
 #include "../../slang-com-ptr.h"
-#include "flag-combiner.h"
+#include "../flag-combiner.h"
 
 #include "resource-d3d12.h"
 #include "descriptor-heap-d3d12.h"
 #include "circular-resource-heap-d3d12.h"
 
-#include "d3d-util.h"
+#include "../d3d/d3d-util.h"
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>

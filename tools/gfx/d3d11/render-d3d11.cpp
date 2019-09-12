@@ -5,17 +5,17 @@
 #include "render-d3d11.h"
 
 //WORKING: #include "options.h"
-#include "render.h"
-#include "d3d-util.h"
+#include "../render.h"
+#include "../d3d/d3d-util.h"
 
-#include "surface.h"
+#include "../surface.h"
 
 // In order to use the Slang API, we need to include its header
 
 //#include <slang.h>
 
 #include "../../slang-com-ptr.h"
-#include "flag-combiner.h"
+#include "../flag-combiner.h"
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
