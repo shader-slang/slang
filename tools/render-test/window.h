@@ -6,10 +6,12 @@
 
 namespace renderer_test {
 
+class Window;
+
 class WindowListener : public Slang::RefObject
 {
 public:
-    virtual SlangResult update() = 0;
+    virtual SlangResult update(Window* window) = 0;
 };
 
 class Window : public Slang::RefObject

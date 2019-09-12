@@ -60,11 +60,11 @@ class RenderTestApp : public WindowListener
 	public:
 
     // WindowListener
-    virtual Result update() SLANG_OVERRIDE;
+    virtual Result update(Window* window) SLANG_OVERRIDE;
 
         // At initialization time, we are going to load and compile our Slang shader
         // code, and then create the API objects we need for rendering.
-    Result initialize(SlangSession* session, Renderer* renderer, Window* window, const Options& options, const ShaderCompilerUtil::Input& input);
+    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input);
     void runCompute();
     void renderFrame();
     void finalize();
@@ -94,15 +94,12 @@ class RenderTestApp : public WindowListener
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
 
-    RefPtr<Window> m_window;
-
     Options m_options;
 };
 
-SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, Window* window, const Options& options, const ShaderCompilerUtil::Input& input)
+SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input)
 {
     m_options = options;
-    m_window = window;
 
     SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
 
@@ -300,7 +297,7 @@ Result RenderTestApp::writeScreen(const char* filename)
     return PngSerializeUtil::write(filename, surface);
 }
 
-Result RenderTestApp::update()
+Result RenderTestApp::update(Window* window)
 {
     // Whenever we don't have Windows events to process, we render a frame.
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
@@ -338,7 +335,7 @@ Result RenderTestApp::update()
             }
         }
         // We are done
-        m_window->postQuit();
+        window->postQuit();
         return SLANG_OK;
     }
 
@@ -525,7 +522,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 	{
 		RefPtr<RenderTestApp> app(new RenderTestApp);
-		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, window, gOptions, input));
+		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input));
         window->show();
         return window->runLoop(app);
 	}
