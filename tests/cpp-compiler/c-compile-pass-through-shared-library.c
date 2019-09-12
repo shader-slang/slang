@@ -1,4 +1,4 @@
-//TEST(smoke,shared-library):CPP_COMPILER_COMPILE: -pass-through c -entry test -target callable
+//TEST(smoke):CPP_COMPILER_COMPILE: -pass-through c -entry test -target callable
 
 #include <stdlib.h>
 #include <stdio.h>

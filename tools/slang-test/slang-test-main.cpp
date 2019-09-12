@@ -711,11 +711,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
     }
     else
     {
-        ioRequirements->addUsed(passThru);
+        ioRequirements->addUsedBackEnd(passThru);
     }
 
     // Add the render api used
-    ioRequirements->addUsed(renderApiType);
+    ioRequirements->addUsedRenderApi(renderApiType);
 
     return SLANG_OK;
 }
@@ -728,7 +728,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsed(_toPassThroughType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(_toPassThroughType(passThrough.getUnownedSlice()));
         }
     }
 
@@ -787,6 +787,11 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
             if (apiType == RenderApiType::CPU)
             {
+                if ((context->availableBackendFlags & PassThroughFlag::Generic_C_CPP) == 0)
+                {
+                    continue;
+                }
+
                 // Check that the session has the generic C/CPP compiler availability - which is all we should need for CPU target
                 if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(context->getSession(), SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
@@ -1403,6 +1408,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
+        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
@@ -1518,6 +1524,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
+        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
@@ -2827,6 +2834,22 @@ void runTestsInDirectory(
     }
 }
 
+static void _disableCPPBackends(TestContext* context)
+{
+    const SlangPassThrough cppPassThrus[] =
+    {
+        SLANG_PASS_THROUGH_GENERIC_C_CPP,
+        SLANG_PASS_THROUGH_VISUAL_STUDIO,
+        SLANG_PASS_THROUGH_CLANG,
+        SLANG_PASS_THROUGH_GCC,
+    };
+
+    for (auto passThru : cppPassThrus)
+    {
+        context->availableBackendFlags &= ~(PassThroughFlags(1) << int(passThru));
+    }
+}
+
 
 SlangResult innerMain(int argc, char** argv)
 {
@@ -2849,8 +2872,7 @@ SlangResult innerMain(int argc, char** argv)
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-    auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
-
+    
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
@@ -2862,7 +2884,6 @@ SlangResult innerMain(int argc, char** argv)
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
-    
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
@@ -2907,6 +2928,16 @@ SlangResult innerMain(int argc, char** argv)
     
     Options& options = context.options;
 
+    if (options.outputMode == TestOutputMode::TeamCity)
+    {
+        // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
+        // That we rely on having compilation tools present such that on x64 systems we can build x86 binaries, and that appears to
+        // not be the case.
+#if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86
+        _disableCPPBackends(&context);
+#endif
+    }
+
     if (options.subCommand.getLength())
     {
         // Get the function from the tool
@@ -2927,17 +2958,6 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         return func(StdWriters::getSingleton(), context.getSession(), int(args.getCount()), args.getBuffer());
-    }
-
-    // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
-    // That when C/C++ code is compiled, it does so for the test systems arch not for the build system
-    // This leads to shared library not being loadable, so we need to disable such tests that have this requirement
-    if (options.outputMode == TestOutputMode::TeamCity)
-    {
-#if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86
-        // Disable shared library requiring tests
-        options.excludeCategories.Add(sharedLibraryCategory, sharedLibraryCategory);
-#endif
     }
 
     if( options.includeCategories.Count() == 0 )
