@@ -32,20 +32,21 @@ struct PassThroughFlag
 /// back-end availability 
 struct TestRequirements
 {
-    TestRequirements& addUsed(SlangPassThrough type)
-    {
-        if (type != SLANG_PASS_THROUGH_NONE)
-        {
-            usedBackendFlags |= PassThroughFlags(1) << int(type);
-        }
-        return *this;
-    }
-    TestRequirements& addUsed(Slang::RenderApiType type)
+    
+    TestRequirements& addUsedRenderApi(Slang::RenderApiType type)
     {
         using namespace Slang;
         if (type != RenderApiType::Unknown)
         {
             usedRenderApiFlags |=RenderApiFlags(1) << int(type);
+        }
+        return *this;
+    }
+    TestRequirements& addUsedBackEnd(SlangPassThrough type)
+    {
+        if (type != SLANG_PASS_THROUGH_NONE)
+        {
+            usedBackendFlags |= PassThroughFlags(1) << int(type);
         }
         return *this;
     }
