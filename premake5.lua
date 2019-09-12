@@ -557,11 +557,11 @@ tool "gfx"
     elseif targetDetail == "mingw" or targetDetail == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
-        addSourceDir "tools/gfx/open-gl"
+        --addSourceDir "tools/gfx/open-gl"
     else
         -- Linux like
         addSourceDir "tools/gfx/vulkan"
-        addSourceDir "tools/gfx/open-gl"
+        --addSourceDir "tools/gfx/open-gl"
     end
         
     filter { "system:linux" }

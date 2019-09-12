@@ -422,19 +422,16 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         {
             return &createD3D12Renderer;
         }
+        case RendererType::OpenGl:
+        {
+            return &createGLRenderer;
+        }
 #endif
 
 #if (SLANG_LINUX || SLANG_WINDOWS_FAMILY) && !__CYGWIN__
         case RendererType::Vulkan:
         {
             return &createVKRenderer;
-        }
-#endif
-
-#if (SLANG_LINUX || SLANG_WINDOWS_FAMILY || SLANG_APPLE_FAMILY) && !__CYGWIN__
-        case RendererType::OpenGl:
-        {
-            return &createGLRenderer;
         }
 #endif
 
