@@ -91,7 +91,7 @@ SlangResult CPUMemoryBinding::init(slang::ShaderReflection* reflection, int entr
     }
 
     {
-        auto entryPointCount = reflection->getEntryPointCount();
+        auto entryPointCount = int(reflection->getEntryPointCount());
         if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
         {
             SLANG_ASSERT(!"Entry point index out of range");
