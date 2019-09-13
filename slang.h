@@ -2820,9 +2820,10 @@ namespace slang
             It is an error to create a composite component type that recursively
             aggregates the a single module more than once.
             */
-        virtual SLANG_NO_THROW IComponentType* SLANG_MCALL createCompositeComponentType(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
             IComponentType* const*  componentTypes,
             SlangInt                componentTypeCount,
+            IComponentType**        outCompositeComponentType,
             ISlangBlob**            outDiagnostics = nullptr) = 0;
 
             /** Specialize a type based on type arguments.
@@ -2965,13 +2966,12 @@ namespace slang
             The `specializationArgs` array must have `specializationArgCount` entries, and
             this must match the number of specialization parameters on this component type.
 
-            If the specialization arguments are not valid, then the function will return null.
-
             If any diagnostics (error or warnings) are produced, they will be written to `outDiagnostics`.
             */
-        virtual SLANG_NO_THROW IComponentType* SLANG_MCALL specialize(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
             SpecializationArg const*    specializationArgs,
             SlangInt                    specializationArgCount,
+            IComponentType**            outSpecializedComponentType,
             ISlangBlob**                outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
@@ -2998,7 +2998,6 @@ namespace slang
     };
     
     #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
-
 
         /** Argument used for specialization to types/values.
         */
@@ -3040,6 +3039,11 @@ namespace slang
 SLANG_API SlangResult spCompileRequest_getProgram(
     SlangCompileRequest*    request,
     slang::IComponentType** outProgram);
+
+SLANG_API SlangResult spCompileRequest_getEntryPoint(
+    SlangCompileRequest*    request,
+    SlangInt                entryPointIndex,
+    slang::IComponentType**    outEntryPoint);
 
 #endif
 

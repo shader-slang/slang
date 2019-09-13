@@ -1522,4 +1522,3 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
     return convert(specializedType);
 }
-
