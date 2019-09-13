@@ -507,8 +507,6 @@ toolSharedLibrary "render-test"
     includedirs { ".", "external", "source", "tools/gfx" }
     links { "core", "slang", "gfx" }
    
-    removefiles { "tools/render-test/cpu-render-test-main.cpp" }
-    
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         
