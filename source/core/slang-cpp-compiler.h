@@ -95,7 +95,8 @@ public:
             enum Enum : Flags
             {
                 EnableExceptionHandling = 0x01,
-                Verbose                 = 0x02, 
+                Verbose                 = 0x02,
+                EnableSecurityChecks    = 0x04,
             };
         };
 

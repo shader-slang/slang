@@ -25,6 +25,17 @@ static const char computeEntryPointName[] = "computeMain";
     out.request = slangRequest;
     out.session = session;
 
+    // Parse all the extra args
+    if (request.compileArgs.getCount() > 0)
+    {
+        List<const char*> args;
+        for (const auto& arg : request.compileArgs)
+        {
+            args.add(arg.value.getBuffer());
+        }
+        SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, args.getBuffer(), int(args.getCount())));
+    }
+
     spSetCodeGenTarget(slangRequest, input.target);
     spSetTargetProfile(slangRequest, 0, spFindProfile(session, input.profile));
 
@@ -224,7 +235,7 @@ static const char computeEntryPointName[] = "computeMain";
     return SLANG_OK;
 }
 
-/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const String& sourcePath, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
+/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const String& sourcePath, const Slang::List<Slang::CommandLine::Arg>& compileArgs, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
 {
     List<char> sourceText;
     SLANG_RETURN_ON_FAIL(readSource(sourcePath, sourceText));
@@ -245,8 +256,11 @@ static const char computeEntryPointName[] = "computeMain";
             break;
     }
 
+    // Deterministic random generator
+    RefPtr<RandomGenerator> rand = RandomGenerator::create(0x34234);
+
     // Parse the layout
-    layout.parse(sourceText.getBuffer());
+    layout.parse(rand, sourceText.getBuffer());
     layout.updateForTarget(input.target);
 
     // Setup SourceInfo
@@ -257,6 +271,9 @@ static const char computeEntryPointName[] = "computeMain";
     sourceInfo.dataEnd = sourceText.getBuffer() + sourceText.getCount() - 1;
 
     ShaderCompileRequest compileRequest;
+
+    compileRequest.compileArgs = compileArgs;
+
     compileRequest.source = sourceInfo;
     if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
     {
