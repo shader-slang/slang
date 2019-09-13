@@ -10840,7 +10840,8 @@ static bool doesParameterMatch(
         /// account any specialization arguments the user might have supplied.
         ///
     RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
-        FrontEndCompileRequest* compileRequest)
+        FrontEndCompileRequest*         compileRequest,
+        List<RefPtr<ComponentType>>&    outUnspecializedEntryPoints)
     {
         auto linkage = compileRequest->getLinkage();
         auto sink = compileRequest->getSink();
@@ -10880,6 +10881,7 @@ static bool doesParameterMatch(
                     //
                     entryPointReq->getTranslationUnit()->entryPoints.add(entryPoint);
 
+                    outUnspecializedEntryPoints.add(entryPoint);
                     allComponentTypes.add(entryPoint);
                 }
             }
@@ -10958,6 +10960,7 @@ static bool doesParameterMatch(
                     //
                     translationUnit->entryPoints.add(entryPoint);
 
+                    outUnspecializedEntryPoints.add(entryPoint);
                     allComponentTypes.add(entryPoint);
                 }
             }
@@ -11570,7 +11573,8 @@ static bool doesParameterMatch(
         /// compilation (e.g., from the command line).
         ///
     RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
-        EndToEndCompileRequest* endToEndReq)
+        EndToEndCompileRequest*         endToEndReq,
+        List<RefPtr<ComponentType>>&    outSpecializedEntryPoints)
     {
         auto specializedGlobalComponentType = endToEndReq->getSpecializedGlobalComponentType();
 
@@ -11587,6 +11591,8 @@ static bool doesParameterMatch(
 
             auto specializedEntryPoint = createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
             allComponentTypes.add(specializedEntryPoint);
+
+            outSpecializedEntryPoints.add(specializedEntryPoint);
         }
 
         RefPtr<ComponentType> composed = CompositeComponentType::create(endToEndReq->getLinkage(), allComponentTypes);

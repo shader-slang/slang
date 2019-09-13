@@ -467,9 +467,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
     }
 
-    // Renderer is constructed (later) using the window
     Slang::RefPtr<Renderer> renderer;
-
     {
         RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(gOptions.rendererType);
         if (createFunc)

@@ -497,16 +497,22 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     return asExternal(module);
 }
 
-SLANG_NO_THROW slang::IComponentType* SLANG_MCALL Linkage::createCompositeComponentType(
-    slang::IComponentType* const*  componentTypes,
-    SlangInt                componentTypeCount,
-    ISlangBlob**            outDiagnostics)
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
+    slang::IComponentType* const*   componentTypes,
+    SlangInt                        componentTypeCount,
+    slang::IComponentType**         outCompositeComponentType,
+    ISlangBlob**                    outDiagnostics)
 {
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
     //
     if( componentTypeCount == 1)
-        return componentTypes[0];
+    {
+        auto componentType = componentTypes[0];
+        componentType->addRef();
+        *outCompositeComponentType = componentType;
+        return SLANG_OK;
+    }
 
     DiagnosticSink sink(getSourceManager());
 
@@ -521,7 +527,9 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL Linkage::createCompositeCompon
         childComponents);
 
     sink.getBlobIfNeeded(outDiagnostics);
-    return asExternal(composite.detach());
+
+    *outCompositeComponentType = asExternal(composite.detach());
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
@@ -953,13 +961,15 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(
         FrontEndCompileRequest* compileRequest);
 
 RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
-        FrontEndCompileRequest* compileRequest);
+        FrontEndCompileRequest*         compileRequest,
+        List<RefPtr<ComponentType>>&    outUnspecializedEntryPoints);
 
 RefPtr<ComponentType> createSpecializedGlobalComponentType(
     EndToEndCompileRequest* endToEndReq);
 
 RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
-    EndToEndCompileRequest* endToEndReq);
+    EndToEndCompileRequest*         endToEndReq,
+    List<RefPtr<ComponentType>>&    outSpecializedEntryPoints);
 
 void FrontEndCompileRequest::checkAllTranslationUnits()
 {
@@ -1092,7 +1102,9 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
-    m_globalAndEntryPointsComponentType = createUnspecializedGlobalAndEntryPointsComponentType(this);
+    m_globalAndEntryPointsComponentType = createUnspecializedGlobalAndEntryPointsComponentType(
+        this,
+        m_unspecializedEntryPoints);
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1208,6 +1220,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         //
         m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
         m_specializedGlobalAndEntryPointsComponentType = getUnspecializedGlobalAndEntryPointsComponentType();
+        m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
         return SLANG_OK;
     }
@@ -1221,7 +1234,9 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         if (getSink()->GetErrorCount() != 0)
             return SLANG_FAIL;
 
-        m_specializedGlobalAndEntryPointsComponentType = createSpecializedGlobalAndEntryPointsComponentType(this);
+        m_specializedGlobalAndEntryPointsComponentType = createSpecializedGlobalAndEntryPointsComponentType(
+            this,
+            m_specializedEntryPoints);
         if (getSink()->GetErrorCount() != 0)
             return SLANG_FAIL;
 
@@ -1260,6 +1275,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
         m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
         m_specializedGlobalAndEntryPointsComponentType = composedProgram;
+        m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
     }
 
     // Generate output code, in whatever format was requested
@@ -1788,6 +1804,11 @@ RefPtr<ComponentType> ComponentType::specialize(
     SlangInt                    specializationArgCount,
     DiagnosticSink*             sink)
 {
+    if(specializationArgCount == 0)
+    {
+        return this;
+    }
+
     List<SpecializationArg> specializationArgs;
     specializationArgs.addRange(
         inSpecializationArgs,
@@ -1810,9 +1831,10 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink);
 }
 
-SLANG_NO_THROW slang::IComponentType* SLANG_MCALL ComponentType::specialize(
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::SpecializationArg const* specializationArgs,
     SlangInt                        specializationArgCount,
+    slang::IComponentType**         outSpecializedComponentType,
     ISlangBlob**                    outDiagnostics)
 {
     DiagnosticSink sink(getLinkage()->getSourceManager());
@@ -1825,7 +1847,7 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL ComponentType::specialize(
     {
         // TODO: diagnose
         sink.getBlobIfNeeded(outDiagnostics);
-        return nullptr;
+        return SLANG_FAIL;
     }
 
     List<SpecializationArg> expandedArgs;
@@ -1842,7 +1864,7 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL ComponentType::specialize(
 
         default:
             sink.getBlobIfNeeded(outDiagnostics);
-            return nullptr;
+            return SLANG_FAIL;
         }
         expandedArgs.add(expandedArg);
     }
@@ -1854,7 +1876,9 @@ SLANG_NO_THROW slang::IComponentType* SLANG_MCALL ComponentType::specialize(
 
     sink.getBlobIfNeeded(outDiagnostics);
 
-    return specializedComponentType;
+    *outSpecializedComponentType = specializedComponentType.detach();
+
+    return SLANG_OK;
 }
 
     /// Visitor used by `ComponentType::enumerateModules`
@@ -3305,11 +3329,26 @@ SLANG_API SlangResult spCompileRequest_getProgram(
 {
     if( !request ) return SLANG_ERROR_INVALID_PARAMETER;
     auto req = Slang::asInternal(request);
-    auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
+    auto program = req->getSpecializedGlobalComponentType();
 
     *outProgram = Slang::ComPtr<slang::IComponentType>(program).detach();
     return SLANG_OK;
 }
+
+SLANG_API SlangResult spCompileRequest_getEntryPoint(
+    SlangCompileRequest*    request,
+    SlangInt                entryPointIndex,
+    slang::IComponentType** outEntryPoint)
+{
+    if( !request ) return SLANG_ERROR_INVALID_PARAMETER;
+    auto req = Slang::asInternal(request);
+
+    auto entryPoint = req->getSpecializedEntryPointComponentType(entryPointIndex);
+
+    *outEntryPoint = Slang::ComPtr<slang::IComponentType>(entryPoint).detach();
+    return SLANG_OK;
+}
+
 
 SLANG_API SlangReflection* spGetReflection(
     SlangCompileRequest*    request)
