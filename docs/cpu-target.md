@@ -112,6 +112,23 @@ When compiled into a shared library/dll - how is it invoked? The entry point is 
 void computeMain(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformParams, UniformState* uniformState);
 ```
 
+
+The if compiled with `SLANG_HOST_CALLABLE` the `ISlangSharedLibrary` will export a function named `computeMain` the same name as the entry point in the original source.  
+
+ComputeVaryingInput is defined in the prelude as 
+
+```
+struct ComputeVaryingInput
+{
+    uint3 groupID;
+    uint3 groupThreadID;
+};
+```
+
+Typically when invoking the kernel it is a question of updating the groupID/groupThreadID, to specify which 'thread' of the computation to execute. For the example above we have `[numthreads(4, 1, 1)]`. This means groupThreadID.x can vary from 0-3 and .y and .z must be 0. That groupID.x indicates which 'group of 4' to execute. So groupID.x = 1, with groupThreadID.x=0,1,2,3 runs the 4th, 5th, 6th and 7th 'thread'. Being able to invoke each thread in this way is flexible - in that any specific thread can specified and executed. It is not necessarily very efficient because there is the call overhead and a small amount of extra work that is performed inside the kernel. 
+
+For improved performance there is a mechnism to execute a 'thread group' all in a single invocation. A function with the same signature will be exposed with the entry point name postfixed with `_Group` - in the example above the function would be called 'computeMain_Group'. When calling this function only the groupID need be specified, the groupThreadID is ignored. All of the threads within the group (as specified by `[numthreads]`) will be executed in a single call. 
+
 The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following... 
 
 ```
