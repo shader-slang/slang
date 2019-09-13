@@ -1,4 +1,4 @@
-﻿// resource-d3d12.h
+// resource-d3d12.h
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN
@@ -11,7 +11,7 @@
 #include <d3d12.h>
 
 #include "../../slang-com-ptr.h"
-#include "d3d-util.h"
+#include "../d3d/d3d-util.h"
 
 namespace gfx {
 

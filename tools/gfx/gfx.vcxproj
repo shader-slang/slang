@@ -171,47 +171,47 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="circular-resource-heap-d3d12.h" />
-    <ClInclude Include="d3d-util.h" />
-    <ClInclude Include="descriptor-heap-d3d12.h" />
+    <ClInclude Include="d3d\d3d-util.h" />
+    <ClInclude Include="d3d11\render-d3d11.h" />
+    <ClInclude Include="d3d12\circular-resource-heap-d3d12.h" />
+    <ClInclude Include="d3d12\descriptor-heap-d3d12.h" />
+    <ClInclude Include="d3d12\render-d3d12.h" />
+    <ClInclude Include="d3d12\resource-d3d12.h" />
     <ClInclude Include="flag-combiner.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="model.h" />
-    <ClInclude Include="render-d3d11.h" />
-    <ClInclude Include="render-d3d12.h" />
-    <ClInclude Include="render-gl.h" />
-    <ClInclude Include="render-vk.h" />
+    <ClInclude Include="open-gl\render-gl.h" />
     <ClInclude Include="render.h" />
-    <ClInclude Include="resource-d3d12.h" />
     <ClInclude Include="surface.h" />
     <ClInclude Include="vector-math.h" />
-    <ClInclude Include="vk-api.h" />
-    <ClInclude Include="vk-device-queue.h" />
-    <ClInclude Include="vk-module.h" />
-    <ClInclude Include="vk-swap-chain.h" />
-    <ClInclude Include="vk-util.h" />
+    <ClInclude Include="vulkan\render-vk.h" />
+    <ClInclude Include="vulkan\vk-api.h" />
+    <ClInclude Include="vulkan\vk-device-queue.h" />
+    <ClInclude Include="vulkan\vk-module.h" />
+    <ClInclude Include="vulkan\vk-swap-chain.h" />
+    <ClInclude Include="vulkan\vk-util.h" />
     <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="circular-resource-heap-d3d12.cpp" />
-    <ClCompile Include="d3d-util.cpp" />
-    <ClCompile Include="descriptor-heap-d3d12.cpp" />
+    <ClCompile Include="d3d\d3d-util.cpp" />
+    <ClCompile Include="d3d11\render-d3d11.cpp" />
+    <ClCompile Include="d3d12\circular-resource-heap-d3d12.cpp" />
+    <ClCompile Include="d3d12\descriptor-heap-d3d12.cpp" />
+    <ClCompile Include="d3d12\render-d3d12.cpp" />
+    <ClCompile Include="d3d12\resource-d3d12.cpp" />
     <ClCompile Include="flag-combiner.cpp" />
     <ClCompile Include="gui.cpp" />
     <ClCompile Include="model.cpp" />
-    <ClCompile Include="render-d3d11.cpp" />
-    <ClCompile Include="render-d3d12.cpp" />
-    <ClCompile Include="render-gl.cpp" />
-    <ClCompile Include="render-vk.cpp" />
+    <ClCompile Include="open-gl\render-gl.cpp" />
     <ClCompile Include="render.cpp" />
-    <ClCompile Include="resource-d3d12.cpp" />
     <ClCompile Include="surface.cpp" />
-    <ClCompile Include="vk-api.cpp" />
-    <ClCompile Include="vk-device-queue.cpp" />
-    <ClCompile Include="vk-module.cpp" />
-    <ClCompile Include="vk-swap-chain.cpp" />
-    <ClCompile Include="vk-util.cpp" />
-    <ClCompile Include="window.cpp" />
+    <ClCompile Include="vulkan\render-vk.cpp" />
+    <ClCompile Include="vulkan\vk-api.cpp" />
+    <ClCompile Include="vulkan\vk-device-queue.cpp" />
+    <ClCompile Include="vulkan\vk-module.cpp" />
+    <ClCompile Include="vulkan\vk-swap-chain.cpp" />
+    <ClCompile Include="vulkan\vk-util.cpp" />
+    <ClCompile Include="windows\win-window.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,11 +1,9 @@
 // render-test-main.cpp
 
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "options.h"
 #include "render.h"
-#include "render-d3d11.h"
-#include "render-d3d12.h"
-#include "render-gl.h"
-#include "render-vk.h"
 
 #include "slang-support.h"
 #include "surface.h"
@@ -21,19 +19,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "window.h"
+
 #include "../../source/core/slang-test-tool-util.h"
 
 #include "cpu-compute-util.h"
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
 
 namespace renderer_test {
 
@@ -41,141 +31,6 @@ using Slang::Result;
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
-
-class Window: public RefObject
-{
-public:
-    SlangResult initialize(int width, int height);
-
-    void show();
-
-    void* getHandle() const { return m_hwnd; }
-
-    Window() {}
-    ~Window();
-
-    static LRESULT CALLBACK windowProc(HWND    windowHandle,
-        UINT    message,
-        WPARAM  wParam,
-        LPARAM  lParam);
-
-protected:
-
-    HINSTANCE m_hinst = nullptr;
-    HWND m_hwnd = nullptr;
-};
-
-//
-// We use a bare-minimum window procedure to get things up and running.
-//
-
-/* static */LRESULT CALLBACK Window::windowProc(
-    HWND    windowHandle,
-    UINT    message,
-    WPARAM  wParam,
-    LPARAM  lParam)
-{
-    switch (message)
-    {
-    case WM_CLOSE:
-        PostQuitMessage(0);
-        return 0;
-    }
-
-    return DefWindowProcW(windowHandle, message, wParam, lParam);
-}
-
-static ATOM _getWindowClassAtom(HINSTANCE hinst)
-{
-    static ATOM s_windowClassAtom;
-
-    if (s_windowClassAtom)
-    {
-        return s_windowClassAtom;
-    }
-    WNDCLASSEXW windowClassDesc;
-    windowClassDesc.cbSize = sizeof(windowClassDesc);
-    windowClassDesc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-    windowClassDesc.lpfnWndProc = &Window::windowProc;
-    windowClassDesc.cbClsExtra = 0;
-    windowClassDesc.cbWndExtra = 0;
-    windowClassDesc.hInstance = hinst;
-    windowClassDesc.hIcon = 0;
-    windowClassDesc.hCursor = 0;
-    windowClassDesc.hbrBackground = 0;
-    windowClassDesc.lpszMenuName = 0;
-    windowClassDesc.lpszClassName = L"SlangRenderTest";
-    windowClassDesc.hIconSm = 0;
-    s_windowClassAtom = RegisterClassExW(&windowClassDesc);
-        
-    return s_windowClassAtom;
-}
-
-SlangResult Window::initialize(int widthIn, int heightIn)
-{
-    // Do initial window-creation stuff here, rather than in the renderer-specific files
-
-    m_hinst = GetModuleHandleA(0);
-
-    // First we register a window class.
-    ATOM windowClassAtom = _getWindowClassAtom(m_hinst);
-    if (!windowClassAtom)
-    {
-        fprintf(stderr, "error: failed to register window class\n");
-        return SLANG_FAIL;
-    }
-
-    // Next, we create a window using that window class.
-
-    // We will create a borderless window since our screen-capture logic in GL
-    // seems to get thrown off by having to deal with a window frame.
-    DWORD windowStyle = WS_POPUP;
-    DWORD windowExtendedStyle = 0;
-
-    RECT windowRect = { 0, 0, widthIn, heightIn };
-    AdjustWindowRectEx(&windowRect, windowStyle, /*hasMenu=*/false, windowExtendedStyle);
-
-    {
-        auto width = windowRect.right - windowRect.left;
-        auto height = windowRect.bottom - windowRect.top;
-
-        LPWSTR windowName = L"Slang Render Test";
-        m_hwnd = CreateWindowExW(
-            windowExtendedStyle,
-            (LPWSTR)windowClassAtom,
-            windowName,
-            windowStyle,
-            0, 0, // x, y
-            width, height,
-            NULL, // parent
-            NULL, // menu
-            m_hinst,
-            NULL);
-    }
-    if (!m_hwnd)
-    {
-        fprintf(stderr, "error: failed to create window\n");
-        return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
-}
-
-
-void Window::show()
-{
-    // Once initialization is all complete, we show the window...
-    int showCommand = SW_SHOW;
-    ShowWindow(m_hwnd, showCommand);
-}
-
-Window::~Window()
-{
-    if (m_hwnd)
-    {
-        DestroyWindow(m_hwnd);
-    }
-}
 
 //
 // For the purposes of a small example, we will define the vertex data for a
@@ -200,16 +55,19 @@ static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
 using namespace Slang;
 
-class RenderTestApp
+class RenderTestApp : public WindowListener
 {
 	public:
 
-		// At initialization time, we are going to load and compile our Slang shader
-		// code, and then create the API objects we need for rendering.
-	Result initialize(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input);
-	void runCompute();
-	void renderFrame();
-	void finalize();
+    // WindowListener
+    virtual Result update(Window* window) SLANG_OVERRIDE;
+
+        // At initialization time, we are going to load and compile our Slang shader
+        // code, and then create the API objects we need for rendering.
+    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input);
+    void runCompute();
+    void renderFrame();
+    void finalize();
 
 	BindingStateImpl* getBindingState() const { return m_bindingState; }
 
@@ -235,11 +93,15 @@ class RenderTestApp
 
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
+
+    Options m_options;
 };
 
-SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
+SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input)
 {
-    SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, shaderType, input));
+    m_options = options;
+
+    SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
 
     m_numAddedConstantBuffers = 0;
 	m_renderer = renderer;
@@ -260,7 +122,7 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
     // TODO: Should probably be more sophisticated than this - with 'dynamic' constant buffer/s binding always being specified
     // in the test file
     RefPtr<BufferResource> addedConstantBuffer;
-    switch(shaderType)
+    switch(m_options.shaderType)
     {
     default:
         break;
@@ -298,7 +160,7 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
         return SLANG_FAIL;
 
     {
-        switch(shaderType)
+        switch(m_options.shaderType)
         {
         default:
             assert(!"unexpected test shader type");
@@ -435,6 +297,52 @@ Result RenderTestApp::writeScreen(const char* filename)
     return PngSerializeUtil::write(filename, surface);
 }
 
+Result RenderTestApp::update(Window* window)
+{
+    // Whenever we don't have Windows events to process, we render a frame.
+    if (m_options.shaderType == Options::ShaderProgramType::Compute)
+    {
+        runCompute();
+    }
+    else
+    {
+        static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+        m_renderer->setClearColor(kClearColor);
+        m_renderer->clearFrame();
+
+        renderFrame();
+    }
+
+    // If we are in a mode where output is requested, we need to snapshot the back buffer here
+    if (m_options.outputPath)
+    {
+        // Submit the work
+        m_renderer->submitGpuWork();
+        // Wait until everything is complete
+        m_renderer->waitForGpu();
+
+        if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+        {
+            SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
+        }
+        else
+        {
+            SlangResult res = writeScreen(gOptions.outputPath);
+            if (SLANG_FAILED(res))
+            {
+                fprintf(stderr, "ERROR: failed to write screen capture to file\n");
+                return res;
+            }
+        }
+        // We are done
+        window->postQuit();
+        return SLANG_OK;
+    }
+
+    m_renderer->presentFrame();
+    return SLANG_OK;
+}
+
 } //  namespace renderer_test
 
 SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
@@ -449,8 +357,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
     // Declare window pointer before renderer, such that window is released after renderer
     RefPtr<renderer_test::Window> window;
-    // Renderer is constructed (later) using the window
-	Slang::RefPtr<Renderer> renderer;
 
     ShaderCompilerUtil::Input input;
     
@@ -465,7 +371,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 	switch (gOptions.rendererType)
 	{
 		case RendererType::DirectX11:
-			renderer = createD3D11Renderer();
 			input.target = SLANG_DXBC;
             input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
@@ -474,7 +379,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 			break;
 
 		case RendererType::DirectX12:
-			renderer = createD3D12Renderer();
 			input.target = SLANG_DXBC;
             input.profile = "sm_5_0";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
@@ -489,7 +393,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 			break;
 
 		case RendererType::OpenGl:
-			renderer = createGLRenderer();
 			input.target = SLANG_GLSL;
             input.profile = "glsl_430";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
@@ -497,7 +400,6 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 			break;
 
 		case RendererType::Vulkan:
-			renderer = createVKRenderer();
 			input.target = SLANG_SPIRV;
             input.profile = "glsl_430";
 			nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
@@ -540,18 +442,59 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         rendererName << "'" << gOptions.adapter << "'";
     }
 
-    
-    if (renderer)
+    // If it's CPU testing we don't need a window or a renderer
+    if (gOptions.rendererType == RendererType::CPU)
     {
+        if (gOptions.onlyStartup)
+        {
+            // Need generic C/C++
+            if (SLANG_FAILED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP)))
+            {
+                return SLANG_FAIL;
+            }
+            // Should work ... 
+            return SLANG_OK;
+        }
+
+        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.shaderType, input, compilationAndLayout));
+
+        CPUComputeUtil::Context context;
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(compilationAndLayout, context));
+
+        // Dump everything out that was written
+        return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
+    }
+
+    // Renderer is constructed (later) using the window
+    Slang::RefPtr<Renderer> renderer;
+
+    {
+        RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(gOptions.rendererType);
+        if (createFunc)
+        {
+            renderer = createFunc();
+        }
+
+        if (!renderer)
+        {
+            if (!gOptions.onlyStartup)
+            {
+                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
+            }
+            return SLANG_FAIL;
+        }
+
         Renderer::Desc desc;
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = gOptions.adapter;
 
-        window = new renderer_test::Window;
+        window = renderer_test::Window::create();
         SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
 
-        SlangResult res = renderer->initialize(desc, (HWND)window->getHandle());
+        SlangResult res = renderer->initialize(desc, window->getHandle());
         if (SLANG_FAILED(res))
         {
             if (!gOptions.onlyStartup)
@@ -570,105 +513,19 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             }
         }
     }
-    else
-    {
-        if (gOptions.rendererType != RendererType::CPU)
-        {
-            if (!gOptions.onlyStartup)
-            {
-                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
-            }
-            return SLANG_FAIL;
-        }
-    }
-
+   
     // If the only test is we can startup, then we are done
     if (gOptions.onlyStartup)
     {
         return SLANG_OK;
     }
 
-    if (!renderer)
-    {
-        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.shaderType, input, compilationAndLayout));
-
-        CPUComputeUtil::Context context;
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(compilationAndLayout, context));
-
-        // Dump everything out that was written
-        return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
-    }
-
 	{
-		RenderTestApp app;
-		SLANG_RETURN_ON_FAIL(app.initialize(session, renderer, gOptions.shaderType, input));
-
+		RefPtr<RenderTestApp> app(new RenderTestApp);
+		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input));
         window->show();
-
-		// ... and enter the event loop:
-		for (;;)
-		{
-			MSG message;
-
-			int result = PeekMessageW(&message, NULL, 0, 0, PM_REMOVE);
-			if (result != 0)
-			{
-				if (message.message == WM_QUIT)
-				{
-					return (int)message.wParam;
-				}
-
-				TranslateMessage(&message);
-				DispatchMessageW(&message);
-			}
-			else
-			{
-				// Whenever we don't have Windows events to process, we render a frame.
-				if (gOptions.shaderType == Options::ShaderProgramType::Compute)
-				{
-					app.runCompute();
-				}
-				else
-				{
-					static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-					renderer->setClearColor(kClearColor);
-					renderer->clearFrame();
-
-					app.renderFrame();
-				}
-				// If we are in a mode where output is requested, we need to snapshot the back buffer here
-				if (gOptions.outputPath)
-				{
-                    // Submit the work
-                    renderer->submitGpuWork();
-                    // Wait until everything is complete
-                    renderer->waitForGpu();
-
-					if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
-                    {
-                        SLANG_RETURN_ON_FAIL(app.writeBindingOutput(gOptions.outputPath));
-                    }
-					else
-                    {
-						SlangResult res = app.writeScreen(gOptions.outputPath);
-
-                        if (SLANG_FAILED(res))
-                        {
-                            fprintf(stderr, "ERROR: failed to write screen capture to file\n");
-                            return res;
-                        }
-                    }
-					return SLANG_OK;
-				}
-
-				renderer->presentFrame();
-			}
-		}
+        return window->runLoop(app);
 	}
-
-	return SLANG_OK;
 }
 
 int main(int argc, char**  argv)

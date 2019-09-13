@@ -3,6 +3,11 @@
 
 #include "../../source/core/slang-math.h"
 
+#include "d3d11/render-d3d11.h"
+#include "d3d12/render-d3d12.h"
+#include "open-gl/render-gl.h"
+#include "vulkan/render-vk.h"
+
 namespace gfx {
 using namespace Slang;
 
@@ -403,5 +408,33 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         default:                            return UnownedStringSlice::fromLiteral("?!?");
     }
 }
+
+/* static */ RendererUtil::CreateFunc RendererUtil::getCreateFunc(RendererType type)
+{
+    switch (type)
+    {
+#if SLANG_WINDOWS_FAMILY
+        case RendererType::DirectX11:
+        {
+            return &createD3D11Renderer;
+        }
+        case RendererType::DirectX12:
+        {
+            return &createD3D12Renderer;
+        }
+        case RendererType::OpenGl:
+        {
+            return &createGLRenderer;
+        }
+        case RendererType::Vulkan:
+        {
+            return &createVKRenderer;
+        }
+#endif
+
+        default: return nullptr;
+    }
+}
+
 
 } // renderer_test

@@ -1,5 +1,5 @@
-// window.cpp
-#include "window.h"
+// win-window.cpp
+#include "../window.h"
 
 #include <stdio.h>
 
@@ -11,7 +11,6 @@
 #endif
 
 #include <stdint.h>
-
 
 #if _WIN32
 #include <Windows.h>

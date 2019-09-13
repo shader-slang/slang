@@ -2,7 +2,7 @@
 #include "render-vk.h"
 
 //WORKING:#include "options.h"
-#include "render.h"
+#include "../render.h"
 
 #include "../../source/core/slang-smart-pointer.h"
 
@@ -11,7 +11,7 @@
 #include "vk-device-queue.h"
 #include "vk-swap-chain.h"
 
-#include "surface.h"
+#include "../surface.h"
 
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/

@@ -751,26 +751,11 @@ static SlangResult _extractReflectionTestRequirements(const CommandLine& cmdLine
     return SLANG_OK;
 }
 
-static SlangResult _tryUseCPURenderTest(TestContext* context, CommandLine& ioCmdLine)
-{
-    String exeName = Path::getFileNameWithoutExt(ioCmdLine.m_executable);
-
-    if (exeName == "render-test")
-    {
-        bool useCPU = ioCmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-cpu")) >= 0;
-        if (useCPU)
-        {
-            ioCmdLine.setExecutablePath(Path::combine(context->options.binDir,  String("cpu-render-test") + ProcessUtil::getExecutableSuffix()));
-        }
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequirements* ioInfo)
 {
     String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
 
-    if (exeName == "render-test" || exeName == "cpu-render-test")
+    if (exeName == "render-test")
     {
         return _extractRenderTestRequirements(cmdLine, ioInfo);
     }
@@ -829,8 +814,6 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 StringBuilder builder;
                 builder << "-" << RenderApiUtil::getApiName(apiType);
                 cmdLine.addArg(builder);
-
-                _tryUseCPURenderTest(context, cmdLine);
 
                 // Run the render-test tool and see if the device could startup
                 ExecuteResult exeRes;
@@ -2071,8 +2054,6 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
 
-    _tryUseCPURenderTest(context, cmdLine);
-
     if (context->isExecuting())
     {
         // clear the stale actual output file first. This will allow us to detect error if render-test fails and outputs nothing.
@@ -2187,8 +2168,6 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
     cmdLine.addArg(langOption);
     cmdLine.addArg("-o");
     cmdLine.addArg(outputStem + outputKind + ".png");
-
-    _tryUseCPURenderTest(context, cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));

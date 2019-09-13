@@ -18,7 +18,7 @@
 //
 #include "gfx/model.h"
 #include "gfx/render.h"
-#include "gfx/render-d3d11.h"
+#include "gfx/d3d11/render-d3d11.h"
 #include "gfx/vector-math.h"
 #include "gfx/window.h"
 #include "gfx/gui.h"
