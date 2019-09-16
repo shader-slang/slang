@@ -32,15 +32,33 @@ int64_t RandomGenerator::nextInt64()
     return (int64_t(high) << 32) | low;
 }
 
-int32_t RandomGenerator::nextInt32InRange(int32_t min, int32_t max)
+uint32_t RandomGenerator::nextUInt32InRange(uint32_t min, uint32_t max)
 {
-    int32_t diff = max - min;
+    // Make sure max is at least in 
+    max = (max >= min) ? max : min;
+
+    // Make 64 bit so can be lazier than having to take care of 32 bit overflow/underflow issues
+    uint32_t diff = max - min;
     if (diff <= 1)
     {
         return min;
     }
+    return (nextUInt32() % diff) + min;
+}
 
-    return (nextPositiveInt32() % diff) + min;
+
+int32_t RandomGenerator::nextInt32InRange(int32_t min, int32_t max)
+{
+    // Make sure max is at least in 
+    max = (max >= min) ? max : min;
+
+    // Make 64 bit so can be lazier than having to take care of 32 bit overflow/underflow issues
+    uint32_t diff = uint32_t(int64_t(max) - int64_t(min));
+    if (diff <= 1)
+    {
+        return min;
+    }
+    return int32_t(int64_t(nextUInt32() % diff) + min);
 }
 
 int64_t RandomGenerator::nextInt64InRange(int64_t min, int64_t max)

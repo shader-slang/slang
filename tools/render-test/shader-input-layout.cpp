@@ -7,6 +7,36 @@ namespace renderer_test
 {
     using namespace Slang;
 
+#define SLANG_SCALAR_TYPES(x) \
+    x("int", INT32) \
+    x("uint", UINT32) \
+    x("float", FLOAT32)
+
+    struct TypeInfo
+    {
+        UnownedStringSlice name;
+        SlangScalarType type;
+    };
+
+#define SLANG_SCALAR_TYPE_INFO(name, value) { UnownedStringSlice::fromLiteral(name), SLANG_SCALAR_TYPE_##value },
+    static const TypeInfo g_scalarTypeInfos[] =
+    {
+        SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_INFO)
+    };
+#undef SLANG_SCALAR_TYPES
+#undef SLANG_SCALAR_TYPE_INFO
+
+    static SlangScalarType _getScalarType(const UnownedStringSlice& slice)
+    {
+        for (const auto& info : g_scalarTypeInfos)
+        {
+            if (info.name == slice)
+            {
+                return info.type;
+            }
+        }
+        return SLANG_SCALAR_TYPE_NONE;
+    }
 
     Index ShaderInputLayout::findEntryIndexByName(const String& name) const
     {
@@ -56,7 +86,7 @@ namespace renderer_test
         }
     }
 
-    void ShaderInputLayout::parse(const char * source)
+    void ShaderInputLayout::parse(RandomGenerator* rand, const char * source)
     {
         entries.clear();
         globalGenericTypeArguments.clear();
@@ -225,9 +255,138 @@ namespace renderer_test
                                     parser.Read("=");
                                     entry.textureDesc.size = parser.ReadInt();
                                 }
+                                else if (word == "random")
+                                {
+                                    parser.Read("(");
+                                    // Read the type
+                                    String type = parser.ReadWord();
+                                    SlangScalarType scalarType = _getScalarType(type.getUnownedSlice());
+                                    if (scalarType == SLANG_SCALAR_TYPE_NONE)
+                                    {
+                                        StringBuilder builder;
+                                        for (const auto& info : g_scalarTypeInfos)
+                                        {
+                                            if (builder.getLength() != 0)
+                                            {
+                                                builder << ", ";
+                                            }
+                                            builder << info.name;
+                                        }
+
+                                        throw TextFormatException("Expecting " + builder + " " + parser.NextToken().Position.Line);
+                                    }
+
+                                    parser.Read(",");
+                                    const int size = int(parser.ReadUInt());
+
+                                    switch (scalarType)
+                                    {
+                                        case SLANG_SCALAR_TYPE_INT32:
+                                        {
+                                            bool hasRange = false;
+
+                                            int32_t minValue = -0x7fffffff - 1;
+                                            int32_t maxValue = 0x7fffffff;
+
+                                            if (parser.LookAhead(","))
+                                            {
+                                                hasRange = true;
+                                                parser.ReadToken();
+                                                minValue = parser.ReadInt();
+
+                                                if (parser.LookAhead(","))
+                                                {
+                                                    parser.ReadToken();
+                                                    maxValue = parser.ReadInt();
+                                                }
+                                            }
+                                            SLANG_ASSERT(minValue <= maxValue);
+                                            maxValue = (maxValue >= minValue) ? maxValue : minValue;
+
+                                            // Generate the data
+                                            entry.bufferData.setCount(size);
+
+                                            int32_t* dst = (int32_t*)entry.bufferData.getBuffer();
+                                            for (int i = 0; i < size; ++i)
+                                            {
+                                                dst[i] = hasRange ? rand->nextInt32InRange(minValue, maxValue) : rand->nextInt32();
+                                            }
+                                            break;
+                                        }
+                                        case SLANG_SCALAR_TYPE_UINT32:
+                                        {
+                                            bool hasRange = false;
+                                            uint32_t minValue = 0;
+                                            uint32_t maxValue = 0xffffffff;
+
+                                            if (parser.LookAhead(","))
+                                            {
+                                                parser.ReadToken();
+                                                minValue = parser.ReadUInt();
+
+                                                hasRange = true;
+
+                                                if (parser.LookAhead(","))
+                                                {
+                                                    parser.ReadToken();
+                                                    maxValue = parser.ReadUInt();
+                                                }
+                                            }
+
+                                            SLANG_ASSERT(minValue <= maxValue);
+                                            maxValue = (maxValue >= minValue) ? maxValue : minValue;
+
+                                            // Generate the data
+                                            entry.bufferData.setCount(size);
+
+                                            uint32_t* dst = (uint32_t*)entry.bufferData.getBuffer();
+                                            for (int i = 0; i < size; ++i)
+                                            {
+                                                dst[i] = hasRange ? rand->nextUInt32InRange(minValue, maxValue) : rand->nextUInt32();
+                                            }
+
+                                            break;
+                                        }
+                                        case SLANG_SCALAR_TYPE_FLOAT32:
+                                        {
+                                            float minValue = -1.0f;
+                                            float maxValue = 1.0f;
+                                            
+                                            if (parser.LookAhead(","))
+                                            {
+                                                parser.ReadToken();
+                                                minValue = parser.ReadFloat();
+
+                                                if (parser.LookAhead(","))
+                                                {
+                                                    parser.ReadToken();
+                                                    maxValue = parser.ReadFloat();
+                                                }
+                                            }
+
+                                            SLANG_ASSERT(minValue <= maxValue);
+                                            maxValue = (maxValue >= minValue) ? maxValue : minValue;
+
+                                            // Generate the data
+                                            entry.bufferData.setCount(size);
+
+                                            float* dst = (float*)entry.bufferData.getBuffer();
+                                            for (int i = 0; i < size; ++i)
+                                            {
+                                                dst[i] = (rand->nextUnitFloat32() * (maxValue - minValue)) + minValue;
+                                            }
+                                            break;
+                                        }
+                                    }
+
+                                    // Read the range
+
+                                    parser.Read(")");
+                                }
                                 else if (word == "data")
                                 {
                                     parser.Read("=");
+
                                     parser.Read("[");
                                     while (!parser.IsEnd() && !parser.LookAhead("]"))
                                     {

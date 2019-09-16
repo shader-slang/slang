@@ -6,6 +6,8 @@
 #include "../../slang-com-helper.h"
 #include "../../source/core/slang-writer.h"
 
+#include "../../source/core/slang-process-util.h"
+
 #include "render.h"
 
 namespace renderer_test {
@@ -58,6 +60,8 @@ struct Options
     bool onlyStartup = false;
 
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
+
+    Slang::List<Slang::CommandLine::Arg> compileArgs;
 
     Slang::String adapter;                              ///< The adapter to use either name or index
 };

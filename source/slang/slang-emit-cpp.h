@@ -257,6 +257,10 @@ protected:
 
     SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName);
+    void _emitEntryPointDefinitionEnd(IRFunc* func);
+    void _emitEntryPointGroup(const UInt sizeAlongAxis[3], const String& funcName);
+
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
 

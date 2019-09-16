@@ -316,6 +316,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
     slang::EntryPointReflection* entryPoint = nullptr;
     Func func = nullptr;
+    Func groupFunc = nullptr;
     {
         auto entryPointCount = reflection->getEntryPointCount();
         SLANG_ASSERT(entryPointCount == 1);
@@ -325,15 +326,19 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         const char* entryPointName = entryPoint->getName();
         func = (Func)sharedLibrary->findFuncByName(entryPointName);
 
-        if (!func)
+        StringBuilder groupEntryPointName;
+        groupEntryPointName << entryPointName << "_Group";
+
+        groupFunc = (Func)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+
+        if (func == nullptr && groupFunc == nullptr)
         {
             return SLANG_FAIL;
         }
     }
 
-    SlangUInt numThreadsPerAxis[3];
-    entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
-
+    // If we have the group function, that's the faster way to execute all threads in group...
+    if (groupFunc)
     {
         UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
         CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
@@ -341,17 +346,33 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         CPPPrelude::ComputeVaryingInput varying;
         varying.groupID = {};
 
-        for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
-        {
-            varying.groupThreadID.z = z;
-            for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
-            {
-                varying.groupThreadID.y = y;
-                for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
-                {
-                    varying.groupThreadID.x = x;
+        groupFunc(&varying, uniformEntryPointParams, uniformState);
+    }
+    else
+    {
+        // We can also fire off each thread individually
+        SlangUInt numThreadsPerAxis[3];
+        entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
 
-                    func(&varying, uniformEntryPointParams, uniformState);
+        {
+            UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+            CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
+
+            CPPPrelude::ComputeVaryingInput varying;
+            varying.groupID = {};
+
+            for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
+            {
+                varying.groupThreadID.z = z;
+                for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
+                {
+                    varying.groupThreadID.y = y;
+                    for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
+                    {
+                        varying.groupThreadID.x = x;
+
+                        func(&varying, uniformEntryPointParams, uniformState);
+                    }
                 }
             }
         }
@@ -359,7 +380,5 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
     return SLANG_OK;
 }
-
-
 
 } // renderer_test

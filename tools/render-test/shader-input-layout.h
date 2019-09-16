@@ -2,6 +2,7 @@
 #define SLANG_TEST_SHADER_INPUT_LAYOUT_H
 
 #include "core/slang-basic.h"
+#include "core/slang-random-generator.h"
 
 #include "render.h"
 
@@ -88,7 +89,7 @@ public:
 
     void updateForTarget(SlangCompileTarget target);
 
-    void parse(const char* source);
+    void parse(Slang::RandomGenerator* rand, const char* source);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);

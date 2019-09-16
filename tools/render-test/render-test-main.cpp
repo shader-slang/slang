@@ -198,7 +198,7 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
 Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
     ShaderCompilerUtil::OutputAndLayout output;
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, shaderType, input,  output));
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  output));
     m_shaderInputLayout = output.layout;
     m_shaderProgram = renderer->createProgram(output.output.desc);
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
@@ -457,7 +457,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         }
 
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.shaderType, input, compilationAndLayout));
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
         CPUComputeUtil::Context context;
         SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
@@ -467,9 +467,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
     }
 
-    // Renderer is constructed (later) using the window
     Slang::RefPtr<Renderer> renderer;
-
     {
         RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(gOptions.rendererType);
         if (createFunc)
