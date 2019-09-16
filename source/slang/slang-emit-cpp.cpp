@@ -1776,6 +1776,9 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc)
 {
+    m_semanticUsedFlags = 0;
+    //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
+
     m_sharedIRBuilder.module = nullptr;
     m_sharedIRBuilder.session = desc.compileRequest->getSession();
 
@@ -2391,18 +2394,20 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
 
                     if (semanticNameSpelling == "sv_dispatchthreadid")
                     {
-                        
+                        m_semanticUsedFlags |= SemanticUsedFlag::DispatchThreadID;
                         m_writer->emit("dispatchThreadID");
                         return;
                     }
                     else if (semanticNameSpelling == "sv_groupid")
                     {
-                        m_writer->emit("varyingInput.groupID");
+                        m_semanticUsedFlags |= SemanticUsedFlag::GroupID;
+                        m_writer->emit("groupID");
                         return;
                     }
                     else if (semanticNameSpelling == "sv_groupthreadid")
                     {
-                        m_writer->emit("varyingInput.groupThreadID");
+                        m_semanticUsedFlags |= SemanticUsedFlag::GroupThreadID;
+                        m_writer->emit("calcGroupThreadID()");
                         return;
                     }
                 }
@@ -2569,12 +2574,51 @@ void CPPSourceEmitter::_emitEntryPointGroupRange(const UInt sizeAlongAxis[3], co
         const auto& axis = axes[i];
         builder.Clear();
         const char elem[2] = { s_elemNames[axis.axis], 0 };
+
+        if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+        {
+            builder << "context.groupDispatchThreadID." << elem << " = start." << elem << ";\n";
+        }
+        if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+        {
+            builder << "context.groupID." << elem << " += varyingInput->startGroupID." << elem << ";\n";
+        }
+
         builder << "for (uint32_t " << elem << " = start." << elem << "; " << elem << " < end." << elem << "; ++" << elem << ")\n{\n";
         m_writer->emit(builder);
         m_writer->indent();
 
         builder.Clear();
         builder << "context.dispatchThreadID." << elem << " = " << elem << ";\n";
+
+        if (m_semanticUsedFlags & (SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::GroupID))
+        {
+            if (sizeAlongAxis[axis.axis] > 1)
+            {
+                builder << "const uint32_t next = context.groupDispatchThreadID." << elem << " + " << axis.size <<";\n";
+
+                if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+                {
+                    builder << "context.groupID." << elem << " += uint32_t(next == " << elem << ");\n";
+                }
+                if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+                {
+                    builder << "context.groupDispatchThreadID." << elem << " = (" << elem << " == next) ? next : context.groupDispatchThreadID." << elem << ";\n";
+                }
+            }
+            else
+            {
+                if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+                {
+                    builder << "context.groupDispatchThreadID." << elem << " = " << elem << ";\n";
+                }
+                if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+                {
+                    builder << "context.groupID." << elem << " = " << elem << ";\n";
+                }
+            }
+        }
+
         m_writer->emit(builder);
     }
 
@@ -2712,7 +2756,26 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->indent();
 
         m_writer->emit("UniformState* uniformState;\n");
-        m_writer->emit("ComputeVaryingInput varyingInput;\n");
+
+        if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+        {
+            // Note not always set!
+            m_writer->emit("uint3 groupID;\n");
+        }
+        // Note not always set
+        if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+        {
+            m_writer->emit("uint3 groupDispatchThreadID;\n");
+
+            m_writer->emit("uint3 calcGroupThreadID() const \n{\n");
+            m_writer->indent();
+            // groupThreadID = dispatchThreadID - groupDispatchThreadID
+            m_writer->emit("uint3 v = { dispatchThreadID.x - groupDispatchThreadID.x, dispatchThreadID.y - groupDispatchThreadID.y, dispatchThreadID.z - groupDispatchThreadID.z }; ");
+            m_writer->emit("return v;\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+        }
+
         m_writer->emit("uint3 dispatchThreadID;\n");
 
         if (entryPointGlobalParams)
@@ -2768,7 +2831,16 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                 {    
                     _emitEntryPointDefinitionStart(func, entryPointGlobalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
-                    m_writer->emit("context.varyingInput = *varyingInput;\n");
+
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+                    {
+                        m_writer->emit("context.groupDispatchThreadID = ");
+                        _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->groupID"), UnownedStringSlice());
+                    }
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+                    {
+                        m_writer->emit("context.groupID = varyingInput->groupID;\n");
+                    }
 
                     // Emit dispatchThreadID
                     m_writer->emit("context.dispatchThreadID = ");
@@ -2790,11 +2862,19 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     String groupFuncName = builder;
 
                     _emitEntryPointDefinitionStart(func, entryPointGlobalParams, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
-                    m_writer->emit("context.varyingInput = *varyingInput;\n");
 
                     m_writer->emit("const uint3 start = ");
                     _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->groupID"), UnownedStringSlice());
 
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+                    {
+                        m_writer->emit("context.groupDispatchThreadID = start;\n");
+                    }
+
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+                    {
+                        m_writer->emit("context.groupID = varyingInput->groupID;\n");
+                    }
                     m_writer->emit("context.dispatchThreadID = start;\n");
 
                     _emitEntryPointGroup(sizeAlongAxis, funcName);
@@ -2816,7 +2896,18 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     m_writer->emit("const uint3 end = ");
                     _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->endGroupID"), UnownedStringSlice());
 
+#if 0
+                    // Not needed as will be emitted as part of the loop
                     m_writer->emit("context.dispatchThreadID = start;\n");
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+                    {
+                        m_writer->emit("context.groupDispatchThreadID = start;");
+                    }
+                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+                    {
+                        m_writer->emit("context.groupID = varyingInput->startGroupID;\n");
+                    }
+#endif
 
                     _emitEntryPointGroupRange(sizeAlongAxis, funcName);
                     _emitEntryPointDefinitionEnd(func);
