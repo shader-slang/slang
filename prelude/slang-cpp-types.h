@@ -232,6 +232,12 @@ struct ComputeVaryingInput
     uint3 groupThreadID;
 };
 
+struct GroupComputeVaryingInput
+{
+    uint3 startGroupID;     ///< start groupID
+    uint3 endGroupID;       ///< Non inclusive end groupID
+};
+
 /* Type that defines the uniform entry point params. The actual content of this type is dependent on the entry point parameters, and can be
 found via reflection or defined such that it matches the shader appropriately. */
 struct UniformEntryPointParams;
