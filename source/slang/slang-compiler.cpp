@@ -789,11 +789,6 @@ namespace Slang
             builder << compilerName << ": ";
         }
 
-        if (diagnostic.size() > 0)
-        {
-            builder.Append(diagnostic);
-        }
-
         if (SLANG_FAILED(res) && res != SLANG_FAIL)
         {
             {
@@ -805,7 +800,14 @@ namespace Slang
             PlatformUtil::appendResult(res, builder);
         }
 
-        builder << "\n";
+        if (diagnostic.size() > 0)
+        {
+            builder.Append(diagnostic);
+            if (!diagnostic.endsWith("\n"))
+            {
+                builder.Append("\n");
+            }
+        }
 
         sink->diagnoseRaw(severity, builder.getUnownedSlice());
     }
