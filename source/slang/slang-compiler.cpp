@@ -805,6 +805,8 @@ namespace Slang
             PlatformUtil::appendResult(res, builder);
         }
 
+        builder << "\n";
+
         sink->diagnoseRaw(severity, builder.getUnownedSlice());
     }
 

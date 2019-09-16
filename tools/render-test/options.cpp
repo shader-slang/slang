@@ -179,6 +179,34 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
 
             gOptions.adapter = *argCursor++;
         }
+        else if (strcmp(arg, "-compute-dispatch") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: comma separated compute dispatch size for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            List<UnownedStringSlice> slices;
+            StringUtil::split(UnownedStringSlice(*argCursor++), ',', slices);
+            if (slices.getCount() != 3)
+            {
+                stdError.print("error: expected 3 comma separated integers for compute dispatch size for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+           
+            String string;
+            for (Index i = 0; i < 3; ++i)
+            {
+                string = slices[i];
+                int v = StringToInt(string);
+                if (v < 1)
+                {
+                    stdError.print("error: expected 3 comma positive integers for compute dispatch size for '%s'\n", arg);
+                    return SLANG_FAIL;
+                }
+                gOptions.computeDispatchSize[i] = v;
+            }
+        }
         else
         {
             // Lookup

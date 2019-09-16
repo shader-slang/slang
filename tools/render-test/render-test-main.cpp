@@ -232,7 +232,7 @@ void RenderTestApp::runCompute()
     auto pipelineType = PipelineType::Compute;
     m_renderer->setPipelineState(pipelineType, m_pipelineState);
     m_bindingState->apply(m_renderer, pipelineType);
-	m_renderer->dispatchCompute(1, 1, 1);
+	m_renderer->dispatchCompute(m_options.computeDispatchSize[0], m_options.computeDispatchSize[1], m_options.computeDispatchSize[2]);
 }
 
 void RenderTestApp::finalize()
@@ -461,7 +461,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
         CPUComputeUtil::Context context;
         SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(compilationAndLayout, context));
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(gOptions.computeDispatchSize, compilationAndLayout, context));
 
         // Dump everything out that was written
         return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);

@@ -2757,13 +2757,16 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
         m_writer->emit("UniformState* uniformState;\n");
 
-        if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
+        
+        m_writer->emit("uint3 dispatchThreadID;\n");
+
+        //if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
         {
             // Note not always set!
             m_writer->emit("uint3 groupID;\n");
         }
-        // Note not always set
-        if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
+
+        //if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
         {
             m_writer->emit("uint3 groupDispatchThreadID;\n");
 
@@ -2775,8 +2778,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
             m_writer->dedent();
             m_writer->emit("}\n");
         }
-
-        m_writer->emit("uint3 dispatchThreadID;\n");
 
         if (entryPointGlobalParams)
         {
