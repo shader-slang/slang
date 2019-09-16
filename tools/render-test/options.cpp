@@ -156,6 +156,19 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             gOptions.onlyStartup = true;
         }
+        else if (strcmp(arg, "-compile-arg") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("expected argument for '%s' option\n", arg);
+                return SLANG_FAIL;
+            }
+
+            CommandLine::Arg arg;
+            arg.type = CommandLine::ArgType::Escaped;
+            arg.value = *argCursor++;
+            gOptions.compileArgs.add(arg);
+        }
         else if (strcmp(arg, "-adapter") == 0)
         {
             if (argCursor == argEnd)

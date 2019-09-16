@@ -1357,10 +1357,14 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
 
-        CPPCompiler::CompileOptions options;
+        typedef CPPCompiler::CompileOptions CompileOptions;
+        CompileOptions options;
 
         // Set the source type
         options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+
+        // Disable exceptions and security checks
+        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
         // Generate a path a temporary filename for output module
         String modulePath;

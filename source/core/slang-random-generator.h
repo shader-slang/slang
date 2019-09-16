@@ -30,6 +30,9 @@ class RandomGenerator: public RefObject
         /// Get the next bool
     virtual bool nextBool();
 
+        /// Next uint32_t
+    uint32_t nextUInt32() { return uint32_t(nextInt32()); }
+
         /// Next Int32 which can only be positive
     int32_t nextPositiveInt32() { return nextInt32() & 0x7fffffff; }
         /// Next Int64 which can only be positive
@@ -38,8 +41,11 @@ class RandomGenerator: public RefObject
         /// Returns value up to BUT NOT INCLUDING maxValue. 
     int32_t nextInt32UpTo(int32_t maxValue) { assert(maxValue > 0); return (maxValue <= 1) ? 0 : (nextPositiveInt32() % maxValue); }
 
-        /// Returns value from min up to BUT NOT INCLUDING max
+        /// Returns value from min up to BUT NOT INCLUDING max. 
     int32_t nextInt32InRange(int32_t min, int32_t max);
+
+    /// Returns value from min up to BUT NOT INCLUDING max
+    uint32_t nextUInt32InRange(uint32_t min, uint32_t max);
 
         /// Returns value up to BUT NOT INCLUDING maxValue
     int64_t nextInt64UpTo(int64_t maxValue) { assert(maxValue > 0); return (maxValue <= 1) ? 0 : (nextPositiveInt64() % maxValue); }

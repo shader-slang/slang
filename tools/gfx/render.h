@@ -12,6 +12,7 @@
 #include "../../source/core/slang-smart-pointer.h"
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-dictionary.h"
+#include "../../source/core/slang-process-util.h"
 
 #include "../../slang.h"
 
@@ -149,6 +150,8 @@ struct ShaderCompileRequest
     Slang::List<Slang::String> entryPointGenericTypeArguments;
     Slang::List<Slang::String> entryPointExistentialTypeArguments;
     Slang::List<Slang::String> globalExistentialTypeArguments;
+
+    Slang::List<Slang::CommandLine::Arg> compileArgs;
 };
 
 /// Different formats of things like pixels or elements of vertices

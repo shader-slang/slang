@@ -95,6 +95,15 @@ namespace Slang
         // Doesn't appear to be a VS equivalent
     }
 
+    if (options.flags & CompileOptions::Flag::EnableSecurityChecks)
+    {
+        cmdLine.addArg("/GS");
+    }
+    else
+    {
+        cmdLine.addArg("/GS-");
+    }
+
     switch (options.debugInfoType)
     {
         default:
