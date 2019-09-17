@@ -140,9 +140,9 @@ void computeMain_Thread(ComputeThreadVaryingInput* varyingInput, UniformEntryPoi
 
 When invoking the kernel at the `thread` level it is a question of updating the groupID/groupThreadID, to specify which thread of the computation to execute. For the example above we have `[numthreads(4, 1, 1)]`. This means groupThreadID.x can vary from 0-3 and .y and .z must be 0. That groupID.x indicates which 'group of 4' to execute. So groupID.x = 1, with groupThreadID.x=0,1,2,3 runs the 4th, 5th, 6th and 7th 'thread'. Being able to invoke each thread in this way is flexible - in that any specific thread can specified and executed. It is not necessarily very efficient because there is the call overhead and a small amount of extra work that is performed inside the kernel. 
 
-Note that the `Thread_` style signature is likely to change to support 'groupshared' variables in the near future.
+Note that the `_Thread` style signature is likely to change to support 'groupshared' variables in the near future.
 
-In terms of performance the 'default' function is probably the most efficient for most common usages. The `_Group` style allows for slightly less loop overhead, but with many invocations this will likely be drowned out by the extra call/setup overhead. The '_Thread' style in most situations will be the slowest, with even more call overhead, and less options for the C/C++ compiler to use faster paths. 
+In terms of performance the 'default' function is probably the most efficient for most common usages. The `_Group` style allows for slightly less loop overhead, but with many invocations this will likely be drowned out by the extra call/setup overhead. The `_Thread` style in most situations will be the slowest, with even more call overhead, and less options for the C/C++ compiler to use faster paths. 
 
 The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following... 
 
