@@ -469,4 +469,52 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     return SLANG_OK;
 }
 
+
+/* static */ SlangResult CPUComputeUtil::checkStyleConsistency(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout)
+{
+    Context context;
+    SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
+
+    // Run the thread style to test against
+    {
+        ExecuteInfo info;
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(ExecuteStyle::Thread, dispatchSize, compilationAndLayout, context, info));
+        SLANG_RETURN_ON_FAIL(execute(info));
+    }
+
+    ExecuteStyle styles[] = { ExecuteStyle::Group, ExecuteStyle::GroupRange };
+    for (auto style: styles)
+    {
+        Context checkContext;
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, checkContext));
+
+        ExecuteInfo info;
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(style, dispatchSize, compilationAndLayout, checkContext, info));
+        SLANG_RETURN_ON_FAIL(execute(info));
+
+        // Make sure the out buffers are all the same
+
+        const auto& entries = compilationAndLayout.layout.entries;
+
+        for (int i = 0; i < entries.getCount(); ++i)
+        {
+            const auto& entry = entries[i];
+            if (entry.isOutput)
+            {
+                const auto& buffer = context.buffers[i];
+                const auto& checkBuffer = checkContext.buffers[i];
+
+                if (buffer.m_sizeInBytes != checkBuffer.m_sizeInBytes ||
+                    memcmp(buffer.m_data, checkBuffer.m_data, buffer.m_sizeInBytes) != 0)
+                {
+                    return SLANG_FAIL;
+                }
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+
 } // renderer_test

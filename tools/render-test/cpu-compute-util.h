@@ -48,6 +48,10 @@ struct CPUComputeUtil
         void* m_uniformEntryPointParams;
     };
 
+    
+        /// Runs code across run styles and makes sure output buffers match
+    static SlangResult checkStyleConsistency(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
+
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
 
     static SlangResult calcExecuteInfo(ExecuteStyle style, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);

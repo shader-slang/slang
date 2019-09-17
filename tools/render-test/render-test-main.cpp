@@ -459,15 +459,25 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
-        CPUComputeUtil::Context context;
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
+       
+        {
+            CPUComputeUtil::Context context;
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
 
-        CPUComputeUtil::ExecuteInfo info;
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
+            CPUComputeUtil::ExecuteInfo info;
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
         
-        // Dump everything out that was written
-        return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
+            // Dump everything out that was written
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+        }
+
+        {
+            // Check all execution styles produce the same result
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(gOptions.computeDispatchSize, compilationAndLayout));
+        }
+
+        return SLANG_OK;
     }
 
     Slang::RefPtr<Renderer> renderer;
