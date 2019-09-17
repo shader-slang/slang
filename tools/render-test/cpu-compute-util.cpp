@@ -301,7 +301,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     return SLANG_OK;
 }
 
-/* static */SlangResult CPUComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context)
+/* static */SlangResult CPUComputeUtil::execute(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context)
 {
     auto request = compilationAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
@@ -313,10 +313,12 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     
     struct UniformState;
     typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
+    typedef void(*GroupRangeFunc)(CPPPrelude::GroupComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
 
     slang::EntryPointReflection* entryPoint = nullptr;
     Func func = nullptr;
     Func groupFunc = nullptr;
+    GroupRangeFunc groupRangeFunc = nullptr;
     {
         auto entryPointCount = reflection->getEntryPointCount();
         SLANG_ASSERT(entryPointCount == 1);
@@ -326,27 +328,58 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         const char* entryPointName = entryPoint->getName();
         func = (Func)sharedLibrary->findFuncByName(entryPointName);
 
-        StringBuilder groupEntryPointName;
-        groupEntryPointName << entryPointName << "_Group";
+        {
+            StringBuilder groupEntryPointName;
+            groupEntryPointName << entryPointName << "_Group";
 
-        groupFunc = (Func)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+            groupFunc = (Func)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+        }
 
-        if (func == nullptr && groupFunc == nullptr)
+        {
+            StringBuilder groupRangeEntryPointName;
+            groupRangeEntryPointName << entryPointName << "_GroupRange";
+
+            groupRangeFunc = (GroupRangeFunc)sharedLibrary->findFuncByName(groupRangeEntryPointName.getBuffer());
+        }
+
+        if (func == nullptr && groupFunc == nullptr && groupRangeFunc == nullptr)
         {
             return SLANG_FAIL;
         }
     }
 
     // If we have the group function, that's the faster way to execute all threads in group...
-    if (groupFunc)
+    if (groupRangeFunc)
     {
         UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
         CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
+        CPPPrelude::GroupComputeVaryingInput varying;
 
+        varying.startGroupID = {};
+        varying.endGroupID = { dispatchSize[0], dispatchSize[1], dispatchSize[2] };
+        
+        groupRangeFunc(&varying, uniformEntryPointParams, uniformState);
+    }
+    else if (groupFunc)
+    {
         CPPPrelude::ComputeVaryingInput varying;
-        varying.groupID = {};
 
-        groupFunc(&varying, uniformEntryPointParams, uniformState);
+        for (uint32_t groupZ = 0; groupZ < dispatchSize[2]; ++groupZ)
+        {
+            for (uint32_t groupY = 0; groupY < dispatchSize[1]; ++groupY)
+            {
+                for (uint32_t groupX = 0; groupX < dispatchSize[0]; ++groupX)
+                {
+                    UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+                    CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
+
+                    varying.groupID = {groupX, groupY, groupZ};
+
+                    groupFunc(&varying, uniformEntryPointParams, uniformState);
+                }
+            }
+        }
+
     }
     else
     {
@@ -359,19 +392,29 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
 
             CPPPrelude::ComputeVaryingInput varying;
-            varying.groupID = {};
 
-            for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
+            for (uint32_t groupZ = 0; groupZ < dispatchSize[2]; ++groupZ)
             {
-                varying.groupThreadID.z = z;
-                for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
+                for (uint32_t groupY = 0; groupY < dispatchSize[1]; ++groupY)
                 {
-                    varying.groupThreadID.y = y;
-                    for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
+                    for (uint32_t groupX = 0; groupX < dispatchSize[0]; ++groupX)
                     {
-                        varying.groupThreadID.x = x;
+                        varying.groupID = {groupX, groupY, groupZ};
 
-                        func(&varying, uniformEntryPointParams, uniformState);
+                        for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
+                        {
+                            varying.groupThreadID.z = z;
+                            for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
+                            {
+                                varying.groupThreadID.y = y;
+                                for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
+                                {
+                                    varying.groupThreadID.x = x;
+
+                                    func(&varying, uniformEntryPointParams, uniformState);
+                                }
+                            }
+                        }
                     }
                 }
             }

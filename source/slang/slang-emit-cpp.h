@@ -132,6 +132,17 @@ public:
         SLANG_CPP_INTRINSIC_OP(SLANG_CPP_INTRINSIC_OP_ENUM)
     };
 
+    typedef uint32_t SemanticUsedFlags;
+    struct SemanticUsedFlag
+    {
+        enum Enum : SemanticUsedFlags
+        {
+            DispatchThreadID    = 0x01,
+            GroupThreadID       = 0x02,
+            GroupID             = 0x04,
+        };
+    };
+
     struct OperationInfo
     {
         UnownedStringSlice name;
@@ -257,9 +268,12 @@ protected:
 
     SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
-    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName);
+    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
     void _emitEntryPointGroup(const UInt sizeAlongAxis[3], const String& funcName);
+    void _emitEntryPointGroupRange(const UInt sizeAlongAxis[3], const String& funcName);
+
+    void _emitInitAxisValues(const UInt sizeAlongAxis[3], const UnownedStringSlice& mulName, const UnownedStringSlice& addName);
 
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
@@ -295,6 +309,8 @@ protected:
     List<IntrinsicOp> m_intrinsicOpMap;
 
     StringSlicePool m_slicePool;
+
+    SemanticUsedFlags m_semanticUsedFlags;
 };
 
 }

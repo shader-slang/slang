@@ -64,6 +64,8 @@ struct Options
     Slang::List<Slang::CommandLine::Arg> compileArgs;
 
     Slang::String adapter;                              ///< The adapter to use either name or index
+
+    uint32_t computeDispatchSize[3] = { 1, 1, 1 };
 };
 
 extern Options gOptions;

@@ -29,7 +29,7 @@ struct CPUComputeUtil
 
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
 
-    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
+    static SlangResult execute(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
 
     static SlangResult writeBindings(const ShaderInputLayout& layout, const List<CPUMemoryBinding::Buffer>& buffers, const Slang::String& fileName);
 };
