@@ -456,7 +456,14 @@ IRInst* tryRemoveTrivialPhi(
         // There were no operands other than the phi itself.
         // This implies that the value at the use sites should
         // actually be undefined.
-        SLANG_UNIMPLEMENTED_X("trivial phi");
+        //
+        // For now we will simply return in this case, without
+        // removing the phi node.
+        //
+        // TODO: Construct a value for `same` that represents an
+        // undefined value with the same type as `phi`.
+        //
+        return phi;
     }
 
     // Removing this phi as trivial may make other phi nodes
@@ -498,6 +505,16 @@ IRInst* tryRemoveTrivialPhi(
     // other phis that might have become  trivial.
     for( auto otherPhi : otherPhis )
     {
+        // It is possible that between when we added a phi
+        // node to `otherPhis` and here it might have been
+        // replaced. This could happen if `otherPhis` had
+        // two entries, `A` and `B`, and the recursive
+        // `tryRemoveTrivialPhi` on `A` also ended up
+        // eliminating `B`.
+        //
+        if( otherPhi->replacement )
+            continue;
+
         tryRemoveTrivialPhi(context, otherPhi);
     }
 
@@ -524,6 +541,7 @@ IRInst* addPhiOperands(
         auto predInfo = *context->blockInfos.TryGetValue(predBlock);
 
         auto phiOperand = readVar(context, predInfo, var);
+        SLANG_ASSERT(phiOperand != nullptr);
 
         operandValues.add(phiOperand);
     }
