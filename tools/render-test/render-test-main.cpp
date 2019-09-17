@@ -461,8 +461,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
         CPUComputeUtil::Context context;
         SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
-        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(gOptions.computeDispatchSize, compilationAndLayout, context));
 
+        CPUComputeUtil::ExecuteInfo info;
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
+        
         // Dump everything out that was written
         return CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath);
     }
