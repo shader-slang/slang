@@ -310,15 +310,13 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(request, 0, 0, sharedLibrary.writeRef()));
 
     // Use reflection to find the entry point name
-    
-    struct UniformState;
-    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
-    typedef void(*GroupRangeFunc)(CPPPrelude::GroupComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
+
 
     slang::EntryPointReflection* entryPoint = nullptr;
-    Func func = nullptr;
-    Func groupFunc = nullptr;
-    GroupRangeFunc groupRangeFunc = nullptr;
+    CPPPrelude::ComputeFunc groupRangeFunc = nullptr;
+    CPPPrelude::ComputeFunc groupFunc = nullptr;
+    CPPPrelude::ComputeThreadFunc threadFunc = nullptr;
+
     {
         auto entryPointCount = reflection->getEntryPointCount();
         SLANG_ASSERT(entryPointCount == 1);
@@ -326,23 +324,23 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         entryPoint = reflection->getEntryPointByIndex(0);
 
         const char* entryPointName = entryPoint->getName();
-        func = (Func)sharedLibrary->findFuncByName(entryPointName);
+        groupRangeFunc = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(entryPointName);
 
         {
             StringBuilder groupEntryPointName;
             groupEntryPointName << entryPointName << "_Group";
 
-            groupFunc = (Func)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+            groupFunc = (CPPPrelude::ComputeFunc )sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
         }
 
         {
-            StringBuilder groupRangeEntryPointName;
-            groupRangeEntryPointName << entryPointName << "_GroupRange";
+            StringBuilder threadEntryPointName;
+            threadEntryPointName << entryPointName << "_Thread";
 
-            groupRangeFunc = (GroupRangeFunc)sharedLibrary->findFuncByName(groupRangeEntryPointName.getBuffer());
+            threadFunc = (CPPPrelude::ComputeThreadFunc)sharedLibrary->findFuncByName(threadEntryPointName.getBuffer());
         }
 
-        if (func == nullptr && groupFunc == nullptr && groupRangeFunc == nullptr)
+        if (threadFunc == nullptr && groupFunc == nullptr && groupRangeFunc == nullptr)
         {
             return SLANG_FAIL;
         }
@@ -351,9 +349,9 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     // If we have the group function, that's the faster way to execute all threads in group...
     if (groupRangeFunc)
     {
-        UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+        CPPPrelude::UniformState* uniformState = (CPPPrelude::UniformState*)context.binding.m_rootBuffer.m_data;
         CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
-        CPPPrelude::GroupComputeVaryingInput varying;
+        CPPPrelude::ComputeVaryingInput varying;
 
         varying.startGroupID = {};
         varying.endGroupID = { dispatchSize[0], dispatchSize[1], dispatchSize[2] };
@@ -370,10 +368,10 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             {
                 for (uint32_t groupX = 0; groupX < dispatchSize[0]; ++groupX)
                 {
-                    UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+                    CPPPrelude::UniformState* uniformState = (CPPPrelude::UniformState*)context.binding.m_rootBuffer.m_data;
                     CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
 
-                    varying.groupID = {groupX, groupY, groupZ};
+                    varying.startGroupID = {groupX, groupY, groupZ};
 
                     groupFunc(&varying, uniformEntryPointParams, uniformState);
                 }
@@ -388,10 +386,10 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
 
         {
-            UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
+            CPPPrelude::UniformState* uniformState = (CPPPrelude::UniformState*)context.binding.m_rootBuffer.m_data;
             CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
 
-            CPPPrelude::ComputeVaryingInput varying;
+            CPPPrelude::ComputeThreadVaryingInput varying;
 
             for (uint32_t groupZ = 0; groupZ < dispatchSize[2]; ++groupZ)
             {
@@ -411,7 +409,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                                 {
                                     varying.groupThreadID.x = x;
 
-                                    func(&varying, uniformEntryPointParams, uniformState);
+                                    threadFunc(&varying, uniformEntryPointParams, uniformState);
                                 }
                             }
                         }

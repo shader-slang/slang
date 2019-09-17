@@ -1109,120 +1109,6 @@ static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, Tempo
     return SharedLibrary::loadWithPlatformPath(sharedLibraryName.getBuffer(), outSharedLibrary);
 }
 
-static void _writeBuffer(const CPPPrelude::RWStructuredBuffer<int32_t>& in, StringBuilder& out)
-{
-    for (size_t i = 0; i < in.count; ++i)
-    {
-        if (i > 0)
-        {
-            out << ", ";
-        }
-        out << in[i];
-    }
-    out << "\n";
-}
-
-TestResult runCPUExecuteTest(TestContext* context, TestInput& input)
-{
-    auto outputStem = input.outputStem;
-
-    CommandLine cmdLine;
-    _initSlangCompiler(context, cmdLine);
-
-    cmdLine.addArg(input.filePath);
-
-    for (auto arg : input.testOptions->args)
-    {
-        cmdLine.addArg(arg);
-    }
-
-    ExecuteResult exeRes;
-    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
-
-    if (context->isCollectingRequirements())
-    {
-        return TestResult::Pass;
-    }
-
-    TemporaryFileSet temporaryFileSet;
-    SharedLibrary::Handle sharedLibrary = SharedLibrary::Handle(0);
-    if (SLANG_FAILED(_loadAsSharedLibrary(exeRes.standardOutput.getUnownedSlice(), temporaryFileSet, sharedLibrary)))
-    {
-        return TestResult::Fail;
-    }
-
-    StringBuilder actualOutput;
-
-    // TODO(JS): For moment just assume function name/data/parameters
-    {
-        SharedLibrary::FuncPtr func = SharedLibrary::findFuncByName(sharedLibrary, "computeMain");
-        if (!func)
-        {
-            SharedLibrary::unload(sharedLibrary);
-            return TestResult::Fail;
-        }
-
-        
-        struct UniformState
-        {
-            CPPPrelude::RWStructuredBuffer<int> buffer;
-        };
-        
-        typedef void (*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* params, UniformState* uniformState);
-
-        Func runFunc = Func(func);
-        int32_t data[4] = { 0, 0, 0, 0};
-
-        UniformState state;
-
-        state.buffer = CPPPrelude::RWStructuredBuffer<int32_t>{data, 4};
-
-        CPPPrelude::ComputeVaryingInput varyingInput = {};
-        for (Int i = 0; i < 4; ++i)
-        {
-            varyingInput.groupThreadID.x = uint32_t(i);
-            runFunc(&varyingInput, nullptr, &state);
-        }
-
-        SharedLibrary::unload(sharedLibrary);
-
-        // Write the data
-        _writeBuffer(state.buffer, actualOutput);
-    }
-
-    String expectedOutputPath = outputStem + ".expected";
-    String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (Slang::IOException)
-    {
-    }
-
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
-    {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
-        result = TestResult::Fail;
-    }
-
-    // If the test failed, then we write the actual output to a file
-    // so that we can easily diff it from the command line and
-    // diagnose the problem.
-    if (result == TestResult::Fail)
-    {
-        String actualOutputPath = outputStem + ".actual";
-        Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
-    }
-
-    return result;
-}
-
 TestResult runSimpleCompareCommandLineTest(TestContext* context, TestInput& input)
 {
     TestInput workInput(input);
@@ -2456,7 +2342,6 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
     { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
-    { "CPU_EXECUTE",                            &runCPUExecuteTest},
 };
 
 TestResult runTest(
