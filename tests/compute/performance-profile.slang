@@ -1,7 +1,7 @@
-//TEST(compute):PERFORMANCE_PROFILE:-cpu -compute -compile-arg -O3 
-//TEST(compute):PERFORMANCE_PROFILE:-slang -compute
-//TEST(compute):PERFORMANCE_PROFILE:-slang -compute -dx12
-//TEST(compute, vulkan):PERFORMANCE_PROFILE:-vk -compute
+//TEST(compute):PERFORMANCE_PROFILE:-cpu -compute -compile-arg -O3 -compute-dispatch 1024,1,1
+//TEST(compute):PERFORMANCE_PROFILE:-slang -compute -compute-dispatch 1024,1,1
+//TEST(compute):PERFORMANCE_PROFILE:-slang -compute -dx12 -compute-dispatch 1024,1,1
+//TEST(compute, vulkan):PERFORMANCE_PROFILE:-vk -compute -compute-dispatch 1024,1,1
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1, 1), stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
