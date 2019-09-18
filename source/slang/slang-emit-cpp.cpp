@@ -2830,8 +2830,13 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                 String funcName = getFuncName(func);
 
-                {    
-                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                {
+                    StringBuilder builder;
+                    builder << funcName << "_Thread";
+
+                    String threadFuncName = builder;
+
+                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, threadFuncName, UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
 
                     if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
                     {
@@ -2854,7 +2859,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     _emitEntryPointDefinitionEnd(func);
                 }
 
-                // Emit the group version which runs for all elements in a thread group
+                // Emit the group version which runs for all elements in *single* thread group
                 {
                     StringBuilder builder;
                     builder << getFuncName(func);
@@ -2865,7 +2870,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     _emitEntryPointDefinitionStart(func, entryPointGlobalParams, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("const uint3 start = ");
-                    _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->groupID"), UnownedStringSlice());
+                    _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->startGroupID"), UnownedStringSlice());
 
                     if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
                     {
@@ -2874,7 +2879,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                     if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
                     {
-                        m_writer->emit("context.groupID = varyingInput->groupID;\n");
+                        m_writer->emit("context.groupID = varyingInput->startGroupID;\n");
                     }
                     m_writer->emit("context.dispatchThreadID = start;\n");
 
@@ -2882,33 +2887,14 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     _emitEntryPointDefinitionEnd(func);
                 }
 
-                // Emit the group version which runs for all elements in a thread group
+                // Emit the main version - which takes a dispatch size
                 {
-                    StringBuilder builder;
-                    builder << getFuncName(func);
-                    builder << "_GroupRange";
-
-                    String groupRangeFuncName = builder;
-
-                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, groupRangeFuncName, UnownedStringSlice::fromLiteral("GroupComputeVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("const uint3 start = ");
                     _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->startGroupID"), UnownedStringSlice());
                     m_writer->emit("const uint3 end = ");
                     _emitInitAxisValues(sizeAlongAxis, UnownedStringSlice::fromLiteral("varyingInput->endGroupID"), UnownedStringSlice());
-
-#if 0
-                    // Not needed as will be emitted as part of the loop
-                    m_writer->emit("context.dispatchThreadID = start;\n");
-                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
-                    {
-                        m_writer->emit("context.groupDispatchThreadID = start;");
-                    }
-                    if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
-                    {
-                        m_writer->emit("context.groupID = varyingInput->startGroupID;\n");
-                    }
-#endif
 
                     _emitEntryPointGroupRange(sizeAlongAxis, funcName);
                     _emitEntryPointDefinitionEnd(func);

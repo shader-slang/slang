@@ -11,6 +11,14 @@ namespace renderer_test {
 
 struct CPUComputeUtil
 {
+    enum class ExecuteStyle
+    {
+        Unknown,
+        Thread,
+        Group,
+        GroupRange,
+    };
+
     struct Resource : public RefObject
     {
         void* getInterface() const { return m_interface; }
@@ -27,9 +35,28 @@ struct CPUComputeUtil
         List<RefPtr<Resource> > m_resources;
     };
 
+    struct ExecuteInfo
+    {
+        typedef void (*Func)();
+
+        ExecuteStyle m_style;
+        Func m_func;
+        uint32_t m_dispatchSize[3];
+        uint32_t m_numThreadsPerAxis[3];
+
+        void* m_uniformState;
+        void* m_uniformEntryPointParams;
+    };
+
+    
+        /// Runs code across run styles and makes sure output buffers match
+    static SlangResult checkStyleConsistency(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
+
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
 
-    static SlangResult execute(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
+    static SlangResult calcExecuteInfo(ExecuteStyle style, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);
+
+    static SlangResult execute(const ExecuteInfo& info);
 
     static SlangResult writeBindings(const ShaderInputLayout& layout, const List<CPUMemoryBinding::Buffer>& buffers, const Slang::String& fileName);
 };

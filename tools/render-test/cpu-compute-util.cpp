@@ -301,121 +301,213 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     return SLANG_OK;
 }
 
-/* static */SlangResult CPUComputeUtil::execute(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context)
+/* static */SlangResult CPUComputeUtil::calcExecuteInfo(ExecuteStyle style, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out)
 {
     auto request = compilationAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
+    slang::EntryPointReflection* entryPoint = nullptr;
+    auto entryPointCount = reflection->getEntryPointCount();
+    SLANG_ASSERT(entryPointCount == 1);
+
+    entryPoint = reflection->getEntryPointByIndex(0);
+
+    const char* entryPointName = entryPoint->getName();
+
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(request, 0, 0, sharedLibrary.writeRef()));
 
-    // Use reflection to find the entry point name
-    
-    struct UniformState;
-    typedef void(*Func)(CPPPrelude::ComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
-    typedef void(*GroupRangeFunc)(CPPPrelude::GroupComputeVaryingInput* varyingInput, CPPPrelude::UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
-
-    slang::EntryPointReflection* entryPoint = nullptr;
-    Func func = nullptr;
-    Func groupFunc = nullptr;
-    GroupRangeFunc groupRangeFunc = nullptr;
+    // Copy dispatch size
+    for (int i = 0; i < 3; ++i)
     {
-        auto entryPointCount = reflection->getEntryPointCount();
-        SLANG_ASSERT(entryPointCount == 1);
+        out.m_dispatchSize[i] = dispatchSize[i];
+    }
 
-        entryPoint = reflection->getEntryPointByIndex(0);
+    out.m_style = style;
+    out.m_uniformState = (void*)context.binding.m_rootBuffer.m_data;
+    out.m_uniformEntryPointParams = (void*)context.binding.m_entryPointBuffer.m_data;
 
-        const char* entryPointName = entryPoint->getName();
-        func = (Func)sharedLibrary->findFuncByName(entryPointName);
-
+    switch (style)
+    {
+        case ExecuteStyle::Group:
         {
             StringBuilder groupEntryPointName;
             groupEntryPointName << entryPointName << "_Group";
 
-            groupFunc = (Func)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
-        }
+            CPPPrelude::ComputeFunc groupFunc = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+            if (!groupFunc)
+            {
+                return SLANG_FAIL;
+            }
 
+            out.m_func = (ExecuteInfo::Func)groupFunc;
+            break;
+        }
+        case ExecuteStyle::GroupRange:
         {
-            StringBuilder groupRangeEntryPointName;
-            groupRangeEntryPointName << entryPointName << "_GroupRange";
-
-            groupRangeFunc = (GroupRangeFunc)sharedLibrary->findFuncByName(groupRangeEntryPointName.getBuffer());
+            CPPPrelude::ComputeFunc groupRangeFunc = nullptr;
+            groupRangeFunc = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(entryPointName);
+            if (!groupRangeFunc)
+            {
+                return SLANG_FAIL;
+            }
+            out.m_func = (ExecuteInfo::Func)groupRangeFunc;
+            break;
         }
+        case ExecuteStyle::Thread:
+        {
+            StringBuilder threadEntryPointName;
+            threadEntryPointName << entryPointName << "_Thread";
 
-        if (func == nullptr && groupFunc == nullptr && groupRangeFunc == nullptr)
+            CPPPrelude::ComputeThreadFunc threadFunc = (CPPPrelude::ComputeThreadFunc)sharedLibrary->findFuncByName(threadEntryPointName.getBuffer());
+            if (!threadFunc)
+            {
+                return SLANG_FAIL;
+            }
+
+            SlangUInt numThreadsPerAxis[3];
+            entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
+            for (int i = 0; i < 3; ++i)
+            {
+                out.m_numThreadsPerAxis[i] = uint32_t(numThreadsPerAxis[i]);
+            }
+            out.m_func = (ExecuteInfo::Func)threadFunc;
+            break;
+        }
+        default:
         {
             return SLANG_FAIL;
         }
     }
 
-    // If we have the group function, that's the faster way to execute all threads in group...
-    if (groupRangeFunc)
-    {
-        UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
-        CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
-        CPPPrelude::GroupComputeVaryingInput varying;
+    return SLANG_OK;
+}
 
-        varying.startGroupID = {};
-        varying.endGroupID = { dispatchSize[0], dispatchSize[1], dispatchSize[2] };
-        
-        groupRangeFunc(&varying, uniformEntryPointParams, uniformState);
-    }
-    else if (groupFunc)
-    {
-        CPPPrelude::ComputeVaryingInput varying;
+/* static */SlangResult CPUComputeUtil::execute(const ExecuteInfo& info)
+{
+    CPPPrelude::UniformState* uniformState = (CPPPrelude::UniformState*)info.m_uniformState;
+    CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)info.m_uniformEntryPointParams;
 
-        for (uint32_t groupZ = 0; groupZ < dispatchSize[2]; ++groupZ)
+    switch (info.m_style)
+    {
+        case ExecuteStyle::Group:
         {
-            for (uint32_t groupY = 0; groupY < dispatchSize[1]; ++groupY)
-            {
-                for (uint32_t groupX = 0; groupX < dispatchSize[0]; ++groupX)
-                {
-                    UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
-                    CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
-
-                    varying.groupID = {groupX, groupY, groupZ};
-
-                    groupFunc(&varying, uniformEntryPointParams, uniformState);
-                }
-            }
-        }
-
-    }
-    else
-    {
-        // We can also fire off each thread individually
-        SlangUInt numThreadsPerAxis[3];
-        entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
-
-        {
-            UniformState* uniformState = (UniformState*)context.binding.m_rootBuffer.m_data;
-            CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)context.binding.m_entryPointBuffer.m_data;
-
+            CPPPrelude::ComputeFunc groupFunc = (CPPPrelude::ComputeFunc)info.m_func;
             CPPPrelude::ComputeVaryingInput varying;
 
-            for (uint32_t groupZ = 0; groupZ < dispatchSize[2]; ++groupZ)
-            {
-                for (uint32_t groupY = 0; groupY < dispatchSize[1]; ++groupY)
-                {
-                    for (uint32_t groupX = 0; groupX < dispatchSize[0]; ++groupX)
-                    {
-                        varying.groupID = {groupX, groupY, groupZ};
+            const uint32_t groupXCount = info.m_dispatchSize[0];
+            const uint32_t groupYCount = info.m_dispatchSize[1];
+            const uint32_t groupZCount = info.m_dispatchSize[2];
 
-                        for (int z = 0; z < int(numThreadsPerAxis[2]); ++z)
+            for (uint32_t groupZ = 0; groupZ < groupZCount; ++groupZ)
+            {
+                for (uint32_t groupY = 0; groupY < groupYCount; ++groupY)
+                {
+                    for (uint32_t groupX = 0; groupX < groupXCount; ++groupX)
+                    {
+                        varying.startGroupID = { groupX, groupY, groupZ };
+                        groupFunc(&varying, uniformEntryPointParams, uniformState);
+                    }
+                }
+            }
+            break;
+        }
+        case ExecuteStyle::GroupRange:
+        {
+            CPPPrelude::ComputeFunc groupRangeFunc = (CPPPrelude::ComputeFunc)info.m_func;
+            CPPPrelude::ComputeVaryingInput varying;
+
+            varying.startGroupID = {};
+            varying.endGroupID = { info.m_dispatchSize[0], info.m_dispatchSize[1], info.m_dispatchSize[2] };
+
+            groupRangeFunc(&varying, uniformEntryPointParams, uniformState);
+            break;
+        }
+        case ExecuteStyle::Thread:
+        {
+            CPPPrelude::ComputeThreadFunc threadFunc = (CPPPrelude::ComputeThreadFunc)info.m_func;
+            CPPPrelude::ComputeThreadVaryingInput varying;
+
+            const uint32_t groupXCount = info.m_dispatchSize[0];
+            const uint32_t groupYCount = info.m_dispatchSize[1];
+            const uint32_t groupZCount = info.m_dispatchSize[2];
+
+            const uint32_t threadXCount = uint32_t(info.m_numThreadsPerAxis[0]);
+            const uint32_t threadYCount = uint32_t(info.m_numThreadsPerAxis[1]);
+            const uint32_t threadZCount = uint32_t(info.m_numThreadsPerAxis[2]);
+
+            for (uint32_t groupZ = 0; groupZ < groupZCount; ++groupZ)
+            {
+                for (uint32_t groupY = 0; groupY < groupYCount; ++groupY)
+                {
+                    for (uint32_t groupX = 0; groupX < groupXCount; ++groupX)
+                    {
+                        varying.groupID = { groupX, groupY, groupZ };
+
+                        for (uint32_t z = 0; z < threadZCount; ++z)
                         {
                             varying.groupThreadID.z = z;
-                            for (int y = 0; y < int(numThreadsPerAxis[1]); ++y)
+                            for (uint32_t y = 0; y < threadYCount; ++y)
                             {
                                 varying.groupThreadID.y = y;
-                                for (int x = 0; x < int(numThreadsPerAxis[0]); ++x)
+                                for (uint32_t x = 0; x < threadXCount; ++x)
                                 {
                                     varying.groupThreadID.x = x;
 
-                                    func(&varying, uniformEntryPointParams, uniformState);
+                                    threadFunc(&varying, uniformEntryPointParams, uniformState);
                                 }
                             }
                         }
                     }
+                }
+            }
+            break;
+        }
+        default: return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+
+/* static */ SlangResult CPUComputeUtil::checkStyleConsistency(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout)
+{
+    Context context;
+    SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
+
+    // Run the thread style to test against
+    {
+        ExecuteInfo info;
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(ExecuteStyle::Thread, dispatchSize, compilationAndLayout, context, info));
+        SLANG_RETURN_ON_FAIL(execute(info));
+    }
+
+    ExecuteStyle styles[] = { ExecuteStyle::Group, ExecuteStyle::GroupRange };
+    for (auto style: styles)
+    {
+        Context checkContext;
+        SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, checkContext));
+
+        ExecuteInfo info;
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(style, dispatchSize, compilationAndLayout, checkContext, info));
+        SLANG_RETURN_ON_FAIL(execute(info));
+
+        // Make sure the out buffers are all the same
+
+        const auto& entries = compilationAndLayout.layout.entries;
+
+        for (int i = 0; i < entries.getCount(); ++i)
+        {
+            const auto& entry = entries[i];
+            if (entry.isOutput)
+            {
+                const auto& buffer = context.buffers[i];
+                const auto& checkBuffer = checkContext.buffers[i];
+
+                if (buffer.m_sizeInBytes != checkBuffer.m_sizeInBytes ||
+                    memcmp(buffer.m_data, checkBuffer.m_data, buffer.m_sizeInBytes) != 0)
+                {
+                    return SLANG_FAIL;
                 }
             }
         }
@@ -423,5 +515,6 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
     return SLANG_OK;
 }
+
 
 } // renderer_test
