@@ -217,7 +217,8 @@ static const CPPSourceEmitter::OperationInfo s_operationInfos[] =
         case kIROp_Div:     return IntrinsicOp::Div;
         case kIROp_Lsh:     return IntrinsicOp::Lsh;
         case kIROp_Rsh:     return IntrinsicOp::Rsh;
-        case kIROp_Mod:     return IntrinsicOp::Mod;
+        case kIROp_IRem:    return IntrinsicOp::IRem;
+        case kIROp_FRem:    return IntrinsicOp::FRem;
 
         case kIROp_Eql:     return IntrinsicOp::Eql;
         case kIROp_Neq:     return IntrinsicOp::Neq;

@@ -390,13 +390,23 @@ namespace renderer_test
                                     parser.Read("[");
                                     while (!parser.IsEnd() && !parser.LookAhead("]"))
                                     {
+                                        bool negate = false;
+                                        if(parser.NextToken().Type == TokenType::OpSub)
+                                        {
+                                            parser.ReadToken();
+                                            negate = true;
+                                        }
+
                                         if (parser.NextToken().Type == TokenType::IntLiteral)
                                         {
-                                            entry.bufferData.add(parser.ReadUInt());
+                                            uint32_t val = parser.ReadUInt();
+                                            if(negate) val = uint32_t(-int32_t(val));
+                                            entry.bufferData.add(val);
                                         }
                                         else
                                         {
                                             auto floatNum = parser.ReadFloat();
+                                            if(negate) floatNum = -floatNum;
                                             entry.bufferData.add(*(unsigned int*)&floatNum);
                                         }
                                     }

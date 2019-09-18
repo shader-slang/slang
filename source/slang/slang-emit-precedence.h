@@ -102,7 +102,7 @@ enum EPrecedence
     \
     x(Mul, "*", Multiplicative) \
     x(Div, "/", Multiplicative) \
-    x(Mod, "%", Multiplicative) \
+    x(Rem, "%", Multiplicative) \
     \
     x(Prefix, "", Prefix) \
     x(Postfix, "", Postfix) \
