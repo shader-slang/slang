@@ -142,6 +142,11 @@ void TestReporter::addResult(TestResult result)
     m_numCurrentResults++;
 }
 
+void TestReporter::addExecutionTime(double time)
+{
+    m_currentInfo.executionTime = time;
+}
+
 void TestReporter::addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
 {
     assert(m_inTest);
@@ -254,6 +259,31 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
     }
 }
 
+static void _appendTime(double timeInSec, StringBuilder& out)
+{
+    SLANG_ASSERT(timeInSec >= 0.0);
+    if (timeInSec == 0.0 || timeInSec >= 1.0)
+    {
+        out << timeInSec << "s";
+        return;
+    }
+    timeInSec *= 1000.0f;
+    if (timeInSec > 1.0f)
+    {
+        out << timeInSec << "ms";
+        return;
+    }
+    timeInSec *= 1000.0f;
+    if (timeInSec > 1.0f)
+    {
+        out << timeInSec << "us";
+        return;
+    }
+
+    timeInSec *= 1000.0f;
+    out << timeInSec << "ns";
+}
+
 void TestReporter::_addResult(const TestInfo& info)
 {
     m_totalTestCount++;
@@ -294,7 +324,13 @@ void TestReporter::_addResult(const TestInfo& info)
                     assert(!"unexpected");
                     break;
             }
-            printf("%s test: '%S'\n", resultString, info.name.toWString().begin());
+
+            StringBuilder buffer;
+            if (info.executionTime > 0.0f)
+            {
+                _appendTime(info.executionTime, buffer);
+            }
+            printf("%s test: '%S' %s\n", resultString, info.name.toWString().begin(), buffer.getBuffer());
             break;
         }
         case TestOutputMode::TeamCity:

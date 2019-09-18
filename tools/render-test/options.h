@@ -59,6 +59,8 @@ struct Options
     bool useDXIL = false;
     bool onlyStartup = false;
 
+    bool performanceProfile = false;
+
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 
     Slang::List<Slang::CommandLine::Arg> compileArgs;

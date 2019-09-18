@@ -66,7 +66,8 @@ class TestReporter
     {
         TestResult testResult = TestResult::Ignored;
         Slang::String name;
-        Slang::String message;                 ///< Message that is specific for the testResult
+        Slang::String message;                  ///< Message that is specific for the testResult
+        double executionTime = 0.0f;            ///< 0.0f if not defined
     };
     
     class TestScope
@@ -110,7 +111,7 @@ class TestReporter
     void addResult(TestResult result);
     void addResultWithLocation(TestResult result, const char* testText, const char* file, int line);
     void addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line);
-
+    void addExecutionTime(double time);
     void endTest();
     
         /// Runs start/endTest and outputs the result

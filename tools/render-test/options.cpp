@@ -169,6 +169,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             arg.value = *argCursor++;
             gOptions.compileArgs.add(arg);
         }
+        else if (strcmp(arg, "-performance-profile") == 0)
+        {
+            gOptions.performanceProfile = true;
+        }
         else if (strcmp(arg, "-adapter") == 0)
         {
             if (argCursor == argEnd)

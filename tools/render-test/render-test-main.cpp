@@ -55,6 +55,13 @@ static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
 using namespace Slang;
 
+static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks, StdWriters* writers)
+{
+    double time = double(endTicks - startTicks) / ProcessUtil::getClockFrequency();
+    WriterHelper writer(writers->getOut());
+    writer.print("profile-time=%g\n", time);
+}
+
 class RenderTestApp : public WindowListener
 {
 	public:
@@ -64,7 +71,7 @@ class RenderTestApp : public WindowListener
 
         // At initialization time, we are going to load and compile our Slang shader
         // code, and then create the API objects we need for rendering.
-    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input);
+    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input, StdWriters* stdWriters);
     void runCompute();
     void renderFrame();
     void finalize();
@@ -78,6 +85,8 @@ class RenderTestApp : public WindowListener
 	protected:
 		/// Called in initialize
 	Result _initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input);
+
+    uint64_t m_startTicks;
 
 	// variables for state to be used for rendering...
 	uintptr_t m_constantBufferSize, m_computeResultBufferSize;
@@ -94,11 +103,14 @@ class RenderTestApp : public WindowListener
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
 
+    StdWriters* m_stdWriters;
+
     Options m_options;
 };
 
-SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input)
+SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input, StdWriters* stdWriters)
 {
+    m_stdWriters = stdWriters;
     m_options = options;
 
     SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
@@ -232,6 +244,9 @@ void RenderTestApp::runCompute()
     auto pipelineType = PipelineType::Compute;
     m_renderer->setPipelineState(pipelineType, m_pipelineState);
     m_bindingState->apply(m_renderer, pipelineType);
+
+    m_startTicks = ProcessUtil::getClockTick();
+
 	m_renderer->dispatchCompute(m_options.computeDispatchSize[0], m_options.computeDispatchSize[1], m_options.computeDispatchSize[2]);
 }
 
@@ -314,24 +329,60 @@ Result RenderTestApp::update(Window* window)
     }
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
-    if (m_options.outputPath)
+    if (m_options.outputPath || m_options.performanceProfile)
     {
         // Submit the work
         m_renderer->submitGpuWork();
         // Wait until everything is complete
         m_renderer->waitForGpu();
 
-        if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+        if (m_options.performanceProfile)
         {
-            SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
-        }
-        else
-        {
-            SlangResult res = writeScreen(gOptions.outputPath);
-            if (SLANG_FAILED(res))
+            // It might not be enough on some APIs to 'waitForGpu' to mean the computation has completed. Let's lock an output
+            // buffer to be sure
+            if (m_bindingState->outputBindings.getCount() > 0)
             {
-                fprintf(stderr, "ERROR: failed to write screen capture to file\n");
-                return res;
+                const auto& binding = m_bindingState->outputBindings[0];
+                auto i = binding.entryIndex;
+                const auto& layoutBinding = m_shaderInputLayout.entries[i];
+
+                assert(layoutBinding.isOutput);
+                
+                if (binding.resource && binding.resource->isBuffer())
+                {
+                    BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+                    const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+                    unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
+                    if (!ptr)
+                    {                            
+                        return SLANG_FAIL;
+                    }
+                    m_renderer->unmap(bufferResource);
+                }
+            }
+
+            // Note we don't do the same with screen rendering -> as that will do a lot of work, which may swamp any computation
+            // so can only really profile compute shaders at the moment
+
+            const uint64_t endTicks = ProcessUtil::getClockTick();
+
+            _outputProfileTime(m_startTicks, endTicks, m_stdWriters);
+        }
+
+        if (gOptions.outputPath)
+        {
+            if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+            {
+                SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
+            }
+            else
+            {
+                SlangResult res = writeScreen(gOptions.outputPath);
+                if (SLANG_FAILED(res))
+                {
+                    fprintf(stderr, "ERROR: failed to write screen capture to file\n");
+                    return res;
+                }
             }
         }
         // We are done
@@ -342,6 +393,8 @@ Result RenderTestApp::update(Window* window)
     m_renderer->presentFrame();
     return SLANG_OK;
 }
+
+
 
 } //  namespace renderer_test
 
@@ -466,17 +519,28 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
             CPUComputeUtil::ExecuteInfo info;
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+
+            const uint64_t startTicks = ProcessUtil::getClockTick();
+
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
+
+            if (gOptions.performanceProfile)
+            {
+                const uint64_t endTicks = ProcessUtil::getClockTick();
+                _outputProfileTime(startTicks, endTicks, stdWriters);
+            }
+
+            if (gOptions.outputPath)
+            {
+                // Dump everything out that was written
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+
+                // Check all execution styles produce the same result
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(gOptions.computeDispatchSize, compilationAndLayout));
+            }
+        }
+
         
-            // Dump everything out that was written
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
-        }
-
-        {
-            // Check all execution styles produce the same result
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(gOptions.computeDispatchSize, compilationAndLayout));
-        }
-
         return SLANG_OK;
     }
 
@@ -533,7 +597,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 	{
 		RefPtr<RenderTestApp> app(new RenderTestApp);
-		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input));
+		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input, stdWriters));
         window->show();
         return window->runLoop(app);
 	}

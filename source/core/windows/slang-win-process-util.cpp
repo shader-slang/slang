@@ -344,4 +344,25 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
     return SLANG_OK;
 }
 
+static uint64_t _getClockFrequency()
+{
+    LARGE_INTEGER timerFrequency;
+    QueryPerformanceFrequency(&timerFrequency);
+    return timerFrequency.QuadPart;
+}
+
+static const uint64_t g_frequency = _getClockFrequency();
+
+/* static */uint64_t ProcessUtil::getClockFrequency()
+{
+    return g_frequency;
+}
+
+/* static */uint64_t ProcessUtil::getClockTick()
+{
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return counter.QuadPart;
+}
+
 } 
