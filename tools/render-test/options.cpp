@@ -183,7 +183,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             if (argCursor == argEnd)
             {
-                stdError.print("error: comma separated compute dispatch size for '%s'\n", arg);
+                stdError.print("error: expecting a comma separated compute dispatch size for '%s'\n", arg);
                 return SLANG_FAIL;
             }
             List<UnownedStringSlice> slices;

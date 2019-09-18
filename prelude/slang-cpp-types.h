@@ -226,21 +226,28 @@ struct Texture2D
 };
 
 /* Varying input for Compute */
-struct ComputeVaryingInput
+
+/* Used when running a single thread */
+struct ComputeThreadVaryingInput
 {
     uint3 groupID;
     uint3 groupThreadID;
 };
 
-struct GroupComputeVaryingInput
+struct ComputeVaryingInput
 {
     uint3 startGroupID;     ///< start groupID
     uint3 endGroupID;       ///< Non inclusive end groupID
 };
 
 /* Type that defines the uniform entry point params. The actual content of this type is dependent on the entry point parameters, and can be
-found via reflection or defined such that it matches the shader appropriately. */
+found via reflection or defined such that it matches the shader appropriately.
+*/
 struct UniformEntryPointParams;
+struct UniformState;
+
+typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
+typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
 
 #ifdef SLANG_PRELUDE_NAMESPACE
 }
