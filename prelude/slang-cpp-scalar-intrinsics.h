@@ -62,6 +62,7 @@ SLANG_FORCE_INLINE float F32_min(float a, float b) { return a < b ? a : b; }
 SLANG_FORCE_INLINE float F32_max(float a, float b) { return a > b ? a : b; }
 SLANG_FORCE_INLINE float F32_pow(float a, float b) { return ::powf(a, b); }
 SLANG_FORCE_INLINE float F32_fmod(float a, float b) { return ::fmodf(a, b); }
+SLANG_FORCE_INLINE float F32_remainder(float a, float b) { return ::remainderf(a, b); }
 SLANG_FORCE_INLINE float F32_step(float a, float b) { return float(a >= b); }
 SLANG_FORCE_INLINE float F32_atan2(float a, float b) { return float(atan2(a, b)); }
 
@@ -110,6 +111,7 @@ SLANG_FORCE_INLINE double F64_min(double a, double b) { return a < b ? a : b; }
 SLANG_FORCE_INLINE double F64_max(double a, double b) { return a > b ? a : b; }
 SLANG_FORCE_INLINE double F64_pow(double a, double b) { return ::pow(a, b); }
 SLANG_FORCE_INLINE double F64_fmod(double a, double b) { return ::fmod(a, b); }
+SLANG_FORCE_INLINE double F64_remainder(double a, double b) { return ::remainder(a, b); }
 SLANG_FORCE_INLINE double F64_step(double a, double b) { return double(a >= b); }
 SLANG_FORCE_INLINE double F64_atan2(double a, double b) { return atan2(a, b); }
 

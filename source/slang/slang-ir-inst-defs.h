@@ -330,11 +330,23 @@ INST(SwizzledStore, swizzledStore, 2, 0)
 
 INST_RANGE(TerminatorInst, ReturnVal, Unreachable)
 
+// TODO: We should consider splitting the basic arithmetic/comparison
+// ops into cases for signed integers, unsigned integers, and floating-point
+// values, to better match downstream targets that want to treat them
+// all differently (e.g., SPIR-V).
+
 INST(Add, add, 2, 0)
 INST(Sub, sub, 2, 0)
 INST(Mul, mul, 2, 0)
 INST(Div, div, 2, 0)
-INST(Mod, mod, 2, 0)
+
+// Remainder of division.
+//
+// Note: this is distinct from modulus, and we should have a separate
+// opcode for `mod` if we ever need to support it.
+//
+INST(IRem, irem, 2, 0) // integer (signed or unsigned)
+INST(FRem, frem, 2, 0) // floating-point
 
 INST(Lsh, shl, 2, 0)
 INST(Rsh, shr, 2, 0)
@@ -461,7 +473,8 @@ PSEUDO_INST(AddAssign)
 PSEUDO_INST(SubAssign)
 PSEUDO_INST(MulAssign)
 PSEUDO_INST(DivAssign)
-PSEUDO_INST(ModAssign)
+PSEUDO_INST(IRemAssign)
+PSEUDO_INST(FRemAssign)
 PSEUDO_INST(AndAssign)
 PSEUDO_INST(OrAssign)
 PSEUDO_INST(XorAssign )

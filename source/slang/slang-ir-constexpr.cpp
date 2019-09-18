@@ -73,7 +73,8 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Sub:
     case kIROp_Mul:
     case kIROp_Div:
-    case kIROp_Mod:
+    case kIROp_IRem:
+    case kIROp_FRem:
     case kIROp_Neg:
     case kIROp_Construct:
     case kIROp_makeVector:

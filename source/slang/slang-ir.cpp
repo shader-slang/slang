@@ -4408,7 +4408,7 @@ namespace Slang
         case kIROp_Sub:
         case kIROp_Mul:
         //case kIROp_Div:   // TODO: We could split out integer vs. floating-point div/mod and assume the floating-point cases have no side effects
-        //case kIROp_Mod:
+        //case kIROp_Rem:
         case kIROp_Lsh:
         case kIROp_Rsh:
         case kIROp_Eql:

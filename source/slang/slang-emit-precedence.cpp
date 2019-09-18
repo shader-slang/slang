@@ -19,7 +19,8 @@ EmitOp getEmitOpForOp(IROp op)
         case kIROp_Sub:     return EmitOp::Sub;
         case kIROp_Mul:     return EmitOp::Mul;
         case kIROp_Div:     return EmitOp::Div;
-        case kIROp_Mod:     return EmitOp::Mod;
+        case kIROp_IRem:    return EmitOp::Rem;
+        case kIROp_FRem:    return EmitOp::Rem;
 
         case kIROp_Lsh:     return EmitOp::Lsh;
         case kIROp_Rsh:     return EmitOp::Rsh;
