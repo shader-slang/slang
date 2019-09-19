@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "../../source/core/slang-string-util.h"
+
 namespace renderer_test {
 using namespace Slang;
 
@@ -53,6 +55,12 @@ static const char computeEntryPointName[] = "computeMain";
         // fall through
     case SLANG_SOURCE_LANGUAGE_HLSL:
         spAddPreprocessorDefine(slangRequest, "__HLSL__", "1");
+        break;
+    case SLANG_SOURCE_LANGUAGE_C:
+        spAddPreprocessorDefine(slangRequest, "__C__", "1");
+        break;
+    case SLANG_SOURCE_LANGUAGE_CPP:
+        spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
         break;
 
     default:
@@ -239,6 +247,23 @@ static const char computeEntryPointName[] = "computeMain";
 {
     List<char> sourceText;
     SLANG_RETURN_ON_FAIL(readSource(sourcePath, sourceText));
+
+    if (input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_C)
+    {
+        // Add an include of the prelude
+        ComPtr<ISlangBlob> prelude;
+        session->getDownstreamCompilerPrelude(SLANG_PASS_THROUGH_GENERIC_C_CPP, prelude.writeRef());
+
+        String preludeString = StringUtil::getString(prelude);
+
+        // Add the prelude 
+        StringBuilder builder;
+        builder << preludeString << "\n";
+        builder << UnownedStringSlice(sourceText.getBuffer(), sourceText.getCount());
+
+        sourceText.setCount(builder.getLength());
+        memcpy(sourceText.getBuffer(), builder.getBuffer(), builder.getLength());
+    }
 
     output.sourcePath = sourcePath;
 

@@ -485,6 +485,16 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             break;
     }
 
+    if (gOptions.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        input.sourceLanguage = gOptions.sourceLanguage;
+
+        if (input.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
+        {
+            input.passThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        }
+    }
+
     // Use the profile name set on options if set
     input.profile = gOptions.profileName ? gOptions.profileName : input.profile;
 
@@ -512,13 +522,30 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
-       
         {
+            // Get the shared library -> it contains the executable code, we need to keep around if we recompile
+            ComPtr<ISlangSharedLibrary> sharedLibrary;
+            SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(compilationAndLayout.output.request, 0, 0, sharedLibrary.writeRef()));
+
+            // If we are running c/c++ we still need binding information, so compile again as slang source
+            if (gOptions.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
+            {
+                ShaderCompilerUtil::Input slangInput = input;
+                slangInput.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+                slangInput.passThrough = SLANG_PASS_THROUGH_NONE;
+                // We just want CPP, so we get suitable reflection
+                slangInput.target = SLANG_CPP_SOURCE;
+
+                SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, slangInput, compilationAndLayout));
+            }
+
+            // calculate binding
             CPUComputeUtil::Context context;
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
 
+            // Get the execution info from the lib
             CPUComputeUtil::ExecuteInfo info;
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout, context, info));
 
             const uint64_t startTicks = ProcessUtil::getClockTick();
 
@@ -536,7 +563,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
                 SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
 
                 // Check all execution styles produce the same result
-                SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(gOptions.computeDispatchSize, compilationAndLayout));
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));
             }
         }
 

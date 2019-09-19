@@ -49,6 +49,7 @@ struct Options
         /// The set render type
     RendererType rendererType = RendererType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
+    SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 
         /// Can be used for overriding the profile
     const char* profileName = nullptr;
