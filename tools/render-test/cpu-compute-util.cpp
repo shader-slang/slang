@@ -181,7 +181,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                 }
                 else
                 {
-                    throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                    throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                 }
             }
 
