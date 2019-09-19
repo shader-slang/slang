@@ -717,7 +717,8 @@ LoweredValInfo emitCallToDeclRef(
             CASE(kIRPseudoOp_SubAssign, kIROp_Sub);
             CASE(kIRPseudoOp_MulAssign, kIROp_Mul);
             CASE(kIRPseudoOp_DivAssign, kIROp_Div);
-            CASE(kIRPseudoOp_ModAssign, kIROp_Mod);
+            CASE(kIRPseudoOp_IRemAssign,kIROp_IRem);
+            CASE(kIRPseudoOp_FRemAssign,kIROp_FRem);
             CASE(kIRPseudoOp_AndAssign, kIROp_BitAnd);
             CASE(kIRPseudoOp_OrAssign, kIROp_BitOr);
             CASE(kIRPseudoOp_XorAssign, kIROp_BitXor);

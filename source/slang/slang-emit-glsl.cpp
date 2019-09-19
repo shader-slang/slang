@@ -1171,7 +1171,36 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // Use the default
             break;
         }
-        
+        case kIROp_FRem:
+        {
+            IRInst* left = inst->getOperand(0);
+            IRInst* right = inst->getOperand(1);
+
+            // Handle as a function call
+            auto prec = getInfo(EmitOp::Postfix);
+
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, outerPrec);
+
+            // TODO: the GLSL `mod` function amounts to a floating-point
+            // modulus rather than a floating-point remainder. We need
+            // to fix this to emit the right SPIR-V opcode, but there is
+            // no built-in GLSL function that maps to the opcode we want.
+            //
+            m_writer->emit("mod(");
+            emitOperand(left, getInfo(EmitOp::General));
+            m_writer->emit(",");
+            emitOperand(right, getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            maybeCloseParens(needClose);
+
+            return true;
+        }
+        // TODO: We should also special-case `kIROp_IRem` here,
+        // so that we emit a remainder instead of a modulus. As for
+        // `FRem` there is no direct GLSL translation, so we will
+        // leave things with the default behavior for now.
 
         default: break;
     }

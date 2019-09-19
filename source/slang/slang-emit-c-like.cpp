@@ -1772,7 +1772,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Div:
-    case kIROp_Mod:
+    case kIROp_IRem:
+    case kIROp_FRem:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_BitXor:
