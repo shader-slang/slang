@@ -1221,8 +1221,7 @@ SlangResult dissassembleDXILUsingDXC(
         bool useOriginalFile = false;
 
         String compileSourcePath;
-        String sourceContents;
-
+        
         String rawSource;
 
         SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
@@ -1313,7 +1312,7 @@ SlangResult dissassembleDXILUsingDXC(
                 {
                     _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
                 }
-                sourceContents = codeBuilder.ProduceString();
+                rawSource = codeBuilder.ProduceString();
             }
         }
         else
