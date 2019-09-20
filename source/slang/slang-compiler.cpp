@@ -1243,6 +1243,13 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 preprocessorDefinitions.Add(define.Key, define.Value);
             }
+            {
+                auto linkage = targetReq->getLinkage();
+                for (auto& define : linkage->preprocessorDefinitions)
+                {
+                    preprocessorDefinitions.Add(define.Key, define.Value);
+                }
+            }
 
             {
                 /* TODO(JS): Not totally clear what options should be set here. If we are using the pass through - then using say the defines/includes
