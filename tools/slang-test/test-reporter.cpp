@@ -339,7 +339,7 @@ void TestReporter::_addResult(const TestInfo& info)
             _appendEncodedTeamCityString(info.name.getUnownedSlice(), escapedTestName);
 
             printf("##teamcity[testStarted name='%s']\n", escapedTestName.begin());
-             
+
             switch (info.testResult)
             {
                 case TestResult::Fail:      
@@ -358,12 +358,24 @@ void TestReporter::_addResult(const TestInfo& info)
                 }
                 case TestResult::Pass:     
                 {
-                    if (info.message.getLength())
+                    StringBuilder message;
+                    message << info.message;
+                    // Add execution time if one is set
+                    if (info.executionTime > 0.0)
+                    {
+                        if (message.getLength())
+                        {
+                            message << " ";
+                        }
+                        _appendTime(info.executionTime, message);
+                    }
+
+                    if (message.getLength())
                     {
                         StringBuilder escapedMessage;
-                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
+                        _appendEncodedTeamCityString(message.getUnownedSlice(), escapedMessage);
                         printf("##teamcity[testStdOut name='%s' out='%s']\n", escapedTestName.begin(), escapedMessage.begin());
-                    }
+                    }                    
                     break;
                 }
                 case TestResult::Ignored:  
@@ -409,6 +421,8 @@ void TestReporter::_addResult(const TestInfo& info)
                     break;
             }
 
+            // https://www.appveyor.com/docs/build-worker-api/#add-tests
+
             CommandLine cmdLine;
             cmdLine.setExecutableFilename("appveyor");
             cmdLine.addArg("AddTest");
@@ -420,6 +434,15 @@ void TestReporter::_addResult(const TestInfo& info)
             cmdLine.addArg("slang-test");
             cmdLine.addArg("-Outcome");
             cmdLine.addArg(resultString);
+
+            // If has execution time output it
+            if (info.executionTime > 0.0)
+            {
+                StringBuilder builder;
+                _appendTime(info.executionTime, builder);
+                cmdLine.addArg("-StdOut");
+                cmdLine.addArg(builder);
+            }
 
             ExecuteResult exeRes;
             SlangResult res = ProcessUtil::execute(cmdLine, exeRes);
