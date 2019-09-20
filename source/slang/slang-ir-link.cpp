@@ -918,6 +918,9 @@ String getTargetName(IRSpecContext* context)
     case CodeGenTarget::CPPSource:
         return "cpp";
 
+    case CodeGenTarget::SPIRV:
+        return "spirv";
+
     default:
         SLANG_UNEXPECTED("unhandled case");
         UNREACHABLE_RETURN("unknown");

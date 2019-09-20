@@ -1697,6 +1697,9 @@ namespace Slang
         //
         bool useUnknownImageFormatAsDefault = false;
 
+            /// Should SPIR-V be generated directly from Slang IR rather than via translation to GLSL?
+        bool shouldEmitSPIRVDirectly = false;
+
     private:
         RefPtr<ComponentType> m_program;
     };

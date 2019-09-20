@@ -660,7 +660,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(
+            return emitEntryPointSource(
                 compileRequest,
                 entryPointIndex,
                 CodeGenTarget::HLSL,
@@ -692,7 +692,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
+            return emitEntryPointSource(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
         }
     }
 
@@ -732,7 +732,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(
+            return emitEntryPointSource(
                 compileRequest,
                 entryPointIndex,
                 CodeGenTarget::GLSL,
@@ -1624,7 +1624,13 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    SlangResult emitSPIRVForEntryPoint(
+    SlangResult emitSPIRVForEntryPointDirectly(
+        BackEndCompileRequest*  compileRequest,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        List<uint8_t>&          spirvOut);
+
+    SlangResult emitSPIRVForEntryPointViaGLSL(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
         Int                     entryPointIndex,
@@ -1661,6 +1667,34 @@ SlangResult dissassembleDXILUsingDXC(
 
         SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
         return SLANG_OK;
+    }
+
+    SlangResult emitSPIRVForEntryPoint(
+        BackEndCompileRequest*  slangRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq,
+        List<uint8_t>&          spirvOut)
+    {
+        if( slangRequest->shouldEmitSPIRVDirectly )
+        {
+            return emitSPIRVForEntryPointDirectly(
+                slangRequest,
+                entryPointIndex,
+                targetReq,
+                spirvOut);
+        }
+        else
+        {
+            return emitSPIRVForEntryPointViaGLSL(
+                slangRequest,
+                entryPoint,
+                entryPointIndex,
+                targetReq,
+                endToEndReq,
+                spirvOut);
+        }
     }
 
     SlangResult emitSPIRVAssemblyForEntryPoint(
@@ -1755,7 +1789,7 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
-                return emitEntryPoint(
+                return emitEntryPointSource(
                     compileRequest,
                     entryPointIndex,
                     target, 

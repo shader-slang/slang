@@ -927,6 +927,10 @@ struct OptionsParser
                 {
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
                 }
+                else if( argStr == "-emit-spirv-directly" )
+                {
+                    requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
+                }
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
