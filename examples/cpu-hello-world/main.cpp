@@ -12,6 +12,14 @@
 // its header. We have set up the build options for this project
 // so that it is as simple as:
 //
+// NOTE! This test will only run on a system correctly where slang can find a suitable
+// C++ compiler - such as clang/gcc/visual studio
+//
+// If slang cannot find the compiler there is a mechanism to specify the compiler
+// location with the API call 'setDownstreamCompilerPath'.
+//
+// By default Slang will try to use the compiler *closest* to the compiler it
+// was compiled with.
 #include <slang.h>
 
 #include <slang-com-ptr.h>
@@ -20,9 +28,16 @@
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-list.h"
 
-// Slang namespace is used for elements support code (like core)
+// Slang namespace is used for elements support code (like core) which we use here
+// for List<>, ComPtr<> and TestToolUtil
 using namespace Slang;
 
+// Slang source is converted into C++ code which is compiled by a backend compiler.
+// That process uses a 'prelude' which defines types and functions that are needed
+// for everything else to work.
+// We include the prelude here, so we can directly use the types as were used by the
+// compiled code. It is not necessary to include the prelude, as long as memory is
+// laid out in the manner that the generated slang code expects. 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
@@ -37,6 +52,23 @@ static SlangResult _innerMain(int argc, char** argv)
     //
     ComPtr<slang::IGlobalSession> slangSession(spCreateSession(NULL));
 
+    // As touched on earlier, in order to generate the final executable code,
+    // the slang code is converted into C++, and that C++ needs a 'prelude' which
+    // is just definitions that the generated code needed to work correctly.
+    // There is a simple default definition of a prelude provided in the prelude
+    // directory called 'slang-cpp-prelude.h'.
+    // 
+    // We need to tell slang either the contents of the prelude, or suitable include/s
+    // that will work. The actual API call to set the prelude is `setDownstreamCompilerPrelude`
+    // and this just sets for a specific backend a bit of text placed before generated code.
+    //
+    // Most downstream C++ compilers work on files. In that case slang may generate temporary
+    // files that contain the generated code. Typically the generated files  will not be in the
+    // same directory as the original source so handling includes becomes awkward. The mechanism used here
+    // is for the prelude code to be an *absolute* path to the 'slang-cpp-prelude.h' - which means
+    // this will work wherever the generated code is, and allows accessing other files via relative paths.
+    //
+    // Look at the source to TestToolUtil::setSessionDefaultPrelude to see what's involed. 
     TestToolUtil::setSessionDefaultPrelude(argv[0], slangSession);
 
     // A compile request represents a single invocation of the compiler,
@@ -44,7 +76,9 @@ static SlangResult _innerMain(int argc, char** argv)
     //
     SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
 
-    // We would like to request a CPU code that can be executed directly on the host 'HOST_CALLABLE' 
+    // We would like to request a CPU code that can be executed directly on the host -
+    // which is the 'SLANG_HOST_CALLABLE' target. 
+    // If we wanted a shared library/dll, we could have used SLANG_SHARED_LIBRARY.
     int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_HOST_CALLABLE);
 
     // A compile request can include one or more "translation units," which more or
@@ -65,12 +99,8 @@ static SlangResult _innerMain(int argc, char** argv)
     // Next we will specify the entry points we'd like to compile.
     // It is often convenient to put more than one entry point in the same file,
     // and the Slang API makes it convenient to use a single run of the compiler
-    // to compile all entry points.
-    //
-    // For each entry point, we need to specify the name of a function, the
-    // translation unit in which that function can be found, and the stage
-    // that we need to compile for (e.g., vertex, fragment, geometry, ...).
-    
+    // to compile all entry points. 
+    // 
     const char entryPointName[] = "computeMain";
     int computeIndex = spAddEntryPoint(slangRequest, translationUnitIndex, entryPointName,  SLANG_STAGE_COMPUTE);
 
@@ -124,24 +154,28 @@ static SlangResult _innerMain(int argc, char** argv)
         CPPPrelude::RWStructuredBuffer<float> ioBuffer;
     };
 
+    // the uniformState will be passed as a pointer to the CPU code 
     UniformState uniformState;
-    List<float> buffer;
 
+    // The contents of the buffer are modified, so we'll copy it
     const float startBufferContents[] = { 2.0f, -10.0f, -3.0f, 5.0f };
-    buffer.addRange(startBufferContents, SLANG_COUNT_OF(startBufferContents));
+    float bufferContents[SLANG_COUNT_OF(startBufferContents)];
+    memcpy(bufferContents, startBufferContents, sizeof(startBufferContents));
 
-    uniformState.ioBuffer.data = buffer.getBuffer();
-    uniformState.ioBuffer.count = buffer.getCount();
-
-    const CPPPrelude::uint3 startGroupID = { 0, 0, 0};
-    const CPPPrelude::uint3 endGroupID = { 1, 1, 1 };
-
-    CPPPrelude::ComputeVaryingInput varyingInput;
+    // Set up the ioBuffer such that it uses bufferContents. It is important to set the .count
+    // such that bounds checking can be performed in the kernel.  
+    uniformState.ioBuffer.data = bufferContents;
+    uniformState.ioBuffer.count = SLANG_COUNT_OF(bufferContents);
 
     // In shader.slang, then entry point is attributed with `[numthreads(4, 1, 1)]` meaning each group
     // consists of 4 'thread' in x. Our input buffer is 4 wide, and we index the input array via `SV_DispatchThreadID`
     // so we only need to run a single group to execute over all of the 4 elements here.
     // The group range from { 0, 0, 0 } -> { 1, 1, 1 } means it will execute over the single group { 0, 0, 0 }.
+
+    const CPPPrelude::uint3 startGroupID = { 0, 0, 0};
+    const CPPPrelude::uint3 endGroupID = { 1, 1, 1 };
+
+    CPPPrelude::ComputeVaryingInput varyingInput;
     varyingInput.startGroupID = startGroupID;
     varyingInput.endGroupID = endGroupID;
 
@@ -150,7 +184,7 @@ static SlangResult _innerMain(int argc, char** argv)
     // that type is just a name to indicate what kind of thing needs to be passed in.
     func(&varyingInput, NULL, (CPPPrelude::UniformState*)&uniformState);
 
-    // buffer holds the output (as ioBuffer in uniformState is a RWStructuredBuffer).
+    // bufferContents holds the output
 
     // Print out the values before the computation
     printf("Before:\n");
@@ -162,7 +196,7 @@ static SlangResult _innerMain(int argc, char** argv)
 
     // Print out the values the the kernel produced
     printf("After: \n");
-    for (float v : buffer)
+    for (float v : bufferContents)
     {
         printf("%f, ", v);
     }
