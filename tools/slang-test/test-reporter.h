@@ -67,7 +67,7 @@ class TestReporter
         TestResult testResult = TestResult::Ignored;
         Slang::String name;
         Slang::String message;                  ///< Message that is specific for the testResult
-        double executionTime = 0.0f;            ///< 0.0f if not defined
+        double executionTime = 0.0;             ///< <= 0.0 if not defined. Time is in seconds. 
     };
     
     class TestScope

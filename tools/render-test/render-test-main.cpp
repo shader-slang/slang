@@ -55,11 +55,11 @@ static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
 using namespace Slang;
 
-static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks, StdWriters* writers)
+static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
 {
+    WriterHelper out = StdWriters::getOut();
     double time = double(endTicks - startTicks) / ProcessUtil::getClockFrequency();
-    WriterHelper writer(writers->getOut());
-    writer.print("profile-time=%g\n", time);
+    out.print("profile-time=%g\n", time);
 }
 
 class RenderTestApp : public WindowListener
@@ -71,7 +71,7 @@ class RenderTestApp : public WindowListener
 
         // At initialization time, we are going to load and compile our Slang shader
         // code, and then create the API objects we need for rendering.
-    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input, StdWriters* stdWriters);
+    Result initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input);
     void runCompute();
     void renderFrame();
     void finalize();
@@ -103,14 +103,11 @@ class RenderTestApp : public WindowListener
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
 
-    StdWriters* m_stdWriters;
-
     Options m_options;
 };
 
-SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input, StdWriters* stdWriters)
+SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer, const Options& options, const ShaderCompilerUtil::Input& input)
 {
-    m_stdWriters = stdWriters;
     m_options = options;
 
     SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
@@ -366,7 +363,7 @@ Result RenderTestApp::update(Window* window)
 
             const uint64_t endTicks = ProcessUtil::getClockTick();
 
-            _outputProfileTime(m_startTicks, endTicks, m_stdWriters);
+            _outputProfileTime(m_startTicks, endTicks);
         }
 
         if (gOptions.outputPath)
@@ -554,7 +551,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             if (gOptions.performanceProfile)
             {
                 const uint64_t endTicks = ProcessUtil::getClockTick();
-                _outputProfileTime(startTicks, endTicks, stdWriters);
+                _outputProfileTime(startTicks, endTicks);
             }
 
             if (gOptions.outputPath)
@@ -624,7 +621,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 	{
 		RefPtr<RenderTestApp> app(new RenderTestApp);
-		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input, stdWriters));
+		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, gOptions, input));
         window->show();
         return window->runLoop(app);
 	}
