@@ -421,6 +421,9 @@ if isTargetWindows then
     example "model-viewer"
 end
 
+example "cpu-hello-world"
+    kind "ConsoleApp"
+
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
 --
