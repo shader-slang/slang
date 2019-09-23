@@ -35,11 +35,15 @@ For users getting started with Slang, it may help to start by looking at our exa
 
 * The [`model-viewer`](examples/model-viewer/) example shows a more involved rendering application that uses Slang's new language features to perform efficient shader specialization and parameter binding while maintaining clear and modular shader code.
 
+* The [`cpu-hello-world`](examples/cpu-hello-world) example shows how to compile and execute Slang code directly on the CPU. 
+
 A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was accepted into SIGGRAPH 2018, and it provides an overview of the language and the compiler implementation. See also Yong He's [dissertation](http://graphics.cs.cmu.edu/projects/renderergenerator/yong_he_thesis.pdf) for the detailed thinking behind the design of the Slang system.
 
 The Slang [language guide](docs/language-guide.md) provides information on extended language features that Slang provides for user code.
 
 The [API user's guide](docs/api-users-guide.md) gives information on how to drive Slang programmatically from an application.
+
+The [CPU target guide](docs/cpu-target.md) gives information on compiling Slang or C++ source into shared libraries/executables or functions that can be directly executed. It also covers how to generate C++ code from Slang source.  
 
 If you want to try out the `slangc` command-line tool, then you will want to read its [documentation](docs/command-line-slangc.md).
 Be warned, however, that the command-line tool is primarily intended for experimenting, testing, and debugging; serious applications will likely want to use the API interface.
