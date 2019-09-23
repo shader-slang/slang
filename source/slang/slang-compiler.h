@@ -1824,6 +1824,10 @@ namespace Slang
             SlangPassThrough inPassThrough,
             char const* prelude) override;
 
+        SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
+            SlangPassThrough inPassThrough,
+            ISlangBlob** outPrelude) override;
+
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
 
         enum class SharedLibraryFuncType

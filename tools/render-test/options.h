@@ -49,6 +49,7 @@ struct Options
         /// The set render type
     RendererType rendererType = RendererType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
+    SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 
         /// Can be used for overriding the profile
     const char* profileName = nullptr;
@@ -58,6 +59,8 @@ struct Options
 
     bool useDXIL = false;
     bool onlyStartup = false;
+
+    bool performanceProfile = false;
 
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 

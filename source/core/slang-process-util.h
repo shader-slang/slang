@@ -91,6 +91,10 @@ struct ProcessUtil
 
         /// Append text escaped for using on a command line
     static void appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out);
+
+    static uint64_t getClockFrequency();
+
+    static uint64_t getClockTick();
 };
 
 // -----------------------------------------------------------------------

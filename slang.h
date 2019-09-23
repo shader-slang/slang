@@ -2670,6 +2670,14 @@ namespace slang
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
 
+            /** Get the 'prelude' for generated code for a 'downstream compiler'.
+            @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
+            @param outPrelude  On exit holds a blob that holds the string of the prelude.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
+            SlangPassThrough passThrough,
+            ISlangBlob** outPrelude) = 0;
+
             /** Get the build version 'tag' string. The string is the same as produced via `git describe --tags`
             for the project. If Slang is built separately from the automated build scripts
             the contents will by default be 'unknown'. Any string can be set by changing the
