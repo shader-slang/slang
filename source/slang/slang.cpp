@@ -202,6 +202,16 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
     m_downstreamCompilerPreludes[int(passThrough)] = prelude;
 }
 
+SLANG_NO_THROW void SLANG_MCALL Session::getDownstreamCompilerPrelude(
+    SlangPassThrough inPassThrough,
+    ISlangBlob** outPrelude)
+{
+    PassThroughMode passThrough = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
+
+    *outPrelude = Slang::StringUtil::createStringBlob(m_downstreamCompilerPreludes[int(passThrough)]).detach();
+}
+
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 {
     return SLANG_TAG_VERSION;

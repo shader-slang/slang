@@ -44,6 +44,32 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
     return SLANG_OK;
 }
 
+static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
+{
+    if (text == "c" || text == "C")
+    {
+        return SLANG_SOURCE_LANGUAGE_C;
+    }
+    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
+    {
+        return SLANG_SOURCE_LANGUAGE_CPP;
+    }
+    else if (text == "slang")
+    {
+        return SLANG_SOURCE_LANGUAGE_SLANG;
+    }
+    else if (text == "glsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_GLSL;
+    }
+    else if (text == "hlsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_HLSL;
+    }
+    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+}
+
+
 SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper stdError)
 {
     using namespace Slang;
@@ -169,6 +195,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             arg.value = *argCursor++;
             gOptions.compileArgs.add(arg);
         }
+        else if (strcmp(arg, "-performance-profile") == 0)
+        {
+            gOptions.performanceProfile = true;
+        }
         else if (strcmp(arg, "-adapter") == 0)
         {
             if (argCursor == argEnd)
@@ -207,6 +237,24 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
                 gOptions.computeDispatchSize[i] = v;
             }
         }
+        else if (strcmp(arg, "-source-language") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expecting a source language name for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            UnownedStringSlice sourceLanguageText(*argCursor++);
+
+            SlangSourceLanguage sourceLanguage = _findSourceLanguage(sourceLanguageText);
+            if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+            {
+                stdError.print("error: expecting unknown source language name '%s' for '%s'\n", String(sourceLanguageText).getBuffer(), arg);
+                return SLANG_FAIL;
+            }
+
+            gOptions.sourceLanguage = sourceLanguage;
+        }
         else
         {
             // Lookup
@@ -228,7 +276,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
                 if (languageRenderType != RendererType::Unknown)
                 {
                     gOptions.targetLanguageRendererType = languageRenderType;
-                    gOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl") ?  InputLanguageID::Native : InputLanguageID::Slang;
+                    gOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl" || argName == "cpp" || argName == "cxx" || argName == "c") ?  InputLanguageID::Native : InputLanguageID::Slang;
                     continue;
                 }
             }

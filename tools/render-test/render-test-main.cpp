@@ -55,6 +55,13 @@ static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
 using namespace Slang;
 
+static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
+{
+    WriterHelper out = StdWriters::getOut();
+    double time = double(endTicks - startTicks) / ProcessUtil::getClockFrequency();
+    out.print("profile-time=%g\n", time);
+}
+
 class RenderTestApp : public WindowListener
 {
 	public:
@@ -78,6 +85,8 @@ class RenderTestApp : public WindowListener
 	protected:
 		/// Called in initialize
 	Result _initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input);
+
+    uint64_t m_startTicks;
 
 	// variables for state to be used for rendering...
 	uintptr_t m_constantBufferSize, m_computeResultBufferSize;
@@ -232,6 +241,9 @@ void RenderTestApp::runCompute()
     auto pipelineType = PipelineType::Compute;
     m_renderer->setPipelineState(pipelineType, m_pipelineState);
     m_bindingState->apply(m_renderer, pipelineType);
+
+    m_startTicks = ProcessUtil::getClockTick();
+
 	m_renderer->dispatchCompute(m_options.computeDispatchSize[0], m_options.computeDispatchSize[1], m_options.computeDispatchSize[2]);
 }
 
@@ -314,24 +326,60 @@ Result RenderTestApp::update(Window* window)
     }
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
-    if (m_options.outputPath)
+    if (m_options.outputPath || m_options.performanceProfile)
     {
         // Submit the work
         m_renderer->submitGpuWork();
         // Wait until everything is complete
         m_renderer->waitForGpu();
 
-        if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+        if (m_options.performanceProfile)
         {
-            SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
-        }
-        else
-        {
-            SlangResult res = writeScreen(gOptions.outputPath);
-            if (SLANG_FAILED(res))
+            // It might not be enough on some APIs to 'waitForGpu' to mean the computation has completed. Let's lock an output
+            // buffer to be sure
+            if (m_bindingState->outputBindings.getCount() > 0)
             {
-                fprintf(stderr, "ERROR: failed to write screen capture to file\n");
-                return res;
+                const auto& binding = m_bindingState->outputBindings[0];
+                auto i = binding.entryIndex;
+                const auto& layoutBinding = m_shaderInputLayout.entries[i];
+
+                assert(layoutBinding.isOutput);
+                
+                if (binding.resource && binding.resource->isBuffer())
+                {
+                    BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+                    const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+                    unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
+                    if (!ptr)
+                    {                            
+                        return SLANG_FAIL;
+                    }
+                    m_renderer->unmap(bufferResource);
+                }
+            }
+
+            // Note we don't do the same with screen rendering -> as that will do a lot of work, which may swamp any computation
+            // so can only really profile compute shaders at the moment
+
+            const uint64_t endTicks = ProcessUtil::getClockTick();
+
+            _outputProfileTime(m_startTicks, endTicks);
+        }
+
+        if (gOptions.outputPath)
+        {
+            if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
+            {
+                SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
+            }
+            else
+            {
+                SlangResult res = writeScreen(gOptions.outputPath);
+                if (SLANG_FAILED(res))
+                {
+                    fprintf(stderr, "ERROR: failed to write screen capture to file\n");
+                    return res;
+                }
             }
         }
         // We are done
@@ -342,6 +390,8 @@ Result RenderTestApp::update(Window* window)
     m_renderer->presentFrame();
     return SLANG_OK;
 }
+
+
 
 } //  namespace renderer_test
 
@@ -432,6 +482,16 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             break;
     }
 
+    if (gOptions.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        input.sourceLanguage = gOptions.sourceLanguage;
+
+        if (input.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
+        {
+            input.passThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        }
+    }
+
     // Use the profile name set on options if set
     input.profile = gOptions.profileName ? gOptions.profileName : input.profile;
 
@@ -459,24 +519,52 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
-       
         {
+            // Get the shared library -> it contains the executable code, we need to keep around if we recompile
+            ComPtr<ISlangSharedLibrary> sharedLibrary;
+            SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(compilationAndLayout.output.request, 0, 0, sharedLibrary.writeRef()));
+
+            // If we are running c/c++ we still need binding information, so compile again as slang source
+            if (gOptions.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
+            {
+                ShaderCompilerUtil::Input slangInput = input;
+                slangInput.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+                slangInput.passThrough = SLANG_PASS_THROUGH_NONE;
+                // We just want CPP, so we get suitable reflection
+                slangInput.target = SLANG_CPP_SOURCE;
+
+                SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, slangInput, compilationAndLayout));
+            }
+
+            // calculate binding
             CPUComputeUtil::Context context;
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
 
+            // Get the execution info from the lib
             CPUComputeUtil::ExecuteInfo info;
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout, context, info));
+
+            const uint64_t startTicks = ProcessUtil::getClockTick();
+
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
+
+            if (gOptions.performanceProfile)
+            {
+                const uint64_t endTicks = ProcessUtil::getClockTick();
+                _outputProfileTime(startTicks, endTicks);
+            }
+
+            if (gOptions.outputPath)
+            {
+                // Dump everything out that was written
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+
+                // Check all execution styles produce the same result
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));
+            }
+        }
+
         
-            // Dump everything out that was written
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
-        }
-
-        {
-            // Check all execution styles produce the same result
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(gOptions.computeDispatchSize, compilationAndLayout));
-        }
-
         return SLANG_OK;
     }
 

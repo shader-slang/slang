@@ -181,7 +181,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                 }
                 else
                 {
-                    throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                    throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                 }
             }
 
@@ -301,7 +301,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     return SLANG_OK;
 }
 
-/* static */SlangResult CPUComputeUtil::calcExecuteInfo(ExecuteStyle style, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out)
+/* static */SlangResult CPUComputeUtil::calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out)
 {
     auto request = compilationAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
@@ -313,9 +313,6 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     entryPoint = reflection->getEntryPointByIndex(0);
 
     const char* entryPointName = entryPoint->getName();
-
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(request, 0, 0, sharedLibrary.writeRef()));
 
     // Copy dispatch size
     for (int i = 0; i < 3; ++i)
@@ -334,7 +331,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             StringBuilder groupEntryPointName;
             groupEntryPointName << entryPointName << "_Group";
 
-            CPPPrelude::ComputeFunc groupFunc = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(groupEntryPointName.getBuffer());
+            CPPPrelude::ComputeFunc groupFunc = (CPPPrelude::ComputeFunc)sharedLib->findFuncByName(groupEntryPointName.getBuffer());
             if (!groupFunc)
             {
                 return SLANG_FAIL;
@@ -346,7 +343,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         case ExecuteStyle::GroupRange:
         {
             CPPPrelude::ComputeFunc groupRangeFunc = nullptr;
-            groupRangeFunc = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(entryPointName);
+            groupRangeFunc = (CPPPrelude::ComputeFunc)sharedLib->findFuncByName(entryPointName);
             if (!groupRangeFunc)
             {
                 return SLANG_FAIL;
@@ -359,7 +356,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             StringBuilder threadEntryPointName;
             threadEntryPointName << entryPointName << "_Thread";
 
-            CPPPrelude::ComputeThreadFunc threadFunc = (CPPPrelude::ComputeThreadFunc)sharedLibrary->findFuncByName(threadEntryPointName.getBuffer());
+            CPPPrelude::ComputeThreadFunc threadFunc = (CPPPrelude::ComputeThreadFunc)sharedLib->findFuncByName(threadEntryPointName.getBuffer());
             if (!threadFunc)
             {
                 return SLANG_FAIL;
@@ -470,7 +467,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 }
 
 
-/* static */ SlangResult CPUComputeUtil::checkStyleConsistency(const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout)
+/* static */ SlangResult CPUComputeUtil::checkStyleConsistency(ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout)
 {
     Context context;
     SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
@@ -478,7 +475,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     // Run the thread style to test against
     {
         ExecuteInfo info;
-        SLANG_RETURN_ON_FAIL(calcExecuteInfo(ExecuteStyle::Thread, dispatchSize, compilationAndLayout, context, info));
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(ExecuteStyle::Thread, sharedLib, dispatchSize, compilationAndLayout, context, info));
         SLANG_RETURN_ON_FAIL(execute(info));
     }
 
@@ -489,7 +486,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, checkContext));
 
         ExecuteInfo info;
-        SLANG_RETURN_ON_FAIL(calcExecuteInfo(style, dispatchSize, compilationAndLayout, checkContext, info));
+        SLANG_RETURN_ON_FAIL(calcExecuteInfo(style, sharedLib, dispatchSize, compilationAndLayout, checkContext, info));
         SLANG_RETURN_ON_FAIL(execute(info));
 
         // Make sure the out buffers are all the same

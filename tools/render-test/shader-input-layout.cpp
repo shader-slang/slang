@@ -506,7 +506,7 @@ namespace renderer_test
                                     Token nameToken = parser.ReadToken();
                                     if (nameToken.Type != TokenType::Identifier)
                                     {
-                                        throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                                        throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                                     }
                                     builder << nameToken.Content;
 
@@ -537,7 +537,7 @@ namespace renderer_test
                                         }
                                         else
                                         {
-                                            throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                                            throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                                         }
                                     }
 
@@ -553,7 +553,7 @@ namespace renderer_test
                 }
                 catch (TextFormatException)
                 {
-                    throw TextFormatException("Invalid input syntax at line " + parser.NextToken().Position.Line);
+                    throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                 }
             }
         }

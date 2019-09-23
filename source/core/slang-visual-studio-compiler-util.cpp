@@ -204,6 +204,7 @@ namespace Slang
     for (const auto& define : options.defines)
     {
         StringBuilder builder;
+        builder << "/D";
         builder << define.nameWithSig;
         if (define.value.getLength())
         {
