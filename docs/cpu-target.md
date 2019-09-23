@@ -83,6 +83,8 @@ The returned function pointer should be cast to the appropriate function signatu
 
 For pass through compilation of C/C++ this mechanism allows any functions marked for export to be directly queried. 
 
+For a complete example on how to execute CPU code using `spGetEntryPointHostCallable` look at code in `example/cpu-hello-world`. 
+
 ABI
 ===
 
