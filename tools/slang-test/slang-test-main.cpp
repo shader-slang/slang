@@ -1914,6 +1914,65 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     }
 }
 
+static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
+{
+    // Need to find the profile figure..
+    LineParser parser(text);
+
+    const auto lineStart = UnownedStringSlice::fromLiteral("profile-time=");
+    for (auto line : parser)
+    {
+        if (line.startsWith(lineStart))
+        {
+            UnownedStringSlice remaining(line.begin() + lineStart.size(), line.end());
+            remaining.trim();
+
+            timeOut = StringToDouble(String(remaining));
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
+}
+
+TestResult runPerformanceProfile(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + ProcessUtil::getExecutableSuffix()));
+    
+    cmdLine.addArg(input.filePath);
+    cmdLine.addArg("-performance-profile");
+
+    _addRenderTestOptions(context->options, cmdLine);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    auto actualOutput = getOutput(exeRes);
+
+    double time;
+    if (SLANG_FAILED(_extractProfileTime(actualOutput.getUnownedSlice(), time)))
+    {
+        return TestResult::Fail;
+    }
+
+    context->reporter->addExecutionTime(time);
+
+    return TestResult::Pass;
+}
+
 TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, const char *const* langOpts, size_t numLangOpts)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
@@ -2342,6 +2401,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
     { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
+    { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
 };
 
 TestResult runTest(

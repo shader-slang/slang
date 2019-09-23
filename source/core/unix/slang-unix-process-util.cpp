@@ -15,6 +15,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <time.h>
+
 namespace Slang {
 
 
@@ -245,6 +247,19 @@ namespace Slang {
     }
 
     return SLANG_FAIL;
+}
+
+
+/* static */uint64_t ProcessUtil::getClockFrequency()
+{
+    return 1000000000;
+}
+
+/* static */uint64_t ProcessUtil::getClockTick()
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return now.tv_sec + now.tv_nsec;
 }
 
 } // namespace Slang

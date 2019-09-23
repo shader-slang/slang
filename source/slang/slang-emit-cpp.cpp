@@ -2774,7 +2774,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
             m_writer->emit("uint3 calcGroupThreadID() const \n{\n");
             m_writer->indent();
             // groupThreadID = dispatchThreadID - groupDispatchThreadID
-            m_writer->emit("uint3 v = { dispatchThreadID.x - groupDispatchThreadID.x, dispatchThreadID.y - groupDispatchThreadID.y, dispatchThreadID.z - groupDispatchThreadID.z }; ");
+            m_writer->emit("uint3 v = { dispatchThreadID.x - groupDispatchThreadID.x, dispatchThreadID.y - groupDispatchThreadID.y, dispatchThreadID.z - groupDispatchThreadID.z };\n");
             m_writer->emit("return v;\n");
             m_writer->dedent();
             m_writer->emit("}\n");
