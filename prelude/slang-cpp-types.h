@@ -3,6 +3,14 @@
 
 #include "../slang.h"
 
+#ifndef SLANG_PRELUDE_ASSERT
+#   ifdef _DEBUG
+#       define SLANG_PRELUDE_ASSERT(VALUE) assert(VALUE)
+#   else
+#       define SLANG_PRELUDE_ASSERT(VALUE) 
+#   endif
+#endif
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
@@ -10,8 +18,8 @@ namespace SLANG_PRELUDE_NAMESPACE {
 template <typename T, size_t SIZE>
 struct FixedArray
 {
-    const T& operator[](size_t index) const { assert(index < SIZE); return m_data[index]; }
-    T& operator[](size_t index) { assert(index < SIZE); return m_data[index]; }
+    const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
+    T& operator[](size_t index) { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
     
     T m_data[SIZE];
 };
@@ -77,8 +85,8 @@ struct Matrix
 template <typename T>
 struct RWStructuredBuffer
 {
-    T& operator[](size_t index) const { assert(index < count); return data[index]; }
-    const T& Load(size_t index) const { assert(index < count); return data[index]; }  
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }  
     void GetDimensions(uint32_t& outNumStructs, uint32_t& outStride) { outNumStructs = uint32_t(count); outStride = uint32_t(sizeof(T)); }
   
     T* data;
@@ -88,8 +96,8 @@ struct RWStructuredBuffer
 template <typename T>
 struct StructuredBuffer
 {
-    const T& operator[](size_t index) const { assert(index < count); return data[index]; }
-    const T& Load(size_t index) const { assert(index < count); return data[index]; }
+    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
     void GetDimensions(uint32_t& outNumStructs, uint32_t& outStride) { outNumStructs = uint32_t(count); outStride = uint32_t(sizeof(T)); }
     
     T* data;
@@ -102,24 +110,24 @@ struct ByteAddressBuffer
     void GetDimensions(uint32_t& outDim) const { outDim = uint32_t(sizeInBytes); }
     uint32_t Load(size_t index) const 
     { 
-        assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
         return data[index >> 2]; 
     }
     uint2 Load2(size_t index) const 
     { 
-        assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     uint3 Load3(size_t index) const 
     { 
-        assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     uint4 Load4(size_t index) const 
     { 
-        assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
@@ -137,43 +145,43 @@ struct RWByteAddressBuffer
     
     uint32_t Load(size_t index) const 
     { 
-        assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
         return data[index >> 2]; 
     }
     uint2 Load2(size_t index) const 
     { 
-        assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint2{data[dataIdx], data[dataIdx + 1]}; 
     }
     uint3 Load3(size_t index) const 
     { 
-        assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
     }
     uint4 Load4(size_t index) const 
     { 
-        assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
     
     void Store(size_t index, uint32_t v) const 
     { 
-        assert(index + 4 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
         data[index >> 2] = v; 
     }
     void Store2(size_t index, uint2 v) const 
     { 
-        assert(index + 8 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 8 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
     }
     void Store3(size_t index, uint3 v) const 
     { 
-        assert(index + 12 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 12 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -181,7 +189,7 @@ struct RWByteAddressBuffer
     }
     void Store4(size_t index, uint4 v) const 
     { 
-        assert(index + 16 <= sizeInBytes && (index & 3) == 0); 
+        SLANG_PRELUDE_ASSERT(index + 16 <= sizeInBytes && (index & 3) == 0); 
         const size_t dataIdx = index >> 2; 
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
