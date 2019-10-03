@@ -243,19 +243,11 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
     {
         case Stage::Compute:
         {
-            static const UInt kAxisCount = 3;
-            UInt sizeAlongAxis[kAxisCount];
-
-            // TODO: this is kind of gross because we are using a public
-            // reflection API function, rather than some kind of internal
-            // utility it forwards to...
-            spReflectionEntryPoint_getComputeThreadGroupSize(
-                (SlangReflectionEntryPoint*)entryPointLayout,
-                kAxisCount,
-                &sizeAlongAxis[0]);
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
 
             m_writer->emit("[numthreads(");
-            for (int ii = 0; ii < 3; ++ii)
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
             {
                 if (ii != 0) m_writer->emit(", ");
                 m_writer->emit(sizeAlongAxis[ii]);

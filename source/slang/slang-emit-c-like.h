@@ -43,6 +43,11 @@ public:
             // explicitly in the layout data.
         StructTypeLayout* globalStructLayout = nullptr;
     };
+
+    enum
+    {
+        kThreadGroupAxisCount = 3,
+    };
     
         /// To simplify cases 
     enum class SourceStyle
@@ -317,6 +322,9 @@ public:
         /// Gets the default type name for built in scalar types. Different impls may require something different.
         /// Returns an empty slice if not a built in type
     static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
+
+        /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
+    static IRNumThreadsDecoration* getComputeThreadGroupSize(IRFunc* func, Int outNumThreads[kThreadGroupAxisCount]);
 
     protected:
 
