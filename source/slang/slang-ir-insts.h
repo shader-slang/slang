@@ -277,6 +277,16 @@ struct IRInstanceDecoration : IRDecoration
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRNumThreadsDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NumThreadsDecoration };
+    IR_LEAF_ISA(NumThreadsDecoration)
+
+    IRIntLit* getX() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getY() { return cast<IRIntLit>(getOperand(1)); }
+    IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

@@ -5947,6 +5947,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
         }
 
+        if(auto attr = decl->FindModifier<NumThreadsAttribute>())
+        {
+            auto builder = getBuilder();
+            IRType* intType = builder->getIntType();
+
+            IRInst* operands[3] = {
+                builder->getIntValue(intType, attr->x),
+                builder->getIntValue(intType, attr->y),
+                builder->getIntValue(intType, attr->z)
+            };
+
+           builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
+        }
+
         if(decl->FindModifier<ReadNoneAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
