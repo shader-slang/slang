@@ -269,6 +269,14 @@ struct IRMaxVertexCountDecoration : IRDecoration
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRInstanceDecoration : IRDecoration
+{
+    enum { kOp = kIROp_InstanceDecoration };
+    IR_LEAF_ISA(InstanceDecoration)
+
+    IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

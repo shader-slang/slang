@@ -328,10 +328,11 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
                 m_writer->emit(")]\n");
             }
 
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
+            if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("[instance(");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
             }
             break;
