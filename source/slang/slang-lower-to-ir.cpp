@@ -4075,6 +4075,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 {
     IRGenContext*   context;
 
+    DiagnosticSink* getSink() { return context->getSink(); }
+
     IRBuilder* getBuilder()
     {
         return context->irBuilder;
@@ -5573,6 +5575,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib)
+    {
+        attrib->args.getCount();
+        SLANG_ASSERT(attrib->args.getCount() ==1);
+        Expr* expr = attrib->args[0];
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRIntLit>(builder->getIntValue(builder->getIntType(), intLitExpr->value));
+    }
+
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
     {
         // We are going to use a nested builder, because we will
@@ -5920,6 +5932,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (decl->FindModifier<EarlyDepthStencilAttribute>())
         {
             getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
+        }
+
+        if (auto attr = decl->FindModifier<OutputControlPointsAttribute>())
+        {
+            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
+            getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
         }
 
         // For convenience, ensure that any additional global

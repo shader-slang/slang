@@ -65,6 +65,20 @@ void HLSLSourceEmitter::_emitHLSLAttributeSingleInt(const char* name, FuncDecl* 
     m_writer->emit(")]\n");
 }
 
+void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val)
+{
+    SLANG_UNUSED(entryPoint);
+    SLANG_ASSERT(val);
+
+    auto intVal = GetIntVal(val);
+
+    m_writer->emit("[");
+    m_writer->emit(name);
+    m_writer->emit("(");
+    m_writer->emit(intVal);
+    m_writer->emit(")]\n");
+}
+
 void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
 {
     if (!chain)
@@ -341,11 +355,13 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             {
                 _emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
             }
+            
             /* [outputcontrolpoints(4)] */
-            if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
+            if (auto decor = irFunc->findDecoration<IROutputControlPointsDecoration>())
             {
-                _emitHLSLAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+                _emitHLSLDecorationSingleInt("outputcontrolpoints", irFunc, decor->getControlPointCount());
             }
+
             /* [patchconstantfunc("HSConst")] */
             if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
             {

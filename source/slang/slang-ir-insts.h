@@ -228,6 +228,15 @@ IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 
+
+struct IROutputControlPointsDecoration : IRDecoration
+{
+    enum { kOp = kIROp_OutputControlPointsDecoration };
+    IR_LEAF_ISA(OutputControlPointsDecoration)
+
+    IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

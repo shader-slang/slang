@@ -56,6 +56,9 @@ protected:
 
     void _emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);
 
+
+    void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
+    
 };
 
 }
