@@ -357,12 +357,13 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             {
                 _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
             }
-            /* [domain("partitioning")] */
-            if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
-            {
-                _emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
-            }
             
+            /* [domain("partitioning")] */
+            if (auto decor = irFunc->findDecoration<IRPartitioningDecoration>())
+            {
+                _emitHLSLDecorationSingleString("partitioning", irFunc, decor->getPartitioning());
+            }
+
             /* [outputtopology("line")] */
             if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {

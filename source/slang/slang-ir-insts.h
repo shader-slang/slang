@@ -245,6 +245,14 @@ struct IROutputTopologyDecoration : IRDecoration
     IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
 };
 
+struct IRPartitioningDecoration : IRDecoration
+{
+    enum { kOp = kIROp_PartitioningDecoration };
+    IR_LEAF_ISA(PartitioningDecoration)
+
+    IRStringLit* getPartitioning() { return cast<IRStringLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

@@ -5945,6 +5945,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
         }
 
+        if (auto attr = decl->FindModifier<PartitioningAttribute>())
+        {
+            IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
+            getBuilder()->addDecoration(irFunc, kIROp_PartitioningDecoration, stringLit);
+        }
+
         if (auto attr = decl->FindModifier<OutputTopologyAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
