@@ -320,12 +320,14 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
         break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<MaxVertexCountAttribute>())
+            if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("[maxvertexcount(");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
             }
+
             if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
             {
                 m_writer->emit("[instance(");
@@ -336,13 +338,11 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
         }
         case Stage::Domain:
         {
-            FuncDecl* entryPoint = entryPointLayout->entryPoint;
             /* [domain("isoline")] */
-            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
             {
-                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("domain", irFunc, decor->getDomain());
             }
-
             break;
         }
         case Stage::Hull:

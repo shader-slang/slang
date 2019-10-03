@@ -5935,6 +5935,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
 
+        if(auto attr = decl->FindModifier<MaxVertexCountAttribute>())
+        {
+            IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
+            getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
+        }
+
         if(decl->FindModifier<ReadNoneAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
