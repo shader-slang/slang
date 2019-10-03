@@ -50,8 +50,6 @@ protected:
 
     void _emitHLSLTextureType(IRTextureTypeBase* texType);
 
-    void _emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib);
-
     void _emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib);
 
     void _emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib);

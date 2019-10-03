@@ -350,8 +350,6 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             // Lists these are only attributes for hull shader
             // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
 
-            FuncDecl* entryPoint = entryPointLayout->entryPoint;
-
             /* [domain("isoline")] */
             if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
             {
@@ -377,9 +375,13 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             }
 
             /* [patchconstantfunc("HSConst")] */
-            if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
+            if (auto decor = irFunc->findDecoration<IRPatchConstantFuncDecoration>())
             {
-                _emitHLSLFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+                const String irName = getName(decor->getFunc());
+
+                m_writer->emit("[patchconstantfunc(\"");
+                m_writer->emit(irName);
+                m_writer->emit("\")]\n");
             }
 
             break;
@@ -450,25 +452,6 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit("<");
     emitType(texType->getElementType());
     m_writer->emit(" >");
-}
-
-void HLSLSourceEmitter::_emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
-{
-    SLANG_UNUSED(attrib);
-
-    auto irPatchFunc = irFunc->findDecoration<IRPatchConstantFuncDecoration>();
-    assert(irPatchFunc);
-    if (!irPatchFunc)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find [patchConstantFunc(...)] decoration");
-        return;
-    }
-
-    const String irName = getName(irPatchFunc->getFunc());
-
-    m_writer->emit("[patchconstantfunc(\"");
-    m_writer->emit(irName);
-    m_writer->emit("\")]\n");
 }
 
 void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
