@@ -253,6 +253,14 @@ struct IRPartitioningDecoration : IRDecoration
     IRStringLit* getPartitioning() { return cast<IRStringLit>(getOperand(0)); }
 };
 
+struct IRDomainDecoration : IRDecoration
+{
+    enum { kOp = kIROp_DomainDecoration };
+    IR_LEAF_ISA(DomainDecoration)
+
+    IRStringLit* getDomain() { return cast<IRStringLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

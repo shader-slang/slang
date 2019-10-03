@@ -353,11 +353,11 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             FuncDecl* entryPoint = entryPointLayout->entryPoint;
 
             /* [domain("isoline")] */
-            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
             {
-                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("domain", irFunc, decor->getDomain());
             }
-            
+
             /* [domain("partitioning")] */
             if (auto decor = irFunc->findDecoration<IRPartitioningDecoration>())
             {
