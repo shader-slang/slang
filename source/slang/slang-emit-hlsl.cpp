@@ -65,6 +65,18 @@ void HLSLSourceEmitter::_emitHLSLAttributeSingleInt(const char* name, FuncDecl* 
     m_writer->emit(")]\n");
 }
 
+void HLSLSourceEmitter::_emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val)
+{
+    SLANG_UNUSED(entryPoint);
+    assert(val);
+
+    m_writer->emit("[");
+    m_writer->emit(name);
+    m_writer->emit("(\"");
+    m_writer->emit(val->getStringSlice());
+    m_writer->emit("\")]\n");
+}
+
 void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val)
 {
     SLANG_UNUSED(entryPoint);
@@ -350,12 +362,13 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             {
                 _emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
             }
-            /* [outputtopology("line")] */
-            if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
-            {
-                _emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
-            }
             
+            /* [outputtopology("line")] */
+            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
+            {
+                _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
+            }
+
             /* [outputcontrolpoints(4)] */
             if (auto decor = irFunc->findDecoration<IROutputControlPointsDecoration>())
             {

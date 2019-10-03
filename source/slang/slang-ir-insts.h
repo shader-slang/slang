@@ -237,6 +237,14 @@ struct IROutputControlPointsDecoration : IRDecoration
     IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IROutputTopologyDecoration : IRDecoration
+{
+    enum { kOp = kIROp_OutputTopologyDecoration };
+    IR_LEAF_ISA(OutputTopologyDecoration)
+
+    IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

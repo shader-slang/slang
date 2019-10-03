@@ -415,6 +415,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
 
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
+    INST(OutputTopologyDecoration,          outputTopology,         1, 0)
 
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point.
         /// Also used in some scenarios mark parameters that are moved from entry point parameters to global params as coming from the entry point.
