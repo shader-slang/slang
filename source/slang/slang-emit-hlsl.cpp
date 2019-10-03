@@ -10,61 +10,6 @@
 
 namespace Slang {
 
-
-void HLSLSourceEmitter::_emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
-{
-    assert(attrib);
-
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto stringLitExpr = as<StringLiteralExpr>(expr);
-    if (!stringLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
-        return;
-    }
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(\"");
-    m_writer->emit(stringLitExpr->value);
-    m_writer->emit("\")]\n");
-}
-
-void HLSLSourceEmitter::_emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
-{
-    assert(attrib);
-
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto intLitExpr = as<IntegerLiteralExpr>(expr);
-    if (!intLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
-        return;
-    }
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(");
-    m_writer->emit(intLitExpr->value);
-    m_writer->emit(")]\n");
-}
-
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);

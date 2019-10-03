@@ -2781,236 +2781,253 @@ namespace Slang
 
         bool validateAttribute(RefPtr<Attribute> attr, AttributeDecl* attribClassDecl)
         {
-                if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
-                {
-                    SLANG_ASSERT(attr->args.getCount() == 3);
-                    auto xVal = checkConstantIntVal(attr->args[0]);
-                    auto yVal = checkConstantIntVal(attr->args[1]);
-                    auto zVal = checkConstantIntVal(attr->args[2]);
+            if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 3);
 
-                    if(!xVal) return false;
-                    if(!yVal) return false;
-                    if(!zVal) return false;
+                int32_t values[3];
 
-                    numThreadsAttr->x          = (int32_t) xVal->value;
-                    numThreadsAttr->y          = (int32_t) yVal->value;
-                    numThreadsAttr->z          = (int32_t) zVal->value;
-                }
-                else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
+                for (int i = 0; i < 3; ++i)
                 {
-                    // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
-                    // Must have 2 int parameters. Ideally this would all be checked from the specification
-                    // in core.meta.slang, but that's not completely implemented. So for now we check here.
-                    if (attr->args.getCount() != 2)
+                    int32_t value = 1;
+
+                    auto arg = attr->args[i];
+                    if (arg)
                     {
-                        return false;
-                    }
-
-                    // TODO(JS): Prior validation currently doesn't ensure both args are ints (as specified in core.meta.slang), so check here
-                    // to make sure they both are
-                    auto binding = checkConstantIntVal(attr->args[0]);
-                    auto set = checkConstantIntVal(attr->args[1]);
-
-                    if (binding == nullptr || set == nullptr)
-                    {
-                        return false;
-                    }
-                    
-                    bindingAttr->binding = int32_t(binding->value);
-                    bindingAttr->set = int32_t(set->value);
-                }
-                else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
-                {
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-                    auto val = checkConstantIntVal(attr->args[0]);
-
-                    if(!val) return false;
-
-                    maxVertexCountAttr->value = (int32_t)val->value;
-                }
-                else if(auto instanceAttr = as<InstanceAttribute>(attr))
-                {
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-                    auto val = checkConstantIntVal(attr->args[0]);
-
-                    if(!val) return false;
-
-                    instanceAttr->value = (int32_t)val->value;
-                }
-                else if(auto entryPointAttr = as<EntryPointAttribute>(attr))
-                {
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-
-                    String stageName;
-                    if(!checkLiteralStringVal(attr->args[0], &stageName))
-                    {
-                        return false;
-                    }
-
-                    auto stage = findStageByName(stageName);
-                    if(stage == Stage::Unknown)
-                    {
-                        getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
-                    }
-
-                    entryPointAttr->stage = stage;
-                }
-                else if ((as<DomainAttribute>(attr)) ||
-                         (as<MaxTessFactorAttribute>(attr)) ||
-                         (as<OutputTopologyAttribute>(attr)) ||
-                         (as<PartitioningAttribute>(attr)) ||
-                         (as<PatchConstantFuncAttribute>(attr)))
-                {
-                    // Let it go thru iff single string attribute
-                    if (!hasStringArgs(attr, 1))
-                    {
-                        getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->name);
-                    }
-                }
-                else if (as<OutputControlPointsAttribute>(attr))
-                {
-                    // Let it go thru iff single integral attribute
-                    if (!hasIntArgs(attr, 1))
-                    {
-                        getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
-                    }
-                }
-                else if (as<PushConstantAttribute>(attr))
-                {
-                    // Has no args
-                    SLANG_ASSERT(attr->args.getCount() == 0);
-                }
-                else if (as<ShaderRecordAttribute>(attr))
-                {
-                    // Has no args
-                    SLANG_ASSERT(attr->args.getCount() == 0);
-                }
-                else if (as<EarlyDepthStencilAttribute>(attr))
-                {
-                    // Has no args
-                    SLANG_ASSERT(attr->args.getCount() == 0);
-                }
-                else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
-                {
-                    uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
-                    if (attr->args.getCount() == 1)
-                    {
-                        RefPtr<IntVal> outIntVal;
-                        if (auto cInt = checkConstantEnumVal(attr->args[0]))
+                        auto intValue = checkConstantIntVal(arg);
+                        if (!intValue)
                         {
-                            targetClassId = (uint32_t)(cInt->value);
-                        }
-                        else
-                        {
-                            getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
                             return false;
                         }
-                    }
-                    if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
-                    {
-                        getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
-                        return false;
-                    }
-                }
-                else if (auto unrollAttr = as<UnrollAttribute>(attr))
-                {
-                    // Check has an argument. We need this because default behavior is to give an error
-                    // if an attribute has arguments, but not handled explicitly (and the default param will come through
-                    // as 1 arg if nothing is specified)
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-                }
-                else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
-                {
-                    // check arguments against attribute parameters defined in attribClassDecl
-                    Index paramIndex = 0;
-                    auto params = attribClassDecl->getMembersOfType<ParamDecl>();
-                    for (auto paramDecl : params)
-                    {
-                        if (paramIndex < attr->args.getCount())
+                        if (intValue->value < 1)
                         {
-                            auto & arg = attr->args[paramIndex];
-                            bool typeChecked = false;
-                            if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
-                            {
-                                if (basicType->baseType == BaseType::Int)
-                                {
-                                    if (auto cint = checkConstantIntVal(arg))
-                                    {
-                                        attr->intArgVals[(uint32_t)paramIndex] = cint;
-                                    }
-                                    typeChecked = true;
-                                }
-                            }
-                            if (!typeChecked)
-                            {
-                                arg = CheckExpr(arg);
-                                arg = coerce(paramDecl->getType(), arg);
-                            }
+                            getSink()->diagnose(attr, Diagnostics::nonPositiveNumThreads, intValue->value);
+                            return false;
                         }
-                        paramIndex++;
+                        value = int32_t(intValue->value);
                     }
-                    if (params.getCount() < attr->args.getCount())
-                    {
-                        getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), params.getCount());
-                    }
-                    else if (params.getCount() > attr->args.getCount())
-                    {
-                        getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.getCount());
-                    }
+                    values[i] = value;
                 }
-                else if (auto formatAttr = as<FormatAttribute>(attr))
+
+                numThreadsAttr->x          = values[0];
+                numThreadsAttr->y          = values[1];
+                numThreadsAttr->z          = values[2]; 
+            }
+            else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
+            {
+                // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)
+                // Must have 2 int parameters. Ideally this would all be checked from the specification
+                // in core.meta.slang, but that's not completely implemented. So for now we check here.
+                if (attr->args.getCount() != 2)
                 {
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-
-                    String formatName;
-                    if(!checkLiteralStringVal(attr->args[0], &formatName))
-                    {
-                        return false;
-                    }
-
-                    ImageFormat format = ImageFormat::unknown;
-                    if(!findImageFormatByName(formatName.getBuffer(), &format))
-                    {
-                        getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
-                    }
-
-                    formatAttr->format = format;
+                    return false;
                 }
-                else if (auto allowAttr = as<AllowAttribute>(attr))
+
+                // TODO(JS): Prior validation currently doesn't ensure both args are ints (as specified in core.meta.slang), so check here
+                // to make sure they both are
+                auto binding = checkConstantIntVal(attr->args[0]);
+                auto set = checkConstantIntVal(attr->args[1]);
+
+                if (binding == nullptr || set == nullptr)
                 {
-                    SLANG_ASSERT(attr->args.getCount() == 1);
-
-                    String diagnosticName;
-                    if(!checkLiteralStringVal(attr->args[0], &diagnosticName))
-                    {
-                        return false;
-                    }
-
-                    auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
-                    if(!diagnosticInfo)
-                    {
-                        getSink()->diagnose(attr->args[0], Diagnostics::unknownDiagnosticName, diagnosticName);
-                    }
-
-                    allowAttr->diagnostic = diagnosticInfo;
+                    return false;
                 }
-                else
+                    
+                bindingAttr->binding = int32_t(binding->value);
+                bindingAttr->set = int32_t(set->value);
+            }
+            else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 1);
+                auto val = checkConstantIntVal(attr->args[0]);
+
+                if(!val) return false;
+
+                maxVertexCountAttr->value = (int32_t)val->value;
+            }
+            else if(auto instanceAttr = as<InstanceAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 1);
+                auto val = checkConstantIntVal(attr->args[0]);
+
+                if(!val) return false;
+
+                instanceAttr->value = (int32_t)val->value;
+            }
+            else if(auto entryPointAttr = as<EntryPointAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 1);
+
+                String stageName;
+                if(!checkLiteralStringVal(attr->args[0], &stageName))
                 {
-                    if(attr->args.getCount() == 0)
+                    return false;
+                }
+
+                auto stage = findStageByName(stageName);
+                if(stage == Stage::Unknown)
+                {
+                    getSink()->diagnose(attr->args[0], Diagnostics::unknownStageName, stageName);
+                }
+
+                entryPointAttr->stage = stage;
+            }
+            else if ((as<DomainAttribute>(attr)) ||
+                        (as<MaxTessFactorAttribute>(attr)) ||
+                        (as<OutputTopologyAttribute>(attr)) ||
+                        (as<PartitioningAttribute>(attr)) ||
+                        (as<PatchConstantFuncAttribute>(attr)))
+            {
+                // Let it go thru iff single string attribute
+                if (!hasStringArgs(attr, 1))
+                {
+                    getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->name);
+                }
+            }
+            else if (as<OutputControlPointsAttribute>(attr))
+            {
+                // Let it go thru iff single integral attribute
+                if (!hasIntArgs(attr, 1))
+                {
+                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
+                }
+            }
+            else if (as<PushConstantAttribute>(attr))
+            {
+                // Has no args
+                SLANG_ASSERT(attr->args.getCount() == 0);
+            }
+            else if (as<ShaderRecordAttribute>(attr))
+            {
+                // Has no args
+                SLANG_ASSERT(attr->args.getCount() == 0);
+            }
+            else if (as<EarlyDepthStencilAttribute>(attr))
+            {
+                // Has no args
+                SLANG_ASSERT(attr->args.getCount() == 0);
+            }
+            else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
+            {
+                uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
+                if (attr->args.getCount() == 1)
+                {
+                    RefPtr<IntVal> outIntVal;
+                    if (auto cInt = checkConstantEnumVal(attr->args[0]))
                     {
-                        // If the attribute took no arguments, then we will
-                        // assume it is valid as written.
+                        targetClassId = (uint32_t)(cInt->value);
                     }
                     else
                     {
-                        // We should be special-casing the checking of any attribute
-                        // with a non-zero number of arguments.
-                        SLANG_DIAGNOSE_UNEXPECTED(getSink(), attr, "unhandled attribute");
+                        getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
                         return false;
                     }
                 }
+                if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
+                {
+                    getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
+                    return false;
+                }
+            }
+            else if (auto unrollAttr = as<UnrollAttribute>(attr))
+            {
+                // Check has an argument. We need this because default behavior is to give an error
+                // if an attribute has arguments, but not handled explicitly (and the default param will come through
+                // as 1 arg if nothing is specified)
+                SLANG_ASSERT(attr->args.getCount() == 1);
+            }
+            else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
+            {
+                // check arguments against attribute parameters defined in attribClassDecl
+                Index paramIndex = 0;
+                auto params = attribClassDecl->getMembersOfType<ParamDecl>();
+                for (auto paramDecl : params)
+                {
+                    if (paramIndex < attr->args.getCount())
+                    {
+                        auto & arg = attr->args[paramIndex];
+                        bool typeChecked = false;
+                        if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
+                        {
+                            if (basicType->baseType == BaseType::Int)
+                            {
+                                if (auto cint = checkConstantIntVal(arg))
+                                {
+                                    attr->intArgVals[(uint32_t)paramIndex] = cint;
+                                }
+                                typeChecked = true;
+                            }
+                        }
+                        if (!typeChecked)
+                        {
+                            arg = CheckExpr(arg);
+                            arg = coerce(paramDecl->getType(), arg);
+                        }
+                    }
+                    paramIndex++;
+                }
+                if (params.getCount() < attr->args.getCount())
+                {
+                    getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), params.getCount());
+                }
+                else if (params.getCount() > attr->args.getCount())
+                {
+                    getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), params.getCount());
+                }
+            }
+            else if (auto formatAttr = as<FormatAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 1);
 
-                return true;
+                String formatName;
+                if(!checkLiteralStringVal(attr->args[0], &formatName))
+                {
+                    return false;
+                }
+
+                ImageFormat format = ImageFormat::unknown;
+                if(!findImageFormatByName(formatName.getBuffer(), &format))
+                {
+                    getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                }
+
+                formatAttr->format = format;
+            }
+            else if (auto allowAttr = as<AllowAttribute>(attr))
+            {
+                SLANG_ASSERT(attr->args.getCount() == 1);
+
+                String diagnosticName;
+                if(!checkLiteralStringVal(attr->args[0], &diagnosticName))
+                {
+                    return false;
+                }
+
+                auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
+                if(!diagnosticInfo)
+                {
+                    getSink()->diagnose(attr->args[0], Diagnostics::unknownDiagnosticName, diagnosticName);
+                }
+
+                allowAttr->diagnostic = diagnosticInfo;
+            }
+            else
+            {
+                if(attr->args.getCount() == 0)
+                {
+                    // If the attribute took no arguments, then we will
+                    // assume it is valid as written.
+                }
+                else
+                {
+                    // We should be special-casing the checking of any attribute
+                    // with a non-zero number of arguments.
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), attr, "unhandled attribute");
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         RefPtr<AttributeBase> checkAttribute(
