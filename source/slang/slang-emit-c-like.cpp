@@ -209,7 +209,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
     for (int i = 0; i < 3; ++i)
     {
-        outNumThreads[i] = decor ? GetIntVal(decor->getOperand(i)) : 1;
+        outNumThreads[i] = decor ? Int(GetIntVal(decor->getOperand(i))) : 1;
     }
     return decor;
 }
