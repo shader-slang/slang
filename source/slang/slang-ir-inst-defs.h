@@ -422,6 +422,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
 
+        // Added to IRParam parameters to an entry point
+    INST(GeometryPrimitiveTypeDecoration,  geometryPrimitiveTypeDecoration, 1, 0)
+    INST(StreamOutputTypeDecoration,       streamOutputTypeDecoration,    1, 0)
+
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point
     INST(EntryPointDecoration,              entryPoint,             1, 0)
 

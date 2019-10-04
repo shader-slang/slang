@@ -222,8 +222,14 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
 void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
+    SLANG_UNUSED(entryPointLayout);
+
+    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecor);
+
     auto profile = m_effectiveProfile;
-    auto stage = entryPointLayout->profile.GetStage();
+    //auto stage = entryPointLayout->profile.GetStage();
+    auto stage = entryPointDecor->getProfile().GetStage();
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
@@ -668,6 +674,22 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    if (auto decor = param->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+    {
+        typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType Type;
+
+        switch (decor->getPrimitiveType())
+        {
+            case Type::Triangle:             m_writer->emit("triangle "); break;
+            case Type::Point:                m_writer->emit("point "); break;
+            case Type::Line:                 m_writer->emit("line "); break;
+            case Type::LineAdj:              m_writer->emit("lineadj "); break;
+            case Type::TriangleAdj:          m_writer->emit("triangleadj "); break;
+            default: SLANG_ASSERT(!"Unknown primitive type"); break;
+        }
+    }
+
+#if 0
     if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
     {
         Layout* layout = layoutDecor->getLayout();
@@ -692,6 +714,7 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             }
         }
     }
+#endif
 
     Super::emitSimpleFuncParamImpl(param);
 }

@@ -1269,6 +1269,12 @@ void legalizeEntryPointParameterForGLSL(
         auto valueType = paramPtrType->getValueType();
         if( auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
         {
+            // Add it to the entry point
+            if (!func->findDecoration<IRStreamOutputTypeDecoration>())
+            {
+                builder->addDecoration(func, kIROp_StreamOutputTypeDecoration, gsStreamType);
+            }
+
             // An output stream type like `TriangleStream<Foo>` should
             // more or less translate into `out Foo` (plus scalarization).
 

@@ -292,7 +292,44 @@ struct IREntryPointDecoration : IRDecoration
     enum { kOp = kIROp_EntryPointDecoration };
     IR_LEAF_ISA(EntryPointDecoration)
 
-    IRIntLit* getProfile() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getProfileInst() { return cast<IRIntLit>(getOperand(0)); }
+    Profile getProfile() { return Profile(Profile::RawVal(GetIntVal(getProfileInst()))); }
+};
+
+struct IRGeometryPrimitiveTypeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_GeometryPrimitiveTypeDecoration };
+    IR_LEAF_ISA(GeometryPrimitiveTypeDecoration)
+
+    enum class PrimitiveType
+    {
+        Unknown,
+        Triangle,
+        Point,
+        Line,
+        LineAdj,
+        TriangleAdj,
+    };
+
+    IRIntLit* getPrimitiveTypeInst() { return cast<IRIntLit>(getOperand(0)); }
+    PrimitiveType getPrimitiveType()
+    {
+        auto inst = getPrimitiveTypeInst();
+        return PrimitiveType(GetIntVal(inst));
+    }
+};
+
+    /// This is a bit of a hack. The problem is that when GLSL legalization takes place
+    /// any entry point parameters which are StreamOut are found they are removed and made
+    /// global. Meaning when doing entryPoint emitting it's kind of hard to know if there
+    /// are stream out parameters. To work around this we add this decoration to the entry
+    /// point that holds the stream out type.
+struct IRStreamOutputTypeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_StreamOutputTypeDecoration };
+    IR_LEAF_ISA(StreamOutputTypeDecoration)
+
+    IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
 };
 
     /// A decoration that marks a value as having linkage.

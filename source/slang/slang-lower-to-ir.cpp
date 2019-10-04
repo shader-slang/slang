@@ -15,6 +15,9 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
+#include "slang-syntax.h"
+#include "slang-legalize-types.h"
+
 namespace Slang
 {
 
@@ -6339,6 +6342,48 @@ static void lowerFrontEndEntryPointToIR(
         instToDecorate = findGenericReturnVal(irGeneric);
     }
     builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile());
+
+    // lets see if we can get get the layout
+    {
+        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
+
+        IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
+        if (valueWithParams)
+        {
+            IRParam* irParam = valueWithParams->getFirstParam();
+
+            for (auto param : params)
+            {
+                if (auto modifier = param->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                {
+                    typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType PrimitiveType;
+                    PrimitiveType primType = PrimitiveType::Unknown;
+
+                    if (as<HLSLTriangleModifier>(modifier))
+                        primType = PrimitiveType::Triangle;
+                    else if (as<HLSLPointModifier>(modifier))
+                        primType = PrimitiveType::Point;
+                    else if (as<HLSLLineModifier>(modifier))
+                        primType = PrimitiveType::Line; 
+                    else if (as<HLSLLineAdjModifier>(modifier))
+                        primType = PrimitiveType::LineAdj;
+                    else if (as<HLSLTriangleAdjModifier>(modifier))
+                        primType = PrimitiveType::TriangleAdj;
+
+                    if (primType != PrimitiveType::Unknown)
+                    {
+                        builder->addDecoration(irParam, kIROp_GeometryPrimitiveTypeDecoration, builder->getIntValue(builder->getIntType(), int(primType)));
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("unhandled primitive type");
+                    }
+                }
+
+                irParam = irParam->getNextParam();
+            }
+        }
+    }
 }
 
 static void lowerProgramEntryPointToIR(

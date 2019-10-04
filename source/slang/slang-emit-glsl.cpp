@@ -654,7 +654,14 @@ void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
 
 void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    auto profile = entryPointLayout->profile;
+    SLANG_UNUSED(entryPointLayout);
+
+    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecor);
+
+    //auto profile = entryPointLayout->profile;
+
+    auto profile = entryPointDecor->getProfile();
     auto stage = profile.GetStage();
 
     switch (stage)
@@ -695,6 +702,49 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                 m_writer->emit(") in;\n");
             }
 
+            auto block = irFunc->getFirstBlock();
+            if (block)
+            {
+                auto params = block->getParams();
+
+                for (auto param : params)
+                {
+                    if (auto decor = param->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+                    {
+                        typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType PrimitiveType;
+
+                        PrimitiveType primType = decor->getPrimitiveType();
+                        switch (primType)
+                        {
+                            case PrimitiveType::Triangle:       m_writer->emit("layout(triangles) in;\n"); break;
+                            case PrimitiveType::Line:           m_writer->emit("layout(lines) in;\n"); break;
+                            case PrimitiveType::LineAdj:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
+                            case PrimitiveType::Point:          m_writer->emit("layout(points) in;\n"); break;
+                            case PrimitiveType::TriangleAdj:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
+                            default:
+                            {
+                                SLANG_ASSERT(!"Unknown primitive type");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (auto decor = irFunc->findDecoration<IRStreamOutputTypeDecoration>())
+            {
+                IRType* type = decor->getStreamType();
+
+                if (as<IRHLSLPointStreamType>(type))
+                    m_writer->emit("layout(points) out;\n");
+                else if (as<IRHLSLLineStreamType>(type))
+                    m_writer->emit("layout(line_strip) out;\n");
+                else if (as<IRHLSLTriangleStreamType>(type))
+                    m_writer->emit("layout(triangle_strip) out;\n");
+                else
+                    SLANG_ASSERT(!"Unknown stream out type");
+            }
+
+#if 0
             for (auto pp : entryPointLayout->getFuncDecl()->GetParameters())
             {
                 if (auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
@@ -737,8 +787,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                     }
                 }
             }
-
-
+#endif
         }
         break;
         case Stage::Pixel:
