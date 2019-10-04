@@ -287,6 +287,14 @@ struct IRNumThreadsDecoration : IRDecoration
     IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
 };
 
+struct IREntryPointDecoration : IRDecoration
+{
+    enum { kOp = kIROp_EntryPointDecoration };
+    IR_LEAF_ISA(EntryPointDecoration)
+
+    IRIntLit* getProfile() { return cast<IRIntLit>(getOperand(0)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,
@@ -1368,9 +1376,9 @@ struct IRBuilder
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
     }
 
-    void addEntryPointDecoration(IRInst* value)
+    void addEntryPointDecoration(IRInst* value, Profile profile)
     {
-        addDecoration(value, kIROp_EntryPointDecoration);
+        addDecoration(value, kIROp_EntryPointDecoration, getIntValue(getIntType(), profile.raw));
     }
 
     void addKeepAliveDecoration(IRInst* value)

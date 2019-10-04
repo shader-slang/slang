@@ -6338,7 +6338,7 @@ static void lowerFrontEndEntryPointToIR(
     {
         instToDecorate = findGenericReturnVal(irGeneric);
     }
-    builder->addEntryPointDecoration(instToDecorate);
+    builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile());
 }
 
 static void lowerProgramEntryPointToIR(
