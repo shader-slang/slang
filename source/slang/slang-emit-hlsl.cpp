@@ -10,58 +10,29 @@
 
 namespace Slang {
 
-
-void HLSLSourceEmitter::_emitHLSLAttributeSingleString(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+void HLSLSourceEmitter::_emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val)
 {
-    assert(attrib);
-
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto stringLitExpr = as<StringLiteralExpr>(expr);
-    if (!stringLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute parameter expecting to be a string ");
-        return;
-    }
+    SLANG_UNUSED(entryPoint);
+    assert(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
     m_writer->emit("(\"");
-    m_writer->emit(stringLitExpr->value);
+    m_writer->emit(val->getStringSlice());
     m_writer->emit("\")]\n");
 }
 
-void HLSLSourceEmitter::_emitHLSLAttributeSingleInt(const char* name, FuncDecl* entryPoint, Attribute* attrib)
+void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val)
 {
-    assert(attrib);
+    SLANG_UNUSED(entryPoint);
+    SLANG_ASSERT(val);
 
-    attrib->args.getCount();
-    if (attrib->args.getCount() != 1)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects single parameter");
-        return;
-    }
-
-    Expr* expr = attrib->args[0];
-
-    auto intLitExpr = as<IntegerLiteralExpr>(expr);
-    if (!intLitExpr)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Attribute expects an int");
-        return;
-    }
+    auto intVal = GetIntVal(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
     m_writer->emit("(");
-    m_writer->emit(intLitExpr->value);
+    m_writer->emit(intVal);
     m_writer->emit(")]\n");
 }
 
@@ -272,19 +243,11 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
     {
         case Stage::Compute:
         {
-            static const UInt kAxisCount = 3;
-            UInt sizeAlongAxis[kAxisCount];
-
-            // TODO: this is kind of gross because we are using a public
-            // reflection API function, rather than some kind of internal
-            // utility it forwards to...
-            spReflectionEntryPoint_getComputeThreadGroupSize(
-                (SlangReflectionEntryPoint*)entryPointLayout,
-                kAxisCount,
-                &sizeAlongAxis[0]);
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
 
             m_writer->emit("[numthreads(");
-            for (int ii = 0; ii < 3; ++ii)
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
             {
                 if (ii != 0) m_writer->emit(", ");
                 m_writer->emit(sizeAlongAxis[ii]);
@@ -294,29 +257,30 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
         break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<MaxVertexCountAttribute>())
+            if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("[maxvertexcount(");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
             }
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
+
+            if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("[instance(");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
             }
             break;
         }
         case Stage::Domain:
         {
-            FuncDecl* entryPoint = entryPointLayout->entryPoint;
             /* [domain("isoline")] */
-            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
             {
-                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("domain", irFunc, decor->getDomain());
             }
-
             break;
         }
         case Stage::Hull:
@@ -324,32 +288,38 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
             // Lists these are only attributes for hull shader
             // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
 
-            FuncDecl* entryPoint = entryPointLayout->entryPoint;
-
             /* [domain("isoline")] */
-            if (auto attrib = entryPoint->FindModifier<DomainAttribute>())
+            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
             {
-                _emitHLSLAttributeSingleString("domain", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("domain", irFunc, decor->getDomain());
             }
+
             /* [domain("partitioning")] */
-            if (auto attrib = entryPoint->FindModifier<PartitioningAttribute>())
+            if (auto decor = irFunc->findDecoration<IRPartitioningDecoration>())
             {
-                _emitHLSLAttributeSingleString("partitioning", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("partitioning", irFunc, decor->getPartitioning());
             }
+
             /* [outputtopology("line")] */
-            if (auto attrib = entryPoint->FindModifier<OutputTopologyAttribute>())
+            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {
-                _emitHLSLAttributeSingleString("outputtopology", entryPoint, attrib);
+                _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
             }
+
             /* [outputcontrolpoints(4)] */
-            if (auto attrib = entryPoint->FindModifier<OutputControlPointsAttribute>())
+            if (auto decor = irFunc->findDecoration<IROutputControlPointsDecoration>())
             {
-                _emitHLSLAttributeSingleInt("outputcontrolpoints", entryPoint, attrib);
+                _emitHLSLDecorationSingleInt("outputcontrolpoints", irFunc, decor->getControlPointCount());
             }
+
             /* [patchconstantfunc("HSConst")] */
-            if (auto attrib = entryPoint->FindModifier<PatchConstantFuncAttribute>())
+            if (auto decor = irFunc->findDecoration<IRPatchConstantFuncDecoration>())
             {
-                _emitHLSLFuncDeclPatchConstantFuncAttribute(irFunc, entryPoint, attrib);
+                const String irName = getName(decor->getFunc());
+
+                m_writer->emit("[patchconstantfunc(\"");
+                m_writer->emit(irName);
+                m_writer->emit("\")]\n");
             }
 
             break;
@@ -420,25 +390,6 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit("<");
     emitType(texType->getElementType());
     m_writer->emit(" >");
-}
-
-void HLSLSourceEmitter::_emitHLSLFuncDeclPatchConstantFuncAttribute(IRFunc* irFunc, FuncDecl* entryPoint, PatchConstantFuncAttribute* attrib)
-{
-    SLANG_UNUSED(attrib);
-
-    auto irPatchFunc = irFunc->findDecoration<IRPatchConstantFuncDecoration>();
-    assert(irPatchFunc);
-    if (!irPatchFunc)
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), entryPoint->loc, "Unable to find [patchConstantFunc(...)] decoration");
-        return;
-    }
-
-    const String irName = getName(irPatchFunc->getFunc());
-
-    m_writer->emit("[patchconstantfunc(\"");
-    m_writer->emit(irName);
-    m_writer->emit("\")]\n");
 }
 
 void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)

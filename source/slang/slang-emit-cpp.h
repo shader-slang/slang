@@ -271,15 +271,15 @@ protected:
 
     void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
-    void _emitEntryPointGroup(const UInt sizeAlongAxis[3], const String& funcName);
-    void _emitEntryPointGroupRange(const UInt sizeAlongAxis[3], const String& funcName);
+    void _emitEntryPointGroup(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);
+    void _emitEntryPointGroupRange(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);
 
-    void _emitInitAxisValues(const UInt sizeAlongAxis[3], const UnownedStringSlice& mulName, const UnownedStringSlice& addName);
+    void _emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupAxisCount], const UnownedStringSlice& mulName, const UnownedStringSlice& addName);
 
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
 
-    /* This is used so as to try and use slangs type system to uniquely identify types and specializations on intrinsice.
+    /* This is used so as to try and use slangs type system to uniquely identify types and specializations on intrinsic.
     That we want to have a pointer to a type be unique, and slang supports this through the m_sharedIRBuilder. BUT for this to
     work all work on the module must use the same sharedIRBuilder, and that appears to not be the case in terms
     of other passes.

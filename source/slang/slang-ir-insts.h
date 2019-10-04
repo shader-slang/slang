@@ -228,6 +228,65 @@ IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 
+
+struct IROutputControlPointsDecoration : IRDecoration
+{
+    enum { kOp = kIROp_OutputControlPointsDecoration };
+    IR_LEAF_ISA(OutputControlPointsDecoration)
+
+    IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IROutputTopologyDecoration : IRDecoration
+{
+    enum { kOp = kIROp_OutputTopologyDecoration };
+    IR_LEAF_ISA(OutputTopologyDecoration)
+
+    IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
+};
+
+struct IRPartitioningDecoration : IRDecoration
+{
+    enum { kOp = kIROp_PartitioningDecoration };
+    IR_LEAF_ISA(PartitioningDecoration)
+
+    IRStringLit* getPartitioning() { return cast<IRStringLit>(getOperand(0)); }
+};
+
+struct IRDomainDecoration : IRDecoration
+{
+    enum { kOp = kIROp_DomainDecoration };
+    IR_LEAF_ISA(DomainDecoration)
+
+    IRStringLit* getDomain() { return cast<IRStringLit>(getOperand(0)); }
+};
+
+struct IRMaxVertexCountDecoration : IRDecoration
+{
+    enum { kOp = kIROp_MaxVertexCountDecoration };
+    IR_LEAF_ISA(MaxVertexCountDecoration)
+
+    IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRInstanceDecoration : IRDecoration
+{
+    enum { kOp = kIROp_InstanceDecoration };
+    IR_LEAF_ISA(InstanceDecoration)
+
+    IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRNumThreadsDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NumThreadsDecoration };
+    IR_LEAF_ISA(NumThreadsDecoration)
+
+    IRIntLit* getX() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getY() { return cast<IRIntLit>(getOperand(1)); }
+    IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
+};
+
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,

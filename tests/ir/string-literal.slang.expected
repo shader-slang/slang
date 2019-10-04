@@ -1,6 +1,7 @@
 result code = 0
 standard error = {
 [entryPoint]
+[numThreads(1, 1, 1)]
 [export("_S3tu04mainp1puV")]
 [nameHint("main")]
 func %main	: Func(Void, UInt)

@@ -1267,27 +1267,6 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
         sizeAlongAxis[1] = numThreadsAttribute->y;
         sizeAlongAxis[2] = numThreadsAttribute->z;
     }
-    else
-    {
-        // Fall back to the GLSL case, which requires a search over global-scope declarations
-        // to look for as with the `local_size_*` qualifier
-        auto module = as<ModuleDecl>(entryPointFunc.getDecl()->ParentDecl);
-        if (module)
-        {
-            for (auto dd : module->Members)
-            {
-                for (auto mod : dd->GetModifiersOfType<GLSLLocalSizeLayoutModifier>())
-                {
-                    if (auto xMod = as<GLSLLocalSizeXLayoutModifier>(mod))
-                        sizeAlongAxis[0] = (SlangUInt) getIntegerLiteralValue(xMod->valToken);
-                    else if (auto yMod = as<GLSLLocalSizeYLayoutModifier>(mod))
-                        sizeAlongAxis[1] = (SlangUInt) getIntegerLiteralValue(yMod->valToken);
-                    else if (auto zMod = as<GLSLLocalSizeZLayoutModifier>(mod))
-                        sizeAlongAxis[2] = (SlangUInt) getIntegerLiteralValue(zMod->valToken);
-                }
-            }
-        }
-    }
 
     //
 

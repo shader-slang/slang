@@ -4450,6 +4450,8 @@ namespace Slang
     {
         ModifierListBuilder listBuilder;
 
+        RefPtr<UncheckedAttribute> numThreadsAttrib;
+
         listBuilder.add(new GLSLLayoutModifierGroupBegin());
         
         parser->ReadToken(TokenType::LParent);
@@ -4458,7 +4460,41 @@ namespace Slang
             auto nameAndLoc = expectIdentifier(parser);
             const String& nameText = nameAndLoc.name->text;
 
-            if (nameText == "binding" ||
+            const char localSizePrefix[] = "local_size_";
+
+            int localSizeIndex = -1;
+            if (nameText.startsWith(localSizePrefix) && nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1)
+            {
+                char lastChar = nameText[SLANG_COUNT_OF(localSizePrefix) - 1];
+                localSizeIndex = (lastChar >= 'x' && lastChar <= 'z') ? (lastChar - 'x') : -1;
+            }
+
+            if (localSizeIndex >= 0)
+            {
+                if (!numThreadsAttrib)
+                {
+                    numThreadsAttrib = new UncheckedAttribute;
+                    numThreadsAttrib->args.setCount(3);
+
+                    // Just mark the loc and name from the first in the list
+                    numThreadsAttrib->name = getName(parser, "numthreads");
+                    numThreadsAttrib->loc = nameAndLoc.loc;
+                    numThreadsAttrib->scope = parser->currentScope;
+                }
+
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    auto expr = parseAtomicExpr(parser);
+                    //SLANG_ASSERT(expr);
+                    if (!expr)
+                    {
+                        return nullptr;
+                    }
+
+                    numThreadsAttrib->args[localSizeIndex] = expr;
+                }
+            }
+            else if (nameText == "binding" ||
                 nameText == "set")
             {
                 GLSLBindingAttribute* attr = listBuilder.find<GLSLBindingAttribute>();
@@ -4499,9 +4535,6 @@ namespace Slang
                 CASE(shaderRecordNV, ShaderRecordAttribute)
                 CASE(constant_id,   GLSLConstantIDLayoutModifier) 
                 CASE(location, GLSLLocationLayoutModifier) 
-                CASE(local_size_x, GLSLLocalSizeXLayoutModifier) 
-                CASE(local_size_y, GLSLLocalSizeYLayoutModifier) 
-                CASE(local_size_z, GLSLLocalSizeZLayoutModifier)
                 {
                     modifier = new GLSLUnparsedLayoutModifier();
                 }
@@ -4526,6 +4559,11 @@ namespace Slang
             if (AdvanceIf(parser, TokenType::RParent))
                 break;
             parser->ReadToken(TokenType::Comma);
+        }
+
+        if (numThreadsAttrib)
+        {
+            listBuilder.add(numThreadsAttrib);
         }
 
         listBuilder.add(new GLSLLayoutModifierGroupEnd());

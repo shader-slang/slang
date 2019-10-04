@@ -661,20 +661,12 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
     {
         case Stage::Compute:
         {
-            static const UInt kAxisCount = 3;
-            UInt sizeAlongAxis[kAxisCount];
-
-            // TODO: this is kind of gross because we are using a public
-            // reflection API function, rather than some kind of internal
-            // utility it forwards to...
-            spReflectionEntryPoint_getComputeThreadGroupSize(
-                (SlangReflectionEntryPoint*)entryPointLayout,
-                kAxisCount,
-                &sizeAlongAxis[0]);
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
 
             m_writer->emit("layout(");
             char const* axes[] = { "x", "y", "z" };
-            for (int ii = 0; ii < 3; ++ii)
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
             {
                 if (ii != 0) m_writer->emit(", ");
                 m_writer->emit("local_size_");
@@ -687,16 +679,19 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
         break;
         case Stage::Geometry:
         {
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<MaxVertexCountAttribute>())
+            if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("layout(max_vertices = ");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(") out;\n");
             }
-            if (auto attrib = entryPointLayout->getFuncDecl()->FindModifier<InstanceAttribute>())
+
+            if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
             {
+                auto count = GetIntVal(decor->getCount());
                 m_writer->emit("layout(invocations = ");
-                m_writer->emit(attrib->value);
+                m_writer->emit(Int(count));
                 m_writer->emit(") in;\n");
             }
 
