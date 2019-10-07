@@ -389,21 +389,6 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
     m_writer->emit("\"");
 }
 
-void CLikeSourceEmitter::setSampleRateFlag()
-{
-    m_entryPointLayout->flags |= EntryPointLayout::Flag::usesAnySampleRateInput;
-}
-
-void CLikeSourceEmitter::doSampleRateInputCheck(Name* name)
-{
-    // TODO(JS): This doesn't appear to be called from anywhere!!
-    auto text = getText(name);
-    if (text == "gl_SampleID")
-    {
-        setSampleRateFlag();
-    }
-}
-
 void CLikeSourceEmitter::emitVal(IRInst* val, EmitOpInfo const& outerPrec)
 {
     if(auto type = as<IRType>(val))
