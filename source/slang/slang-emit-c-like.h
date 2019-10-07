@@ -241,7 +241,7 @@ public:
 
     String getFuncName(IRFunc* func);
 
-    void emitEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout);
+    void emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor);
 
     void emitPhiVarDecls(IRFunc* func);
 
@@ -326,7 +326,8 @@ public:
 
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
-    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout) = 0;
+    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
+
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
     virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
     virtual void emitPreprocessorDirectivesImpl() {}

@@ -1905,12 +1905,12 @@ void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformP
     }
 }
 
-void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    SLANG_UNUSED(irFunc);
+    SLANG_UNUSED(entryPointDecor);
 
-    auto profile = m_effectiveProfile;
-    auto stage = entryPointLayout->profile.GetStage();
+    auto profile = m_effectiveProfile;    
+    auto stage = profile.GetStage();
 
     switch (stage)
     {
@@ -2450,10 +2450,12 @@ struct GlobalParamInfo
 void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName)
 {
     auto resultType = func->getResultType();
-    auto entryPointLayout = asEntryPoint(func);
+    
+    auto entryPointDecl = func->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecl);
 
     // Emit the actual function
-    emitEntryPointAttributes(func, entryPointLayout);
+    emitEntryPointAttributes(func, entryPointDecl);
     emitType(resultType, funcName);
 
     m_writer->emit("(");
