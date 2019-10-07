@@ -15,9 +15,6 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
-#include "slang-syntax.h"
-#include "slang-legalize-types.h"
-
 namespace Slang
 {
 
@@ -6343,7 +6340,7 @@ static void lowerFrontEndEntryPointToIR(
     }
     builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile());
 
-    // lets see if we can get get the layout
+    // Go through the entry point parameters creating decorations from layout as appropriate
     {
         FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
 

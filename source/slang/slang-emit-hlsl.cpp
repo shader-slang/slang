@@ -228,7 +228,6 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
     SLANG_ASSERT(entryPointDecor);
 
     auto profile = m_effectiveProfile;
-    //auto stage = entryPointLayout->profile.GetStage();
     auto stage = entryPointDecor->getProfile().GetStage();
 
     if (profile.getFamily() == ProfileFamily::DX)
@@ -688,33 +687,6 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             default: SLANG_ASSERT(!"Unknown primitive type"); break;
         }
     }
-
-#if 0
-    if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
-    {
-        Layout* layout = layoutDecor->getLayout();
-        VarLayout* varLayout = as<VarLayout>(layout);
-
-        if (varLayout)
-        {
-            auto var = varLayout->getVariable();
-
-            if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
-            {
-                if (as<HLSLTriangleModifier>(primTypeModifier))
-                    m_writer->emit("triangle ");
-                else if (as<HLSLPointModifier>(primTypeModifier))
-                    m_writer->emit("point ");
-                else if (as<HLSLLineModifier>(primTypeModifier))
-                    m_writer->emit("line ");
-                else if (as<HLSLLineAdjModifier>(primTypeModifier))
-                    m_writer->emit("lineadj ");
-                else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
-                    m_writer->emit("triangleadj ");
-            }
-        }
-    }
-#endif
 
     Super::emitSimpleFuncParamImpl(param);
 }
