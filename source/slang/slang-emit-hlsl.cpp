@@ -275,7 +275,7 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
 void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    auto layout = getVarLayout(inst);
+    auto layout = getVarLayout(inst); 
     if (layout)
     {
         _emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
