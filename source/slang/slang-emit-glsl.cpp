@@ -730,6 +730,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                 }
             }
 
+#if 0
             if (auto decor = irFunc->findDecoration<IRStreamOutputTypeDecoration>())
             {
                 IRType* type = decor->getStreamType();
@@ -743,6 +744,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                 else
                     SLANG_ASSERT(!"Unknown stream out type");
             }
+#endif
 
 #if 0
             for (auto pp : entryPointLayout->getFuncDecl()->GetParameters())
@@ -1578,6 +1580,27 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
 
 void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
+    {
+        IRType* type = varDecl->getFullType();
+        // Strip out type 
+        if (auto outType = as<IROutTypeBase>(type))
+        {
+            type = outType->getValueType();
+        }
+
+        if (auto streamType = as<IRHLSLStreamOutputType>(type))
+        {
+            if (as<IRHLSLPointStreamType>(type))
+                m_writer->emit("layout(points) out;\n");
+            else if (as<IRHLSLLineStreamType>(type))
+                m_writer->emit("layout(line_strip) out;\n");
+            else if (as<IRHLSLTriangleStreamType>(type))
+                m_writer->emit("layout(triangle_strip) out;\n");
+            else
+                SLANG_ASSERT(!"Unknown stream out type");
+        }
+    }
+
     // Deal with Vulkan raytracing layout stuff *before* we
     // do the check for whether `layout` is null, because
     // the payload won't automatically get a layout applied
