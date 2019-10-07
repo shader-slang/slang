@@ -296,28 +296,17 @@ struct IREntryPointDecoration : IRDecoration
     Profile getProfile() { return Profile(Profile::RawVal(GetIntVal(getProfileInst()))); }
 };
 
-struct IRGeometryPrimitiveTypeDecoration : IRDecoration
+struct IRGeometryPrimitiveTypeDecoration: IRDecoration
 {
     enum { kOp = kIROp_GeometryPrimitiveTypeDecoration };
-    IR_LEAF_ISA(GeometryPrimitiveTypeDecoration)
-
-    enum class PrimitiveType
-    {
-        Unknown,
-        Triangle,
-        Point,
-        Line,
-        LineAdj,
-        TriangleAdj,
-    };
-
-    IRIntLit* getPrimitiveTypeInst() { return cast<IRIntLit>(getOperand(0)); }
-    PrimitiveType getPrimitiveType()
-    {
-        auto inst = getPrimitiveTypeInst();
-        return PrimitiveType(GetIntVal(inst));
-    }
+    IR_PARENT_ISA(GeometryPrimitiveTypeDecoration)
 };
+
+IR_SIMPLE_DECORATION(PointPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LinePrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TrianglePrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LineAdjPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TriangleAdjPrimitiveTypeDecoration)
 
     /// This is a bit of a hack. The problem is that when GLSL legalization takes place
     /// A decoration that marks a value as having linkage.

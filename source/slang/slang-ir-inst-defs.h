@@ -424,6 +424,15 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         // Added to IRParam parameters to an entry point
     INST(GeometryPrimitiveTypeDecoration,  geometryPrimitiveTypeDecoration, 1, 0)
+
+    /* GeometryPrimitiveTypeDecoration */
+        INST(PointPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)
+        INST(LinePrimitiveTypeDecoration,   linePrimitiveType,      0, 0)
+        INST(TrianglePrimitiveTypeDecoration, trianglePrimitiveType, 0, 0)
+        INST(LineAdjPrimitiveTypeDecoration,  lineAdjPrimitiveType,  0, 0)
+        INST(TriangleAdjPrimitiveTypeDecoration, triangleAdjPrimitiveType, 0, 0)
+    INST_RANGE(GeometryPrimitiveTypeDecoration, PointPrimitiveTypeDecoration, TriangleAdjPrimitiveTypeDecoration)
+
     INST(StreamOutputTypeDecoration,       streamOutputTypeDecoration,    1, 0)
 
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point

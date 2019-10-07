@@ -1257,7 +1257,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         if (!func->findDecoration<IRGeometryPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, kIROp_GeometryPrimitiveTypeDecoration, geomDecor->getPrimitiveTypeInst());
+            builder->addDecoration(func, geomDecor->op);
         }
         else
         {

@@ -6353,23 +6353,22 @@ static void lowerFrontEndEntryPointToIR(
             {
                 if (auto modifier = param->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
-                    typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType PrimitiveType;
-                    PrimitiveType primType = PrimitiveType::Unknown;
+                    IROp op = kIROp_Invalid;
 
                     if (as<HLSLTriangleModifier>(modifier))
-                        primType = PrimitiveType::Triangle;
+                        op = kIROp_TrianglePrimitiveTypeDecoration;
                     else if (as<HLSLPointModifier>(modifier))
-                        primType = PrimitiveType::Point;
+                        op = kIROp_PointPrimitiveTypeDecoration;
                     else if (as<HLSLLineModifier>(modifier))
-                        primType = PrimitiveType::Line; 
+                        op = kIROp_LinePrimitiveTypeDecoration; 
                     else if (as<HLSLLineAdjModifier>(modifier))
-                        primType = PrimitiveType::LineAdj;
+                        op = kIROp_LineAdjPrimitiveTypeDecoration;
                     else if (as<HLSLTriangleAdjModifier>(modifier))
-                        primType = PrimitiveType::TriangleAdj;
+                        op = kIROp_TriangleAdjPrimitiveTypeDecoration;
 
-                    if (primType != PrimitiveType::Unknown)
+                    if (op != kIROp_Invalid)
                     {
-                        builder->addDecoration(irParam, kIROp_GeometryPrimitiveTypeDecoration, builder->getIntValue(builder->getIntType(), int(primType)));
+                        builder->addDecoration(irParam, op);
                     }
                     else
                     {
