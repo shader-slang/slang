@@ -319,13 +319,22 @@ struct IRGeometryPrimitiveTypeDecoration : IRDecoration
     }
 };
 
+    /// This is a bit of a hack. The problem is that when GLSL legalization takes place
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,
     /// or will have a definition imported from another module.
     /// In either case, it requires a mangled name to use when
     /// matching imports and exports.
-    ///
+struct IRStreamOutputTypeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_StreamOutputTypeDecoration };
+    IR_LEAF_ISA(StreamOutputTypeDecoration)
+
+    IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
+};
+
+
 struct IRLinkageDecoration : IRDecoration
 {
     IR_PARENT_ISA(LinkageDecoration)

@@ -702,94 +702,39 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                 m_writer->emit(") in;\n");
             }
 
-            auto block = irFunc->getFirstBlock();
-            if (block)
+            // These decorations were moved from the parameters to the entry point by ir-glsl-legalize.
+            // The actual parameters have become potentially multiple global parameters.
+            if (auto decor = irFunc->findDecoration<IRGeometryPrimitiveTypeDecoration>())
             {
-                auto params = block->getParams();
+                typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType PrimitiveType;
 
-                for (auto param : params)
+                PrimitiveType primType = decor->getPrimitiveType();
+                switch (primType)
                 {
-                    if (auto decor = param->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+                    case PrimitiveType::Triangle:       m_writer->emit("layout(triangles) in;\n"); break;
+                    case PrimitiveType::Line:           m_writer->emit("layout(lines) in;\n"); break;
+                    case PrimitiveType::LineAdj:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
+                    case PrimitiveType::Point:          m_writer->emit("layout(points) in;\n"); break;
+                    case PrimitiveType::TriangleAdj:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
+                    default:
                     {
-                        typedef IRGeometryPrimitiveTypeDecoration::PrimitiveType PrimitiveType;
-
-                        PrimitiveType primType = decor->getPrimitiveType();
-                        switch (primType)
-                        {
-                            case PrimitiveType::Triangle:       m_writer->emit("layout(triangles) in;\n"); break;
-                            case PrimitiveType::Line:           m_writer->emit("layout(lines) in;\n"); break;
-                            case PrimitiveType::LineAdj:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
-                            case PrimitiveType::Point:          m_writer->emit("layout(points) in;\n"); break;
-                            case PrimitiveType::TriangleAdj:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
-                            default:
-                            {
-                                SLANG_ASSERT(!"Unknown primitive type");
-                            }
-                        }
+                        SLANG_ASSERT(!"Unknown primitive type");
                     }
                 }
             }
 
-#if 0
             if (auto decor = irFunc->findDecoration<IRStreamOutputTypeDecoration>())
             {
                 IRType* type = decor->getStreamType();
 
-                if (as<IRHLSLPointStreamType>(type))
-                    m_writer->emit("layout(points) out;\n");
-                else if (as<IRHLSLLineStreamType>(type))
-                    m_writer->emit("layout(line_strip) out;\n");
-                else if (as<IRHLSLTriangleStreamType>(type))
-                    m_writer->emit("layout(triangle_strip) out;\n");
-                else
-                    SLANG_ASSERT(!"Unknown stream out type");
-            }
-#endif
-
-#if 0
-            for (auto pp : entryPointLayout->getFuncDecl()->GetParameters())
-            {
-                if (auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                switch (type->op)
                 {
-                    if (as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(triangles) in;\n");
-                    }
-                    else if (as<HLSLLineModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(lines) in;\n");
-                    }
-                    else if (as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(lines_adjacency) in;\n");
-                    }
-                    else if (as<HLSLPointModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(points) in;\n");
-                    }
-                    else if (as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(triangles_adjacency) in;\n");
-                    }
-                }
-
-                if (auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
-                {
-                    if (as<HLSLTriangleStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(triangle_strip) out;\n");
-                    }
-                    else if (as<HLSLLineStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(line_strip) out;\n");
-                    }
-                    else if (as<HLSLPointStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(points) out;\n");
-                    }
-                }
+                    case kIROp_HLSLPointStreamType:     m_writer->emit("layout(points) out;\n"); break;
+                    case kIROp_HLSLLineStreamType:      m_writer->emit("layout(line_strip) out;\n"); break;
+                    case kIROp_HLSLTriangleStreamType:  m_writer->emit("layout(triangle_strip) out;\n"); break;
+                    default: SLANG_ASSERT(!"Unknown stream out type");
+                }    
             }
-#endif
         }
         break;
         case Stage::Pixel:
