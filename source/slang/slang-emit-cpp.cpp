@@ -2343,7 +2343,7 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
         {            
             String name = getName(inst);
 
-            if (inst->findDecorationImpl(kIROp_EntryPointDecoration))
+            if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
             {
                 // It's an entry point parameter
                 // The parameter is held in a struct so always deref
@@ -2695,7 +2695,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
             {
                 auto inst = action.inst;
 
-                if (inst->findDecorationImpl(kIROp_EntryPointDecoration))
+                if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
                 {
                     // Should only be one instruction marked this way
                     SLANG_ASSERT(entryPointGlobalParams == nullptr);

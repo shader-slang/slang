@@ -654,7 +654,14 @@ void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
 
 void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
-    auto profile = entryPointLayout->profile;
+    SLANG_UNUSED(entryPointLayout);
+
+    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecor);
+
+    //auto profile = entryPointLayout->profile;
+
+    auto profile = entryPointDecor->getProfile();
     auto stage = profile.GetStage();
 
     switch (stage)
@@ -695,50 +702,36 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointL
                 m_writer->emit(") in;\n");
             }
 
-            for (auto pp : entryPointLayout->getFuncDecl()->GetParameters())
+            // These decorations were moved from the parameters to the entry point by ir-glsl-legalize.
+            // The actual parameters have become potentially multiple global parameters.
+            if (auto decor = irFunc->findDecoration<IRGeometryPrimitiveTypeDecoration>())
             {
-                if (auto inputPrimitiveTypeModifier = pp->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                switch (decor->op)
                 {
-                    if (as<HLSLTriangleModifier>(inputPrimitiveTypeModifier))
+                    case kIROp_TrianglePrimitiveTypeDecoration:       m_writer->emit("layout(triangles) in;\n"); break;
+                    case kIROp_LinePrimitiveTypeDecoration:           m_writer->emit("layout(lines) in;\n"); break;
+                    case kIROp_LineAdjPrimitiveTypeDecoration:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
+                    case kIROp_PointPrimitiveTypeDecoration:          m_writer->emit("layout(points) in;\n"); break;
+                    case kIROp_TriangleAdjPrimitiveTypeDecoration:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
+                    default:
                     {
-                        m_writer->emit("layout(triangles) in;\n");
-                    }
-                    else if (as<HLSLLineModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(lines) in;\n");
-                    }
-                    else if (as<HLSLLineAdjModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(lines_adjacency) in;\n");
-                    }
-                    else if (as<HLSLPointModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(points) in;\n");
-                    }
-                    else if (as<HLSLTriangleAdjModifier>(inputPrimitiveTypeModifier))
-                    {
-                        m_writer->emit("layout(triangles_adjacency) in;\n");
-                    }
-                }
-
-                if (auto outputStreamType = as<HLSLStreamOutputType>(pp->type))
-                {
-                    if (as<HLSLTriangleStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(triangle_strip) out;\n");
-                    }
-                    else if (as<HLSLLineStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(line_strip) out;\n");
-                    }
-                    else if (as<HLSLPointStreamType>(outputStreamType))
-                    {
-                        m_writer->emit("layout(points) out;\n");
+                        SLANG_ASSERT(!"Unknown primitive type");
                     }
                 }
             }
 
+            if (auto decor = irFunc->findDecoration<IRStreamOutputTypeDecoration>())
+            {
+                IRType* type = decor->getStreamType();
 
+                switch (type->op)
+                {
+                    case kIROp_HLSLPointStreamType:     m_writer->emit("layout(points) out;\n"); break;
+                    case kIROp_HLSLLineStreamType:      m_writer->emit("layout(line_strip) out;\n"); break;
+                    case kIROp_HLSLTriangleStreamType:  m_writer->emit("layout(triangle_strip) out;\n"); break;
+                    default: SLANG_ASSERT(!"Unknown stream out type");
+                }    
+            }
         }
         break;
         case Stage::Pixel:

@@ -250,7 +250,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
                     globalParam = builder->createGlobalParam(paramStructType);
 
                     // Mark that this global comes from the entry point
-                    builder->addEntryPointDecoration(globalParam);
+                    builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
                 }
 
                 // No matter what, the global shader parameter should have the layout

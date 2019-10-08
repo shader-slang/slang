@@ -222,8 +222,13 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
 void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
 {
+    SLANG_UNUSED(entryPointLayout);
+
+    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecor);
+
     auto profile = m_effectiveProfile;
-    auto stage = entryPointLayout->profile.GetStage();
+    auto stage = entryPointDecor->getProfile().GetStage();
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
@@ -668,28 +673,16 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
+    if (auto decor = param->findDecoration<IRGeometryPrimitiveTypeDecoration>())
     {
-        Layout* layout = layoutDecor->getLayout();
-        VarLayout* varLayout = as<VarLayout>(layout);
-
-        if (varLayout)
+        switch (decor->op)
         {
-            auto var = varLayout->getVariable();
-
-            if (auto primTypeModifier = var->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
-            {
-                if (as<HLSLTriangleModifier>(primTypeModifier))
-                    m_writer->emit("triangle ");
-                else if (as<HLSLPointModifier>(primTypeModifier))
-                    m_writer->emit("point ");
-                else if (as<HLSLLineModifier>(primTypeModifier))
-                    m_writer->emit("line ");
-                else if (as<HLSLLineAdjModifier>(primTypeModifier))
-                    m_writer->emit("lineadj ");
-                else if (as<HLSLTriangleAdjModifier>(primTypeModifier))
-                    m_writer->emit("triangleadj ");
-            }
+            case kIROp_TrianglePrimitiveTypeDecoration:             m_writer->emit("triangle "); break;
+            case kIROp_PointPrimitiveTypeDecoration:                m_writer->emit("point "); break;
+            case kIROp_LinePrimitiveTypeDecoration:                 m_writer->emit("line "); break;
+            case kIROp_LineAdjPrimitiveTypeDecoration:              m_writer->emit("lineadj "); break;
+            case kIROp_TriangleAdjPrimitiveTypeDecoration:          m_writer->emit("triangleadj "); break;
+            default: SLANG_ASSERT(!"Unknown primitive type"); break;
         }
     }
 
