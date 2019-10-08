@@ -220,13 +220,75 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     m_writer->emit("}\n");
 }
 
-void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 {
-    SLANG_UNUSED(entryPointLayout);
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
 
-    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
-    SLANG_ASSERT(entryPointDecor);
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            m_writer->emit("RW");
+            break;
 
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            m_writer->emit("RasterizerOrdered");
+            break;
+
+        case SLANG_RESOURCE_ACCESS_APPEND:
+            m_writer->emit("Append");
+            break;
+
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+            m_writer->emit("Consume");
+            break;
+
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
+            break;
+    }
+
+    switch (texType->GetBaseShape())
+    {
+        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
+        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
+        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
+        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
+        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+            break;
+    }
+
+    if (texType->isMultisample())
+    {
+        m_writer->emit("MS");
+    }
+    if (texType->isArray())
+    {
+        m_writer->emit("Array");
+    }
+    m_writer->emit("<");
+    emitType(texType->getElementType());
+    m_writer->emit(" >");
+}
+
+void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
+{
+    auto layout = getVarLayout(inst); 
+    if (layout)
+    {
+        _emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
+    }
+}
+
+void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+{
+    _emitHLSLParameterGroup(varDecl, type);
+}
+
+void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
+{
     auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().GetStage();
 
@@ -341,79 +403,6 @@ void HLSLSourceEmitter::_emitHLSLEntryPointAttributes(IRFunc* irFunc, EntryPoint
         default:
             break;
     }
-}
-
-
-void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
-{
-    switch (texType->getAccess())
-    {
-        case SLANG_RESOURCE_ACCESS_READ:
-            break;
-
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
-            m_writer->emit("RW");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            m_writer->emit("RasterizerOrdered");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_APPEND:
-            m_writer->emit("Append");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_CONSUME:
-            m_writer->emit("Consume");
-            break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
-            break;
-    }
-
-    switch (texType->GetBaseShape())
-    {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-            break;
-    }
-
-    if (texType->isMultisample())
-    {
-        m_writer->emit("MS");
-    }
-    if (texType->isArray())
-    {
-        m_writer->emit("Array");
-    }
-    m_writer->emit("<");
-    emitType(texType->getElementType());
-    m_writer->emit(" >");
-}
-
-void HLSLSourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
-{
-    auto layout = getVarLayout(inst);
-    if (layout)
-    {
-        _emitHLSLRegisterSemantics(layout, uniformSemanticSpelling);
-    }
-}
-
-void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
-{
-    _emitHLSLParameterGroup(varDecl, type);
-}
-
-void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
-{
-    _emitHLSLEntryPointAttributes(irFunc, entryPointLayout);
 }
 
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
