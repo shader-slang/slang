@@ -1246,6 +1246,48 @@ void legalizeEntryPointParameterForGLSL(
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
+    // (JS): In the legalization process parameters are moved from the entry point.
+    // So when we get to emit we have a problem in that we can't use parameters to find important decorations
+    // And in the future we will not have front end 'Layout' available. To work around this, we take the
+    // decorations that need special handling from parameters and put them on the IRFunc.
+    //
+    // This is only appropriate of course if there is only one of each for all parameters...
+    // which is what current emit code assumes, but may not be more generally applicable.
+    if (auto geomDecor = pp->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+    {
+        if (!func->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+        {
+            builder->addDecoration(func, geomDecor->op);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Only expected a single parameter to have IRGeometryPrimitiveTypeDecoration decoration");
+        }
+    }
+
+    // There *can* be multiple streamout parameters, to an entry point (points if nothing else)
+    {
+        IRType* type = pp->getFullType();
+        // Strip out type 
+        if (auto outType = as<IROutTypeBase>(type))
+        {
+            type = outType->getValueType();
+        }
+
+        if (auto streamType = as<IRHLSLStreamOutputType>(type))
+        {
+            if (auto decor = func->findDecoration<IRStreamOutputTypeDecoration>())
+            {
+                // If it has the same stream out type, we *may* be ok (might not work for all types of streams)
+                SLANG_ASSERT(decor->getStreamType()->op == streamType->op);
+            }
+            else
+            {
+                builder->addDecoration(func, kIROp_StreamOutputTypeDecoration, streamType);
+            }
+        }
+    }
+
     // We need to create a global variable that will replace the parameter.
     // It seems superficially obvious that the variable should have
     // the same type as the parameter.
@@ -1288,8 +1330,6 @@ void legalizeEntryPointParameterForGLSL(
             //
             // For now we will just try to deal with `Append` calls
             // directly in this function.
-
-
 
             for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
             {

@@ -152,10 +152,6 @@ public:
 
     void emitStringLiteral(const String& value);
 
-    void setSampleRateFlag();
-
-    void doSampleRateInputCheck(Name* name);
-
     void emitVal(IRInst* val, const EmitOpInfo& outerPrec);
 
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);

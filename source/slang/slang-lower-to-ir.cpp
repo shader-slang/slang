@@ -6338,7 +6338,48 @@ static void lowerFrontEndEntryPointToIR(
     {
         instToDecorate = findGenericReturnVal(irGeneric);
     }
-    builder->addEntryPointDecoration(instToDecorate);
+    builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile());
+
+    // Go through the entry point parameters creating decorations from layout as appropriate
+    {
+        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
+
+        IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
+        if (valueWithParams)
+        {
+            IRParam* irParam = valueWithParams->getFirstParam();
+
+            for (auto param : params)
+            {
+                if (auto modifier = param->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                {
+                    IROp op = kIROp_Invalid;
+
+                    if (as<HLSLTriangleModifier>(modifier))
+                        op = kIROp_TrianglePrimitiveTypeDecoration;
+                    else if (as<HLSLPointModifier>(modifier))
+                        op = kIROp_PointPrimitiveTypeDecoration;
+                    else if (as<HLSLLineModifier>(modifier))
+                        op = kIROp_LinePrimitiveTypeDecoration; 
+                    else if (as<HLSLLineAdjModifier>(modifier))
+                        op = kIROp_LineAdjPrimitiveTypeDecoration;
+                    else if (as<HLSLTriangleAdjModifier>(modifier))
+                        op = kIROp_TriangleAdjPrimitiveTypeDecoration;
+
+                    if (op != kIROp_Invalid)
+                    {
+                        builder->addDecoration(irParam, op);
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("unhandled primitive type");
+                    }
+                }
+
+                irParam = irParam->getNextParam();
+            }
+        }
+    }
 }
 
 static void lowerProgramEntryPointToIR(

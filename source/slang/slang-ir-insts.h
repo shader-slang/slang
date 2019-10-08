@@ -287,13 +287,43 @@ struct IRNumThreadsDecoration : IRDecoration
     IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
 };
 
+struct IREntryPointDecoration : IRDecoration
+{
+    enum { kOp = kIROp_EntryPointDecoration };
+    IR_LEAF_ISA(EntryPointDecoration)
+
+    IRIntLit* getProfileInst() { return cast<IRIntLit>(getOperand(0)); }
+    Profile getProfile() { return Profile(Profile::RawVal(GetIntVal(getProfileInst()))); }
+};
+
+struct IRGeometryPrimitiveTypeDecoration: IRDecoration
+{
+    enum { kOp = kIROp_GeometryPrimitiveTypeDecoration };
+    IR_PARENT_ISA(GeometryPrimitiveTypeDecoration)
+};
+
+IR_SIMPLE_DECORATION(PointPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LinePrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TrianglePrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LineAdjPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TriangleAdjPrimitiveTypeDecoration)
+
+    /// This is a bit of a hack. The problem is that when GLSL legalization takes place
     /// A decoration that marks a value as having linkage.
     ///
     /// A value with linkage is either exported from its module,
     /// or will have a definition imported from another module.
     /// In either case, it requires a mangled name to use when
     /// matching imports and exports.
-    ///
+struct IRStreamOutputTypeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_StreamOutputTypeDecoration };
+    IR_LEAF_ISA(StreamOutputTypeDecoration)
+
+    IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
+};
+
+
 struct IRLinkageDecoration : IRDecoration
 {
     IR_PARENT_ISA(LinkageDecoration)
@@ -1368,9 +1398,9 @@ struct IRBuilder
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
     }
 
-    void addEntryPointDecoration(IRInst* value)
+    void addEntryPointDecoration(IRInst* value, Profile profile)
     {
-        addDecoration(value, kIROp_EntryPointDecoration);
+        addDecoration(value, kIROp_EntryPointDecoration, getIntValue(getIntType(), profile.raw));
     }
 
     void addKeepAliveDecoration(IRInst* value)
