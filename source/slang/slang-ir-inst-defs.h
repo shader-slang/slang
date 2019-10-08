@@ -423,15 +423,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
 
         // Added to IRParam parameters to an entry point
-    INST(GeometryPrimitiveTypeDecoration,  geometryPrimitiveTypeDecoration, 1, 0)
-
-    /* GeometryPrimitiveTypeDecoration */
-        INST(PointPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)
-        INST(LinePrimitiveTypeDecoration,   linePrimitiveType,      0, 0)
-        INST(TrianglePrimitiveTypeDecoration, trianglePrimitiveType, 0, 0)
-        INST(LineAdjPrimitiveTypeDecoration,  lineAdjPrimitiveType,  0, 0)
-        INST(TriangleAdjPrimitiveTypeDecoration, triangleAdjPrimitiveType, 0, 0)
-    INST_RANGE(GeometryPrimitiveTypeDecoration, PointPrimitiveTypeDecoration, TriangleAdjPrimitiveTypeDecoration)
+    /* GeometryInputPrimitiveTypeDecoration */
+        INST(PointInputPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)
+        INST(LineInputPrimitiveTypeDecoration,   linePrimitiveType,      0, 0)
+        INST(TriangleInputPrimitiveTypeDecoration, trianglePrimitiveType, 0, 0)
+        INST(LineAdjInputPrimitiveTypeDecoration,  lineAdjPrimitiveType,  0, 0)
+        INST(TriangleAdjInputPrimitiveTypeDecoration, triangleAdjPrimitiveType, 0, 0)
+    INST_RANGE(GeometryInputPrimitiveTypeDecoration, PointInputPrimitiveTypeDecoration, TriangleAdjInputPrimitiveTypeDecoration)
 
     INST(StreamOutputTypeDecoration,       streamOutputTypeDecoration,    1, 0)
 

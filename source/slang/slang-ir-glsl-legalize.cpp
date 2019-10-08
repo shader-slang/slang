@@ -1253,15 +1253,15 @@ void legalizeEntryPointParameterForGLSL(
     //
     // This is only appropriate of course if there is only one of each for all parameters...
     // which is what current emit code assumes, but may not be more generally applicable.
-    if (auto geomDecor = pp->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+    if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        if (!func->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
             builder->addDecoration(func, geomDecor->op);
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have IRGeometryPrimitiveTypeDecoration decoration");
+            SLANG_UNEXPECTED("Only expected a single parameter to have IRGeometryInputPrimitiveTypeDecoration decoration");
         }
     }
 

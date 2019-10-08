@@ -6356,15 +6356,15 @@ static void lowerFrontEndEntryPointToIR(
                     IROp op = kIROp_Invalid;
 
                     if (as<HLSLTriangleModifier>(modifier))
-                        op = kIROp_TrianglePrimitiveTypeDecoration;
+                        op = kIROp_TriangleInputPrimitiveTypeDecoration;
                     else if (as<HLSLPointModifier>(modifier))
-                        op = kIROp_PointPrimitiveTypeDecoration;
+                        op = kIROp_PointInputPrimitiveTypeDecoration;
                     else if (as<HLSLLineModifier>(modifier))
-                        op = kIROp_LinePrimitiveTypeDecoration; 
+                        op = kIROp_LineInputPrimitiveTypeDecoration; 
                     else if (as<HLSLLineAdjModifier>(modifier))
-                        op = kIROp_LineAdjPrimitiveTypeDecoration;
+                        op = kIROp_LineAdjInputPrimitiveTypeDecoration;
                     else if (as<HLSLTriangleAdjModifier>(modifier))
-                        op = kIROp_TriangleAdjPrimitiveTypeDecoration;
+                        op = kIROp_TriangleAdjInputPrimitiveTypeDecoration;
 
                     if (op != kIROp_Invalid)
                     {
