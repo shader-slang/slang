@@ -289,8 +289,6 @@ void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
 
 void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    SLANG_ASSERT(entryPointDecor);
-
     auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().GetStage();
 
