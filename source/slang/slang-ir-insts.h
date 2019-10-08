@@ -296,24 +296,23 @@ struct IREntryPointDecoration : IRDecoration
     Profile getProfile() { return Profile(Profile::RawVal(GetIntVal(getProfileInst()))); }
 };
 
-struct IRGeometryPrimitiveTypeDecoration: IRDecoration
+struct IRGeometryInputPrimitiveTypeDecoration: IRDecoration
 {
-    IR_PARENT_ISA(GeometryPrimitiveTypeDecoration)
+    IR_PARENT_ISA(GeometryInputPrimitiveTypeDecoration)
 };
 
-IR_SIMPLE_DECORATION(PointPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(LinePrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(TrianglePrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(LineAdjPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(TriangleAdjPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(PointInputPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LineInputPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TriangleInputPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(LineAdjInputPrimitiveTypeDecoration)
+IR_SIMPLE_DECORATION(TriangleAdjInputPrimitiveTypeDecoration)
 
     /// This is a bit of a hack. The problem is that when GLSL legalization takes place
-    /// A decoration that marks a value as having linkage.
-    ///
-    /// A value with linkage is either exported from its module,
-    /// or will have a definition imported from another module.
-    /// In either case, it requires a mangled name to use when
-    /// matching imports and exports.
+    /// the parameters from the entry point are globalized *and* potentially split
+    /// So even if we did copy a suitable decoration onto the globalized parameters,
+    /// it would potentially output multiple times without extra logic.
+    /// Using this decoration we can copy the StreamOut type to the entry point, and then
+    /// emit as part of entry point attribute emitting.  
 struct IRStreamOutputTypeDecoration : IRDecoration
 {
     enum { kOp = kIROp_StreamOutputTypeDecoration };
@@ -322,7 +321,11 @@ struct IRStreamOutputTypeDecoration : IRDecoration
     IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
 };
 
-
+    /// A decoration that marks a value as having linkage. 
+    /// A value with linkage is either exported from its module,
+    /// or will have a definition imported from another module.
+    /// In either case, it requires a mangled name to use when
+    /// matching imports and exports.
 struct IRLinkageDecoration : IRDecoration
 {
     IR_PARENT_ISA(LinkageDecoration)
