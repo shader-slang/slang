@@ -1336,14 +1336,20 @@ SlangResult dissassembleDXILUsingDXC(
             rawSourceLanguage = SourceLanguage::CPP;
         }
 
-        List<String> tempFiles;
+        // Generate a path a temporary filename for output module
+        String modulePath;
+        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
 
         if (!useOriginalFile)
         {
-            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), compileSourcePath));
+            // We need to create a new file which has the source. We'll use the module generated name as the basis
+            compileSourcePath = modulePath;
+
+            // NOTE: Strictly speaking producing filenames by modifying the generateTemporary path that may introduce a temp filename clash, but in practice is extraordinary unlikely
+
+            compileSourcePath.append("-src");
 
             // Make the temporary filename have the appropriate extension.
-            // NOTE: Strictly speaking that may introduce a temp filename clash, but in practice is extraordinary unlikely
             if (rawSourceLanguage == SourceLanguage::C)
             {
                 compileSourcePath.append(".c");
@@ -1375,10 +1381,6 @@ SlangResult dissassembleDXILUsingDXC(
 
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
-
-        // Generate a path a temporary filename for output module
-        String modulePath;
-        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
 
         // Remove the temporary path/file when done
         temporaryFileSet.add(modulePath);
