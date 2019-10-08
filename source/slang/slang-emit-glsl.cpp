@@ -652,14 +652,9 @@ void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
     _emitGLSLParameterGroup(varDecl, type);
 }
 
-void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    SLANG_UNUSED(entryPointLayout);
-
-    IREntryPointDecoration* entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
-
-    //auto profile = entryPointLayout->profile;
 
     auto profile = entryPointDecor->getProfile();
     auto stage = profile.GetStage();

@@ -2476,9 +2476,9 @@ String CLikeSourceEmitter::getFuncName(IRFunc* func)
 }
 
 
-void CLikeSourceEmitter::emitEntryPointAttributes(IRFunc* irFunc, EntryPointLayout* entryPointLayout)
+void CLikeSourceEmitter::emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    emitEntryPointAttributesImpl(irFunc, entryPointLayout);
+    emitEntryPointAttributesImpl(irFunc, entryPointDecor);
 }
 
 void CLikeSourceEmitter::emitPhiVarDecls(IRFunc* func)
@@ -2544,10 +2544,9 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     // Deal with decorations that need
     // to be emitted as attributes
-    auto entryPointLayout = asEntryPoint(func);
-    if (entryPointLayout)
+    if ( IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
     {
-        emitEntryPointAttributes(func, entryPointLayout);
+        emitEntryPointAttributes(func, entryPointDecor);
     }
 
     auto name = getFuncName(func);
