@@ -662,15 +662,15 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    if (auto decor = param->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+    if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
         switch (decor->op)
         {
-            case kIROp_TrianglePrimitiveTypeDecoration:             m_writer->emit("triangle "); break;
-            case kIROp_PointPrimitiveTypeDecoration:                m_writer->emit("point "); break;
-            case kIROp_LinePrimitiveTypeDecoration:                 m_writer->emit("line "); break;
-            case kIROp_LineAdjPrimitiveTypeDecoration:              m_writer->emit("lineadj "); break;
-            case kIROp_TriangleAdjPrimitiveTypeDecoration:          m_writer->emit("triangleadj "); break;
+            case kIROp_TriangleInputPrimitiveTypeDecoration:             m_writer->emit("triangle "); break;
+            case kIROp_PointInputPrimitiveTypeDecoration:                m_writer->emit("point "); break;
+            case kIROp_LineInputPrimitiveTypeDecoration:                 m_writer->emit("line "); break;
+            case kIROp_LineAdjInputPrimitiveTypeDecoration:              m_writer->emit("lineadj "); break;
+            case kIROp_TriangleAdjInputPrimitiveTypeDecoration:          m_writer->emit("triangleadj "); break;
             default: SLANG_ASSERT(!"Unknown primitive type"); break;
         }
     }

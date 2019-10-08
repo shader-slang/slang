@@ -699,15 +699,15 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
             // These decorations were moved from the parameters to the entry point by ir-glsl-legalize.
             // The actual parameters have become potentially multiple global parameters.
-            if (auto decor = irFunc->findDecoration<IRGeometryPrimitiveTypeDecoration>())
+            if (auto decor = irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
             {
                 switch (decor->op)
                 {
-                    case kIROp_TrianglePrimitiveTypeDecoration:       m_writer->emit("layout(triangles) in;\n"); break;
-                    case kIROp_LinePrimitiveTypeDecoration:           m_writer->emit("layout(lines) in;\n"); break;
-                    case kIROp_LineAdjPrimitiveTypeDecoration:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
-                    case kIROp_PointPrimitiveTypeDecoration:          m_writer->emit("layout(points) in;\n"); break;
-                    case kIROp_TriangleAdjPrimitiveTypeDecoration:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
+                    case kIROp_TriangleInputPrimitiveTypeDecoration:       m_writer->emit("layout(triangles) in;\n"); break;
+                    case kIROp_LineInputPrimitiveTypeDecoration:           m_writer->emit("layout(lines) in;\n"); break;
+                    case kIROp_LineAdjInputPrimitiveTypeDecoration:        m_writer->emit("layout(lines_adjacency) in;\n"); break;
+                    case kIROp_PointInputPrimitiveTypeDecoration:          m_writer->emit("layout(points) in;\n"); break;
+                    case kIROp_TriangleAdjInputPrimitiveTypeDecoration:    m_writer->emit("layout(triangles_adjacency) in;\n"); break;
                     default:
                     {
                         SLANG_ASSERT(!"Unknown primitive type");
