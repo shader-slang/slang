@@ -298,7 +298,6 @@ struct IREntryPointDecoration : IRDecoration
 
 struct IRGeometryPrimitiveTypeDecoration: IRDecoration
 {
-    enum { kOp = kIROp_GeometryPrimitiveTypeDecoration };
     IR_PARENT_ISA(GeometryPrimitiveTypeDecoration)
 };
 
