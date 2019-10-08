@@ -434,7 +434,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(StreamOutputTypeDecoration,       streamOutputTypeDecoration,    1, 0)
 
         /// An `[entryPoint]` decoration marks a function that represents a shader entry point
-    INST(EntryPointDecoration,              entryPoint,             1, 0)
+    INST(EntryPointDecoration,              entryPoint,             2, 0)
 
         /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
     INST(EntryPointParamDecoration,         entryPointParam,        0, 0)

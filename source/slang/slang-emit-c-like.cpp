@@ -601,17 +601,22 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     }
 
     auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>();
-    if (entryPointDecor && getSourceStyle() == SourceStyle::GLSL)
+    if (entryPointDecor)
     {
-        // GLSL will always need to use `main` as the
-        // name for an entry-point function, but other
-        // targets should try to use the original name.
-        //
-        // TODO: always use the original name, and
-        // use the appropriate options for glslang to
-        // make it support a non-`main` name.
-        //
-        return "main";
+        if (getSourceStyle() == SourceStyle::GLSL)
+        {
+            // GLSL will always need to use `main` as the
+            // name for an entry-point function, but other
+            // targets should try to use the original name.
+            //
+            // TODO: always use the original name, and
+            // use the appropriate options for glslang to
+            // make it support a non-`main` name.
+            //
+            return "main";
+        }
+
+        return entryPointDecor->getName()->getStringSlice();
     }
 
     // If we have a name hint on the instruction, then we will try to use that
@@ -632,13 +637,6 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     //
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
     {
-        // We need to special case entry points to use the name as given.
-        if (entryPointDecor)
-        {
-            // Just use the name as given
-            return nameHintDecoration->getName();
-        }
-
         // The name we output will basically be:
         //
         //      <nameHint>_<uniqueID>
