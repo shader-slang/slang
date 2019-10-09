@@ -6338,7 +6338,11 @@ static void lowerFrontEndEntryPointToIR(
     {
         instToDecorate = findGenericReturnVal(irGeneric);
     }
-    builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile());
+
+    {
+        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile(), entryPointName->text.getUnownedSlice());
+    }
 
     // Go through the entry point parameters creating decorations from layout as appropriate
     {

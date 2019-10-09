@@ -1,6 +1,6 @@
 result code = 0
 standard error = {
-[entryPoint(6)]
+[entryPoint(6, "main")]
 [numThreads(1, 1, 1)]
 [export("_S3tu04mainp1puV")]
 [nameHint("main")]

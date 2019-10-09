@@ -239,8 +239,6 @@ public:
         // Is an IR function a definition? (otherwise it is a declaration)
     bool isDefinition(IRFunc* func);
 
-    String getFuncName(IRFunc* func);
-
     void emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor);
 
     void emitPhiVarDecls(IRFunc* func);

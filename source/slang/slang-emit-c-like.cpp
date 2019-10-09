@@ -600,6 +600,25 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return String(intrinsicDecoration->getDefinition());
     }
 
+    auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>();
+    if (entryPointDecor)
+    {
+        if (getSourceStyle() == SourceStyle::GLSL)
+        {
+            // GLSL will always need to use `main` as the
+            // name for an entry-point function, but other
+            // targets should try to use the original name.
+            //
+            // TODO: always use the original name, and
+            // use the appropriate options for glslang to
+            // make it support a non-`main` name.
+            //
+            return "main";
+        }
+
+        return entryPointDecor->getName()->getStringSlice();
+    }
+
     // If we have a name hint on the instruction, then we will try to use that
     // to provide the actual name in the output code.
     //
@@ -2448,34 +2467,6 @@ bool CLikeSourceEmitter::isDefinition(IRFunc* func)
     return func->getFirstBlock() != nullptr;
 }
 
-String CLikeSourceEmitter::getFuncName(IRFunc* func)
-{
-    if (auto entryPointLayout = asEntryPoint(func))
-    {
-        // GLSL will always need to use `main` as the
-        // name for an entry-point function, but other
-        // targets should try to use the original name.
-        //
-        // TODO: always use the original name, and
-        // use the appropriate options for glslang to
-        // make it support a non-`main` name.
-        //
-        if (getSourceStyle() != SourceStyle::GLSL)
-        {
-            return getText(entryPointLayout->getFuncDecl()->getName());
-        }
-
-        //
-
-        return "main";
-    }
-    else
-    {
-        return getName(func);
-    }
-}
-
-
 void CLikeSourceEmitter::emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
     emitEntryPointAttributesImpl(irFunc, entryPointDecor);
@@ -2549,7 +2540,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         emitEntryPointAttributes(func, entryPointDecor);
     }
 
-    auto name = getFuncName(func);
+    auto name = getName(func);
 
     emitType(resultType, name);
 
@@ -2657,7 +2648,7 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
 
-    auto name = getFuncName(func);
+    auto name = getName(func);
 
     emitType(resultType, name);
 

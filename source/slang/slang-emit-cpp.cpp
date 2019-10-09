@@ -1939,15 +1939,14 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
 
-    auto name = getFuncName(func);
+    auto name = getName(func);
 
     // Deal with decorations that need
     // to be emitted as attributes
 
     // We are going to ignore the parameters passed and just pass in the Context
 
-    auto entryPointLayout = asEntryPoint(func);
-    if (entryPointLayout)
+    if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
     {
         StringBuilder prefixName;
         prefixName << "_" << name;
@@ -2809,8 +2808,9 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         {
             IRFunc* func = as<IRFunc>(action.inst);
 
-            auto entryPointLayout = asEntryPoint(func);
-            if (entryPointLayout && entryPointLayout->profile.GetStage() == Stage::Compute)
+            IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+          
+            if (entryPointDecor && entryPointDecor->getProfile().GetStage() == Stage::Compute)
             {
                 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sv-dispatchthreadid
                 // SV_DispatchThreadID is the sum of SV_GroupID * numthreads and GroupThreadID.
@@ -2818,7 +2818,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 Int groupThreadSize[kThreadGroupAxisCount];
                 getComputeThreadGroupSize(func, groupThreadSize);
                 
-                String funcName = getFuncName(func);
+                String funcName = getName(func);
 
                 {
                     StringBuilder builder;
@@ -2852,7 +2852,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 // Emit the group version which runs for all elements in *single* thread group
                 {
                     StringBuilder builder;
-                    builder << getFuncName(func);
+                    builder << getName(func);
                     builder << "_Group";
 
                     String groupFuncName = builder;
