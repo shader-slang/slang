@@ -2365,7 +2365,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
         for( auto p : originalStructTypeLayout->mapVarToLayout )
         {
-            Decl* key = p.Key;
+            VarDeclBase* key = p.Key;
             RefPtr<VarLayout> originalVal = p.Value;
             RefPtr<VarLayout> adjustedVal;
             if( mapOriginalFieldToAdjusted.TryGetValue(originalVal, adjustedVal) )

@@ -1249,7 +1249,7 @@ static LegalVal legalizeInst(
 RefPtr<VarLayout> findVarLayout(IRInst* value)
 {
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
-        return as<VarLayout>(layoutDecoration->getLayout());
+        return as<VarLayout>(layoutDecoration->getIRLayout()->getASTLayout());
     return nullptr;
 }
 

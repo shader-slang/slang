@@ -222,6 +222,11 @@ struct DeadCodeEliminationContext
         //
         if(inst->mightHaveSideEffects())
             return true;
+
+        // If it's a layout instruction we don't want to remove it
+        if (as<IRLayout>(inst))
+            return true;
+
         //
         // The `mightHaveSideEffects` query is conservative, and will
         // return `true` as its default mode, so once we are past that

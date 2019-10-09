@@ -15,15 +15,14 @@ namespace Slang
     // Clone the IR values reachable from the given entry point
     // into the IR module associated with the specialization state.
     // When multiple definitions of a symbol are found, the one
-    // that is best specialized for the given `targetReq` will be
-    // used.
+    // that is best specialized for the appropriate compilation
+    // target will be used.
     //
     LinkedIR linkIR(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
-        ProgramLayout*          programLayout,
+        Int                     entryPointIndex,
         CodeGenTarget           target,
-        TargetRequest*          targetReq);
+        TargetProgram*          targetProgram);
 
     // Replace any global constants in the IR module with their
     // definitions, if possible.

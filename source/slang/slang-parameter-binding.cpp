@@ -3227,6 +3227,10 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
     if( !m_layout )
     {
         m_layout = generateParameterBindings(this, sink);
+        if( m_layout )
+        {
+            m_irModuleForLayout = createIRModuleForLayout(sink);
+        }
     }
     return m_layout;
 }

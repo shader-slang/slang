@@ -6707,4 +6707,98 @@ RefPtr<IRModule> generateIRForSpecializedComponentType(
     return context.process(componentType, sink);
 }
 
+
+RefPtr<IRModule> TargetProgram::getOrCreateIRModuleForLayout(DiagnosticSink* sink)
+{
+    getOrCreateLayout(sink);
+    return m_irModuleForLayout;
+}
+
+RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
+{
+    if(m_irModuleForLayout)
+        return m_irModuleForLayout;
+
+
+    // Okay, now we need to fill it in.
+
+    auto programLayout = getOrCreateLayout(sink);
+    if(!programLayout)
+        return nullptr;
+
+    auto program = getProgram();
+    auto linkage = program->getLinkage();
+    auto session = linkage->getSessionImpl();
+
+    SharedIRGenContext sharedContextStorage(
+        session,
+        sink);
+    auto sharedContext = &sharedContextStorage;
+
+    IRGenContext contextStorage(sharedContext);
+    auto context = &contextStorage;
+
+    SharedIRBuilder sharedBuilderStorage;
+    auto sharedBuilder = &sharedBuilderStorage;
+    sharedBuilder->module = nullptr;
+    sharedBuilder->session = session;
+
+    IRBuilder builderStorage;
+    auto builder = &builderStorage;
+    builder->sharedBuilder = sharedBuilder;
+
+    RefPtr<IRModule> irModule = builder->createModule();
+    sharedBuilder->module = irModule;
+
+    builder->setInsertInto(irModule->getModuleInst());
+
+    context->irBuilder = builder;
+
+
+    // Okay, now we need to walk through and decorate everything.
+    auto globalStructLayout = getScopeStructLayout(programLayout);
+    for(auto globalVarPair : globalStructLayout->mapVarToLayout)
+    {
+        auto varDecl = globalVarPair.Key;
+        auto varLayout = globalVarPair.Value;
+
+        // Ensure that an `[import(...)]` declaration for the variable
+        // has been emitted to this module, so that we will have something
+        // to decorate.
+        //
+        auto irVar = getSimpleVal(context, ensureDecl(context, varDecl));
+
+        // Now attach the decoration to the variable.
+        //
+        builder->addLayoutDecoration(irVar, varLayout);
+    }
+
+    for( auto entryPointLayout : programLayout->entryPoints )
+    {
+        auto funcDeclRef = entryPointLayout->entryPoint;
+
+        auto irFuncType = lowerType(context, getFuncType(session, funcDeclRef));
+        auto irFunc = getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType));
+
+        if( !irFunc->findDecoration<IRLinkageDecoration>() )
+        {
+            builder->addImportDecoration(irFunc, getMangledName(funcDeclRef).getUnownedSlice());
+        }
+
+        builder->addLayoutDecoration(irFunc, entryPointLayout);
+    }
+
+    for( auto taggedUnionTypeLayout : programLayout->taggedUnionTypeLayouts )
+    {
+        auto taggedUnionType = taggedUnionTypeLayout->getType();
+        auto irType = lowerType(context, taggedUnionType);
+        builder->addLayoutDecoration(irType, taggedUnionTypeLayout);
+    }
+
+    m_irModuleForLayout = irModule;
+    return irModule;
+}
+
+
+
 } // namespace Slang

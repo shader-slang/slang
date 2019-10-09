@@ -25,23 +25,13 @@ public:
         BackEndCompileRequest* compileRequest = nullptr;
             // The target language we want to generate code for
         CodeGenTarget target = CodeGenTarget::Unknown;
-            // The entry point we are being asked to compile
-        EntryPoint* entryPoint = nullptr;
+            // The stage for the entry point we are being asked to compile
+        Stage entryPointStage = Stage::Unknown;
             // The "effective" profile that is being used to emit code,
             // combining information from the target and entry point.
         Profile effectiveProfile = Profile::RawEnum::Unknown;
 
         SourceWriter* sourceWriter = nullptr;
-            // The layout for the entry point
-        EntryPointLayout* entryPointLayout = nullptr;
-
-        ProgramLayout* programLayout = nullptr;
-            // We track the original global-scope layout so that we can
-            // find layout information for `import`ed parameters.
-            //
-            // TODO: This will probably change if we represent imports
-            // explicitly in the layout data.
-        StructTypeLayout* globalStructLayout = nullptr;
     };
 
     enum
@@ -361,11 +351,14 @@ public:
     
     BackEndCompileRequest* m_compileRequest = nullptr;
 
-    // The entry point we are being asked to compile
-    EntryPoint* m_entryPoint;
-
-    // The layout for the entry point
-    EntryPointLayout* m_entryPointLayout;
+    // The stage for which we are emitting code.
+    //
+    // TODO: We should support emitting code that includes multiple
+    // entry points for different stages, but this value is used
+    // in some very specific cases to determine how a construct
+    // should map to GLSL.
+    //
+    Stage m_entryPointStage;
 
     // The target language we want to generate code for
     CodeGenTarget m_target;
@@ -378,15 +371,6 @@ public:
     // We only want to emit each `import`ed module one time, so
     // we maintain a set of already-emitted modules.
     HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
-
-    // We track the original global-scope layout so that we can
-    // find layout information for `import`ed parameters.
-    //
-    // TODO: This will probably change if we represent imports
-    // explicitly in the layout data.
-    StructTypeLayout* m_globalStructLayout;
-
-    ProgramLayout* m_programLayout;
 
     ModuleDecl* m_program;
 
