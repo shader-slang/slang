@@ -156,13 +156,25 @@ SlangResult CPUMemoryBinding::_add(slang::VariableLayoutReflection* varLayout, s
         {
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
             auto elementCount = int(typeLayout->getElementCount());
-            const size_t stride = elementTypeLayout->getSize();
-            uint8_t* cur = (uint8_t*)dst;
-            for (int i = 0; i < elementCount; ++i)
+
+            if (elementCount == 0)
             {
-                Buffer elementBuffer;
-                _add(nullptr, elementTypeLayout, cur, elementBuffer);
-                cur += stride;
+                // We don't currently know the size that this array will be. So let's initially size it to 0.
+
+                CPPPrelude::Array<uint8_t>& dstBuf = *(CPPPrelude::Array<uint8_t>*)dst;
+                dstBuf.data = nullptr;
+                dstBuf.count = 0;
+            }
+            else
+            {
+                const size_t stride = elementTypeLayout->getSize();
+                uint8_t* cur = (uint8_t*)dst;
+                for (int i = 0; i < elementCount; ++i)
+                {
+                    Buffer elementBuffer;
+                    _add(nullptr, elementTypeLayout, cur, elementBuffer);
+                    cur += stride;
+                }
             }
             break;
         }
@@ -305,6 +317,11 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
     {
         return *this;
     }
+    SLANG_ASSERT(index >= 0);
+    if (index < 0)
+    {
+        return Location();
+    }
 
     auto typeLayout = m_typeLayout;
     uint8_t* cur = m_cur;
@@ -318,13 +335,24 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
             const auto elementCount = int(typeLayout->getElementCount());
             const auto elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            if (index < 0 || index >= elementCount)
+            if (elementCount == 0)
             {
-                SLANG_ASSERT(index < elementCount);
+                CPPPrelude::Array<uint8_t>& array = *(CPPPrelude::Array<uint8_t>*)cur;
+                if (index < array.count)
+                {
+                    return Location(elementTypeLayout, array.data + elementStride * index);
+                }
                 return Location();
             }
-
-            return Location(elementTypeLayout, cur + elementStride * index);
+            else
+            {
+                if (index >= elementCount)
+                {
+                    SLANG_ASSERT(index < elementCount);
+                    return Location();
+                }
+                return Location(elementTypeLayout, cur + elementStride * index);
+            }
         }
         default: break;
     }
@@ -332,6 +360,32 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
     return Location();
 }
 
+SlangResult CPUMemoryBinding::initValue(slang::TypeLayoutReflection* typeLayout, void* dst)
+{
+    // TODO(JS): FINISH OFF THIS!!
+
+    const auto kind = typeLayout->getKind();
+    switch (kind)
+    {
+        case slang::TypeReflection::Kind::ParameterBlock:
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        {
+            // Become pointers
+            *(void**)dst = nullptr;
+            break;
+        }
+        case slang::TypeReflection::Kind::Struct:
+        case slang::TypeReflection::Kind::Array:
+        {
+        }
+        case slang::TypeReflection::Kind::Matrix:
+        case slang::TypeReflection::Kind::Vector:
+
+        default: return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
 
 SlangResult CPUMemoryBinding::setBufferContents(const Location& location, const void* initialData, size_t sizeInBytes)
 {

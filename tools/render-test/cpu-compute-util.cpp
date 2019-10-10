@@ -191,9 +191,23 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             const auto kind = typeLayout->getKind();
             switch (kind)
             {
-                case slang::TypeReflection::Kind::Vector:
-                case slang::TypeReflection::Kind::Matrix:
                 case slang::TypeReflection::Kind::Array:
+                {
+                    auto elementCount = int(typeLayout->getElementCount());
+                    if (elementCount == 0)
+                    {
+                        if (srcEntry.type == ShaderInputType::Array)
+                        {
+                            // We need to set the size
+
+                        }
+                        break;
+                    }
+                    SLANG_RETURN_ON_FAIL(binding.setInplace(location, srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                case slang::TypeReflection::Kind::Vector:
+                case slang::TypeReflection::Kind::Matrix:                
                 case slang::TypeReflection::Kind::Scalar:
                 case slang::TypeReflection::Kind::Struct:
                 {

@@ -366,6 +366,25 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         }
     }
 
+    SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        if (elementCount.isInfinite())
+        {
+            // This is an unsized array, get information for element
+            auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
+
+            // So it is actually a Array<T> on CPU which is a pointer and a size
+            info.size = sizeof(void*) * 2;
+            info.alignment = sizeof(void*);
+
+            return info;
+        }
+        else
+        {
+            return Super::GetArrayLayout(elementInfo, elementCount);
+        }
+    }
+
     UniformLayoutInfo BeginStructLayout() override
     {
         return Super::BeginStructLayout();

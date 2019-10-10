@@ -50,6 +50,10 @@ struct CPUMemoryBinding
     SlangResult setNewBuffer(const Location& location, const void* initialData, size_t sizeInBytes, Buffer& outBuffer);
     SlangResult setObject(const Location& location, void* object);
     SlangResult setInplace(const Location& location, const void* data, size_t sizeInBytes);
+        /// Initialize memory with a 'sensible' value based on type. Pointer types become null.
+    SlangResult initValue(slang::TypeLayoutReflection* typeLayout, void* dst);
+    SlangResult initValue(const Location& location) { return initValue(location.getTypeLayout(), location.getPtr()); }
+    
     SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex);
     CPUMemoryBinding();
 

@@ -12,7 +12,7 @@ using namespace gfx;
 
 enum class ShaderInputType
 {
-    Buffer, Texture, Sampler, CombinedTextureSampler
+    Buffer, Texture, Sampler, CombinedTextureSampler, Array
 };
 
 enum class InputTextureContent
@@ -51,6 +51,11 @@ struct InputSamplerDesc
     bool isCompareSampler = false;
 };
 
+struct ArrayDesc
+{
+    int size = 0;
+};
+
 class ShaderInputLayoutEntry
 {
 public:
@@ -59,6 +64,7 @@ public:
     InputTextureDesc textureDesc;
     InputBufferDesc bufferDesc;
     InputSamplerDesc samplerDesc;
+    ArrayDesc arrayDesc;
     bool isOutput = false;
     bool isCPUOnly = false;
     int hlslBinding = -1;
