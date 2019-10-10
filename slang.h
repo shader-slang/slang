@@ -560,6 +560,9 @@ extern "C"
         /* Skip code generation step, just check the code and generate layout */
         SLANG_COMPILE_FLAG_NO_CODEGEN           = 1 << 4,
 
+        /* Obfuscate shader names on release products */
+        SLANG_COMPILE_FLAG_OBFUSCATE = 1 << 5,
+
         /* Deprecated flags: kept around to allow existing applications to
         compile. Note that the relevant features will still be left in
         their default state. */

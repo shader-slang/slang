@@ -775,6 +775,10 @@ struct OptionsParser
                 {
                     requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
                 }
+                else if (argStr == "-obfuscate")
+                {
+                    requestImpl->getBackEndReq()->obfuscateCode = true;
+                }
                 else if (argStr == "-file-system")
                 {
                     String name;
