@@ -637,7 +637,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     //
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
     {
-        // The name we output will basically be:
+        // The (non-obfuscated) name we output will basically be:
         //
         //      <nameHint>_<uniqueID>
         //
@@ -645,15 +645,28 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         // and we will omit the underscore if the (scrubbed)
         // name hint already ends with one.
         //
-
-        String nameHint = nameHintDecoration->getName();
-        nameHint = scrubName(nameHint);
+        // The obfuscated name we output will simply be:
+        //
+        //      _<uniqueID>
+        //
 
         StringBuilder sb;
-        sb.append(nameHint);
 
-        // Avoid introducing a double underscore
-        if(!nameHint.endsWith("_"))
+        if (!m_compileRequest->obfuscateCode)
+        {
+
+            String nameHint = nameHintDecoration->getName();
+            nameHint = scrubName(nameHint);
+
+            sb.append(nameHint);
+
+            // Avoid introducing a double underscore
+            if (!nameHint.endsWith("_"))
+            {
+                sb.append("_");
+            }
+        }
+        else
         {
             sb.append("_");
         }
