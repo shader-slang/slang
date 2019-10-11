@@ -199,7 +199,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                         if (srcEntry.type == ShaderInputType::Array)
                         {
                             // We need to set the size
-
+                            CPUMemoryBinding::Buffer buffer;
+                            SLANG_RETURN_ON_FAIL(binding.setArrayCount(location, srcEntry.arrayDesc.size, buffer));
                         }
                         break;
                     }

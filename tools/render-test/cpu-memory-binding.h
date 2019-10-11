@@ -43,6 +43,8 @@ struct CPUMemoryBinding
     slang::VariableLayoutReflection* getParameterByName(const char* name);
     slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
 
+        /// Finds which buffer starts at the ptr index
+    Slang::Index findBufferIndex(const void* ptr) const;
 
     Location find(const char* name);
 
@@ -53,6 +55,11 @@ struct CPUMemoryBinding
         /// Initialize memory with a 'sensible' value based on type. Pointer types become null.
     SlangResult initValue(slang::TypeLayoutReflection* typeLayout, void* dst);
     SlangResult initValue(const Location& location) { return initValue(location.getTypeLayout(), location.getPtr()); }
+
+        /// Set the size of a *non fixed size* array at location.
+        /// A non fixed size array is reflected as having a count of 0 elements.
+        /// Only returns a buffer in outBuffer if a new buffer is created. 
+    SlangResult setArrayCount(const Location& location, int count, Buffer& outBuffer);
     
     SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex);
     CPUMemoryBinding();
