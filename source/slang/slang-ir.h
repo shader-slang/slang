@@ -219,7 +219,108 @@ struct IRInstList : IRInstListBase
     Iterator end();
 };
 
+    /// A list of contiguous operands that can be iterated over as `IRInst`s.
+struct IROperandListBase
+{
+    IROperandListBase()
+        : m_begin(nullptr)
+        , m_end(nullptr)
+    {}
 
+    IROperandListBase(
+        IRUse* begin,
+        IRUse* end)
+        : m_begin(begin)
+        , m_end(end)
+    {}
+
+    struct Iterator
+    {
+    public:
+        Iterator()
+            : m_cursor(nullptr)
+        {}
+
+        Iterator(IRUse* use)
+            : m_cursor(use)
+        {}
+
+        IRInst* operator*() const
+        {
+            return m_cursor->get();
+        }
+
+        IRUse* getCursor() const { return m_cursor; }
+
+        void operator++()
+        {
+            m_cursor++;
+        }
+
+        bool operator!=(Iterator const& that) const
+        {
+            return m_cursor != that.m_cursor;
+        }
+
+    protected:
+        IRUse* m_cursor;
+    };
+
+    Iterator begin() const { return Iterator(m_begin); }
+    Iterator end() const { return Iterator(m_end); }
+
+    Int getCount() const { return m_end - m_begin; }
+
+    IRInst* operator[](Int index) const
+    {
+        return m_begin[index].get();
+    }
+
+protected:
+    IRUse* m_begin;
+    IRUse* m_end;
+};
+
+    /// A list of contiguous operands that can be iterated over as all being of type `T`.
+template<typename T>
+struct IROperandList : IROperandListBase
+{
+    typedef IROperandListBase Super;
+public:
+    IROperandList()
+    {}
+
+    IROperandList(
+        IRUse* begin,
+        IRUse* end)
+        : Super(begin, end)
+    {}
+
+    struct Iterator : public IROperandListBase::Iterator
+    {
+        typedef IROperandListBase::Iterator Super;
+    public:
+        Iterator()
+        {}
+
+        Iterator(IRUse* use)
+            : Super(use)
+        {}
+
+        T* operator*() const
+        {
+            return (T*) m_cursor->get();
+        }
+    };
+
+    Iterator begin() const { return Iterator(m_begin); }
+    Iterator end() const { return Iterator(m_end); }
+
+    T* operator[](Int index) const
+    {
+        return (T*) m_begin[index].get();
+    }
+};
 
 // Every value in the IR is an instruction (even things
 // like literal values).
@@ -259,6 +360,40 @@ struct IRInst
     IRDecoration* findDecorationImpl(IROp op);
     template<typename T>
     T* findDecoration();
+
+        /// Get all the attributes attached to this instruction.
+    IROperandListBase getAllAttrs();
+
+        /// Find the first attribute of type `T` attached to this instruction.
+    template<typename T>
+    T* findAttr()
+    {
+        for( auto attr : getAllAttrs() )
+        {
+            if(auto found = as<T>(attr))
+                return found;
+        }
+        return nullptr;
+    }
+
+        /// Find all attributes of type `T` attached to this instruction.
+        ///
+        /// This operation assumes that attributes are grouped by type,
+        /// so that all the attributes of type `T` are contiguous.
+        ///
+    template<typename T>
+    IROperandList<T> findAttrs()
+    {
+        auto allAttrs = getAllAttrs();
+        auto bb = allAttrs.begin();
+        auto end = allAttrs.end();
+        while(bb != end && !as<T>(*bb))
+            ++bb;
+        auto ee = bb;
+        while(ee != end && as<T>(*ee))
+            ++ee;
+        return IROperandList<T>(bb.getCursor(),ee.getCursor());
+    }
 
     // The first use of this value (start of a linked list)
     IRUse*      firstUse = nullptr;

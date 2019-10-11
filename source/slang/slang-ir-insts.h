@@ -370,129 +370,688 @@ struct IRLookupWitnessTable : IRInst
 
 // Layout decorations
 
-struct IRStageLayoutDecoration : public IRDecoration
+    /// A decoration that marks a field key as having been associated
+    /// with a particular simple semantic (e.g., `COLOR` or `SV_Position`,
+    /// but not a `register` semantic).
+    ///
+    /// This is currently needed so that we can round-trip HLSL `struct`
+    /// types that get used for varying input/output. This is an unfortunate
+    /// case where some amount of "layout" information can't just come
+    /// in via the `TypeLayout` part of things.
+    ///
+struct IRSemanticDecoration : public IRDecoration
 {
-    enum { kOp = kIROp_StageLayoutDecoration };
-    IR_LEAF_ISA(StageLayoutDecoration)
-
-    IRIntLit* getStageInst() { return cast<IRIntLit>(getOperand(0)); }
-    Stage getStage() { return Stage(GetIntVal(getStageInst())); }
-};
-
-struct IRSemanticDecorationBase : public IRDecoration
-{
-    IR_PARENT_ISA(SemanticDecorationBase)
+    IR_LEAF_ISA(SemanticDecoration)
 
     IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
+
     IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
     int getSemanticIndex() { return int(GetIntVal(getSemanticIndexOperand())); }
 };
 
-// A decoration that marks a field key as having been associated
-// with a particular simple semantic (e.g., `COLOR` or `SV_Position`,
-// but not a `register` semantic).
-//
-// This is currently needed so that we can round-trip HLSL `struct`
-// types that get used for varying input/output. This is an unfortunate
-// case where some amount of "layout" information can't just come
-// in via the `TypeLayout` part of things.
-//
-struct IRSemanticDecoration : IRSemanticDecorationBase
+    /// An attribute that can be attached to another instruction as an operand.
+    ///
+    /// Attributes serve a similar role to decorations, in that both are ways
+    /// to attach additional information to an instruction, where the operand
+    /// of the attribute/decoration identifies the purpose of the additional
+    /// information.
+    ///
+    /// The key difference between decorations and attributes is that decorations
+    /// are stored as children of an instruction (in terms of the ownership
+    /// hierarchy), while attributes are referenced as operands.
+    ///
+    /// The key benefit of having attributes be operands is that they must
+    /// be present at the time an instruction is created, which means that
+    /// they can affect the conceptual value/identity of an instruction
+    /// in cases where we deduplicate/hash instructions by value.
+    ///
+struct IRAttr : public IRInst
 {
-    enum { kOp = kIROp_SemanticDecoration };
-    IR_LEAF_ISA(SemanticDecoration)
+    IR_PARENT_ISA(Attr);
 };
 
-struct IRSystemSemanticDecoration : IRSemanticDecorationBase
+    /// An attribute that specifies layout information for a single resource kind.
+struct IRLayoutResourceInfoAttr : public IRAttr
 {
-    enum { kOp = kIROp_SystemSemanticDecoration };
-    IR_LEAF_ISA(SystemSemanticDecoration)
-};
+    IR_PARENT_ISA(LayoutResourceInfoAttr);
 
-/// Holds the resource usage. Typically bound to an IRVarLayout. Note that there can be multiple decorations,
-/// for each resource kind. That there should at most be one decoration connected to an instruction for a *kind*.
-struct IRResourceInfoLayoutDecoration : public IRDecoration
-{
-    enum { kOp = kIROp_ResourceInfoLayoutDecoration };
-    IR_LEAF_ISA(ResourceInfoLayoutDecoration)
-
-        // What kind of register was it?
     IRIntLit* getResourceKindInst() { return cast<IRIntLit>(getOperand(0)); }
-    LayoutResourceKind getResourceKind() { return (LayoutResourceKind)GetIntVal(getResourceKindInst()); }
+    LayoutResourceKind getResourceKind() { return LayoutResourceKind(GetIntVal(getResourceKindInst())); }
+};
 
-        // What binding space (HLSL) or set (Vulkan) are we placed in?
-    IRIntLit* getSpaceInst() { return cast<IRIntLit>(getOperand(1)); }
-    UInt getSpace() { return UInt(GetIntVal(getSpaceInst())); }
+    /// An attribute that specifies offset information for a single resource kind.
+    ///
+    /// This operation can appear as `varOffset(kind, offset)` or
+    /// `varOffset(kind, offset, space)`. The latter form is only
+    /// used when `space` is non-zero.
+    ///
+struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
+{
+    IR_LEAF_ISA(VarOffsetAttr);
 
-        // What is our starting register in that space?
-        //
-        // (In the case of uniform data, this is a byte offset)
-    IRIntLit* getIndexInst() { return cast<IRIntLit>(getOperand(2)); }
-    UInt getIndex() { return UInt(GetIntVal(getIndexInst())); }
+    IRIntLit* getOffsetInst() { return cast<IRIntLit>(getOperand(1)); }
+    UInt getOffset() { return UInt(GetIntVal(getOffsetInst())); }
+
+    IRIntLit* getSpaceInst()
+    {
+        if(getOperandCount() > 2)
+            return cast<IRIntLit>(getOperand(2));
+        return nullptr;
+    }
+
+    UInt getSpace()
+    {
+        if(auto spaceInst = getSpaceInst())
+            return UInt(GetIntVal(spaceInst));
+        return 0;
+    }
+};
+
+    /// An attribute that specifies size information for a single resource kind.
+struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
+{
+    IR_LEAF_ISA(TypeSizeAttr);
+
+    IRIntLit* getSizeInst() { return cast<IRIntLit>(getOperand(1)); }
+    LayoutSize getSize() { return LayoutSize::fromRaw(LayoutSize::RawValue(GetIntVal(getSizeInst()))); }
+    size_t getFiniteSize() { return getSize().getFiniteValue(); }
 };
 
 // Layout
 
+    /// Base type for instructions that represent layout information.
+    ///
+    /// Layout instructions are effectively just meta-data constants.
+    ///
 struct IRLayout : IRInst
 {
     IR_PARENT_ISA(Layout)
-
-        /// TODO(JS): Hold the pointer to the AST for now, whilst process of transitioning 
-        /// Over to using IR layout.
-    IRPtrLit* getASTLayoutOperand() { return cast<IRPtrLit>(getOperand(0)); }
-    Layout* getASTLayout() { return (VarLayout*)getASTLayoutOperand()->getValue(); }
 };
 
+struct IRVarLayout;
+
+    /// An attribute to specify that a layout has another layout attached for "pending" data.
+    ///
+    /// "Pending" data refers to the parts of a type or variable that
+    /// couldn't be laid out until the concrete types for existential
+    /// type slots were filled in. The layout of pending data may not
+    /// be contiguous with the layout of the original type/variable.
+    ///
+struct IRPendingLayoutAttr : IRAttr
+{
+    IR_LEAF_ISA(PendingLayoutAttr);
+
+    IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
+};
+
+    /// Layout information for a type.
+    ///
+    /// The most important thing this instruction provides is the
+    /// resource usage (aka "size") of the type for each of the
+    /// resource kinds it consumes.
+    ///
+    /// Subtypes of `IRTypeLayout` will include additional type-specific
+    /// operands or attributes. For example, a type layout for a
+    /// `struct` type will include offset information for its fields.
+    ///
 struct IRTypeLayout : IRLayout
 {
-    IR_LEAF_ISA(TypeLayout);
-    TypeLayout* getLayout() { return static_cast<TypeLayout*>(getASTLayout()); }
+    IR_PARENT_ISA(TypeLayout);
+
+        /// Find the attribute that stores offset information for `kind`.
+        ///
+        /// Returns null if no attribute is found, indicating that this
+        /// type does not consume any resources of `kind`.
+        ///
+    IRTypeSizeAttr* findSizeAttr(LayoutResourceKind kind);
+
+        /// Get all the attributes representing size information.
+    IROperandList<IRTypeSizeAttr> getSizeAttrs();
+
+        /// Unwrap any layers of array-ness and return the outer-most non-array type.
+    IRTypeLayout* unwrapArray();
+
+        /// Get the layout for pending data, if present.
+    IRTypeLayout* getPendingDataTypeLayout();
+
+        /// A builder for constructing `IRTypeLayout`s
+    struct Builder
+    {
+            /// Begin building.
+            ///
+            /// The `irBuilder` will be used to construct the
+            /// type layout and any additional instructions required.
+            ///
+        Builder(IRBuilder* irBuilder);
+
+            /// Add `size` units of resource `kind` to the resource usage of this type.
+        void addResourceUsage(
+            LayoutResourceKind  kind,
+            LayoutSize          size);
+
+            /// Add the resource usage specified by `sizeAttr`.
+        void addResourceUsage(IRTypeSizeAttr* sizeAttr);
+
+            /// Add all resource usage from `typeLayout`.
+        void addResourceUsageFrom(IRTypeLayout* typeLayout);
+
+            /// Set the (optional) layout for pending data.
+        void setPendingTypeLayout(
+            IRTypeLayout* typeLayout)
+        {
+            m_pendingTypeLayout = typeLayout;
+        }
+
+            /// Build a type layout according to the information specified so far.
+        IRTypeLayout* build();
+
+    protected:
+        // The following services are provided so that
+        // subtypes of `IRTypeLayout` can provide their
+        // own `Builder` subtypes that construct appropriate
+        // layouts.
+
+            /// Override to customize the opcode of the generated layout.
+        virtual IROp getOp() { return kIROp_TypeLayoutBase; }
+
+            /// Override to add additional operands to the generated layout.
+        virtual void addOperandsImpl(List<IRInst*>&) {}
+
+            /// Override to add additional attributes to the generated layout.
+        virtual void addAttrsImpl(List<IRInst*>&) {}
+
+            /// Use to access the underlying IR builder.
+        IRBuilder* getIRBuilder() { return m_irBuilder; };
+
+    private:
+        void addOperands(List<IRInst*>&);
+        void addAttrs(List<IRInst*>& ioOperands);
+
+        IRBuilder* m_irBuilder = nullptr;
+        IRTypeLayout* m_pendingTypeLayout = nullptr;
+
+        struct ResInfo
+        {
+            LayoutResourceKind  kind = LayoutResourceKind::None;
+            LayoutSize          size = 0;
+        };
+        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
+    };
 };
 
+    /// Type layout for parameter groups (constant buffers and parameter blocks)
+struct IRParameterGroupTypeLayout : IRTypeLayout
+{
+private:
+    typedef IRTypeLayout Super;
+
+public:
+    IR_LEAF_ISA(ParameterGroupTypeLayout)
+
+    IRVarLayout* getContainerVarLayout()
+    {
+        return cast<IRVarLayout>(getOperand(0));
+    }
+
+    IRVarLayout* getElementVarLayout()
+    {
+        return cast<IRVarLayout>(getOperand(1));
+    }
+
+    // TODO: There shouldn't be a need for the IR to store an "offset" element type layout,
+    // but there are just enough places that currently use that information so that removing
+    // it would require some careful refactoring.
+    //
+    IRTypeLayout* getOffsetElementTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(2));
+    }
+
+        /// Specialized builder for parameter group type layouts.
+    struct Builder : Super::Builder
+    {
+    public:
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        void setContainerVarLayout(IRVarLayout* varLayout)
+        {
+            m_containerVarLayout = varLayout;
+        }
+
+        void setElementVarLayout(IRVarLayout* varLayout)
+        {
+            m_elementVarLayout = varLayout;
+        }
+
+        void setOffsetElementTypeLayout(IRTypeLayout* typeLayout)
+        {
+            m_offsetElementTypeLayout = typeLayout;
+        }
+
+        IRParameterGroupTypeLayout* build();
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_ParameterGroupTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRVarLayout* m_containerVarLayout;
+        IRVarLayout* m_elementVarLayout;
+        IRTypeLayout* m_offsetElementTypeLayout;
+    };
+};
+
+    /// Specialized layout information for array types
+struct IRArrayTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(ArrayTypeLayout)
+
+    IRTypeLayout* getElementTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout)
+            : Super::Builder(irBuilder)
+            , m_elementTypeLayout(elementTypeLayout)
+        {}
+
+        IRArrayTypeLayout* build()
+        {
+            return cast<IRArrayTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_ArrayTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRTypeLayout* m_elementTypeLayout;
+    };
+};
+
+    /// Specialized layout information for stream-output types
+struct IRStreamOutputTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(StreamOutputTypeLayout)
+
+    IRTypeLayout* getElementTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout)
+            : Super::Builder(irBuilder)
+            , m_elementTypeLayout(elementTypeLayout)
+        {}
+
+        IRArrayTypeLayout* build()
+        {
+            return cast<IRArrayTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_StreamOutputTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRTypeLayout* m_elementTypeLayout;
+    };
+};
+
+    /// Specialized layout information for matrix types
+struct IRMatrixTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(MatrixTypeLayout)
+
+    MatrixLayoutMode getMode()
+    {
+        return MatrixLayoutMode(GetIntVal(cast<IRIntLit>(getOperand(0))));
+    }
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, MatrixLayoutMode mode);
+
+        IRMatrixTypeLayout* build()
+        {
+            return cast<IRMatrixTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_MatrixTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRInst* m_modeInst = nullptr;
+    };
+};
+
+    /// Attribute that specifies the layout for one field of a structure type.
+struct IRStructFieldLayoutAttr : IRAttr
+{
+    IR_LEAF_ISA(StructFieldLayoutAttr)
+
+    IRStructKey* getFieldKey()
+    {
+        return cast<IRStructKey>(getOperand(0));
+    }
+
+    IRVarLayout* getLayout()
+    {
+        return cast<IRVarLayout>(getOperand(1));
+    }
+};
+
+    /// Specialized layout information for structure types.
+struct IRStructTypeLayout : IRTypeLayout
+{
+    IR_LEAF_ISA(StructTypeLayout)
+
+    typedef IRTypeLayout Super;
+
+        /// Get all of the attributes that represent field layouts.
+    IROperandList<IRStructFieldLayoutAttr> getFieldLayoutAttrs()
+    {
+        return findAttrs<IRStructFieldLayoutAttr>();
+    }
+
+        /// Get the number of fields for which layout information is stored.
+    UInt getFieldCount()
+    {
+        return getFieldLayoutAttrs().getCount();
+    }
+
+        /// Get the layout information for a field by `index`
+    IRVarLayout* getFieldLayout(UInt index)
+    {
+        return getFieldLayoutAttrs()[index]->getLayout();
+    }
+
+        /// Specialized builder for structure type layouts.
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        void addField(IRStructKey* key, IRVarLayout* layout)
+        {
+            FieldInfo info;
+            info.key = key;
+            info.layout = layout;
+            m_fields.add(info);
+        }
+
+        IRStructTypeLayout* build()
+        {
+            return cast<IRStructTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_StructTypeLayout; }
+        void addAttrsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        struct FieldInfo
+        {
+            IRStructKey* key;
+            IRVarLayout* layout;
+        };
+
+        List<FieldInfo> m_fields;
+    };
+};
+
+    /// Attribute that represents the layout for one case of a union type
+struct IRCaseTypeLayoutAttr : IRAttr
+{
+    IR_LEAF_ISA(CaseTypeLayoutAttr);
+
+    IRTypeLayout* getTypeLayout()
+    {
+        return cast<IRTypeLayout>(getOperand(0));
+    }
+};
+
+    /// Specialized layout information for tagged union types
+struct IRTaggedUnionTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(TaggedUnionTypeLayout)
+
+        /// Get the (byte) offset of the tagged union's tag (aka "discriminator") field
+    LayoutSize getTagOffset()
+    {
+        return LayoutSize::fromRaw(LayoutSize::RawValue(GetIntVal(cast<IRIntLit>(getOperand(0)))));
+    }
+
+        /// Get all the attributes representing layouts for the difference cases
+    IROperandList<IRCaseTypeLayoutAttr> getCaseTypeLayoutAttrs()
+    {
+        return findAttrs<IRCaseTypeLayoutAttr>();
+    }
+
+        /// Get the number of cases for which layout information is stored
+    UInt getCaseCount()
+    {
+        return getCaseTypeLayoutAttrs().getCount();
+    }
+
+        /// Get the layout information for the case at the given `index`
+    IRTypeLayout* getCaseTypeLayout(UInt index)
+    {
+        return getCaseTypeLayoutAttrs()[index]->getTypeLayout();
+    }
+
+        /// Specialized builder for tagged union type layouts
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder, LayoutSize tagOffset);
+
+        void addCaseTypeLayout(IRTypeLayout* typeLayout);
+
+        IRTaggedUnionTypeLayout* build()
+        {
+            return cast<IRTaggedUnionTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_TaggedUnionTypeLayout; }
+        void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+        void addAttrsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
+
+        IRInst* m_tagOffset = nullptr;
+        List<IRAttr*> m_caseTypeLayoutAttrs;
+    };
+};
+
+    /// Layout information for an entry point
 struct IREntryPointLayout : IRLayout
 {
     IR_LEAF_ISA(EntryPointLayout)
-    EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(getASTLayout()); }
+
+        /// Get the layout information for the entry point parameters.
+        ///
+        /// The parameters layout will either be a structure type layout
+        /// with one field per parameter, or a parameter group type
+        /// layout wrapping such a structure, if the entry point parameters
+        /// needed to be allocated into a constant buffer.
+        ///
+    IRVarLayout* getParamsLayout()
+    {
+        return cast<IRVarLayout>(getOperand(0));
+    }
+
+        /// Get the layout information for the entry point result.
+        ///
+        /// This represents the return value of the entry point.
+        /// Note that it does *not* represent all of the entry
+        /// point outputs, because the parameter list may also
+        /// contain `out` or `inout` parameters.
+        ///
+    IRVarLayout* getResultLayout()
+    {
+        return cast<IRVarLayout>(getOperand(1));
+    }
 };
 
-// Associated data can be attached via the following decorations
-// * SemanticDecoration/SystemSemanticDecoration for semantics
-// * (potentially multiple) ResourceInfoLayoutDecoration
-// * StageLayoutDecoration to indicate a specific associated stage
-// * PendingVarLayoutDecoration to indicate pending var layout 
-// The VarLayoutFlag::HasSemantic flag is equivalent to having the SemanticDecoration
+    /// Given an entry-point layout, extract the layout for the parameters struct.
+IRStructTypeLayout* getScopeStructLayout(IREntryPointLayout* scopeLayout);
+
+    /// Attribute that associates a variable layout with a known stage.
+struct IRStageAttr : IRAttr
+{
+    IR_LEAF_ISA(StageAttr);
+
+    IRIntLit* getStageOperand() { return cast<IRIntLit>(getOperand(0)); }
+    Stage getStage() { return Stage(GetIntVal(getStageOperand())); }
+};
+
+    /// Base type for attributes that associate a variable layout with a semantic name and index.
+struct IRSemanticAttr : IRAttr
+{
+    IR_PARENT_ISA(SemanticAttr);
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+
+    IRIntLit* getIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
+    UInt getIndex() { return UInt(GetIntVal(getIndexOperand())); }
+};
+
+    /// Attribute that associates a variable with a system-value semantic name and index
+struct IRSystemValueSemanticAttr : IRSemanticAttr
+{
+    IR_LEAF_ISA(SystemValueSemanticAttr);
+};
+
+    /// Attribute that associates a variable with a user-defined semantic name and index
+struct IRUserSemanticAttr : IRSemanticAttr
+{
+    IR_LEAF_ISA(UserSemanticAttr);
+};
+
+    /// Layout infromation for a single parameter/field
 struct IRVarLayout : IRLayout
 {
     IR_LEAF_ISA(VarLayout)
 
-        /// The name of this variable
-    IRStringLit* getName() { return cast<IRStringLit>(getOperand(1)); }
-        /// For now this uses a link back into the AST representation. Will be replaced by IR based type representation
-    IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(2)); }
+        /// Get the type layout information for this variable
+    IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 
-        /// Get/set absolute layout
-    IRVarLayout* getAbsoluteLayout() { return cast<IRVarLayout>(getOperand(3)); }
-    void setAbsoluteLayout(IRVarLayout* layout) { getOperands()[3].set(layout); }
+        /// Get all the attributes representing resource-kind-specific offsets
+    IROperandList<IRVarOffsetAttr> getOffsetAttrs();
+
+        /// Find the offset information (if present) for the given resource `kind`
+    IRVarOffsetAttr* findOffsetAttr(LayoutResourceKind kind);
+
+        /// Does this variable use any resources of the given `kind`?
+    bool usesResourceKind(LayoutResourceKind kind);
+
+        /// Get the fixed/known stage that this variable is associated with.
+        ///
+        /// This will be a specific stage for entry-point parameters, but
+        /// will be `Stage::Unknown` for any parameter that is not bound
+        /// solely to one entry point.
+        ///
+    Stage getStage();
+
+        /// Find the system-value semantic attribute for this variable, if any.
+    IRSystemValueSemanticAttr* findSystemValueSemanticAttr();
+
+        /// Get the (optional) layout for any "pending" data assocaited with this variable.
+    IRVarLayout* getPendingVarLayout();
+
+        /// Builder for construction `IRVarLayout`s in a stateful fashion
+    struct Builder
+    {
+            /// Begin building a variable layout with the given `typeLayout`
+            ///
+            /// The result layout and any instructions needed along the way
+            /// will be allocated with `irBuilder`.
+            ///
+        Builder(
+            IRBuilder*      irBuilder,
+            IRTypeLayout*   typeLayout);
+
+            /// Represents resource-kind-specific offset information
+        struct ResInfo
+        {
+            LayoutResourceKind  kind = LayoutResourceKind::None;
+            UInt                offset = 0;
+            UInt                space = 0;
+        };
+
+            /// Has any resource usage/offset been registered for the given resource `kind`?
+        bool usesResourceKind(LayoutResourceKind kind);
+
+            /// Either fetch or add a `ResInfo` record for `kind` and return it
+        ResInfo* findOrAddResourceInfo(LayoutResourceKind kind);
+
+            /// Set the (optional) variable layout for pending data.
+        void setPendingVarLayout(IRVarLayout* varLayout)
+        {
+            m_pendingVarLayout = varLayout;
+        }
+
+            /// Set the (optional) system-valeu semantic for this variable.
+        void setSystemValueSemantic(String const& name, UInt index);
+
+            /// Set the (optional) user-defined semantic for this variable.
+        void setUserSemantic(String const& name, UInt index);
+
+            /// Set the (optional) known stage for this variable.
+        void setStage(Stage stage);
+
+            /// Clone all of the layout information from the `other` layout, except for offsets.
+            ///
+            /// This is convenience when one wants to build a variable layout "like that other one, but..."
+        void cloneEverythingButOffsetsFrom(
+            IRVarLayout* other);
+
+            /// Build a variable layout using the current state that has been set.
+        IRVarLayout* build();
+
+    private:
+        IRBuilder* m_irBuilder;
+        IRBuilder* getIRBuilder() { return m_irBuilder; };
+
+        IRTypeLayout* m_typeLayout = nullptr;
+        IRVarLayout* m_pendingVarLayout = nullptr;
+
+        IRSystemValueSemanticAttr* m_systemValueSemantic = nullptr;
+        IRUserSemanticAttr* m_userSemantic = nullptr;
+        IRStageAttr* m_stageAttr = nullptr;
+
+        ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
+    };
 };
 
-// Associates an IR-level decoration with a source layout
+    /// Associate layout information with an instruction.
+    ///
+    /// This decoration is used in three main ways:
+    ///
+    /// * To attach an `IRVarLayout` to an `IRGlobalParam` or entry-point `IRParam` representing a shader parameter
+    /// * To attach an `IREntryPointLayout` to an `IRFunc` representing an entry point
+    /// * To attach an `IRTaggedUnionTypeLayout` to an `IRTaggedUnionType`
+    ///
 struct IRLayoutDecoration : IRDecoration
 {
     enum { kOp = kIROp_LayoutDecoration };
     IR_LEAF_ISA(LayoutDecoration)
 
-    IRLayout* getIRLayout() { return cast<IRLayout>(getOperand(0)); }
-
-    Layout* getASTLayout()
-    {
-        IRLayout* irLayout = getIRLayout();
-        if (!irLayout)
-        {
-            return nullptr;
-        }
-        return irLayout->getASTLayout();
-    }
+        /// Get the layout that is being attached to the parent instruction
+    IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
 };
 
 //
@@ -1434,9 +1993,57 @@ struct IRBuilder
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
 
-    void addLayoutDecoration(IRInst* value, Layout* layout);
+//    void addLayoutDecoration(IRInst* value, Layout* layout);
+    void addLayoutDecoration(IRInst* value, IRLayout* layout);
 
-    IRLayout* getLayout(Layout* astLayout);
+//    IRLayout* getLayout(Layout* astLayout);
+
+    IRTypeSizeAttr* getTypeSizeAttr(
+        LayoutResourceKind kind,
+        LayoutSize size);
+    IRVarOffsetAttr* getVarOffsetAttr(
+        LayoutResourceKind  kind,
+        UInt                offset,
+        UInt                space = 0);
+    IRPendingLayoutAttr* getPendingLayoutAttr(
+        IRLayout* pendingLayout);
+    IRStructFieldLayoutAttr* getFieldLayoutAttr(
+        IRStructKey*    key,
+        IRVarLayout*    layout);
+    IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(
+        IRTypeLayout*   layout);
+
+    IRSemanticAttr* getSemanticAttr(
+        IROp            op,
+        String const&   name,
+        UInt            index);
+    IRSystemValueSemanticAttr* getSystemValueSemanticAttr(
+        String const&   name,
+        UInt            index)
+    {
+        return cast<IRSystemValueSemanticAttr>(getSemanticAttr(
+            kIROp_SystemValueSemanticAttr,
+            name,
+            index));
+    }
+    IRUserSemanticAttr* getUserSemanticAttr(
+        String const&   name,
+        UInt            index)
+    {
+        return cast<IRUserSemanticAttr>(getSemanticAttr(
+            kIROp_UserSemanticAttr,
+            name,
+            index));
+    }
+
+    IRStageAttr* getStageAttr(Stage stage);
+
+    IRTypeLayout* getTypeLayout(IROp op, List<IRInst*> const& operands);
+    IRVarLayout* getVarLayout(List<IRInst*> const& operands);
+    IREntryPointLayout* getEntryPointLayout(
+        IRVarLayout* paramsLayout,
+        IRVarLayout* resultLayout);
+
 
     void addNameHintDecoration(IRInst* value, IRStringLit* name)
     {

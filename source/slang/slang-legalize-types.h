@@ -323,11 +323,11 @@ struct WrappedBufferPseudoType : LegalTypeImpl
 
 //
 
-RefPtr<TypeLayout> getDerefTypeLayout(
-    TypeLayout* typeLayout);
+IRTypeLayout* getDerefTypeLayout(
+    IRTypeLayout* typeLayout);
 
-RefPtr<VarLayout> getFieldLayout(
-    TypeLayout*     typeLayout,
+IRVarLayout* getFieldLayout(
+    IRTypeLayout*     typeLayout,
     IRInst*         fieldKey);
 
     /// Represents a "chain" of variables leading to some leaf field.
@@ -362,7 +362,7 @@ struct SimpleLegalVarChain
     SimpleLegalVarChain*    next = nullptr;
 
     // The layout for the variable at this link in thain.
-    VarLayout*              varLayout = nullptr;
+    IRVarLayout*            varLayout = nullptr;
 };
 
     /// A "chain" of variable declarations that can handle both primary and "pending" data.
@@ -389,15 +389,6 @@ struct LegalVarChain
 
     // The chain of variables that represents the pending allocation.
     SimpleLegalVarChain*    pendingChain = nullptr;
-
-    // If the primary chain is non-empty, gets the variable at the leaf.
-    DeclRef<VarDeclBase> getLeafVarDeclRef() const
-    {
-        if(!primaryChain)
-            return DeclRef<VarDeclBase>();
-
-        return primaryChain->varLayout->varDecl;
-    }
 };
 
     /// RAII type for adding a link to a `LegalVarChain` as needed.
@@ -432,7 +423,7 @@ struct LegalVarChainLink : LegalVarChain
     {}
 
         /// Construct a chain that extends `parent` with `varLayout`, if it is non-null.
-    LegalVarChainLink(LegalVarChain const& parent, VarLayout* varLayout)
+    LegalVarChainLink(LegalVarChain const& parent, IRVarLayout* varLayout)
         : LegalVarChain(parent)
     {
         if( varLayout )
@@ -441,7 +432,7 @@ struct LegalVarChainLink : LegalVarChain
             primaryLink.varLayout = varLayout;
             primaryChain = &primaryLink;
 
-            if( auto pendingVarLayout = varLayout->pendingVarLayout )
+            if( auto pendingVarLayout = varLayout->getPendingVarLayout() )
             {
                 pendingLink.next = parent.pendingChain;
                 pendingLink.varLayout = pendingVarLayout;
@@ -454,13 +445,15 @@ struct LegalVarChainLink : LegalVarChain
     SimpleLegalVarChain pendingLink;
 };
 
-RefPtr<VarLayout> createVarLayout(
+IRVarLayout* createVarLayout(
+    IRBuilder*              irBuilder,
     LegalVarChain const&    varChain,
-    TypeLayout*             typeLayout);
+    IRTypeLayout*           typeLayout);
 
-RefPtr<VarLayout> createSimpleVarLayout(
+IRVarLayout* createSimpleVarLayout(
+    IRBuilder*              irBuilder,
     SimpleLegalVarChain*    varChain,
-    TypeLayout*             typeLayout);
+    IRTypeLayout*           typeLayout);
 
 //
 // The result of legalizing an IR value will be

@@ -209,7 +209,7 @@ struct GLSLLegalizationContext
 
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLLegalizationContext*    context,
-    VarLayout*                  varLayout,
+    IRVarLayout*                varLayout,
     LayoutResourceKind          kind,
     Stage                       stage,
     GLSLSystemValueInfo*        inStorage)
@@ -217,10 +217,11 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     char const* name = nullptr;
     char const* outerArrayName = nullptr;
 
-    auto semanticNameSpelling = varLayout->systemValueSemantic;
-    if(semanticNameSpelling.getLength() == 0)
+    auto semanticInst = varLayout->findSystemValueSemanticAttr();
+    if(!semanticInst)
         return nullptr;
 
+    String semanticNameSpelling = semanticInst->getName();
     auto semanticName = semanticNameSpelling.toLower();
 
     // HLSL semantic types can be found here
@@ -543,7 +544,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(varLayout->varDecl.getDecl()->loc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
+    context->getSink()->diagnose(varLayout->sourceLoc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
     return nullptr;
 }
 
@@ -551,8 +552,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext*    context,
     IRBuilder*                  builder,
     IRType*                     inType,
-    VarLayout*                  inVarLayout,
-    TypeLayout*                 inTypeLayout,
+    IRVarLayout*                inVarLayout,
+    IRTypeLayout*               inTypeLayout,
     LayoutResourceKind          kind,
     Stage                       stage,
     UInt                        bindingIndex,
@@ -578,7 +579,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     // Construct the actual type and type-layout for the global variable
     //
-    RefPtr<TypeLayout> typeLayout = inTypeLayout;
+    IRTypeLayout* typeLayout = inTypeLayout;
     for( auto dd = declarator; dd; dd = dd->next )
     {
         // We only have one declarator case right now...
@@ -588,23 +589,18 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             type,
             dd->elementCount);
 
-        RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
-//            arrayTypeLayout->type = arrayType;
-        arrayTypeLayout->rules = typeLayout->rules;
-        arrayTypeLayout->originalElementTypeLayout =  typeLayout;
-        arrayTypeLayout->elementTypeLayout = typeLayout;
-        arrayTypeLayout->uniformStride = 0;
-
-        if( auto resInfo = inTypeLayout->FindResourceInfo(kind) )
+        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
+        if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
         {
             // TODO: it is kind of gross to be re-running some
             // of the type layout logic here.
 
             UInt elementCount = (UInt) GetIntVal(dd->elementCount);
-            arrayTypeLayout->addResourceUsage(
+            arrayTypeLayoutBuilder.addResourceUsage(
                 kind,
-                resInfo->count * elementCount);
+                resInfo->getSize() * elementCount);
         }
+        auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
 
         type = arrayType;
         typeLayout = arrayTypeLayout;
@@ -614,16 +610,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // if the original had its own layout, because it might be
     // an `inout` parameter, and we only want to deal with the case
     // described by our `kind` parameter.
-    RefPtr<VarLayout> varLayout = new VarLayout();
-    varLayout->varDecl = inVarLayout->varDecl;
-    varLayout->typeLayout = typeLayout;
-    varLayout->flags = inVarLayout->flags;
-    varLayout->systemValueSemantic = inVarLayout->systemValueSemantic;
-    varLayout->systemValueSemanticIndex = inVarLayout->systemValueSemanticIndex;
-    varLayout->semanticName = inVarLayout->semanticName;
-    varLayout->semanticIndex = inVarLayout->semanticIndex;
-    varLayout->stage = inVarLayout->stage;
-    varLayout->AddResourceInfo(kind)->index = bindingIndex;
+    //
+    IRVarLayout::Builder varLayoutBuilder(builder, typeLayout);
+    varLayoutBuilder.cloneEverythingButOffsetsFrom(inVarLayout);
+    varLayoutBuilder.findOrAddResourceInfo(kind)->offset = bindingIndex;
+    IRVarLayout* varLayout = varLayoutBuilder.build();
 
     // We are going to be creating a global parameter to replace
     // the function parameter, but we need to handle the case
@@ -678,8 +669,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     GLSLLegalizationContext*    context,
     IRBuilder*                  builder,
     IRType*                     type,
-    VarLayout*                  varLayout,
-    TypeLayout*                 typeLayout,
+    IRVarLayout*                varLayout,
+    IRTypeLayout*               typeLayout,
     LayoutResourceKind          kind,
     Stage                       stage,
     UInt                        bindingIndex,
@@ -714,9 +705,9 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         auto elementType = arrayType->getElementType();
         auto elementCount = arrayType->getElementCount();
-        auto arrayLayout = as<ArrayTypeLayout>(typeLayout);
+        auto arrayLayout = as<IRArrayTypeLayout>(typeLayout);
         SLANG_ASSERT(arrayLayout);
-        auto elementTypeLayout = arrayLayout->elementTypeLayout;
+        auto elementTypeLayout = arrayLayout->getElementTypeLayout();
 
         GlobalVaryingDeclarator arrayDeclarator;
         arrayDeclarator.flavor = GlobalVaryingDeclarator::Flavor::array;
@@ -737,9 +728,9 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
     {
         auto elementType = streamType->getElementType();
-        auto streamLayout = as<StreamOutputTypeLayout>(typeLayout);
+        auto streamLayout = as<IRStreamOutputTypeLayout>(typeLayout);
         SLANG_ASSERT(streamLayout);
-        auto elementTypeLayout = streamLayout->elementTypeLayout;
+        auto elementTypeLayout = streamLayout->getElementTypeLayout();
 
         return createGLSLGlobalVaryingsImpl(
             context,
@@ -757,7 +748,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         // We need to recurse down into the individual fields,
         // and generate a variable for each of them.
 
-        auto structTypeLayout = as<StructTypeLayout>(typeLayout);
+        auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
         SLANG_ASSERT(structTypeLayout);
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
@@ -781,18 +772,18 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         {
             UInt fieldIndex = fieldCounter++;
 
-            auto fieldLayout = structTypeLayout->fields[fieldIndex];
+            auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex);
 
             UInt fieldBindingIndex = bindingIndex;
-            if(auto fieldResInfo = fieldLayout->FindResourceInfo(kind))
-                fieldBindingIndex += fieldResInfo->index;
+            if(auto fieldResInfo = fieldLayout->findOffsetAttr(kind))
+                fieldBindingIndex += fieldResInfo->getOffset();
 
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
                 builder,
                 field->getFieldType(),
                 fieldLayout,
-                fieldLayout->typeLayout,
+                fieldLayout->getTypeLayout(),
                 kind,
                 stage,
                 fieldBindingIndex,
@@ -820,16 +811,16 @@ ScalarizedVal createGLSLGlobalVaryings(
     GLSLLegalizationContext*    context,
     IRBuilder*                  builder,
     IRType*                     type,
-    VarLayout*                  layout,
+    IRVarLayout*                layout,
     LayoutResourceKind          kind,
     Stage                       stage)
 {
     UInt bindingIndex = 0;
-    if(auto rr = layout->FindResourceInfo(kind))
-        bindingIndex = rr->index;
+    if(auto rr = layout->findOffsetAttr(kind))
+        bindingIndex = rr->getOffset();
     return createGLSLGlobalVaryingsImpl(
         context,
-        builder, type, layout, layout->typeLayout, kind, stage, bindingIndex, nullptr);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, nullptr);
 }
 
 ScalarizedVal extractField(
@@ -1189,7 +1180,7 @@ void legalizeRayTracingEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
     IRFunc*                     func,
     IRParam*                    pp,
-    VarLayout*                  paramLayout)
+    IRVarLayout*                paramLayout)
 {
     auto builder = context->getBuilder();
     auto paramType = pp->getDataType();
@@ -1241,7 +1232,7 @@ void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext*    context,
     IRFunc*                     func,
     IRParam*                    pp,
-    VarLayout*                  paramLayout)
+    IRVarLayout*                paramLayout)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
@@ -1553,21 +1544,24 @@ void legalizeEntryPointForGLSL(
     DiagnosticSink*         sink,
     GLSLExtensionTracker*   glslExtensionTracker)
 {
+    auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPointDecor);
+
+    auto stage = entryPointDecor->getProfile().GetStage();
+
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
 
-    auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout());
+    auto entryPointLayout = as<IREntryPointLayout>(layoutDecoration->getLayout());
     SLANG_ASSERT(entryPointLayout);
 
 
 
     GLSLLegalizationContext context;
     context.session = session;
-    context.stage = entryPointLayout->profile.GetStage();
+    context.stage = stage;
     context.sink = sink;
     context.glslExtensionTracker = glslExtensionTracker;
-
-    Stage stage = entryPointLayout->profile.GetStage();
 
     // We require that the entry-point function has no uses,
     // because otherwise we'd invalidate the signature
@@ -1631,7 +1625,7 @@ void legalizeEntryPointForGLSL(
             &context,
             &builder,
             resultType,
-            entryPointLayout->resultLayout,
+            entryPointLayout->getResultLayout(),
             LayoutResourceKind::VaryingOutput,
             stage);
 
@@ -1684,7 +1678,7 @@ void legalizeEntryPointForGLSL(
             //
             auto paramLayoutDecoration = pp->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(paramLayoutDecoration);
-            auto paramLayout = as<VarLayout>(paramLayoutDecoration->getIRLayout()->getASTLayout());
+            auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
             legalizeEntryPointParameterForGLSL(
