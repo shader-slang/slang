@@ -693,7 +693,7 @@ standardProject "slang-glslang"
     defines
     {
         -- `ENABLE_OPT` must be defined (to either zero or one) for glslang to compile at all
-        "ENABLE_OPT=0",
+        "ENABLE_OPT=1",
 
         -- We want to build a version of glslang that supports every feature possible,
         -- so we will enable all of the supported vendor-specific extensions so

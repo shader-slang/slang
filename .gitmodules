@@ -13,3 +13,6 @@
 [submodule "external/slang-binaries"]
 	path = external/slang-binaries
 	url = https://github.com/shader-slang/slang-binaries
+[submodule "external/spirv-tools"]
+	path = external/spirv-tools
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
