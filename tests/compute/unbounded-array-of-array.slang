@@ -3,11 +3,8 @@
 
 struct IntAoa { RWStructuredBuffer<int> array[]; }
 
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
-
-// How do I set the size of the root array?
 
 //TEST_INPUT:array(size=2):name g_aoa.array
 ParameterBlock<IntAoa> g_aoa;
