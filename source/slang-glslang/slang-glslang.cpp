@@ -165,7 +165,10 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         std::vector<unsigned int> spirv;
         std::string warningsErrors;
         spv::SpvBuildLogger logger;
-        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
+        glslang::SpvOptions options;
+        options.disableOptimizer = false;
+        options.optimizeSize = true;
+        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &options);
 
         dumpDiagnostics(request, logger.getAllMessages());
 
