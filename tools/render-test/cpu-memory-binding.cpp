@@ -156,13 +156,25 @@ SlangResult CPUMemoryBinding::_add(slang::VariableLayoutReflection* varLayout, s
         {
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
             auto elementCount = int(typeLayout->getElementCount());
-            const size_t stride = elementTypeLayout->getSize();
-            uint8_t* cur = (uint8_t*)dst;
-            for (int i = 0; i < elementCount; ++i)
+
+            if (elementCount == 0)
             {
-                Buffer elementBuffer;
-                _add(nullptr, elementTypeLayout, cur, elementBuffer);
-                cur += stride;
+                // We don't currently know the size that this array will be. So let's initially size it to 0.
+
+                CPPPrelude::Array<uint8_t>& dstBuf = *(CPPPrelude::Array<uint8_t>*)dst;
+                dstBuf.data = nullptr;
+                dstBuf.count = 0;
+            }
+            else
+            {
+                const size_t stride = elementTypeLayout->getSize();
+                uint8_t* cur = (uint8_t*)dst;
+                for (int i = 0; i < elementCount; ++i)
+                {
+                    Buffer elementBuffer;
+                    _add(nullptr, elementTypeLayout, cur, elementBuffer);
+                    cur += stride;
+                }
             }
             break;
         }
@@ -305,6 +317,11 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
     {
         return *this;
     }
+    SLANG_ASSERT(index >= 0);
+    if (index < 0)
+    {
+        return Location();
+    }
 
     auto typeLayout = m_typeLayout;
     uint8_t* cur = m_cur;
@@ -318,13 +335,24 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
             const auto elementCount = int(typeLayout->getElementCount());
             const auto elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            if (index < 0 || index >= elementCount)
+            if (elementCount == 0)
             {
-                SLANG_ASSERT(index < elementCount);
+                CPPPrelude::Array<uint8_t>& array = *(CPPPrelude::Array<uint8_t>*)cur;
+                if (index < array.count)
+                {
+                    return Location(elementTypeLayout, array.data + elementStride * index);
+                }
                 return Location();
             }
-
-            return Location(elementTypeLayout, cur + elementStride * index);
+            else
+            {
+                if (index >= elementCount)
+                {
+                    SLANG_ASSERT(index < elementCount);
+                    return Location();
+                }
+                return Location(elementTypeLayout, cur + elementStride * index);
+            }
         }
         default: break;
     }
@@ -332,6 +360,13 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
     return Location();
 }
 
+SlangResult CPUMemoryBinding::initValue(slang::TypeLayoutReflection* typeLayout, void* dst)
+{
+    auto size = typeLayout->getSize();
+    // Zeroing works for built in types, and object types
+    memset(dst, 0, size);
+    return SLANG_OK;
+}
 
 SlangResult CPUMemoryBinding::setBufferContents(const Location& location, const void* initialData, size_t sizeInBytes)
 {
@@ -517,6 +552,89 @@ SlangResult CPUMemoryBinding::setInplace(const Location& location, const void* d
     size_t dstSize = location.getTypeLayout()->getSize();
     sizeInBytes = (sizeInBytes > dstSize) ? dstSize : sizeInBytes;
     memcpy(location.getPtr(), data, sizeInBytes);
+    return SLANG_OK;
+}
+
+Index CPUMemoryBinding::findBufferIndex(const void* ptr) const
+{
+    const Index count = m_allBuffers.getCount();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        if (m_allBuffers[i].m_data == ptr)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+SlangResult CPUMemoryBinding::setArrayCount(const Location& location, int count, Buffer& outBuffer)
+{
+    if (!location.isValid())
+    {
+        return SLANG_FAIL;
+    }
+
+    auto typeLayout = location.getTypeLayout();
+    uint8_t* cur = location.getPtr();
+
+    const auto kind = typeLayout->getKind();
+
+    if (!(typeLayout->getKind() == slang::TypeReflection::Kind::Array && typeLayout->getElementCount() == 0))
+    {
+        return SLANG_FAIL;
+    }
+
+    CPPPrelude::Array<uint8_t>& array = *(CPPPrelude::Array<uint8_t>*)cur;
+    uint8_t* elements = array.data;
+
+    // Making smaller, just reduce the count.
+    // NOTE! Nothing is done here about deallocating resources which are perhaps no longer reachable.
+    // This isn't a leakage problem tho, as all buffers are released automatically when scope is left.
+    if (count <= array.count)
+    {
+        array.count = count;
+        return SLANG_OK;
+    }
+
+    const size_t elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+
+    const Index bufferIndex = elements ? findBufferIndex(elements) : -1;
+    if (bufferIndex > 0)
+    {
+        int maxCount = int(m_allBuffers[bufferIndex].m_sizeInBytes / elementStride);
+        if (count <= maxCount)
+        {
+            // Just initialize the space
+            memset(elements + elementStride * array.count, 0, (count - array.count) * elementStride);
+            array.count = count;
+            return SLANG_OK;
+        }
+    }
+
+    // Ok allocate a buffer that can hold all the elements
+
+    const size_t newBufferSize = count * elementStride;
+    Buffer newBuffer = _allocateBuffer(newBufferSize);
+
+    // Copy over the data from the old buffer if there is any
+    if (elements && array.count)
+    {
+        memcpy(newBuffer.m_data, elements, array.count * elementStride);
+    }
+
+    // Remove the old buffer as no longer needed
+    if (bufferIndex >= 0)
+    {
+        m_allBuffers.removeAt(bufferIndex);
+    }
+
+    // Set data 
+    array.count = count;
+    array.data = newBuffer.m_data;
+
+    outBuffer = newBuffer;
     return SLANG_OK;
 }
 

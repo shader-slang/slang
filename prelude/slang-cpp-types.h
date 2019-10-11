@@ -24,12 +24,20 @@ struct FixedArray
     T m_data[SIZE];
 };
 
-
-// Hmm... I guess a constant buffer should be unwrapped to be just a struct passed in
-/* template <typename T>
-struct ConstantBuffer
+// An array that has no specified size, becomes a 'Array'. This stores the size so it can potentially 
+// do bounds checking.  
+template <typename T>
+struct Array
 {
-}; */
+    const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    T& operator[](size_t index) { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    
+    T* data;
+    size_t count;
+};
+
+/* Constant buffers become a pointer to the contained type, so ConstantBuffer<T> becomes T* in C++ code.
+*/
 
 template <typename T, int COUNT>
 struct Vector;

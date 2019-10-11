@@ -138,7 +138,11 @@ namespace renderer_test
                     {
                         ShaderInputLayoutEntry entry;
 
-                        if (parser.LookAhead("cbuffer"))
+                        if (parser.LookAhead("array"))
+                        {
+                            entry.type = ShaderInputType::Array;
+                        }
+                        else if (parser.LookAhead("cbuffer"))
                         {
                             entry.type = ShaderInputType::Buffer;
                             entry.bufferDesc.type = InputBufferType::ConstantBuffer;
@@ -253,7 +257,15 @@ namespace renderer_test
                                 else if (word == "size")
                                 {
                                     parser.Read("=");
-                                    entry.textureDesc.size = parser.ReadInt();
+                                    auto size = parser.ReadInt();
+                                    if (entry.type == ShaderInputType::Array)
+                                    {
+                                        entry.arrayDesc.size = size;
+                                    }
+                                    else
+                                    {
+                                        entry.textureDesc.size = size;
+                                    }
                                 }
                                 else if (word == "random")
                                 {

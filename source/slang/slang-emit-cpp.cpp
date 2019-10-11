@@ -544,6 +544,16 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             out << ", " << elementCount << ">";
             return SLANG_OK;
         }
+        case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+
+            out << "Array<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            out << ">";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->op))
