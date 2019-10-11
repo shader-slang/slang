@@ -447,13 +447,13 @@ struct IRLayout : IRInst
 struct IRTypeLayout : IRLayout
 {
     IR_LEAF_ISA(TypeLayout);
-    TypeLayout* getLayout() { return static_cast<TypeLayout*>(getLayout()); }
+    TypeLayout* getLayout() { return static_cast<TypeLayout*>(getASTLayout()); }
 };
 
 struct IREntryPointLayout : IRLayout
 {
     IR_LEAF_ISA(EntryPointLayout)
-    EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(getLayout()); }
+    EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(getASTLayout()); }
 };
 
 // Associated data can be attached via the following decorations
