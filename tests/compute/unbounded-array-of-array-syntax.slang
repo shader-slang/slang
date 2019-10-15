@@ -18,7 +18,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int baseIndex = index >> 2;
     int innerIndex = index & 3;
 
-    RWStructuredBuffer<int> buffer = g_aoa[baseIndex];
+    RWStructuredBuffer<int> buffer = g_aoa[NonUniformResourceIndex(baseIndex)];
 
     // Get the size 
     uint bufferCount, bufferStride;
