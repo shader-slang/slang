@@ -57,6 +57,7 @@ SLANG_SPLICE(kIROp_HLSLStructuredBufferType
 SLANG_RAW(")\n")
 SLANG_RAW("struct StructuredBuffer\n")
 SLANG_RAW("{\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"$1 = $0._data.length(); $2 = 0\")\n")
 SLANG_RAW("    void GetDimensions(\n")
 SLANG_RAW("        out uint numStructs,\n")
 SLANG_RAW("        out uint stride);\n")
@@ -119,7 +120,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
 };
 for(auto item : kMutableByteAddressBufferCases) {
-SLANG_RAW("#line 104 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 105 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__magic_type(HLSL")
@@ -272,7 +273,7 @@ SLANG_RAW("};\n")
 SLANG_RAW("\n")
 
 }
-SLANG_RAW("#line 247 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 248 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 
@@ -281,11 +282,11 @@ static const struct {
     char const* name;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" }, 
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
-SLANG_RAW("#line 259 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 260 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
@@ -305,12 +306,14 @@ SLANG_RAW("\n")
 SLANG_RAW("{\n")
 SLANG_RAW("    uint DecrementCounter();\n")
 SLANG_RAW("\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"$1 = $0._data.length(); $2 = 0\")\n")
 SLANG_RAW("    void GetDimensions(\n")
 SLANG_RAW("        out uint numStructs,\n")
 SLANG_RAW("        out uint stride);\n")
 SLANG_RAW("\n")
 SLANG_RAW("    uint IncrementCounter();\n")
 SLANG_RAW("\n")
+SLANG_RAW("    __target_intrinsic(glsl, \"$0._data[$1]\")\n")
 SLANG_RAW("    T Load(int location);\n")
 SLANG_RAW("    T Load(int location, out uint status);\n")
 SLANG_RAW("\n")
@@ -323,7 +326,7 @@ SLANG_RAW("};\n")
 SLANG_RAW("\n")
 
 }
-SLANG_RAW("#line 287 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 290 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
@@ -1568,7 +1571,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1495 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1498 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
