@@ -35,6 +35,8 @@ public:
 
     Safe32Ptr() : m_container(nullptr), m_offset(kNullOffset) {}
 
+    Safe32Ptr(int32_t offset, RelativeContainer* container): m_offset(offset), m_container(container) {}
+
     RelativeContainer* m_container;
     int32_t m_offset;
 };
@@ -84,10 +86,38 @@ class Relative32Array
     Relative32Ptr m_data;           ///< The data
 };
 
+struct RelativeString
+{
+    enum
+    {
+        kSizeBase = 252,
+        kMaxSizeEncodeSize = 5,
+    };
+
+        /// Get contents as a slice
+    UnownedStringSlice getSlice() const;
+        /// Get null terminated string
+    const char* getCstr() const;
+
+        /// Decode the size. Returns the start of the string text, and outSize holds the size (NOT including terminating 0)
+    static const char* decodeSize(const char* in, size_t& outSize );
+
+        /// Returns the amount of bytes used, end encoding in 'encode'
+    static size_t calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeSize]);
+        /// Calculate the total size needed to store the string *including* terminating 0
+    static size_t calcAllocationSize(const UnownedStringSlice& slice);
+
+        /// Calculate the total size needed to store string. Size should be passed *without* terminating 0
+    static size_t calcAllocationSize(size_t size);
+
+
+    char m_sizeThenContents[1];
+};
+
 class RelativeContainer
 {
 public:
-
+    
     template <typename T>
     Safe32Ptr<T> allocate()
     {
@@ -96,6 +126,8 @@ public:
         return Safe32Ptr<T>(getOffset(data), this);
     }
 
+        /// Allocate without alignment (effectively 1)
+    void* allocate(size_t size);
     void* allocate(size_t size, size_t alignment);
     void* allocateAndZero(size_t size, size_t alignment);
 
@@ -122,6 +154,9 @@ public:
         return int32_t(offset);
     }
 
+    Safe32Ptr<RelativeString> newString(const UnownedStringSlice& slice);
+    Safe32Ptr<RelativeString> newString(const char* contents);
+
         /// Get the contained data
     uint8_t* getData() { return m_data.getBuffer(); }
 
@@ -141,6 +176,10 @@ SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const
 {
     return m_container ? ((T*)(m_container->getData() + m_offset)) : (T*)nullptr;
 }
+
+
+
+
 
 // Work out the state based on the api
 class CompileState
