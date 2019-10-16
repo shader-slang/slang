@@ -79,7 +79,9 @@ static void relativeContainerUnitTest()
 
                 if (check)
                 {
-                    SLANG_CHECK(str && strcmp(str->getCstr(), check) == 0);
+                    SLANG_CHECK(str != nullptr);
+                    const char* strCstr = str->getCstr();
+                    SLANG_CHECK(strcmp(strCstr, check) == 0);
                 }
                 else
                 {
