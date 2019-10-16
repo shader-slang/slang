@@ -28,6 +28,12 @@ public:
 
     SLANG_FORCE_INLINE T* get() const;
 
+    void setNull()
+    {
+        m_offset = kNullOffset32;
+        m_container = nullptr;
+    }
+
     Safe32Ptr() : m_container(nullptr), m_offset(kNullOffset32) {}
 
     Safe32Ptr(int32_t offset, RelativeContainer* container) : m_offset(offset), m_container(container) {}
@@ -49,7 +55,7 @@ public:
     T* get()
     {
         uint8_t* nonConstThis = (uint8_t*)this;
-        return (m_offset == kNullOffset) ? nullptr : (T*)(nonConstThis + m_offset);
+        return (m_offset == kNullOffset32) ? nullptr : (T*)(nonConstThis + m_offset);
     }
     T* get() const
     {
@@ -64,21 +70,60 @@ public:
     SLANG_FORCE_INLINE void set(T* ptr) { m_offset = ptr ? int32_t(((uint8_t*)ptr) - ((const uint8_t*)this)) : uint32_t(kNullOffset32); }
 
     Relative32Ptr(const Safe32Ptr<T>& rhs) { set(rhs.get()); }
-    Relative32Ptr() :m_offset(kNullOffset) {}
+    Relative32Ptr() :m_offset(kNullOffset32) {}
     Relative32Ptr(T* ptr) { set(ptr); }
 
-    const Relative32Ptr& operator=(const ThisType& rhs) { m_offset = rhs.m_offset; }
-    const Relative32Ptr& operator=(const Safe32Ptr& rhs) { set(rhs.get()); }
+    const Relative32Ptr& operator=(const ThisType& rhs) { set(rhs.get()); return *this; }
+    const Relative32Ptr& operator=(const Safe32Ptr<T>& rhs) { set(rhs.get()); return *this; }
 
     int32_t m_offset;
 };
 
 template <typename T>
+class Safe32Array
+{
+public:
+
+    Index getCount() const { return Index(m_count); }
+    T* getData() { return m_data.get(); }
+    const T* getData() const { return m_data.get(); }
+
+    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+
+    Safe32Array(Safe32Ptr<T> data, uint32_t count):m_data(data), m_count(count) {}
+
+    Safe32Array():m_count(0) {}
+
+    Safe32Ptr<T> m_data;
+    uint32_t m_count;
+};
+
+
+template <typename T>
 class Relative32Array
 {
-    Relative32Array() :m_count(0) {}
+public:
+    typedef Relative32Array ThisType;
+
+    Index getCount() const { return Index(m_count); }
+    T* getData() { return m_data.get(); }
+    const T* getData() const { return m_data.get(); }
+
+    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+
+    Relative32Array(const Safe32Array<T>& rhs):
+        m_count(rhs.m_count),
+        m_data(rhs.m_data)
+    {
+    }
+
+    Relative32Array() : m_count(0) {}
+    Relative32Array(const ThisType& rhs) : m_count(rhs.m_count), m_data(rhs.m_data) {}
+
     uint32_t m_count;               ///< the size of the data
-    Relative32Ptr m_data;           ///< The data
+    Relative32Ptr<T> m_data;           ///< The data
 };
 
 struct RelativeString
@@ -116,8 +161,23 @@ public:
     Safe32Ptr<T> allocate()
     {
         void* data = allocate(sizeof(T), SLANG_ALIGN_OF(T));
-        memset(data, 0, size);
+        new (data) T();
         return Safe32Ptr<T>(getOffset(data), this);
+    }
+
+    template <typename T>
+    Safe32Array<T> allocateArray(size_t size)
+    {
+        if (size == 0)
+        {
+            return Safe32Array<T>();
+        }
+        T* data = (T*)allocate(sizeof(T) * size, SLANG_ALIGN_OF(T));
+        for (size_t i = 0; i < size; ++i)
+        {
+            new (data + i) T();
+        }
+        return Safe32Array<T>(Safe32Ptr<T>(getOffset(data), this), uint32_t(size));
     }
 
     /// Allocate without alignment (effectively 1)
@@ -153,6 +213,11 @@ public:
 
     /// Get the contained data
     uint8_t* getData() { return m_data.getBuffer(); }
+        /// Return the last used byte of the data
+    size_t getDataCount() const { return m_current; }
+
+        /// Set the contents
+    void set(void* data, size_t size);
 
     /// Ctor
     RelativeContainer();

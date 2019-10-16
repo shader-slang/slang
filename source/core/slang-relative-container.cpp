@@ -154,11 +154,13 @@ Safe32Ptr<RelativeString> RelativeContainer::newString(const UnownedStringSlice&
 {
     size_t stringSize = slice.size();
 
-    size_t allocSize = RelativeString::calcAllocationSize(stringSize);
+    uint8_t head[RelativeString::kMaxSizeEncodeSize];
+    size_t headSize = RelativeString::calcEncodedSize(stringSize, head);
+
+    size_t allocSize = headSize + stringSize + 1;
     uint8_t* bytes = (uint8_t*)allocate(allocSize);
 
-    size_t headSize = RelativeString::calcEncodedSize(slice.size(), bytes);
-
+    ::memcpy(bytes, head, headSize);    
     ::memcpy(bytes + headSize, slice.begin(), stringSize);
 
     // 0 terminate
@@ -177,5 +179,13 @@ Safe32Ptr<RelativeString> RelativeContainer::newString(const char* contents)
     return relString;
 }
 
+void RelativeContainer::set(void* data, size_t size)
+{
+    m_data.clearAndDeallocate();
+    m_data.setCount(size);
+
+    ::memcpy(m_data.getBuffer(), data, size);
+    m_current = size;
+}
 
 } // namespace Slang
