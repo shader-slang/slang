@@ -98,11 +98,11 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -115,11 +115,11 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -132,14 +132,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -153,14 +153,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
