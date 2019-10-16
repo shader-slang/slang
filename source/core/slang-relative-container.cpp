@@ -25,7 +25,7 @@ size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncod
     // It might be one byte past the front, if its < 0x100 but greater than kSizeBase 
     SLANG_ASSERT(num >= 1);
 
-    encode[0] = uint8_t(kSizeBase + (num - 1));
+    encode[0] = uint8_t(kSizeBase + num);
     return num + 1;
 }
 
@@ -41,22 +41,22 @@ size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncod
     int numBytes = *cur - kSizeBase;
     switch (numBytes)
     {
-        case 0:
+        case 1:
         {
             outSize = cur[1];
             return in + 2;
         }
-        case 1:
+        case 2:
         {
             outSize = cur[1] | (uint32_t(cur[2]) << 8);
             return in + 3;
         }
-        case 2:
+        case 3:
         {
             outSize = cur[1] | (uint32_t(cur[2]) << 8) | (uint32_t(cur[3]) << 16);
             return in + 4;
         }
-        case 3:
+        case 4:
         {
             outSize = cur[1] | (uint32_t(cur[2]) << 8) | (uint32_t(cur[3]) << 16) | (uint32_t(cur[4]) << 24);
             return in + 5;

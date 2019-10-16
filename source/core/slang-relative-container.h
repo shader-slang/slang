@@ -85,7 +85,7 @@ struct RelativeString
 {
     enum
     {
-        kSizeBase = 252,
+        kSizeBase = 251,
         kMaxSizeEncodeSize = 5,
     };
 
