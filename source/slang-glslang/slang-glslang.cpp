@@ -16,6 +16,9 @@
 
 #include "../../slang.h"
 
+#include "spirv-tools/optimizer.hpp"
+#include "spirv-tools/libspirv.h"
+
 #if 0
 #include <cstring>
 #include <cstdlib>
@@ -84,6 +87,118 @@ static void dumpDiagnostics(
     std::string const&      log)
 {
     dump(log.c_str(), log.length(), request->diagnosticFunc, request->diagnosticUserData, stderr);
+}
+
+// Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
+// TODO: add flag for optimizing SPIR-V size as well
+static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, unsigned optimizationLevel, unsigned debugInfoType)
+{
+    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_2;
+
+    spvtools::Optimizer optimizer(target_env);
+    optimizer.SetMessageConsumer(
+        [](spv_message_level_t level, const char *source, const spv_position_t &position, const char *message) {
+        auto &out = std::cerr;
+        switch (level)
+        {
+        case SPV_MSG_FATAL:
+        case SPV_MSG_INTERNAL_ERROR:
+        case SPV_MSG_ERROR:
+            out << "error: ";
+            break;
+        case SPV_MSG_WARNING:
+            out << "warning: ";
+            break;
+        case SPV_MSG_INFO:
+        case SPV_MSG_DEBUG:
+            out << "info: ";
+            break;
+        default:
+            break;
+        }
+        if (source)
+        {
+            out << source << ":";
+        }
+        out << position.line << ":" << position.column << ":" << position.index << ":";
+        if (message)
+        {
+            out << " " << message;
+        }
+        out << std::endl;
+    });
+
+    // If debug info is being generated, propagate
+    // line information into all SPIR-V instructions. This avoids loss of
+    // information when instructions are deleted or moved. Later, remove
+    // redundant information to minimize final SPRIR-V size.
+    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
+    }
+
+    switch (optimizationLevel)
+    {
+    case SLANG_OPTIMIZATION_LEVEL_NONE:
+        // Don't register any passes if our optimization level is none
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+        // Use a minimal set of performance settings
+        optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+        optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
+        optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_HIGH:
+    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+        // Use the same passes when specifying the "-O" flag in spirv-opt
+        optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
+        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+        optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+        optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
+        optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateCCPPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+        optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
+        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+        optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
+        optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
+        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+        optimizer.RegisterPass(spvtools::CreateIfConversionPass());
+        optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
+        optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+        optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+        optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+        break;
+    }
+
+    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
+    }
+
+    spvtools::OptimizerOptions spvOptOptions;
+    spvOptOptions.set_run_validator(false); // Don't run the validator by default
+    optimizer.Run(spirv.data(), spirv.size(), &spirv, spvOptOptions);
 }
 
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
@@ -169,6 +284,11 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         options.disableOptimizer = false;
         options.optimizeSize = true;
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &options);
+
+        if (request->optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
+        {
+            glslang_optimizeSPIRV(spirv, request->optimizationLevel, request->debugInfoType);
+        }
 
         dumpDiagnostics(request, logger.getAllMessages());
 
