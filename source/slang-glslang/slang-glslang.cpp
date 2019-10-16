@@ -137,6 +137,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, unsigned opt
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
     }
 
+    // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
     case SLANG_OPTIMIZATION_LEVEL_NONE:
@@ -280,10 +281,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         std::vector<unsigned int> spirv;
         std::string warningsErrors;
         spv::SpvBuildLogger logger;
-        glslang::SpvOptions options;
-        options.disableOptimizer = false;
-        options.optimizeSize = true;
-        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &options);
+        glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
 
         if (request->optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
