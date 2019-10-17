@@ -491,6 +491,10 @@ struct OptionsParser
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
+                else if (argStr == "-dump-repro")
+                {
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->getFrontEndReq()->dumpRepro));
+                }
                 else if (argStr == "-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;

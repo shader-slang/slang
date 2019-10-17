@@ -13,6 +13,8 @@
 #include "slang-syntax-visitors.h"
 #include "slang-type-layout.h"
 
+#include "slang-state-serialize.h"
+
 #include "slang-file-system.h"
 
 #include "../core/slang-writer.h"
@@ -1072,7 +1074,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
     return language;
 }
 
-SlangResult FrontEndCompileRequest::executeActionsInner()
+SlangResult FrontEndCompileRequest::executeActionsInner(EndToEndCompileRequest* endToEndRequest)
 {
     // We currently allow GlSL files on the command line so that we can
     // drive our "pass-through" mode, but we really want to issue an error
@@ -1096,6 +1098,13 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     {
         parseTranslationUnit(translationUnit.Ptr());
     }
+
+    //
+    if (dumpRepro.getLength() && endToEndRequest)
+    {
+        SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(endToEndRequest, dumpRepro));
+    }    
+
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1215,7 +1224,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     //
     if (passThrough == PassThroughMode::None)
     {
-        SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner());
+        SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner(this));
     }
 
     // If command line specifies to skip codegen, we exit here.
@@ -2473,7 +2482,7 @@ void Session::addBuiltinSource(
         path,
         source);
 
-    SlangResult res = compileRequest->executeActionsInner();
+    SlangResult res = compileRequest->executeActionsInner(nullptr);
     if (SLANG_FAILED(res))
     {
         char const* diagnostics = sink.outputBuffer.getBuffer();

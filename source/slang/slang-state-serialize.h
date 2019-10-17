@@ -2,113 +2,100 @@
 #ifndef SLANG_STATE_SERIALIZE_H_INCLUDED
 #define SLANG_STATE_SERIALIZE_H_INCLUDED
 
-#include "../core/slang-basic.h"
-#include "../core/slang-stream.h"
+#include "../core/slang-riff.h"
 #include "../core/slang-string.h"
 
 // For TranslationUnitRequest
 #include "slang-compiler.h"
 
+#include "../core/slang-relative-container.h"
+
 namespace Slang {
 
-
-// Work out the state based on the api
-class CompileState
+struct StateSerializeUtil
 {
-    class File
+    static const uint32_t kSlangStateFourCC = SLANG_FOUR_CC('S', 'L', 'S', 'T');             ///< Holds all the slang specific chunks
+    
+    struct Header
     {
-        enum Type
-        {
-            FileSystem,             ///< Loaded from the file system
-            String,           ///< Specified as a String
-        };
-
-        Type type;
-        Slang::String path;
-        Slang::String contents;
+        RiffChunk m_chunk;
+        uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
-
-    // Ignore
-    // spSessionSetSharedLibraryLoader
-    // spAddBuiltins
-    // spSetFileSystem
-    // spSetDiagnosticCallback
-    // spSetWriter
 
     struct SessionState
     {
-        
-        //List<File> builtIns;
-
 
     };
 
-    // spSetCodeGenTarget/spAddCodeGenTarget
-    // spSetTargetProfile
-    // spSetTargetFlags
-    // spSetTargetFloatingPointMode
-    // spSetTargetMatrixLayoutMode
-    struct TargetState
+        // spSetCodeGenTarget/spAddCodeGenTarget
+        // spSetTargetProfile
+        // spSetTargetFlags
+        // spSetTargetFloatingPointMode
+        // spSetTargetMatrixLayoutMode
+    struct TargetRequestState
     {
-        Slang::Profile profile;
-        Slang::CodeGenTarget target;
+        Profile profile;
+        CodeGenTarget target;
         SlangTargetFlags targetFlags;
-        Slang::FloatingPointMode floatingPointMode;
-
+        FloatingPointMode floatingPointMode;
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
     struct Define
     {
-        String key;
-        String value;
+        Relative32Ptr<RelativeString> key;
+        Relative32Ptr<RelativeString> value;
     };
 
-    // spAddTranslationUnit
-    struct TranslationUnitState
+        // spAddTranslationUnit
+    struct TranslationUnitRequestState
     {
         SourceLanguage language;
 
-        String moduleName;
+        Relative32Ptr<RelativeString> moduleName;
 
         // spTranslationUnit_addPreprocessorDefine
-        List<Define> preprocessorDefinitions;
+        Relative32Array<Define> preprocessorDefinitions;
     };
 
     struct RequestState
     {
+        Relative32Ptr<SessionState> session;
+
         // spSetCompileFlags
         SlangCompileFlags compileFlags;
         // spSetDumpIntermediates
         bool shouldDumpIntermediates;
         // spSetLineDirectiveMode
-        Slang::LineDirectiveMode lineDirectiveMode;
-        
-        List<TargetState> targets;
+        LineDirectiveMode lineDirectiveMode;
+
+        Relative32Array<TargetRequestState> targetRequests;
 
         // spSetDebugInfoLevel
-        Slang::DebugInfoLevel debugInfoLevel;
+        DebugInfoLevel debugInfoLevel;
         // spSetOptimizationLevel
-        Slang::OptimizationLevel optimizationLevel;
+        OptimizationLevel optimizationLevel;
         // spSetOutputContainerFormat
-        Slang::ContainerFormat containerFormat;
+        ContainerFormat containerFormat;
         // spSetPassThrough
-        Slang::PassThroughMode passThroughMode;
+        PassThroughMode passThroughMode;
 
         // spAddSearchPath
-        List<String> searchPaths;
+        Relative32Array<Relative32Ptr<RelativeString> > searchPaths;
 
         // spAddPreprocessorDefine
-        List<Define> preprocessorDefinitions;
+        Relative32Array<Define> preprocessorDefinitions;
 
-        List<TranslationUnitState> translationUnits;
+        Relative32Array<TranslationUnitRequestState> translationUnits;
     };
 
-    SessionState sessionState;
-    RequestState requestState;
+    static SlangResult store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest);
 
-    SlangResult loadState(Session* session);
-    SlangResult loadState(EndToEndCompileRequest* request);
+
+    static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
+
+    static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
+
 };
 
 } // namespace Slang

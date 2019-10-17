@@ -1346,6 +1346,9 @@ namespace Slang
         // If true will serialize and de-serialize with debug information
         bool verifyDebugSerialization = false;
 
+        // If set, will dump the compilation state 
+        String dumpRepro;           
+
         List<RefPtr<FrontEndEntryPointRequest>> m_entryPointReqs;
 
         List<RefPtr<FrontEndEntryPointRequest>> const& getEntryPointReqs() { return m_entryPointReqs; }
@@ -1371,7 +1374,7 @@ namespace Slang
 
         void generateIR();
 
-        SlangResult executeActionsInner();
+        SlangResult executeActionsInner(EndToEndCompileRequest* endToEndRequest);
 
             /// Add a translation unit to be compiled.
             ///
@@ -1722,6 +1725,7 @@ namespace Slang
         void setWriter(WriterChannel chan, ISlangWriter* writer);
         ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
 
+            /// The end to end request can be passed as nullptr, if not driven by one
         SlangResult executeActionsInner();
         SlangResult executeActions();
 

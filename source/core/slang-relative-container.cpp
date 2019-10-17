@@ -117,6 +117,11 @@ void* RelativeContainer::allocate(size_t size)
     return allocate(size, 1);
 }
 
+void RelativeContainer::fixAlignment(size_t alignment)
+{
+    allocate(0, alignment);
+}
+
 void* RelativeContainer::allocate(size_t size, size_t alignment)
 {
     size_t offset = (m_current + alignment - 1) & ~(alignment - 1);

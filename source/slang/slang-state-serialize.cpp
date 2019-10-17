@@ -7,96 +7,123 @@
 
 namespace Slang {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileState !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-SlangResult CompileState::loadState(Session* session)
+const Safe32Array<StateSerializeUtil::Define> _calcDefines(const Dictionary<String, String>& srcDefines, RelativeContainer& inOutContainer)
 {
-    SLANG_UNUSED(session);
-    //
+    typedef StateSerializeUtil::Define Define;
 
-    return SLANG_OK;
+    Safe32Array<Define> dstDefines = inOutContainer.allocateArray<Define>(srcDefines.Count());
+
+    Index index = 0;
+    for (const auto& srcDefine : srcDefines)
+    {
+        // Do allocation before setting
+        auto key = inOutContainer.newString(srcDefine.Key.getUnownedSlice());
+        auto value = inOutContainer.newString(srcDefine.Value.getUnownedSlice());
+
+        auto& dstDefine = dstDefines[index];
+        dstDefine.key = key;
+        dstDefine.value = value;
+
+        index++;
+    }
+
+    return dstDefines;
 }
 
-
-SlangResult CompileState::loadState(EndToEndCompileRequest* request)
+/* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest)
 {
-    RequestState& dstState = requestState;
-
-    dstState.compileFlags = request->getFrontEndReq()->compileFlags;
-    dstState.shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
-    dstState.lineDirectiveMode = request->getBackEndReq()->lineDirectiveMode;
-
     auto linkage = request->getLinkage();
 
-    dstState.debugInfoLevel = linkage->debugInfoLevel;
-    dstState.optimizationLevel = linkage->optimizationLevel;
-    dstState.containerFormat = request->containerFormat;
-    dstState.passThroughMode = request->passThrough;
+    Safe32Ptr<RequestState> requestState = inOutContainer.allocate<RequestState>();
+
+    {
+        RequestState* dst = requestState; 
+
+        dst->compileFlags = request->getFrontEndReq()->compileFlags;
+        dst->shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
+        dst->lineDirectiveMode = request->getBackEndReq()->lineDirectiveMode;
+
+        dst->debugInfoLevel = linkage->debugInfoLevel;
+        dst->optimizationLevel = linkage->optimizationLevel;
+        dst->containerFormat = request->containerFormat;
+        dst->passThroughMode = request->passThrough;
+    }
 
     {
         const auto defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
 
-        dstState.targets.clear();
-        for (TargetRequest* targetRequest : linkage->targets)
-        {
-            TargetState targetState;
-            targetState.target = targetRequest->getTarget();
-            targetState.profile = targetRequest->getTargetProfile();
-            targetState.targetFlags = targetRequest->targetFlags;
-            targetState.floatingPointMode = targetRequest->floatingPointMode;
-            targetState.defaultMatrixLayoutMode = defaultMatrixLayoutMode;
+        Safe32Array<TargetRequestState> dstTargets = inOutContainer.allocateArray<TargetRequestState>(linkage->targets.getCount());
 
-            dstState.targets.add(targetState);
+        for (Index i = 0; i < linkage->targets.getCount(); ++i)
+        {
+            auto& dst = dstTargets[i];
+            TargetRequest* targetRequest = linkage->targets[i];
+
+            dst.target = targetRequest->getTarget();
+            dst.profile = targetRequest->getTargetProfile();
+            dst.targetFlags = targetRequest->targetFlags;
+            dst.floatingPointMode = targetRequest->floatingPointMode;
+            dst.defaultMatrixLayoutMode = defaultMatrixLayoutMode;
         }
+
+        requestState->targetRequests = dstTargets;
     }
 
     {
-        dstState.searchPaths.clear();
+        const auto& srcPaths = linkage->searchDirectories.searchDirectories;
+        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.allocateArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
+
         // We don't handle parents here
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
-        for (auto& searchPath : linkage->searchDirectories.searchDirectories)
+
+        for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            dstState.searchPaths.add(searchPath.path);
+            dstPaths[i] = inOutContainer.newString(srcPaths[i].path.getUnownedSlice());
         }
+
+        requestState->searchPaths = dstPaths;
     }
 
-    {
-        dstState.preprocessorDefinitions.clear();
-
-        for (const auto srcDefine : linkage->preprocessorDefinitions)
-        {
-            Define define;
-            define.key = srcDefine.Key;
-            define.value = srcDefine.Value;
-
-            dstState.preprocessorDefinitions.add(define);
-        }
-    }
+    requestState->preprocessorDefinitions = _calcDefines(linkage->preprocessorDefinitions, inOutContainer);
 
     {
-        dstState.translationUnits.clear();
+        const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
+        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.allocateArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
 
-        for (TranslationUnitRequest* srcTranslationUnit : request->getFrontEndReq()->translationUnits)
+        for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
-            TranslationUnitState dstTranslationUnit;
+            TranslationUnitRequest* srcTranslationUnit = srcTranslationUnits[i];
+
+            // Do before setting, because this can allocate, and therefore break, the following section
+            auto defines = _calcDefines(srcTranslationUnit->preprocessorDefinitions, inOutContainer);
+            auto moduleName = inOutContainer.newString(srcTranslationUnit->moduleName->text.getUnownedSlice());
+
+            TranslationUnitRequestState& dstTranslationUnit = dstTranslationUnits[i];
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
-            dstTranslationUnit.moduleName = srcTranslationUnit->moduleName->text;
+            dstTranslationUnit.moduleName = moduleName;
 
-            for (const auto srcDefine : srcTranslationUnit->preprocessorDefinitions)
-            {
-                Define define;
-                define.key = srcDefine.Key;
-                define.value = srcDefine.Value;
-
-                dstTranslationUnit.preprocessorDefinitions.add(define);
-            }
-            
-            dstState.translationUnits.add(dstTranslationUnit);
+            dstTranslationUnit.preprocessorDefinitions = defines;
         }
     }
 
+    outRequest = requestState;
     return SLANG_OK;
+}
+
+/* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
+{
+    RelativeContainer container;
+    Safe32Ptr<RequestState> requestState;
+    SLANG_RETURN_ON_FAIL(store(request, container, requestState));
+    return RiffUtil::writeData(kSlangStateFourCC, container.getData(), container.getDataCount(), stream);
+}
+
+/* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, const String& filename)
+{
+    RefPtr<Stream> stream(new FileStream(filename, FileMode::Create));
+    return saveState(request, stream);
 }
 
 } // namespace Slang

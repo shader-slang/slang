@@ -840,7 +840,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
     {
         case Bin::CompressionType::None:
         {
-            payloadSize = sizeof(Bin::ArrayHeader) - sizeof(Bin::Chunk) + typeSize * numEntries;
+            payloadSize = sizeof(Bin::ArrayHeader) - sizeof(RiffChunk) + typeSize * numEntries;
 
             Bin::ArrayHeader header;
             header.m_chunk.m_type = chunkId;
@@ -860,7 +860,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
 
             ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
 
-            payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.getCount();
+            payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(RiffChunk) + compressedPayload.getCount();
 
             Bin::CompressedArrayHeader header;
             header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
@@ -1005,7 +1005,7 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             List<uint8_t> compressedPayload;
             SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
             
-            size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(Bin::Chunk) + compressedPayload.getCount();
+            size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(RiffChunk) + compressedPayload.getCount();
 
             Bin::CompressedArrayHeader header;
             header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
@@ -1124,7 +1124,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     }
 
     {
-        Bin::Chunk riffHeader;
+        RiffChunk riffHeader;
         riffHeader.m_type = Bin::kRiffFourCc;
         riffHeader.m_size = uint32_t(totalSize);
         
@@ -1133,7 +1133,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
     {
         Bin::SlangHeader slangHeader;
         slangHeader.m_chunk.m_type = Bin::kSlangFourCc;
-        slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(Bin::Chunk));
+        slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(RiffChunk));
         slangHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
 
         stream->Write(&slangHeader, sizeof(slangHeader));
@@ -1192,7 +1192,7 @@ class ListResizerForType: public ListResizer
     List<T>& m_list;
 };
 
-static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, ListResizer& listOut)
+static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, const RiffChunk& chunk, Stream* stream, size_t* numReadInOut, ListResizer& listOut)
 {
     typedef IRSerialBinary Bin;
 
@@ -1206,13 +1206,13 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             Bin::CompressedArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
-            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            *numReadInOut += sizeof(header) - sizeof(RiffChunk);
 
             void* data = listOut.setSize(header.m_numEntries);
             
             // Need to read all the compressed data... 
-            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
+            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(RiffChunk));
 
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
@@ -1232,8 +1232,8 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             Bin::ArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
-            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            *numReadInOut += sizeof(header) - sizeof(RiffChunk);
 
             const size_t payloadSize = header.m_numEntries * typeSize;
 
@@ -1260,7 +1260,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
 }
 
 template <typename T>
-Result _readArrayChunk(const IRSerialBinary::SlangHeader& header, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
+static Result _readArrayChunk(const IRSerialBinary::SlangHeader& header, const RiffChunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
 {
     typedef IRSerialBinary Bin;
 
@@ -1276,7 +1276,7 @@ Result _readArrayChunk(const IRSerialBinary::SlangHeader& header, const IRSerial
 }  
 
 template <typename T>
-Result _readArrayUncompressedChunk(const IRSerialBinary::SlangHeader& header, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
+static Result _readArrayUncompressedChunk(const IRSerialBinary::SlangHeader& header, const RiffChunk& chunk, Stream* stream, size_t* numReadInOut, List<T>& arrayOut)
 {
     typedef IRSerialBinary Bin;
     SLANG_UNUSED(header);
@@ -1351,7 +1351,7 @@ static Result _decodeInsts(IRSerialBinary::CompressionType compressionType, cons
     return SLANG_OK;
 }
 
-Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const IRSerialBinary::Chunk& chunk, Stream* stream, size_t* numReadInOut, List<IRSerialData::Inst>& arrayOut)
+static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const RiffChunk& chunk, Stream* stream, size_t* numReadInOut, List<IRSerialData::Inst>& arrayOut)
 {
     typedef IRSerialBinary Bin;
 
@@ -1374,11 +1374,11 @@ Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const
             Bin::CompressedArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(Bin::Chunk));
-            *numReadInOut += sizeof(header) - sizeof(Bin::Chunk);
+            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            *numReadInOut += sizeof(header) - sizeof(RiffChunk);
             
             // Need to read all the compressed data... 
-            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(Bin::Chunk));
+            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(RiffChunk));
 
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
@@ -1409,26 +1409,6 @@ Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader, const
     return SLANG_OK;
 }
 
-int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
-{
-    int64_t size = chunk.m_size + sizeof(IRSerialBinary::Chunk);
-    return (size + 3) & ~int64_t(3);
-}
-
-/* static */Result IRSerialReader::_skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut)
-{
-    typedef IRSerialBinary Bin;
-    int64_t chunkSize = _calcChunkTotalSize(chunk);
-    if (remainingBytesInOut)
-    {
-        *remainingBytesInOut -= chunkSize;
-    }
-
-    // Skip the payload (we don't need to skip the Chunk because that was already read
-    stream->Seek(SeekOrigin::Current, chunkSize - sizeof(IRSerialBinary::Chunk));
-    return SLANG_OK;
-}
-
 /* static */Result IRSerialReader::readStream(Stream* stream, IRSerialData* dataOut)
 {
     typedef IRSerialBinary Bin;
@@ -1437,8 +1417,8 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
     int64_t remainingBytes = 0;
     {
-        Bin::Chunk header;
-        stream->Read(&header, sizeof(header));
+        RiffChunk header;
+        SLANG_RETURN_ON_FAIL(RiffUtil::readChunk(stream, header));
         if (header.m_type != Bin::kRiffFourCc)
         {
             return SLANG_FAIL;
@@ -1454,9 +1434,8 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
     while (remainingBytes > 0)
     {
-        Bin::Chunk chunk;
-
-        stream->Read(&chunk, sizeof(chunk));
+        RiffChunk chunk;
+        SLANG_RETURN_ON_FAIL(RiffUtil::readChunk(stream, chunk));
 
         size_t bytesRead = sizeof(chunk);
 
@@ -1472,77 +1451,77 @@ int64_t _calcChunkTotalSize(const IRSerialBinary::Chunk& chunk)
 
                 stream->Read(&slangHeader.m_chunk + 1, sizeof(slangHeader) - sizeof(chunk));
 
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
             case Bin::kInstFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readInstArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_insts));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;    
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
             case Bin::kChildRunFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_childRuns));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
             case Bin::kExternalOperandsFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_externalOperands));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kStringFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_stringTable));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kUInt32SourceLocFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_rawSourceLocs));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kDebugStringFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugStringTable));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kDebugLineInfoFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugLineInfos));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kDebugAdjustedLineInfoFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugAdjustedLineInfos));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case Bin::kDebugSourceInfoFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugSourceInfos));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
             case Bin::kDebugSourceLocRunFourCc:
             {
                 SLANG_RETURN_ON_FAIL(_readArrayChunk(slangHeader, chunk, stream, &bytesRead, dataOut->m_debugSourceLocRuns));
-                remainingBytes -= _calcChunkTotalSize(chunk);
+                remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
             } 
 
             default:
             {
-                SLANG_RETURN_ON_FAIL(_skip(chunk, stream, &remainingBytes));
+                SLANG_RETURN_ON_FAIL(RiffUtil::skip(chunk, stream, &remainingBytes));
                 break;
             }
         }

@@ -191,6 +191,8 @@ public:
     void* allocate(size_t size, size_t alignment);
     void* allocateAndZero(size_t size, size_t alignment);
 
+    void fixAlignment(size_t alignment);
+
     template <typename T>
     Safe32Ptr<T> toSafe(T* ptr) { SafePtr<T> safePtr; relPtr.m_offset = getOffset(); }
     int32_t getOffset(const void* ptr)
