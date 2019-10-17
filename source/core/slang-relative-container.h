@@ -89,6 +89,11 @@ template <typename T>
 class Safe32Array
 {
 public:
+    const T* begin() const { return m_data; }
+    const T* end() const { return begin() + m_count; }
+
+    T* begin() { return m_data; }
+    T* end() { return begin() + m_count; }
 
     Index getCount() const { return Index(m_count); }
     T* getData() { return m_data.get(); }
@@ -111,6 +116,12 @@ class Relative32Array
 {
 public:
     typedef Relative32Array ThisType;
+
+    const T* begin() const { return m_data; }
+    const T* end() const { return begin() + m_count; }
+
+    T* begin() { return m_data; }
+    T* end() { return begin() + m_count; }
 
     Index getCount() const { return Index(m_count); }
     T* getData() { return m_data.get(); }

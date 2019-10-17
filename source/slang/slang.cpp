@@ -219,6 +219,30 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
+SlangResult Session::_loadRequest(EndToEndCompileRequest* request, const void* data, size_t size)
+{
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
+
+    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, request));
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangCompileRequest* Session::createRequestFromRepro(const void* data, size_t size)
+{
+    EndToEndCompileRequest* request = asInternal(spCreateCompileRequest(asExternal(this)));
+
+    if (SLANG_FAILED(_loadRequest(request, data, size)))
+    {
+        spDestroyCompileRequest(asExternal(request));
+        return nullptr;
+    }
+
+    return asExternal(request);
+}
+
 struct IncludeHandlerImpl : IncludeHandler
 {
     Linkage*    linkage;

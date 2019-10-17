@@ -5,6 +5,8 @@
 
 #include "../core/slang-math.h"
 
+#include "slang-source-loc.h"
+
 namespace Slang {
 
 
@@ -84,8 +86,14 @@ struct StoreContext
         m_stringMap.Add(in, value);
         return value;
     }
-
-
+    Safe32Ptr<RelativeString> fromName(Name* name)
+    {
+        if (name)
+        {
+            return fromString(name->text);
+        }
+        return Safe32Ptr<RelativeString>();
+    }
 
     const Safe32Array<StateSerializeUtil::Define> calcDefines(const Dictionary<String, String>& srcDefines)
     {
@@ -117,6 +125,228 @@ struct StoreContext
     RelativeContainer* m_container;
 };
 
+struct LoadContext
+{
+    typedef StateSerializeUtil::SourceFileState SourceFileState;
+
+    SourceFile* getSourceFile(SourceFileState* srcFile)
+    {
+        if (srcFile == nullptr)
+        {
+            return nullptr;
+        }
+
+        SourceFile* dstFile;
+        if (!m_sourceFileMap.TryGetValue(srcFile, dstFile))
+        {
+            PathInfo pathInfo;
+
+            UnownedStringSlice slice = srcFile->content->getSlice();
+
+            pathInfo.type = srcFile->type;
+            pathInfo.foundPath = srcFile->foundPath->getSlice();
+            pathInfo.uniqueIdentity = srcFile->uniqueIdentity->getSlice();
+
+            dstFile = new SourceFile(m_sourceManager, pathInfo, slice.size());
+
+            ISlangBlob* contents = getBlob(srcFile->content);
+            dstFile->setContents(contents);
+
+            // Add to map
+            m_sourceFileMap.Add(srcFile, dstFile);
+
+            // Add to manager
+            m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, dstFile);
+        }
+        return dstFile;
+    }
+    ISlangBlob* getBlob(RelativeString* src)
+    {
+        if (src == nullptr)
+        {
+            return nullptr;
+        }
+        ComPtr<ISlangBlob> dstBlob;
+        if (!m_contentsMap.TryGetValue(src, dstBlob))
+        {
+            dstBlob = new StringBlob(src->getSlice());
+            m_contentsMap.Add(src, dstBlob);
+        }
+
+        return dstBlob;
+    }
+
+    LoadContext(SourceManager* sourceManger):
+        m_sourceManager(sourceManger)
+    {
+    }
+
+    SourceManager* m_sourceManager;
+    Dictionary<SourceFileState*, SourceFile*> m_sourceFileMap;
+    Dictionary<RelativeString*, ComPtr<ISlangBlob>> m_contentsMap;
+};
+
+} // anonymous
+
+static void _loadDefines(const Relative32Array<StateSerializeUtil::Define>& in, Dictionary<String, String>& out)
+{
+    out.Clear();
+
+    for (const auto& define : in)
+    {
+        out.Add(define.key->getSlice(), define.value->getSlice());
+    }
+}
+
+
+/* static */SlangResult StateSerializeUtil::load(RequestState* requestState, EndToEndCompileRequest* request)
+{
+    auto externalRequest = asExternal(request);
+
+    auto linkage = request->getLinkage();
+
+    LoadContext context(linkage->getSourceManager());
+
+    // Try to set state through API - as doing so means if state stored in multiple places it will be ok
+
+    {
+        spSetCompileFlags(externalRequest, (SlangCompileFlags)requestState->compileFlags);
+        spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
+        spSetLineDirectiveMode(externalRequest, SlangLineDirectiveMode(requestState->lineDirectiveMode));
+        spSetDebugInfoLevel(externalRequest, SlangDebugInfoLevel(requestState->debugInfoLevel));
+        spSetOptimizationLevel(externalRequest, SlangOptimizationLevel(requestState->optimizationLevel));
+        spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
+        spSetPassThrough(externalRequest, SlangPassThrough(request->passThrough));
+
+        linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
+    }
+
+    {
+        for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
+        {
+            TargetRequestState& src = requestState->targetRequests[i];
+            int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
+            SLANG_ASSERT(index == i);
+
+            auto dstTarget = linkage->targets[i];
+
+            SLANG_ASSERT(dstTarget->getTarget() == src.target);
+            dstTarget->targetProfile = src.profile;
+            dstTarget->targetFlags = src.targetFlags;
+            dstTarget->floatingPointMode = src.floatingPointMode;
+        }
+    }
+
+    {
+        const auto& srcPaths = requestState->searchPaths;
+        auto& dstPaths = linkage->searchDirectories.searchDirectories;
+        for (Index i = 0; i < srcPaths.getCount(); ++i)
+        {
+            dstPaths[i].path = srcPaths[i]->getSlice();
+        }
+    }
+
+    _loadDefines(requestState->preprocessorDefinitions, linkage->preprocessorDefinitions);
+
+    {
+        auto frontEndReq = request->getFrontEndReq();
+
+        const auto& srcTranslationUnits = requestState->translationUnits;
+        auto& dstTranslationUnits = frontEndReq->translationUnits;
+
+        dstTranslationUnits.clear();
+        
+        for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
+        {
+            const auto& srcTranslationUnit = srcTranslationUnits[i];
+
+            int index = frontEndReq->addTranslationUnit(srcTranslationUnit.language);
+            SLANG_ASSERT(index == i);
+
+            TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
+
+            _loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
+
+            Name* moduleName = nullptr;
+            if (srcTranslationUnit.moduleName)
+            {
+                moduleName = request->getNamePool()->getName(srcTranslationUnit.moduleName->getSlice());
+            }
+
+            dstTranslationUnit->moduleName = moduleName;
+
+            const auto& srcSourceFiles = srcTranslationUnit.sourceFiles;
+            auto& dstSourceFiles = dstTranslationUnit->m_sourceFiles;
+
+            dstSourceFiles.clear();
+
+            for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
+            {
+                SourceFile* sourceFile = context.getSourceFile(srcSourceFiles[i]);
+                // Add to translation unit
+                dstTranslationUnit->addSourceFile(sourceFile);
+            }
+        }
+    }
+
+    {
+        RefPtr<CacheFileSystem> cacheFileSystem = new CacheFileSystem(nullptr);
+
+        // Put all the files in the cache system
+
+        {
+            auto& dstFiles = cacheFileSystem->getFileMap();
+            const auto&  srcFiles = requestState->fileSystemFiles;
+
+            for (auto& srcFile : srcFiles)
+            {
+                String uniqueIdentity = srcFile->uniqueIdentity->getSlice();
+                CacheFileSystem::PathInfo* dstInfo = new CacheFileSystem::PathInfo(uniqueIdentity);
+
+                if (srcFile->canonicalPath)
+                {
+                    String canonicalPath(srcFile->canonicalPath->getSlice());
+                    dstInfo->m_canonicalPath = new StringBlob(canonicalPath);
+                }
+
+                dstInfo->m_fileBlob = context.getBlob(srcFile->contents);
+                dstInfo->m_getCanonicalPathResult = srcFile->getCanonicalPathResult;
+                dstInfo->m_getPathTypeResult = srcFile->getPathTypeResult;
+                dstInfo->m_loadFileResult = srcFile->loadFileResult;
+                dstInfo->m_pathType = srcFile->pathType;
+                dstInfo->m_uniqueIdentity = new StringBlob(uniqueIdentity);
+                
+                dstFiles.Add(uniqueIdentity, dstInfo);
+            }
+        }
+
+        // We need the references
+        {
+            auto& files = cacheFileSystem->getFileMap();
+
+            auto& dstPaths = cacheFileSystem->getPathMap();
+            const auto& srcPaths = requestState->pathToUniqueMap;
+
+            dstPaths.Clear();
+
+            for (const auto& pair : srcPaths)
+            {
+                String uniqueIdentifier = String(pair.second->getSlice());
+                CacheFileSystem::PathInfo* pathInfo = nullptr;
+
+                files.TryGetValue(uniqueIdentifier, pathInfo);
+                dstPaths.Add(pair.first->getSlice(), pathInfo);
+            }
+        }
+
+        // This is a bit of a hack, we are going to replace the file system, with our one which is filled in
+        // with what was read from the file. 
+
+        linkage->fileSystemExt = cacheFileSystem;
+        linkage->cacheFileSystem = cacheFileSystem;
+    }
+
+    return SLANG_OK;
 }
 
 /* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest)
@@ -138,11 +368,12 @@ struct StoreContext
         dst->optimizationLevel = linkage->optimizationLevel;
         dst->containerFormat = request->containerFormat;
         dst->passThroughMode = request->passThrough;
+
+        dst->defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
     }
 
     {
-        const auto defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
-
+        
         Safe32Array<TargetRequestState> dstTargets = inOutContainer.allocateArray<TargetRequestState>(linkage->targets.getCount());
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
@@ -154,7 +385,6 @@ struct StoreContext
             dst.profile = targetRequest->getTargetProfile();
             dst.targetFlags = targetRequest->targetFlags;
             dst.floatingPointMode = targetRequest->floatingPointMode;
-            dst.defaultMatrixLayoutMode = defaultMatrixLayoutMode;
         }
 
         requestState->targetRequests = dstTargets;
@@ -187,7 +417,7 @@ struct StoreContext
 
             // Do before setting, because this can allocate, and therefore break, the following section
             auto defines = context.calcDefines(srcTranslationUnit->preprocessorDefinitions);
-            auto moduleName = context.fromString(srcTranslationUnit->moduleName->text);
+            auto moduleName = context.fromName(srcTranslationUnit->moduleName);
 
             Safe32Array<Relative32Ptr<SourceFileState>> dstSourceFiles;
             {
@@ -295,5 +525,49 @@ struct StoreContext
     RefPtr<Stream> stream(new FileStream(filename, FileMode::Create));
     return saveState(request, stream);
 }
+
+/* static */ SlangResult StateSerializeUtil::loadState(const String& filename, List<uint8_t>& outBuffer)
+{
+    RefPtr<Stream> stream;
+    try
+    {
+        stream = new FileStream(filename, FileMode::Open);
+    }
+    catch (IOException&)
+    {
+    	return SLANG_FAIL;
+    }
+
+    return loadState(stream, outBuffer);
+}
+
+/* static */ SlangResult StateSerializeUtil::loadState(Stream* stream, List<uint8_t>& buffer)
+{
+    RiffChunk chunk;
+    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, chunk, buffer));
+
+    if (chunk.m_type != kSlangStateFourCC)
+    {
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult StateSerializeUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
+{
+    MemoryStream stream(FileAccess::Read);
+
+    stream.m_contents.setCount(size);
+    ::memcpy(stream.m_contents.getBuffer(), data, size);
+
+    return loadState(&stream, outBuffer);
+}
+
+/* static */ StateSerializeUtil::RequestState* StateSerializeUtil::getRequest(const List<uint8_t>& buffer)
+{
+    return (StateSerializeUtil::RequestState*)buffer.getBuffer();
+}
+
 
 } // namespace Slang

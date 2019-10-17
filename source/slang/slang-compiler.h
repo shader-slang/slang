@@ -1847,6 +1847,9 @@ namespace Slang
 
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
 
+        SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createRequestFromRepro(const void* data, size_t size) override;
+
+
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,
@@ -1994,6 +1997,9 @@ namespace Slang
         ~Session();
 
     private:
+
+        SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
+
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 

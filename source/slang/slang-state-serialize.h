@@ -54,7 +54,6 @@ struct StateSerializeUtil
         CodeGenTarget target;
         SlangTargetFlags targetFlags;
         FloatingPointMode floatingPointMode;
-        SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
     struct Define
@@ -129,14 +128,22 @@ struct StateSerializeUtil
         Relative32Array<StringPair> pathToUniqueMap;                        ///< Maps paths to unique indentities
 
         Relative32Array<TranslationUnitRequestState> translationUnits;
+
+        SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
     static SlangResult store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest);
-
-
+    static SlangResult load(RequestState* requestState, EndToEndCompileRequest* request);
+    
     static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
 
     static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
+
+    static SlangResult loadState(const String& filename, List<uint8_t>& outBuffer);
+    static SlangResult loadState(Stream* stream, List<uint8_t>& outBuffer);
+    static SlangResult loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer);
+
+    static RequestState* getRequest(const List<uint8_t>& inBuffer);
 
 };
 
