@@ -2412,32 +2412,70 @@ Session* CompileRequestBase::getSession()
 }
 
 static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+static const Slang::Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
 void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 {
     // Set the fileSystem
     fileSystem = inFileSystem;
 
+    // Release what's there
+    fileSystemExt.setNull();
+    cacheFileSystem.setNull();
+
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        fileSystemExt = cacheFileSystem;
     }
     else
     {
-        // See if we have the full ISlangFileSystemExt interface, if we do just use it
-        inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
-
-        // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
-        if (!fileSystemExt)
+        CacheFileSystem* cacheFileSystemPtr;   
+        inFileSystem->queryInterface(IID_SlangCacheFileSystem, (void**)&cacheFileSystemPtr);
+        if (cacheFileSystemPtr)
         {
-            // Construct a wrapper to emulate the extended interface behavior
-            fileSystemExt = new Slang::CacheFileSystem(fileSystem);
+            cacheFileSystem = cacheFileSystemPtr;
+            fileSystemExt = cacheFileSystemPtr;
+        }
+        else 
+        {
+            if (m_requireCacheFileSystem)
+            {
+                cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
+                fileSystemExt = cacheFileSystem;
+            }
+            else
+            {
+                // See if we have the full ISlangFileSystemExt interface, if we do just use it
+                inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
+
+                // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
+                if (!fileSystemExt)
+                {
+                    // Construct a wrapper to emulate the extended interface behavior
+                    cacheFileSystem = new Slang::CacheFileSystem(fileSystem);
+                    fileSystemExt = cacheFileSystem;
+                }
+            }
         }
     }
 
     // Set the file system used on the source manager
     getSourceManager()->setFileSystemExt(fileSystemExt);
+}
+
+void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)
+{
+    if (requireCacheFileSystem == m_requireCacheFileSystem)
+    {
+        return;
+    }
+
+    ComPtr<ISlangFileSystem> scopeFileSystem(fileSystem);
+    m_requireCacheFileSystem = requireCacheFileSystem;
+
+    setFileSystem(scopeFileSystem);
 }
 
 RefPtr<Module> findOrImportModule(
@@ -3155,9 +3193,9 @@ SLANG_API SlangResult spCompile(
     }
 #endif
 
-    if (req->getFrontEndReq()->dumpRepro.getLength())
+    if (req->dumpRepro.getLength())
     {
-        SLANG_RETURN_ON_FAIL(Slang::StateSerializeUtil::saveState(req, req->getFrontEndReq()->dumpRepro));
+        SLANG_RETURN_ON_FAIL(Slang::StateSerializeUtil::saveState(req, req->dumpRepro));
     }
 
     return res;

@@ -41,7 +41,7 @@ interpretation for that lex/parse.
 struct PathInfo
 {
         /// To be more rigorous about where a path comes from, the type identifies what a paths origin is
-    enum class Type
+    enum class Type : uint8_t
     {
         Unknown,                    ///< The path is not known
         Normal,                     ///< Normal has both path and uniqueIdentity

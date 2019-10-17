@@ -13,6 +13,8 @@
 #include "slang-profile.h"
 #include "slang-syntax.h"
 
+#include "slang-file-system.h"
+
 #include "../../slang.h"
 
 namespace Slang
@@ -1164,6 +1166,9 @@ namespace Slang
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
+        /// Set if fileSystemExt is a cache file system
+        RefPtr<CacheFileSystem> cacheFileSystem;
+
         ISlangFileSystemExt* getFileSystemExt() { return fileSystemExt; }
 
         /// Load a file into memory using the configured file system.
@@ -1225,6 +1230,8 @@ namespace Slang
             m_sourceManager = sourceManager;
         }
 
+        void setRequireCacheFileSystem(bool requireCacheFileSystem);
+
         void setFileSystem(ISlangFileSystem* fileSystem);
 
         /// The layout to use for matrices by default (row/column major)
@@ -1235,6 +1242,8 @@ namespace Slang
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
+
+        bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
     private:
@@ -1345,9 +1354,6 @@ namespace Slang
 
         // If true will serialize and de-serialize with debug information
         bool verifyDebugSerialization = false;
-
-        // If set, will dump the compilation state 
-        String dumpRepro;           
 
         List<RefPtr<FrontEndEntryPointRequest>> m_entryPointReqs;
 
@@ -1690,6 +1696,10 @@ namespace Slang
         bool isCommandLineCompile = false;
 
         String mDiagnosticOutput;
+
+
+            // If set, will dump the compilation state 
+        String dumpRepro;
 
             /// A blob holding the diagnostic output
         ComPtr<ISlangBlob> diagnosticOutputBlob;

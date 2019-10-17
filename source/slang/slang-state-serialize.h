@@ -10,6 +10,8 @@
 
 #include "../core/slang-relative-container.h"
 
+#include "slang-file-system.h"
+
 namespace Slang {
 
 struct StateSerializeUtil
@@ -20,6 +22,20 @@ struct StateSerializeUtil
     {
         RiffChunk m_chunk;
         uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
+    };
+
+    struct FileState
+    {
+        typedef CacheFileSystem::CompressedResult CompressedResult;
+
+        Relative32Ptr<RelativeString> uniqueIdentity;
+        CompressedResult loadFileResult = CompressedResult::Uninitialized;
+        CompressedResult getPathTypeResult = CompressedResult::Uninitialized;
+        CompressedResult getCanonicalPathResult = CompressedResult::Uninitialized;
+
+        SlangPathType pathType = SLANG_PATH_TYPE_FILE;
+        Relative32Ptr<RelativeString> contents;
+        Relative32Ptr<RelativeString> canonicalPath;
     };
 
     struct SessionState
@@ -47,6 +63,26 @@ struct StateSerializeUtil
         Relative32Ptr<RelativeString> value;
     };
 
+    struct FileReference
+    {
+        Relative32Ptr<RelativeString> name;
+        Relative32Ptr<FileState> file;
+    };
+
+    struct StringPair
+    {
+        Relative32Ptr<RelativeString> first;
+        Relative32Ptr<RelativeString> second;
+    };
+
+    struct SourceFileState
+    {
+        PathInfo::Type type;                      
+        Relative32Ptr<RelativeString> foundPath;               
+        Relative32Ptr<RelativeString> uniqueIdentity;          
+        Relative32Ptr<RelativeString> content;         ///< The actual contents of the file.
+    };
+
         // spAddTranslationUnit
     struct TranslationUnitRequestState
     {
@@ -56,6 +92,8 @@ struct StateSerializeUtil
 
         // spTranslationUnit_addPreprocessorDefine
         Relative32Array<Define> preprocessorDefinitions;
+
+        Relative32Array<Relative32Ptr<SourceFileState> > sourceFiles;
     };
 
     struct RequestState
@@ -85,6 +123,10 @@ struct StateSerializeUtil
 
         // spAddPreprocessorDefine
         Relative32Array<Define> preprocessorDefinitions;
+
+        // Files loaded by the file system
+        Relative32Array<Relative32Ptr<FileState>> fileSystemFiles;         ///< Files
+        Relative32Array<StringPair> pathToUniqueMap;                        ///< Maps paths to unique indentities
 
         Relative32Array<TranslationUnitRequestState> translationUnits;
     };

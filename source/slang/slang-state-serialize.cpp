@@ -8,31 +8,121 @@
 namespace Slang {
 
 
-const Safe32Array<StateSerializeUtil::Define> _calcDefines(const Dictionary<String, String>& srcDefines, RelativeContainer& inOutContainer)
+namespace { // anonymous
+
+struct StoreContext
 {
-    typedef StateSerializeUtil::Define Define;
-
-    Safe32Array<Define> dstDefines = inOutContainer.allocateArray<Define>(srcDefines.Count());
-
-    Index index = 0;
-    for (const auto& srcDefine : srcDefines)
+    StoreContext(RelativeContainer* container)
     {
-        // Do allocation before setting
-        auto key = inOutContainer.newString(srcDefine.Key.getUnownedSlice());
-        auto value = inOutContainer.newString(srcDefine.Value.getUnownedSlice());
-
-        auto& dstDefine = dstDefines[index];
-        dstDefine.key = key;
-        dstDefine.value = value;
-
-        index++;
+        m_container = container;
     }
 
-    return dstDefines;
+    Safe32Ptr<StateSerializeUtil::SourceFileState> fromSourceFile(SourceFile* sourceFile)
+    {
+        typedef StateSerializeUtil::SourceFileState SourceFileState;
+        Safe32Ptr<SourceFileState> value;
+        if (sourceFile)
+        {
+            if (!m_sourceFileMap.TryGetValue(sourceFile, value))
+            {
+                value = m_container->allocate<SourceFileState>();
+
+                const auto& pathInfo = sourceFile->getPathInfo();
+
+                auto foundPath = fromString(pathInfo.foundPath);
+                auto uniqueIdentity = fromString(pathInfo.uniqueIdentity);
+                auto content = fromBlob(sourceFile->getContentBlob());
+
+                SourceFileState& dst = *value;
+
+                dst.type = pathInfo.type;
+                dst.foundPath = foundPath;
+                dst.uniqueIdentity = uniqueIdentity;
+                dst.content = content;
+
+                m_sourceFileMap.Add(sourceFile, value);
+            }
+        }
+        return value;
+    }
+
+    Safe32Ptr<RelativeString> fromBlob(ISlangBlob* blob)
+    {
+        Safe32Ptr<RelativeString> value;
+        if (blob)
+        {        
+            if (m_blobMap.TryGetValue(blob, value))
+            {
+                return value;
+            }
+            value = newStringFromBlob(blob);
+            m_blobMap.Add(blob, value);
+        }
+        return value;
+    }
+    Safe32Ptr<RelativeString> newStringFromBlob(ISlangBlob* blob)
+    {
+        if (!blob)
+        {
+            return Safe32Ptr<RelativeString>();
+        }
+
+        // If it has terminating 0, we should remove it
+        UnownedStringSlice slice((const char*)blob->getBufferPointer(), blob->getBufferSize());
+        return m_container->newString(slice);
+    }
+
+    Safe32Ptr<RelativeString> fromString(const String& in)
+    {
+        Safe32Ptr<RelativeString> value;
+        
+        if (m_stringMap.TryGetValue(in, value))
+        {
+            return value;
+        }
+        value = m_container->newString(in.getUnownedSlice());
+        m_stringMap.Add(in, value);
+        return value;
+    }
+
+
+
+    const Safe32Array<StateSerializeUtil::Define> calcDefines(const Dictionary<String, String>& srcDefines)
+    {
+        typedef StateSerializeUtil::Define Define;
+
+        Safe32Array<Define> dstDefines = m_container->allocateArray<Define>(srcDefines.Count());
+
+        Index index = 0;
+        for (const auto& srcDefine : srcDefines)
+        {
+            // Do allocation before setting
+            auto key = fromString(srcDefine.Key);
+            auto value = fromString(srcDefine.Value);
+
+            auto& dstDefine = dstDefines[index];
+            dstDefine.key = key;
+            dstDefine.value = value;
+
+            index++;
+        }
+
+        return dstDefines;
+    }
+
+    Dictionary<ISlangBlob*, Safe32Ptr<RelativeString> > m_blobMap;
+    Dictionary<SourceFile*, Safe32Ptr<StateSerializeUtil::SourceFileState> > m_sourceFileMap;
+    Dictionary<String, Safe32Ptr<RelativeString> > m_stringMap;
+
+    RelativeContainer* m_container;
+};
+
 }
 
 /* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest)
 {
+    StoreContext context(&inOutContainer);
+
     auto linkage = request->getLinkage();
 
     Safe32Ptr<RequestState> requestState = inOutContainer.allocate<RequestState>();
@@ -79,13 +169,13 @@ const Safe32Array<StateSerializeUtil::Define> _calcDefines(const Dictionary<Stri
 
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            dstPaths[i] = inOutContainer.newString(srcPaths[i].path.getUnownedSlice());
+            dstPaths[i] = context.fromString(srcPaths[i].path);
         }
 
         requestState->searchPaths = dstPaths;
     }
 
-    requestState->preprocessorDefinitions = _calcDefines(linkage->preprocessorDefinitions, inOutContainer);
+    requestState->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
@@ -96,15 +186,95 @@ const Safe32Array<StateSerializeUtil::Define> _calcDefines(const Dictionary<Stri
             TranslationUnitRequest* srcTranslationUnit = srcTranslationUnits[i];
 
             // Do before setting, because this can allocate, and therefore break, the following section
-            auto defines = _calcDefines(srcTranslationUnit->preprocessorDefinitions, inOutContainer);
-            auto moduleName = inOutContainer.newString(srcTranslationUnit->moduleName->text.getUnownedSlice());
+            auto defines = context.calcDefines(srcTranslationUnit->preprocessorDefinitions);
+            auto moduleName = context.fromString(srcTranslationUnit->moduleName->text);
+
+            Safe32Array<Relative32Ptr<SourceFileState>> dstSourceFiles;
+            {
+                const auto& srcFiles = srcTranslationUnit->getSourceFiles();
+                dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
+
+                for (Index j = 0; j < srcFiles.getCount(); ++j)
+                {
+                    dstSourceFiles[j] = context.fromSourceFile(srcFiles[j]);
+                }
+            }
 
             TranslationUnitRequestState& dstTranslationUnit = dstTranslationUnits[i];
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
             dstTranslationUnit.moduleName = moduleName;
-
+            dstTranslationUnit.sourceFiles = dstSourceFiles;
             dstTranslationUnit.preprocessorDefinitions = defines;
+        }
+
+        requestState->translationUnits = dstTranslationUnits;
+    }
+
+    {
+        CacheFileSystem* cacheFileSystem = linkage->cacheFileSystem;
+        
+        {
+            const auto& srcFiles = cacheFileSystem->getFileMap();
+
+            Safe32Array<Relative32Ptr<FileState>> dstFiles = inOutContainer.allocateArray<Relative32Ptr<FileState>>(srcFiles.Count());
+
+            Index index = 0;
+            for (auto& pair : srcFiles)
+            {
+                //const String& uniquePath = pair.Key;
+                CacheFileSystem::PathInfo* srcInfo = pair.Value;
+
+                Safe32Ptr<RelativeString> dstUnique = context.fromString(srcInfo->getUniqueIdentity());
+                Safe32Ptr<RelativeString> dstCanonicalPath;
+                if (srcInfo->m_canonicalPath)
+                {
+                    dstCanonicalPath = context.fromString(srcInfo->m_canonicalPath->getString());
+                }
+                Safe32Ptr<RelativeString> dstContents = context.fromBlob(srcInfo->m_fileBlob);
+
+                Safe32Ptr<FileState> file = inOutContainer.allocate<FileState>();
+
+                FileState& dst = *file;
+
+                dst.canonicalPath = dstCanonicalPath;
+                dst.contents = dstContents;
+                dst.uniqueIdentity = dstUnique;
+
+                dst.getCanonicalPathResult = srcInfo->m_getCanonicalPathResult;
+                dst.loadFileResult = srcInfo->m_loadFileResult;
+                dst.getPathTypeResult = srcInfo->m_getPathTypeResult;
+                dst.pathType = srcInfo->m_pathType;
+
+                dstFiles[index] = file;
+
+                index++;
+            }
+
+            // Set the files
+            requestState->fileSystemFiles;
+        }
+
+        // We need the references
+        {
+            const auto& srcFiles = cacheFileSystem->getPathMap();
+
+            Safe32Array<StringPair> pathUniqueMap = inOutContainer.allocateArray<StringPair>(srcFiles.Count());
+
+            Index index = 0;
+            for (const auto& pair : srcFiles)
+            {
+                Safe32Ptr<RelativeString> path = context.fromString(pair.Key);
+                Safe32Ptr<RelativeString> uniqueIdentity = context.fromString(pair.Value->getUniqueIdentity());
+
+                StringPair& dst = pathUniqueMap[index];
+                dst.first = path;
+                dst.second = uniqueIdentity;
+
+                index++;
+            }
+
+            requestState->pathToUniqueMap = pathUniqueMap;
         }
     }
 

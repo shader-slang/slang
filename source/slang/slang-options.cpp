@@ -493,7 +493,8 @@ struct OptionsParser
                 }
                 else if (argStr == "-dump-repro")
                 {
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->getFrontEndReq()->dumpRepro));
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
+                    requestImpl->getLinkage()->setRequireCacheFileSystem(true);
                 }
                 else if (argStr == "-serial-ir")
                 {

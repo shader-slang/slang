@@ -93,6 +93,9 @@ private:
     static OSFileSystem s_singleton;
 };
 
+
+ #define SLANG_UUID_CacheFileSystem { 0x2f4d1d03, 0xa0d1, 0x434b, { 0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b } };
+
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
 as well as emulation of methods if only has ISlangFileSystem interface. Will query capabilities
 of the interface on the constructor.
@@ -133,8 +136,40 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         CountOf,
     };
 
-    // ISlangUnknown 
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    struct PathInfo
+    {
+        PathInfo(const String& uniqueIdentity)
+        {
+            m_uniqueIdentity = new StringBlob(uniqueIdentity);
+            m_uniqueIdentity->addRef();
+
+            m_loadFileResult = CompressedResult::Uninitialized;
+            m_getPathTypeResult = CompressedResult::Uninitialized;
+            m_getCanonicalPathResult = CompressedResult::Uninitialized;
+
+            m_pathType = SLANG_PATH_TYPE_FILE;
+        }
+
+        /// Get the unique identity path as a string
+        const String& getUniqueIdentity() const { SLANG_ASSERT(m_uniqueIdentity); return m_uniqueIdentity->getString(); }
+
+        RefPtr<StringBlob> m_uniqueIdentity;
+        CompressedResult m_loadFileResult;
+        CompressedResult m_getPathTypeResult;
+        CompressedResult m_getCanonicalPathResult;
+
+        SlangPathType m_pathType;
+        ComPtr<ISlangBlob> m_fileBlob;
+        RefPtr<StringBlob> m_canonicalPath;
+    };
+
+    Dictionary<String, PathInfo*>& getPathMap() { return m_pathMap; }
+    Dictionary<String, PathInfo*>& getFileMap() { return m_uniqueIdentityMap; }
+
+    // ISlangUnknown
+    SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF 
+    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
     // ISlangFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
@@ -178,32 +213,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 protected:
     ISlangUnknown* getInterface(const Guid& guid);
 
-    struct PathInfo
-    {
-        PathInfo(const String& uniqueIdentity)
-        {
-            m_uniqueIdentity = new StringBlob(uniqueIdentity);
-            m_uniqueIdentity->addRef();
-
-            m_loadFileResult = CompressedResult::Uninitialized;
-            m_getPathTypeResult = CompressedResult::Uninitialized;
-            m_getCanonicalPathResult = CompressedResult::Uninitialized;
-
-            m_pathType = SLANG_PATH_TYPE_FILE;
-        }
-        
-            /// Get the unique identity path as a string
-        const String& getUniqueIdentity() const { SLANG_ASSERT(m_uniqueIdentity); return m_uniqueIdentity->getString(); }
-
-        RefPtr<StringBlob> m_uniqueIdentity;
-        CompressedResult m_loadFileResult;              
-        CompressedResult m_getPathTypeResult;
-        CompressedResult m_getCanonicalPathResult;
-
-        SlangPathType m_pathType;
-        ComPtr<ISlangBlob> m_fileBlob;
-        RefPtr<StringBlob> m_canonicalPath;
-    };
+    
         /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode. outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
     SlangResult _calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents);
 

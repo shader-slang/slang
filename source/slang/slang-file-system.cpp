@@ -13,6 +13,7 @@ namespace Slang
 static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+static const Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
 // Cacluate a combined path, just using Path:: string processing
 static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -159,13 +160,35 @@ ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
     return _getInterface(this, guid);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == IID_SlangCacheFileSystem)
+    {
+        *outObject = this;
+        return SLANG_OK;
+    }
+
+    ISlangUnknown* intf = getInterface(uuid);
+    if (intf)
+    {
+        addReference();
+        *outObject = intf;
+        return SLANG_OK;
+    }
+    return SLANG_E_NO_INTERFACE;
+}
+
+
 CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode, PathStyle pathStyle) :
     m_fileSystem(fileSystem),
     m_uniqueIdentityMode(uniqueIdentityMode),
     m_pathStyle(pathStyle)
 {
-    // Try to get the more sophisticated interface
-    fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+    if (fileSystem)
+    {
+        // Try to get the more sophisticated interface
+        fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+    }
 
     switch (uniqueIdentityMode)
     {
@@ -263,6 +286,12 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         case UniqueIdentityMode::SimplifyPathAndHash:
         case UniqueIdentityMode::Hash:
         {
+            // If we don't have a file system -> assume cannot be found
+            if (m_fileSystem)
+            {
+                return SLANG_E_NOT_FOUND;
+            }
+
             // I can only see if this is the same file as already loaded by loading the file and doing a hash
             Result res = m_fileSystem->loadFile(path.getBuffer(), outFileContents.writeRef());
             if (SLANG_FAILED(res) || outFileContents == nullptr)
@@ -512,5 +541,6 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
     *outCanonicalPath = info->m_canonicalPath;
     return SLANG_OK;
 }
+
 
 } 
