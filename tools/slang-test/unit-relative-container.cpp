@@ -54,7 +54,7 @@ static void relativeContainerUnitTest()
             Safe32Ptr<Root> root = container.allocate<Root>();
 
             auto array = container.allocateArray<Relative32Ptr<RelativeString>>(SLANG_COUNT_OF(strings));
-            for (Int i =0 ; i < SLANG_COUNT_OF(strings); ++i)
+            for (Int i = 0; i < SLANG_COUNT_OF(strings); ++i)
             {
                 array[i] = container.newString(strings[i]);
             }

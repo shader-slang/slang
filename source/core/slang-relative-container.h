@@ -8,10 +8,13 @@ namespace Slang {
 
 enum
 {
-    kNullOffset32 = 0x80000000
+    kNullOffset32 = int32_t(0x80000000)
 };
 
-class RelativeContainer;
+struct RelativeBase
+{
+    uint8_t* m_data;
+};
 
 template <typename T>
 class Safe32Ptr
@@ -23,22 +26,23 @@ public:
     T* operator->() const { return get(); }
     operator T*() const { return get(); }
 
-    Safe32Ptr(const ThisType& rhs) : m_offset(rhs.m_offset), m_container(rhs.m_container) {}
-    const Safe32Ptr& operator=(const ThisType& rhs) { m_offset = rhs.m_offset; return *this; }
+    Safe32Ptr(const ThisType& rhs) : m_offset(rhs.m_offset), m_base(rhs.m_base) {}
 
-    SLANG_FORCE_INLINE T* get() const;
+    const Safe32Ptr& operator=(const ThisType& rhs) { m_offset = rhs.m_offset; m_base = rhs.m_base; return *this; }
+
+    SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const { return m_base ? ((T*)(m_base->m_data + m_offset)) : (T*)nullptr; }
 
     void setNull()
     {
         m_offset = kNullOffset32;
-        m_container = nullptr;
+        m_base = nullptr;
     }
 
-    Safe32Ptr() : m_container(nullptr), m_offset(kNullOffset32) {}
+    Safe32Ptr() : m_base(nullptr), m_offset(kNullOffset32) {}
 
-    Safe32Ptr(int32_t offset, RelativeContainer* container) : m_offset(offset), m_container(container) {}
+    Safe32Ptr(int32_t offset, RelativeBase* base) : m_offset(offset), m_base(base) {}
 
-    RelativeContainer* m_container;
+    RelativeBase* m_base;
     int32_t m_offset;
 };
 
@@ -70,6 +74,8 @@ public:
     SLANG_FORCE_INLINE void set(T* ptr) { m_offset = ptr ? int32_t(((uint8_t*)ptr) - ((const uint8_t*)this)) : uint32_t(kNullOffset32); }
 
     Relative32Ptr(const Safe32Ptr<T>& rhs) { set(rhs.get()); }
+    Relative32Ptr(const ThisType& rhs) { set(rhs.get()); }
+
     Relative32Ptr() :m_offset(kNullOffset32) {}
     Relative32Ptr(T* ptr) { set(ptr); }
 
@@ -162,7 +168,7 @@ public:
     {
         void* data = allocate(sizeof(T), SLANG_ALIGN_OF(T));
         new (data) T();
-        return Safe32Ptr<T>(getOffset(data), this);
+        return Safe32Ptr<T>(getOffset(data), &m_base);
     }
 
     template <typename T>
@@ -177,7 +183,7 @@ public:
         {
             new (data + i) T();
         }
-        return Safe32Array<T>(Safe32Ptr<T>(getOffset(data), this), uint32_t(size));
+        return Safe32Array<T>(Safe32Ptr<T>(getOffset(data), &m_base), uint32_t(size));
     }
 
     /// Allocate without alignment (effectively 1)
@@ -186,21 +192,10 @@ public:
     void* allocateAndZero(size_t size, size_t alignment);
 
     template <typename T>
-    T* toPtr(Safe32Ptr<T> ptr)
-    {
-        if (ptr.m_offset == kNullOffset)
-        {
-            return nullptr;
-        }
-        SLANG_ASSERT(ptr.m_offset >= 0 && ptr.m_offset <= m_current)
-            return (T*)(m_data.getBuffer() + ptr.m_offset);
-    }
-
-    template <typename T>
     Safe32Ptr<T> toSafe(T* ptr) { SafePtr<T> safePtr; relPtr.m_offset = getOffset(); }
     int32_t getOffset(const void* ptr)
     {
-        ptrdiff_t offset = ((const uint8_t*)ptr) - m_data.getBuffer();
+        ptrdiff_t offset = ((const uint8_t*)ptr) - m_base.m_data; 
         if (offset < 0 || size_t(offset) > m_current)
         {
             return int32_t(kNullOffset32);
@@ -211,29 +206,27 @@ public:
     Safe32Ptr<RelativeString> newString(const UnownedStringSlice& slice);
     Safe32Ptr<RelativeString> newString(const char* contents);
 
-    /// Get the contained data
-    uint8_t* getData() { return m_data.getBuffer(); }
+        /// Get the contained data
+    uint8_t* getData() { return m_base.m_data; }
         /// Return the last used byte of the data
     size_t getDataCount() const { return m_current; }
 
         /// Set the contents
     void set(void* data, size_t size);
 
-    /// Ctor
+    RelativeBase* getBase() { return &m_base; }
+
+        /// Ctor
     RelativeContainer();
+    ~RelativeContainer();
+
 
 protected:
     size_t m_current;
-    List<uint8_t> m_data;
+    size_t m_capacity;
+    RelativeBase m_base;
 };
 
-// --------------------------------------------------------------------------
-
-template <typename T>
-SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const
-{
-    return m_container ? ((T*)(m_container->getData() + m_offset)) : (T*)nullptr;
-}
 
 } // namespace Slang
 

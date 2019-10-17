@@ -100,6 +100,16 @@ const char* RelativeString::getCstr() const
 RelativeContainer::RelativeContainer()
 {
     m_current = 0;
+    m_capacity = 0;
+    m_base.m_data = nullptr;
+}
+
+RelativeContainer::~RelativeContainer()
+{
+    if (m_base.m_data)
+    {
+        ::free(m_base.m_data);
+    }
 }
 
 void* RelativeContainer::allocate(size_t size)
@@ -111,36 +121,33 @@ void* RelativeContainer::allocate(size_t size, size_t alignment)
 {
     size_t offset = (m_current + alignment - 1) & ~(alignment - 1);
 
-    size_t dataSize = m_data.getCount();
-
-    if (offset + size > dataSize)
+    if (offset + size > m_capacity)
     {
         const size_t minSize = offset + size;
 
-        size_t calcSize = dataSize;
-        if (dataSize < 2048)
+        size_t calcSize = m_capacity;
+        if (calcSize < 2048)
         {
             calcSize = 2048;
         }
         else
         {
             // Expand geometrically, but lets not double in size...
-            calcSize = dataSize + (dataSize / 2);
+            calcSize = calcSize + (calcSize / 2);
         }
 
-        // We must be at least calc size
+        // We must be at least minSize
         size_t newSize = (calcSize < minSize) ? minSize : calcSize;
-        m_data.setCount(newSize);
 
-        //m_data.getCapacity();
-
-        dataSize = newSize;
+        // Reallocate space
+        m_base.m_data = (uint8_t*)::realloc(m_base.m_data, newSize);
+        m_capacity = newSize;
     }
-    SLANG_ASSERT(offset + size <= dataSize);
+
+    SLANG_ASSERT(offset + size <= m_capacity);
 
     m_current = offset + size;
-
-    return m_data.getBuffer() + offset;
+    return m_base.m_data + offset;
 }
 
 void* RelativeContainer::allocateAndZero(size_t size, size_t alignment)
@@ -166,7 +173,7 @@ Safe32Ptr<RelativeString> RelativeContainer::newString(const UnownedStringSlice&
     // 0 terminate
     bytes[headSize + stringSize] = 0;
 
-    return Safe32Ptr<RelativeString>(getOffset(bytes), this);
+    return Safe32Ptr<RelativeString>(getOffset(bytes), &m_base);
 }
 
 Safe32Ptr<RelativeString> RelativeContainer::newString(const char* contents)
@@ -181,11 +188,20 @@ Safe32Ptr<RelativeString> RelativeContainer::newString(const char* contents)
 
 void RelativeContainer::set(void* data, size_t size)
 {
-    m_data.clearAndDeallocate();
-    m_data.setCount(size);
+    if (m_base.m_data)
+    {
+        ::free(m_base.m_data);
+        m_base.m_data = nullptr;
+    }
 
-    ::memcpy(m_data.getBuffer(), data, size);
+    if (size > 0)
+    {
+        m_base.m_data = (uint8_t*)::malloc(size);
+        ::memcpy(m_base.m_data, data, size);
+    }
+
     m_current = size;
+    m_capacity = size;
 }
 
 } // namespace Slang
