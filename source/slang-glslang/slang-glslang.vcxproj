@@ -97,11 +97,12 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=0;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -113,11 +114,12 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=0;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -129,14 +131,15 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=0;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -149,14 +152,15 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=0;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\external\glslang;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;ENABLE_OPT=1;AMD_EXTENSIONS;NV_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\external\glslang;..\..\external\spirv-tools;..\..\external\spirv-tools\include;..\..\external\spirv-headers\include;..\..\external\spirv-tools\build;..\..\external\spirv-tools-generated;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MinimalRebuild>false</MinimalRebuild>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ObjectFileName>$(IntDir)/%(RelativeDir)/$(Configuration)/</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -252,6 +256,177 @@
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\propagateNoContraction.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\MachineIndependent\reflection.cpp" />
     <ClCompile Include="..\..\external\glslang\glslang\OSDependent\Windows\ossource.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\assembly_grammar.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\binary.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\diagnostic.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\disassemble.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\enum_string_mapping.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\extensions.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\ext_inst.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\libspirv.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\name_mapper.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opcode.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\operand.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\aggressive_dead_code_elim_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\amd_ext_to_khr.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\basic_block.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\block_merge_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\block_merge_util.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\build_module.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\ccp_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\cfg.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\cfg_cleanup_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\code_sink.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\combine_access_chains.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\compact_ids_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\composite.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\constants.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\const_folding_rules.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\convert_to_half_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\copy_prop_arrays.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\dead_branch_elim_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\dead_insert_elim_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\dead_variable_elimination.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\decompose_initialized_variables_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\decoration_manager.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\def_use_manager.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\desc_sroa.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\dominator_analysis.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\dominator_tree.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\eliminate_dead_constant_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\eliminate_dead_functions_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\eliminate_dead_functions_util.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\eliminate_dead_members_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\feature_manager.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\fix_storage_class.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\flatten_decoration_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\fold.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\folding_rules.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\fold_spec_constant_op_and_composite_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\freeze_spec_constant_value_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\function.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\generate_webgpu_initializers_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\graphics_robust_access_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\if_conversion.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\inline_exhaustive_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\inline_opaque_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\inline_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\instruction.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\instruction_list.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\instrument_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\inst_bindless_check_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\inst_buff_addr_check_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\ir_context.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\ir_loader.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\legalize_vector_shuffle_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\licm_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\local_access_chain_convert_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\local_redundancy_elimination.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\local_single_block_elim_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\local_single_store_elim_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_dependence.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_dependence_helpers.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_descriptor.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_fission.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_fusion.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_fusion_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_peeling.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_unroller.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_unswitch_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\loop_utils.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\mem_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\merge_return_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\module.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\optimizer.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\pass_manager.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\pch_source_opt.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\private_to_local_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\process_lines_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\propagator.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\reduce_load_size.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\redundancy_elimination.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\register_pressure.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\relax_float_ops_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\remove_duplicates_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\replace_invalid_opc.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\scalar_analysis.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\scalar_analysis_simplification.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\scalar_replacement_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\set_spec_constant_default_value_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\simplification_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\split_invalid_unreachable_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\ssa_rewrite_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\strength_reduction_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\strip_atomic_counter_memory_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\strip_debug_info_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\strip_reflect_info_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\struct_cfg_analysis.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\types.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\type_manager.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\unify_const_pass.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\upgrade_memory_model.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\value_number_table.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\vector_dce.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\workaround1209.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\opt\wrap_opkill.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\parsed_operand.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\pch_source.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\print.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\software_version.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_endian.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_fuzzer_options.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_optimizer_options.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_reducer_options.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_target_env.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\spirv_validator_options.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\table.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\text.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\text_handler.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\util\bit_vector.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\util\parse_number.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\util\string_utils.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\util\timer.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\basic_block.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\construct.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\function.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\instruction.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_adjacency.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_annotation.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_arithmetics.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_atomics.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_barriers.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_bitwise.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_builtins.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_capability.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_cfg.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_composites.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_constants.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_conversion.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_debug.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_decorations.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_derivatives.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_execution_limitations.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_extensions.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_function.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_id.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_image.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_instruction.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_interfaces.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_layout.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_literals.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_logicals.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_memory.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_memory_semantics.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_misc.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_mode_setting.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_non_uniform.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_primitives.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_scopes.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_small_type_uses.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validate_type.cpp" />
+    <ClCompile Include="..\..\external\spirv-tools\source\val\validation_state.cpp" />
     <ClCompile Include="slang-glslang.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
