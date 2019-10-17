@@ -1074,7 +1074,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
     return language;
 }
 
-SlangResult FrontEndCompileRequest::executeActionsInner(EndToEndCompileRequest* endToEndRequest)
+SlangResult FrontEndCompileRequest::executeActionsInner()
 {
     // We currently allow GlSL files on the command line so that we can
     // drive our "pass-through" mode, but we really want to issue an error
@@ -1098,12 +1098,6 @@ SlangResult FrontEndCompileRequest::executeActionsInner(EndToEndCompileRequest* 
     {
         parseTranslationUnit(translationUnit.Ptr());
     }
-
-    //
-    if (dumpRepro.getLength() && endToEndRequest)
-    {
-        SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(endToEndRequest, dumpRepro));
-    }    
 
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
@@ -1224,7 +1218,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     //
     if (passThrough == PassThroughMode::None)
     {
-        SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner(this));
+        SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner());
     }
 
     // If command line specifies to skip codegen, we exit here.
@@ -2482,7 +2476,7 @@ void Session::addBuiltinSource(
         path,
         source);
 
-    SlangResult res = compileRequest->executeActionsInner(nullptr);
+    SlangResult res = compileRequest->executeActionsInner();
     if (SLANG_FAILED(res))
     {
         char const* diagnostics = sink.outputBuffer.getBuffer();
@@ -3112,6 +3106,8 @@ SLANG_API SlangResult spCompile(
 {
     auto req = Slang::asInternal(request);
 
+    SlangResult res = SLANG_FAIL;
+
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
@@ -3122,7 +3118,7 @@ SLANG_API SlangResult spCompile(
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
-    SlangResult res = SLANG_FAIL; 
+    
     try
     {
         res = req->executeActions();
@@ -3150,14 +3146,21 @@ SLANG_API SlangResult spCompile(
         req->getSink()->diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
     }
     req->mDiagnosticOutput = req->getSink()->outputBuffer.ProduceString();
-    return res;
+    
 #else
     // When debugging, we probably don't want to filter out any errors, since
     // we are probably trying to root-cause and *fix* those errors.
     {
-        return req->executeActions();
+        res = req->executeActions();
     }
 #endif
+
+    if (req->getFrontEndReq()->dumpRepro.getLength())
+    {
+        SLANG_RETURN_ON_FAIL(Slang::StateSerializeUtil::saveState(req, req->getFrontEndReq()->dumpRepro));
+    }
+
+    return res;
 }
 
 SLANG_API int

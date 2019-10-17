@@ -1374,7 +1374,7 @@ namespace Slang
 
         void generateIR();
 
-        SlangResult executeActionsInner(EndToEndCompileRequest* endToEndRequest);
+        SlangResult executeActionsInner();
 
             /// Add a translation unit to be compiled.
             ///
