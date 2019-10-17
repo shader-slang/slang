@@ -688,7 +688,7 @@ standardProject "slang"
 standardProject "slang-glslang"
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
-    includedirs { "external/glslang" }
+    includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include", "external/spirv-tools-generated" }
 
     defines
     {
@@ -712,6 +712,10 @@ standardProject "slang-glslang"
     addSourceDir("external/glslang/OGLCompilersDLL")
     addSourceDir("external/glslang/SPIRV")
     addSourceDir("external/glslang/StandAlone")
+    addSourceDir("external/spirv-tools/source")
+    addSourceDir("external/spirv-tools/source/opt")
+    addSourceDir("external/spirv-tools/source/util")
+    addSourceDir("external/spirv-tools/source/val")
 
     -- Unfortunately, blindly adding files like that also pulled in a declaration
     -- of a main entry point that we do *not* want, so we will specifically
