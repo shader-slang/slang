@@ -909,7 +909,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto hlslCode = emitHLSLForEntryPoint(compileRequest, /*entryPoint,*/ entryPointIndex, targetReq, endToEndReq);
+        auto hlslCode = emitHLSLForEntryPoint(compileRequest, entryPointIndex, targetReq, endToEndReq);
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
