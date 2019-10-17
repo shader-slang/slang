@@ -85,6 +85,10 @@ struct Matrix
     Vector<T, COLS> rows[ROWS];
 };
 
+// We can just map `NonUniformResourceIndex` type directly to the index type on CPU, as CPU does not require
+// any special handling around such accesses.
+typedef size_t NonUniformResourceIndex;
+
 // ----------------------------- ResourceType -----------------------------------------
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-structuredbuffer-getdimensions
