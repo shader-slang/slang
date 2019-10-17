@@ -48,6 +48,7 @@ __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
+    __target_intrinsic(glsl, "$1 = $0._data.length(); $2 = 0")
     void GetDimensions(
         out uint numStructs,
         out uint stride);
@@ -252,7 +253,7 @@ static const struct {
     char const* name;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" }, 
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
@@ -266,12 +267,14 @@ struct $(item.name)
 {
     uint DecrementCounter();
 
+    __target_intrinsic(glsl, "$1 = $0._data.length(); $2 = 0")
     void GetDimensions(
         out uint numStructs,
         out uint stride);
 
     uint IncrementCounter();
 
+    __target_intrinsic(glsl, "$0._data[$1]")
     T Load(int location);
     T Load(int location, out uint status);
 

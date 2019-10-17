@@ -182,11 +182,35 @@ Notice that of the entry point parameters `dispatchThreadID` is not part of Unif
     size_t sizeInBytes;
 ```    
 
-Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`.  
 
+Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`.  
+ 
 The actual definitions for the interfaces for resource types, and types are specified in 'slang-cpp-types.h' in the `prelude` directory.
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```.
+## Unsized arrays
+
+Unsized arrays can be used, which are indicated by an array with no size as in `[]`. For example 
+
+```
+    RWStructuredBuffer<int> arrayOfArrays[];
+```
+
+With normal 'sized' arrays, the elements are just stored contiguously within wherever they are defined. With an unsized array they map to `Array<T>` which is...
+
+```
+    T* data;
+    size_t count;
+```    
+
+Note that there is no method in the shader source to get the `count`, even though on the CPU target it is stored and easily available. This is because of the behavior on GPU targets 
+
+* That the count has to be stored elsewhere (unlike with CPU) 
+* On some GPU targets there is no bounds checking - accessing outside the bound values can cause *undefined behavior*
+* The elements may be laid out *contiguously* on GPU
+
+In practice this means if you want to access the `count` in shader code it will need to be passed by another mechanism - such as within a constant buffer. It is possible in the future support may be added to allow direct access of `count` work across targets transparently. 
+
+It is perhaps worth noting that the CPU allows us to have an indirection (a pointer to the unsized arrays contents) which has the potential for more flexibility than is possible on GPU targets. GPU target typically require the elements to be placed 'contiguously' from their location in their `container` - be that registers or in memory. This means on GPU targets there may be other restrictions on where unsized arrays can be placed in a structure for example, such as only at the end. If code needs to work across targets this means these restrictions will need to be followed across targets. 
 
 ## Prelude
 
@@ -227,6 +251,8 @@ It may be useful to be able to include `slang-cpp-types.h` in C++ code to access
 ``` 
 
 Would wrap all the Slang prelude types in the namespace `CPPPrelude`, such that say a `StructuredBuffer<int32_t>` could be specified in C++ source code as `CPPPrelude::StructuredBuffer<int32_t>`.
+
+The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
 Language aspects
 ================
