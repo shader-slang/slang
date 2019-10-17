@@ -1098,6 +1098,7 @@ SlangResult dissassembleDXILUsingDXC(
     {
         Session* session = slangCompileRequest->getSession();
         auto sink = slangCompileRequest->getSink();
+        auto linkage = slangCompileRequest->getLinkage();
 
         auto glslang_compile = (glslang_CompileFunc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile, sink);
         if (!glslang_compile)
@@ -1114,6 +1115,9 @@ SlangResult dissassembleDXILUsingDXC(
 
         request.diagnosticFunc = diagnosticOutputFunc;
         request.diagnosticUserData = &diagnosticOutput;
+
+        request.optimizationLevel = (unsigned)linkage->optimizationLevel;
+        request.debugInfoType = (unsigned)linkage->debugInfoLevel;
 
         int err = glslang_compile(&request);
 
