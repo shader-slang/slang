@@ -42,13 +42,12 @@ static void relativeContainerUnitTest()
     {
         RelativeContainer container;
 
-        char* strings[] =
+        const char* strings[] =
         {
             "Hello",
             "World",
             nullptr,
         };
-
 
         {
             Safe32Ptr<Root> root = container.allocate<Root>();
