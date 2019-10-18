@@ -1005,6 +1005,20 @@ extern "C"
 
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
+
+        /** Write the data specified with data and size to the specified path.
+
+        Note that for normal slang operation it doesn't write files so this can return SLANG_E_NOT_IMPLEMENTED.
+
+        @param path The path for data to be saved to
+        @param data The data to be saved
+        @param size The size of the data
+        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(
+            const char* path,
+            const void* data,
+            size_t size) = 0;
     };
 
     #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }

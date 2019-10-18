@@ -146,6 +146,11 @@ struct StateSerializeUtil
     static SlangResult loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer);
 
     static RequestState* getRequest(const List<uint8_t>& inBuffer);
+
+    static SlangResult extractFilesToDirectory(const String& file);
+
+    static SlangResult extractFiles(RequestState* requestState, ISlangFileSystemExt* fileSystem);
+
 };
 
 } // namespace Slang

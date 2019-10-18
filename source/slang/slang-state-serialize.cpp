@@ -759,5 +759,136 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     return (StateSerializeUtil::RequestState*)buffer.getBuffer();
 }
 
+/* static */SlangResult StateSerializeUtil::extractFilesToDirectory(const String& filename)
+{
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(filename, buffer));
+
+    RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+
+    String absPath;
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(filename, absPath));
+
+    String parentDir = Path::getParentDirectory(absPath);
+
+    String baseName = Path::getFileNameWithoutExt(filename);
+    String ext = Path::getFileExt(filename);
+
+    if (ext.getLength() == 0)
+    {
+        StringBuilder builder;
+        builder << baseName << "-files";
+        baseName = builder;
+    }
+
+    String dirPath = Path::combine(parentDir, baseName);
+
+    Path::createDirectory(dirPath);
+    // Set up a file system to write into this directory
+    RelativeFileSystem relFileSystem(OSFileSystemExt::getSingleton(), dirPath);
+
+    return extractFiles(requestState, &relFileSystem);
+}
+
+/* static */SlangResult StateSerializeUtil::extractFiles(RequestState* requestState, ISlangFileSystemExt* fileSystem)
+{
+    StringBuilder builder;
+
+    builder << "[files]\n";
+
+    for (FileState* file : requestState->files)
+    {
+        if (file->contents)
+        {
+            UnownedStringSlice contents = file->contents->getSlice();
+
+            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(file->uniqueName->getCstr(), contents.begin(), contents.size()));
+
+            RelativeString* originalName = nullptr;
+            if (file->canonicalPath)
+            {
+                originalName = file->canonicalPath;
+            }
+            else if (file->foundPath)
+            {
+                originalName = file->foundPath;
+            }
+            else if (file->uniqueIdentity)
+            {
+                originalName = file->uniqueIdentity;
+            }
+
+            builder << file->uniqueName->getSlice() << " -> ";
+            if (originalName)
+            {
+                builder << originalName->getSlice();
+            }
+            else
+            {
+                builder << "?";
+            }
+            builder << "\n";
+        }
+    }
+
+    builder << "[paths]\n";
+    for (const PathAndPathInfo& path : requestState->pathInfoMap)
+    {
+        builder << path.path->getSlice() << " -> ";
+
+        const auto pathInfo = path.pathInfo.get();
+
+        if (pathInfo->file)
+        {
+            builder << pathInfo->file->uniqueIdentity->getSlice();
+        }
+        else
+        {
+            typedef CacheFileSystem::CompressedResult CompressedResult;
+            if (pathInfo->getPathTypeResult == CompressedResult::Ok)
+            {
+                switch (pathInfo->pathType)
+                {
+                    case SLANG_PATH_TYPE_FILE: builder << "file "; break;
+                    case SLANG_PATH_TYPE_DIRECTORY: builder << "directory "; break;
+                    default: builder << "?"; break;
+                }
+            }
+
+            CompressedResult curRes =  pathInfo->getCanonicalPathResult;
+            CompressedResult results[] =
+            {
+                pathInfo->getPathTypeResult,
+                pathInfo->loadFileResult,
+            };
+
+            for (auto compRes : results)
+            {
+                if (int(compRes) > int(curRes))
+                {
+                    curRes = compRes;
+                }
+            }
+
+            switch (curRes)
+            {
+                default:
+                case CompressedResult::Uninitialized: break;
+                case CompressedResult::Ok: break;
+                
+                case CompressedResult::NotFound:    builder << " [not found]"; break;
+                case CompressedResult::CannotOpen:  builder << "[cannot open]"; break;
+                case CompressedResult::Fail:        builder << "[fail]"; break;
+            }
+
+            
+        }
+
+        builder << "\n";
+    }
+
+    SLANG_RETURN_ON_FAIL(fileSystem->saveFile("manifest.txt", builder.getBuffer(), builder.getLength()));
+    return SLANG_OK;
+}
 
 } // namespace Slang

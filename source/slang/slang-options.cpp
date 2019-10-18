@@ -498,6 +498,13 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
                     requestImpl->getLinkage()->setRequireCacheFileSystem(true);
                 }
+                else if (argStr == "-extract-repro")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::extractFilesToDirectory(reproName));
+                }
                 else if(argStr == "-load-repro")
                 {
                     String reproName;
