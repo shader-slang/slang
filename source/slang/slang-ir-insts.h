@@ -39,16 +39,6 @@ struct IRHighLevelDeclDecoration : IRDecoration
     Decl* getDecl() { return (Decl*) getDeclOperand()->getValue(); }
 };
 
-// Associates an IR-level decoration with a source layout
-struct IRLayoutDecoration : IRDecoration
-{
-    enum { kOp = kIROp_LayoutDecoration };
-    IR_LEAF_ISA(LayoutDecoration)
-
-    IRPtrLit* getLayoutOperand() { return cast<IRPtrLit>(getOperand(0)); }
-    Layout* getLayout() { return (Layout*) getLayoutOperand()->getValue(); }
-};
-
 enum IRLoopControl
 {
     kIRLoopControl_Unroll,
@@ -109,28 +99,6 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
     UnownedStringSlice getOuterArrayName()
     {
         return getOuterArraynameOperand()->getStringSlice();
-    }
-};
-
-// A decoration that marks a field key as having been associated
-// with a particular simple semantic (e.g., `COLOR` or `SV_Position`,
-// but not a `register` semantic).
-//
-// This is currently needed so that we can round-trip HLSL `struct`
-// types that get used for varying input/output. This is an unfortunate
-// case where some amount of "layout" information can't just come
-// in via the `TypeLayout` part of things.
-//
-struct IRSemanticDecoration : IRDecoration
-{
-    enum { kOp = kIROp_SemanticDecoration };
-    IR_LEAF_ISA(SemanticDecoration)
-
-    IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
-
-    UnownedStringSlice getSemanticName()
-    {
-        return getSemanticNameOperand()->getStringSlice();
     }
 };
 
@@ -398,6 +366,133 @@ struct IRLookupWitnessTable : IRInst
 {
     IRUse sourceType;
     IRUse interfaceType;
+};
+
+// Layout decorations
+
+struct IRStageLayoutDecoration : public IRDecoration
+{
+    enum { kOp = kIROp_StageLayoutDecoration };
+    IR_LEAF_ISA(StageLayoutDecoration)
+
+    IRIntLit* getStageInst() { return cast<IRIntLit>(getOperand(0)); }
+    Stage getStage() { return Stage(GetIntVal(getStageInst())); }
+};
+
+struct IRSemanticDecorationBase : public IRDecoration
+{
+    IR_PARENT_ISA(SemanticDecorationBase)
+
+    IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
+    IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
+    int getSemanticIndex() { return int(GetIntVal(getSemanticIndexOperand())); }
+};
+
+// A decoration that marks a field key as having been associated
+// with a particular simple semantic (e.g., `COLOR` or `SV_Position`,
+// but not a `register` semantic).
+//
+// This is currently needed so that we can round-trip HLSL `struct`
+// types that get used for varying input/output. This is an unfortunate
+// case where some amount of "layout" information can't just come
+// in via the `TypeLayout` part of things.
+//
+struct IRSemanticDecoration : IRSemanticDecorationBase
+{
+    enum { kOp = kIROp_SemanticDecoration };
+    IR_LEAF_ISA(SemanticDecoration)
+};
+
+struct IRSystemSemanticDecoration : IRSemanticDecorationBase
+{
+    enum { kOp = kIROp_SystemSemanticDecoration };
+    IR_LEAF_ISA(SystemSemanticDecoration)
+};
+
+/// Holds the resource usage. Typically bound to an IRVarLayout. Note that there can be multiple decorations,
+/// for each resource kind. That there should at most be one decoration connected to an instruction for a *kind*.
+struct IRResourceInfoLayoutDecoration : public IRDecoration
+{
+    enum { kOp = kIROp_ResourceInfoLayoutDecoration };
+    IR_LEAF_ISA(ResourceInfoLayoutDecoration)
+
+        // What kind of register was it?
+    IRIntLit* getResourceKindInst() { return cast<IRIntLit>(getOperand(0)); }
+    LayoutResourceKind getResourceKind() { return (LayoutResourceKind)GetIntVal(getResourceKindInst()); }
+
+        // What binding space (HLSL) or set (Vulkan) are we placed in?
+    IRIntLit* getSpaceInst() { return cast<IRIntLit>(getOperand(1)); }
+    UInt getSpace() { return UInt(GetIntVal(getSpaceInst())); }
+
+        // What is our starting register in that space?
+        //
+        // (In the case of uniform data, this is a byte offset)
+    IRIntLit* getIndexInst() { return cast<IRIntLit>(getOperand(2)); }
+    UInt getIndex() { return UInt(GetIntVal(getIndexInst())); }
+};
+
+// Layout
+
+struct IRLayout : IRInst
+{
+    IR_PARENT_ISA(Layout)
+
+        /// TODO(JS): Hold the pointer to the AST for now, whilst process of transitioning 
+        /// Over to using IR layout.
+    IRPtrLit* getASTLayoutOperand() { return cast<IRPtrLit>(getOperand(0)); }
+    Layout* getASTLayout() { return (VarLayout*)getASTLayoutOperand()->getValue(); }
+};
+
+struct IRTypeLayout : IRLayout
+{
+    IR_LEAF_ISA(TypeLayout);
+    TypeLayout* getLayout() { return static_cast<TypeLayout*>(getASTLayout()); }
+};
+
+struct IREntryPointLayout : IRLayout
+{
+    IR_LEAF_ISA(EntryPointLayout)
+    EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(getASTLayout()); }
+};
+
+// Associated data can be attached via the following decorations
+// * SemanticDecoration/SystemSemanticDecoration for semantics
+// * (potentially multiple) ResourceInfoLayoutDecoration
+// * StageLayoutDecoration to indicate a specific associated stage
+// * PendingVarLayoutDecoration to indicate pending var layout 
+// The VarLayoutFlag::HasSemantic flag is equivalent to having the SemanticDecoration
+struct IRVarLayout : IRLayout
+{
+    IR_LEAF_ISA(VarLayout)
+
+        /// The name of this variable
+    IRStringLit* getName() { return cast<IRStringLit>(getOperand(1)); }
+        /// For now this uses a link back into the AST representation. Will be replaced by IR based type representation
+    IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(2)); }
+
+        /// Get/set absolute layout
+    IRVarLayout* getAbsoluteLayout() { return cast<IRVarLayout>(getOperand(3)); }
+    void setAbsoluteLayout(IRVarLayout* layout) { getOperands()[3].set(layout); }
+};
+
+// Associates an IR-level decoration with a source layout
+struct IRLayoutDecoration : IRDecoration
+{
+    enum { kOp = kIROp_LayoutDecoration };
+    IR_LEAF_ISA(LayoutDecoration)
+
+    IRLayout* getIRLayout() { return cast<IRLayout>(getOperand(0)); }
+
+    Layout* getASTLayout()
+    {
+        IRLayout* irLayout = getIRLayout();
+        if (!irLayout)
+        {
+            return nullptr;
+        }
+        return irLayout->getASTLayout();
+    }
 };
 
 //
@@ -803,6 +898,9 @@ struct SharedIRBuilder
 
     Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
+
+    // TODO: We probably shouldn't use this in the long run.
+    Dictionary<void*,           IRLayout*>        layoutMap;
 };
 
 struct IRBuilderSourceLocRAII;
@@ -1335,7 +1433,10 @@ struct IRBuilder
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+
     void addLayoutDecoration(IRInst* value, Layout* layout);
+
+    IRLayout* getLayout(Layout* astLayout);
 
     void addNameHintDecoration(IRInst* value, IRStringLit* name)
     {
@@ -1362,9 +1463,9 @@ struct IRBuilder
         addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
     }
 
-    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text)
+    void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)
     {
-        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text));
+        addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
     }
 
     void addTargetIntrinsicDecoration(IRInst* value, UnownedStringSlice const& target, UnownedStringSlice const& definition)

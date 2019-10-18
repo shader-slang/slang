@@ -645,7 +645,7 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
-        auto layout = layoutDecoration->getLayout();
+        auto layout = layoutDecoration->getIRLayout()->getASTLayout();
         if (auto varLayout = as<VarLayout>(layout))
         {
             emitSemantics(varLayout);

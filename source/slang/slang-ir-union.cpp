@@ -670,7 +670,7 @@ struct DesugarUnionTypesContext
         //
         auto layoutDecoration = type->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(layoutDecoration);
-        auto layout = layoutDecoration->getLayout();
+        auto layout = layoutDecoration->getIRLayout()->getASTLayout();
         SLANG_ASSERT(layout);
         auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(layout);
         SLANG_ASSERT(taggedUnionTypeLayout);

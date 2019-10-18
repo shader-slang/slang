@@ -9,6 +9,7 @@
 #include "slang-compiler.h"
 #include "slang-lexer.h"
 #include "slang-lower-to-ir.h"
+#include "slang-mangle.h"
 #include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
@@ -328,6 +329,23 @@ namespace Slang
         return getModule();
     }
 
+    String EntryPoint::getEntryPointMangledName(Index index)
+    {
+        SLANG_UNUSED(index);
+        SLANG_ASSERT(index == 0);
+
+        // Note: this routine might get called on the "dummy"
+        // `EntryPoint` objects we create when doing pass-through
+        // compilation, in which case there won't be any
+        // function decl to be referenced and thus have
+        // its mangled name computed.
+        //
+        if(auto funcDeclRef = getFuncDeclRef())
+            return getMangledName(funcDeclRef);
+        else
+            return String();
+    }
+
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
     {
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
@@ -597,7 +615,6 @@ namespace Slang
 
     String emitHLSLForEntryPoint(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq)
@@ -622,7 +639,7 @@ namespace Slang
         {
             return emitEntryPoint(
                 compileRequest,
-                entryPoint,
+                entryPointIndex,
                 CodeGenTarget::HLSL,
                 targetReq);
         }
@@ -630,7 +647,6 @@ namespace Slang
 
     String emitCPPForEntryPoint(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq)
@@ -653,13 +669,12 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(compileRequest, entryPoint, CodeGenTarget::CPPSource, targetReq);
+            return emitEntryPoint(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
         }
     }
 
     String emitGLSLForEntryPoint(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq)
@@ -694,11 +709,9 @@ namespace Slang
         }
         else
         {
-            // TODO(tfoley): need to pass along the entry point
-            // so that we properly emit it as the `main` function.
             return emitEntryPoint(
                 compileRequest,
-                entryPoint,
+                entryPointIndex,
                 CodeGenTarget::GLSL,
                 targetReq);
         }
@@ -896,7 +909,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto hlslCode = emitHLSLForEntryPoint(compileRequest, entryPoint, entryPointIndex, targetReq, endToEndReq);
+        auto hlslCode = emitHLSLForEntryPoint(compileRequest, entryPointIndex, targetReq, endToEndReq);
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
@@ -1163,7 +1176,6 @@ SlangResult dissassembleDXILUsingDXC(
 
     SlangResult emitCPUBinaryForEntryPoint(
         BackEndCompileRequest*  slangRequest,
-        EntryPoint*             entryPoint,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
@@ -1330,7 +1342,6 @@ SlangResult dissassembleDXILUsingDXC(
         {
             rawSource = emitCPPForEntryPoint(
                 slangRequest,
-                entryPoint,
                 entryPointIndex,
                 targetReq,
                 endToEndReq);
@@ -1602,7 +1613,6 @@ SlangResult dissassembleDXILUsingDXC(
 
         String rawGLSL = emitGLSLForEntryPoint(
             slangRequest,
-            entryPoint,
             entryPointIndex,
             targetReq,
             endToEndReq);
@@ -1677,7 +1687,6 @@ SlangResult dissassembleDXILUsingDXC(
                 List<uint8_t> code;
                 if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
                     compileRequest,
-                    entryPoint,
                     entryPointIndex,
                     targetReq,
                     endToEndReq,
@@ -1700,7 +1709,6 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String code = emitHLSLForEntryPoint(
                     compileRequest,
-                    entryPoint,
                     entryPointIndex,
                     targetReq,
                     endToEndReq);
@@ -1713,7 +1721,6 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String code = emitGLSLForEntryPoint(
                     compileRequest,
-                    entryPoint,
                     entryPointIndex,
                     targetReq,
                     endToEndReq);
@@ -1727,7 +1734,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 return emitEntryPoint(
                     compileRequest,
-                    entryPoint,
+                    entryPointIndex,
                     target, 
                     targetReq);
             }

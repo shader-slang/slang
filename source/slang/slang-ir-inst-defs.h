@@ -394,7 +394,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(TargetIntrinsicDecoration,     targetIntrinsic,        2, 0)
     INST_RANGE(TargetSpecificDecoration, TargetDecoration, TargetIntrinsicDecoration)
     INST(GLSLOuterArrayDecoration,          glslOuterArray,         1, 0)
-    INST(SemanticDecoration,                semantic,               1, 0)
+    
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
@@ -456,7 +456,18 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
-INST_RANGE(Decoration, HighLevelDeclDecoration, ExportDecoration)
+    /* Layout decorations that do not use AST */
+    INST(StageLayoutDecoration, stageLayoutDecoration, 1, 0)
+    INST(ResourceInfoLayoutDecoration, resourceInfoLayoutDecoration, 3, 0)
+
+    /* SemanticLayoutDecoration */
+        INST(SemanticDecoration, semantic, 2, 0)
+        INST(SystemSemanticDecoration, systemSemantic, 2, 0)
+    INST_RANGE(SemanticDecorationBase, SemanticDecoration, SystemSemanticDecoration)
+
+    INST(PendingVarLayoutDecoration, pendingVarLayoutDecoration, 1, 0)
+
+INST_RANGE(Decoration, HighLevelDeclDecoration, PendingVarLayoutDecoration)
 
 
 //
@@ -482,6 +493,12 @@ INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
+
+/* Layout */
+    INST(VarLayout, varLayout, 4, 0)
+    INST(TypeLayout, typeLayout, 1, 0)
+    INST(EntryPointLayout, EntryPointLayout, 1, 0)
+INST_RANGE(Layout, VarLayout, EntryPointLayout)
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)

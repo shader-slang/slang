@@ -12,16 +12,32 @@ namespace Slang
     class ProgramLayout;
     class TranslationUnitRequest;
 
-    // Emit code for a single entry point, based on
-    // the input translation unit.
+        /// Emit source code for a single entry point.
+        ///
+        /// This function generates source code for the
+        /// entry point with index `entryPointIndex`
+        /// inside the program being compiled in `compileRequest`.
+        ///
+        /// The code is generated for the language specified
+        /// as `target` (e.g., HLSL or GLSL).
+        ///
+        /// The `targetRequest` gives further information about
+        /// the compilation target and its options.
+        ///
+        /// Note: it is possible that `target` and `targetRequest`
+        /// do not store the same target format. For example
+        /// `target` might be HLSL, while `targetRequest` is
+        /// a DXIL target. The split information here tells us
+        /// both the immediate target language (HLSL) as well
+        /// as the eventual destination format (DXIL) in case
+        /// we need to customize the output (e.g., we might
+        /// generate different HLSL output if we know it
+        /// will be used to generate SPIR-V).
+        ///
     String emitEntryPoint(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
-
-        // The target language to generate code in (e.g., HLSL/GLSL)
+        Int                     entryPointIndex,
         CodeGenTarget           target,
-
-        // The full target request
         TargetRequest*          targetRequest);
 }
 #endif

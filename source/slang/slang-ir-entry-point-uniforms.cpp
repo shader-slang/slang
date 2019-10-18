@@ -155,7 +155,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         if(!funcLayoutDecoration)
             return;
 
-        auto entryPointLayout = as<EntryPointLayout>(funcLayoutDecoration->getLayout());
+        auto entryPointLayout = as<EntryPointLayout>(funcLayoutDecoration->getASTLayout());
         SLANG_ASSERT(entryPointLayout);
         if(!entryPointLayout)
             return;
@@ -208,7 +208,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
             SLANG_ASSERT(layoutDecoration);
             if(!layoutDecoration)
                 continue;
-            auto paramLayout = as<VarLayout>(layoutDecoration->getLayout());
+            auto paramLayout = as<VarLayout>(layoutDecoration->getIRLayout()->getASTLayout());
             SLANG_ASSERT(paramLayout);
             if(!paramLayout)
                 continue;

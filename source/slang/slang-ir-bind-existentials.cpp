@@ -196,7 +196,7 @@ struct BindExistentialSlots
         auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
         if(!layoutDecoration)
             return;
-        auto varLayout = as<VarLayout>(layoutDecoration->getLayout());
+        auto varLayout = as<VarLayout>(layoutDecoration->getASTLayout());
         if(!varLayout)
             return;
 
