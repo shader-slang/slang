@@ -197,6 +197,9 @@ namespace Slang
             /// Get the profile that the entry point is to be compiled for
         Profile getProfile() { return m_profile; }
 
+            /// Get the index to the translation unit
+        int getTranslationUnitIndex() const { return m_translationUnitIndex; }
+
     private:
         // The parent compile request
         FrontEndCompileRequest* m_compileRequest;

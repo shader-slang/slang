@@ -201,6 +201,16 @@ struct StoreContext
         return dstDefines;
     }
 
+    const Safe32Array<Relative32Ptr<RelativeString>> fromList(const List<String>& src)
+    {   
+        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->allocateArray<Relative32Ptr<RelativeString>>(src.getCount());
+        for (Index j = 0; j < src.getCount(); ++j)
+        {
+            dst[j] = fromString(src[j]);
+        }
+        return dst;
+    }
+
     Dictionary<String, Safe32Ptr<RelativeString> > m_stringMap;
 
     Dictionary<SourceFile*, Safe32Ptr<StateSerializeUtil::SourceFileState> > m_sourceFileMap;
@@ -251,8 +261,41 @@ static bool _isStorable(const PathInfo::Type type)
         dst->containerFormat = request->containerFormat;
         dst->passThroughMode = request->passThrough;
 
+
+        dst->useUnknownImageFormatAsDefault = request->getBackEndReq()->useUnknownImageFormatAsDefault;
+        dst->obfuscateCode = request->getBackEndReq()->obfuscateCode;
+
         dst->defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
     }
+
+    // Entry points
+    {
+        const auto& srcEntryPoints = request->getFrontEndReq()->m_entryPointReqs;
+        const auto& srcEndToEndEntryPoints = request->entryPoints;
+
+        SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
+
+        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.allocateArray<EntryPointState>(srcEntryPoints.getCount());
+
+        for (Index i = 0; i < srcEntryPoints.getCount(); ++i)
+        {
+            FrontEndEntryPointRequest* srcEntryPoint = srcEntryPoints[i];
+            const auto& srcEndToEndEntryPoint = srcEndToEndEntryPoints[i];
+
+            auto dstSpecializationArgStrings = context.fromList(srcEndToEndEntryPoint.specializationArgStrings);
+            Safe32Ptr<RelativeString> dstName = context.fromName(srcEntryPoint->getName());
+
+            EntryPointState& dst = dstEntryPoints[i];
+
+            dst.profile = srcEntryPoint->getProfile();
+            dst.translationUnitIndex = uint32_t(srcEntryPoint->getTranslationUnitIndex());
+            dst.specializationArgStrings = dstSpecializationArgStrings;
+            dst.name = dstName;
+        }
+
+        requestState->entryPoints = dstEntryPoints;
+    }
+
 
     // Add all of the source files
     {
@@ -565,6 +608,18 @@ struct LoadContext
         return dstInfo;
     }
 
+    static List<const char*> toList(const Relative32Array<Relative32Ptr<RelativeString>>& src)
+    {
+        List<const char*> dst;
+        dst.setCount(src.getCount());
+        for (Index i = 0; i < src.getCount(); ++i)
+        {
+            RelativeString* srcString = src[i];
+            dst[i] = srcString ? srcString->getCstr() : nullptr;
+        }
+        return dst;
+    }
+
     LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem):
         m_sourceManager(sourceManger),
         m_fileSystem(fileSystem)
@@ -611,9 +666,11 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
         spSetPassThrough(externalRequest, SlangPassThrough(request->passThrough));
 
+        request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
+        request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
+
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
-
     {
         for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
         {
@@ -680,6 +737,20 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
                 // Add to translation unit
                 dstTranslationUnit->addSourceFile(sourceFile);
             }
+        }
+    }
+
+    // Entry points
+    {
+        for (const auto& srcEntryPoint : requestState->entryPoints)
+        {
+            const char* name = srcEntryPoint.name ? srcEntryPoint.name->getCstr() : nullptr;
+
+            Stage stage = srcEntryPoint.profile.GetStage();
+
+            List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
+
+            spAddEntryPointEx(externalRequest, int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
         }
     }
 

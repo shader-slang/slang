@@ -97,7 +97,14 @@ struct StateSerializeUtil
         Relative32Array<Relative32Ptr<SourceFileState> > sourceFiles;
     };
 
-    
+    struct EntryPointState
+    {
+        Relative32Ptr<RelativeString> name;
+        Profile profile; 
+        uint32_t translationUnitIndex;
+        Relative32Array<Relative32Ptr<RelativeString>> specializationArgStrings;
+    };
+
     struct RequestState
     {
         Relative32Array<Relative32Ptr<FileState>> files;                   ///< All of the files
@@ -127,9 +134,14 @@ struct StateSerializeUtil
             // spAddPreprocessorDefine
         Relative32Array<StringPair> preprocessorDefinitions;
 
+        bool useUnknownImageFormatAsDefault = false;
+        bool obfuscateCode = false;
+
         Relative32Array<PathAndPathInfo> pathInfoMap;                  ///< Stores all the accesses to the file system
 
         Relative32Array<TranslationUnitRequestState> translationUnits;
+
+        Relative32Array<EntryPointState> entryPoints;
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
