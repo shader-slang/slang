@@ -312,6 +312,9 @@ namespace Slang
             /// Get one of the entry points linked into this component type.
         virtual RefPtr<EntryPoint> getEntryPoint(Index index) = 0;
 
+            /// Get the mangled name of one of the entry points linked into this component type.
+        virtual String getEntryPointMangledName(Index index) = 0;
+
             /// Get the number of global shader parameters linked into this component type.
         virtual Index getShaderParamCount() = 0;
 
@@ -500,6 +503,7 @@ namespace Slang
 
         Index getEntryPointCount() SLANG_OVERRIDE;
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE;
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE;
         GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE;
@@ -548,6 +552,7 @@ namespace Slang
         // points, parameters, etc. while giving a better overall memory usage.
         //
         List<EntryPoint*> m_entryPoints;
+        List<String> m_entryPointMangledNames;
         List<GlobalShaderParamInfo> m_shaderParams;
         List<SpecializationParam> m_specializationParams;
         List<ComponentType*> m_requirements;
@@ -585,6 +590,7 @@ namespace Slang
 
         Index getEntryPointCount() SLANG_OVERRIDE { return m_base->getEntryPointCount(); }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { return m_base->getEntryPoint(index); }
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_base->getShaderParamCount(); }
         GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_base->getShaderParam(index); }
@@ -625,6 +631,8 @@ namespace Slang
         RefPtr<SpecializationInfo> m_specializationInfo;
         SpecializationArgs m_specializationArgs;
         RefPtr<IRModule> m_irModule;
+
+        List<String> m_entryPointMangledNames;
 
         // Any tagged union types that were referenced by the specialization arguments.
         List<RefPtr<TaggedUnionType>> m_taggedUnionTypes;
@@ -706,6 +714,7 @@ namespace Slang
 
         Index getEntryPointCount() SLANG_OVERRIDE { return 1; };
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return this; }
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
         GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return GlobalShaderParamInfo(); }
@@ -866,6 +875,7 @@ namespace Slang
 
         Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
         GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
@@ -1462,6 +1472,7 @@ namespace Slang
 
         Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
         GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
@@ -1606,7 +1617,16 @@ namespace Slang
             BackEndCompileRequest*  backEndRequest,
             EndToEndCompileRequest* endToEndRequest);
 
+        RefPtr<IRModule> getOrCreateIRModuleForLayout(DiagnosticSink* sink);
+
+        RefPtr<IRModule> getExistingIRModuleForLayout()
+        {
+            return m_irModuleForLayout;
+        }
+
     private:
+        RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
+
         // The program being compiled or laid out
         ComponentType* m_program;
 
@@ -1620,6 +1640,8 @@ namespace Slang
         // in the parent `Program` (indexing matches
         // the order they are given in the `Program`)
         List<CompileResult> m_entryPointResults;
+
+        RefPtr<IRModule> m_irModuleForLayout;
     };
 
         /// A request to generate code for a program

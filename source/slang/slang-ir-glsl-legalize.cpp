@@ -1556,7 +1556,7 @@ void legalizeEntryPointForGLSL(
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
 
-    auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getLayout());
+    auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout());
     SLANG_ASSERT(entryPointLayout);
 
 
@@ -1684,7 +1684,7 @@ void legalizeEntryPointForGLSL(
             //
             auto paramLayoutDecoration = pp->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(paramLayoutDecoration);
-            auto paramLayout = as<VarLayout>(paramLayoutDecoration->getLayout());
+            auto paramLayout = as<VarLayout>(paramLayoutDecoration->getIRLayout()->getASTLayout());
             SLANG_ASSERT(paramLayout);
 
             legalizeEntryPointParameterForGLSL(

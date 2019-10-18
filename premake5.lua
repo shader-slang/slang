@@ -688,12 +688,12 @@ standardProject "slang"
 standardProject "slang-glslang"
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
-    includedirs { "external/glslang" }
+    includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include", "external/spirv-tools-generated" }
 
     defines
     {
         -- `ENABLE_OPT` must be defined (to either zero or one) for glslang to compile at all
-        "ENABLE_OPT=0",
+        "ENABLE_OPT=1",
 
         -- We want to build a version of glslang that supports every feature possible,
         -- so we will enable all of the supported vendor-specific extensions so
@@ -712,6 +712,10 @@ standardProject "slang-glslang"
     addSourceDir("external/glslang/OGLCompilersDLL")
     addSourceDir("external/glslang/SPIRV")
     addSourceDir("external/glslang/StandAlone")
+    addSourceDir("external/spirv-tools/source")
+    addSourceDir("external/spirv-tools/source/opt")
+    addSourceDir("external/spirv-tools/source/util")
+    addSourceDir("external/spirv-tools/source/val")
 
     -- Unfortunately, blindly adding files like that also pulled in a declaration
     -- of a main entry point that we do *not* want, so we will specifically

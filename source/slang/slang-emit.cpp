@@ -158,16 +158,15 @@ static void dumpIRIfEnabled(
 
 String emitEntryPoint(
     BackEndCompileRequest*  compileRequest,
-    EntryPoint*             entryPoint,
+    Int                     entryPointIndex,
     CodeGenTarget           target,
     TargetRequest*          targetRequest)
 {
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
     auto targetProgram = program->getTargetProgram(targetRequest);
-    auto programLayout = targetProgram->getOrCreateLayout(sink);
 
-//    auto translationUnit = entryPoint->getTranslationUnit();
+    auto entryPoint = program->getEntryPoint(entryPointIndex);
 
     auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
@@ -187,23 +186,9 @@ String emitEntryPoint(
 
     desc.compileRequest = compileRequest;
     desc.target = target;
-    desc.entryPoint = entryPoint;
+    desc.entryPointStage = entryPoint->getStage();
     desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     desc.sourceWriter = &sourceWriter;
-
-    if (entryPoint && programLayout)
-    {
-        desc.entryPointLayout = findEntryPointLayout(programLayout, entryPoint);
-    }
-
-    desc.programLayout = programLayout;
-
-    // Layout information for the global scope is either an ordinary
-    // `struct` in the common case, or a constant buffer in the case
-    // where there were global-scope uniforms.
-    
-    StructTypeLayout* globalStructLayout = programLayout ? getGlobalStructLayout(programLayout) : nullptr;
-    desc.globalStructLayout = globalStructLayout;
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
 
@@ -251,10 +236,9 @@ String emitEntryPoint(
         //
         linkedIR = linkIR(
             compileRequest,
-            entryPoint,
-            programLayout,
+            entryPointIndex,
             target,
-            targetRequest);
+            targetProgram);
         auto irModule = linkedIR.module;
         auto irEntryPoint = linkedIR.entryPoint;
 

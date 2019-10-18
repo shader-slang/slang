@@ -15,6 +15,8 @@ namespace Slang {
 enum class BaseType;
 class Type;
 
+struct IRLayout;
+
 //
 
 #if 0
@@ -601,7 +603,7 @@ public:
     // TODO: This should map from a declaration to the *index*
     // in the array above, rather than to the actual pointer,
     // so that we 
-    Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
+    Dictionary<VarDeclBase*, RefPtr<VarLayout>> mapVarToLayout;
 
     // As an accellerator for type layouts created at the
     // IR layer, we include a second map that use IR "key"

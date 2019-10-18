@@ -31,7 +31,6 @@ namespace Slang
     String GetHLSLProfileName(Profile profile);
     String emitHLSLForEntryPoint(
         BackEndCompileRequest*  compileRequest,
-        EntryPoint*             entryPoint,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq);
@@ -95,7 +94,6 @@ namespace Slang
         // point, since we'll need that to feed into dxc.
         auto hlslCode = emitHLSLForEntryPoint(
             compileRequest,
-            entryPoint,
             entryPointIndex,
             targetReq,
             endToEndReq);

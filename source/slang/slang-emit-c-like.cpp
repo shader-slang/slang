@@ -127,13 +127,8 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_target = desc.target;
 
     m_compileRequest = desc.compileRequest;
-    m_entryPoint = desc.entryPoint;
+    m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
-    
-    m_entryPointLayout = desc.entryPointLayout;
-    
-    m_programLayout = desc.programLayout;
-    m_globalStructLayout = desc.globalStructLayout;
 }
 
 //
@@ -782,6 +777,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
+        return true;
+
+    // Treat these as folded, because they don't make sense to emit on their own.
+    case kIROp_TypeLayout:
+    case kIROp_VarLayout:
+    case kIROp_EntryPointLayout:
         return true;
 
     // Always fold these in, because their results
@@ -1477,7 +1478,7 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
                             // The `$XT` case handles selecting between
                             // the `gl_HitTNV` and `gl_RayTmaxNV` builtins,
                             // based on what stage we are using:
-                            switch( m_entryPoint->getStage() )
+                            switch( m_entryPointStage )
                             {
                             default:
                                 m_writer->emit("gl_RayTmaxNV");
@@ -2202,7 +2203,7 @@ VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
     if (!decoration)
         return nullptr;
 
-    return (VarLayout*) decoration->getLayout();
+    return (VarLayout*) decoration->getIRLayout()->getASTLayout();
 }
 
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
@@ -2686,7 +2687,7 @@ EntryPointLayout* CLikeSourceEmitter::getEntryPointLayout(IRFunc* func)
 {
     if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
     {
-        return as<EntryPointLayout>(layoutDecoration->getLayout());
+        return as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout());
     }
     return nullptr;
 }
@@ -2695,7 +2696,7 @@ EntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
 {
     if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
     {
-        if (auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getLayout()))
+        if (auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout()))
         {
             return entryPointLayout;
         }

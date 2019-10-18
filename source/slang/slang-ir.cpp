@@ -10,6 +10,9 @@ namespace Slang
 {
     struct IRSpecContext;
 
+
+    SLANG_COMPILE_TIME_ASSERT(kIROpCount < kIRPseudoOp_First);
+
     IRInst* cloneGlobalValueWithLinkage(
         IRSpecContext*          context,
         IRInst*                 originalVal,
@@ -3083,14 +3086,82 @@ namespace Slang
         addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
     }
 
-    void IRBuilder::addLayoutDecoration(IRInst* inst, Layout* layout)
+    void IRBuilder::addLayoutDecoration(IRInst* value, Layout* layout)
     {
-        auto ptrConst = getPtrValue(addRefObjectToFree(layout));
-        addDecoration(inst, kIROp_LayoutDecoration, ptrConst);
+        IRLayout* irLayout = getLayout(layout);
+        addDecoration(value, kIROp_LayoutDecoration, irLayout);
+
+
+    }
+
+    IRLayout* IRBuilder::getLayout(Layout* astLayout)
+    {
+        if (astLayout == nullptr)
+        {
+            return nullptr;
+        }
+
+        IRLayout* irLayout = nullptr;
+        if(sharedBuilder->layoutMap.TryGetValue(astLayout, irLayout))
+        {
+            SLANG_ASSERT(irLayout->getASTLayout() == astLayout);
+            return irLayout;
+        }
+
+        if (EntryPointLayout* entryPointLayout = as<EntryPointLayout>(astLayout))
+        {
+            irLayout = createInst<IREntryPointLayout>(this, kIROp_EntryPointLayout, nullptr, getPtrValue(astLayout));
+        }
+        else if (VarLayout* varLayout = as<VarLayout>(astLayout))
+        {
+            UnownedStringSlice nameSlice;
+            if (varLayout->getVariable())
+            {
+                Name* name = varLayout->getName();
+                if (name)
+                {
+                    nameSlice = name->text.getUnownedSlice();
+                }
+            }
+
+            // Get the name as a literal.
+            // We use an empty length string, as we can't use a null inst ptr.
+            // If there was a 'null' instruction then it might make more sense to use that
+            IRStringLit* nameLit = getStringValue(nameSlice);
+            
+            // Layout, name, type layout, absolute layout
+            IRInst* args[4] = {
+                getPtrValue(astLayout),
+                nameLit, 
+                getLayout(varLayout->getTypeLayout()),
+                getLayout(varLayout->m_absoluteLayout)
+            };
+
+            irLayout = createInst<IRVarLayout>(this, kIROp_VarLayout, nullptr, 4, args);
+        }
+        else if (TypeLayout* typeLayout = as<TypeLayout>(astLayout))
+        {
+            irLayout = createInst<IRTypeLayout>(this, kIROp_TypeLayout, nullptr, getPtrValue(astLayout));
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unknown layout type");
+        }
+
+        SLANG_ASSERT(irLayout);
+        SLANG_ASSERT(irLayout->getASTLayout() == astLayout);
+
+        sharedBuilder->layoutMap[astLayout] = irLayout;
+
+        addGlobalValue(this, irLayout);
+
+        // need to keep in scope 
+        addRefObjectToFree(astLayout);
+
+        return irLayout;
     }
 
     //
-
 
     struct IRDumpContext
     {

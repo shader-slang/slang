@@ -28,6 +28,9 @@ struct glslang_CompileRequest
     int                 slangStage;
 
     unsigned            action;
+
+    unsigned            optimizationLevel;
+    unsigned            debugInfoType;
 };
 
 typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);
