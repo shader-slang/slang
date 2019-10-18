@@ -74,7 +74,7 @@ static void relativeContainerUnitTest()
             {
                 RelativeString* str = root->dirs[i];
 
-                char* check = strings[i];
+                const char* check = strings[i];
 
                 if (check)
                 {
