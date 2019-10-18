@@ -515,7 +515,19 @@ struct OptionsParser
 
                     auto requestState = StateSerializeUtil::getRequest(buffer);
 
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, requestImpl));
+                    // If we can find a directory, that exists, we will set up a file system to load from that directory
+                    ComPtr<ISlangFileSystem> fileSystem;
+                    String dirPath;
+                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    {
+                        SlangPathType pathType;
+                        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+                        {
+                            fileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath);
+                        }
+                    }
+
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, requestImpl));
 
                     if (argCursor < argEnd)
                     {

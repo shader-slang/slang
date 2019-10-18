@@ -1620,13 +1620,15 @@ extern "C"
 
     Should only be performed on a newly created request. 
 
-    @param request          The request 
+    @param request          The request
+    @param fileSystem       An (optional) filesystem. If non null, files from repro will be loaded (by unique names) from the file system
     @param data             The data to load from.
     @param size             The size of the data to load from. 
     @returns                A `SlangResult` to indicate success or failure.
     */
     SLANG_API SlangResult spLoadRepro(
         SlangCompileRequest* request,
+        ISlangFileSystem* fileSystem,
         const void* data,
         size_t size);
 

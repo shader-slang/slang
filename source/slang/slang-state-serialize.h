@@ -135,11 +135,15 @@ struct StateSerializeUtil
     };
 
     static SlangResult store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest);
-    static SlangResult load(RequestState* requestState, EndToEndCompileRequest* request);
     
     static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
 
     static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
+
+        /// Load the requestState into request
+        /// The fileSystem is optional and can be passed as nullptr. If set, as each file is loaded
+        /// it will attempt to load from fileSystem the *uniqueName*
+    static SlangResult load(RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request);
 
     static SlangResult loadState(const String& filename, List<uint8_t>& outBuffer);
     static SlangResult loadState(Stream* stream, List<uint8_t>& outBuffer);
@@ -151,6 +155,8 @@ struct StateSerializeUtil
 
     static SlangResult extractFiles(RequestState* requestState, ISlangFileSystemExt* fileSystem);
 
+        /// Given the repo file work out a suitable path
+    static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);
 };
 
 } // namespace Slang

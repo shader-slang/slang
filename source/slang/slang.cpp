@@ -3400,6 +3400,7 @@ SLANG_API void const* spGetCompileRequestCode(
 
 SLANG_API SlangResult spLoadRepro(
     SlangCompileRequest* inRequest,
+    ISlangFileSystem* fileSystem,
     const void* data,
     size_t size)
 {
@@ -3411,7 +3412,7 @@ SLANG_API SlangResult spLoadRepro(
 
     StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
 
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, request));
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, request));
     return SLANG_OK;
 }
 

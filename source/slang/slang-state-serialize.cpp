@@ -460,7 +460,7 @@ struct LoadContext
 
     ISlangBlob* getFileBlob(FileState* file)
     {
-        if (!file || file->contents == nullptr)
+        if (!file)
         {
             return nullptr;
         }
@@ -468,7 +468,19 @@ struct LoadContext
         ComPtr<ISlangBlob> blob;
         if (!m_fileToBlobMap.TryGetValue(file, blob))
         {
-            blob = new StringBlob(file->contents->getSlice());
+            if (m_fileSystem && file->uniqueName)
+            {
+                // Try loading from the file system
+                m_fileSystem->loadFile(file->uniqueName->getCstr(), blob.writeRef());
+            }
+
+            // If wasn't loaded, and has contents, use that
+            if (!blob && file->contents)
+            {
+                blob = new StringBlob(file->contents->getSlice());
+            }
+
+            // Add to map, even if the blob is nullptr (say from a failed read)
             m_fileToBlobMap.Add(file, blob);
         }
 
@@ -553,10 +565,13 @@ struct LoadContext
         return dstInfo;
     }
 
-    LoadContext(SourceManager* sourceManger):
-        m_sourceManager(sourceManger)
+    LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem):
+        m_sourceManager(sourceManger),
+        m_fileSystem(fileSystem)
     {
     }
+
+    ISlangFileSystem* m_fileSystem;
 
     SourceManager* m_sourceManager;
     Dictionary<SourceFileState*, SourceFile*> m_sourceFileMap;
@@ -577,13 +592,13 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 }
 
 
-/* static */SlangResult StateSerializeUtil::load(RequestState* requestState, EndToEndCompileRequest* request)
+/* static */SlangResult StateSerializeUtil::load(RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
 {
     auto externalRequest = asExternal(request);
 
     auto linkage = request->getLinkage();
 
-    LoadContext context(linkage->getSourceManager());
+    LoadContext context(linkage->getSourceManager(), fileSystem);
 
     // Try to set state through API - as doing so means if state stored in multiple places it will be ok
 
@@ -759,13 +774,8 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     return (StateSerializeUtil::RequestState*)buffer.getBuffer();
 }
 
-/* static */SlangResult StateSerializeUtil::extractFilesToDirectory(const String& filename)
+/* static */SlangResult StateSerializeUtil::calcDirectoryPathFromFilename(const String& filename, String& outPath)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(filename, buffer));
-
-    RequestState* requestState = StateSerializeUtil::getRequest(buffer);
-
     String absPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(filename, absPath));
 
@@ -781,7 +791,19 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         baseName = builder;
     }
 
-    String dirPath = Path::combine(parentDir, baseName);
+    outPath = Path::combine(parentDir, baseName);
+    return SLANG_OK;
+}
+
+/* static */SlangResult StateSerializeUtil::extractFilesToDirectory(const String& filename)
+{
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(filename, buffer));
+
+    RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+
+    String dirPath;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::calcDirectoryPathFromFilename(filename, dirPath));
 
     Path::createDirectory(dirPath);
     // Set up a file system to write into this directory
@@ -840,7 +862,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
         if (pathInfo->file)
         {
-            builder << pathInfo->file->uniqueIdentity->getSlice();
+            builder << pathInfo->file->uniqueName->getSlice();
         }
         else
         {
