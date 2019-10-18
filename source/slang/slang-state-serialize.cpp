@@ -364,18 +364,75 @@ static bool _isStorable(const PathInfo::Type type)
         }
     }
 
-    // Save all of the files
+    // Save all of the files 
     {
+        Dictionary<String, int> uniqueNameMap;
+
         auto files = inOutContainer.allocateArray<Relative32Ptr<FileState>>(context.m_files.getCount());
         for (Index i = 0; i < context.m_files.getCount(); ++i)
         {
-            files[i] = context.m_files[i];
+            Safe32Ptr<FileState> file = context.m_files[i];
+
+            // Need to come up with unique names
+            String path;
+
+            if (file->canonicalPath)
+            {
+                path = file->canonicalPath->getSlice();
+            }
+            else if (file->foundPath)
+            {
+                path = file->foundPath->getSlice();
+            }
+            else if (file->uniqueIdentity)
+            {
+                path = file->uniqueIdentity->getSlice();
+            }
+
+            if (path.getLength() == 0)
+            {
+                StringBuilder builder;
+                builder << "unnamed" << i;
+                path = builder;
+            }
+
+            String filename = Path::getFileNameWithoutExt(path);
+            String ext = Path::getFileExt(path);
+
+            StringBuilder uniqueName;
+            for (Index j = 0; j < 0x10000; j++)
+            {
+                uniqueName.Clear();
+                uniqueName << filename;
+
+                if (j > 0)
+                {
+                    uniqueName << "-" << j;
+                }
+
+                if (ext.getLength())
+                {
+                    uniqueName << "." << ext;
+                }
+
+                int dummy = 0;
+                if (!uniqueNameMap.TryGetValueOrAdd(uniqueName, dummy))
+                {
+                    // It was added so we are done
+                    break;
+                }
+            }
+
+            // Save the unique generated name
+            file->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
+
+            files[i] = file;
         }
 
         requestState->files = files;
     }
 
-    // Save all the source files
+    // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
         auto dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
