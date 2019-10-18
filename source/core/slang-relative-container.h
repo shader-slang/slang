@@ -24,7 +24,7 @@ public:
     operator T*() const { return get(); }
 
     const Safe32Ptr& operator=(const ThisType& rhs) { m_offset = rhs.m_offset; m_base = rhs.m_base; return *this; }
-    SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const { return (T*)(m_base->m_data + m_offset); } 
+    SLANG_FORCE_INLINE T* get() const { return (T*)(m_base->m_data + m_offset); } 
 
     void setNull()
     {
