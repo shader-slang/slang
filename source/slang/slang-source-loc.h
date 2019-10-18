@@ -371,7 +371,10 @@ struct SourceManager
 
         /// Allocate a string slice
     UnownedStringSlice allocateStringSlice(const UnownedStringSlice& slice);
-    
+
+        /// Get all of the source files
+    const List<SourceFile*>& getSourceFiles() const { return m_sourceFiles; }
+
     SourceManager() :
         m_memoryArena(2048)
     {}

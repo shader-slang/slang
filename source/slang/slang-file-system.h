@@ -164,7 +164,7 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     };
 
     Dictionary<String, PathInfo*>& getPathMap() { return m_pathMap; }
-    Dictionary<String, PathInfo*>& getFileMap() { return m_uniqueIdentityMap; }
+    Dictionary<String, PathInfo*>& getUniqueMap() { return m_uniqueIdentityMap; }
 
     // ISlangUnknown
     SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;

@@ -1177,7 +1177,7 @@ namespace Slang
         /// @param outBlob A destination pointer to receive the loaded blob
         /// @returns A `SlangResult` to indicate success or failure.
         ///
-        SlangResult loadFile(String const& path, ISlangBlob** outBlob);
+        SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob);
 
 
         RefPtr<Expr> parseTypeString(String typeStr, RefPtr<Scope> scope);
@@ -1312,7 +1312,7 @@ namespace Slang
         SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
         ISlangFileSystemExt* getFileSystemExt() { return getLinkage()->getFileSystemExt(); }
-        SlangResult loadFile(String const& path, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outBlob); }
+        SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outPathInfo, outBlob); }
 
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;

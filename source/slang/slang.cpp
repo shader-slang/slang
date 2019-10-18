@@ -795,9 +795,21 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
     }
 }
 
-SlangResult Linkage::loadFile(String const& path, ISlangBlob** outBlob)
+SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob)
 {
-    return fileSystemExt->loadFile(path.getBuffer(), outBlob);
+    outPathInfo.type = PathInfo::Type::Unknown;
+
+    SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
+
+    ComPtr<ISlangBlob> uniqueIdentity;
+    // Get the unique identity
+    SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
+
+    outPathInfo.foundPath = path;
+    outPathInfo.type = PathInfo::Type::FoundPath;
+    outPathInfo.uniqueIdentity = StringUtil::getString(uniqueIdentity);
+
+    return SLANG_OK;
 }
 
 RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
@@ -1380,8 +1392,10 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     // paths were not taken into account by this function.
     //
 
+    PathInfo pathInfo;
+
     ComPtr<ISlangBlob> sourceBlob;
-    SlangResult result = loadFile(path, sourceBlob.writeRef());
+    SlangResult result = loadFile(path, pathInfo, sourceBlob.writeRef());
     if(SLANG_FAILED(result))
     {
         // Emit a diagnostic!
@@ -1393,7 +1407,6 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     }
 
     // Was loaded from the specified path
-    const auto pathInfo = PathInfo::makePath(path);
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }

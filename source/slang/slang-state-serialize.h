@@ -26,21 +26,30 @@ struct StateSerializeUtil
 
     struct FileState
     {
+        Relative32Ptr<RelativeString> uniqueIdentity;           ///< The unique identity for the file (from ISlangFileSystem), or nullptr
+        Relative32Ptr<RelativeString> contents;                 ///< The contents of this file
+        Relative32Ptr<RelativeString> canonicalPath;            ///< The canonical name of this file (or nullptr)
+        Relative32Ptr<RelativeString> foundPath;                ///< The 'found' path
+
+        Relative32Ptr<RelativeString> uniqueName;               ///< A generated unique name (not used by slang, but used as mechanism to replace files)
+    };
+
+    struct PathInfoState
+    {
         typedef CacheFileSystem::CompressedResult CompressedResult;
 
-        Relative32Ptr<RelativeString> uniqueIdentity;
+        SlangPathType pathType = SLANG_PATH_TYPE_FILE;
         CompressedResult loadFileResult = CompressedResult::Uninitialized;
         CompressedResult getPathTypeResult = CompressedResult::Uninitialized;
         CompressedResult getCanonicalPathResult = CompressedResult::Uninitialized;
 
-        SlangPathType pathType = SLANG_PATH_TYPE_FILE;
-        Relative32Ptr<RelativeString> contents;
-        Relative32Ptr<RelativeString> canonicalPath;
+        Relative32Ptr<FileState> file;                          ///< File contents
     };
 
-    struct SessionState
+    struct PathAndPathInfo
     {
-
+        Relative32Ptr<RelativeString> path;
+        Relative32Ptr<PathInfoState> pathInfo;
     };
 
         // spSetCodeGenTarget/spAddCodeGenTarget
@@ -54,12 +63,6 @@ struct StateSerializeUtil
         CodeGenTarget target;
         SlangTargetFlags targetFlags;
         FloatingPointMode floatingPointMode;
-    };
-
-    struct Define
-    {
-        Relative32Ptr<RelativeString> key;
-        Relative32Ptr<RelativeString> value;
     };
 
     struct FileReference
@@ -76,10 +79,9 @@ struct StateSerializeUtil
 
     struct SourceFileState
     {
-        PathInfo::Type type;                      
-        Relative32Ptr<RelativeString> foundPath;               
-        Relative32Ptr<RelativeString> uniqueIdentity;          
-        Relative32Ptr<RelativeString> content;         ///< The actual contents of the file.
+        PathInfo::Type type;                           ///< The type of this file
+        Relative32Ptr<RelativeString> foundPath;       ///< The Path this was found along
+        Relative32Ptr<FileState> file;                 ///< The file contents
     };
 
         // spAddTranslationUnit
@@ -90,42 +92,42 @@ struct StateSerializeUtil
         Relative32Ptr<RelativeString> moduleName;
 
         // spTranslationUnit_addPreprocessorDefine
-        Relative32Array<Define> preprocessorDefinitions;
+        Relative32Array<StringPair> preprocessorDefinitions;
 
         Relative32Array<Relative32Ptr<SourceFileState> > sourceFiles;
     };
 
+    
     struct RequestState
     {
-        Relative32Ptr<SessionState> session;
+        Relative32Array<Relative32Ptr<FileState>> files;                   ///< All of the files
+        Relative32Array<Relative32Ptr<SourceFileState>> sourceFiles;       ///< All of the source files (from source manager)
 
-        // spSetCompileFlags
+            // spSetCompileFlags
         SlangCompileFlags compileFlags;
-        // spSetDumpIntermediates
+            // spSetDumpIntermediates
         bool shouldDumpIntermediates;
-        // spSetLineDirectiveMode
+            // spSetLineDirectiveMode
         LineDirectiveMode lineDirectiveMode;
 
         Relative32Array<TargetRequestState> targetRequests;
 
-        // spSetDebugInfoLevel
+            // spSetDebugInfoLevel
         DebugInfoLevel debugInfoLevel;
-        // spSetOptimizationLevel
+            // spSetOptimizationLevel
         OptimizationLevel optimizationLevel;
-        // spSetOutputContainerFormat
+            // spSetOutputContainerFormat
         ContainerFormat containerFormat;
-        // spSetPassThrough
+            // spSetPassThrough
         PassThroughMode passThroughMode;
 
-        // spAddSearchPath
+            // spAddSearchPath
         Relative32Array<Relative32Ptr<RelativeString> > searchPaths;
 
-        // spAddPreprocessorDefine
-        Relative32Array<Define> preprocessorDefinitions;
+            // spAddPreprocessorDefine
+        Relative32Array<StringPair> preprocessorDefinitions;
 
-        // Files loaded by the file system
-        Relative32Array<Relative32Ptr<FileState>> fileSystemFiles;         ///< Files
-        Relative32Array<StringPair> pathToUniqueMap;                        ///< Maps paths to unique indentities
+        Relative32Array<PathAndPathInfo> pathInfoMap;                  ///< Stores all the accesses to the file system
 
         Relative32Array<TranslationUnitRequestState> translationUnits;
 
@@ -144,7 +146,6 @@ struct StateSerializeUtil
     static SlangResult loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer);
 
     static RequestState* getRequest(const List<uint8_t>& inBuffer);
-
 };
 
 } // namespace Slang

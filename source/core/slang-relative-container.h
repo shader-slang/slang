@@ -197,6 +197,19 @@ public:
         return Safe32Array<T>(Safe32Ptr<T>(getOffset(data), &m_base), uint32_t(size));
     }
 
+        /// Make a pointer into a safe ptr
+    template <typename T>
+    Safe32Ptr<T> toSafe(T* in)
+    {
+        Safe32Ptr<T> dst;
+        if (in)
+        {
+            dst.m_base = &m_base;
+            dst.m_offset = getOffset(in);
+        }
+        return dst;
+    }
+
     /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);
     void* allocate(size_t size, size_t alignment);
@@ -204,16 +217,11 @@ public:
 
     void fixAlignment(size_t alignment);
 
-    template <typename T>
-    Safe32Ptr<T> toSafe(T* ptr) { SafePtr<T> safePtr; relPtr.m_offset = getOffset(); }
-    int32_t getOffset(const void* ptr)
+    SLANG_FORCE_INLINE uint32_t getOffset(const void* ptr) const
     {
         ptrdiff_t offset = ((const uint8_t*)ptr) - m_base.m_data; 
-        if (offset < 0 || size_t(offset) > m_current)
-        {
-            return int32_t(kRelative32PtrNull);
-        }
-        return int32_t(offset);
+        SLANG_ASSERT(offset >= 0 && size_t(offset) < m_current);
+        return uint32_t(offset);
     }
 
     Safe32Ptr<RelativeString> newString(const UnownedStringSlice& slice);
