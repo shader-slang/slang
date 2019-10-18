@@ -1847,9 +1847,6 @@ namespace Slang
 
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
 
-        SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createRequestFromRepro(const void* data, size_t size) override;
-
-
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,
@@ -2086,6 +2083,21 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
 {
     return reinterpret_cast<EndToEndCompileRequest*>(request);
 }
+
+class ListBlob : public ISlangBlob, public RefObject
+{
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
+
+    List<uint8_t> m_data;
+
+protected:
+    ISlangUnknown* getInterface(const Guid& guid);
+};
 
 }
 

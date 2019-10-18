@@ -240,6 +240,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::Define>& in, 
     {
         const auto& srcPaths = requestState->searchPaths;
         auto& dstPaths = linkage->searchDirectories.searchDirectories;
+        dstPaths.setCount(srcPaths.getCount());
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
             dstPaths[i].path = srcPaths[i]->getSlice();
@@ -482,7 +483,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::Define>& in, 
             }
 
             // Set the files
-            requestState->fileSystemFiles;
+            requestState->fileSystemFiles = dstFiles;
         }
 
         // We need the references
@@ -522,7 +523,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::Define>& in, 
 
 /* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, const String& filename)
 {
-    RefPtr<Stream> stream(new FileStream(filename, FileMode::Create));
+    RefPtr<Stream> stream(new FileStream(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
     return saveState(request, stream);
 }
 
@@ -531,7 +532,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::Define>& in, 
     RefPtr<Stream> stream;
     try
     {
-        stream = new FileStream(filename, FileMode::Open);
+        stream = new FileStream(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
     }
     catch (IOException&)
     {

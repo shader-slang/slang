@@ -10,6 +10,8 @@
 
 #include "slang-file-system.h"
 
+#include "slang-state-serialize.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -495,6 +497,26 @@ struct OptionsParser
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
                     requestImpl->getLinkage()->setRequireCacheFileSystem(true);
+                }
+                else if(argStr == "-load-repro")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    List<uint8_t> buffer;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+
+                    auto requestState = StateSerializeUtil::getRequest(buffer);
+
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, requestImpl));
+
+                    if (argCursor < argEnd)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::parametersAfterLoadReproIgnored);
+                        return SLANG_FAIL;
+                    }
+
+                    return SLANG_OK;
                 }
                 else if (argStr == "-serial-ir")
                 {

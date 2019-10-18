@@ -1601,6 +1601,32 @@ extern "C"
         size_t*                 outSize);
 
 
+    
+    /** Load repro from memory specified.
+
+    Should only be performed on a newly created request. 
+
+    @param request          The request 
+    @param data             The data to load from.
+    @param size             The size of the data to load from. 
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spLoadRepro(
+        SlangCompileRequest* request,
+        const void* data,
+        size_t size);
+
+    /** Save repro state. Should *typically* be performed after spCompile, so that everything
+    that is needed for a compilation is available. 
+
+    @param request          The request 
+    @param outBlob          Blob that will hold the serialized state
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spSaveRepro(
+        SlangCompileRequest* request,
+        ISlangBlob** outBlob
+    );
 
     /*
     Forward declarations of types used in the reflection interface;
@@ -2689,16 +2715,6 @@ namespace slang
             @return The build tag string
             */
         virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() = 0;
-
-            /* Create a request with the same state as a repro capture. Calling spCompile should produce the same result
-            as happened on the original capture
-
-            @param data Buffer holding data that was saved as repro
-            @param size Size of the buffer in bytes
-
-            @return Request, or nullptr if an error
-            */
-        virtual SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createRequestFromRepro(const void* data, size_t size) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

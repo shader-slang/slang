@@ -219,30 +219,6 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-SlangResult Session::_loadRequest(EndToEndCompileRequest* request, const void* data, size_t size)
-{
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
-
-    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
-
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, request));
-    return SLANG_OK;
-}
-
-SLANG_NO_THROW SlangCompileRequest* Session::createRequestFromRepro(const void* data, size_t size)
-{
-    EndToEndCompileRequest* request = asInternal(spCreateCompileRequest(asExternal(this)));
-
-    if (SLANG_FAILED(_loadRequest(request, data, size)))
-    {
-        spDestroyCompileRequest(asExternal(request));
-        return nullptr;
-    }
-
-    return asExternal(request);
-}
-
 struct IncludeHandlerImpl : IncludeHandler
 {
     Linkage*    linkage;
@@ -701,6 +677,10 @@ ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
     return ComPtr<ISlangBlob>(new RawBlob(inData, size));
 }
 
+ISlangUnknown* ListBlob::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
+}
 //
 // TargetRequest
 //
@@ -3403,6 +3383,41 @@ SLANG_API void const* spGetCompileRequestCode(
     SLANG_UNUSED(request);
     SLANG_UNUSED(outSize);
     return nullptr;
+}
+
+SLANG_API SlangResult spLoadRepro(
+    SlangCompileRequest* inRequest,
+    const void* data,
+    size_t size)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
+
+    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, request));
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spSaveRepro(
+    SlangCompileRequest* inRequest,
+    ISlangBlob** outBlob)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    MemoryStream stream(FileAccess::Write);
+
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
+
+    RefPtr<ListBlob> listBlob(new ListBlob);
+    listBlob->m_data.swapWith(stream.m_contents);
+
+    *outBlob = listBlob.detach();
+    return SLANG_OK;
 }
 
 // Reflection API

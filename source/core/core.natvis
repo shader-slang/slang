@@ -98,4 +98,9 @@
     </Expand>
 </Type>
 
+<Type Name="Slang::RelativeString">
+    <DisplayString>{(m_sizeThenContents + 1),s}</DisplayString>
+    <StringView>(m_sizeThenContents + 1),s</StringView>
+</Type>
+
 </AutoVisualizer>
