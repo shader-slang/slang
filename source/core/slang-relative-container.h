@@ -6,14 +6,11 @@
 
 namespace Slang {
 
-enum
-{
-    kNullOffset32 = int32_t(0x80000000)
-};
-
 struct RelativeBase
 {
     uint8_t* m_data;
+
+    static RelativeBase g_null;
 };
 
 template <typename T>
@@ -26,24 +23,27 @@ public:
     T* operator->() const { return get(); }
     operator T*() const { return get(); }
 
-    Safe32Ptr(const ThisType& rhs) : m_offset(rhs.m_offset), m_base(rhs.m_base) {}
-
     const Safe32Ptr& operator=(const ThisType& rhs) { m_offset = rhs.m_offset; m_base = rhs.m_base; return *this; }
-
-    SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const { return m_base ? ((T*)(m_base->m_data + m_offset)) : (T*)nullptr; }
+    SLANG_FORCE_INLINE T* Safe32Ptr<T>::get() const { return (T*)(m_base->m_data + m_offset); } 
 
     void setNull()
     {
-        m_offset = kNullOffset32;
-        m_base = nullptr;
+        m_offset = 0;
+        m_base = &RelativeBase::g_null; 
     }
 
-    Safe32Ptr() : m_base(nullptr), m_offset(kNullOffset32) {}
-
-    Safe32Ptr(int32_t offset, RelativeBase* base) : m_offset(offset), m_base(base) {}
+    Safe32Ptr(const ThisType& rhs) : m_offset(rhs.m_offset), m_base(rhs.m_base) {}
+    Safe32Ptr() : m_base(&RelativeBase::g_null), m_offset(0) {}
+    Safe32Ptr(uint32_t offset, RelativeBase* base) : m_offset(offset), m_base(base) {}
 
     RelativeBase* m_base;
-    int32_t m_offset;
+    uint32_t m_offset;
+};
+
+
+enum
+{
+    kRelative32PtrNull = int32_t(0x80000000)
 };
 
 template <typename T>
@@ -59,24 +59,24 @@ public:
     T* get()
     {
         uint8_t* nonConstThis = (uint8_t*)this;
-        return (m_offset == kNullOffset32) ? nullptr : (T*)(nonConstThis + m_offset);
+        return (m_offset == kRelative32PtrNull) ? nullptr : (T*)(nonConstThis + m_offset);
     }
     T* get() const
     {
         uint8_t* nonConstThis = const_cast<uint8_t*>((const uint8_t*)this);
-        return (m_offset == kNullOffset32) ? nullptr : (T*)(nonConstThis + m_offset);
+        return (m_offset == kRelative32PtrNull) ? nullptr : (T*)(nonConstThis + m_offset);
     }
 
-    T* detach() { T* ptr = get(); m_offset = kNullOffset32; }
+    T* detach() { T* ptr = get(); m_offset = kRelative32PtrNull; }
 
-    void setNull() { m_offset = kNullOffset32; }
+    void setNull() { m_offset = kRelative32PtrNull; }
 
-    SLANG_FORCE_INLINE void set(T* ptr) { m_offset = ptr ? int32_t(((uint8_t*)ptr) - ((const uint8_t*)this)) : uint32_t(kNullOffset32); }
+    SLANG_FORCE_INLINE void set(T* ptr) { m_offset = ptr ? int32_t(((uint8_t*)ptr) - ((const uint8_t*)this)) : uint32_t(kRelative32PtrNull); }
 
     Relative32Ptr(const Safe32Ptr<T>& rhs) { set(rhs.get()); }
     Relative32Ptr(const ThisType& rhs) { set(rhs.get()); }
 
-    Relative32Ptr() :m_offset(kNullOffset32) {}
+    Relative32Ptr() :m_offset(kRelative32PtrNull) {}
     Relative32Ptr(T* ptr) { set(ptr); }
 
     const Relative32Ptr& operator=(const ThisType& rhs) { set(rhs.get()); return *this; }
@@ -151,20 +151,20 @@ struct RelativeString
         kMaxSizeEncodeSize = 5,
     };
 
-    /// Get contents as a slice
+        /// Get contents as a slice
     UnownedStringSlice getSlice() const;
-    /// Get null terminated string
+        /// Get null terminated string
     const char* getCstr() const;
 
-    /// Decode the size. Returns the start of the string text, and outSize holds the size (NOT including terminating 0)
+        /// Decode the size. Returns the start of the string text, and outSize holds the size (NOT including terminating 0)
     static const char* decodeSize(const char* in, size_t& outSize);
 
-    /// Returns the amount of bytes used, end encoding in 'encode'
+        /// Returns the amount of bytes used, end encoding in 'encode'
     static size_t calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeSize]);
-    /// Calculate the total size needed to store the string *including* terminating 0
+        /// Calculate the total size needed to store the string *including* terminating 0
     static size_t calcAllocationSize(const UnownedStringSlice& slice);
 
-    /// Calculate the total size needed to store string. Size should be passed *without* terminating 0
+        /// Calculate the total size needed to store string. Size should be passed *without* terminating 0
     static size_t calcAllocationSize(size_t size);
 
     char m_sizeThenContents[1];
@@ -211,7 +211,7 @@ public:
         ptrdiff_t offset = ((const uint8_t*)ptr) - m_base.m_data; 
         if (offset < 0 || size_t(offset) > m_current)
         {
-            return int32_t(kNullOffset32);
+            return int32_t(kRelative32PtrNull);
         }
         return int32_t(offset);
     }

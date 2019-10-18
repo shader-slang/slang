@@ -3,6 +3,9 @@
 
 namespace Slang {
 
+
+/* static */RelativeBase RelativeBase::g_null = { nullptr };
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RelativeString !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeSize])
