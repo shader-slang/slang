@@ -676,6 +676,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         {
             TargetRequestState& src = requestState->targetRequests[i];
             int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
+            SLANG_UNUSED(index);
             SLANG_ASSERT(index == i);
 
             auto dstTarget = linkage->targets[i];
@@ -712,6 +713,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
             const auto& srcTranslationUnit = srcTranslationUnits[i];
 
             int index = frontEndReq->addTranslationUnit(srcTranslationUnit.language);
+            SLANG_UNUSED(index);
             SLANG_ASSERT(index == i);
 
             TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
