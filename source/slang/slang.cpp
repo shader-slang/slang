@@ -2503,7 +2503,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     }
     else
     {
-        CacheFileSystem* cacheFileSystemPtr;   
+        CacheFileSystem* cacheFileSystemPtr = nullptr;   
         inFileSystem->queryInterface(IID_SlangCacheFileSystem, (void**)&cacheFileSystemPtr);
         if (cacheFileSystemPtr)
         {

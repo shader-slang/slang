@@ -311,7 +311,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         case UniqueIdentityMode::Hash:
         {
             // If we don't have a file system -> assume cannot be found
-            if (m_fileSystem)
+            if (m_fileSystem == nullptr)
             {
                 return SLANG_E_NOT_FOUND;
             }
