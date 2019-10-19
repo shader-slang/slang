@@ -1004,7 +1004,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    if (input.testOptions->command == "SIMPLE")
+    if (input.testOptions->command != "SIMPLE_EX")
     {
         cmdLine.addArg(input.filePath);
     }
