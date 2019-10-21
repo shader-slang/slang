@@ -99,8 +99,8 @@ public:
     T* getData() { return m_data.get(); }
     const T* getData() const { return m_data.get(); }
 
-    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
-    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count); return m_data.get()[i]; }
+    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count); return m_data.get()[i]; }
 
     Safe32Array(Safe32Ptr<T> data, uint32_t count):m_data(data), m_count(count) {}
 
@@ -127,8 +127,8 @@ public:
     T* getData() { return m_data.get(); }
     const T* getData() const { return m_data.get(); }
 
-    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
-    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && i < m_count); return m_data.get()[i]; }
+    const T& operator[](Index i) const { SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count); return m_data.get()[i]; }
+    T& operator[](Index i) { SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count); return m_data.get()[i]; }
 
     Relative32Array(const Safe32Array<T>& rhs):
         m_count(rhs.m_count),
