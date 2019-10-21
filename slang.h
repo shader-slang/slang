@@ -1618,10 +1618,13 @@ extern "C"
     
     /** Load repro from memory specified.
 
-    Should only be performed on a newly created request. 
+    Should only be performed on a newly created request.
+
+    NOTE! When using the fileSystem, files will be loaded via their `unique names` as if they are part of the flat file system. This
+    mechanism is described more fully in docs/repro.md.
 
     @param request          The request
-    @param fileSystem       An (optional) filesystem. If non null, files from repro will be loaded (by unique names) from the file system
+    @param fileSystem       An (optional) filesystem. Pass nullptr to just use contents of repro held in data.
     @param data             The data to load from.
     @param size             The size of the data to load from. 
     @returns                A `SlangResult` to indicate success or failure.
