@@ -338,7 +338,7 @@ CPUMemoryBinding::Location CPUMemoryBinding::Location::toIndex(int index) const
             if (elementCount == 0)
             {
                 CPPPrelude::Array<uint8_t>& array = *(CPPPrelude::Array<uint8_t>*)cur;
-                if (index < array.count)
+                if (index < int(array.count))
                 {
                     return Location(elementTypeLayout, array.data + elementStride * index);
                 }
@@ -592,7 +592,7 @@ SlangResult CPUMemoryBinding::setArrayCount(const Location& location, int count,
     // Making smaller, just reduce the count.
     // NOTE! Nothing is done here about deallocating resources which are perhaps no longer reachable.
     // This isn't a leakage problem tho, as all buffers are released automatically when scope is left.
-    if (count <= array.count)
+    if (count <= int(array.count))
     {
         array.count = count;
         return SLANG_OK;

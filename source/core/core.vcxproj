@@ -191,7 +191,9 @@
     <ClInclude Include="slang-platform.h" />
     <ClInclude Include="slang-process-util.h" />
     <ClInclude Include="slang-random-generator.h" />
+    <ClInclude Include="slang-relative-container.h" />
     <ClInclude Include="slang-render-api-util.h" />
+    <ClInclude Include="slang-riff.h" />
     <ClInclude Include="slang-secure-crt.h" />
     <ClInclude Include="slang-shared-library.h" />
     <ClInclude Include="slang-smart-pointer.h" />
@@ -220,7 +222,9 @@
     <ClCompile Include="slang-object-scope-manager.cpp" />
     <ClCompile Include="slang-platform.cpp" />
     <ClCompile Include="slang-random-generator.cpp" />
+    <ClCompile Include="slang-relative-container.cpp" />
     <ClCompile Include="slang-render-api-util.cpp" />
+    <ClCompile Include="slang-riff.cpp" />
     <ClCompile Include="slang-shared-library.cpp" />
     <ClCompile Include="slang-std-writers.cpp" />
     <ClCompile Include="slang-stream.cpp" />

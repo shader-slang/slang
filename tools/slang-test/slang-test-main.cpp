@@ -1004,7 +1004,10 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
-    cmdLine.addArg(input.filePath);
+    if (input.testOptions->command != "SIMPLE_EX")
+    {
+        cmdLine.addArg(input.filePath);
+    }
 
     for( auto arg : input.testOptions->args )
     {
@@ -2384,6 +2387,7 @@ struct TestCommandInfo
 static const TestCommandInfo s_testCommandInfos[] =
 {
     { "SIMPLE",                                 &runSimpleTest},
+    { "SIMPLE_EX",                              &runSimpleTest},
     { "REFLECTION",                             &runReflectionTest},
     { "CPU_REFLECTION",                         &runReflectionTest},
     { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},

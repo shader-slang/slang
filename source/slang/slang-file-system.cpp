@@ -13,6 +13,7 @@ namespace Slang
 static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+static const Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
 // Cacluate a combined path, just using Path:: string processing
 static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
@@ -129,6 +130,30 @@ SlangResult OSFileSystemExt::loadFile(char const* pathIn, ISlangBlob** outBlob)
     return SLANG_E_CANNOT_OPEN;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL OSFileSystemExt::saveFile(const char* pathIn, const void* data, size_t size)
+{
+    const String path = _fixPathDelimiters(pathIn);
+
+    try
+    {
+        FileStream stream(pathIn, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+
+        int64_t numWritten = stream.Write(data, size);
+
+        if (numWritten != int64_t(size))
+        {
+            return SLANG_FAIL;
+        }
+
+    }
+    catch (IOException&)
+    {
+    	return SLANG_E_CANNOT_OPEN;
+    }
+
+    return SLANG_OK;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CacheFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */ const Result CacheFileSystem::s_compressedResultToResult[] = 
@@ -159,13 +184,35 @@ ISlangUnknown* CacheFileSystem::getInterface(const Guid& guid)
     return _getInterface(this, guid);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject)
+{
+    if (uuid == IID_SlangCacheFileSystem)
+    {
+        *outObject = this;
+        return SLANG_OK;
+    }
+
+    ISlangUnknown* intf = getInterface(uuid);
+    if (intf)
+    {
+        addReference();
+        *outObject = intf;
+        return SLANG_OK;
+    }
+    return SLANG_E_NO_INTERFACE;
+}
+
+
 CacheFileSystem::CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode, PathStyle pathStyle) :
     m_fileSystem(fileSystem),
     m_uniqueIdentityMode(uniqueIdentityMode),
     m_pathStyle(pathStyle)
 {
-    // Try to get the more sophisticated interface
-    fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+    if (fileSystem)
+    {
+        // Try to get the more sophisticated interface
+        fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+    }
 
     switch (uniqueIdentityMode)
     {
@@ -263,6 +310,12 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         case UniqueIdentityMode::SimplifyPathAndHash:
         case UniqueIdentityMode::Hash:
         {
+            // If we don't have a file system -> assume cannot be found
+            if (m_fileSystem == nullptr)
+            {
+                return SLANG_E_NOT_FOUND;
+            }
+
             // I can only see if this is the same file as already loaded by loading the file and doing a hash
             Result res = m_fileSystem->loadFile(path.getBuffer(), outFileContents.writeRef());
             if (SLANG_FAILED(res) || outFileContents == nullptr)
@@ -511,6 +564,75 @@ SlangResult CacheFileSystem::getCanonicalPath(const char* path, ISlangBlob** out
     }
     *outCanonicalPath = info->m_canonicalPath;
     return SLANG_OK;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  RelativeFileSystem  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+ISlangUnknown* RelativeFileSystem::getInterface(const Guid& guid)
+{
+    return _getInterface(this, guid);
+}
+
+SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
+{
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(m_fileSystem->calcCombinedPath(SLANG_PATH_TYPE_DIRECTORY, m_relativePath.getBuffer(), path,  blob.writeRef()));
+
+    outPath = StringUtil::getString(blob);
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::loadFile(char const* path, ISlangBlob**    outBlob)
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return m_fileSystem->loadFile(fixedPath.getBuffer(), outBlob);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) 
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return m_fileSystem->getFileUniqueIdentity(fixedPath.getBuffer(), outUniqueIdentity);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** outPath)
+{
+    String fixedFromPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(fromPath, fixedFromPath));
+
+    return m_fileSystem->calcCombinedPath(fromPathType, fixedFromPath.getBuffer(), path, outPath);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::getPathType(const char* path, SlangPathType* outPathType)
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return m_fileSystem->getPathType(fixedPath.getBuffer(), outPathType);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+{
+    return m_fileSystem->getSimplifiedPath(path, outSimplifiedPath);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return m_fileSystem->getCanonicalPath(fixedPath.getBuffer(), outCanonicalPath);
+}
+
+SLANG_NO_THROW void SLANG_MCALL RelativeFileSystem::clearCache()
+{
+    m_fileSystem->clearCache();
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL RelativeFileSystem::saveFile(const char* path, const void* data, size_t size)
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return m_fileSystem->saveFile(fixedPath.getBuffer(), data, size);
 }
 
 } 

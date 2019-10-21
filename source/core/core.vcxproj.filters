@@ -72,7 +72,13 @@
     <ClInclude Include="slang-random-generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-relative-container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-render-api-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-riff.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-secure-crt.h">
@@ -155,7 +161,13 @@
     <ClCompile Include="slang-random-generator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-relative-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-render-api-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-riff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-shared-library.cpp">
