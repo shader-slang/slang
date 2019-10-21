@@ -3483,7 +3483,9 @@ SLANG_API SlangResult spSaveRepro(
     SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
 
     RefPtr<ListBlob> listBlob(new ListBlob);
-    listBlob->m_data.swapWith(stream.m_contents);
+
+    // Put the contents of the stream in the blob
+    stream.swapContents(listBlob->m_data);
 
     *outBlob = listBlob.detach();
     return SLANG_OK;
@@ -3497,6 +3499,21 @@ SLANG_API SlangResult spEnableReproCapture(
 
     request->getLinkage()->setRequireCacheFileSystem(true);
     return SLANG_OK;
+}
+
+SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangFileSystemExt* fileSystem)
+{
+    using namespace Slang;
+    SLANG_UNUSED(session);
+
+    List<uint8_t> buffer;
+    {
+        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
+        SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&memoryStream, buffer));
+    }
+
+    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+    return StateSerializeUtil::extractFiles(requestState, fileSystem);
 }
 
 // Reflection API

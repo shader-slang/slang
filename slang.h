@@ -1647,7 +1647,7 @@ extern "C"
         ISlangBlob** outBlob
     );
 
-    /** Enable Repro capture.
+    /** Enable repro capture.
 
     Should be set after any ISlangFileSystem has been set, but before any compilation. It ensures that everything
     that the ISlangFileSystem accesses will be correctly recorded.
@@ -1657,7 +1657,25 @@ extern "C"
     @param request          The request
     @returns                A `SlangResult` to indicate success or failure.
     */
-    SLANG_API SlangResult spEnableReproCapture(SlangCompileRequest* request);
+    SLANG_API SlangResult spEnableReproCapture(
+        SlangCompileRequest* request);
+
+    /** Extract contents of a repro.
+
+    Writes the contained files and manifest with their 'unique' names into fileSystem. For more details read the
+    docs/repro.md documentation. 
+
+    @param session          The slang session
+    @param reproData        Holds the repro data
+    @param reproDataSize    The size of the repro data
+    @param fileSystem       File system that the contents of the repro will be written to
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spExtractRepro(
+        SlangSession* session,
+        const void* reproData,
+        size_t reproDataSize,
+        ISlangFileSystemExt* fileSystem);
 
     /*
     Forward declarations of types used in the reflection interface;

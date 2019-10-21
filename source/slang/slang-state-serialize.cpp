@@ -318,15 +318,49 @@ static bool _isStorable(const PathInfo::Type type)
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
         {
-            auto& dst = dstTargets[i];
-            TargetRequest* targetRequest = linkage->targets[i];
+            TargetRequest* srcTargetRequest = linkage->targets[i];
 
-            dst.target = targetRequest->getTarget();
-            dst.profile = targetRequest->getTargetProfile();
-            dst.targetFlags = targetRequest->targetFlags;
-            dst.floatingPointMode = targetRequest->floatingPointMode;
+            // Copy the simple stuff
+            {
+                auto& dst = dstTargets[i];
+                dst.target = srcTargetRequest->getTarget();
+                dst.profile = srcTargetRequest->getTargetProfile();
+                dst.targetFlags = srcTargetRequest->targetFlags;
+                dst.floatingPointMode = srcTargetRequest->floatingPointMode;
+            }
+
+            // Copy the entry point/target output names
+            {
+                const auto& srcTargetInfos = request->targetInfos;
+
+                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.TryGetValue(srcTargetRequest))
+                {
+                    EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
+
+                    const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
+
+                    Safe32Array<OutputState> dstOutputStates;
+                    dstOutputStates = inOutContainer.allocateArray<OutputState>(entryPointOutputPaths.Count());
+
+                    Index index = 0;
+                    for (const auto& pair : entryPointOutputPaths)
+                    {
+                        Safe32Ptr<RelativeString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
+
+                        auto& dstOutputState = dstOutputStates[index];
+
+                        dstOutputState.entryPointIndex = int32_t(pair.Key);
+                        dstOutputState.outputPath = outputPath;
+
+                        index++;
+                    }
+
+                    dstTargets[i].outputStates = dstOutputStates;
+                }
+            }
         }
-
+    
+        // Save the result
         requestState->targetRequests = dstTargets;
     }
 
@@ -656,7 +690,16 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 {
     auto externalRequest = asExternal(request);
 
+    
     auto linkage = request->getLinkage();
+
+    // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
+    // Reset state
+    {
+        request->targetInfos.Clear();
+        // Remove any requests
+        linkage->targets.clear();
+    }
 
     LoadContext context(linkage->getSourceManager(), fileSystem);
 
@@ -676,20 +719,41 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
+
+    // Add the target requests
     {
         for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
         {
             TargetRequestState& src = requestState->targetRequests[i];
             int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
-            SLANG_UNUSED(index);
             SLANG_ASSERT(index == i);
 
-            auto dstTarget = linkage->targets[i];
+            auto dstTarget = linkage->targets[index];
 
             SLANG_ASSERT(dstTarget->getTarget() == src.target);
             dstTarget->targetProfile = src.profile;
             dstTarget->targetFlags = src.targetFlags;
             dstTarget->floatingPointMode = src.floatingPointMode;
+
+            // If there is output state (like output filenames) add here
+            if (src.outputStates.getCount())
+            {
+                RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
+                request->targetInfos[dstTarget] = dstTargetInfo;
+
+                for (const auto& srcOutputState : src.outputStates)
+                {
+                    SLANG_ASSERT(srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
+
+                    String entryPointPath;
+                    if (srcOutputState.outputPath)
+                    {
+                        entryPointPath = srcOutputState.outputPath->getSlice();
+                    }
+                    
+                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                }
+            }
         }
     }
 
@@ -749,6 +813,9 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
     // Entry points
     {
+        // Check there aren't any set entry point
+        SLANG_ASSERT(request->getFrontEndReq()->m_entryPointReqs.getCount() == 0);
+
         for (const auto& srcEntryPoint : requestState->entryPoints)
         {
             const char* name = srcEntryPoint.name ? srcEntryPoint.name->getCstr() : nullptr;
@@ -839,11 +906,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */SlangResult StateSerializeUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
 {
-    MemoryStream stream(FileAccess::Read);
-
-    stream.m_contents.setCount(size);
-    ::memcpy(stream.m_contents.getBuffer(), data, size);
-
+    MemoryStreamBase stream(FileAccess::Read, data, size);
     return loadState(&stream, outBuffer);
 }
 

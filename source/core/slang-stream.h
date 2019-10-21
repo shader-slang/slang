@@ -61,29 +61,79 @@ namespace Slang
 		None, ReadOnly, WriteOnly, ReadWrite
 	};
 
-    class MemoryStream : public Stream
+    /// Base class for memory streams. Only supports reading and does NOT own contained data.
+    class MemoryStreamBase : public Stream
     {
     public:
-        virtual Int64 GetPosition() SLANG_OVERRIDE { return m_position;  }
+        typedef Stream Super;
+
+        virtual Int64 GetPosition() SLANG_OVERRIDE { return m_position; }
         virtual void Seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
         virtual Int64 Read(void * buffer, Int64 length) SLANG_OVERRIDE;
-        virtual Int64 Write(const void * buffer, Int64 length) SLANG_OVERRIDE;
+        virtual Int64 Write(const void * buffer, Int64 length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
         virtual bool IsEnd() SLANG_OVERRIDE { return m_atEnd; }
-        virtual bool CanRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0;  }
+        virtual bool CanRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
         virtual bool CanWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
-        virtual void Close() SLANG_OVERRIDE { m_access = FileAccess::None;  }
+        virtual void Close() SLANG_OVERRIDE { m_access = FileAccess::None; }
 
-        MemoryStream(FileAccess access) :
-            m_access(access),
+        MemoryStreamBase(FileAccess access = FileAccess::Read, const void* data = nullptr, size_t dataSize = 0):
+            m_data((const uint8_t*)data),
+            m_dataSize(dataSize),
             m_position(0),
-            m_atEnd(false)
-        {}
+            m_atEnd(false),
+            m_access(access)
+        {
+        }
 
-        Index m_position;
+    protected:
+        const uint8_t* m_data;
+
+        // Use ptrdiff_t (as opposed to size_t) as makes maths simpler
+        ptrdiff_t m_dataSize;
+        ptrdiff_t m_position;
 
         bool m_atEnd;           ///< Happens when a read is done and nothing can be returned because already at end
 
         FileAccess m_access;
+    };
+
+    /// Memory stream that owns it's contents
+    class MemoryStream : public MemoryStreamBase
+    {
+    public:
+        typedef MemoryStreamBase Super;
+
+        virtual Int64 Write(const void * buffer, Int64 length) SLANG_OVERRIDE;
+
+            /// Set the contents
+        void setContents(const void* data, size_t size)
+        {
+            m_contents.setCount(size);
+            ::memcpy(m_contents.getBuffer(), data, size);
+             _update();
+        }
+
+        void swapContents(List<uint8_t>& rhs)
+        {
+            rhs.swapWith(m_contents);
+            _update();
+        }
+
+        MemoryStream(FileAccess access) :
+            Super(access)
+        {}
+
+    protected:
+        void _update()
+        {
+            m_data = m_contents.getBuffer();
+            m_dataSize = ptrdiff_t(m_contents.getCount());
+            // Make sure position is in range
+            m_position = (m_position > m_dataSize) ? m_dataSize : m_position;
+            // We only have at end when a read has happened past the end. So here we reset, as seems most sensible. 
+            m_atEnd = false;
+        }
+
         List<uint8_t> m_contents;
     };
 

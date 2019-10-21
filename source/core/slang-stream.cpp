@@ -217,45 +217,45 @@ namespace Slang
 		return endReached;
 	}
 
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MemoryStreamBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    void MemoryStream::Seek(SeekOrigin origin, Int64 offset)
+    void MemoryStreamBase::Seek(SeekOrigin origin, Int64 offset)
     {
         Int64 pos = 0;
         switch (origin)
         {
-        case Slang::SeekOrigin::Start:
-            pos = offset;
-            break;
-        case Slang::SeekOrigin::End:
-            pos = Int64(m_contents.getCount()) + offset;
-            break;
-        case Slang::SeekOrigin::Current:
-            pos = Int64(m_position) + offset;
-            break;
-        default:
-            throw NotSupportedException("Unsupported seek origin.");
-            break;
+            case Slang::SeekOrigin::Start:
+                pos = offset;
+                break;
+            case Slang::SeekOrigin::End:
+                pos = Int64(m_dataSize) + offset;
+                break;
+            case Slang::SeekOrigin::Current:
+                pos = Int64(m_position) + offset;
+                break;
+            default:
+                throw NotSupportedException("Unsupported seek origin.");
+                break;
         }
 
         m_atEnd = false;
 
         // Clamp to the valid range
         pos = (pos < 0) ? 0 : pos;
-        pos = (pos > Int64(m_contents.getCount())) ? Int64(m_contents.getCount()) : pos;
+        pos = (pos > Int64(m_dataSize)) ? Int64(m_dataSize) : pos;
 
         m_position = UInt(pos);
     }
 
-    Int64 MemoryStream::Read(void * buffer, Int64 length)
+    Int64 MemoryStreamBase::Read(void* buffer, Int64 length)
     {
         if (!CanRead())
         {
             throw IOException("Cannot read this stream.");
         }
 
-        const Int64 maxRead = Int64(m_contents.getCount() - m_position);
-        
+        const Int64 maxRead = Int64(m_dataSize - m_position);
+
         if (maxRead == 0 && length > 0)
         {
             m_atEnd = true;
@@ -264,11 +264,13 @@ namespace Slang
 
         length = length > maxRead ? maxRead : length;
 
-        ::memcpy(buffer, m_contents.begin() + m_position, size_t(length));
+        ::memcpy(buffer, m_data + m_position, size_t(length));
         m_position += UInt(length);
         return maxRead;
     }
-    
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     Int64 MemoryStream::Write(const void * buffer, Int64 length)
     {
         if (!CanWrite())
@@ -285,9 +287,12 @@ namespace Slang
             m_contents.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
         }
 
+        m_data = m_contents.getBuffer();
+        m_dataSize = ptrdiff_t(m_contents.getCount());
+
         m_atEnd = false;
 
-        m_position += UInt(length);
+        m_position += ptrdiff_t(length);
         return length;
     }
 
