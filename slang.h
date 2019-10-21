@@ -1647,6 +1647,18 @@ extern "C"
         ISlangBlob** outBlob
     );
 
+    /** Enable Repro capture.
+
+    Should be set after any ISlangFileSystem has been set, but before any compilation. It ensures that everything
+    that the ISlangFileSystem accesses will be correctly recorded.
+    Note that if a ISlangFileSystem/ISlangFileSystemExt isn't explicitly set (ie the default is used), then the
+    request will automatically be set up to record everything appropriate. 
+
+    @param request          The request
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spEnableReproCapture(SlangCompileRequest* request);
+
     /*
     Forward declarations of types used in the reflection interface;
     */

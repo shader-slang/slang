@@ -383,7 +383,12 @@ static bool _isStorable(const PathInfo::Type type)
 
     // Find files from the file system, and mapping paths to files
     {
-        CacheFileSystem* cacheFileSystem = linkage->cacheFileSystem;
+        CacheFileSystem* cacheFileSystem = linkage->getCacheFileSystem();
+        if (!cacheFileSystem)
+        {
+            return SLANG_FAIL;
+        }
+
         // Traverse the references (in process we will construct the map from PathInfo)        
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
@@ -782,8 +787,8 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         // This is a bit of a hack, we are going to replace the file system, with our one which is filled in
         // with what was read from the file. 
 
-        linkage->fileSystemExt = cacheFileSystem;
-        linkage->cacheFileSystem = cacheFileSystem;
+        linkage->m_fileSystemExt = cacheFileSystem;
+        linkage->m_cacheFileSystem = cacheFileSystem;
     }
 
     return SLANG_OK;
