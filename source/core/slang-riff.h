@@ -56,8 +56,8 @@ struct RiffSemanticVersion
 
     static RiffSemanticVersion make(int major, int minor, int patch) { return makeFromRaw(makeRaw(major, minor, patch)); }
 
-        /// 
-    static const bool areCompatible(const ThisType& currentVersion, const ThisType& readVersion)
+        /// True if the read version is compatible with the current version, based on semantic rules.
+    static bool areCompatible(const ThisType& currentVersion, const ThisType& readVersion)
     {
         const RawType currentRaw = currentVersion.m_raw;
         const RawType readRaw = readVersion.m_raw;
