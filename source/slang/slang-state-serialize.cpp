@@ -9,6 +9,53 @@
 
 namespace Slang {
 
+/* static */const RiffSemanticVersion StateSerializeUtil::g_semanticVersion =
+    RiffSemanticVersion::make(StateSerializeUtil::kMajorVersion, StateSerializeUtil::kMinorVersion, StateSerializeUtil::kPatchVersion);
+
+// A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
+static uint32_t _calcTypeHash()
+{
+    typedef StateSerializeUtil Util;
+
+    const size_t sizes[] =
+    {
+        sizeof(Util::FileState),
+        sizeof(Util::PathInfoState),
+            sizeof(Util::PathInfoState::CompressedResult),
+            sizeof(SlangPathType),
+        sizeof(Util::PathAndPathInfo),
+        sizeof(Util::TargetRequestState),
+            sizeof(Profile),
+            sizeof(CodeGenTarget),
+            sizeof(SlangTargetFlags),
+            sizeof(FloatingPointMode),
+        sizeof(Util::StringPair),
+        sizeof(Util::SourceFileState),
+            sizeof(PathInfo::Type),
+        sizeof(Util::TranslationUnitRequestState),
+            sizeof(SourceLanguage),
+        sizeof(Util::EntryPointState),
+            sizeof(Profile),
+        sizeof(Util::RequestState),
+            sizeof(SlangCompileFlags),
+            sizeof(bool),                       //< Unfortunately bools size can change across compilers/versions
+            sizeof(LineDirectiveMode),
+            sizeof(DebugInfoLevel),
+            sizeof(OptimizationLevel),
+            sizeof(ContainerFormat),
+            sizeof(PassThroughMode),
+            sizeof(SlangMatrixLayoutMode),
+    };
+
+    return uint32_t(GetHashCode((const char*)&sizes, sizeof(sizes)));
+}
+
+static uint32_t _getTypeHash()
+{
+    static uint32_t s_hash = _calcTypeHash();
+    return s_hash;
+}
+
 
 namespace { // anonymous
 
@@ -795,7 +842,13 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     RelativeContainer container;
     Safe32Ptr<RequestState> requestState;
     SLANG_RETURN_ON_FAIL(store(request, container, requestState));
-    return RiffUtil::writeData(kSlangStateFourCC, container.getData(), container.getDataCount(), stream);
+
+    Header header;
+    header.m_chunk.m_type = kSlangStateFourCC;
+    header.m_semanticVersion = g_semanticVersion;
+    header.m_typeHash = _getTypeHash();
+
+    return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
 }
 
 /* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, const String& filename)
@@ -821,10 +874,20 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */ SlangResult StateSerializeUtil::loadState(Stream* stream, List<uint8_t>& buffer)
 {
-    RiffChunk chunk;
-    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, chunk, buffer));
+    Header header;
 
-    if (chunk.m_type != kSlangStateFourCC)
+    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer));
+    if (header.m_chunk.m_type != kSlangStateFourCC)
+    {
+        return SLANG_FAIL;
+    }
+
+    if (!RiffSemanticVersion::areCompatible(g_semanticVersion, header.m_semanticVersion))
+    {
+        return SLANG_FAIL;
+    }
+
+    if (header.m_typeHash != _getTypeHash())
     {
         return SLANG_FAIL;
     }
