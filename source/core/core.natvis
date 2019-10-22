@@ -62,4 +62,45 @@
       <ExpandedItem>pointer</ExpandedItem>
     </Expand>
 </Type>
+
+
+<Type Name="Slang::Safe32Ptr&lt;*&gt;">
+    <Expand>
+        <ExpandedItem>($T1*)(m_base->m_data + m_offset)</ExpandedItem>
+    </Expand>
+</Type>
+
+<Type Name="Slang::Relative32Ptr&lt;*&gt;">
+    <Expand>
+        <ExpandedItem>(m_offset == 0x80000000) ? nullptr : ($T1*)(((char*)this) + m_offset)</ExpandedItem>
+    </Expand>
+</Type>
+
+
+<Type Name="Slang::Safe32Array&lt;*&gt;">
+    <Expand>
+        <Item Name="[count]">m_count</Item>
+        <ArrayItems>
+            <Size>m_count</Size>
+            <ValuePointer>($T1*)(m_data.m_base->m_data + m_data.m_offset)</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+
+<Type Name="Slang::Relative32Array&lt;*&gt;">
+    <Expand>
+        <Item Name="[count]">m_count</Item>
+        <ArrayItems>
+            <Size>m_count</Size>
+            <ValuePointer>(m_data.m_offset == 0x80000000) ? nullptr : ($T1*)(((char*)&amp;m_data) + m_data.m_offset)</ValuePointer>
+        </ArrayItems>
+    </Expand>
+</Type>
+
+<Type Name="Slang::RelativeString">
+    <DisplayString>{(m_sizeThenContents + 1),s}</DisplayString>
+    <StringView>(m_sizeThenContents + 1),s</StringView>
+</Type>
+
 </AutoVisualizer>

@@ -175,6 +175,7 @@
     <ClCompile Include="slangc-tool.cpp" />
     <ClCompile Include="test-context.cpp" />
     <ClCompile Include="test-reporter.cpp" />
+    <ClCompile Include="unit-relative-container.cpp" />
     <ClCompile Include="unit-test-byte-encode.cpp" />
     <ClCompile Include="unit-test-free-list.cpp" />
     <ClCompile Include="unit-test-memory-arena.cpp" />

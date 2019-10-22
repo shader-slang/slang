@@ -14,6 +14,8 @@
 #include "slang-syntax-visitors.h"
 #include "slang-type-layout.h"
 
+#include "slang-state-serialize.h"
+
 #include "slang-file-system.h"
 
 #include "../core/slang-writer.h"
@@ -676,6 +678,10 @@ ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
     return ComPtr<ISlangBlob>(new RawBlob(inData, size));
 }
 
+ISlangUnknown* ListBlob::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
+}
 //
 // TargetRequest
 //
@@ -790,9 +796,21 @@ void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
     }
 }
 
-SlangResult Linkage::loadFile(String const& path, ISlangBlob** outBlob)
+SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob)
 {
-    return fileSystemExt->loadFile(path.getBuffer(), outBlob);
+    outPathInfo.type = PathInfo::Type::Unknown;
+
+    SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
+
+    ComPtr<ISlangBlob> uniqueIdentity;
+    // Get the unique identity
+    SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
+
+    outPathInfo.foundPath = path;
+    outPathInfo.type = PathInfo::Type::FoundPath;
+    outPathInfo.uniqueIdentity = StringUtil::getString(uniqueIdentity);
+
+    return SLANG_OK;
 }
 
 RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
@@ -1097,6 +1115,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     {
         parseTranslationUnit(translationUnit.Ptr());
     }
+
     if (getSink()->GetErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1375,8 +1394,10 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     // paths were not taken into account by this function.
     //
 
+    PathInfo pathInfo;
+
     ComPtr<ISlangBlob> sourceBlob;
-    SlangResult result = loadFile(path, sourceBlob.writeRef());
+    SlangResult result = loadFile(path, pathInfo, sourceBlob.writeRef());
     if(SLANG_FAILED(result))
     {
         // Emit a diagnostic!
@@ -1388,7 +1409,6 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     }
 
     // Was loaded from the specified path
-    const auto pathInfo = PathInfo::makePath(path);
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(pathInfo, sourceBlob);
     addTranslationUnitSourceFile(translationUnitIndex, sourceFile);
 }
@@ -2464,32 +2484,70 @@ Session* CompileRequestBase::getSession()
 }
 
 static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
+static const Slang::Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
 void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 {
     // Set the fileSystem
     fileSystem = inFileSystem;
 
+    // Release what's there
+    fileSystemExt.setNull();
+    cacheFileSystem.setNull();
+
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        fileSystemExt = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        fileSystemExt = cacheFileSystem;
     }
     else
     {
-        // See if we have the full ISlangFileSystemExt interface, if we do just use it
-        inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
-
-        // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
-        if (!fileSystemExt)
+        CacheFileSystem* cacheFileSystemPtr = nullptr;   
+        inFileSystem->queryInterface(IID_SlangCacheFileSystem, (void**)&cacheFileSystemPtr);
+        if (cacheFileSystemPtr)
         {
-            // Construct a wrapper to emulate the extended interface behavior
-            fileSystemExt = new Slang::CacheFileSystem(fileSystem);
+            cacheFileSystem = cacheFileSystemPtr;
+            fileSystemExt = cacheFileSystemPtr;
+        }
+        else 
+        {
+            if (m_requireCacheFileSystem)
+            {
+                cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
+                fileSystemExt = cacheFileSystem;
+            }
+            else
+            {
+                // See if we have the full ISlangFileSystemExt interface, if we do just use it
+                inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
+
+                // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
+                if (!fileSystemExt)
+                {
+                    // Construct a wrapper to emulate the extended interface behavior
+                    cacheFileSystem = new Slang::CacheFileSystem(fileSystem);
+                    fileSystemExt = cacheFileSystem;
+                }
+            }
         }
     }
 
     // Set the file system used on the source manager
     getSourceManager()->setFileSystemExt(fileSystemExt);
+}
+
+void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)
+{
+    if (requireCacheFileSystem == m_requireCacheFileSystem)
+    {
+        return;
+    }
+
+    ComPtr<ISlangFileSystem> scopeFileSystem(fileSystem);
+    m_requireCacheFileSystem = requireCacheFileSystem;
+
+    setFileSystem(scopeFileSystem);
 }
 
 RefPtr<Module> findOrImportModule(
@@ -3158,6 +3216,8 @@ SLANG_API SlangResult spCompile(
 {
     auto req = Slang::asInternal(request);
 
+    SlangResult res = SLANG_FAIL;
+
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
@@ -3168,7 +3228,7 @@ SLANG_API SlangResult spCompile(
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
-    SlangResult res = SLANG_FAIL; 
+    
     try
     {
         res = req->executeActions();
@@ -3196,14 +3256,21 @@ SLANG_API SlangResult spCompile(
         req->getSink()->diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
     }
     req->mDiagnosticOutput = req->getSink()->outputBuffer.ProduceString();
-    return res;
+    
 #else
     // When debugging, we probably don't want to filter out any errors, since
     // we are probably trying to root-cause and *fix* those errors.
     {
-        return req->executeActions();
+        res = req->executeActions();
     }
 #endif
+
+    if (req->dumpRepro.getLength())
+    {
+        SLANG_RETURN_ON_FAIL(Slang::StateSerializeUtil::saveState(req, req->dumpRepro));
+    }
+
+    return res;
 }
 
 SLANG_API int
@@ -3384,6 +3451,42 @@ SLANG_API void const* spGetCompileRequestCode(
     SLANG_UNUSED(request);
     SLANG_UNUSED(outSize);
     return nullptr;
+}
+
+SLANG_API SlangResult spLoadRepro(
+    SlangCompileRequest* inRequest,
+    ISlangFileSystem* fileSystem,
+    const void* data,
+    size_t size)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
+
+    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, request));
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spSaveRepro(
+    SlangCompileRequest* inRequest,
+    ISlangBlob** outBlob)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    MemoryStream stream(FileAccess::Write);
+
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
+
+    RefPtr<ListBlob> listBlob(new ListBlob);
+    listBlob->m_data.swapWith(stream.m_contents);
+
+    *outBlob = listBlob.detach();
+    return SLANG_OK;
 }
 
 // Reflection API

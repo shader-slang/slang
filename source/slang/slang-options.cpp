@@ -10,6 +10,8 @@
 
 #include "slang-file-system.h"
 
+#include "slang-state-serialize.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -490,6 +492,50 @@ struct OptionsParser
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
+                }
+                else if (argStr == "-dump-repro")
+                {
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
+                    requestImpl->getLinkage()->setRequireCacheFileSystem(true);
+                }
+                else if (argStr == "-extract-repro")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::extractFilesToDirectory(reproName));
+                }
+                else if(argStr == "-load-repro")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    List<uint8_t> buffer;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+
+                    auto requestState = StateSerializeUtil::getRequest(buffer);
+
+                    // If we can find a directory, that exists, we will set up a file system to load from that directory
+                    ComPtr<ISlangFileSystem> fileSystem;
+                    String dirPath;
+                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    {
+                        SlangPathType pathType;
+                        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+                        {
+                            fileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath);
+                        }
+                    }
+
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, requestImpl));
+
+                    if (argCursor < argEnd)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::parametersAfterLoadReproIgnored);
+                        return SLANG_FAIL;
+                    }
+
+                    return SLANG_OK;
                 }
                 else if (argStr == "-serial-ir")
                 {

@@ -2,10 +2,8 @@
 #ifndef SLANG_IR_SERIALIZE_H_INCLUDED
 #define SLANG_IR_SERIALIZE_H_INCLUDED
 
-#include "../core/slang-basic.h"
-#include "../core/slang-stream.h"
-
 #include "../core/slang-object-scope-manager.h"
+#include "../core/slang-riff.h"
 
 #include "slang-ir.h"
 
@@ -349,20 +347,10 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
 }
 
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
-
 #define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) (((fourCc) & 0xffff00ff) | (uint32_t('c') << 8))
 
 struct IRSerialBinary
 {
-    // http://fileformats.archiveteam.org/wiki/RIFF
-    // http://www.fileformat.info/format/riff/egff.htm
-
-    struct Chunk
-    {
-        uint32_t m_type;
-        uint32_t m_size;
-    };
 
     enum class CompressionType
     {
@@ -370,8 +358,7 @@ struct IRSerialBinary
         VariableByteLite,
     };
 
-    
-    static const uint32_t kRiffFourCc = SLANG_FOUR_CC('R', 'I', 'F', 'F');
+    static const uint32_t kRiffFourCc = RiffFourCC::kRiff;
     static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
 
     static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
@@ -394,17 +381,17 @@ struct IRSerialBinary
 
     struct SlangHeader
     {
-        Chunk m_chunk;
+        RiffChunk m_chunk;
         uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader
     {
-        Chunk m_chunk;
+        RiffChunk m_chunk;
         uint32_t m_numEntries;
     };
     struct CompressedArrayHeader
     {
-        Chunk m_chunk;
+        RiffChunk m_chunk;
         uint32_t m_numEntries;              ///< The number of entries
         uint32_t m_numCompressedEntries;    ///< The amount of compressed entries
     };
@@ -525,8 +512,6 @@ struct IRSerialReader
     }
 
     protected:
-
-    static Result _skip(const IRSerialBinary::Chunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
 
     StringRepresentationCache m_stringRepresentationCache;
 

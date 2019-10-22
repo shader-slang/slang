@@ -1005,6 +1005,20 @@ extern "C"
 
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
+
+        /** Write the data specified with data and size to the specified path.
+
+        Note that for normal slang operation it doesn't write files so this can return SLANG_E_NOT_IMPLEMENTED.
+
+        @param path The path for data to be saved to
+        @param data The data to be saved
+        @param size The size of the data
+        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(
+            const char* path,
+            const void* data,
+            size_t size) = 0;
     };
 
     #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
@@ -1601,6 +1615,37 @@ extern "C"
         size_t*                 outSize);
 
 
+    
+    /** Load repro from memory specified.
+
+    Should only be performed on a newly created request.
+
+    NOTE! When using the fileSystem, files will be loaded via their `unique names` as if they are part of the flat file system. This
+    mechanism is described more fully in docs/repro.md.
+
+    @param request          The request
+    @param fileSystem       An (optional) filesystem. Pass nullptr to just use contents of repro held in data.
+    @param data             The data to load from.
+    @param size             The size of the data to load from. 
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spLoadRepro(
+        SlangCompileRequest* request,
+        ISlangFileSystem* fileSystem,
+        const void* data,
+        size_t size);
+
+    /** Save repro state. Should *typically* be performed after spCompile, so that everything
+    that is needed for a compilation is available. 
+
+    @param request          The request 
+    @param outBlob          Blob that will hold the serialized state
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spSaveRepro(
+        SlangCompileRequest* request,
+        ISlangBlob** outBlob
+    );
 
     /*
     Forward declarations of types used in the reflection interface;

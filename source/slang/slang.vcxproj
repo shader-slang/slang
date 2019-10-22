@@ -228,6 +228,7 @@
     <ClInclude Include="slang-profile.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-source-loc.h" />
+    <ClInclude Include="slang-state-serialize.h" />
     <ClInclude Include="slang-stmt-defs.h" />
     <ClInclude Include="slang-syntax-base-defs.h" />
     <ClInclude Include="slang-syntax-defs.h" />
@@ -289,6 +290,7 @@
     <ClCompile Include="slang-profile.cpp" />
     <ClCompile Include="slang-reflection.cpp" />
     <ClCompile Include="slang-source-loc.cpp" />
+    <ClCompile Include="slang-state-serialize.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang-syntax.cpp" />
     <ClCompile Include="slang-token.cpp" />

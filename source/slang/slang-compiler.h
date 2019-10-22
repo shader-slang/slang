@@ -13,6 +13,8 @@
 #include "slang-profile.h"
 #include "slang-syntax.h"
 
+#include "slang-file-system.h"
+
 #include "../../slang.h"
 
 namespace Slang
@@ -194,6 +196,9 @@ namespace Slang
 
             /// Get the profile that the entry point is to be compiled for
         Profile getProfile() { return m_profile; }
+
+            /// Get the index to the translation unit
+        int getTranslationUnitIndex() const { return m_translationUnitIndex; }
 
     private:
         // The parent compile request
@@ -1174,6 +1179,9 @@ namespace Slang
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
         ComPtr<ISlangFileSystemExt> fileSystemExt;
 
+        /// Set if fileSystemExt is a cache file system
+        RefPtr<CacheFileSystem> cacheFileSystem;
+
         ISlangFileSystemExt* getFileSystemExt() { return fileSystemExt; }
 
         /// Load a file into memory using the configured file system.
@@ -1182,7 +1190,7 @@ namespace Slang
         /// @param outBlob A destination pointer to receive the loaded blob
         /// @returns A `SlangResult` to indicate success or failure.
         ///
-        SlangResult loadFile(String const& path, ISlangBlob** outBlob);
+        SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob);
 
 
         RefPtr<Expr> parseTypeString(String typeStr, RefPtr<Scope> scope);
@@ -1235,6 +1243,8 @@ namespace Slang
             m_sourceManager = sourceManager;
         }
 
+        void setRequireCacheFileSystem(bool requireCacheFileSystem);
+
         void setFileSystem(ISlangFileSystem* fileSystem);
 
         /// The layout to use for matrices by default (row/column major)
@@ -1245,6 +1255,8 @@ namespace Slang
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
+
+        bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
     private:
@@ -1313,7 +1325,7 @@ namespace Slang
         SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
         ISlangFileSystemExt* getFileSystemExt() { return getLinkage()->getFileSystemExt(); }
-        SlangResult loadFile(String const& path, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outBlob); }
+        SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob) { return getLinkage()->loadFile(path, outPathInfo, outBlob); }
 
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;
@@ -1710,6 +1722,10 @@ namespace Slang
 
         String mDiagnosticOutput;
 
+
+            // If set, will dump the compilation state 
+        String dumpRepro;
+
             /// A blob holding the diagnostic output
         ComPtr<ISlangBlob> diagnosticOutputBlob;
 
@@ -1744,6 +1760,7 @@ namespace Slang
         void setWriter(WriterChannel chan, ISlangWriter* writer);
         ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
 
+            /// The end to end request can be passed as nullptr, if not driven by one
         SlangResult executeActionsInner();
         SlangResult executeActions();
 
@@ -2002,6 +2019,9 @@ namespace Slang
         ~Session();
 
     private:
+
+        SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
+
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 
@@ -2088,6 +2108,21 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
 {
     return reinterpret_cast<EndToEndCompileRequest*>(request);
 }
+
+class ListBlob : public ISlangBlob, public RefObject
+{
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
+
+    List<uint8_t> m_data;
+
+protected:
+    ISlangUnknown* getInterface(const Guid& guid);
+};
 
 }
 
