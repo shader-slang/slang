@@ -3478,14 +3478,14 @@ SLANG_API SlangResult spSaveRepro(
     using namespace Slang;
     auto request = asInternal(inRequest);
 
-    MemoryStream stream(FileAccess::Write);
+    OwnedMemoryStream stream(FileAccess::Write);
 
     SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
 
     RefPtr<ListBlob> listBlob(new ListBlob);
 
-    // Put the contents of the stream in the blob
-    stream.swapContents(listBlob->m_data);
+    // Put the content of the stream in the blob
+    stream.swapContent(listBlob->m_data);
 
     *outBlob = listBlob.detach();
     return SLANG_OK;

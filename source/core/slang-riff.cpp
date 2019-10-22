@@ -20,7 +20,7 @@ namespace Slang
     }
 
     // Skip the payload (we don't need to skip the Chunk because that was already read
-    stream->Seek(SeekOrigin::Current, chunkSize - sizeof(RiffChunk));
+    stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffChunk));
     return SLANG_OK;
 }
 
@@ -29,7 +29,7 @@ namespace Slang
 {
     try
     {
-        stream->Read(&outChunk, sizeof(RiffChunk));
+        stream->read(&outChunk, sizeof(RiffChunk));
     }
     catch (IOException&)
     {
@@ -53,13 +53,13 @@ namespace Slang
 
     try
     {
-        out->Write(&chunk, sizeof(chunk));
-        out->Write(data, size);
+        out->write(&chunk, sizeof(chunk));
+        out->write(data, size);
         size_t remaining = size & 3;
         if (remaining)
         {
             uint8_t end[4] = { 0, 0, 0, 0};
-            out->Write(end, 4 - remaining);
+            out->write(end, 4 - remaining);
         }
     }
     catch (IOException&)
@@ -79,13 +79,13 @@ namespace Slang
 
     try
     {
-        stream->Read(data.getBuffer(), outChunk.m_size);
+        stream->read(data.getBuffer(), outChunk.m_size);
 
         // Skip to the alignment
         uint32_t remaining = outChunk.m_size & 3;
         if (remaining)
         {
-            stream->Seek(SeekOrigin::Current, 4 - remaining);
+            stream->seek(SeekOrigin::Current, 4 - remaining);
         }
     }
     catch (IOException&)

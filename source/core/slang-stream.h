@@ -5,159 +5,170 @@
 
 namespace Slang
 {
-	class IOException : public Exception
-	{
-	public:
-		IOException()
-		{}
-		IOException(const String & message)
-			: Slang::Exception(message)
-		{
-		}
-	};
 
-	class EndOfStreamException : public IOException
+class IOException : public Exception
+{
+public:
+	IOException()
+	{}
+	IOException(const String & message)
+		: Slang::Exception(message)
 	{
-	public:
-		EndOfStreamException()
-		{}
-		EndOfStreamException(const String & message)
-			: IOException(message)
-		{
-		}
-	};
+	}
+};
 
-	enum class SeekOrigin
+class EndOfStreamException : public IOException
+{
+public:
+	EndOfStreamException()
+	{}
+	EndOfStreamException(const String & message)
+		: IOException(message)
 	{
-		Start, End, Current
-	};
+	}
+};
 
-	class Stream : public RefObject
-	{
-	public:
-        virtual ~Stream() {}
-		virtual Int64 GetPosition()=0;
-		virtual void Seek(SeekOrigin origin, Int64 offset)=0;
-		virtual Int64 Read(void * buffer, Int64 length) = 0;
-		virtual Int64 Write(const void * buffer, Int64 length) = 0;
-		virtual bool IsEnd() = 0;
-		virtual bool CanRead() = 0;
-		virtual bool CanWrite() = 0;
-		virtual void Close() = 0;
-	};
+enum class SeekOrigin
+{
+	Start, End, Current
+};
 
-	enum class FileMode
-	{
-		Create, Open, CreateNew, Append
-	};
+class Stream : public RefObject
+{
+public:
+    virtual ~Stream() {}
+	virtual Int64 getPosition()=0;
+	virtual void seek(SeekOrigin origin, Int64 offset)=0;
+	virtual Int64 read(void * buffer, Int64 length) = 0;
+	virtual Int64 write(const void * buffer, Int64 length) = 0;
+	virtual bool isEnd() = 0;
+	virtual bool canRead() = 0;
+	virtual bool canWrite() = 0;
+	virtual void close() = 0;
+};
 
-	enum class FileAccess
-	{
-		None = 0, Read = 1, Write = 2, ReadWrite = 3
-	};
+enum class FileMode
+{
+	Create, Open, CreateNew, Append
+};
 
-	enum class FileShare
-	{
-		None, ReadOnly, WriteOnly, ReadWrite
-	};
+enum class FileAccess
+{
+	None = 0, Read = 1, Write = 2, ReadWrite = 3
+};
 
-    /// Base class for memory streams. Only supports reading and does NOT own contained data.
-    class MemoryStreamBase : public Stream
+enum class FileShare
+{
+	None, ReadOnly, WriteOnly, ReadWrite
+};
+
+/// Base class for memory streams. Only supports reading and does NOT own contained data.
+class MemoryStreamBase : public Stream
+{
+public:
+    typedef Stream Super;
+
+    virtual Int64 getPosition() SLANG_OVERRIDE { return m_position; }
+    virtual void seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
+    virtual Int64 read(void * buffer, Int64 length) SLANG_OVERRIDE;
+    virtual Int64 write(const void * buffer, Int64 length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
+    virtual bool isEnd() SLANG_OVERRIDE { return m_atEnd; }
+    virtual bool canRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
+    virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
+    virtual void close() SLANG_OVERRIDE { m_access = FileAccess::None; }
+
+    MemoryStreamBase(FileAccess access = FileAccess::Read, const void* content = nullptr, size_t contentSize = 0):
+        m_access(access)
     {
-    public:
-        typedef Stream Super;
+        _setContent(content, contentSize);
+    }
 
-        virtual Int64 GetPosition() SLANG_OVERRIDE { return m_position; }
-        virtual void Seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
-        virtual Int64 Read(void * buffer, Int64 length) SLANG_OVERRIDE;
-        virtual Int64 Write(const void * buffer, Int64 length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
-        virtual bool IsEnd() SLANG_OVERRIDE { return m_atEnd; }
-        virtual bool CanRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
-        virtual bool CanWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
-        virtual void Close() SLANG_OVERRIDE { m_access = FileAccess::None; }
-
-        MemoryStreamBase(FileAccess access = FileAccess::Read, const void* data = nullptr, size_t dataSize = 0):
-            m_data((const uint8_t*)data),
-            m_dataSize(dataSize),
-            m_position(0),
-            m_atEnd(false),
-            m_access(access)
-        {
-        }
-
-    protected:
-        const uint8_t* m_data;
-
-        // Use ptrdiff_t (as opposed to size_t) as makes maths simpler
-        ptrdiff_t m_dataSize;
-        ptrdiff_t m_position;
-
-        bool m_atEnd;           ///< Happens when a read is done and nothing can be returned because already at end
-
-        FileAccess m_access;
-    };
-
-    /// Memory stream that owns it's contents
-    class MemoryStream : public MemoryStreamBase
+protected:
+        /// Set to replace wholly current content with specified content
+    void _setContent(const void* content, size_t contentSize)
     {
-    public:
-        typedef MemoryStreamBase Super;
+        m_content = (const uint8_t*)content;
+        m_contentSize = ptrdiff_t(contentSize);
+        m_position = 0;
+        m_atEnd = false;    
+    }
+        /// Update means that the content has changed, but position should be maintained
+    void _updateContent(const void* content, size_t contentSize)
+    {
+        const ptrdiff_t newPosition = (m_position > ptrdiff_t(contentSize)) ? ptrdiff_t(contentSize) : m_position;
+        _setContent(content, contentSize);
+        m_position = newPosition;
+    }
 
-        virtual Int64 Write(const void * buffer, Int64 length) SLANG_OVERRIDE;
+    const uint8_t* m_content;   ///< The content held in the stream
 
-            /// Set the contents
-        void setContents(const void* data, size_t size)
-        {
-            m_contents.setCount(size);
-            ::memcpy(m_contents.getBuffer(), data, size);
-             _update();
-        }
+    // Using ptrdiff_t (as opposed to size_t) as makes maths simpler
+    ptrdiff_t m_contentSize;    ///< Total size of the content in bytes
+    ptrdiff_t m_position;       ///< The current position within content (valid values can only be between 0 and m_contentSize)
 
-        void swapContents(List<uint8_t>& rhs)
-        {
-            rhs.swapWith(m_contents);
-            _update();
-        }
+    bool m_atEnd;               ///< Happens when a read is done and nothing can be returned because already at end
 
-        MemoryStream(FileAccess access) :
-            Super(access)
-        {}
+    FileAccess m_access;
+};
 
-    protected:
-        void _update()
-        {
-            m_data = m_contents.getBuffer();
-            m_dataSize = ptrdiff_t(m_contents.getCount());
-            // Make sure position is in range
-            m_position = (m_position > m_dataSize) ? m_dataSize : m_position;
-            // We only have at end when a read has happened past the end. So here we reset, as seems most sensible. 
-            m_atEnd = false;
-        }
+/// Memory stream that owns it's contents
+class OwnedMemoryStream : public MemoryStreamBase
+{
+public:
+    typedef MemoryStreamBase Super;
 
-        List<uint8_t> m_contents;
-    };
+    virtual Int64 write(const void * buffer, Int64 length) SLANG_OVERRIDE;
 
-	class FileStream : public Stream
-	{
-	private:
-		FILE * handle;
-		FileAccess fileAccess;
-		bool endReached = false;
-		void Init(const Slang::String & fileName, FileMode fileMode, FileAccess access, FileShare share);
-	public:
-		FileStream(const Slang::String & fileName, FileMode fileMode = FileMode::Open);
-		FileStream(const Slang::String & fileName, FileMode fileMode, FileAccess access, FileShare share);
-		~FileStream();
-	public:
-		virtual Int64 GetPosition();
-		virtual void Seek(SeekOrigin origin, Int64 offset);
-		virtual Int64 Read(void * buffer, Int64 length);
-		virtual Int64 Write(const void * buffer, Int64 length);
-		virtual bool CanRead();
-		virtual bool CanWrite();
-		virtual void Close();
-		virtual bool IsEnd();
-	};
+        /// Set the contents
+    void setContent(const void* data, size_t size)
+    {
+        m_ownedContent.setCount(size);
+        ::memcpy(m_ownedContent.getBuffer(), data, size);
+        _setContent(m_ownedContent.getBuffer(), m_ownedContent.getCount());
+    }
+
+    void swapContent(List<uint8_t>& rhs)
+    {
+        rhs.swapWith(m_ownedContent);
+        _setContent(m_ownedContent.getBuffer(), m_ownedContent.getCount());
+    }
+
+    OwnedMemoryStream(FileAccess access) :
+        Super(access)
+    {}
+
+protected:
+     
+    List<uint8_t> m_ownedContent;
+};
+
+class FileStream : public Stream
+{
+public:
+    typedef Stream Super;
+
+    // Stream interface
+	virtual Int64 getPosition();
+	virtual void seek(SeekOrigin origin, Int64 offset);
+	virtual Int64 read(void * buffer, Int64 length);
+	virtual Int64 write(const void * buffer, Int64 length);
+	virtual bool canRead();
+	virtual bool canWrite();
+	virtual void close();
+	virtual bool isEnd();
+
+    FileStream(const String& fileName, FileMode fileMode = FileMode::Open);
+    FileStream(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
+    ~FileStream();
+
+private:
+    void _init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
+
+    FILE* m_handle;
+    FileAccess m_fileAccess;
+    bool m_endReached = false;
+};
+
 }
 
 #endif

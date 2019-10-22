@@ -138,7 +138,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL OSFileSystemExt::saveFile(const char* pat
     {
         FileStream stream(pathIn, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
 
-        int64_t numWritten = stream.Write(data, size);
+        int64_t numWritten = stream.write(data, size);
 
         if (numWritten != int64_t(size))
         {

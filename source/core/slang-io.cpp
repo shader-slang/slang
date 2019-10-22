@@ -660,10 +660,10 @@ namespace Slang
 	{
 		RefPtr<FileStream> fs = new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 		List<unsigned char> buffer;
-		while (!fs->IsEnd())
+		while (!fs->isEnd())
 		{
 			unsigned char ch;
-			int read = (int)fs->Read(&ch, 1);
+			int read = (int)fs->read(&ch, 1);
 			if (read)
 				buffer.add(ch);
 			else
