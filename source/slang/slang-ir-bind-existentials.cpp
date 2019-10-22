@@ -196,14 +196,14 @@ struct BindExistentialSlots
         auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
         if(!layoutDecoration)
             return;
-        auto varLayout = as<VarLayout>(layoutDecoration->getASTLayout());
+        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
         if(!varLayout)
             return;
 
         // We only care about parameters that are associated
         // with one or more existential slots.
         //
-        auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam);
+        auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::ExistentialTypeParam);
         if(!resInfo)
             return;
 
@@ -212,8 +212,8 @@ struct BindExistentialSlots
         // the type to find out the number of slots.
         //
         UInt slotCount = 0;
-        if(auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-            slotCount = UInt(typeResInfo->count.getFiniteValue());
+        if(auto typeResInfo = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::ExistentialTypeParam))
+            slotCount = UInt(typeResInfo->getFiniteSize());
 
         // At this point we know that the parameter consumes
         // some number of slots, so it would be an error

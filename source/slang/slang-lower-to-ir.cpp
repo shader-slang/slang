@@ -6714,6 +6714,278 @@ RefPtr<IRModule> TargetProgram::getOrCreateIRModuleForLayout(DiagnosticSink* sin
     return m_irModuleForLayout;
 }
 
+    /// Specialized IR generation context for when generating IR for layouts.
+struct IRLayoutGenContext : IRGenContext
+{
+    IRLayoutGenContext(SharedIRGenContext* shared)
+        : IRGenContext(shared)
+    {}
+
+        /// Cache for custom key instructions used for entry-point parameter layout information.
+    Dictionary<ParamDecl*, IRStructKey*> mapEntryPointParamToKey;
+};
+
+    /// Lower an AST-level type layout to an IR-level type layout.
+IRTypeLayout* lowerTypeLayout(
+    IRLayoutGenContext* context,
+    TypeLayout*         typeLayout);
+
+    /// Lower an AST-level variable layout to an IR-level variable layout.
+IRVarLayout* lowerVarLayout(
+    IRLayoutGenContext* context,
+    VarLayout*          varLayout);
+
+    /// Shared code for most `lowerTypeLayout` cases.
+    ///
+    /// Handles copying of resource usage and pending data type layout
+    /// from the AST `typeLayout` to the specified `builder`.
+    ///
+static IRTypeLayout* _lowerTypeLayoutCommon(
+    IRLayoutGenContext*     context,
+    IRTypeLayout::Builder*  builder,
+    TypeLayout*             typeLayout)
+{
+    for( auto resInfo : typeLayout->resourceInfos )
+    {
+        builder->addResourceUsage(resInfo.kind, resInfo.count);
+    }
+
+    if( auto pendingTypeLayout = typeLayout->pendingDataTypeLayout )
+    {
+        builder->setPendingTypeLayout(
+            lowerTypeLayout(context, pendingTypeLayout));
+    }
+
+    return builder->build();
+}
+
+IRTypeLayout* lowerTypeLayout(
+    IRLayoutGenContext* context,
+    TypeLayout*         typeLayout)
+{
+    // TODO: We chould consider caching the layouts we create based on `typeLayout`
+    // and re-using them. This isn't strictly necessary because we emit the
+    // instructions as "hoistable" which should give us de-duplication, and it wouldn't
+    // help much until/unless the AST level gets less wasteful about how it computes layout.
+
+    // We will use casting to detect if `typeLayout` is
+    // one of the cases that requires a dedicated sub-type
+    // of IR type layout.
+    //
+    if( auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
+    {
+        IRParameterGroupTypeLayout::Builder builder(context->irBuilder);
+
+        builder.setContainerVarLayout(
+            lowerVarLayout(context, paramGroupTypeLayout->containerVarLayout));
+        builder.setElementVarLayout(
+            lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout));
+        builder.setOffsetElementTypeLayout(
+            lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
+
+        return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
+    }
+    else if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
+    {
+        IRStructTypeLayout::Builder builder(context->irBuilder);
+
+        for( auto fieldLayout : structTypeLayout->fields )
+        {
+            auto fieldDecl = fieldLayout->varDecl;
+
+            IRStructKey* irFieldKey = nullptr;
+            if(auto paramDecl = as<ParamDecl>(fieldDecl) )
+            {
+                // There is a subtle special case here.
+                //
+                // A `StructTypeLayout` might be used to represent
+                // the parameters of an entry point, and this is the
+                // one and only case where the "fields" being used
+                // might actually be `ParamDecl`s.
+                //
+                // The IR encoding of structure type layouts relies
+                // on using field "key" instructions to identify
+                // the fields, but these don't exist (by default)
+                // for function parameters.
+                //
+                // To get around this problem we will create key
+                // instructions to stand in for the entry-point parameters
+                // as needed when generating layout.
+                //
+                // We need to cache the generated keys on the context,
+                // so that if we run into another type layout for the
+                // same entry point we will re-use the same keys.
+                //
+                if( !context->mapEntryPointParamToKey.TryGetValue(paramDecl, irFieldKey) )
+                {
+                    irFieldKey = context->irBuilder->createStructKey();
+
+                    // TODO: It might eventually be a good idea to attach a mangled
+                    // name to the key we just generated (derived from the entry point
+                    // and parameter name), even though parameters don't usually have
+                    // linkage.
+                    //
+                    // Doing so would ensure that if we ever combined partial layout
+                    // information from different modules they would agree on the key
+                    // to use for entry-point parameters.
+                    //
+                    // For now this is a non-issue because both the creation and use
+                    // of these keys will be local to a single `IREntryPointLayout`,
+                    // and we don't support combination at a finer granularity than that.
+
+                    context->mapEntryPointParamToKey.Add(paramDecl, irFieldKey);
+                }
+            }
+            else
+            {
+                IRInst* irFieldKeyInst = getSimpleVal(context,
+                    ensureDecl(context, fieldDecl));
+                irFieldKey = as<IRStructKey>(irFieldKeyInst);
+            }
+            SLANG_ASSERT(irFieldKey);
+
+            auto irFieldLayout = lowerVarLayout(context, fieldLayout);
+            builder.addField(irFieldKey, irFieldLayout);
+        }
+
+        return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
+    }
+    else if( auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout) )
+    {
+        auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
+        IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
+    }
+    else if( auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(typeLayout) )
+    {
+        IRTaggedUnionTypeLayout::Builder builder(context->irBuilder, taggedUnionTypeLayout->tagOffset);
+
+        for( auto caseTypeLayout : taggedUnionTypeLayout->caseTypeLayouts )
+        {
+            builder.addCaseTypeLayout(
+                lowerTypeLayout(
+                    context,
+                    caseTypeLayout));
+        }
+
+        return _lowerTypeLayoutCommon(context, &builder, taggedUnionTypeLayout);
+    }
+    else if( auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout) )
+    {
+        auto irElementTypeLayout = lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
+
+        IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
+    }
+    else if( auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout) )
+    {
+        // TODO: Our support for explicit layouts on matrix types is minimal, so whether
+        // or not we even include `IRMatrixTypeLayout` doesn't impact any behavior we
+        // currently test.
+        //
+        // Our handling of matrix types and their layout needs a complete overhaul, but
+        // that isn't something we can get to right away, so we'll just try to pass
+        // along this data as best we can for now.
+
+        IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
+        return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
+    }
+    else
+    {
+        // If no special case applies we will build a generic `IRTypeLayout`.
+        //
+        IRTypeLayout::Builder builder(context->irBuilder);
+        return _lowerTypeLayoutCommon(context, &builder, typeLayout);
+    }
+}
+
+IRVarLayout* lowerVarLayout(
+    IRLayoutGenContext* context,
+    VarLayout*          varLayout)
+{
+    auto irTypeLayout = lowerTypeLayout(context, varLayout->typeLayout);
+    IRVarLayout::Builder irLayoutBuilder(context->irBuilder, irTypeLayout);
+
+    for( auto resInfo : varLayout->resourceInfos )
+    {
+        auto irResInfo = irLayoutBuilder.findOrAddResourceInfo(resInfo.kind);
+        irResInfo->offset = resInfo.index;
+        irResInfo->space = resInfo.space;
+    }
+
+    if( auto pendingVarLayout = varLayout->pendingVarLayout )
+    {
+        irLayoutBuilder.setPendingVarLayout(
+            lowerVarLayout(context, pendingVarLayout));
+    }
+
+    // We will only generate layout information with *either* a system-value
+    // semantic or a user-defined semantic, and we will always check for
+    // the system-value semantic first because the AST-level representation
+    // seems to encode both when a system-value semantic is present.
+    //
+    if( varLayout->systemValueSemantic.getLength() )
+    {
+        irLayoutBuilder.setSystemValueSemantic(
+            varLayout->systemValueSemantic,
+            varLayout->systemValueSemanticIndex);
+    }
+    else if( varLayout->semanticName.getLength() )
+    {
+        irLayoutBuilder.setUserSemantic(
+            varLayout->semanticName,
+            varLayout->semanticIndex);
+    }
+
+    if( varLayout->stage != Stage::Unknown )
+    {
+        irLayoutBuilder.setStage(varLayout->stage);
+    }
+
+    return irLayoutBuilder.build();
+}
+
+    /// Handle the lowering of an entry-point result layout to the IR
+IRVarLayout* lowerEntryPointResultLayout(
+    IRLayoutGenContext* context,
+    VarLayout*          layout)
+{
+    // The easy case is when there is a non-null `layout`, because we
+    // can handle it like any other var layout.
+    //
+    if(layout)
+        return lowerVarLayout(context, layout);
+
+    // Right now the AST-level layout logic will leave a null layout
+    // for the result when an entry point has a `void` result type.
+    //
+    // TODO: We should fix this at the AST level instead of the IR,
+    // but doing so would impact reflection, where clients could
+    // be using a null check to test for a `void` result.
+    //
+    // As a workaround, we will create an empty type layout and
+    // an empty var layout that represents it, consistent with the
+    // way that a `void` value consumes no resources.
+    //
+    IRTypeLayout::Builder typeLayoutBuilder(context->irBuilder);
+    auto irTypeLayout = typeLayoutBuilder.build();
+    IRVarLayout::Builder varLayoutBuilder(context->irBuilder, irTypeLayout);
+    return varLayoutBuilder.build();
+}
+
+    /// Lower AST-level layout information for an entry point to the IR
+IREntryPointLayout* lowerEntryPointLayout(
+    IRLayoutGenContext* context,
+    EntryPointLayout*   entryPointLayout)
+{
+    auto irParamsLayout = lowerVarLayout(context, entryPointLayout->parametersLayout);
+    auto irResultLayout = lowerEntryPointResultLayout(context, entryPointLayout->resultLayout);
+
+    return context->irBuilder->getEntryPointLayout(
+        irParamsLayout,
+        irResultLayout);
+}
+
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
     if(m_irModuleForLayout)
@@ -6735,7 +7007,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         sink);
     auto sharedContext = &sharedContextStorage;
 
-    IRGenContext contextStorage(sharedContext);
+    IRLayoutGenContext contextStorage(sharedContext);
     auto context = &contextStorage;
 
     SharedIRBuilder sharedBuilderStorage;
@@ -6768,9 +7040,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         //
         auto irVar = getSimpleVal(context, ensureDecl(context, varDecl));
 
+        auto irLayout = lowerVarLayout(context, varLayout);
+
         // Now attach the decoration to the variable.
         //
-        builder->addLayoutDecoration(irVar, varLayout);
+        builder->addLayoutDecoration(irVar, irLayout);
     }
 
     for( auto entryPointLayout : programLayout->entryPoints )
@@ -6785,14 +7059,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
             builder->addImportDecoration(irFunc, getMangledName(funcDeclRef).getUnownedSlice());
         }
 
-        builder->addLayoutDecoration(irFunc, entryPointLayout);
+        auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
+
+        builder->addLayoutDecoration(irFunc, irEntryPointLayout);
     }
 
     for( auto taggedUnionTypeLayout : programLayout->taggedUnionTypeLayouts )
     {
         auto taggedUnionType = taggedUnionTypeLayout->getType();
         auto irType = lowerType(context, taggedUnionType);
-        builder->addLayoutDecoration(irType, taggedUnionTypeLayout);
+
+        auto irTypeLayout = lowerTypeLayout(context, taggedUnionTypeLayout);
+
+        builder->addLayoutDecoration(irType, irTypeLayout);
     }
 
     m_irModuleForLayout = irModule;

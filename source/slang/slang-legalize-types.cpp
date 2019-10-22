@@ -1288,22 +1288,22 @@ LegalType legalizeType(
 
 //
 
-RefPtr<TypeLayout> getDerefTypeLayout(
-    TypeLayout* typeLayout)
+IRTypeLayout* getDerefTypeLayout(
+    IRTypeLayout* typeLayout)
 {
     if (!typeLayout)
         return nullptr;
 
-    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
     {
-        return parameterGroupTypeLayout->offsetElementTypeLayout;
+        return parameterGroupTypeLayout->getOffsetElementTypeLayout();
     }
 
     return typeLayout;
 }
 
-RefPtr<VarLayout> getFieldLayout(
-    TypeLayout*     typeLayout,
+IRVarLayout* getFieldLayout(
+    IRTypeLayout*     typeLayout,
     IRInst*         fieldKey)
 {
     if (!typeLayout)
@@ -1311,13 +1311,13 @@ RefPtr<VarLayout> getFieldLayout(
 
     for(;;)
     {
-        if(auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
+        if(auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
         {
-            typeLayout = arrayTypeLayout->elementTypeLayout;
+            typeLayout = arrayTypeLayout->getElementTypeLayout();
         }
-        else if(auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+        else if(auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
         {
-            typeLayout = parameterGroupTypeLayout->offsetElementTypeLayout;
+            typeLayout = parameterGroupTypeLayout->getOffsetElementTypeLayout();
         }
         else
         {
@@ -1326,30 +1326,13 @@ RefPtr<VarLayout> getFieldLayout(
     }
 
 
-    if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
+    if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
     {
-        // First, let's see if the field had a layout registered
-        // directly using its IR key.
-        //
-        RefPtr<VarLayout> fieldLayout;
-        if(structTypeLayout->mapKeyToLayout.TryGetValue(fieldKey, fieldLayout))
-            return fieldLayout;
-
-        // Otherwise, fall back to doing lookup using the linkage
-        // attached to the key, and its mangled name.
-        //
-        auto fieldLinkage = fieldKey->findDecoration<IRLinkageDecoration>();
-        if(!fieldLinkage)
-            return nullptr;
-        auto mangledFieldName = fieldLinkage->getMangledName();
-
-        // In this case we fall back to a linear search over the fields.
-        //
-        for(auto ff : structTypeLayout->fields)
+        for(auto ff : structTypeLayout->getFieldLayoutAttrs())
         {
-            if(mangledFieldName == getMangledName(ff->varDecl.getDecl()).getUnownedSlice() )
+            if(ff->getFieldKey() == fieldKey)
             {
-                return ff;
+                return ff->getLayout();
             }
         }
     }
@@ -1357,22 +1340,22 @@ RefPtr<VarLayout> getFieldLayout(
     return nullptr;
 }
 
-RefPtr<VarLayout> createSimpleVarLayout(
+void buildSimpleVarLayout(
+    IRVarLayout::Builder*   builder,
     SimpleLegalVarChain*    varChain,
-    TypeLayout*             typeLayout)
+    IRTypeLayout*           typeLayout)
 {
-    if (!typeLayout)
-        return nullptr;
-
     // We need to construct a layout for the new variable
     // that reflects both the type we have given it, as
     // well as all the offset information that has accumulated
     // along the chain of parent variables.
 
-    // TODO: this logic needs to propagate through semantics...
-
-    RefPtr<VarLayout> varLayout = new VarLayout();
-    varLayout->typeLayout = typeLayout;
+    // TODO: This logic doesn't currently handle semantics or
+    // other attributes that might have been present on the
+    // original variable layout. That is probably okay for now
+    // as the legalization logic does not apply to varying
+    // parameters (where resource types would be illegal anyway),
+    // but it is probably worth addressing sooner or later.
 
     // For most resource kinds, the register index/space to use should
     // be the sum along the entire chain of variables.
@@ -1387,16 +1370,17 @@ RefPtr<VarLayout> createSimpleVarLayout(
     // the offset for `s` (10 texture registers) to get the final
     // binding to apply.
     //
-    for (auto rr : typeLayout->resourceInfos)
+    for (auto rr : typeLayout->getSizeAttrs())
     {
-        auto resInfo = varLayout->findOrAddResourceInfo(rr.kind);
+        auto kind = rr->getResourceKind();
+        auto resInfo = builder->findOrAddResourceInfo(kind);
 
         for (auto vv = varChain; vv; vv = vv->next)
         {
-            if (auto parentResInfo = vv->varLayout->FindResourceInfo(rr.kind))
+            if (auto parentResInfo = vv->varLayout->findOffsetAttr(kind))
             {
-                resInfo->index += parentResInfo->index;
-                resInfo->space += parentResInfo->space;
+                resInfo->offset += parentResInfo->getOffset();
+                resInfo->space += parentResInfo->getSpace();
             }
         }
     }
@@ -1404,44 +1388,57 @@ RefPtr<VarLayout> createSimpleVarLayout(
     // As a special case, if the leaf variable doesn't hold an entry for
     // `RegisterSpace`, but at least one declaration in the chain *does*,
     // then we want to make sure that we add such an entry.
-    if (!varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+    //
+    if (!builder->usesResourceKind(LayoutResourceKind::RegisterSpace))
     {
         // Sum up contributions from all parents.
         UInt space = 0;
         for (auto vv = varChain; vv; vv = vv->next)
         {
-            if (auto parentResInfo = vv->varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+            if (auto parentResInfo = vv->varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
             {
-                space += parentResInfo->index;
+                space += parentResInfo->getOffset();
             }
         }
 
         // If there were non-zero contributions, then add an entry to represent them.
         if (space)
         {
-            varLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index = space;
+            builder->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = space;
         }
     }
-
-    return varLayout;
 }
 
+IRVarLayout* createSimpleVarLayout(
+    IRBuilder*              irBuilder,
+    SimpleLegalVarChain*    varChain,
+    IRTypeLayout*           typeLayout)
+{
+    if (!typeLayout)
+        return nullptr;
+    IRVarLayout::Builder varLayoutBuilder(irBuilder, typeLayout);
+    buildSimpleVarLayout(&varLayoutBuilder, varChain, typeLayout);
+    return varLayoutBuilder.build();
+}
 
-RefPtr<VarLayout> createVarLayout(
+IRVarLayout* createVarLayout(
+    IRBuilder*              irBuilder,
     LegalVarChain const&    varChain,
-    TypeLayout*             typeLayout)
+    IRTypeLayout*           typeLayout)
 {
     if(!typeLayout)
         return nullptr;
 
-    auto varLayout = createSimpleVarLayout(varChain.primaryChain, typeLayout);
+    IRVarLayout::Builder varLayoutBuilder(irBuilder, typeLayout);
+    buildSimpleVarLayout(&varLayoutBuilder, varChain.primaryChain, typeLayout);
 
-    if(auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
+    if(auto pendingDataTypeLayout = typeLayout->getPendingDataTypeLayout())
     {
-        varLayout->pendingVarLayout = createSimpleVarLayout(varChain.pendingChain, typeLayout);
+        varLayoutBuilder.setPendingVarLayout(
+            createSimpleVarLayout(irBuilder, varChain.pendingChain, typeLayout));
     }
 
-    return varLayout;
+    return varLayoutBuilder.build();
 }
 
 //
