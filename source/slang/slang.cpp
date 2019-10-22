@@ -3485,7 +3485,7 @@ SLANG_API SlangResult spSaveRepro(
     RefPtr<ListBlob> listBlob(new ListBlob);
 
     // Put the content of the stream in the blob
-    stream.swapContent(listBlob->m_data);
+    stream.swapContents(listBlob->m_data);
 
     *outBlob = listBlob.detach();
     return SLANG_OK;

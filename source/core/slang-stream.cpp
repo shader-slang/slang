@@ -235,7 +235,7 @@ void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
             pos = offset;
             break;
         case SeekOrigin::End:
-            pos = Int64(m_contentSize) + offset;
+            pos = Int64(m_contentsSize) + offset;
             break;
         case SeekOrigin::Current:
             pos = Int64(m_position) + offset;
@@ -249,7 +249,7 @@ void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
 
     // Clamp to the valid range
     pos = (pos < 0) ? 0 : pos;
-    pos = (pos > Int64(m_contentSize)) ? Int64(m_contentSize) : pos;
+    pos = (pos > Int64(m_contentsSize)) ? Int64(m_contentsSize) : pos;
 
     m_position = UInt(pos);
 }
@@ -261,7 +261,7 @@ Int64 MemoryStreamBase::read(void* buffer, Int64 length)
         throw IOException("Cannot read this stream.");
     }
 
-    const Int64 maxRead = Int64(m_contentSize - m_position);
+    const Int64 maxRead = Int64(m_contentsSize - m_position);
 
     if (maxRead == 0 && length > 0)
     {
@@ -271,7 +271,7 @@ Int64 MemoryStreamBase::read(void* buffer, Int64 length)
 
     length = length > maxRead ? maxRead : length;
 
-    ::memcpy(buffer, m_content + m_position, size_t(length));
+    ::memcpy(buffer, m_contents + m_position, size_t(length));
     m_position += UInt(length);
     return maxRead;
 }
@@ -285,17 +285,17 @@ Int64 OwnedMemoryStream::write(const void * buffer, Int64 length)
         throw IOException("Cannot write this stream.");
     }
 
-    if (m_position == m_ownedContent.getCount())
+    if (m_position == m_ownedContents.getCount())
     {
-        m_ownedContent.addRange((const uint8_t*)buffer, UInt(length));
+        m_ownedContents.addRange((const uint8_t*)buffer, UInt(length));
     }
     else
     {
-        m_ownedContent.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
+        m_ownedContents.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
     }
 
-    m_content = m_ownedContent.getBuffer();
-    m_contentSize = ptrdiff_t(m_ownedContent.getCount());
+    m_contents = m_ownedContents.getBuffer();
+    m_contentsSize = ptrdiff_t(m_ownedContents.getCount());
 
     m_atEnd = false;
 

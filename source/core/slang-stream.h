@@ -77,33 +77,33 @@ public:
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
     virtual void close() SLANG_OVERRIDE { m_access = FileAccess::None; }
 
-    MemoryStreamBase(FileAccess access = FileAccess::Read, const void* content = nullptr, size_t contentSize = 0):
+    MemoryStreamBase(FileAccess access = FileAccess::Read, const void* contents = nullptr, size_t contentsSize = 0):
         m_access(access)
     {
-        _setContent(content, contentSize);
+        _setContents(contents, contentsSize);
     }
 
 protected:
         /// Set to replace wholly current content with specified content
-    void _setContent(const void* content, size_t contentSize)
+    void _setContents(const void* contents, size_t contentsSize)
     {
-        m_content = (const uint8_t*)content;
-        m_contentSize = ptrdiff_t(contentSize);
+        m_contents = (const uint8_t*)contents;
+        m_contentsSize = ptrdiff_t(contentsSize);
         m_position = 0;
         m_atEnd = false;    
     }
         /// Update means that the content has changed, but position should be maintained
-    void _updateContent(const void* content, size_t contentSize)
+    void _updateContents(const void* contents, size_t contentsSize)
     {
-        const ptrdiff_t newPosition = (m_position > ptrdiff_t(contentSize)) ? ptrdiff_t(contentSize) : m_position;
-        _setContent(content, contentSize);
+        const ptrdiff_t newPosition = (m_position > ptrdiff_t(contentsSize)) ? ptrdiff_t(contentsSize) : m_position;
+        _setContents(contents, contentsSize);
         m_position = newPosition;
     }
 
-    const uint8_t* m_content;   ///< The content held in the stream
+    const uint8_t* m_contents;   ///< The content held in the stream
 
     // Using ptrdiff_t (as opposed to size_t) as makes maths simpler
-    ptrdiff_t m_contentSize;    ///< Total size of the content in bytes
+    ptrdiff_t m_contentsSize;    ///< Total size of the content in bytes
     ptrdiff_t m_position;       ///< The current position within content (valid values can only be between 0 and m_contentSize)
 
     bool m_atEnd;               ///< Happens when a read is done and nothing can be returned because already at end
@@ -117,20 +117,20 @@ class OwnedMemoryStream : public MemoryStreamBase
 public:
     typedef MemoryStreamBase Super;
 
-    virtual Int64 write(const void * buffer, Int64 length) SLANG_OVERRIDE;
+    virtual Int64 write(const void* buffer, Int64 length) SLANG_OVERRIDE;
 
         /// Set the contents
-    void setContent(const void* data, size_t size)
+    void setContent(const void* contents, size_t contentsSize)
     {
-        m_ownedContent.setCount(size);
-        ::memcpy(m_ownedContent.getBuffer(), data, size);
-        _setContent(m_ownedContent.getBuffer(), m_ownedContent.getCount());
+        m_ownedContents.setCount(contentsSize);
+        ::memcpy(m_ownedContents.getBuffer(), contents, contentsSize);
+        _setContents(m_ownedContents.getBuffer(), m_ownedContents.getCount());
     }
 
-    void swapContent(List<uint8_t>& rhs)
+    void swapContents(List<uint8_t>& rhs)
     {
-        rhs.swapWith(m_ownedContent);
-        _setContent(m_ownedContent.getBuffer(), m_ownedContent.getCount());
+        rhs.swapWith(m_ownedContents);
+        _setContents(m_ownedContents.getBuffer(), m_ownedContents.getCount());
     }
 
     OwnedMemoryStream(FileAccess access) :
@@ -139,7 +139,7 @@ public:
 
 protected:
      
-    List<uint8_t> m_ownedContent;
+    List<uint8_t> m_ownedContents;
 };
 
 class FileStream : public Stream
@@ -150,8 +150,8 @@ public:
     // Stream interface
 	virtual Int64 getPosition();
 	virtual void seek(SeekOrigin origin, Int64 offset);
-	virtual Int64 read(void * buffer, Int64 length);
-	virtual Int64 write(const void * buffer, Int64 length);
+	virtual Int64 read(void* buffer, Int64 length);
+	virtual Int64 write(const void* buffer, Int64 length);
 	virtual bool canRead();
 	virtual bool canWrite();
 	virtual void close();
@@ -169,6 +169,6 @@ private:
     bool m_endReached = false;
 };
 
-}
+} // namespace Slang
 
 #endif
