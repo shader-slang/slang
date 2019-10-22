@@ -101,7 +101,7 @@ struct DesugarUnionTypesContext
         // unions in the generated IR have an associated (target-specific)
         // layout.
         //
-        TaggedUnionTypeLayout* taggedUnionTypeLayout;
+        IRTaggedUnionTypeLayout* taggedUnionTypeLayout;
 
         // The basic approach we will use 16-byte chunks (represented as an array
         // of `uint4`s) to reprent the "bulk" of a type, and then use a single field
@@ -269,8 +269,8 @@ struct DesugarUnionTypesContext
                 // for fields, etc.).
                 //
                 auto taggedUnionTypeLayout = taggedUnionInfo->taggedUnionTypeLayout;
-                SLANG_ASSERT(caseTagIndex < UInt(taggedUnionTypeLayout->caseTypeLayouts.getCount()));
-                auto caseTypeLayout = taggedUnionTypeLayout->caseTypeLayouts[caseTagIndex];
+                SLANG_ASSERT(caseTagIndex < UInt(taggedUnionTypeLayout->getCaseCount()));
+                auto caseTypeLayout = taggedUnionTypeLayout->getCaseTypeLayout(caseTagIndex);
 
                 // At this point we know the type we are trying to extract, as well
                 // as its layout. We will defer the actual implementation of extraction
@@ -342,7 +342,7 @@ struct DesugarUnionTypesContext
         IRType*             payloadType,
 
         // - The memory layout of that payload type.
-        TypeLayout*         payloadTypeLayout,
+        IRTypeLayout*       payloadTypeLayout,
 
         // - The byte offset at which we want to fetch the payload.
         UInt64              payloadOffset)
@@ -366,7 +366,7 @@ struct DesugarUnionTypesContext
             // there to be complete type layout information for the
             // types involved.
             //
-            auto structTypeLayout = as<StructTypeLayout>(payloadTypeLayout);
+            auto structTypeLayout = as<IRStructTypeLayout>(payloadTypeLayout);
             SLANG_ASSERT(structTypeLayout);
 
             // We are going to emit code to extract each of the fields
@@ -384,15 +384,15 @@ struct DesugarUnionTypesContext
                 // IR struct and the fields of the layout still align.
                 //
                 UInt fieldIndex = fieldCounter++;
-                auto fieldLayout = structTypeLayout->fields[fieldIndex];
+                auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex);
                 auto fieldTypeLayout = fieldLayout->getTypeLayout();
 
                 // The offset of the field can be computed from the base
                 // offset passed in, plus the reflection data for the field.
                 //
                 UInt64 fieldOffset = payloadOffset;
-                if(auto resInfo = fieldLayout->FindResourceInfo(LayoutResourceKind::Uniform))
-                    fieldOffset += resInfo->index;
+                if(auto resInfo = fieldLayout->findOffsetAttr(LayoutResourceKind::Uniform))
+                    fieldOffset += resInfo->getOffset();
 
                 // We make a recursive call to extract each field, expecting
                 // that this will bottom out eventually.
@@ -429,10 +429,10 @@ struct DesugarUnionTypesContext
             // no way to query the layout of the elements of a vector
             // type. Until that gets added we will kludge things here.
             //
-            TypeLayout* elementTypeLayout = nullptr;
+            IRTypeLayout* elementTypeLayout = nullptr;
             size_t elementSize = 0;
-            if(auto resInfo = payloadTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
-                elementSize = resInfo->count.getFiniteValue() / elementCount;
+            if(auto resInfo = payloadTypeLayout->findSizeAttr(LayoutResourceKind::Uniform))
+                elementSize = resInfo->getSize().getFiniteValue() / elementCount;
 
             // Similar to the `struct` case above, we will extract a
             // value for each element of the vector, and then use
@@ -465,13 +465,13 @@ struct DesugarUnionTypesContext
             // we have an individual scalar field that we need to fetch.
             //
             UInt64 payloadSize = 0;
-            if( auto resInfo = payloadTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+            if( auto resInfo = payloadTypeLayout->findSizeAttr(LayoutResourceKind::Uniform) )
             {
                 // TODO: somebody before this point should generate an error if
                 // we have a `union` type that contains a potentially unbounded
                 // amount of data.
                 //
-                payloadSize = resInfo->count.getFiniteValue();
+                payloadSize = resInfo->getSize().getFiniteValue();
             }
 
             if( payloadSize != 4 )
@@ -670,9 +670,9 @@ struct DesugarUnionTypesContext
         //
         auto layoutDecoration = type->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(layoutDecoration);
-        auto layout = layoutDecoration->getIRLayout()->getASTLayout();
+        auto layout = layoutDecoration->getLayout();
         SLANG_ASSERT(layout);
-        auto taggedUnionTypeLayout = as<TaggedUnionTypeLayout>(layout);
+        auto taggedUnionTypeLayout = as<IRTaggedUnionTypeLayout>(layout);
         SLANG_ASSERT(taggedUnionTypeLayout);
 
         info->taggedUnionTypeLayout = taggedUnionTypeLayout;
@@ -684,7 +684,7 @@ struct DesugarUnionTypesContext
         // of the tag's alignment. We should deal with that when/if we support
         // types smaller than 4 bytes in unions.
         //
-        auto payloadSize = taggedUnionTypeLayout->tagOffset.getFiniteValue();
+        auto payloadSize = taggedUnionTypeLayout->getTagOffset().getFiniteValue();
 
         // We are going to be construction IR code that makes use of the `int`
         // and `uint` types in several cases, so we go ahead and get a pointer

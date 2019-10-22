@@ -155,7 +155,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         if(!funcLayoutDecoration)
             return;
 
-        auto entryPointLayout = as<EntryPointLayout>(funcLayoutDecoration->getASTLayout());
+        auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
         SLANG_ASSERT(entryPointLayout);
         if(!entryPointLayout)
             return;
@@ -167,8 +167,10 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // If we are in the latter case we will need to make sure to allocate
         // an explicit IR constant buffer for that wrapper, 
         //
-        auto entryPointParamsLayout = entryPointLayout->parametersLayout;
-        bool needConstantBuffer = targetNeedsConstantBuffer && entryPointParamsLayout->typeLayout.is<ParameterGroupTypeLayout>(); 
+        auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
+        bool needConstantBuffer = targetNeedsConstantBuffer && as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()); 
+
+        auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
 
         // We will set up an IR builder so that we are ready to generate code.
         //
@@ -196,9 +198,11 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // us modifying it along the way.
         //
         IRParam* nextParam = nullptr;
+        UInt paramCounter = 0;
         for( IRParam* param = func->getFirstParam(); param; param = nextParam )
         {
             nextParam = param->getNextParam();
+            UInt paramIndex = paramCounter++;
 
             // We expect all entry-point parameters to have layout information,
             // but we will be defensive and skip parameters without the required
@@ -208,7 +212,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
             SLANG_ASSERT(layoutDecoration);
             if(!layoutDecoration)
                 continue;
-            auto paramLayout = as<VarLayout>(layoutDecoration->getIRLayout()->getASTLayout());
+            auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
             if(!paramLayout)
                 continue;
@@ -268,7 +272,21 @@ struct MoveEntryPointUniformParametersToGlobalScope
             auto paramType = param->getFullType();
 
             builder->setInsertBefore(paramStructType);
-            auto paramFieldKey = builder->createStructKey();
+
+            // We need to know the "key" that should be used for the parameter,
+            // so we will read it off of the entry-point layout information.
+            //
+            // TODO: Maybe we should associate the key to the parameter via
+            // a decoration to avoid this indirection?
+            //
+            // TODO: Alternatively, we should make this pass responsible for
+            // dealing with the transfer of layout information from the entry
+            // point to its parameters, rather than baking that behavior into
+            // the linker. After all, this pass is traversing the same information
+            // anyway, so it could do the work while it is here...
+            //
+            auto paramFieldKey = entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey();
+
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
             SLANG_UNUSED(paramField);
 
@@ -279,17 +297,6 @@ struct MoveEntryPointUniformParametersToGlobalScope
             // be moved to the *field* instead.
             //
             param->transferDecorationsTo(paramFieldKey);
-
-            // There is a bit of a hacky issue, where downstream passes (notably
-            // type legalization) require the field keys for `struct` types to
-            // have mangled names, because those mangled names will be used to
-            // lookup field layout information inside of the layout information
-            // for the `struct` type.
-            //
-            // TODO: We should fix that design choice in how layout information
-            // is stored, to avoid the reliance on name strings.
-            //
-            builder->addExportDecoration(paramFieldKey, getMangledName(paramLayout->varDecl).getUnownedSlice());
 
             // At this point we want to eliminate the original entry point
             // parameter, in favor of the `struct` field we declared.
@@ -363,7 +370,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
     // We need to be able to determine if a parameter is logically
     // a "varying" parameter based on its layout.
     //
-    bool isVaryingParameter(VarLayout* layout)
+    bool isVaryingParameter(IRVarLayout* layout)
     {
         // If *any* of the resources consumed by the parameter
         // is a varying resource kind (e.g., varying input) then
@@ -372,9 +379,9 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // This is reasonable because there is no way to declare
         // a parameter that mixes varying and non-varying fields.
         //
-        for( auto resInfo : layout->resourceInfos )
+        for( auto resInfo : layout->getOffsetAttrs() )
         {
-            if(isVaryingResourceKind(resInfo.kind))
+            if(isVaryingResourceKind(resInfo->getResourceKind()))
                 return true;
         }
 
@@ -388,7 +395,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // Note: an empty `struct` parameter would also show up the same way, but
         // we should eliminate any such parameters later on during type legalization.
         //
-        if(layout->resourceInfos.getCount() == 0)
+        if(layout->getOffsetAttrs().getCount() == 0)
             return true;
 
         // if none of the above tests determined that the

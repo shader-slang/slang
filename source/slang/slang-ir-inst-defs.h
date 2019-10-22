@@ -456,18 +456,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
-    /* Layout decorations that do not use AST */
-    INST(StageLayoutDecoration, stageLayoutDecoration, 1, 0)
-    INST(ResourceInfoLayoutDecoration, resourceInfoLayoutDecoration, 3, 0)
+    INST(SemanticDecoration, semantic, 2, 0)
 
-    /* SemanticLayoutDecoration */
-        INST(SemanticDecoration, semantic, 2, 0)
-        INST(SystemSemanticDecoration, systemSemantic, 2, 0)
-    INST_RANGE(SemanticDecorationBase, SemanticDecoration, SystemSemanticDecoration)
-
-    INST(PendingVarLayoutDecoration, pendingVarLayoutDecoration, 1, 0)
-
-INST_RANGE(Decoration, HighLevelDeclDecoration, PendingVarLayoutDecoration)
+    INST_RANGE(Decoration, HighLevelDeclDecoration, SemanticDecoration)
 
 
 //
@@ -495,10 +486,35 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 INST(BitCast,                           bitCast,                    1, 0)
 
 /* Layout */
-    INST(VarLayout, varLayout, 4, 0)
-    INST(TypeLayout, typeLayout, 1, 0)
+    INST(VarLayout, varLayout, 1, 0)
+
+    /* TypeLayout */
+        INST(TypeLayoutBase, typeLayout, 0, 0)
+        INST(ParameterGroupTypeLayout, parameterGroupTypeLayout, 2, 0)
+        INST(ArrayTypeLayout, arrayTypeLayout, 1, 0)
+        INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, 0)
+        INST(MatrixTypeLayout, matrixTypeLayout, 1, 0)
+        INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, 0)
+        INST(StructTypeLayout, structTypeLayout, 0, 0)
+    INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
+
     INST(EntryPointLayout, EntryPointLayout, 1, 0)
 INST_RANGE(Layout, VarLayout, EntryPointLayout)
+
+/* Attr */
+    INST(PendingLayoutAttr, pendingLayout, 1, 0)
+    INST(StageAttr, stage, 1, 0)
+    INST(StructFieldLayoutAttr, fieldLayout, 2, 0)
+    INST(CaseTypeLayoutAttr, caseLayout, 1, 0)
+    /* SemanticAttr */
+        INST(UserSemanticAttr, userSemantic, 2, 0)
+        INST(SystemValueSemanticAttr, systemValueSemantic, 2, 0)
+    INST_RANGE(SemanticAttr, UserSemanticAttr, SystemValueSemanticAttr)
+    /* LayoutResourceInfoAttr */
+        INST(TypeSizeAttr, size, 2, 0)
+        INST(VarOffsetAttr, offset, 2, 0)
+    INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
+INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
 
 PSEUDO_INST(Pos)
 PSEUDO_INST(PreInc)

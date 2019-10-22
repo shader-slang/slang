@@ -401,9 +401,9 @@ UInt CLikeSourceEmitter::getBindingOffset(EmitVarChain* chain, LayoutResourceKin
     UInt offset = 0;
     for(auto cc = chain; cc; cc = cc->next)
     {
-        if(auto resInfo = cc->varLayout->FindResourceInfo(kind))
+        if(auto resInfo = cc->varLayout->findOffsetAttr(kind))
         {
-            offset += resInfo->index;
+            offset += resInfo->getOffset();
         }
     }
     return offset;
@@ -415,13 +415,13 @@ UInt CLikeSourceEmitter::getBindingSpace(EmitVarChain* chain, LayoutResourceKind
     for(auto cc = chain; cc; cc = cc->next)
     {
         auto varLayout = cc->varLayout;
-        if(auto resInfo = varLayout->FindResourceInfo(kind))
+        if(auto resInfo = varLayout->findOffsetAttr(kind))
         {
-            space += resInfo->space;
+            space += resInfo->getSpace();
         }
-        if(auto resInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
+        if(auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
         {
-            space += resInfo->index;
+            space += resInfo->getOffset();
         }
     }
     return space;
@@ -779,12 +779,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_BoolLit:
         return true;
 
-    // Treat these as folded, because they don't make sense to emit on their own.
-    case kIROp_TypeLayout:
-    case kIROp_VarLayout:
-    case kIROp_EntryPointLayout:
-        return true;
-
     // Always fold these in, because their results
     // cannot be represented in the type system of
     // our current targets.
@@ -798,6 +792,15 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Specialize:
         return true;
     }
+
+    // Layouts and attributes are only present to annotate other
+    // instructions, and should not be emitted as anything in
+    // source code.
+    //
+    if(as<IRLayout>(inst))
+        return true;
+    if(as<IRAttr>(inst))
+        return true;
 
     switch( inst->op )
     {
@@ -2179,15 +2182,33 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     }
 }
 
-void CLikeSourceEmitter::emitSemantics(VarLayout* varLayout)
+void CLikeSourceEmitter::emitSemantics(IRVarLayout* varLayout)
 {
-    if(varLayout->flags & VarLayoutFlag::HasSemantic)
+    if(auto semanticAttr = varLayout->findAttr<IRSemanticAttr>())
     {
+        // Note: We force the semantic name stored in the IR to
+        // upper-case here because that is what existing Slang
+        // tests had assumed and continue to rely upon.
+        //
+        // The original rationale for switching to uppercase was
+        // canonicalization for reflection (users can't accidentally
+        // write code that works for `COLOR` but not for `COLOR`),
+        // but it would probably be more ideal for our output code
+        // to give the semantic name as close to how it was originally spelled
+        // spelled as possible.
+        //
+        // TODO: Try removing this step and fixing up the test cases
+        // to see if we are happier with an approach that doesn't
+        // force uppercase.
+        //
+        String name = semanticAttr->getName();
+        name = name.toUpper();
+
         m_writer->emit(" : ");
-        m_writer->emit(varLayout->semanticName);
-        if(varLayout->semanticIndex)
+        m_writer->emit(name);
+        if(auto index = semanticAttr->getIndex())
         {
-            m_writer->emit(varLayout->semanticIndex);
+            m_writer->emit(index);
         }
     }
 }
@@ -2197,13 +2218,13 @@ void CLikeSourceEmitter::emitSemantics(IRInst* inst)
     emitSemanticsImpl(inst);
 }
 
-VarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
+IRVarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
 {
     auto decoration = var->findDecoration<IRLayoutDecoration>();
     if (!decoration)
         return nullptr;
 
-    return (VarLayout*) decoration->getIRLayout()->getASTLayout();
+    return as<IRVarLayout>(decoration->getLayout());
 }
 
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
@@ -2683,20 +2704,20 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)
     m_writer->emit(");\n\n");
 }
 
-EntryPointLayout* CLikeSourceEmitter::getEntryPointLayout(IRFunc* func)
+IREntryPointLayout* CLikeSourceEmitter::getEntryPointLayout(IRFunc* func)
 {
     if( auto layoutDecoration = func->findDecoration<IRLayoutDecoration>() )
     {
-        return as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout());
+        return as<IREntryPointLayout>(layoutDecoration->getLayout());
     }
     return nullptr;
 }
 
-EntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
+IREntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
 {
     if (auto layoutDecoration = func->findDecoration<IRLayoutDecoration>())
     {
-        if (auto entryPointLayout = as<EntryPointLayout>(layoutDecoration->getIRLayout()->getASTLayout()))
+        if (auto entryPointLayout = as<IREntryPointLayout>(layoutDecoration->getLayout()))
         {
             return entryPointLayout;
         }
@@ -2797,7 +2818,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     m_writer->emit("};\n\n");
 }
 
-void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout)
+void CLikeSourceEmitter::emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
 {
     emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
@@ -2835,7 +2856,7 @@ void CLikeSourceEmitter::emitTempModifiers(IRInst* temp)
     }
 }
 
-void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType)
+void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, IRType* varType)
 {
     // TODO(JS): We could push all of this onto the target impls, and then not need so many virtual hooks.
     emitVarDecorationsImpl(varDecl);
@@ -2850,8 +2871,8 @@ void CLikeSourceEmitter::emitVarModifiers(VarLayout* layout, IRInst* varDecl, IR
     // Target specific modifier output
     emitImageFormatModifierImpl(varDecl, varType);
 
-    if(layout->FindResourceInfo(LayoutResourceKind::VaryingInput)
-        || layout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+    if(layout->usesResourceKind(LayoutResourceKind::VaryingInput)
+        || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
     }
@@ -2990,7 +3011,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     // parameter.
     //
     SLANG_ASSERT(!getVarLayout(varDecl));
-    VarLayout* layout = nullptr;
+    IRVarLayout* layout = nullptr;
 
     // An ordinary global variable (which is not a
     // shader parameter) may need special
