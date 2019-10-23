@@ -3214,7 +3214,8 @@ SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
 SLANG_API SlangResult spCompile(
     SlangCompileRequest*    request)
 {
-    auto req = Slang::asInternal(request);
+    using namespace Slang;
+    auto req = asInternal(request);
 
     SlangResult res = SLANG_FAIL;
 
@@ -3233,19 +3234,19 @@ SLANG_API SlangResult spCompile(
     {
         res = req->executeActions();
     }
-    catch (Slang::AbortCompilationException&)
+    catch (AbortCompilationException&)
     {
         // This situation indicates a fatal (but not necessarily internal) error
         // that forced compilation to terminate. There should already have been
         // a diagnostic produced, so we don't need to add one here.
     }
-    catch (Slang::Exception& e)
+    catch (Exception& e)
     {
         // The compiler failed due to an internal error that was detected.
         // We will print out information on the exception to help out the user
         // in either filing a bug, or locating what in their code created
         // a problem.
-        req->getSink()->diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAbortedDueToException, typeid(e).name(), e.Message);
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::compilationAbortedDueToException, typeid(e).name(), e.Message);
     }
     catch (...)
     {
@@ -3253,7 +3254,7 @@ SLANG_API SlangResult spCompile(
         // `Exception`, so something really fishy is going on. We want to
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
-        req->getSink()->diagnose(Slang::SourceLoc(), Slang::Diagnostics::compilationAborted);
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
     }
     req->mDiagnosticOutput = req->getSink()->outputBuffer.ProduceString();
     
@@ -3265,9 +3266,33 @@ SLANG_API SlangResult spCompile(
     }
 #endif
 
-    if (req->dumpRepro.getLength())
+    // Repro dump handling
     {
-        SLANG_RETURN_ON_FAIL(Slang::StateSerializeUtil::saveState(req, req->dumpRepro));
+        if (req->dumpRepro.getLength())
+        {
+            SlangResult saveRes = StateSerializeUtil::saveState(req, req->dumpRepro);
+            if (SLANG_FAILED(saveRes))
+            {
+                req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, req->dumpRepro);
+                return saveRes;
+            }
+        }
+        else if (req->dumpReproOnError && SLANG_FAILED(res))
+        {
+            String reproFileName;
+            SlangResult saveRes = SLANG_FAIL;
+
+            RefPtr<Stream> stream;
+            if (SLANG_SUCCEEDED(StateSerializeUtil::findUniqueReproDumpStream(req, reproFileName, stream)))
+            {
+                saveRes = StateSerializeUtil::saveState(req, stream);
+            }
+
+            if (SLANG_FAILED(saveRes))
+            {
+                req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, reproFileName);
+            }
+        }
     }
 
     return res;

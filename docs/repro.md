@@ -7,11 +7,12 @@ One use of the feature is if a compilation fails, or produces an unexpected or w
 
 The actual data saved is the contents of the SlangCompileReqest. Currently no state is saved from the SlangSession. Saving and loading a SlangCompileRequest into a new SlangCompileRequest should provide two SlangCompileRequests with the same state, and with the second compile request having access to all the files contents the original request had directly in memory. 
 
-There are 3 command line options
+There are a few command line options
 
 * `-dump-repro [filename]` dumps the compilations state (ie post attempting to compile) to the file specified afterwards
 * `-extract-repro [filename]` extracts the contents of the repro file. The contained files are placed in a directory with a name, the same as the repro file minus the extension. Also contains a 'manifest'.
 * `-load-repro [filename]` loads the repro and compiles using it's options. Note this must be the last arg on the command line.
+* `-dump-repro-on-error` if a compilation fails will attempt to save a repro (using a filename generated from first source filename)
 
 First it is worth just describing what is required to reproduce a compilation. Most straightforwardly the options setup for the compilation need to be stored. This would include any flags, and defines, include paths, entry points, input filenames and so forth. Also needed will be the contents of any files that were specified. This might be files on the file system, but could also be 'files' specified as strings through the slang API. Lastly we need any files that were referenced as part of the compilation - this could be include files, or module source files and so forth. All of this information is bundled up together into a file that can then later be loaded and compiled. This is broadly speaking all of the data that is stored within a repro file. 
 
