@@ -259,7 +259,7 @@ namespace Slang
 		virtual void Write(const char * str);
 		virtual void Close()
 		{
-			stream->Close();
+			stream->close();
 		}
         void ReleaseStream()
         {
@@ -300,11 +300,11 @@ namespace Slang
 		virtual String ReadToEnd();
 		virtual bool IsEnd()
 		{
-			return ptr == buffer.getCount() && stream->IsEnd();
+			return ptr == buffer.getCount() && stream->isEnd();
 		}
 		virtual void Close()
 		{
-			stream->Close();
+			stream->close();
 		}
         void ReleaseStream()
         {
