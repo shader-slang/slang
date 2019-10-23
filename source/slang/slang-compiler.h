@@ -1331,6 +1331,10 @@ namespace Slang
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;
 
+        // Remove name hints to help obfuscate code
+        //
+        bool obfuscateCode = false;
+
     protected:
         CompileRequestBase(
             Linkage*        linkage,
@@ -1671,9 +1675,6 @@ namespace Slang
         //
         bool useUnknownImageFormatAsDefault = false;
 
-        // Remove name hints to help obfuscate code
-        //
-        bool obfuscateCode = false;
     private:
         RefPtr<ComponentType> m_program;
     };
