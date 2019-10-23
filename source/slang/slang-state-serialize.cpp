@@ -18,21 +18,23 @@ struct StoreContext
     typedef StateSerializeUtil::SourceFileState SourceFileState;
     typedef StateSerializeUtil::PathInfoState PathInfoState;
 
-    StoreContext(RelativeContainer* container)
+    StoreContext(OffsetContainer* container)
     {
         m_container = container;
     }
 
-    Safe32Ptr<FileState> findFile(const String& uniqueIdentity)
+    Offset32Ptr<FileState> findFile(const String& uniqueIdentity)
     {
-        Safe32Ptr<FileState> file;
+        Offset32Ptr<FileState> file;
         m_uniqueToFileMap.TryGetValue(uniqueIdentity, file);
         return file;
     }
 
-    Safe32Ptr<FileState> addFile(const String& uniqueIdentity, const UnownedStringSlice* content)
+    Offset32Ptr<FileState> addFile(const String& uniqueIdentity, const UnownedStringSlice* content)
     {
-        Safe32Ptr<FileState> file;
+        Offset32Ptr<FileState> file;
+
+        auto base = m_container->getBase();
 
         // Get the file, if it has an identity
         if (uniqueIdentity.getLength() && m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
@@ -46,11 +48,11 @@ struct StoreContext
 
         if (content)
         {
-            file->contents = m_container->newString(*content);
+            base->asRaw(file)->contents = m_container->newString(*content);
         }
         if (uniqueIdentity.getLength())
         {
-            file->uniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
+            base->asRaw(file)->uniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
             m_uniqueToFileMap.Add(uniqueIdentity, file);
         }
 
@@ -58,14 +60,16 @@ struct StoreContext
         return file;
     }
 
-    Safe32Ptr<SourceFileState> addSourceFile(SourceFile* sourceFile)
+    Offset32Ptr<SourceFileState> addSourceFile(SourceFile* sourceFile)
     {
         if (!sourceFile)
         {
-            return Safe32Ptr<SourceFileState>();
+            return Offset32Ptr<SourceFileState>();
         }
 
-        Safe32Ptr<StateSerializeUtil::SourceFileState> sourceFileState;
+        auto base = m_container->getBase();
+
+        Offset32Ptr<StateSerializeUtil::SourceFileState> sourceFileState;
         if (m_sourceFileMap.TryGetValue(sourceFile, sourceFileState))
         {
             return sourceFileState;
@@ -74,32 +78,35 @@ struct StoreContext
         const PathInfo& pathInfo = sourceFile->getPathInfo();
 
         UnownedStringSlice content = sourceFile->getContent();
-        Safe32Ptr<FileState> file = addFile(pathInfo.uniqueIdentity, &content);
+        Offset32Ptr<FileState> file = addFile(pathInfo.uniqueIdentity, &content);
 
-        Safe32Ptr<RelativeString> foundPath;
+        Offset32Ptr<OffsetString> foundPath;
 
-        if (pathInfo.foundPath.getLength() && file->foundPath == nullptr)
+        if (pathInfo.foundPath.getLength() && base->asRaw(file)->foundPath.isNull())
         {
             foundPath = fromString(pathInfo.foundPath.getUnownedSlice());
         }
         // Set on the file
-        file->foundPath = foundPath;
+        base->asRaw(file)->foundPath = foundPath;
 
         // Create the source file
         sourceFileState = m_container->newObject<SourceFileState>();
 
-        sourceFileState->file = file;
-        sourceFileState->foundPath = foundPath;
-        sourceFileState->type = pathInfo.type;
+        {
+            auto dst = base->asRaw(sourceFileState);
+            dst->file = file;
+            dst->foundPath = foundPath;
+            dst->type = pathInfo.type;
+        }
 
         m_sourceFileMap.Add(sourceFile, sourceFileState);
 
         return sourceFileState;
     }
 
-    Safe32Ptr<RelativeString> fromString(const String& in)
+    Offset32Ptr<OffsetString> fromString(const String& in)
     {
-        Safe32Ptr<RelativeString> value;
+        Offset32Ptr<OffsetString> value;
         
         if (m_stringMap.TryGetValue(in, value))
         {
@@ -109,27 +116,29 @@ struct StoreContext
         m_stringMap.Add(in, value);
         return value;
     }
-    Safe32Ptr<RelativeString> fromName(Name* name)
+    Offset32Ptr<OffsetString> fromName(Name* name)
     {
         if (name)
         {
             return fromString(name->text);
         }
-        return Safe32Ptr<RelativeString>();
+        return Offset32Ptr<OffsetString>();
     }
 
-    Safe32Ptr<PathInfoState> addPathInfo(const CacheFileSystem::PathInfo* srcPathInfo)
+    Offset32Ptr<PathInfoState> addPathInfo(const CacheFileSystem::PathInfo* srcPathInfo)
     {
         if (!srcPathInfo)
         {
-            return Safe32Ptr<PathInfoState>();
+            return Offset32Ptr<PathInfoState>();
         }
 
-        Safe32Ptr<PathInfoState> pathInfo;
+        auto base = m_container->getBase();
+
+        Offset32Ptr<PathInfoState> pathInfo;
         if (!m_pathInfoMap.TryGetValue(srcPathInfo, pathInfo))
         {
             // Get the associated file
-            Safe32Ptr<FileState> fileState;
+            Offset32Ptr<FileState> fileState;
 
             // Only store as file if we have the contents
             if(srcPathInfo->m_fileBlob)
@@ -139,9 +148,9 @@ struct StoreContext
 
             // Save the rest of the state
             pathInfo = m_container->newObject<PathInfoState>();
-            PathInfoState& dst = *pathInfo;
+            PathInfoState& dst = base->asRaw(*pathInfo);
 
-            pathInfo->file = fileState;
+            dst.file = fileState;
 
             // Save any other info
             dst.getCanonicalPathResult = srcPathInfo->m_getCanonicalPathResult;
@@ -153,36 +162,38 @@ struct StoreContext
         }
 
         // Fill in info on the file
-        Safe32Ptr<FileState> fileState(m_container->toSafe(pathInfo->file.get()));
+        auto fileState(base->asRaw(pathInfo)->file);
 
         // If have fileState add any missing element
         if (fileState)
         {
-            if (srcPathInfo->m_fileBlob && fileState->contents == nullptr)
+            if (srcPathInfo->m_fileBlob && base->asRaw(fileState)->contents.isNull())
             {
                 UnownedStringSlice contents((const char*)srcPathInfo->m_fileBlob->getBufferPointer(), srcPathInfo->m_fileBlob->getBufferSize());
-                fileState->contents = m_container->newString(contents);
+                base->asRaw(fileState)->contents = m_container->newString(contents);
             }
 
-            if (srcPathInfo->m_canonicalPath && fileState->canonicalPath == nullptr)
+            if (srcPathInfo->m_canonicalPath && base->asRaw(fileState)->canonicalPath.isNull())
             {
-                fileState->canonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
+                base->asRaw(fileState)->canonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
             }
 
-            if (srcPathInfo->m_uniqueIdentity && fileState->uniqueIdentity == nullptr)
+            if (srcPathInfo->m_uniqueIdentity && base->asRaw(fileState)->uniqueIdentity.isNull())
             {
-                fileState->uniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
+                base->asRaw(fileState)->uniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
             }
         }
 
         return pathInfo;
     }
 
-    const Safe32Array<StateSerializeUtil::StringPair> calcDefines(const Dictionary<String, String>& srcDefines)
+    const Offset32Array<StateSerializeUtil::StringPair> calcDefines(const Dictionary<String, String>& srcDefines)
     {
         typedef StateSerializeUtil::StringPair StringPair;
 
-        Safe32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
+        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
+
+        auto base = m_container->getBase();
 
         Index index = 0;
         for (const auto& srcDefine : srcDefines)
@@ -191,7 +202,7 @@ struct StoreContext
             auto key = fromString(srcDefine.Key);
             auto value = fromString(srcDefine.Value);
 
-            auto& dstDefine = dstDefines[index];
+            auto& dstDefine = base->asRaw(dstDefines[index]);
             dstDefine.first = key;
             dstDefine.second = value;
 
@@ -201,27 +212,29 @@ struct StoreContext
         return dstDefines;
     }
 
-    const Safe32Array<Relative32Ptr<RelativeString>> fromList(const List<String>& src)
+    const Offset32Array<Offset32Ptr<OffsetString>> fromList(const List<String>& src)
     {   
-        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->newArray<Relative32Ptr<RelativeString>>(src.getCount());
+        Offset32Array<Offset32Ptr<OffsetString>> dst = m_container->newArray<Offset32Ptr<OffsetString>>(src.getCount());
+        auto base = m_container->getBase();
+
         for (Index j = 0; j < src.getCount(); ++j)
         {
-            dst[j] = fromString(src[j]);
+            base->asRaw(dst[j]) = fromString(src[j]);
         }
         return dst;
     }
 
-    Dictionary<String, Safe32Ptr<RelativeString> > m_stringMap;
+    Dictionary<String, Offset32Ptr<OffsetString> > m_stringMap;
 
-    Dictionary<SourceFile*, Safe32Ptr<StateSerializeUtil::SourceFileState> > m_sourceFileMap;
+    Dictionary<SourceFile*, Offset32Ptr<StateSerializeUtil::SourceFileState> > m_sourceFileMap;
     
-    Dictionary<String, Safe32Ptr<StateSerializeUtil::FileState> > m_uniqueToFileMap;
+    Dictionary<String, Offset32Ptr<StateSerializeUtil::FileState> > m_uniqueToFileMap;
 
-    Dictionary<const CacheFileSystem::PathInfo*, Safe32Ptr<PathInfoState> > m_pathInfoMap;
+    Dictionary<const CacheFileSystem::PathInfo*, Offset32Ptr<PathInfoState> > m_pathInfoMap;
 
-    List<Safe32Ptr<StateSerializeUtil::FileState> > m_files; 
+    List<Offset32Ptr<StateSerializeUtil::FileState> > m_files; 
 
-    RelativeContainer* m_container;
+    OffsetContainer* m_container;
 };
 
 } //
@@ -241,16 +254,18 @@ static bool _isStorable(const PathInfo::Type type)
     }
 }
 
-/* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest)
+/* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)
 {
     StoreContext context(&inOutContainer);
 
+    auto base = inOutContainer.getBase();
+
     auto linkage = request->getLinkage();
 
-    Safe32Ptr<RequestState> requestState = inOutContainer.newObject<RequestState>();
+    Offset32Ptr<RequestState> requestState = inOutContainer.newObject<RequestState>();
 
     {
-        RequestState* dst = requestState;
+        RequestState* dst = base->asRaw(requestState);
 
         dst->compileFlags = request->getFrontEndReq()->compileFlags;
         dst->shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
@@ -275,7 +290,7 @@ static bool _isStorable(const PathInfo::Type type)
 
         SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
 
-        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
+        Offset32Array<EntryPointState> dstEntryPoints = inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
 
         for (Index i = 0; i < srcEntryPoints.getCount(); ++i)
         {
@@ -283,9 +298,9 @@ static bool _isStorable(const PathInfo::Type type)
             const auto& srcEndToEndEntryPoint = srcEndToEndEntryPoints[i];
 
             auto dstSpecializationArgStrings = context.fromList(srcEndToEndEntryPoint.specializationArgStrings);
-            Safe32Ptr<RelativeString> dstName = context.fromName(srcEntryPoint->getName());
+            Offset32Ptr<OffsetString> dstName = context.fromName(srcEntryPoint->getName());
 
-            EntryPointState& dst = dstEntryPoints[i];
+            EntryPointState& dst = base->asRaw(dstEntryPoints[i]);
 
             dst.profile = srcEntryPoint->getProfile();
             dst.translationUnitIndex = uint32_t(srcEntryPoint->getTranslationUnitIndex());
@@ -293,7 +308,7 @@ static bool _isStorable(const PathInfo::Type type)
             dst.name = dstName;
         }
 
-        requestState->entryPoints = dstEntryPoints;
+        base->asRaw(requestState)->entryPoints = dstEntryPoints;
     }
 
 
@@ -314,7 +329,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     // Add all the target requests
     {
-        Safe32Array<TargetRequestState> dstTargets = inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
+        Offset32Array<TargetRequestState> dstTargets = inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
         {
@@ -322,7 +337,7 @@ static bool _isStorable(const PathInfo::Type type)
 
             // Copy the simple stuff
             {
-                auto& dst = dstTargets[i];
+                auto& dst = base->asRaw(dstTargets[i]);
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getTargetProfile();
                 dst.targetFlags = srcTargetRequest->targetFlags;
@@ -339,14 +354,14 @@ static bool _isStorable(const PathInfo::Type type)
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Safe32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
+                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
 
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
                     {
-                        Safe32Ptr<RelativeString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
+                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
 
-                        auto& dstOutputState = dstOutputStates[index];
+                        auto& dstOutputState = base->asRaw(dstOutputStates[index]);
 
                         dstOutputState.entryPointIndex = int32_t(pair.Key);
                         dstOutputState.outputPath = outputPath;
@@ -354,35 +369,35 @@ static bool _isStorable(const PathInfo::Type type)
                         index++;
                     }
 
-                    dstTargets[i].outputStates = dstOutputStates;
+                    base->asRaw(dstTargets[i]).outputStates = dstOutputStates;
                 }
             }
         }
     
         // Save the result
-        requestState->targetRequests = dstTargets;
+        base->asRaw(requestState)->targetRequests = dstTargets;
     }
 
     // Add the search paths
     {
         const auto& srcPaths = linkage->searchDirectories.searchDirectories;
-        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.newArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
+        Offset32Array<Offset32Ptr<OffsetString> > dstPaths = inOutContainer.newArray<Offset32Ptr<OffsetString> >(srcPaths.getCount());
 
         // We don't handle parents here
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            dstPaths[i] = context.fromString(srcPaths[i].path);
+            base->asRaw(dstPaths[i]) = context.fromString(srcPaths[i].path);
         }
-        requestState->searchPaths = dstPaths;
+        base->asRaw(requestState)->searchPaths = dstPaths;
     }
 
     // Add preprocessor definitions
-    requestState->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
+    base->asRaw(requestState)->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
-        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
+        Offset32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
 
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
@@ -392,18 +407,18 @@ static bool _isStorable(const PathInfo::Type type)
             auto defines = context.calcDefines(srcTranslationUnit->preprocessorDefinitions);
             auto moduleName = context.fromName(srcTranslationUnit->moduleName);
 
-            Safe32Array<Relative32Ptr<SourceFileState>> dstSourceFiles;
+            Offset32Array<Offset32Ptr<SourceFileState>> dstSourceFiles;
             {
                 const auto& srcFiles = srcTranslationUnit->getSourceFiles();
-                dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
+                dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState> >(srcFiles.getCount());
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
-                    dstSourceFiles[j] = context.addSourceFile(srcFiles[j]);
+                    base->asRaw(dstSourceFiles[j]) = context.addSourceFile(srcFiles[j]);
                 }
             }
 
-            TranslationUnitRequestState& dstTranslationUnit = dstTranslationUnits[i];
+            TranslationUnitRequestState& dstTranslationUnit = base->asRaw(dstTranslationUnits[i]);
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
             dstTranslationUnit.moduleName = moduleName;
@@ -411,7 +426,7 @@ static bool _isStorable(const PathInfo::Type type)
             dstTranslationUnit.preprocessorDefinitions = defines;
         }
 
-        requestState->translationUnits = dstTranslationUnits;
+        base->asRaw(requestState)->translationUnits = dstTranslationUnits;
     }
 
     // Find files from the file system, and mapping paths to files
@@ -426,22 +441,22 @@ static bool _isStorable(const PathInfo::Type type)
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Safe32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
+            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
 
             Index index = 0;
             for (const auto& pair : srcFiles)
             {
-                Safe32Ptr<RelativeString> path = context.fromString(pair.Key);
-                Safe32Ptr<PathInfoState> pathInfo = context.addPathInfo(pair.Value);
+                Offset32Ptr<OffsetString> path = context.fromString(pair.Key);
+                Offset32Ptr<PathInfoState> pathInfo = context.addPathInfo(pair.Value);
 
-                PathAndPathInfo& dstInfo = pathMap[index];
+                PathAndPathInfo& dstInfo = base->asRaw(pathMap[index]);
                 dstInfo.path = path;
                 dstInfo.pathInfo = pathInfo;
 
                 index++;
             }
 
-            requestState->pathInfoMap = pathMap;
+            base->asRaw(requestState)->pathInfoMap = pathMap;
         }
     }
 
@@ -449,25 +464,25 @@ static bool _isStorable(const PathInfo::Type type)
     {
         Dictionary<String, int> uniqueNameMap;
 
-        auto files = inOutContainer.newArray<Relative32Ptr<FileState>>(context.m_files.getCount());
+        auto files = inOutContainer.newArray<Offset32Ptr<FileState>>(context.m_files.getCount());
         for (Index i = 0; i < context.m_files.getCount(); ++i)
         {
-            Safe32Ptr<FileState> file = context.m_files[i];
+            Offset32Ptr<FileState> file = context.m_files[i];
 
             // Need to come up with unique names
             String path;
 
-            if (file->canonicalPath)
+            if (auto canonicalPath = base->asRaw(file)->canonicalPath)
             {
-                path = file->canonicalPath->getSlice();
+                path = base->asRaw(canonicalPath)->getSlice();
             }
-            else if (file->foundPath)
+            else if (auto foundPath = base->asRaw(file)->foundPath)
             {
-                path = file->foundPath->getSlice();
+                path = base->asRaw(foundPath)->getSlice();
             }
-            else if (file->uniqueIdentity)
+            else if (auto uniqueIdentity = base->asRaw(file)->uniqueIdentity)
             {
-                path = file->uniqueIdentity->getSlice();
+                path = base->asRaw(uniqueIdentity)->getSlice();
             }
 
             if (path.getLength() == 0)
@@ -505,26 +520,26 @@ static bool _isStorable(const PathInfo::Type type)
             }
 
             // Save the unique generated name
-            file->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
+            base->asRaw(file)->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
 
-            files[i] = file;
+            base->asRaw(files[i]) = file;
         }
 
-        requestState->files = files;
+        base->asRaw(requestState)->files = files;
     }
 
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
+        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.Count());
 
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
         {
-            dstSourceFiles[index] = pair.Value; 
+            base->asRaw(dstSourceFiles[index]) = pair.Value; 
             index++;
         }
-        requestState->sourceFiles = dstSourceFiles;
+        base->asRaw(requestState)->sourceFiles = dstSourceFiles;
     }
 
     outRequest = requestState;
@@ -552,13 +567,13 @@ struct LoadContext
             if (m_fileSystem && file->uniqueName)
             {
                 // Try loading from the file system
-                m_fileSystem->loadFile(file->uniqueName->getCstr(), blob.writeRef());
+                m_fileSystem->loadFile(m_base->asRaw(file->uniqueName)->getCstr(), blob.writeRef());
             }
 
             // If wasn't loaded, and has contents, use that
             if (!blob && file->contents)
             {
-                blob = new StringBlob(file->contents->getSlice());
+                blob = new StringBlob(m_base->asRaw(file->contents)->getSlice());
             }
 
             // Add to map, even if the blob is nullptr (say from a failed read)
@@ -578,7 +593,7 @@ struct LoadContext
         SourceFile* dstFile;
         if (!m_sourceFileMap.TryGetValue(sourceFile, dstFile))
         {
-            FileState* file = sourceFile->file;
+            FileState* file = m_base->asRaw(sourceFile->file);
             ISlangBlob* blob = getFileBlob(file);
 
             PathInfo pathInfo;
@@ -587,16 +602,16 @@ struct LoadContext
 
             if (sourceFile->foundPath)
             {
-                pathInfo.foundPath = sourceFile->foundPath->getSlice();
+                pathInfo.foundPath = m_base->asRaw(sourceFile->foundPath)->getSlice();
             }
             else if (file->foundPath)
             {
-                pathInfo.foundPath = file->foundPath->getSlice();
+                pathInfo.foundPath = m_base->asRaw(file->foundPath)->getSlice();
             }
 
             if (file->uniqueIdentity)
             {
-                pathInfo.uniqueIdentity = file->uniqueIdentity->getSlice();
+                pathInfo.uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
             }
 
             dstFile = new SourceFile(m_sourceManager, pathInfo, blob->getBufferSize());
@@ -620,18 +635,18 @@ struct LoadContext
         }
 
         CacheFileSystem::PathInfo* dstInfo = new CacheFileSystem::PathInfo(String());
-        FileState* file = srcInfo->file;
+        FileState* file = m_base->asRaw(srcInfo->file);
         if (file)
         {
             if (file->uniqueIdentity)
             {
-                String uniqueIdentity = file->uniqueIdentity->getSlice();
+                String uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
                 dstInfo->m_uniqueIdentity = new StringBlob(uniqueIdentity);
             }
 
             if (file->canonicalPath)
             {
-                dstInfo->m_canonicalPath = new StringBlob(file->canonicalPath->getSlice());
+                dstInfo->m_canonicalPath = new StringBlob(m_base->asRaw(file->canonicalPath)->getSlice());
             }
 
             dstInfo->m_fileBlob = getFileBlob(file);
@@ -646,25 +661,39 @@ struct LoadContext
         return dstInfo;
     }
 
-    static List<const char*> toList(const Relative32Array<Relative32Ptr<RelativeString>>& src)
+    List<const char*> toList(const Offset32Array<Offset32Ptr<OffsetString>>& src)
     {
         List<const char*> dst;
         dst.setCount(src.getCount());
         for (Index i = 0; i < src.getCount(); ++i)
         {
-            RelativeString* srcString = src[i];
+            OffsetString* srcString = m_base->asRaw(m_base->asRaw(src[i]));
             dst[i] = srcString ? srcString->getCstr() : nullptr;
         }
         return dst;
     }
 
-    LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem):
+
+    void loadDefines(const Offset32Array<StateSerializeUtil::StringPair>& in, Dictionary<String, String>& out)
+    {
+        out.Clear();
+
+        for (const auto& define : in)
+        {
+            out.Add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
+        }
+    }
+
+    LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem, OffsetBase* base):
         m_sourceManager(sourceManger),
-        m_fileSystem(fileSystem)
+        m_fileSystem(fileSystem),
+        m_base(base)
     {
     }
 
     ISlangFileSystem* m_fileSystem;
+
+    OffsetBase* m_base;
 
     SourceManager* m_sourceManager;
     Dictionary<SourceFileState*, SourceFile*> m_sourceFileMap;
@@ -674,22 +703,12 @@ struct LoadContext
 
 } // anonymous
 
-static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& in, Dictionary<String, String>& out)
-{
-    out.Clear();
-
-    for (const auto& define : in)
-    {
-        out.Add(define.first->getSlice(), define.second->getSlice());
-    }
-}
 
 
-/* static */SlangResult StateSerializeUtil::load(RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
+/* static */SlangResult StateSerializeUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
 {
     auto externalRequest = asExternal(request);
 
-    
     auto linkage = request->getLinkage();
 
     // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
@@ -700,7 +719,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         linkage->targets.clear();
     }
 
-    LoadContext context(linkage->getSourceManager(), fileSystem);
+    LoadContext context(linkage->getSourceManager(), fileSystem, &base);
 
     // Try to set state through API - as doing so means if state stored in multiple places it will be ok
 
@@ -723,7 +742,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     {
         for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
         {
-            TargetRequestState& src = requestState->targetRequests[i];
+            TargetRequestState& src = base.asRaw(requestState->targetRequests[i]);
             int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
             SLANG_ASSERT(index == i);
 
@@ -740,14 +759,16 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
                 RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
                 request->targetInfos[dstTarget] = dstTargetInfo;
 
-                for (const auto& srcOutputState : src.outputStates)
+                for (const auto& srcOutputStateOffset : src.outputStates)
                 {
+                    const auto& srcOutputState = base.asRaw(srcOutputStateOffset);
+
                     SLANG_ASSERT(srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
 
                     String entryPointPath;
                     if (srcOutputState.outputPath)
                     {
-                        entryPointPath = srcOutputState.outputPath->getSlice();
+                        entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
                     
                     dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
@@ -762,11 +783,11 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         dstPaths.setCount(srcPaths.getCount());
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            dstPaths[i].path = srcPaths[i]->getSlice();
+            dstPaths[i].path = base.asRaw(base.asRaw(srcPaths[i]))->getSlice();
         }
     }
 
-    _loadDefines(requestState->preprocessorDefinitions, linkage->preprocessorDefinitions);
+    context.loadDefines(requestState->preprocessorDefinitions, linkage->preprocessorDefinitions);
 
     {
         auto frontEndReq = request->getFrontEndReq();
@@ -778,7 +799,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
-            const auto& srcTranslationUnit = srcTranslationUnits[i];
+            const auto& srcTranslationUnit = base.asRaw(srcTranslationUnits[i]);
 
             int index = frontEndReq->addTranslationUnit(srcTranslationUnit.language);
             SLANG_UNUSED(index);
@@ -786,12 +807,12 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
             TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
 
-            _loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
+            context.loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
 
             Name* moduleName = nullptr;
             if (srcTranslationUnit.moduleName)
             {
-                moduleName = request->getNamePool()->getName(srcTranslationUnit.moduleName->getSlice());
+                moduleName = request->getNamePool()->getName(base.asRaw(srcTranslationUnit.moduleName)->getSlice());
             }
 
             dstTranslationUnit->moduleName = moduleName;
@@ -803,7 +824,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
-                SourceFile* sourceFile = context.getSourceFile(srcSourceFiles[i]);
+                SourceFile* sourceFile = context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
                 // Add to translation unit
                 dstTranslationUnit->addSourceFile(sourceFile);
             }
@@ -815,9 +836,11 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         // Check there aren't any set entry point
         SLANG_ASSERT(request->getFrontEndReq()->m_entryPointReqs.getCount() == 0);
 
-        for (const auto& srcEntryPoint : requestState->entryPoints)
+        for (const auto& srcEntryPointOffset : requestState->entryPoints)
         {
-            const char* name = srcEntryPoint.name ? srcEntryPoint.name->getCstr() : nullptr;
+            const auto srcEntryPoint = base.asRaw(srcEntryPointOffset);
+
+            const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
 
             Stage stage = srcEntryPoint.profile.GetStage();
 
@@ -834,10 +857,11 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
         // Put all the paths to path info
         {
-            for (const auto& pair : requestState->pathInfoMap)
+            for (const auto& pairOffset : requestState->pathInfoMap)
             {
-                CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(pair.pathInfo);
-                dstPathMap.Add(pair.path->getSlice(), pathInfo);
+                const auto& pair = base.asRaw(pairOffset);
+                CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(base.asRaw(pair.pathInfo));
+                dstPathMap.Add(base.asRaw(pair.path)->getSlice(), pathInfo);
             }
         }
         // Put all the path infos in the cache system
@@ -863,8 +887,8 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
 {
-    RelativeContainer container;
-    Safe32Ptr<RequestState> requestState;
+    OffsetContainer container;
+    Offset32Ptr<RequestState> requestState;
     SLANG_RETURN_ON_FAIL(store(request, container, requestState));
     return RiffUtil::writeData(kSlangStateFourCC, container.getData(), container.getDataCount(), stream);
 }
@@ -911,7 +935,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */ StateSerializeUtil::RequestState* StateSerializeUtil::getRequest(const List<uint8_t>& buffer)
 {
-    return (StateSerializeUtil::RequestState*)buffer.getBuffer();
+    return (StateSerializeUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
 }
 
 /* static */SlangResult StateSerializeUtil::calcDirectoryPathFromFilename(const String& filename, String& outPath)
@@ -940,6 +964,9 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     List<uint8_t> buffer;
     SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(filename, buffer));
 
+    OffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
     RequestState* requestState = StateSerializeUtil::getRequest(buffer);
 
     String dirPath;
@@ -949,60 +976,66 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     // Set up a file system to write into this directory
     RelativeFileSystem relFileSystem(OSFileSystemExt::getSingleton(), dirPath);
 
-    return extractFiles(requestState, &relFileSystem);
+    return extractFiles(base, requestState, &relFileSystem);
 }
 
-/* static */SlangResult StateSerializeUtil::extractFiles(RequestState* requestState, ISlangFileSystemExt* fileSystem)
+/* static */SlangResult StateSerializeUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem)
 {
     StringBuilder builder;
 
     builder << "[files]\n";
 
-    for (FileState* file : requestState->files)
+    for (auto fileOffset : requestState->files)
     {
+        auto file = base.asRaw(base.asRaw(fileOffset));
+
         if (file->contents)
         {
-            UnownedStringSlice contents = file->contents->getSlice();
+            UnownedStringSlice contents = base.asRaw(file->contents)->getSlice();
 
-            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(file->uniqueName->getCstr(), contents.begin(), contents.size()));
+            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(base.asRaw(file->uniqueName)->getCstr(), contents.begin(), contents.size()));
 
-            RelativeString* originalName = nullptr;
+            OffsetString* originalName = nullptr;
             if (file->canonicalPath)
             {
-                originalName = file->canonicalPath;
+                originalName = base.asRaw(file->canonicalPath);
             }
             else if (file->foundPath)
             {
-                originalName = file->foundPath;
+                originalName = base.asRaw(file->foundPath);
             }
             else if (file->uniqueIdentity)
             {
-                originalName = file->uniqueIdentity;
+                originalName = base.asRaw(file->uniqueIdentity);
             }
 
-            builder << file->uniqueName->getSlice() << " -> ";
+            builder << base.asRaw(file->uniqueName)->getSlice() << " -> ";
             if (originalName)
             {
                 builder << originalName->getSlice();
             }
-            else
+
+            if (builder.getLength() == 0)
             {
                 builder << "?";
             }
+
             builder << "\n";
         }
     }
 
     builder << "[paths]\n";
-    for (const PathAndPathInfo& path : requestState->pathInfoMap)
+    for (const auto pathOffset : requestState->pathInfoMap)
     {
-        builder << path.path->getSlice() << " -> ";
+        const auto& path = base.asRaw(pathOffset);
 
-        const auto pathInfo = path.pathInfo.get();
+        builder << base.asRaw(path.path)->getSlice() << " -> ";
+
+        const auto pathInfo = base.asRaw(path.pathInfo);
 
         if (pathInfo->file)
         {
-            builder << pathInfo->file->uniqueName->getSlice();
+            builder << base.asRaw(base.asRaw(pathInfo->file)->uniqueName)->getSlice();
         }
         else
         {

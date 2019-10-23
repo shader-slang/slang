@@ -53,9 +53,9 @@ static void offsetContainerUnitTest()
         {
             auto base = container.getBase();
 
-            Offset32Ptr<Root> root = container.allocate<Root>();
+            Offset32Ptr<Root> root = container.newObject<Root>();
 
-            auto array = container.allocateArray<Offset32Ptr<OffsetString>>(SLANG_COUNT_OF(strings));
+            auto array = container.newArray<Offset32Ptr<OffsetString>>(SLANG_COUNT_OF(strings));
             for (Int i = 0; i < SLANG_COUNT_OF(strings); ++i)
             {
                 base->asRaw(array[i]) = container.newString(strings[i]);
