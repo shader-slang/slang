@@ -339,8 +339,7 @@ static bool _isStorable(const PathInfo::Type type)
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Safe32Array<OutputState> dstOutputStates;
-                    dstOutputStates = inOutContainer.allocateArray<OutputState>(entryPointOutputPaths.Count());
+                    Safe32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
 
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
