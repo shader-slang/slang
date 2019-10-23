@@ -16,12 +16,21 @@ namespace Slang {
 
 struct StateSerializeUtil
 {
+    enum
+    {
+        kMajorVersion = 0,
+        kMinorVersion = 0,
+        kPatchVersion = 0,
+    };
+
     static const uint32_t kSlangStateFourCC = SLANG_FOUR_CC('S', 'L', 'S', 'T');             ///< Holds all the slang specific chunks
-    
+    static const RiffSemanticVersion g_semanticVersion;
+
     struct Header
     {
-        RiffChunk m_chunk;
-        uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
+        RiffChunk m_chunk;                              ///< The chunk 
+        RiffSemanticVersion m_semanticVersion;          ///< The semantic version
+        uint32_t m_typeHash;                            ///< A hash based on the binary representation. If doesn't match then not binary compatible (extra check over semantic versioning)
     };
 
     struct FileState
@@ -71,12 +80,6 @@ struct StateSerializeUtil
         FloatingPointMode floatingPointMode;
 
         Offset32Array<OutputState> outputStates;
-    };
-
-    struct FileReference
-    {
-        Offset32Ptr<OffsetString> name;
-        Offset32Ptr<FileState> file;
     };
 
     struct StringPair

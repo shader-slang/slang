@@ -42,20 +42,28 @@ namespace Slang
 }
 
 
-/* static */SlangResult RiffUtil::writeData(uint32_t riffType, const void* data, size_t size, Stream* out)
+/* static */SlangResult RiffUtil::writeData(const RiffChunk* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out)
 {
-    SLANG_ASSERT(uint64_t(size) <= uint64_t(0xfffffffff));
+    SLANG_ASSERT(uint64_t(payloadSize) <= uint64_t(0xfffffffff));
+    SLANG_ASSERT(headerSize >= sizeof(RiffChunk));
+    SLANG_ASSERT((headerSize & 3) == 0);
 
     // TODO(JS): Could handle endianness here
+
     RiffChunk chunk;
-    chunk.m_type = riffType;
-    chunk.m_size = uint32_t(size);
+    chunk.m_type = header->m_type;
+    chunk.m_size = uint32_t(headerSize - sizeof(RiffChunk) + payloadSize);
 
     try
     {
-        out->write(&chunk, sizeof(chunk));
-        out->write(data, size);
-        size_t remaining = size & 3;
+        // The chunk
+        out->write(&chunk, sizeof(RiffChunk));
+        // The rest of the header
+        out->write(header + 1, headerSize - sizeof(RiffChunk));
+
+        out->write(payload, payloadSize);
+        size_t remaining = payloadSize & 3;
+
         if (remaining)
         {
             uint8_t end[4] = { 0, 0, 0, 0};
@@ -70,19 +78,30 @@ namespace Slang
     return SLANG_OK;
 }
 
-
-/* static */SlangResult RiffUtil::readData(Stream* stream, RiffChunk& outChunk, List<uint8_t>& data)
+/* static */SlangResult RiffUtil::readData(Stream* stream, RiffChunk* outHeader, size_t headerSize, List<uint8_t>& data)
 {
-    SLANG_RETURN_ON_FAIL(readChunk(stream, outChunk));
+    RiffChunk chunk;
+    SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
+    if (chunk.m_size < headerSize)
+    {
+        return SLANG_FAIL;
+    }
 
-    data.setCount(outChunk.m_size);
+    *outHeader = chunk;
 
     try
     {
-        stream->read(data.getBuffer(), outChunk.m_size);
+        // Read the header
+        stream->read(outHeader + 1, headerSize - sizeof(RiffChunk));
+
+        const size_t payloadSize = chunk.m_size - (headerSize - sizeof(RiffChunk));
+
+        data.setCount(payloadSize);
+
+        stream->read(data.getBuffer(), payloadSize);
 
         // Skip to the alignment
-        uint32_t remaining = outChunk.m_size & 3;
+        uint32_t remaining = payloadSize & 3;
         if (remaining)
         {
             stream->seek(SeekOrigin::Current, 4 - remaining);
