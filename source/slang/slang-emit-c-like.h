@@ -77,7 +77,7 @@ public:
     // A chain of variables to use for emitting semantic/layout info
     struct EmitVarChain
     {
-        VarLayout*      varLayout;
+        IRVarLayout*      varLayout;
         EmitVarChain*   next;
 
         EmitVarChain()
@@ -85,12 +85,12 @@ public:
             , next(nullptr)
         {}
 
-        EmitVarChain(VarLayout* varLayout)
+        EmitVarChain(IRVarLayout* varLayout)
             : varLayout(varLayout)
             , next(nullptr)
         {}
 
-        EmitVarChain(VarLayout* varLayout, EmitVarChain* next)
+        EmitVarChain(IRVarLayout* varLayout, EmitVarChain* next)
             : varLayout(varLayout)
             , next(next)
         {}
@@ -206,10 +206,17 @@ public:
 
     void emitInst(IRInst* inst);
 
-    void emitSemantics(VarLayout* varLayout);
+    // TODO: When this signature switched from `VarLayout` to `IRVarLayout`
+    // it became possible to get confused beetween this overload and the
+    // one that takes a base `IRInst`. We should probably be careful and
+    // rename one of the other of the `emitSemantics()` functions to avoid
+    // confusion.
+    //
+    void emitSemantics(IRVarLayout* varLayout);
+
     void emitSemantics(IRInst* inst);
 
-    static VarLayout* getVarLayout(IRInst* var);
+    static IRVarLayout* getVarLayout(IRInst* var);
 
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
@@ -244,9 +251,9 @@ public:
 
     void emitFuncDecl(IRFunc* func);
 
-    EntryPointLayout* getEntryPointLayout(IRFunc* func);
+    IREntryPointLayout* getEntryPointLayout(IRFunc* func);
 
-    EntryPointLayout* asEntryPoint(IRFunc* func);
+    IREntryPointLayout* asEntryPoint(IRFunc* func);
 
         // Detect if the given IR function represents a
         // declaration of an intrinsic/builtin for the
@@ -262,7 +269,7 @@ public:
 
     void emitStruct(IRStructType* structType);
 
-    void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, VarLayout* layout);
+    void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
 
     UInt getRayPayloadLocation(IRInst* inst);
 
@@ -271,7 +278,7 @@ public:
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     void emitTempModifiers(IRInst* temp);
 
-    void emitVarModifiers(VarLayout* layout, IRInst* varDecl, IRType* varType);
+    void emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, IRType* varType);
 
         /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
@@ -317,16 +324,16 @@ public:
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
 
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
-    virtual void emitLayoutQualifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout); }
+    virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout); }
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
-    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
-    virtual void emitMatrixLayoutModifiersImpl(VarLayout* layout) { SLANG_UNUSED(layout);  }
+    virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout);  }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module);

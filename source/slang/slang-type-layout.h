@@ -44,6 +44,13 @@ struct LayoutSize
         SLANG_ASSERT(size != RawValue(-1));
     }
 
+    static LayoutSize fromRaw(RawValue raw)
+    {
+        LayoutSize size;
+        size.raw = raw;
+        return size;
+    }
+
     static LayoutSize infinite()
     {
         LayoutSize result;
@@ -469,21 +476,6 @@ public:
     }
 
     RefPtr<VarLayout> pendingVarLayout;
-
-
-        /// Get the "absolute" layout of this variable, if applicable.
-        ///
-        /// The `parentAbsoluteLayout` must be the absolute layout
-        /// of the parent of this variable.
-        ///
-        /// The absolute layout will be created once and cached on
-        /// future accesses; if `parentAbsoluteLayout` is not
-        /// consistent at different call sites an unexpected
-        /// layout could be returned.
-        ///
-    VarLayout* getAbsoluteLayout(VarLayout* parentAbsoluteLayout);
-
-    RefPtr<VarLayout> m_absoluteLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -510,16 +502,6 @@ public:
     // so that any fields (if the element type is a `struct`)
     // will be offset by the resource usage of the container.
     RefPtr<TypeLayout>  offsetElementTypeLayout;
-
-    // If the element type layout had any "pending" data, then
-    // as much of that data as possible will be flushed to
-    // fit into the overall layout of the parameter group.
-    //
-    // This field stores the offset information for where
-    // the pending data got stored relative to the start of
-    // the group.
-    //
-//    RefPtr<VarLayout> flushedDataVarLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -604,12 +586,6 @@ public:
     // in the array above, rather than to the actual pointer,
     // so that we 
     Dictionary<VarDeclBase*, RefPtr<VarLayout>> mapVarToLayout;
-
-    // As an accellerator for type layouts created at the
-    // IR layer, we include a second map that use IR "key"
-    // instructions to map to fields.
-    //
-    Dictionary<IRInst*, RefPtr<VarLayout>> mapKeyToLayout;
 };
 
 class GenericParamTypeLayout : public TypeLayout
@@ -691,9 +667,9 @@ public:
     };
     unsigned flags = 0;
 
-    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
+//    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
 
-    RefPtr<EntryPointLayout> m_absoluteLayout;
+//    RefPtr<EntryPointLayout> m_absoluteLayout;
 };
 
     /// Reflection/layout information about a specialization parameter
@@ -1170,10 +1146,20 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     RefPtr<TypeLayout>  oldTypeLayout,
     RefPtr<VarLayout>   offsetVarLayout);
 
+struct IRBuilder;
+struct IRTypeLayout;
+struct IRVarLayout;
+
+IRTypeLayout* applyOffsetToTypeLayout(
+    IRBuilder*      irBuilder,
+    IRTypeLayout*   oldTypeLayout,
+    IRVarLayout*    offsetVarLayout);
+
     /// Create a layout like `baseLayout`, but offset by `offsetLayout`
-RefPtr<VarLayout> applyOffsetToVarLayout(
-    VarLayout* baseLayout,
-    VarLayout* offsetLayout);
+IRVarLayout* applyOffsetToVarLayout(
+    IRBuilder*      irBuilder,
+    IRVarLayout*    baseLayout,
+    IRVarLayout*    offsetLayout);
 
 }
 

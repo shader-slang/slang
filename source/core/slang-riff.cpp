@@ -20,7 +20,7 @@ namespace Slang
     }
 
     // Skip the payload (we don't need to skip the Chunk because that was already read
-    stream->Seek(SeekOrigin::Current, chunkSize - sizeof(RiffChunk));
+    stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffChunk));
     return SLANG_OK;
 }
 
@@ -29,7 +29,7 @@ namespace Slang
 {
     try
     {
-        stream->Read(&outChunk, sizeof(RiffChunk));
+        stream->read(&outChunk, sizeof(RiffChunk));
     }
     catch (IOException&)
     {
@@ -57,16 +57,17 @@ namespace Slang
     try
     {
         // The chunk
-        out->Write(&chunk, sizeof(RiffChunk));
+        out->write(&chunk, sizeof(RiffChunk));
         // The rest of the header
-        out->Write(header + 1, headerSize - sizeof(RiffChunk));
+        out->write(header + 1, headerSize - sizeof(RiffChunk));
 
-        out->Write(payload, payloadSize);
+        out->write(payload, payloadSize);
         size_t remaining = payloadSize & 3;
+
         if (remaining)
         {
             uint8_t end[4] = { 0, 0, 0, 0};
-            out->Write(end, 4 - remaining);
+            out->write(end, 4 - remaining);
         }
     }
     catch (IOException&)
@@ -76,7 +77,6 @@ namespace Slang
 
     return SLANG_OK;
 }
-
 
 /* static */SlangResult RiffUtil::readData(Stream* stream, RiffChunk* outHeader, size_t headerSize, List<uint8_t>& data)
 {
@@ -92,19 +92,19 @@ namespace Slang
     try
     {
         // Read the header
-        stream->Read(outHeader + 1, headerSize - sizeof(RiffChunk));
+        stream->read(outHeader + 1, headerSize - sizeof(RiffChunk));
 
         const size_t payloadSize = chunk.m_size - (headerSize - sizeof(RiffChunk));
 
         data.setCount(payloadSize);
 
-        stream->Read(data.getBuffer(), payloadSize);
+        stream->read(data.getBuffer(), payloadSize);
 
         // Skip to the alignment
         uint32_t remaining = payloadSize & 3;
         if (remaining)
         {
-            stream->Seek(SeekOrigin::Current, 4 - remaining);
+            stream->seek(SeekOrigin::Current, 4 - remaining);
         }
     }
     catch (IOException&)

@@ -754,23 +754,26 @@ static void maybeCopyLayoutInformationToParameters(
     if(!layoutDecor)
         return;
 
-    auto entryPointLayout = as<EntryPointLayout>(layoutDecor->getASTLayout());
+    auto entryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout());
     if(!entryPointLayout)
         return;
 
     if( auto firstBlock = func->getFirstBlock() )
     {
         auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
-        Index paramLayoutCount = paramsStructLayout->fields.getCount();
+        Index paramLayoutCount = paramsStructLayout->getFieldCount();
         Index paramCounter = 0;
         for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
         {
             Index paramIndex = paramCounter++;
             if( paramIndex < paramLayoutCount )
             {
-                auto paramLayout = paramsStructLayout->fields[paramIndex];
+                auto paramLayout = paramsStructLayout->getFieldLayout(paramIndex);
 
-                auto offsetParamLayout = applyOffsetToVarLayout(paramLayout, entryPointLayout->parametersLayout);
+                auto offsetParamLayout = applyOffsetToVarLayout(
+                    builder,
+                    paramLayout,
+                    entryPointLayout->getParamsLayout());
 
                 builder->addLayoutDecoration(
                     pp,

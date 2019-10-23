@@ -126,11 +126,11 @@ namespace Slang
 		this->encoding = encoding;
 		if (encoding == Encoding::UTF16)
 		{
-			this->stream->Write(&Utf16Header, 2);
+			this->stream->write(&Utf16Header, 2);
 		}
 		else if (encoding == Encoding::UTF16Reversed)
 		{
-			this->stream->Write(&Utf16ReversedHeader, 2);
+			this->stream->write(&Utf16ReversedHeader, 2);
 		}
 	}
 	StreamWriter::StreamWriter(RefPtr<Stream> stream, Encoding * encoding)
@@ -139,11 +139,11 @@ namespace Slang
 		this->encoding = encoding;
 		if (encoding == Encoding::UTF16)
 		{
-			this->stream->Write(&Utf16Header, 2);
+			this->stream->write(&Utf16Header, 2);
 		}
 		else if (encoding == Encoding::UTF16Reversed)
 		{
-			this->stream->Write(&Utf16ReversedHeader, 2);
+			this->stream->write(&Utf16ReversedHeader, 2);
 		}
 	}
 	void StreamWriter::Write(const String & str)
@@ -169,7 +169,7 @@ namespace Slang
 				sb << str[i];
 		}
 		encoding->GetBytes(encodingBuffer, sb.ProduceString());
-		stream->Write(encodingBuffer.getBuffer(), encodingBuffer.getCount());
+		stream->write(encodingBuffer.getBuffer(), encodingBuffer.getCount());
 	}
 	void StreamWriter::Write(const char * str)
 	{
@@ -237,7 +237,7 @@ namespace Slang
 	{
 		buffer.setCount(4096);
         memset(buffer.getBuffer(), 0, buffer.getCount() * sizeof(buffer[0]));
-		auto len = stream->Read(buffer.getBuffer(), buffer.getCount());
+		auto len = stream->read(buffer.getBuffer(), buffer.getCount());
 		buffer.setCount((int)len);
 		ptr = 0;
 	}
@@ -248,7 +248,7 @@ namespace Slang
 		{
 			return buffer[ptr++];
 		}
-		if (!stream->IsEnd())
+		if (!stream->isEnd())
 			ReadBuffer();
 		if (ptr<buffer.getCount())
 		{

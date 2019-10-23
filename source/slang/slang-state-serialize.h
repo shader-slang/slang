@@ -61,6 +61,12 @@ struct StateSerializeUtil
         Relative32Ptr<PathInfoState> pathInfo;
     };
 
+    struct OutputState
+    {
+        int32_t entryPointIndex;
+        Relative32Ptr<RelativeString> outputPath;
+    };
+
         // spSetCodeGenTarget/spAddCodeGenTarget
         // spSetTargetProfile
         // spSetTargetFlags
@@ -72,6 +78,8 @@ struct StateSerializeUtil
         CodeGenTarget target;
         SlangTargetFlags targetFlags;
         FloatingPointMode floatingPointMode;
+
+        Relative32Array<OutputState> outputStates;
     };
 
     struct StringPair
