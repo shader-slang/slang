@@ -496,7 +496,7 @@ struct OptionsParser
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
-                    requestImpl->getLinkage()->setRequireCacheFileSystem(true);
+                    spEnableReproCapture(asExternal(requestImpl));
                 }
                 else if (argStr == "-dump-repro-on-error")
                 {

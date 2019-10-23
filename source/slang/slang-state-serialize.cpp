@@ -11,6 +11,53 @@
 
 namespace Slang {
 
+/* static */const RiffSemanticVersion StateSerializeUtil::g_semanticVersion =
+    RiffSemanticVersion::make(StateSerializeUtil::kMajorVersion, StateSerializeUtil::kMinorVersion, StateSerializeUtil::kPatchVersion);
+
+// A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
+static uint32_t _calcTypeHash()
+{
+    typedef StateSerializeUtil Util;
+
+    const size_t sizes[] =
+    {
+        sizeof(Util::FileState),
+        sizeof(Util::PathInfoState),
+            sizeof(Util::PathInfoState::CompressedResult),
+            sizeof(SlangPathType),
+        sizeof(Util::PathAndPathInfo),
+        sizeof(Util::TargetRequestState),
+            sizeof(Profile),
+            sizeof(CodeGenTarget),
+            sizeof(SlangTargetFlags),
+            sizeof(FloatingPointMode),
+        sizeof(Util::StringPair),
+        sizeof(Util::SourceFileState),
+            sizeof(PathInfo::Type),
+        sizeof(Util::TranslationUnitRequestState),
+            sizeof(SourceLanguage),
+        sizeof(Util::EntryPointState),
+            sizeof(Profile),
+        sizeof(Util::RequestState),
+            sizeof(SlangCompileFlags),
+            sizeof(bool),                       //< Unfortunately bools size can change across compilers/versions
+            sizeof(LineDirectiveMode),
+            sizeof(DebugInfoLevel),
+            sizeof(OptimizationLevel),
+            sizeof(ContainerFormat),
+            sizeof(PassThroughMode),
+            sizeof(SlangMatrixLayoutMode),
+    };
+
+    return uint32_t(GetHashCode((const char*)&sizes, sizeof(sizes)));
+}
+
+static uint32_t _getTypeHash()
+{
+    static uint32_t s_hash = _calcTypeHash();
+    return s_hash;
+}
+
 
 namespace { // anonymous
 
@@ -44,7 +91,7 @@ struct StoreContext
 
         // If file was not found create it
         // Create the file
-        file = m_container->allocate<FileState>();
+        file = m_container->newObject<FileState>();
 
         if (content)
         {
@@ -88,7 +135,7 @@ struct StoreContext
         file->foundPath = foundPath;
 
         // Create the source file
-        sourceFileState = m_container->allocate<SourceFileState>();
+        sourceFileState = m_container->newObject<SourceFileState>();
 
         sourceFileState->file = file;
         sourceFileState->foundPath = foundPath;
@@ -140,7 +187,7 @@ struct StoreContext
             }
 
             // Save the rest of the state
-            pathInfo = m_container->allocate<PathInfoState>();
+            pathInfo = m_container->newObject<PathInfoState>();
             PathInfoState& dst = *pathInfo;
 
             pathInfo->file = fileState;
@@ -184,7 +231,7 @@ struct StoreContext
     {
         typedef StateSerializeUtil::StringPair StringPair;
 
-        Safe32Array<StringPair> dstDefines = m_container->allocateArray<StringPair>(srcDefines.Count());
+        Safe32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
 
         Index index = 0;
         for (const auto& srcDefine : srcDefines)
@@ -205,7 +252,7 @@ struct StoreContext
 
     const Safe32Array<Relative32Ptr<RelativeString>> fromList(const List<String>& src)
     {   
-        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->allocateArray<Relative32Ptr<RelativeString>>(src.getCount());
+        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->newArray<Relative32Ptr<RelativeString>>(src.getCount());
         for (Index j = 0; j < src.getCount(); ++j)
         {
             dst[j] = fromString(src[j]);
@@ -249,7 +296,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     auto linkage = request->getLinkage();
 
-    Safe32Ptr<RequestState> requestState = inOutContainer.allocate<RequestState>();
+    Safe32Ptr<RequestState> requestState = inOutContainer.newObject<RequestState>();
 
     {
         RequestState* dst = requestState;
@@ -277,7 +324,7 @@ static bool _isStorable(const PathInfo::Type type)
 
         SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
 
-        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.allocateArray<EntryPointState>(srcEntryPoints.getCount());
+        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
 
         for (Index i = 0; i < srcEntryPoints.getCount(); ++i)
         {
@@ -316,26 +363,59 @@ static bool _isStorable(const PathInfo::Type type)
 
     // Add all the target requests
     {
-        Safe32Array<TargetRequestState> dstTargets = inOutContainer.allocateArray<TargetRequestState>(linkage->targets.getCount());
+        Safe32Array<TargetRequestState> dstTargets = inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
         {
-            auto& dst = dstTargets[i];
-            TargetRequest* targetRequest = linkage->targets[i];
+            TargetRequest* srcTargetRequest = linkage->targets[i];
 
-            dst.target = targetRequest->getTarget();
-            dst.profile = targetRequest->getTargetProfile();
-            dst.targetFlags = targetRequest->targetFlags;
-            dst.floatingPointMode = targetRequest->floatingPointMode;
+            // Copy the simple stuff
+            {
+                auto& dst = dstTargets[i];
+                dst.target = srcTargetRequest->getTarget();
+                dst.profile = srcTargetRequest->getTargetProfile();
+                dst.targetFlags = srcTargetRequest->targetFlags;
+                dst.floatingPointMode = srcTargetRequest->floatingPointMode;
+            }
+
+            // Copy the entry point/target output names
+            {
+                const auto& srcTargetInfos = request->targetInfos;
+
+                if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.TryGetValue(srcTargetRequest))
+                {
+                    EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
+
+                    const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
+
+                    Safe32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
+
+                    Index index = 0;
+                    for (const auto& pair : entryPointOutputPaths)
+                    {
+                        Safe32Ptr<RelativeString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
+
+                        auto& dstOutputState = dstOutputStates[index];
+
+                        dstOutputState.entryPointIndex = int32_t(pair.Key);
+                        dstOutputState.outputPath = outputPath;
+
+                        index++;
+                    }
+
+                    dstTargets[i].outputStates = dstOutputStates;
+                }
+            }
         }
-
+    
+        // Save the result
         requestState->targetRequests = dstTargets;
     }
 
     // Add the search paths
     {
         const auto& srcPaths = linkage->searchDirectories.searchDirectories;
-        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.allocateArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
+        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.newArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
 
         // We don't handle parents here
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
@@ -351,7 +431,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
-        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.allocateArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
+        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
 
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
@@ -364,7 +444,7 @@ static bool _isStorable(const PathInfo::Type type)
             Safe32Array<Relative32Ptr<SourceFileState>> dstSourceFiles;
             {
                 const auto& srcFiles = srcTranslationUnit->getSourceFiles();
-                dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
+                dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
@@ -385,12 +465,17 @@ static bool _isStorable(const PathInfo::Type type)
 
     // Find files from the file system, and mapping paths to files
     {
-        CacheFileSystem* cacheFileSystem = linkage->cacheFileSystem;
+        CacheFileSystem* cacheFileSystem = linkage->getCacheFileSystem();
+        if (!cacheFileSystem)
+        {
+            return SLANG_FAIL;
+        }
+
         // Traverse the references (in process we will construct the map from PathInfo)        
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Safe32Array<PathAndPathInfo> pathMap = inOutContainer.allocateArray<PathAndPathInfo>(srcFiles.Count());
+            Safe32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
 
             Index index = 0;
             for (const auto& pair : srcFiles)
@@ -413,7 +498,7 @@ static bool _isStorable(const PathInfo::Type type)
     {
         Dictionary<String, int> uniqueNameMap;
 
-        auto files = inOutContainer.allocateArray<Relative32Ptr<FileState>>(context.m_files.getCount());
+        auto files = inOutContainer.newArray<Relative32Ptr<FileState>>(context.m_files.getCount());
         for (Index i = 0; i < context.m_files.getCount(); ++i)
         {
             Safe32Ptr<FileState> file = context.m_files[i];
@@ -480,7 +565,7 @@ static bool _isStorable(const PathInfo::Type type)
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
+        auto dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
 
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
@@ -653,7 +738,16 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 {
     auto externalRequest = asExternal(request);
 
+    
     auto linkage = request->getLinkage();
+
+    // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
+    // Reset state
+    {
+        request->targetInfos.Clear();
+        // Remove any requests
+        linkage->targets.clear();
+    }
 
     LoadContext context(linkage->getSourceManager(), fileSystem);
 
@@ -673,20 +767,41 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
+
+    // Add the target requests
     {
         for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
         {
             TargetRequestState& src = requestState->targetRequests[i];
             int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
-            SLANG_UNUSED(index);
             SLANG_ASSERT(index == i);
 
-            auto dstTarget = linkage->targets[i];
+            auto dstTarget = linkage->targets[index];
 
             SLANG_ASSERT(dstTarget->getTarget() == src.target);
             dstTarget->targetProfile = src.profile;
             dstTarget->targetFlags = src.targetFlags;
             dstTarget->floatingPointMode = src.floatingPointMode;
+
+            // If there is output state (like output filenames) add here
+            if (src.outputStates.getCount())
+            {
+                RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
+                request->targetInfos[dstTarget] = dstTargetInfo;
+
+                for (const auto& srcOutputState : src.outputStates)
+                {
+                    SLANG_ASSERT(srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
+
+                    String entryPointPath;
+                    if (srcOutputState.outputPath)
+                    {
+                        entryPointPath = srcOutputState.outputPath->getSlice();
+                    }
+                    
+                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                }
+            }
         }
     }
 
@@ -746,6 +861,9 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
     // Entry points
     {
+        // Check there aren't any set entry point
+        SLANG_ASSERT(request->getFrontEndReq()->m_entryPointReqs.getCount() == 0);
+
         for (const auto& srcEntryPoint : requestState->entryPoints)
         {
             const char* name = srcEntryPoint.name ? srcEntryPoint.name->getCstr() : nullptr;
@@ -784,8 +902,8 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         // This is a bit of a hack, we are going to replace the file system, with our one which is filled in
         // with what was read from the file. 
 
-        linkage->fileSystemExt = cacheFileSystem;
-        linkage->cacheFileSystem = cacheFileSystem;
+        linkage->m_fileSystemExt = cacheFileSystem;
+        linkage->m_cacheFileSystem = cacheFileSystem;
     }
 
     return SLANG_OK;
@@ -797,7 +915,13 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
     RelativeContainer container;
     Safe32Ptr<RequestState> requestState;
     SLANG_RETURN_ON_FAIL(store(request, container, requestState));
-    return RiffUtil::writeData(kSlangStateFourCC, container.getData(), container.getDataCount(), stream);
+
+    Header header;
+    header.m_chunk.m_type = kSlangStateFourCC;
+    header.m_semanticVersion = g_semanticVersion;
+    header.m_typeHash = _getTypeHash();
+
+    return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
 }
 
 /* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, const String& filename)
@@ -823,10 +947,20 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */ SlangResult StateSerializeUtil::loadState(Stream* stream, List<uint8_t>& buffer)
 {
-    RiffChunk chunk;
-    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, chunk, buffer));
+    Header header;
 
-    if (chunk.m_type != kSlangStateFourCC)
+    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer));
+    if (header.m_chunk.m_type != kSlangStateFourCC)
+    {
+        return SLANG_FAIL;
+    }
+
+    if (!RiffSemanticVersion::areCompatible(g_semanticVersion, header.m_semanticVersion))
+    {
+        return SLANG_FAIL;
+    }
+
+    if (header.m_typeHash != _getTypeHash())
     {
         return SLANG_FAIL;
     }
@@ -836,11 +970,7 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
 
 /* static */SlangResult StateSerializeUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
 {
-    MemoryStream stream(FileAccess::Read);
-
-    stream.m_contents.setCount(size);
-    ::memcpy(stream.m_contents.getBuffer(), data, size);
-
+    MemoryStreamBase stream(FileAccess::Read, data, size);
     return loadState(&stream, outBuffer);
 }
 

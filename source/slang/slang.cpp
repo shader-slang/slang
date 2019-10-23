@@ -800,11 +800,11 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
 {
     outPathInfo.type = PathInfo::Type::Unknown;
 
-    SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
+    SLANG_RETURN_ON_FAIL(m_fileSystemExt->loadFile(path.getBuffer(), outBlob));
 
     ComPtr<ISlangBlob> uniqueIdentity;
     // Get the unique identity
-    SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
 
     outPathInfo.foundPath = path;
     outPathInfo.type = PathInfo::Type::FoundPath;
@@ -2489,17 +2489,17 @@ static const Slang::Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 {
     // Set the fileSystem
-    fileSystem = inFileSystem;
+    m_fileSystem = inFileSystem;
 
     // Release what's there
-    fileSystemExt.setNull();
-    cacheFileSystem.setNull();
+    m_fileSystemExt.setNull();
+    m_cacheFileSystem.setNull();
 
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
-        fileSystemExt = cacheFileSystem;
+        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        m_fileSystemExt = m_cacheFileSystem;
     }
     else
     {
@@ -2507,34 +2507,34 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
         inFileSystem->queryInterface(IID_SlangCacheFileSystem, (void**)&cacheFileSystemPtr);
         if (cacheFileSystemPtr)
         {
-            cacheFileSystem = cacheFileSystemPtr;
-            fileSystemExt = cacheFileSystemPtr;
+            m_cacheFileSystem = cacheFileSystemPtr;
+            m_fileSystemExt = cacheFileSystemPtr;
         }
         else 
         {
             if (m_requireCacheFileSystem)
             {
-                cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
-                fileSystemExt = cacheFileSystem;
+                m_cacheFileSystem = new Slang::CacheFileSystem(inFileSystem);
+                m_fileSystemExt = m_cacheFileSystem;
             }
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)fileSystemExt.writeRef());
+                inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
-                if (!fileSystemExt)
+                if (!m_fileSystemExt)
                 {
                     // Construct a wrapper to emulate the extended interface behavior
-                    cacheFileSystem = new Slang::CacheFileSystem(fileSystem);
-                    fileSystemExt = cacheFileSystem;
+                    m_cacheFileSystem = new Slang::CacheFileSystem(m_fileSystem);
+                    m_fileSystemExt = m_cacheFileSystem;
                 }
             }
         }
     }
 
     // Set the file system used on the source manager
-    getSourceManager()->setFileSystemExt(fileSystemExt);
+    getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
 
 void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)
@@ -2544,7 +2544,7 @@ void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)
         return;
     }
 
-    ComPtr<ISlangFileSystem> scopeFileSystem(fileSystem);
+    ComPtr<ISlangFileSystem> scopeFileSystem(m_fileSystem);
     m_requireCacheFileSystem = requireCacheFileSystem;
 
     setFileSystem(scopeFileSystem);
@@ -3503,15 +3503,42 @@ SLANG_API SlangResult spSaveRepro(
     using namespace Slang;
     auto request = asInternal(inRequest);
 
-    MemoryStream stream(FileAccess::Write);
+    OwnedMemoryStream stream(FileAccess::Write);
 
     SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
 
     RefPtr<ListBlob> listBlob(new ListBlob);
-    listBlob->m_data.swapWith(stream.m_contents);
+
+    // Put the content of the stream in the blob
+    stream.swapContents(listBlob->m_data);
 
     *outBlob = listBlob.detach();
     return SLANG_OK;
+}
+
+SLANG_API SlangResult spEnableReproCapture(
+    SlangCompileRequest* inRequest)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    request->getLinkage()->setRequireCacheFileSystem(true);
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangFileSystemExt* fileSystem)
+{
+    using namespace Slang;
+    SLANG_UNUSED(session);
+
+    List<uint8_t> buffer;
+    {
+        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
+        SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&memoryStream, buffer));
+    }
+
+    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+    return StateSerializeUtil::extractFiles(requestState, fileSystem);
 }
 
 // Reflection API

@@ -6,6 +6,141 @@
 
 namespace Slang {
 
+/*
+The purpose of RelativeContainer and related types is to provide a mechanism to easily serialize relative structures.
+
+The root idea here is the "relative pointer". A typical pointer in a language like C/C++ holds the absolute address
+of the thing that is being pointed to. This introduces a problem if the structure is serialized in that
+it is highly likely that the structures will be placed at different addresses. This means that the absolute
+pointers will not point to the correct places, and so not be usable when read back from a serialization, or
+when moved to another location.
+
+A relative pointer means a pointer that points to something relative
+to the *location of the pointer*. The Relative32Ptr uses a 32 bit offset from the pointers location in memory. This
+means such a pointer can address a 4Gb address space, but more realistically it gives it a 2Gb address space as this
+is the size such that a pointer at any address can point to any other address. For specialized uses, it can be useful
+to have 8 bit, 16 bit, 64 bit and scaled relative pointers. For the purposes here though 32 bits works well enough
+for current use cases.
+
+Special care is needed when using relative pointers - both when constructing structures that contain them, reading
+them and in general usage.
+
+For simplicity here we store all relative pointers within a single contiguous allocation. This allocation is
+typically managed by the RelativeContainer. For simplicity it's easiest to claim that all relative pointers
+*can only exist* in this address space. That is no relative pointer should be decared as a variable on the stack, and
+similarly no struct, or other derived type holding a relative pointer should be held on the stack.
+
+Why? Most simply in a 64bit address space there is no guarentee that say a 32bit relative pointer *can* point to the
+memory in the RelativeContainer. For similar reasons relative ptrs cannot be held in the heap, or in a typical ADT
+container (like std::vector). In summary RelativePtr can *only* be stored in contiguous chunk of memory designed for
+the purpose - such as RelativeContainer, or a continuous chunk of memory that has been serialized in.
+
+This presents a problem - in how do we create and use such structures? For reading the process is simple - in that we
+can just turn the relative pointer into a regular raw pointer and use it. When creating structures - unless you know
+the allocated space (in the RelativeContainer or some other piece of memory) is larger than required, then special care
+is needed, because when a new larger piece of memory is allocated to hold everything, all of the absolute pointers
+will likely be invalidated.
+
+To work around this problem we have the Safe32Ptr. This is a pointer which holds a pointer relative to the start of the
+allocation as well as knowing what the base allocation is. So if there is a change in the base allocation address -
+for example when the RelativeContainer resizes the backing memory, the Safe32Ptr is aware of the change and everything continues to
+work as expected. Safe32Ptr are much more like normal pointers - and they can be stored on the stack or in other structures
+like say a vector without problems. On the other hand a Safe32Ptr *cannot* be stored within stuctures held within the RelativeContainer,
+as it would no longer have the correct properties to be serializable (it would contain an absolute pointer - the one in the SafePtr).
+
+We can divide types into to sets. 'Relative types' and 'Non relative types'. 'Relative types' are Relative pointers/arrays,
+and value types (such as float, int etc), and POD types constructed from those types. Everything else is not a 'relative type'.
+Any relative type that has a relative pointer (such as Relative32Ptr and Relative32Array) can only be allocated in a 'relative aware'
+piece or memory such as RelativeContainer, or suitable contiguous piece of memory.
+
+So in basic usage - Relative32Ptr can only be stored inside of RelativeContainer or part of contiguous memory arranged to
+support them. Conversely Safe32Ptr can only be used outside of the places RelativePtrs can be used.
+They can both point to the same things though. RelativePtrs can be thought of pointers for use in serialization, and SafePtrs
+as pointers used to construct things using RelativePtrs.
+
+With that out of the way there is one last caveat - and it is around use of Safe32Ptr. That the Safe32Ptr is safe to use
+even if the underlying memory is moved. But raw pointers (which are of course absolute) from it are only valid whilst there
+are no changes to the location of memory. That Relative32Ptr and Safe32Ptrs are convertible between each other.
+
+For example 
+
+```
+
+struct Thing
+{
+    Relative32Ptr<RelativeString> text;
+    int value;
+};
+
+void func()
+{
+    RelativeContainer container;
+
+    // BAD! Can't construct anything containing a Relative32Ptr on the stack.
+    Thing thing;
+
+    // BAD! We are closer - thing is constructed in the container, but we cannot have Relative32Ptrs held on the stack.
+    Relative32Ptr<Thing> thing = container.newObject<Thing>();
+
+    // Ok - this is now correct
+    Safe32Ptr<Thing> thing = container.newObject<Thing>();
+
+    // We can write and read things via the Safe32Ptr
+    thing->value = 10;
+    const int value = thing->value;
+
+    // Now lets write to it
+    {
+        // We can have raw pointer (or reference) to a thing but we need to be *careful* if we allocate 
+        Thing* rawThing = thing;
+        // We are okay here, nothing between getting the raw pointer and the write allocated/newed anything on the RelativeContainer
+        rawThing->value = 20;
+
+        // Lets set up name 
+        Safe32Ptr<RelativeString> text = relativeContainer.newString("Hello World!");
+
+        // BAD! Thr rawThing point could now be invalid because the call to newString may have had to allocate more memory
+        rawThing->text = text;
+
+        // This is okay because access is through the Safe32Ptr
+        thing->text = text;
+
+        // Or we can update rawThing such that is up to date
+        rawThing = thing;
+        // So now this is okay again
+        rawThing->text = text;
+    }
+}
+
+```
+
+Safe32Array and Relative32Array have very similar behaviors to Safe32Ptr and Relative32Ptr and can be used in the same places
+for the same purposes, but their use revolves around arrays. The arrays data is always allocated in the *RelativeContainer* so
+the arrays contents *even with* Safe32Array, can only contain Relative types. 
+
+For example
+
+```
+
+// BAD! The element types cannot contain any absolute pointers and that includes SafePtr
+Safe32Array<Safe32Ptr<RelativeString>> array = container.newArray<Safe32Ptr<RelativeString>>(10);
+
+// Ok
+Safe32Array<Relative32Ptr<RelativeString>> array = container.newArray<Relative32<Ptr<RelativeString>>(10);
+// I can now set array element in the normal way
+array[1] = container.newString("Hello");
+array[2] = container.newString("World!");
+```
+
+*/
+
+
+/* A type that is used to hold the base address of the contiguous memory that holds either RelativePtr and related types
+and/or is pointed to by Safe32Ptrs.
+
+The g_null member is a special singleton version that just holds m_data as nullptr, allows the representation of 'nullptr' on
+a Safe32Ptr to be that RelativeBase with an offset of 0.
+*/
 struct RelativeBase
 {
     uint8_t* m_data;
@@ -13,6 +148,9 @@ struct RelativeBase
     static RelativeBase g_null;
 };
 
+/* A pointer to items held in RelativeContainer that remains correct even if the memory inside RelativeContainer moves.
+Safe32Ptr can be allocated on the stack, on the heap, used in containers such as List, std::vector.
+*/
 template <typename T>
 class Safe32Ptr
 {
@@ -46,6 +184,26 @@ enum
     kRelative32PtrNull = int32_t(0x80000000)
 };
 
+/* A 32 bit relative pointer. It can only be held in contiguous memory designed for it's usage (like RelativeContainer). The thing
+that it points to is relative to the address *of the pointer*.
+
+This means that in normal usage should *not* be allocated on the stack, on the heap (unless as part of contiguous piece of memory
+designed for usage), or in a container such as std::vector or List.
+
+That because pointers are relative, we use a special value `kRelative32PtrNull` to indicate a pointer is nullptr. 0 could not be used
+because if we had
+
+```
+struct Thing
+{
+    RelativePtr<Thing> thingPtr;
+    int someThingElse;
+};
+```
+
+It might be valid for thingPtr to point to Thing and in that case it's offset would be 0, and this confused with nullptr if 0 was
+used to represent nullptr.
+*/
 template <typename T>
 class Relative32Ptr
 {
@@ -85,6 +243,8 @@ public:
     int32_t m_offset;
 };
 
+/* Much like SafePtr this is an array but whose memory is stored inside the RelativeContainer. This means elements types 
+must be 'relative types'. */
 template <typename T>
 class Safe32Array
 {
@@ -110,7 +270,7 @@ public:
     uint32_t m_count;
 };
 
-
+/* Much like a RelativePtr this is an array whose elements are stored inside the RelativeContainer. This means element types can only be 'relative types'. */
 template <typename T>
 class Relative32Array
 {
@@ -143,6 +303,9 @@ public:
     Relative32Ptr<T> m_data;           ///< The data
 };
 
+/** RelativeString is used for storing strings within a RelativeContainer. Strings are stored with the initial byte indicating the size
+of the string. Note that all relative strings are stored with a terminating zero, and that the terminating zero is *NOT* included in
+the encoded size. */
 struct RelativeString
 {
     enum
@@ -170,12 +333,18 @@ struct RelativeString
     char m_sizeThenContents[1];
 };
 
+/* RelativeContainer is a type designed to manage the construction structures around 'relative types'. In particular it allows
+for construction of relative structures where their total relative encoded size is not known at the outset.
+
+The main mechanism to make this work is via the use of SafeXXX types, which when constructed from the RelativeContainer will
+maintain valid values, even if the underlying backing memories location is changed. 
+*/
 class RelativeContainer
 {
 public:
 
     template <typename T>
-    Safe32Ptr<T> allocate()
+    Safe32Ptr<T> newObject()
     {
         void* data = allocate(sizeof(T), SLANG_ALIGN_OF(T));
         new (data) T();
@@ -183,7 +352,7 @@ public:
     }
 
     template <typename T>
-    Safe32Array<T> allocateArray(size_t size)
+    Safe32Array<T> newArray(size_t size)
     {
         if (size == 0)
         {
@@ -197,7 +366,7 @@ public:
         return Safe32Array<T>(Safe32Ptr<T>(getOffset(data), &m_base), uint32_t(size));
     }
 
-        /// Make a pointer into a safe ptr
+        /// Make a raw pointer into a safe ptr
     template <typename T>
     Safe32Ptr<T> toSafe(T* in)
     {
