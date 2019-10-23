@@ -188,6 +188,7 @@
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
     <ClInclude Include="slang-object-scope-manager.h" />
+    <ClInclude Include="slang-offset-container.h" />
     <ClInclude Include="slang-platform.h" />
     <ClInclude Include="slang-process-util.h" />
     <ClInclude Include="slang-random-generator.h" />
@@ -220,6 +221,7 @@
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />
+    <ClCompile Include="slang-offset-container.cpp" />
     <ClCompile Include="slang-platform.cpp" />
     <ClCompile Include="slang-random-generator.cpp" />
     <ClCompile Include="slang-relative-container.cpp" />

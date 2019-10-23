@@ -44,6 +44,9 @@
     <ClCompile Include="test-reporter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="unit-offset-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="unit-relative-container.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
