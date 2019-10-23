@@ -42,7 +42,7 @@ struct StoreContext
 
         // If file was not found create it
         // Create the file
-        file = m_container->allocate<FileState>();
+        file = m_container->newObject<FileState>();
 
         if (content)
         {
@@ -86,7 +86,7 @@ struct StoreContext
         file->foundPath = foundPath;
 
         // Create the source file
-        sourceFileState = m_container->allocate<SourceFileState>();
+        sourceFileState = m_container->newObject<SourceFileState>();
 
         sourceFileState->file = file;
         sourceFileState->foundPath = foundPath;
@@ -138,7 +138,7 @@ struct StoreContext
             }
 
             // Save the rest of the state
-            pathInfo = m_container->allocate<PathInfoState>();
+            pathInfo = m_container->newObject<PathInfoState>();
             PathInfoState& dst = *pathInfo;
 
             pathInfo->file = fileState;
@@ -182,7 +182,7 @@ struct StoreContext
     {
         typedef StateSerializeUtil::StringPair StringPair;
 
-        Safe32Array<StringPair> dstDefines = m_container->allocateArray<StringPair>(srcDefines.Count());
+        Safe32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
 
         Index index = 0;
         for (const auto& srcDefine : srcDefines)
@@ -203,7 +203,7 @@ struct StoreContext
 
     const Safe32Array<Relative32Ptr<RelativeString>> fromList(const List<String>& src)
     {   
-        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->allocateArray<Relative32Ptr<RelativeString>>(src.getCount());
+        Safe32Array<Relative32Ptr<RelativeString>> dst = m_container->newArray<Relative32Ptr<RelativeString>>(src.getCount());
         for (Index j = 0; j < src.getCount(); ++j)
         {
             dst[j] = fromString(src[j]);
@@ -247,7 +247,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     auto linkage = request->getLinkage();
 
-    Safe32Ptr<RequestState> requestState = inOutContainer.allocate<RequestState>();
+    Safe32Ptr<RequestState> requestState = inOutContainer.newObject<RequestState>();
 
     {
         RequestState* dst = requestState;
@@ -275,7 +275,7 @@ static bool _isStorable(const PathInfo::Type type)
 
         SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
 
-        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.allocateArray<EntryPointState>(srcEntryPoints.getCount());
+        Safe32Array<EntryPointState> dstEntryPoints = inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
 
         for (Index i = 0; i < srcEntryPoints.getCount(); ++i)
         {
@@ -314,7 +314,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     // Add all the target requests
     {
-        Safe32Array<TargetRequestState> dstTargets = inOutContainer.allocateArray<TargetRequestState>(linkage->targets.getCount());
+        Safe32Array<TargetRequestState> dstTargets = inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
         {
@@ -339,8 +339,7 @@ static bool _isStorable(const PathInfo::Type type)
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Safe32Array<OutputState> dstOutputStates;
-                    dstOutputStates = inOutContainer.allocateArray<OutputState>(entryPointOutputPaths.Count());
+                    Safe32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.Count());
 
                     Index index = 0;
                     for (const auto& pair : entryPointOutputPaths)
@@ -367,7 +366,7 @@ static bool _isStorable(const PathInfo::Type type)
     // Add the search paths
     {
         const auto& srcPaths = linkage->searchDirectories.searchDirectories;
-        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.allocateArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
+        Safe32Array<Relative32Ptr<RelativeString> > dstPaths = inOutContainer.newArray<Relative32Ptr<RelativeString> >(srcPaths.getCount());
 
         // We don't handle parents here
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
@@ -383,7 +382,7 @@ static bool _isStorable(const PathInfo::Type type)
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
-        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.allocateArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
+        Safe32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
 
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
@@ -396,7 +395,7 @@ static bool _isStorable(const PathInfo::Type type)
             Safe32Array<Relative32Ptr<SourceFileState>> dstSourceFiles;
             {
                 const auto& srcFiles = srcTranslationUnit->getSourceFiles();
-                dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
+                dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState> >(srcFiles.getCount());
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
@@ -427,7 +426,7 @@ static bool _isStorable(const PathInfo::Type type)
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Safe32Array<PathAndPathInfo> pathMap = inOutContainer.allocateArray<PathAndPathInfo>(srcFiles.Count());
+            Safe32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.Count());
 
             Index index = 0;
             for (const auto& pair : srcFiles)
@@ -450,7 +449,7 @@ static bool _isStorable(const PathInfo::Type type)
     {
         Dictionary<String, int> uniqueNameMap;
 
-        auto files = inOutContainer.allocateArray<Relative32Ptr<FileState>>(context.m_files.getCount());
+        auto files = inOutContainer.newArray<Relative32Ptr<FileState>>(context.m_files.getCount());
         for (Index i = 0; i < context.m_files.getCount(); ++i)
         {
             Safe32Ptr<FileState> file = context.m_files[i];
@@ -517,7 +516,7 @@ static bool _isStorable(const PathInfo::Type type)
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.allocateArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
+        auto dstSourceFiles = inOutContainer.newArray<Relative32Ptr<SourceFileState>>(srcSourceFiles.Count());
 
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
