@@ -2182,7 +2182,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     }
 }
 
-void CLikeSourceEmitter::emitSemantics(IRVarLayout* varLayout)
+void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
 {
     if(auto semanticAttr = varLayout->findAttr<IRSemanticAttr>())
     {
@@ -2192,7 +2192,7 @@ void CLikeSourceEmitter::emitSemantics(IRVarLayout* varLayout)
         //
         // The original rationale for switching to uppercase was
         // canonicalization for reflection (users can't accidentally
-        // write code that works for `COLOR` but not for `COLOR`),
+        // write code that works for `COLOR` but not for `Color`),
         // but it would probably be more ideal for our output code
         // to give the semantic name as close to how it was originally spelled
         // spelled as possible.

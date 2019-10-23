@@ -206,15 +206,8 @@ public:
 
     void emitInst(IRInst* inst);
 
-    // TODO: When this signature switched from `VarLayout` to `IRVarLayout`
-    // it became possible to get confused beetween this overload and the
-    // one that takes a base `IRInst`. We should probably be careful and
-    // rename one of the other of the `emitSemantics()` functions to avoid
-    // confusion.
-    //
-    void emitSemantics(IRVarLayout* varLayout);
-
     void emitSemantics(IRInst* inst);
+    void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
     static IRVarLayout* getVarLayout(IRInst* var);
 
