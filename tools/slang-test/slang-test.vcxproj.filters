@@ -47,9 +47,6 @@
     <ClCompile Include="unit-offset-container.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="unit-relative-container.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="unit-test-byte-encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
