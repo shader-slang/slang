@@ -847,9 +847,9 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             header.m_chunk.m_size = uint32_t(payloadSize);
             header.m_numEntries = uint32_t(numEntries);
 
-            stream->Write(&header, sizeof(header));
+            stream->write(&header, sizeof(header));
 
-            stream->Write(data, typeSize * numEntries);
+            stream->write(data, typeSize * numEntries);
             break;
         }
         case Bin::CompressionType::VariableByteLite:
@@ -868,9 +868,9 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             header.m_numEntries = uint32_t(numEntries);
             header.m_numCompressedEntries = uint32_t(numCompressedEntries);
 
-            stream->Write(&header, sizeof(header));
+            stream->write(&header, sizeof(header));
 
-            stream->Write(compressedPayload.begin(), compressedPayload.getCount());
+            stream->write(compressedPayload.begin(), compressedPayload.getCount());
             break;
         }
         default:
@@ -884,7 +884,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
         const uint8_t pad[4] = { 0, 0, 0, 0 };
         // Pad outs
         int padSize = 4 - (payloadSize & 3);
-        stream->Write(pad, padSize);
+        stream->write(pad, padSize);
     }
 
     return SLANG_OK;
@@ -1013,8 +1013,8 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             header.m_numEntries = uint32_t(array.getCount());
             header.m_numCompressedEntries = 0;          
 
-            stream->Write(&header, sizeof(header));
-            stream->Write(compressedPayload.begin(), compressedPayload.getCount());
+            stream->write(&header, sizeof(header));
+            stream->write(compressedPayload.begin(), compressedPayload.getCount());
     
             // All chunks have sizes rounded to dword size
             if (payloadSize & 3)
@@ -1022,7 +1022,7 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
                 const uint8_t pad[4] = { 0, 0, 0, 0 };
                 // Pad outs
                 int padSize = 4 - (payloadSize & 3);
-                stream->Write(pad, padSize);
+                stream->write(pad, padSize);
             }
             return SLANG_OK;
         }
@@ -1128,7 +1128,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         riffHeader.m_type = Bin::kRiffFourCc;
         riffHeader.m_size = uint32_t(totalSize);
         
-        stream->Write(&riffHeader, sizeof(riffHeader));
+        stream->write(&riffHeader, sizeof(riffHeader));
     }
     {
         Bin::SlangHeader slangHeader;
@@ -1136,7 +1136,7 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
         slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(RiffChunk));
         slangHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
 
-        stream->Write(&slangHeader, sizeof(slangHeader));
+        stream->write(&slangHeader, sizeof(slangHeader));
     }
 
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, stream));
@@ -1206,7 +1206,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             Bin::CompressedArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            stream->read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
             *numReadInOut += sizeof(header) - sizeof(RiffChunk);
 
             void* data = listOut.setSize(header.m_numEntries);
@@ -1217,7 +1217,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
 
-            stream->Read(compressedPayload.begin(), payloadSize);
+            stream->read(compressedPayload.begin(), payloadSize);
             *numReadInOut += payloadSize;
         
             SLANG_ASSERT(header.m_numCompressedEntries == uint32_t((header.m_numEntries * typeSize) / sizeof(uint32_t)));
@@ -1232,14 +1232,14 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             Bin::ArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            stream->read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
             *numReadInOut += sizeof(header) - sizeof(RiffChunk);
 
             const size_t payloadSize = header.m_numEntries * typeSize;
 
             void* data = listOut.setSize(header.m_numEntries);
 
-            stream->Read(data, payloadSize);
+            stream->read(data, payloadSize);
             *numReadInOut += payloadSize;
             break;
         }
@@ -1251,7 +1251,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
         const uint8_t pad[4] = { 0, 0, 0, 0 };
         // Pad outs
         int padSize = 4 - int(*numReadInOut & 3);
-        stream->Seek(SeekOrigin::Current, padSize);
+        stream->seek(SeekOrigin::Current, padSize);
 
         *numReadInOut += padSize;
     }
@@ -1374,7 +1374,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
             Bin::CompressedArrayHeader header;
             header.m_chunk = chunk;
 
-            stream->Read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
+            stream->read(&header.m_chunk + 1, sizeof(header) - sizeof(RiffChunk));
             *numReadInOut += sizeof(header) - sizeof(RiffChunk);
             
             // Need to read all the compressed data... 
@@ -1383,7 +1383,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
 
-            stream->Read(compressedPayload.begin(), payloadSize);
+            stream->read(compressedPayload.begin(), payloadSize);
             *numReadInOut += payloadSize;
 
             arrayOut.setCount(header.m_numEntries);
@@ -1402,7 +1402,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
     {
         // Pad outs
         int padSize = 4 - int(*numReadInOut & 3);
-        stream->Seek(SeekOrigin::Current, padSize);
+        stream->seek(SeekOrigin::Current, padSize);
         *numReadInOut += padSize;
     }
 
@@ -1449,7 +1449,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
                 // NOTE! Really we should only read what we know the size to be...
                 // and skip if it's larger
 
-                stream->Read(&slangHeader.m_chunk + 1, sizeof(slangHeader) - sizeof(chunk));
+                stream->read(&slangHeader.m_chunk + 1, sizeof(slangHeader) - sizeof(chunk));
 
                 remainingBytes -= RiffUtil::calcChunkTotalSize(chunk);
                 break;
@@ -1964,11 +1964,11 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     }
 
     // Write the data out to stream
-    MemoryStream memoryStream(FileAccess::ReadWrite);
+    OwnedMemoryStream memoryStream(FileAccess::ReadWrite);
     SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, compressionType, &memoryStream));
 
     // Reset stream
-    memoryStream.Seek(SeekOrigin::Start, 0);
+    memoryStream.seek(SeekOrigin::Start, 0);
 
     IRSerialData readData;
 

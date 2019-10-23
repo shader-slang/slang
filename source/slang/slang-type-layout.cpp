@@ -2,6 +2,7 @@
 #include "slang-type-layout.h"
 
 #include "slang-syntax.h"
+#include "slang-ir-insts.h"
 
 #include <assert.h>
 
@@ -1356,73 +1357,110 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     return newTypeLayout;
 }
 
-RefPtr<VarLayout> applyOffsetToVarLayout(
-    VarLayout* baseLayout,
-    VarLayout* offsetLayout)
+IRTypeLayout* applyOffsetToTypeLayout(
+    IRBuilder*      irBuilder,
+    IRTypeLayout*   oldTypeLayout,
+    IRVarLayout*    offsetVarLayout)
 {
-    RefPtr<VarLayout> adjustedLayout = new VarLayout();
-    adjustedLayout->typeLayout = baseLayout->typeLayout;
-    adjustedLayout->varDecl = baseLayout->varDecl;
-    adjustedLayout->flags = baseLayout->flags;
-    adjustedLayout->semanticName = baseLayout->semanticName;
-    adjustedLayout->semanticIndex = baseLayout->semanticIndex;
-    adjustedLayout->systemValueSemantic = baseLayout->systemValueSemantic;
-    adjustedLayout->systemValueSemanticIndex = baseLayout->systemValueSemanticIndex;
-    adjustedLayout->stage = baseLayout->stage;
+    // The body of this function is derived from the AST case defined above.
+    //
+    // TODO: We shouldn't need this function at all because "offset" type
+    // layouts were only introduced as a legacy workaround for some bad choices
+    // in the reflection API.
+    //
 
-    if( auto basePendingLayout = baseLayout->pendingVarLayout )
+    // There is no need to apply offsets if the old type and the offset
+    // don't share any resource infos in common.
+    bool anyHit = false;
+    for (auto oldResInfo : oldTypeLayout->getSizeAttrs())
     {
-        if( auto offsetPendingLayout = offsetLayout->pendingVarLayout )
+        if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
         {
-            adjustedLayout->pendingVarLayout = applyOffsetToVarLayout(
-                basePendingLayout,
-                offsetPendingLayout);
+            anyHit = true;
+            break;
         }
     }
 
-    for( auto baseResInfo : baseLayout->resourceInfos )
+    if (!anyHit)
+        return oldTypeLayout;
+
+    if (auto oldStructTypeLayout = as<IRStructTypeLayout>(oldTypeLayout))
     {
-        auto adjustedResInfo = baseResInfo;
-        if( auto offsetResInfo = offsetLayout->FindResourceInfo(baseResInfo.kind) )
+        IRStructTypeLayout::Builder newStructTypeLayoutBuilder(irBuilder);
+        newStructTypeLayoutBuilder.addResourceUsageFrom(oldTypeLayout);
+
+        for (auto oldFieldAttr : oldStructTypeLayout->getFieldLayoutAttrs())
         {
-            adjustedResInfo.index += offsetResInfo->index;
-            adjustedResInfo.space += offsetResInfo->space;
+            auto fieldKey = oldFieldAttr->getFieldKey();
+            auto oldFieldLayout = oldFieldAttr->getLayout();
+
+            IRVarLayout::Builder newFieldBuilder(irBuilder, oldFieldLayout->getTypeLayout());
+            newFieldBuilder.cloneEverythingButOffsetsFrom(oldFieldLayout);
+
+            for (auto oldResInfo : oldFieldLayout->getOffsetAttrs())
+            {
+                auto kind = oldResInfo->getResourceKind();
+                auto newResInfo = newFieldBuilder.findOrAddResourceInfo(kind);
+                newResInfo->offset = oldResInfo->getOffset();
+                newResInfo->space = oldResInfo->getSpace();
+                if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(kind))
+                {
+                    newResInfo->offset += offsetResInfo->getOffset();
+                }
+            }
+
+            newStructTypeLayoutBuilder.addField(fieldKey, newFieldBuilder.build());
         }
-        adjustedLayout->resourceInfos.add(adjustedResInfo);
-    }
 
-    return adjustedLayout;
+        return newStructTypeLayoutBuilder.build();
+    }
+    else
+    {
+        // We can only effectively apply this offsetting to basic struct types,
+        // and so we won't even attempt it for anything else. This matches the
+        // AST implementation of this function, and shouldn't matter in the long
+        // run since we will remove the concept of offset type layouts from
+        // the IR.
+        //
+        return oldTypeLayout;
+    }
 }
 
-EntryPointLayout* EntryPointLayout::getAbsoluteLayout(
-    VarLayout* parentLayout)
+IRVarLayout* applyOffsetToVarLayout(
+    IRBuilder*      irBuilder,
+    IRVarLayout*    baseLayout,
+    IRVarLayout*    offsetLayout)
 {
-    SLANG_ASSERT(parentLayout);
+    IRVarLayout::Builder adjustedLayoutBuilder(irBuilder, baseLayout->getTypeLayout());
+    adjustedLayoutBuilder.cloneEverythingButOffsetsFrom(baseLayout);
 
-    if(m_absoluteLayout)
-        return m_absoluteLayout;
-
-    RefPtr<EntryPointLayout> adjustedLayout = new EntryPointLayout();
-    adjustedLayout->entryPoint = this->entryPoint;
-    adjustedLayout->flags = this->flags;
-    adjustedLayout->parametersLayout = this->parametersLayout->getAbsoluteLayout(parentLayout);
-    adjustedLayout->profile = this->profile;
-    if( auto baseResultLayout = this->resultLayout )
+    if( auto basePendingLayout = baseLayout->getPendingVarLayout() )
     {
-        adjustedLayout->resultLayout = baseResultLayout->getAbsoluteLayout(parentLayout);
+        if( auto offsetPendingLayout = offsetLayout->getPendingVarLayout() )
+        {
+            adjustedLayoutBuilder.setPendingVarLayout(
+                applyOffsetToVarLayout(
+                    irBuilder,
+                    basePendingLayout,
+                    offsetPendingLayout));
+        }
     }
 
-    m_absoluteLayout = adjustedLayout;
-    return adjustedLayout;
-}
-
-VarLayout* VarLayout::getAbsoluteLayout(VarLayout* parentAbsoluteLayout)
-{
-    if( !m_absoluteLayout )
+    for( auto baseResInfo : baseLayout->getOffsetAttrs() )
     {
-        m_absoluteLayout = applyOffsetToVarLayout(this, parentAbsoluteLayout);
+        auto kind = baseResInfo->getResourceKind();
+        auto adjustedResInfo = adjustedLayoutBuilder.findOrAddResourceInfo(kind);
+        adjustedResInfo->offset = baseResInfo->getOffset();
+        adjustedResInfo->space = baseResInfo->getSpace();
+
+        if( auto offsetResInfo = offsetLayout->findOffsetAttr(baseResInfo->getResourceKind()) )
+        {
+            adjustedResInfo->offset += offsetResInfo->getOffset();
+            adjustedResInfo->space += offsetResInfo->getSpace();
+        }
     }
-    return m_absoluteLayout;
+
+    return adjustedLayoutBuilder.build();
 }
 
 static bool _usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)

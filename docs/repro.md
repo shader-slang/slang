@@ -34,9 +34,12 @@ There currently isn't a mechanism to alter the options of a repro from the comma
 1) Altering the include paths - unless this may break the mechanism used to map paths to files stored in the repro file
 2) Altering the ISlangFileSystem. That to make the contents of the file system appear to be that of the repro, slang uses a ISlangFileSystemExt that uses the contents of the repro file and/or the `repro directory`. If you replace the file system this mechanism will no longer work. 
 
-There are currently two API calls for using the repro functionality 
+There are currently several API calls for using the repro functionality 
 
 ```
+SLANG_API SlangResult spEnableReproCapture(
+        SlangCompileRequest* request);
+    
 SLANG_API SlangResult spLoadRepro(
         SlangCompileRequest* request,
         ISlangFileSystem* fileSystem,
@@ -47,12 +50,21 @@ SLANG_API SlangResult spSaveRepro(
         SlangCompileRequest* request,
         ISlangBlob** outBlob
     );
+    
+SLANG_API SlangResult spExtractRepro(
+    SlangSession* session, 
+    const void* reproData, 
+    size_t reproDataSize, 
+    ISlangFileSystemExt* fileSystem);    
+    
 ```
 
-The fileSystem parameter passed to `spLoadRepro` provides the mechanism for client code to replace the files that are held within the repro. NOTE! That the files will be loaded from this file system with their `unique names` as if they are part of the flat file system. If an attempt to load a file fails, the file within the repro is used. That `spLoadRepro` is typically performed on a new 'unused' SlangCompileRequest.
+The fileSystem parameter passed to `spLoadRepro` provides the mechanism for client code to replace the files that are held within the repro. NOTE! That the files will be loaded from this file system with their `unique names` as if they are part of the flat file system. If an attempt to load a file fails, the file within the repro is used. That `spLoadRepro` is typically performed on a new 'unused' SlangCompileRequest. After a call to `spLoadRepro` normal functions to alter the state of the SlangCompileRequest are available. 
 
-That after `spLoadRepro`, normal functions to alter the state of the SlangCompileRequest are available. 
-
+The function `spEnableReproCapture` should be set after any ISlangFileSystem has been set (if any), but before any compilation. It ensures that everything that the ISlangFileSystem accesses will be correctly recorded. Note that if a ISlangFileSystem/ISlangFileSystemExt isn't explicitly set (ie the default is used), then a request will automatically be set up to record everything appropriate and a call to this function isn't strictly required.  
+    
+The function `spExtractRepro` allows for extracting the files used in a request (along with the associated manifest). They files and manifest are stored under the 'unique names' in the root of the user provided ISlangFileSystemExt.     
+    
 Repro files are currently stored in a binary format. This format is sensitive to changes in the API, as well as internal state within a SlangCompileRequest. This means that the functionality can only be guarenteed to work with exactly the same version of Slang on the same version of compiler. In practice things are typically not so draconian, and future versions will aim to provide a more clear slang repro versioning system, and work will be performed to make more generally usable. 
 
 Finally this version of the repo system does not take into account endianess at all. The system the repro is saved from must have the same endianess as the system loaded on.

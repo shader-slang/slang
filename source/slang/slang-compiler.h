@@ -1172,17 +1172,19 @@ namespace Slang
         /// If this member is `null`, a default implementation that tries
         /// to use the native OS filesystem will be used instead.
         ///
-        ComPtr<ISlangFileSystem> fileSystem;
+        ComPtr<ISlangFileSystem> m_fileSystem;
 
         /// The extended file system implementation. Will be set to a default implementation
         /// if fileSystem is nullptr. Otherwise it will either be fileSystem's interface, 
         /// or a wrapped impl that makes fileSystem operate as fileSystemExt
-        ComPtr<ISlangFileSystemExt> fileSystemExt;
+        ComPtr<ISlangFileSystemExt> m_fileSystemExt;
 
+        
         /// Set if fileSystemExt is a cache file system
-        RefPtr<CacheFileSystem> cacheFileSystem;
+        RefPtr<CacheFileSystem> m_cacheFileSystem;
 
-        ISlangFileSystemExt* getFileSystemExt() { return fileSystemExt; }
+        ISlangFileSystemExt* getFileSystemExt() { return m_fileSystemExt; }
+        CacheFileSystem* getCacheFileSystem() const { return m_cacheFileSystem; }
 
         /// Load a file into memory using the configured file system.
         ///
@@ -1191,7 +1193,6 @@ namespace Slang
         /// @returns A `SlangResult` to indicate success or failure.
         ///
         SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob);
-
 
         RefPtr<Expr> parseTypeString(String typeStr, RefPtr<Scope> scope);
 
@@ -1230,7 +1231,7 @@ namespace Slang
             return m_sourceManager;
         }
 
-            /// Override the source manager for the linakge.
+            /// Override the source manager for the linkage.
             ///
             /// This is only used to install a temporary override when
             /// parsing stuff from strings (where we don't want to retain

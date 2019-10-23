@@ -40,7 +40,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(LayoutResourceKind kind, EmitV
 {
     if (!chain)
         return;
-    if (!chain->varLayout->FindResourceInfo(kind))
+    if (!chain->varLayout->usesResourceKind(kind))
         return;
 
     UInt index = getBindingOffset(chain, kind);
@@ -144,13 +144,13 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, char con
             break;
     }
 
-    for (auto rr : layout->resourceInfos)
+    for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantic(rr.kind, chain, uniformSemanticSpelling);
+        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, uniformSemanticSpelling);
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLRegisterSemantics(VarLayout* varLayout, char const* uniformSemanticSpelling)
+void HLSLSourceEmitter::_emitHLSLRegisterSemantics(IRVarLayout* varLayout, char const* uniformSemanticSpelling)
 {
     if (!varLayout)
         return;
@@ -165,13 +165,13 @@ void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(EmitVarChain
         return;
 
     auto layout = chain->varLayout;
-    for (auto rr : layout->resourceInfos)
+    for (auto rr : layout->getOffsetAttrs())
     {
-        _emitHLSLRegisterSemantic(rr.kind, chain, "packoffset");
+        _emitHLSLRegisterSemantic(rr->getResourceKind(), chain, "packoffset");
     }
 }
 
-void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(RefPtr<VarLayout> fieldLayout, EmitVarChain* inChain)
+void HLSLSourceEmitter::_emitHLSLParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain)
 {
     EmitVarChain chain(fieldLayout, inChain);
     _emitHLSLParameterGroupFieldLayoutSemantics(&chain);
@@ -197,13 +197,13 @@ void HLSLSourceEmitter::_emitHLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     EmitVarChain containerChain = blockChain;
     EmitVarChain elementChain = blockChain;
 
-    auto typeLayout = varLayout->typeLayout;
-    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    auto typeLayout = varLayout->getTypeLayout();
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
     {
-        containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
-        elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+        containerChain = EmitVarChain(parameterGroupTypeLayout->getContainerVarLayout(), &blockChain);
+        elementChain = EmitVarChain(parameterGroupTypeLayout->getElementVarLayout(), &blockChain);
 
-        typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
+        typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
     _emitHLSLRegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
@@ -645,14 +645,14 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
 
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
-        auto layout = layoutDecoration->getIRLayout()->getASTLayout();
-        if (auto varLayout = as<VarLayout>(layout))
+        auto layout = layoutDecoration->getLayout();
+        if (auto varLayout = as<IRVarLayout>(layout))
         {
             emitSemantics(varLayout);
         }
-        else if (auto entryPointLayout = as<EntryPointLayout>(layout))
+        else if (auto entryPointLayout = as<IREntryPointLayout>(layout))
         {
-            if (auto resultLayout = entryPointLayout->resultLayout)
+            if (auto resultLayout = entryPointLayout->getResultLayout())
             {
                 emitSemantics(resultLayout);
             }
@@ -691,7 +691,7 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
     }
 }
 
-void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout)
+void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
 {
     SLANG_UNUSED(layout);
     SLANG_UNUSED(valueType);
@@ -720,19 +720,17 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     }
 }
 
-void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(VarLayout* layout)
+void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
 {
     // When a variable has a matrix type, we want to emit an explicit
     // layout qualifier based on what the layout has been computed to be.
     //
 
-    auto typeLayout = layout->typeLayout;
-    while (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
-        typeLayout = arrayTypeLayout->elementTypeLayout;
+    auto typeLayout = layout->getTypeLayout()->unwrapArray();
 
-    if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
+    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
     {
-        switch (matrixTypeLayout->mode)
+        switch (matrixTypeLayout->getMode())
         {
             case kMatrixLayoutMode_ColumnMajor:
                 m_writer->emit("column_major ");

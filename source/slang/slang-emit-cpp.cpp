@@ -2389,9 +2389,9 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
 
             if (varLayout)
             {
-                auto semanticNameSpelling = varLayout->systemValueSemantic;
-                if (semanticNameSpelling.getLength())
+                if(auto systemValueSemantic = varLayout->findSystemValueSemanticAttr())
                 {
+                    String semanticNameSpelling = systemValueSemantic->getName();
                     semanticNameSpelling = semanticNameSpelling.toLower();
 
                     if (semanticNameSpelling == "sv_dispatchthreadid")
@@ -2714,17 +2714,18 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                     continue;
                 }
 
-                VarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
+                IRVarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
                 SLANG_ASSERT(varLayout);
-                const VarLayout::ResourceInfo* varInfo = varLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-                TypeLayout* typeLayout = varLayout->getTypeLayout();
-                TypeLayout::ResourceInfo* typeInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+
+                IRVarOffsetAttr* offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform);
+                IRTypeLayout* typeLayout = varLayout->getTypeLayout();
+                IRTypeSizeAttr* sizeAttr = typeLayout->findSizeAttr(LayoutResourceKind::Uniform);
 
                 GlobalParamInfo paramInfo;
                 paramInfo.inst = action.inst;
                 // Index is the byte offset for uniform
-                paramInfo.offset = varInfo ? varInfo->index : 0;
-                paramInfo.size = typeInfo ? typeInfo->count.raw : 0;
+                paramInfo.offset = offsetAttr ? offsetAttr->getOffset() : 0;
+                paramInfo.size = sizeAttr ? sizeAttr->getFiniteSize() : 0;
 
                 params.add(paramInfo);
             }

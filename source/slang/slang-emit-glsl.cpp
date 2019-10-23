@@ -195,13 +195,13 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     EmitVarChain containerChain = blockChain;
     EmitVarChain elementChain = blockChain;
 
-    auto typeLayout = varLayout->typeLayout->unwrapArray();
-    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
     {
-        containerChain = EmitVarChain(parameterGroupTypeLayout->containerVarLayout, &blockChain);
-        elementChain = EmitVarChain(parameterGroupTypeLayout->elementVarLayout, &blockChain);
+        containerChain = EmitVarChain(parameterGroupTypeLayout->getContainerVarLayout(), &blockChain);
+        elementChain = EmitVarChain(parameterGroupTypeLayout->getElementVarLayout(), &blockChain);
 
-        typeLayout = parameterGroupTypeLayout->elementVarLayout->typeLayout;
+        typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
     /*
@@ -432,7 +432,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
 {
     if (!chain)
         return false;
-    if (!chain->varLayout->FindResourceInfo(kind))
+    if (!chain->varLayout->findOffsetAttr(kind))
         return false;
 
     UInt index = getBindingOffset(chain, kind);
@@ -509,7 +509,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
     return true;
 }
 
-void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, EmitVarChain* inChain, LayoutResourceKind filter)
+void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarChain* inChain, LayoutResourceKind filter)
 {
     if (!layout) return;
 
@@ -524,16 +524,16 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(RefPtr<VarLayout> layout, Emit
 
     EmitVarChain chain(layout, inChain);
 
-    for (auto info : layout->resourceInfos)
+    for (auto info : layout->getOffsetAttrs())
     {
         // Skip info that doesn't match our filter
         if (filter != LayoutResourceKind::None
-            && filter != info.kind)
+            && filter != info->getResourceKind())
         {
             continue;
         }
 
-        _emitGLSLLayoutQualifier(info.kind, &chain);
+        _emitGLSLLayoutQualifier(info->getResourceKind(), &chain);
     }
 }
 
@@ -849,16 +849,16 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
     }
 }
 
-void GLSLSourceEmitter::emitLayoutQualifiersImpl(VarLayout* layout)
+void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 {
     // Layout-related modifiers need to come before the declaration,
     // so deal with them here.
     _emitGLSLLayoutQualifiers(layout, nullptr);
 
     // try to emit an appropriate leading qualifier
-    for (auto rr : layout->resourceInfos)
+    for (auto rr : layout->getOffsetAttrs())
     {
-        switch (rr.kind)
+        switch (rr->getResourceKind())
         {
             case LayoutResourceKind::Uniform:
             case LayoutResourceKind::ShaderResource:
@@ -1471,7 +1471,7 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
     }
 }
 
-void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, VarLayout* layout)
+void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
 {
     bool anyModifiers = false;
 
@@ -1507,8 +1507,8 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         // output everything with `flat` except for
         // fragment *outputs* (and maybe vertex inputs).
         //
-        if (layout && layout->stage == Stage::Fragment
-            && layout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+        if (layout && layout->getStage() == Stage::Fragment
+            && layout->usesResourceKind(LayoutResourceKind::VaryingInput))
         {
             _maybeEmitGLSLFlatModifier(valueType);
         }
@@ -1548,24 +1548,22 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     }
 }
 
-void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(VarLayout* layout)
+void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
 {
     // When a variable has a matrix type, we want to emit an explicit
     // layout qualifier based on what the layout has been computed to be.
     //
 
-    auto typeLayout = layout->typeLayout;
-    while (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
-        typeLayout = arrayTypeLayout->elementTypeLayout;
+    auto typeLayout = layout->getTypeLayout()->unwrapArray();
 
-    if (auto matrixTypeLayout = typeLayout.as<MatrixTypeLayout>())
+    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
     {
         // Reminder: the meaning of row/column major layout
         // in our semantics is the *opposite* of what GLSL
         // calls them, because what they call "columns"
         // are what we call "rows."
         //
-        switch (matrixTypeLayout->mode)
+        switch (matrixTypeLayout->getMode())
         {
             case kMatrixLayoutMode_ColumnMajor:
                 m_writer->emit("layout(row_major)\n");
