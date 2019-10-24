@@ -95,11 +95,11 @@ struct StoreContext
 
         if (content)
         {
-            base->asRaw(file)->contents = m_container->newString(*content);
+            base[file]->contents = m_container->newString(*content);
         }
         if (uniqueIdentity.getLength())
         {
-            base->asRaw(file)->uniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
+            base[file]->uniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
             m_uniqueToFileMap.Add(uniqueIdentity, file);
         }
 
@@ -129,18 +129,18 @@ struct StoreContext
 
         Offset32Ptr<OffsetString> foundPath;
 
-        if (pathInfo.foundPath.getLength() && base->asRaw(file)->foundPath.isNull())
+        if (pathInfo.foundPath.getLength() && base[file]->foundPath.isNull())
         {
             foundPath = fromString(pathInfo.foundPath.getUnownedSlice());
         }
         // Set on the file
-        base->asRaw(file)->foundPath = foundPath;
+        base[file]->foundPath = foundPath;
 
         // Create the source file
         sourceFileState = m_container->newObject<SourceFileState>();
 
         {
-            auto dst = base->asRaw(sourceFileState);
+            auto dst = base[sourceFileState];
             dst->file = file;
             dst->foundPath = foundPath;
             dst->type = pathInfo.type;
@@ -195,7 +195,7 @@ struct StoreContext
 
             // Save the rest of the state
             pathInfo = m_container->newObject<PathInfoState>();
-            PathInfoState& dst = base->asRaw(*pathInfo);
+            PathInfoState& dst = base[*pathInfo];
 
             dst.file = fileState;
 
@@ -209,25 +209,25 @@ struct StoreContext
         }
 
         // Fill in info on the file
-        auto fileState(base->asRaw(pathInfo)->file);
+        auto fileState(base[pathInfo]->file);
 
         // If have fileState add any missing element
         if (fileState)
         {
-            if (srcPathInfo->m_fileBlob && base->asRaw(fileState)->contents.isNull())
+            if (srcPathInfo->m_fileBlob && base[fileState]->contents.isNull())
             {
                 UnownedStringSlice contents((const char*)srcPathInfo->m_fileBlob->getBufferPointer(), srcPathInfo->m_fileBlob->getBufferSize());
-                base->asRaw(fileState)->contents = m_container->newString(contents);
+                base[fileState]->contents = m_container->newString(contents);
             }
 
-            if (srcPathInfo->m_canonicalPath && base->asRaw(fileState)->canonicalPath.isNull())
+            if (srcPathInfo->m_canonicalPath && base[fileState]->canonicalPath.isNull())
             {
-                base->asRaw(fileState)->canonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
+                base[fileState]->canonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
             }
 
-            if (srcPathInfo->m_uniqueIdentity && base->asRaw(fileState)->uniqueIdentity.isNull())
+            if (srcPathInfo->m_uniqueIdentity && base[fileState]->uniqueIdentity.isNull())
             {
-                base->asRaw(fileState)->uniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
+                base[fileState]->uniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
             }
         }
 
@@ -249,7 +249,7 @@ struct StoreContext
             auto key = fromString(srcDefine.Key);
             auto value = fromString(srcDefine.Value);
 
-            auto& dstDefine = base->asRaw(dstDefines[index]);
+            auto& dstDefine = base[dstDefines[index]];
             dstDefine.first = key;
             dstDefine.second = value;
 
@@ -266,7 +266,7 @@ struct StoreContext
 
         for (Index j = 0; j < src.getCount(); ++j)
         {
-            base->asRaw(dst[j]) = fromString(src[j]);
+            base[dst[j]] = fromString(src[j]);
         }
         return dst;
     }
@@ -312,7 +312,7 @@ static bool _isStorable(const PathInfo::Type type)
     Offset32Ptr<RequestState> requestState = inOutContainer.newObject<RequestState>();
 
     {
-        RequestState* dst = base->asRaw(requestState);
+        RequestState* dst = base[requestState];
 
         dst->compileFlags = request->getFrontEndReq()->compileFlags;
         dst->shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
@@ -347,7 +347,7 @@ static bool _isStorable(const PathInfo::Type type)
             auto dstSpecializationArgStrings = context.fromList(srcEndToEndEntryPoint.specializationArgStrings);
             Offset32Ptr<OffsetString> dstName = context.fromName(srcEntryPoint->getName());
 
-            EntryPointState& dst = base->asRaw(dstEntryPoints[i]);
+            EntryPointState& dst = base[dstEntryPoints[i]];
 
             dst.profile = srcEntryPoint->getProfile();
             dst.translationUnitIndex = uint32_t(srcEntryPoint->getTranslationUnitIndex());
@@ -355,7 +355,7 @@ static bool _isStorable(const PathInfo::Type type)
             dst.name = dstName;
         }
 
-        base->asRaw(requestState)->entryPoints = dstEntryPoints;
+        base[requestState]->entryPoints = dstEntryPoints;
     }
 
 
@@ -384,7 +384,7 @@ static bool _isStorable(const PathInfo::Type type)
 
             // Copy the simple stuff
             {
-                auto& dst = base->asRaw(dstTargets[i]);
+                auto& dst = base[dstTargets[i]];
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getTargetProfile();
                 dst.targetFlags = srcTargetRequest->targetFlags;
@@ -408,7 +408,7 @@ static bool _isStorable(const PathInfo::Type type)
                     {
                         Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(pair.Value.getUnownedSlice());
 
-                        auto& dstOutputState = base->asRaw(dstOutputStates[index]);
+                        auto& dstOutputState = base[dstOutputStates[index]];
 
                         dstOutputState.entryPointIndex = int32_t(pair.Key);
                         dstOutputState.outputPath = outputPath;
@@ -416,13 +416,13 @@ static bool _isStorable(const PathInfo::Type type)
                         index++;
                     }
 
-                    base->asRaw(dstTargets[i]).outputStates = dstOutputStates;
+                    base[dstTargets[i]].outputStates = dstOutputStates;
                 }
             }
         }
     
         // Save the result
-        base->asRaw(requestState)->targetRequests = dstTargets;
+        base[requestState]->targetRequests = dstTargets;
     }
 
     // Add the search paths
@@ -434,13 +434,13 @@ static bool _isStorable(const PathInfo::Type type)
         SLANG_ASSERT(linkage->searchDirectories.parent == nullptr);
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            base->asRaw(dstPaths[i]) = context.fromString(srcPaths[i].path);
+            base[dstPaths[i]] = context.fromString(srcPaths[i].path);
         }
-        base->asRaw(requestState)->searchPaths = dstPaths;
+        base[requestState]->searchPaths = dstPaths;
     }
 
     // Add preprocessor definitions
-    base->asRaw(requestState)->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
+    base[requestState]->preprocessorDefinitions = context.calcDefines(linkage->preprocessorDefinitions);
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
@@ -461,11 +461,11 @@ static bool _isStorable(const PathInfo::Type type)
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
-                    base->asRaw(dstSourceFiles[j]) = context.addSourceFile(srcFiles[j]);
+                    base[dstSourceFiles[j]] = context.addSourceFile(srcFiles[j]);
                 }
             }
 
-            TranslationUnitRequestState& dstTranslationUnit = base->asRaw(dstTranslationUnits[i]);
+            TranslationUnitRequestState& dstTranslationUnit = base[dstTranslationUnits[i]];
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
             dstTranslationUnit.moduleName = moduleName;
@@ -473,7 +473,7 @@ static bool _isStorable(const PathInfo::Type type)
             dstTranslationUnit.preprocessorDefinitions = defines;
         }
 
-        base->asRaw(requestState)->translationUnits = dstTranslationUnits;
+        base[requestState]->translationUnits = dstTranslationUnits;
     }
 
     // Find files from the file system, and mapping paths to files
@@ -496,14 +496,14 @@ static bool _isStorable(const PathInfo::Type type)
                 Offset32Ptr<OffsetString> path = context.fromString(pair.Key);
                 Offset32Ptr<PathInfoState> pathInfo = context.addPathInfo(pair.Value);
 
-                PathAndPathInfo& dstInfo = base->asRaw(pathMap[index]);
+                PathAndPathInfo& dstInfo = base[pathMap[index]];
                 dstInfo.path = path;
                 dstInfo.pathInfo = pathInfo;
 
                 index++;
             }
 
-            base->asRaw(requestState)->pathInfoMap = pathMap;
+            base[requestState]->pathInfoMap = pathMap;
         }
     }
 
@@ -519,17 +519,17 @@ static bool _isStorable(const PathInfo::Type type)
             // Need to come up with unique names
             String path;
 
-            if (auto canonicalPath = base->asRaw(file)->canonicalPath)
+            if (auto canonicalPath = base[file]->canonicalPath)
             {
-                path = base->asRaw(canonicalPath)->getSlice();
+                path = base[canonicalPath]->getSlice();
             }
-            else if (auto foundPath = base->asRaw(file)->foundPath)
+            else if (auto foundPath = base[file]->foundPath)
             {
-                path = base->asRaw(foundPath)->getSlice();
+                path = base[foundPath]->getSlice();
             }
-            else if (auto uniqueIdentity = base->asRaw(file)->uniqueIdentity)
+            else if (auto uniqueIdentity = base[file]->uniqueIdentity)
             {
-                path = base->asRaw(uniqueIdentity)->getSlice();
+                path = base[uniqueIdentity]->getSlice();
             }
 
             if (path.getLength() == 0)
@@ -567,12 +567,12 @@ static bool _isStorable(const PathInfo::Type type)
             }
 
             // Save the unique generated name
-            base->asRaw(file)->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
+            base[file]->uniqueName = inOutContainer.newString(uniqueName.getUnownedSlice());
 
-            base->asRaw(files[i]) = file;
+            base[files[i]] = file;
         }
 
-        base->asRaw(requestState)->files = files;
+        base[requestState]->files = files;
     }
 
     // Save all the SourceFile state
@@ -583,10 +583,10 @@ static bool _isStorable(const PathInfo::Type type)
         Index index = 0;
         for (const auto& pair : srcSourceFiles)
         {
-            base->asRaw(dstSourceFiles[index]) = pair.Value; 
+            base[dstSourceFiles[index]] = pair.Value; 
             index++;
         }
-        base->asRaw(requestState)->sourceFiles = dstSourceFiles;
+        base[requestState]->sourceFiles = dstSourceFiles;
     }
 
     outRequest = requestState;

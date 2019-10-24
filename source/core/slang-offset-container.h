@@ -234,10 +234,18 @@ struct OffsetString
 class OffsetBase
 {
 public:
+        /// Turn an offset into a raw regular pointer or reference
     template <typename T>
     T* asRaw(const Offset32Ptr<T>& ptr) { return (T*)_getRaw(ptr.m_offset); }
     template <typename T>
     T& asRaw(const Offset32Ref<T>& ref) { return *(T*)_getRaw(ref.m_offset); }
+
+        /// A more terse way to get a raw pointer/reference. Using the [] operator can be seen as 'indexing' to access the
+        /// object the offset relates to. Unlike 'indices' that are typically used with [] offsets are generally not contiguous. 
+    template <typename T>
+    T* operator[](const Offset32Ptr<T>& ptr) { return (T*)_getRaw(ptr.m_offset); }
+    template <typename T>
+    T& operator[](const Offset32Ref<T>& ref) { return *(T*)_getRaw(ref.m_offset); }
 
     template <typename T>
     Offset32Ptr<T> asPtr(T* ptr) { return Offset32Ptr<T>(getOffset(ptr)); }
@@ -262,6 +270,10 @@ public:
         /// Return the last used byte of the data
     SLANG_FORCE_INLINE size_t getDataCount() const { return m_dataSize; }
 
+        /// Get the first allocated thing. Typically the root of the structure contained
+    void* getFirst() { return (m_dataSize < kStartOffset) ? nullptr :  (m_data + kStartOffset); }
+
+        /// Get a raw pointer from the offset
     uint8_t* _getRaw(uint32_t offset) { return (offset == kNull32Offset) ? nullptr : (m_data + offset); }
 
     OffsetBase():
@@ -318,7 +330,7 @@ public:
     }
 
         /// Get the base - which is needed for turning offsets into things
-    OffsetBase* asBase() { return this; }
+    OffsetBase& asBase() { return *this; }
 
     /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);

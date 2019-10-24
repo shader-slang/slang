@@ -49,7 +49,6 @@ static void offsetContainerUnitTest()
             nullptr,
         };
 
-        
         {
             auto base = container.asBase();
 
@@ -58,20 +57,17 @@ static void offsetContainerUnitTest()
             auto array = container.newArray<Offset32Ptr<OffsetString>>(SLANG_COUNT_OF(strings));
             for (Int i = 0; i < SLANG_COUNT_OF(strings); ++i)
             {
-                base->asRaw(array[i]) = container.newString(strings[i]);
+                base[array[i]] = container.newString(strings[i]);
             }
-
-            base->asRaw(root)->dirs = array;
+            base[root]->dirs = array;
         }
 
         {
-            
             List<uint8_t> copy;
-            copy.addRange(container.asBase()->m_data, container.asBase()->m_dataSize);
-
-            OffsetBase base;
-            base.m_data = copy.getBuffer();
-            base.m_dataSize = copy.getCount();
+            copy.addRange(container.getData(), container.getDataCount());
+            
+            MemoryOffsetBase base;
+            base.set(copy.getBuffer(), copy.getCount());
 
             Root* root = (Root*)(copy.getBuffer() + kStartOffset);
 
