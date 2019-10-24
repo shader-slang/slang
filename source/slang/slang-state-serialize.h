@@ -8,7 +8,7 @@
 // For TranslationUnitRequest
 #include "slang-compiler.h"
 
-#include "../core/slang-relative-container.h"
+#include "../core/slang-offset-container.h"
 
 #include "slang-file-system.h"
 
@@ -35,12 +35,12 @@ struct StateSerializeUtil
 
     struct FileState
     {
-        Relative32Ptr<RelativeString> uniqueIdentity;           ///< The unique identity for the file (from ISlangFileSystem), or nullptr
-        Relative32Ptr<RelativeString> contents;                 ///< The contents of this file
-        Relative32Ptr<RelativeString> canonicalPath;            ///< The canonical name of this file (or nullptr)
-        Relative32Ptr<RelativeString> foundPath;                ///< The 'found' path
+        Offset32Ptr<OffsetString> uniqueIdentity;           ///< The unique identity for the file (from ISlangFileSystem), or nullptr
+        Offset32Ptr<OffsetString> contents;                 ///< The contents of this file
+        Offset32Ptr<OffsetString> canonicalPath;            ///< The canonical name of this file (or nullptr)
+        Offset32Ptr<OffsetString> foundPath;                ///< The 'found' path
 
-        Relative32Ptr<RelativeString> uniqueName;               ///< A generated unique name (not used by slang, but used as mechanism to replace files)
+        Offset32Ptr<OffsetString> uniqueName;               ///< A generated unique name (not used by slang, but used as mechanism to replace files)
     };
 
     struct PathInfoState
@@ -52,19 +52,19 @@ struct StateSerializeUtil
         CompressedResult getPathTypeResult = CompressedResult::Uninitialized;
         CompressedResult getCanonicalPathResult = CompressedResult::Uninitialized;
 
-        Relative32Ptr<FileState> file;                          ///< File contents
+        Offset32Ptr<FileState> file;                          ///< File contents
     };
 
     struct PathAndPathInfo
     {
-        Relative32Ptr<RelativeString> path;
-        Relative32Ptr<PathInfoState> pathInfo;
+        Offset32Ptr<OffsetString> path;
+        Offset32Ptr<PathInfoState> pathInfo;
     };
 
     struct OutputState
     {
         int32_t entryPointIndex;
-        Relative32Ptr<RelativeString> outputPath;
+        Offset32Ptr<OffsetString> outputPath;
     };
 
         // spSetCodeGenTarget/spAddCodeGenTarget
@@ -79,20 +79,20 @@ struct StateSerializeUtil
         SlangTargetFlags targetFlags;
         FloatingPointMode floatingPointMode;
 
-        Relative32Array<OutputState> outputStates;
+        Offset32Array<OutputState> outputStates;
     };
 
     struct StringPair
     {
-        Relative32Ptr<RelativeString> first;
-        Relative32Ptr<RelativeString> second;
+        Offset32Ptr<OffsetString> first;
+        Offset32Ptr<OffsetString> second;
     };
 
     struct SourceFileState
     {
         PathInfo::Type type;                           ///< The type of this file
-        Relative32Ptr<RelativeString> foundPath;       ///< The Path this was found along
-        Relative32Ptr<FileState> file;                 ///< The file contents
+        Offset32Ptr<OffsetString> foundPath;       ///< The Path this was found along
+        Offset32Ptr<FileState> file;                 ///< The file contents
     };
 
         // spAddTranslationUnit
@@ -100,26 +100,26 @@ struct StateSerializeUtil
     {
         SourceLanguage language;
 
-        Relative32Ptr<RelativeString> moduleName;
+        Offset32Ptr<OffsetString> moduleName;
 
         // spTranslationUnit_addPreprocessorDefine
-        Relative32Array<StringPair> preprocessorDefinitions;
+        Offset32Array<StringPair> preprocessorDefinitions;
 
-        Relative32Array<Relative32Ptr<SourceFileState> > sourceFiles;
+        Offset32Array<Offset32Ptr<SourceFileState> > sourceFiles;
     };
 
     struct EntryPointState
     {
-        Relative32Ptr<RelativeString> name;
+        Offset32Ptr<OffsetString> name;
         Profile profile; 
         uint32_t translationUnitIndex;
-        Relative32Array<Relative32Ptr<RelativeString>> specializationArgStrings;
+        Offset32Array<Offset32Ptr<OffsetString>> specializationArgStrings;
     };
 
     struct RequestState
     {
-        Relative32Array<Relative32Ptr<FileState>> files;                   ///< All of the files
-        Relative32Array<Relative32Ptr<SourceFileState>> sourceFiles;       ///< All of the source files (from source manager)
+        Offset32Array<Offset32Ptr<FileState>> files;                   ///< All of the files
+        Offset32Array<Offset32Ptr<SourceFileState>> sourceFiles;       ///< All of the source files (from source manager)
 
             // spSetCompileFlags
         SlangCompileFlags compileFlags;
@@ -128,7 +128,7 @@ struct StateSerializeUtil
             // spSetLineDirectiveMode
         LineDirectiveMode lineDirectiveMode;
 
-        Relative32Array<TargetRequestState> targetRequests;
+        Offset32Array<TargetRequestState> targetRequests;
 
             // spSetDebugInfoLevel
         DebugInfoLevel debugInfoLevel;
@@ -140,24 +140,24 @@ struct StateSerializeUtil
         PassThroughMode passThroughMode;
 
             // spAddSearchPath
-        Relative32Array<Relative32Ptr<RelativeString> > searchPaths;
+        Offset32Array<Offset32Ptr<OffsetString> > searchPaths;
 
             // spAddPreprocessorDefine
-        Relative32Array<StringPair> preprocessorDefinitions;
+        Offset32Array<StringPair> preprocessorDefinitions;
 
         bool useUnknownImageFormatAsDefault = false;
         bool obfuscateCode = false;
 
-        Relative32Array<PathAndPathInfo> pathInfoMap;                  ///< Stores all the accesses to the file system
+        Offset32Array<PathAndPathInfo> pathInfoMap;                  ///< Stores all the accesses to the file system
 
-        Relative32Array<TranslationUnitRequestState> translationUnits;
+        Offset32Array<TranslationUnitRequestState> translationUnits;
 
-        Relative32Array<EntryPointState> entryPoints;
+        Offset32Array<EntryPointState> entryPoints;
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
-    static SlangResult store(EndToEndCompileRequest* request, RelativeContainer& inOutContainer, Safe32Ptr<RequestState>& outRequest);
+    static SlangResult store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest);
     
     static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
 
@@ -166,7 +166,7 @@ struct StateSerializeUtil
         /// Load the requestState into request
         /// The fileSystem is optional and can be passed as nullptr. If set, as each file is loaded
         /// it will attempt to load from fileSystem the *uniqueName*
-    static SlangResult load(RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request);
+    static SlangResult load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request);
 
     static SlangResult loadState(const String& filename, List<uint8_t>& outBuffer);
     static SlangResult loadState(Stream* stream, List<uint8_t>& outBuffer);
@@ -176,7 +176,7 @@ struct StateSerializeUtil
 
     static SlangResult extractFilesToDirectory(const String& file);
 
-    static SlangResult extractFiles(RequestState* requestState, ISlangFileSystemExt* fileSystem);
+    static SlangResult extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem);
 
         /// Given the repo file work out a suitable path
     static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);

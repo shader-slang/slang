@@ -63,6 +63,9 @@
     <ClInclude Include="slang-object-scope-manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-offset-container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -70,9 +73,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-random-generator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-relative-container.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-render-api-util.h">
@@ -155,13 +155,13 @@
     <ClCompile Include="slang-object-scope-manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-offset-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-platform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-random-generator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-relative-container.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-render-api-util.cpp">
