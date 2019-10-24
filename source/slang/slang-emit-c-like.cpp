@@ -1629,23 +1629,6 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
         m_writer->emit(".");
         operandIndex++;
     }
-    // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
-    bool glslSignFix = getSourceStyle() == SourceStyle::GLSL && name == "sign";
-    if (glslSignFix)
-    {
-        if (auto vectorType = as<IRVectorType>(inst->getDataType()))
-        {
-            m_writer->emit("ivec");
-            m_writer->emit(as<IRConstant>(vectorType->getElementCount())->value.intVal);
-            m_writer->emit("(");
-        }
-        else if (auto scalarType = as<IRBasicType>(inst->getDataType()))
-        {
-            m_writer->emit("int(");
-        }
-        else
-            glslSignFix = false;
-    }
     m_writer->emit(name);
     m_writer->emit("(");
     bool first = true;
@@ -1656,8 +1639,6 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
         first = false;
     }
     m_writer->emit(")");
-    if (glslSignFix)
-        m_writer->emit(")");
     maybeCloseParens(needClose);
 }
 
