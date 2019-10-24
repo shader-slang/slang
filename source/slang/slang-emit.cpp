@@ -339,7 +339,7 @@ String emitEntryPoint(
         // TODO: Are there other cleanup optimizations we should
         // apply at this point?
         //
-        eliminateDeadCode(compileRequest, irModule);
+        eliminateDeadCode(irModule);
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif
@@ -376,7 +376,7 @@ String emitEntryPoint(
             legalizeExistentialTypeLayout(
                 irModule,
                 sink);
-            eliminateDeadCode(compileRequest, irModule);
+            eliminateDeadCode(irModule);
         
 #if 0
             dumpIRIfEnabled(compileRequest, irModule, "EXISTENTIALS LEGALIZED");
@@ -397,7 +397,7 @@ String emitEntryPoint(
             legalizeResourceTypes(
                 irModule,
                 sink);
-            eliminateDeadCode(compileRequest, irModule);
+            eliminateDeadCode(irModule);
         }
 
         //  Debugging output of legalization
@@ -482,7 +482,7 @@ String emitEntryPoint(
         // dead-code-elimination (DCE) pass that only retains
         // whatever code is "live."
         //
-        eliminateDeadCode(compileRequest, irModule);
+        eliminateDeadCode(irModule);
 #if 0
         dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif

@@ -648,13 +648,13 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
         auto layout = layoutDecoration->getLayout();
         if (auto varLayout = as<IRVarLayout>(layout))
         {
-            emitSemantics(varLayout);
+            emitSemanticsUsingVarLayout(varLayout);
         }
         else if (auto entryPointLayout = as<IREntryPointLayout>(layout))
         {
             if (auto resultLayout = entryPointLayout->getResultLayout())
             {
-                emitSemantics(resultLayout);
+                emitSemanticsUsingVarLayout(resultLayout);
             }
         }
     }
