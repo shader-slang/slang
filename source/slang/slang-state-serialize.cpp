@@ -763,6 +763,8 @@ static void _loadDefines(const Relative32Array<StateSerializeUtil::StringPair>& 
         request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
         request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
 
+        request->getFrontEndReq()->obfuscateCode = requestState->obfuscateCode;
+
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
 

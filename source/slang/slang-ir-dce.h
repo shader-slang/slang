@@ -3,8 +3,12 @@
 
 namespace Slang
 {
-    class BackEndCompileRequest;
     struct IRModule;
+
+    struct IRDeadCodeEliminationOptions
+    {
+        bool keepExportsAlive = false;
+    };
 
         /// Eliminate "dead" code from the given IR module.
         ///
@@ -14,6 +18,6 @@ namespace Slang
         /// etc.
         ///
     void eliminateDeadCode(
-        BackEndCompileRequest*  compileRequest,
-        IRModule*               module);
+        IRModule*                           module,
+        IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
 }
