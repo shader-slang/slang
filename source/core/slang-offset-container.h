@@ -140,12 +140,6 @@ public:
     ThisType& operator--() { m_offset -= sizeof(T); return *this; }
     ThisType operator--(int) { const auto offset = m_offset; m_offset -= uint32_t(sizeof(T)); return ThisType(offset); }
 
-    friend ThisType operator+(const ThisType& a, int b) { return ThisType(a.m_offset + uint32_t(sizeof(T) * b)); }
-    friend ThisType operator+(int a, const ThisType& b) { return ThisType(b.m_offset + uint32_t(sizeof(T) * a)); }
-
-    friend ThisType operator+(const ThisType& a, uint32_t b) { return ThisType(a.m_offset + uint32_t(sizeof(T) * b)); }
-    friend ThisType operator+(uint32_t a, const ThisType& b) { return ThisType(b.m_offset + uint32_t(sizeof(T) * a)); }
-
     friend ThisType operator+(const ThisType& a, Index b) { return ThisType(a.m_offset + uint32_t(sizeof(T) * b)); }
     friend ThisType operator+(Index a, const ThisType& b) { return ThisType(b.m_offset + uint32_t(sizeof(T) * a)); }
 
@@ -193,10 +187,10 @@ class Offset32Array
 {
 public:
     Offset32Ptr<const T> begin() const { return Offset32Ptr<const T>(m_data.m_offset); }
-    Offset32Ptr<const T> end() const { return begin() + m_count; }
+    Offset32Ptr<const T> end() const { return begin() + Index(m_count); }
 
     Offset32Ptr<T> begin() { return m_data; }
-    Offset32Ptr<T> end() { return begin() + m_count; }
+    Offset32Ptr<T> end() { return begin() + Index(m_count); }
 
     Index getCount() const { return Index(m_count); }
 
