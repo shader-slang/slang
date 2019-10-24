@@ -5561,8 +5561,132 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 definition = definitionToken.Content;
             }
 
-            builder->addTargetIntrinsicDecoration(irInst, targetMod->targetToken.Content, definition.getUnownedSlice());
+            UnownedStringSlice targetName;
+            auto& targetToken = targetMod->targetToken;
+            if( targetToken.type != TokenType::Unknown )
+            {
+                targetName = targetToken.Content;
+            }
+
+            builder->addTargetIntrinsicDecoration(irInst, targetName, definition.getUnownedSlice());
         }
+    }
+
+        /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
+    bool isStdLibMemberFuncDecl(
+        CallableDecl*   decl)
+    {
+        // Constructors aren't really member functions, insofar
+        // as they aren't called with a `this` parameter.
+        //
+        // TODO: We may also want to exclude `static` functions
+        // here for the same reason, but this routine is only
+        // used for the stdlib, where we don't currently have
+        // any `static` member functions to worry about.
+        //
+        if(as<ConstructorDecl>(decl))
+            return false;
+
+        auto dd = decl->ParentDecl;
+        for(;;)
+        {
+            if(auto genericDecl = as<GenericDecl>(dd))
+            {
+                dd = genericDecl->ParentDecl;
+                continue;
+            }
+
+            if( auto subscriptDecl = as<SubscriptDecl>(dd) )
+            {
+                dd = subscriptDecl->ParentDecl;
+            }
+
+            break;
+        }
+
+        // Note: the use of `AggTypeDeclBase` here instead of just
+        // `AggTypeDecl` means that we consider a declaration that
+        // is under a `struct` *or* an `extension` to be a member
+        // function for our purposes.
+        //
+        if(as<AggTypeDeclBase>(dd))
+            return true;
+
+        return false;
+    }
+
+        /// Add a "catch-all" decoration for a stdlib function if it would be needed
+    void addCatchAllIntrinsicDecorationIfNeeded(
+        IRInst*             irInst,
+        FunctionDeclBase*   decl)
+    {
+        // We don't need an intrinsic decoration on a function that has a body,
+        // since the body can be used as the "catch-all" case.
+        //
+        if(decl->Body)
+            return;
+
+        // Only standard library declarations should get any kind of catch-all
+        // treatment by default. Declarations in user case are responsible
+        // for marking things as target intrinsics if they want to go down
+        // that (unsupported) route.
+        //
+        if(!isFromStdLib(decl))
+            return;
+
+        // No need to worry about functions that lower to intrinsic IR opcodes
+        // (or pseudo-ops).
+        //
+        if(decl->FindModifier<IntrinsicOpModifier>())
+            return;
+
+        // We also don't need an intrinsic decoration if the function already
+        // had a catch-all case on one of its target overloads.
+        //
+        for( auto f = decl->primaryDecl; f; f = f->nextDecl )
+        {
+            for(auto targetMod : f->GetModifiersOfType<TargetIntrinsicModifier>())
+            {
+                // If we find a catch-all case (marked as either *no* target
+                // token or an empty target name), then we should bail out.
+                //
+                if(targetMod->targetToken.type == TokenType::Unknown)
+                    return;
+                else if(targetMod->targetToken.Content.size() == 0)
+                    return;
+            }
+        }
+
+        String definition;
+        
+        // If we have a member function, then we want the default intrinsic
+        // definition to reflect this fact so that we can emit it correctly
+        // (the assumption is that a catch-all definition of a member function
+        // is itself implemented as a member function).
+        //
+        if( isStdLibMemberFuncDecl(decl) )
+        {
+            // We will mark member functions by appending a `.` to the
+            // start of their name.
+            //
+            definition.append(".");
+        }
+
+        // We want to output the name of the declaration,
+        // but in some cases the actual `decl` that has
+        // to be emitted is not the one with the name.
+        //
+        // In particular, an accessor declaration (e.g.,
+        // a `get`ter` in a subscript or property) doesn't
+        // have a name, but its parent should.
+        //
+        Decl* declForName = decl;
+        if(auto accessorDecl = as<AccessorDecl>(decl))
+            declForName = decl->ParentDecl;
+
+        definition.append(getText(declForName->getName()));
+
+        getBuilder()->addTargetIntrinsicDecoration(irInst, UnownedStringSlice(), definition.getUnownedSlice());
     }
 
     void addParamNameHint(IRInst* inst, ParameterInfo info)
@@ -5921,6 +6045,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If this declaration was marked as having a target-specific lowering
         // for a particular target, then handle that here.
         addTargetIntrinsicDecorations(irFunc, decl);
+
+        addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
         // If this declaration requires certain GLSL extension (or a particular GLSL version)
         // for it to be usable, then declare that here.

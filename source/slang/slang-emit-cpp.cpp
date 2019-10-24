@@ -2049,8 +2049,17 @@ void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)
     }
 }
 
-void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec)
+void CPPSourceEmitter::emitIntrinsicCallExpr(
+    IRCall*                         inst,
+    IRTargetIntrinsicDecoration*    targetIntrinsic,
+    EmitOpInfo const&               inOuterPrec)
 {
+    // TODO: Much of this logic duplicates code that is already
+    // in `CLikeSourceEmitter::emitIntrinsicCallExpr`. The only
+    // real difference is that when things bottom out on an ordinary
+    // function call there is logic to look up a C/C++-backend-specific
+    // opcode based on the function name, and emit using that.
+
     auto outerPrec = inOuterPrec;
     bool needClose = false;
 
@@ -2058,57 +2067,16 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpI
     // have N+1 operands. We will start consuming operands
     // starting at the index 1.
     UInt operandCount = inst->getOperandCount();
-    UInt argCount = operandCount - 1;
     UInt operandIndex = 1;
 
-    // Our current strategy for dealing with intrinsic
-    // calls is to "un-mangle" the mangled name, in
-    // order to figure out what the user was originally
-    // calling. This is a bit messy, and there might
-    // be better strategies (including just stuffing
-    // a pointer to the original decl onto the callee).
 
-    // If the intrinsic the user is calling is a generic,
-    // then the mangled name will have been set on the
-    // outer-most generic, and not on the leaf value
-    // (which is `func` above), so we need to walk
-    // upwards to find it.
-    //
-    IRInst* valueForName = func;
-    for (;;)
-    {
-        auto parentBlock = as<IRBlock>(valueForName->parent);
-        if (!parentBlock)
-            break;
-
-        auto parentGeneric = as<IRGeneric>(parentBlock->parent);
-        if (!parentGeneric)
-            break;
-
-        valueForName = parentGeneric;
-    }
-
-    // If we reach this point, we are assuming that the value
-    // has some kind of linkage, and thus a mangled name.
-    //
-    auto linkageDecoration = valueForName->findDecoration<IRLinkageDecoration>();
-    SLANG_ASSERT(linkageDecoration);
-    
-    // We will use the `MangledLexer` to
-    // help us split the original name into its pieces.
-    MangledLexer lexer(linkageDecoration->getMangledName());
-
-    // We'll read through the qualified name of the
-    // symbol (e.g., `Texture2D<T>.Sample`) and then
-    // only keep the last segment of the name (e.g.,
-    // the `Sample` part).
-    auto name = lexer.readSimpleName();
+    auto name = targetIntrinsic->getDefinition();
 
     // We will special-case some names here, that
     // represent callable declarations that aren't
     // ordinary functions, and thus may use different
     // syntax.
-    if (name == "operator[]")
+    if (name == ".operator[]")
     {
         // The user is invoking a built-in subscript operator
 
@@ -2133,18 +2101,13 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpI
     auto prec = getInfo(EmitOp::Postfix);
     needClose = maybeEmitParens(outerPrec, prec);
 
-    // The mangled function name currently records
-    // the number of explicit parameters, and thus
-    // doesn't include the implicit `this` parameter.
-    // We can compare the argument and parameter counts
-    // to figure out whether we have a member function call.
-    UInt paramCount = lexer.readParamCount();
-
-    if (argCount != paramCount)
+    if (name[0] == '.')
     {
         // Looks like a member function call
         emitOperand(inst->getOperand(operandIndex), leftSide(outerPrec, prec));
         m_writer->emit(".");
+
+        name = UnownedStringSlice(name.begin()+1, name.end());
         operandIndex++;
     }
     else
@@ -2284,9 +2247,9 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
             // We want to detect any call to an intrinsic operation,
             // that we can emit it directly without mangling, etc.
-            if (auto irFunc = asTargetIntrinsic(funcValue))
+            if(auto targetIntrinsic = findTargetIntrinsicDecoration(funcValue))
             {
-                emitIntrinsicCallExpr(static_cast<IRCall*>(inst), irFunc, inOuterPrec);
+                emitIntrinsicCallExpr(static_cast<IRCall*>(inst), targetIntrinsic, inOuterPrec);
                 return true;
             }
 

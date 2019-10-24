@@ -226,7 +226,10 @@ protected:
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
 
-    void emitIntrinsicCallExpr(IRCall* inst, IRFunc* func, EmitOpInfo const& inOuterPrec);
+    void emitIntrinsicCallExpr(
+        IRCall*                         inst,
+        IRTargetIntrinsicDecoration*    targetIntrinsic,
+        EmitOpInfo const&               inOuterPrec);
 
     void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp);
 
