@@ -3465,9 +3465,12 @@ SLANG_API SlangResult spLoadRepro(
     List<uint8_t> buffer;
     SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
 
+    MemoryOffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
     StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
 
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, request));
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, request));
     return SLANG_OK;
 }
 
@@ -3512,8 +3515,11 @@ SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproDat
         SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&memoryStream, buffer));
     }
 
+    MemoryOffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
     StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
-    return StateSerializeUtil::extractFiles(requestState, fileSystem);
+    return StateSerializeUtil::extractFiles(base, requestState, fileSystem);
 }
 
 // Reflection API
