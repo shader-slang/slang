@@ -12,41 +12,49 @@ namespace Slang {
 /* static */const RiffSemanticVersion StateSerializeUtil::g_semanticVersion =
     RiffSemanticVersion::make(StateSerializeUtil::kMajorVersion, StateSerializeUtil::kMinorVersion, StateSerializeUtil::kPatchVersion);
 
+// We can't just use sizeof for the sizes of these types, because the hash will be dependent on the ptr size,
+// which isn't an issue for serialization (we turn all pointers into Offset32Ptr -> uint32_t). So we use an x macro
+// to set up the thing to hash.
+//
+// Note that bool is in the list because size of bool can change between compilers.
+#define SLANG_STATE_TYPES(x) \
+    x(Util::FileState) \
+    x(Util::PathInfoState) \
+        x(Util::PathInfoState::CompressedResult) \
+        x(SlangPathType) \
+    x(Util::PathAndPathInfo) \
+    x(Util::TargetRequestState) \
+        x(Profile) \
+        x(CodeGenTarget) \
+        x(SlangTargetFlags) \
+        x(FloatingPointMode) \
+    x(Util::StringPair) \
+    x(Util::SourceFileState) \
+        x(PathInfo::Type) \
+    x(Util::TranslationUnitRequestState) \
+        x(SourceLanguage) \
+    x(Util::EntryPointState) \
+        x(Profile) \
+    x(Util::RequestState) \
+        x(SlangCompileFlags) \
+        x(bool) \
+        x(LineDirectiveMode) \
+        x(DebugInfoLevel) \
+        x(OptimizationLevel) \
+        x(ContainerFormat) \
+        x(PassThroughMode) \
+        x(SlangMatrixLayoutMode) \
+
+#define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)), 
+
 // A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
 static uint32_t _calcTypeHash()
 {
     typedef StateSerializeUtil Util;
-
-    const size_t sizes[] =
+    const uint32_t sizes[] =
     {
-        sizeof(Util::FileState),
-        sizeof(Util::PathInfoState),
-            sizeof(Util::PathInfoState::CompressedResult),
-            sizeof(SlangPathType),
-        sizeof(Util::PathAndPathInfo),
-        sizeof(Util::TargetRequestState),
-            sizeof(Profile),
-            sizeof(CodeGenTarget),
-            sizeof(SlangTargetFlags),
-            sizeof(FloatingPointMode),
-        sizeof(Util::StringPair),
-        sizeof(Util::SourceFileState),
-            sizeof(PathInfo::Type),
-        sizeof(Util::TranslationUnitRequestState),
-            sizeof(SourceLanguage),
-        sizeof(Util::EntryPointState),
-            sizeof(Profile),
-        sizeof(Util::RequestState),
-            sizeof(SlangCompileFlags),
-            sizeof(bool),                       //< Unfortunately bools size can change across compilers/versions
-            sizeof(LineDirectiveMode),
-            sizeof(DebugInfoLevel),
-            sizeof(OptimizationLevel),
-            sizeof(ContainerFormat),
-            sizeof(PassThroughMode),
-            sizeof(SlangMatrixLayoutMode),
+        SLANG_STATE_TYPES(SLANG_STATE_TYPE_SIZE)
     };
-
     return uint32_t(GetHashCode((const char*)&sizes, sizeof(sizes)));
 }
 
