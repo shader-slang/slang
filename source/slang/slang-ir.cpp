@@ -4040,26 +4040,6 @@ namespace Slang
     {
         for(auto dd : inst->getDecorations())
         {
-            // Certain decorations aren't helpful to appear
-            // in output dumps, so we will only include them
-            // in the "detailed" dumping mode.
-            //
-            // For all other modes, we will check the opcode
-            // and skip selected decorations.
-            //
-            if(context->mode != IRDumpMode::Detailed)
-            {
-                switch(dd->op)
-                {
-                default:
-                    break;
-
-                case kIROp_HighLevelDeclDecoration:
-                case kIROp_LayoutDecoration:
-                    continue;
-                }
-            }
-
             dump(context, "[");
             dumpInstBody(context, dd);
             dump(context, "]\n");
