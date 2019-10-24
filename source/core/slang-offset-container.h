@@ -238,6 +238,8 @@ struct OffsetString
 class OffsetBase
 {
 public:
+    typedef OffsetBase ThisType;
+
         /// Turn an offset into a raw regular pointer or reference
     template <typename T>
     T* asRaw(const Offset32Ptr<T>& ptr) { return (T*)_getRaw(ptr.m_offset); }
@@ -286,8 +288,15 @@ public:
     {
     }
 
+
+
     uint8_t* m_data;
     size_t m_dataSize;
+
+protected:
+        /// We want protected, because we don't want copies to be made of OffsetBase by default!
+    OffsetBase(const ThisType& rhs) = default;
+    ThisType& operator=(const ThisType& rhs) = default;
 };
 
 class MemoryOffsetBase : public OffsetBase

@@ -89,7 +89,7 @@ struct StoreContext
     {
         Offset32Ptr<FileState> file;
 
-        auto base = m_container->asBase();
+        OffsetBase& base = m_container->asBase();
 
         // Get the file, if it has an identity
         if (uniqueIdentity.getLength() && m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
@@ -122,7 +122,7 @@ struct StoreContext
             return Offset32Ptr<SourceFileState>();
         }
 
-        auto base = m_container->asBase();
+        auto& base = m_container->asBase();
 
         Offset32Ptr<StateSerializeUtil::SourceFileState> sourceFileState;
         if (m_sourceFileMap.TryGetValue(sourceFile, sourceFileState))
@@ -187,7 +187,7 @@ struct StoreContext
             return Offset32Ptr<PathInfoState>();
         }
 
-        auto base = m_container->asBase();
+        OffsetBase& base = m_container->asBase();
 
         Offset32Ptr<PathInfoState> pathInfo;
         if (!m_pathInfoMap.TryGetValue(srcPathInfo, pathInfo))
@@ -248,7 +248,7 @@ struct StoreContext
 
         Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
 
-        auto base = m_container->asBase();
+        OffsetBase& base = m_container->asBase();
 
         Index index = 0;
         for (const auto& srcDefine : srcDefines)
@@ -270,7 +270,7 @@ struct StoreContext
     const Offset32Array<Offset32Ptr<OffsetString>> fromList(const List<String>& src)
     {   
         Offset32Array<Offset32Ptr<OffsetString>> dst = m_container->newArray<Offset32Ptr<OffsetString>>(src.getCount());
-        auto base = m_container->asBase();
+        OffsetBase& base = m_container->asBase();
 
         for (Index j = 0; j < src.getCount(); ++j)
         {
@@ -313,7 +313,7 @@ static bool _isStorable(const PathInfo::Type type)
 {
     StoreContext context(&inOutContainer);
 
-    auto base = inOutContainer.asBase();
+    OffsetBase& base = inOutContainer.asBase();
 
     auto linkage = request->getLinkage();
 

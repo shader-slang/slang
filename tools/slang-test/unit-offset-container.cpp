@@ -50,7 +50,7 @@ static void offsetContainerUnitTest()
         };
 
         {
-            auto base = container.asBase();
+            auto& base = container.asBase();
 
             Offset32Ptr<Root> root = container.newObject<Root>();
 
