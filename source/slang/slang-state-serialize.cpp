@@ -87,31 +87,44 @@ struct StoreContext
 
     Offset32Ptr<FileState> addFile(const String& uniqueIdentity, const UnownedStringSlice* content)
     {
-        Offset32Ptr<FileState> file;
-
         OffsetBase& base = m_container->asBase();
 
+        Offset32Ptr<FileState> file;
+        
         // Get the file, if it has an identity
-        if (uniqueIdentity.getLength() && m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
-        {
-            return file;
-        }
-
-        // If file was not found create it
-        // Create the file
-        file = m_container->newObject<FileState>();
-
-        if (content)
-        {
-            base[file]->contents = m_container->newString(*content);
-        }
         if (uniqueIdentity.getLength())
         {
-            base[file]->uniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
-            m_uniqueToFileMap.Add(uniqueIdentity, file);
+            if (!m_uniqueToFileMap.TryGetValue(uniqueIdentity, file))
+            {
+                // If file was not found create it
+                // Create the file
+                file = m_container->newObject<FileState>();
+                // Add it 
+                m_uniqueToFileMap.Add(uniqueIdentity, file);
+
+                // Set the identity
+                auto offsetUniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
+                base[file]->uniqueIdentity = offsetUniqueIdentity;
+
+                // Add the file
+                m_files.add(file);
+            }
+        }
+        else
+        {
+            // Create a file, but we know it can't have unique identity
+            file = m_container->newObject<FileState>();
+            // Add the file
+            m_files.add(file);    
         }
 
-        m_files.add(file);
+        // If the contents is not set add it
+        if (!base[file]->contents && content)
+        {
+            auto offsetContent = m_container->newString(*content);
+            base[file]->contents = offsetContent;
+        }
+
         return file;
     }
 
@@ -196,9 +209,11 @@ struct StoreContext
             Offset32Ptr<FileState> fileState;
 
             // Only store as file if we have the contents
-            if(srcPathInfo->m_fileBlob)
+            if(ISlangBlob* fileBlob = srcPathInfo->m_fileBlob)
             {
-                fileState = addFile(srcPathInfo->getUniqueIdentity(), nullptr);
+                UnownedStringSlice content((const char*)fileBlob->getBufferPointer(), fileBlob->getBufferSize());
+
+                fileState = addFile(srcPathInfo->getUniqueIdentity(), &content);
             }
 
             // Save the rest of the state
@@ -225,17 +240,20 @@ struct StoreContext
             if (srcPathInfo->m_fileBlob && base[fileState]->contents.isNull())
             {
                 UnownedStringSlice contents((const char*)srcPathInfo->m_fileBlob->getBufferPointer(), srcPathInfo->m_fileBlob->getBufferSize());
-                base[fileState]->contents = m_container->newString(contents);
+                auto offsetContents = m_container->newString(contents);
+                base[fileState]->contents = offsetContents;
             }
 
             if (srcPathInfo->m_canonicalPath && base[fileState]->canonicalPath.isNull())
             {
-                base[fileState]->canonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
+                auto offsetCanonicalPath = fromString(srcPathInfo->m_canonicalPath->getString());
+                base[fileState]->canonicalPath = offsetCanonicalPath;
             }
 
             if (srcPathInfo->m_uniqueIdentity && base[fileState]->uniqueIdentity.isNull())
             {
-                base[fileState]->uniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
+                auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity->getString());
+                base[fileState]->uniqueIdentity = offsetUniqueIdentity;
             }
         }
 

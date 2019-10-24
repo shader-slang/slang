@@ -27,7 +27,23 @@ typically managed by the OffsetContainer for writing. When reading a MemoryOffse
 An issue around using offset pointers, is that we cannot directly access it's contents, because it's just an
 offset to some base address. Thus to access the thing being pointed to we need to turn the offset pointer back into
 a 'raw' pointer. This is achieved via using the asRaw methods on the OffsetBase. For a convenience operator[] can also
-be used, and this is typically the preferred mechanism.  
+be used, and this is typically the preferred mechanism.
+
+NOTE! That the evaluation order of a function calls parameters is undefined in C++. That whilst it might appear doing
+
+```
+base[thing] = container.newObject<Thing>();
+```
+
+will evaluate the construction of newObject *before* the assignment, if you look at the assignment as being a function call
+(as it is when it is overloaded), then base[thing] might be evaluated *before* newObject, and if it is then the result
+could be wrong if the newObject needed to reallocate. Therefore when allocation is involved, a new (or any allocation backed
+function call from the OffsetContainer) should always place a result in a local variable. Then assign as in
+
+```
+auto anotherThing = container.newObject<Thing>();
+base[thing] = anotherThing; 
+```
 
 When creating structures - unless you know the allocated space (in the OffsetContainer or some other piece of memory)
 is larger than required, then special care is needed, because when a new larger piece of memory is allocated to hold
@@ -95,6 +111,15 @@ void func()
         rawThing = base[thing];
         // So now this is okay again
         rawThing->text = text;
+
+        // BAD! we don't know the evaluation order here, if the lhs is evaluate before the rhs, then it could write to the wrong area of memory. 
+        base[thing]->text = offsetContainer.newString("Hello World again!");
+
+        // So where there is allocation, and assignment to something that in held in offset ptr use a local for the allocation as in
+        {
+            auto text = offsetContainer.newString("Hello World again!");
+            base[thing]->text = text;
+        }
     }
 }
 
