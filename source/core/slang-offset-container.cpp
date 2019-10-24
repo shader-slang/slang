@@ -100,7 +100,7 @@ const char* OffsetString::getCstr() const
 OffsetContainer::OffsetContainer()
 {
     m_capacity = 0;
-    m_base.m_data = nullptr;
+    m_data = nullptr;
 
     // We need to allocate some of the first bytes 0 can be used for nullptr. 
     allocateAndZero(kStartOffset, 1);
@@ -108,9 +108,9 @@ OffsetContainer::OffsetContainer()
 
 OffsetContainer::~OffsetContainer()
 {
-    if (m_base.m_data)
+    if (m_data)
     {
-        ::free(m_base.m_data);
+        ::free(m_data);
     }
 }
 
@@ -126,7 +126,7 @@ void OffsetContainer::fixAlignment(size_t alignment)
 
 void* OffsetContainer::allocate(size_t size, size_t alignment)
 {
-    size_t offset = (m_base.m_dataSize + alignment - 1) & ~(alignment - 1);
+    size_t offset = (m_dataSize + alignment - 1) & ~(alignment - 1);
 
     if (offset + size > m_capacity)
     {
@@ -147,14 +147,14 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
         size_t newSize = (calcSize < minSize) ? minSize : calcSize;
 
         // Reallocate space
-        m_base.m_data = (uint8_t*)::realloc(m_base.m_data, newSize);
+        m_data = (uint8_t*)::realloc(m_data, newSize);
         m_capacity = newSize;
     }
 
     SLANG_ASSERT(offset + size <= m_capacity);
 
-    m_base.m_dataSize = offset + size;
-    return m_base.m_data + offset;
+    m_dataSize = offset + size;
+    return m_data + offset;
 }
 
 void* OffsetContainer::allocateAndZero(size_t size, size_t alignment)
@@ -180,7 +180,7 @@ Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& s
     // 0 terminate
     bytes[headSize + stringSize] = 0;
 
-    return Offset32Ptr<OffsetString>(m_base.getOffset(bytes));
+    return Offset32Ptr<OffsetString>(getOffset(bytes));
 }
 
 Offset32Ptr<OffsetString> OffsetContainer::newString(const char* contents)

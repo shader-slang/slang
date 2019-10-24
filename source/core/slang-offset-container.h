@@ -6,9 +6,6 @@
 
 namespace Slang {
 
-
-
-
 /*
 The purpose of OffsetContainer and related types is to provide a mechanism to easily serialize offset structures.
 
@@ -98,10 +95,7 @@ void func()
 }
 
 ```
-
 */
-
-
 
 enum
 {
@@ -237,8 +231,9 @@ struct OffsetString
 
 /* A type that is used to hold the base address of the contiguous memory that holds either Offset32Ptr and related types>
 */
-struct OffsetBase
+class OffsetBase
 {
+public:
     template <typename T>
     T* asRaw(const Offset32Ptr<T>& ptr) { return (T*)_getRaw(ptr.m_offset); }
     template <typename T>
@@ -249,9 +244,8 @@ struct OffsetBase
         /// Note the use of ptr when setting up a reference here - it's needed because a ref does not have to be backed by a pointer.
         /// And commonly is not when the const& and the thing referenced can be held in a word.
     template <typename T>
-    Offset32Ref<T> asRef(T* ptr) { return Offset32Ref<T>(getOffset(ptr)); }
+    Offset32Ref<T> asRef(T* ptr) { SLANG_ASSERT(ptr); return Offset32Ref<T>(getOffset(ptr)); }
 
-    uint8_t* _getRaw(uint32_t offset) { return (offset == kNull32Offset) ? nullptr : (m_data + offset); }
     uint32_t getOffset(const void* ptr)
     {
         if (ptr == nullptr)
@@ -263,11 +257,12 @@ struct OffsetBase
         return uint32_t(diff);
     }
 
-    void set(void* data, size_t dataSize)
-    {
-        m_data = (uint8_t*)data;
-        m_dataSize = dataSize;
-    }
+        /// Get the contained data
+    SLANG_FORCE_INLINE uint8_t* getData() { return m_data; }
+        /// Return the last used byte of the data
+    SLANG_FORCE_INLINE size_t getDataCount() const { return m_dataSize; }
+
+    uint8_t* _getRaw(uint32_t offset) { return (offset == kNull32Offset) ? nullptr : (m_data + offset); }
 
     OffsetBase():
         m_data(nullptr),
@@ -279,13 +274,23 @@ struct OffsetBase
     size_t m_dataSize;
 };
 
+class MemoryOffsetBase : public OffsetBase
+{
+public:
+    void set(void* data, size_t dataSize)
+    {
+        m_data = (uint8_t*)data;
+        m_dataSize = dataSize;
+    }
+};
+
 /* OffsetContainer is a type designed to manage the construction structures around 'offset types'. In particular it allows
 for construction of offset structures where their total encoded size is not known at the outset.
 
 The main mechanism to make this work is via the use of OffsetXXX types, which when constructed from the OffsetContainer will
 maintain valid values, even if the underlying backing memories location is changed.
 */
-class OffsetContainer
+class OffsetContainer : public OffsetBase
 {
 public:
 
@@ -294,7 +299,7 @@ public:
     {
         void* data = allocate(sizeof(T), SLANG_ALIGN_OF(T));
         new (data) T();
-        return Offset32Ptr<T>(m_base.getOffset(data));
+        return Offset32Ptr<T>(getOffset(data));
     }
 
     template <typename T>
@@ -309,11 +314,11 @@ public:
         {
             new (data + i) T();
         }
-        return Offset32Array<T>(Offset32Ptr<T>(m_base.getOffset(data)), uint32_t(size));
+        return Offset32Array<T>(Offset32Ptr<T>(getOffset(data)), uint32_t(size));
     }
 
         /// Get the base - which is needed for turning offsets into things
-    OffsetBase* getBase() { return &m_base; }
+    OffsetBase* asBase() { return this; }
 
     /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);
@@ -325,17 +330,11 @@ public:
     Offset32Ptr<OffsetString> newString(const UnownedStringSlice& slice);
     Offset32Ptr<OffsetString> newString(const char* contents);
 
-        /// Get the contained data
-    uint8_t* getData() { return m_base.m_data; }
-        /// Return the last used byte of the data
-    size_t getDataCount() const { return m_base.m_dataSize; }
-
         /// Ctor
     OffsetContainer();
     ~OffsetContainer();
 
 protected:
-    OffsetBase m_base;
     size_t m_capacity;
 };
 

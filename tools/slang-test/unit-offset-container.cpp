@@ -51,7 +51,7 @@ static void offsetContainerUnitTest()
 
         
         {
-            auto base = container.getBase();
+            auto base = container.asBase();
 
             Offset32Ptr<Root> root = container.newObject<Root>();
 
@@ -67,7 +67,7 @@ static void offsetContainerUnitTest()
         {
             
             List<uint8_t> copy;
-            copy.addRange(container.getBase()->m_data, container.getBase()->m_dataSize);
+            copy.addRange(container.asBase()->m_data, container.asBase()->m_dataSize);
 
             OffsetBase base;
             base.m_data = copy.getBuffer();

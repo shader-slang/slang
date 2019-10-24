@@ -514,7 +514,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
 
                     auto requestState = StateSerializeUtil::getRequest(buffer);
-                    OffsetBase base;
+                    MemoryOffsetBase base;
                     base.set(buffer.getBuffer(), buffer.getCount());
 
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
