@@ -10,26 +10,26 @@ namespace Slang {
 The purpose of OffsetContainer and related types is to provide a mechanism to easily serialize offset structures.
 
 The root idea here is the "offset pointer". A typical pointer in a language like C/C++ holds the absolute address
-in the current address space of the thing that is being pointed to. This introduces a problem if the structure is
-serialized in that it is highly likely that the structures will be placed at different addresses. This means that
-the absolute pointers will not point to the correct places, and so not be usable when read back from a serialization, or
-when moved to another location.
+in the current address space of the thing that is being pointed to. This introduces a problem, as when data is
+serialized in the contents will very likely be be placed at different addresses - meaning any absolute pointer
+will point to the wrong place. There is also a related issue around pointer sizes - on some targets they are 32 bits
+and on others 64 bits. 
 
-An offset pointer means a pointer that points to something relative to some base address. The OffsetPtr uses a 32 bit
+An offset pointer means a pointer that points to something 'offset' to some base address. The OffsetPtr uses a 32 bit
 offset from the pointers location in memory. This means such a pointer can address a 4Gb address space.
 
 Special care is needed when using offset pointers - both when constructing structures that contain them, reading
 them and in general usage.
 
 For simplicity here we store all offset pointers within a single contiguous allocation. This allocation is
-typically managed by the OffsetContainer for writing and just with OffsetBase for reading. For simplicity it's easiest
-to claim that all offset pointers *can only exist* in this address space.
+typically managed by the OffsetContainer for writing. When reading a MemoryOffsetBase can be used.
 
 An issue around using offset pointers, is that we cannot directly access it's contents, because it's just an
 offset to some base address. Thus to access the thing being pointed to we need to turn the offset pointer back into
-a 'raw' pointer. This is achieved via using the asRaw methods on the OffsetBase. 
+a 'raw' pointer. This is achieved via using the asRaw methods on the OffsetBase. For a convenience operator[] can also
+be used, and this is typically the preferred mechanism.  
 
-When creating structures - unless you know the allocated space (in the RelativeContainer or some other piece of memory)
+When creating structures - unless you know the allocated space (in the OffsetContainer or some other piece of memory)
 is larger than required, then special care is needed, because when a new larger piece of memory is allocated to hold
 everything, raw pointers pointers will likely be invalidated. When reading there is typically no need to move
 the base address, so raw pointers remain valid through out. When doing writing if a call is made to something that
@@ -48,7 +48,7 @@ struct Thing
 void func()
 {
     OffsetContainer container;
-    OffsetBase* base = container.getBase();
+    OffsetBase& base = container.asBase();
 
     {
         // We can allocate on the heap. BUT we can't set up a offset pointer to it
@@ -62,8 +62,12 @@ void func()
 
     // To write values, we need a raw pointer
     {
+        // To get the raw pointer we can use 'asRaw'
         auto rawThing = base->asRaw(thing);
 
+        // Or more perhaps slightly more conveniently []
+        auto rawThing = base[thing];
+        
         // We can write and read things via the Safe32Ptr
         rawThing->value = 10;
         const int value = rawThing->value;
@@ -74,8 +78,8 @@ void func()
     // Now lets write to it
     {
         // We can have raw pointer (or reference) to a thing but we need to be *careful* if we allocate 
-        Thing* rawThing = base->asRaw(thing);
-        // We are okay here, nothing between getting the raw pointer and the write allocated/newed anything on the RelativeContainer
+        Thing* rawThing = base[thing];
+        // We are okay here, nothing between getting the raw pointer and the write allocated/newed anything on the OffsetContainer
         rawThing->value = 20;
 
         // Lets set up name 
@@ -85,10 +89,10 @@ void func()
         rawThing->text = text;
 
         // This is okay 
-        base->asRaw(thing)->text = text;
+        base[thing]->text = text;
 
         // Or we can update rawThing such that is up to date
-        rawThing = base->asRaw(thing);
+        rawThing = base[thing];
         // So now this is okay again
         rawThing->text = text;
     }
@@ -175,7 +179,7 @@ SLANG_FORCE_INLINE Offset32Ref<T> Offset32Ptr<T>::operator*()
 
 
 /* Much like Offset32Ptr this is an array but whose memory is stored inside the OffsetContainer. This means elements types
-must be 'relative types'. */
+must be 'offset types'. */
 template <typename T>
 class Offset32Array
 {
