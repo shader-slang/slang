@@ -6,10 +6,12 @@
 #include "slang-check.h"
 #include "slang-ir.h"
 #include "slang-ir-constexpr.h"
+#include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa.h"
+#include "slang-ir-strip.h"
 #include "slang-ir-validate.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -6553,6 +6555,46 @@ IRModule* generateIRForTranslationUnit(
 
     checkForMissingReturns(module, compileRequest->getSink());
 
+    // The "mandatory" optimization passes may make use of the
+    // `IRHighLevelDeclDecoration` type to relate IR instructions
+    // back to AST-level code in order to improve the quality
+    // of diagnostics that are emitted.
+    //
+    // While it is important for these passes to have access
+    // to AST-level information, allowing that information to
+    // flow into later steps (e.g., code generation) could lead
+    // to unclean layering of the parts of the compiler.
+    // In principle, back-end steps should not need to know where
+    // IR code came from.
+    //
+    // In order to avoid problems, we run a pass here to strip
+    // out any decorations that should not be relied upon by
+    // later passes.
+    //
+    {
+        // Because we are already stripping out undesired decorations,
+        // this is also a convenient place to remove any `IRNameHintDecoration`s
+        // in the case where we are obfuscating code. We handle this
+        // by setting up the options for the stripping pass appropriately.
+        //
+        IRStripOptions stripOptions;
+        stripOptions.shouldStripNameHints = compileRequest->obfuscateCode;
+
+        stripFrontEndOnlyInstructions(module, stripOptions);
+
+        // Stripping out decorations could leave some dead code behind
+        // in the module, and in some cases that extra code is also
+        // undesirable (e.g., the string literals referenced by name-hint
+        // decorations are just as undesirable as the decorations themselves).
+        // To clean up after ourselves we also run a dead-code elimination
+        // pass here, but make sure to set our options so that we don't
+        // eliminate anything that has been marked for export.
+        //
+        IRDeadCodeEliminationOptions options;
+        options.keepExportsAlive = true;
+        eliminateDeadCode(module, options);
+    }
+
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
     // that we can avoid doing them downstream.
@@ -6564,7 +6606,7 @@ IRModule* generateIRForTranslationUnit(
 
     validateIRModuleIfEnabled(compileRequest, module);
 
-    // If we are being sked to dump IR during compilation,
+    // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
     if(compileRequest->shouldDumpIR)
     {

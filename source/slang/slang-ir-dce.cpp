@@ -16,8 +16,8 @@ struct DeadCodeEliminationContext
     // the parameters that were passed to the top-level
     // `eliminateDeadCode` function.
     //
-    BackEndCompileRequest*  compileRequest;
-    IRModule*               module;
+    IRModule*                       module;
+    IRDeadCodeEliminationOptions    options;
 
     // Our overall process is going to be to determine
     // which instructions in the module are "live"
@@ -222,11 +222,6 @@ struct DeadCodeEliminationContext
         //
         if(inst->mightHaveSideEffects())
             return true;
-
-        // If it's a layout instruction we don't want to remove it
-        if (as<IRLayout>(inst))
-            return true;
-
         //
         // The `mightHaveSideEffects` query is conservative, and will
         // return `true` as its default mode, so once we are past that
@@ -245,10 +240,21 @@ struct DeadCodeEliminationContext
         if(inst->findDecorationImpl(kIROp_KeepAliveDecoration))
             return true;
         //
-        // TODO: Eventually it would make sense to consider everything
-        // with an `[export(...)]` decoration as live, but our current
-        // approach to linking for back-end compilation leaves many
-        // linkage decorations in place that we seemingly don't need/want.
+        // We also consider anything with an `[export(...)]` as live,
+        // when the appropriate option has been set.
+        //
+        // Note: our current approach to linking for back-end compilation
+        // leaves many linakge decorations in place that we seemingly
+        // don't need/want, so this option currently can't be enabled
+        // unconditionally.
+        //
+        if( options.keepExportsAlive )
+        {
+            if( inst->findDecoration<IRExportDecoration>() )
+            {
+                return true;
+            }
+        }
 
         // A basic block is an interesting case. Knowing that a function
         // is live means that its entry block is live, but the liveness
@@ -317,12 +323,12 @@ struct DeadCodeEliminationContext
 // and then defer to it for the real work.
 //
 void eliminateDeadCode(
-    BackEndCompileRequest* compileRequest,
-    IRModule*       module)
+    IRModule*                           module,
+    IRDeadCodeEliminationOptions const& options)
 {
     DeadCodeEliminationContext context;
-    context.compileRequest = compileRequest;
     context.module = module;
+    context.options = options;
 
     context.processModule();
 }

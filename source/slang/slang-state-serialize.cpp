@@ -808,6 +808,8 @@ struct LoadContext
         request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
         request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
 
+        request->getFrontEndReq()->obfuscateCode = requestState->obfuscateCode;
+
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
 
