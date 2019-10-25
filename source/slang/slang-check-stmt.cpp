@@ -5,10 +5,40 @@
 
 namespace Slang
 {
-    void SemanticsVisitor::checkStmt(Stmt* stmt)
+    namespace
+    {
+            /// RAII-like type for establishing an "outer" statement during nested checks.
+            ///
+            /// The `SemanticsStmtVisitor` maintains a linked list of outer statements
+            /// using `OuterStmtInfo` records stored on the recursive call stack during
+            /// checking. This type creates a sub-`SemanticsStmtVisitor` that has one
+            /// additional outer statement added to the stack of outer statements.
+            ///
+            /// The outer statements are used to validate and resolve things like
+            /// the target of `break` or `continue` statements.
+            ///
+        struct WithOuterStmt : public SemanticsStmtVisitor
+        {
+        public:
+            WithOuterStmt(SemanticsStmtVisitor* visitor, Stmt* outerStmt)
+                : SemanticsStmtVisitor(*visitor)
+            {
+                m_parentFunc = visitor->m_parentFunc;
+
+                m_outerStmt.next = visitor->m_outerStmts;
+                m_outerStmt.stmt = outerStmt;
+                m_outerStmts = &m_outerStmt;
+            }
+
+        private:
+            OuterStmtInfo m_outerStmt;
+        };
+    }
+
+    void SemanticsVisitor::checkStmt(Stmt* stmt, FuncDecl* parentDecl, OuterStmtInfo* outerStmts)
     {
         if (!stmt) return;
-        dispatchStmt(stmt);
+        dispatchStmt(stmt, parentDecl, outerStmts);
         checkModifiers(stmt);
     }
 
@@ -40,14 +70,17 @@ namespace Slang
         }
     }
 
-    template<typename T>
-    T* SemanticsVisitor::FindOuterStmt()
+    void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
     {
-        auto& outerStmts = getShared()->outerStmts;
-        const Index outerStmtCount = outerStmts.getCount();
-        for (Index ii = outerStmtCount; ii > 0; --ii)
+        SemanticsVisitor::checkStmt(stmt, m_parentFunc, m_outerStmts);
+    }
+
+    template<typename T>
+    T* SemanticsStmtVisitor::FindOuterStmt()
+    {
+        for(auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
         {
-            auto outerStmt = outerStmts[ii-1];
+            auto outerStmt = outerStmtInfo->stmt;
             auto found = as<T>(outerStmt);
             if (found)
                 return found;
@@ -75,18 +108,6 @@ namespace Slang
         stmt->parentStmt = outer;
     }
 
-    void SemanticsVisitor::PushOuterStmt(Stmt* stmt)
-    {
-        auto& outerStmts = getShared()->outerStmts;
-        outerStmts.add(stmt);
-    }
-
-    void SemanticsVisitor::PopOuterStmt(Stmt* /*stmt*/)
-    {
-        auto& outerStmts = getShared()->outerStmts;
-        outerStmts.removeAt(outerStmts.getCount() - 1);
-    }
-
     RefPtr<Expr> SemanticsVisitor::checkPredicateExpr(Expr* expr)
     {
         RefPtr<Expr> e = expr;
@@ -97,16 +118,16 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt *stmt)
     {
-        PushOuterStmt(stmt);
-        stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        checkStmt(stmt->Statement);
+        WithOuterStmt subContxt(this, stmt);
 
-        PopOuterStmt(stmt);
+        stmt->Predicate = checkPredicateExpr(stmt->Predicate);
+        subContxt.checkStmt(stmt->Statement);
     }
 
     void SemanticsStmtVisitor::visitForStmt(ForStmt *stmt)
     {
-        PushOuterStmt(stmt);
+        WithOuterStmt subContext(this, stmt);
+
         checkStmt(stmt->InitialStatement);
         if (stmt->PredicateExpression)
         {
@@ -116,9 +137,7 @@ namespace Slang
         {
             stmt->SideEffectExpression = CheckExpr(stmt->SideEffectExpression);
         }
-        checkStmt(stmt->Statement);
-
-        PopOuterStmt(stmt);
+        subContext.checkStmt(stmt->Statement);
     }
 
     RefPtr<Expr> SemanticsVisitor::checkExpressionAndExpectIntegerConstant(RefPtr<Expr> expr, RefPtr<IntVal>* outIntVal)
@@ -132,7 +151,7 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitCompileTimeForStmt(CompileTimeForStmt* stmt)
     {
-        PushOuterStmt(stmt);
+        WithOuterStmt subContext(this, stmt);
 
         stmt->varDecl->type.type = getSession()->getIntType();
         addModifier(stmt->varDecl, new ConstModifier());
@@ -157,24 +176,20 @@ namespace Slang
         stmt->rangeBeginVal = rangeBeginVal;
         stmt->rangeEndVal = rangeEndVal;
 
-        checkStmt(stmt->body);
-
-
-        PopOuterStmt(stmt);
+        subContext.checkStmt(stmt->body);
     }
 
     void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     {
-        PushOuterStmt(stmt);
+        WithOuterStmt subContext(this, stmt);
+
         // TODO(tfoley): need to coerce condition to an integral type...
         stmt->condition = CheckExpr(stmt->condition);
-        checkStmt(stmt->body);
+        subContext.checkStmt(stmt->body);
 
         // TODO(tfoley): need to check that all case tags are unique
 
         // TODO(tfoley): check that there is at most one `default` clause
-
-        PopOuterStmt(stmt);
     }
 
     void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
@@ -232,9 +247,10 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt *stmt)
     {
+        auto function = getParentFunc();
         if (!stmt->Expression)
         {
-            if (getFunction() && !getFunction()->ReturnType.Equals(getSession()->getVoidType()))
+            if (function && !function->ReturnType.Equals(getSession()->getVoidType()))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }
@@ -244,9 +260,9 @@ namespace Slang
             stmt->Expression = CheckTerm(stmt->Expression);
             if (!stmt->Expression->type->Equals(getSession()->getErrorType()))
             {
-                if (getFunction())
+                if (function)
                 {
-                    stmt->Expression = coerce(getFunction()->ReturnType.Ptr(), stmt->Expression);
+                    stmt->Expression = coerce(function->ReturnType.Ptr(), stmt->Expression);
                 }
                 else
                 {
@@ -262,10 +278,9 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitWhileStmt(WhileStmt *stmt)
     {
-        PushOuterStmt(stmt);
+        WithOuterStmt subContext(this, stmt);
         stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        checkStmt(stmt->Statement);
-        PopOuterStmt(stmt);
+        subContext.checkStmt(stmt->Statement);
     }
 
     void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt *stmt)

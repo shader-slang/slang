@@ -187,9 +187,9 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::dispatchStmt(Stmt* stmt)
+    void SemanticsVisitor::dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts)
     {
-        SemanticsStmtVisitor visitor(getShared());
+        SemanticsStmtVisitor visitor(getShared(), parentFunc, outerStmts);
         try
         {
             visitor.dispatch(stmt);

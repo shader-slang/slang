@@ -450,6 +450,22 @@ namespace Slang
         }
     }
 
+    static bool _isLocalVar(VarDeclBase* varDecl)
+    {
+        auto pp = varDecl->ParentDecl;
+
+        if(as<ScopeDecl>(pp))
+            return true;
+
+        if(auto genericDecl = as<GenericDecl>(pp))
+            pp = genericDecl;
+
+        if(as<FuncDecl>(pp))
+            return true;
+
+        return false;
+    }
+
     void SemanticsVisitor::CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl)
     {
         // A variable that didn't have an explicit type written must
@@ -485,7 +501,7 @@ namespace Slang
         }
         else
         {
-            if (getFunction() || getCheckingPhase() == CheckingPhase::Header)
+            if (_isLocalVar(varDecl) || getCheckingPhase() == CheckingPhase::Header)
             {
                 TypeExp typeExp = CheckUsableType(varDecl->type);
                 varDecl->type = typeExp;
@@ -1784,13 +1800,9 @@ namespace Slang
         {
             // TODO: should put the checking of the body onto a "work list"
             // to avoid recursion here.
-            if (functionNode->Body)
+            if (auto body = functionNode->Body)
             {
-                auto& function = getShared()->function;
-                auto oldFunc = function;
-                function = functionNode;
-                checkStmt(functionNode->Body);
-                function = oldFunc;
+                checkBodyStmt(body, functionNode);
             }
         }
     }
@@ -2256,10 +2268,6 @@ namespace Slang
         if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
         functionNode->SetCheckState(DeclCheckState::CheckingHeader);
 
-        auto& function = getShared()->function;
-        auto oldFunc = function;
-        function = functionNode;
-
         auto resultType = functionNode->ReturnType;
         if(resultType.exp)
         {
@@ -2284,7 +2292,6 @@ namespace Slang
             else
                 paraNames.Add(para->getName());
         }
-        function = oldFunc;
         functionNode->SetCheckState(DeclCheckState::CheckedHeader);
 
         // One last bit of validation: check if we are redeclaring an existing function

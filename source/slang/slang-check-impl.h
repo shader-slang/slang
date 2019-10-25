@@ -226,12 +226,6 @@ namespace Slang
             return m_sink;
         }
 
-        FuncDecl * function = nullptr;
-
-
-        // lexical outer statements
-        List<Stmt*> outerStmts;
-
         // We need to track what has been `import`ed,
         // to avoid importing the same thing more than once
         //
@@ -279,11 +273,26 @@ namespace Slang
 
         Session* getSession() { return m_shared->getSession(); }
 
-        FuncDecl* getFunction() { return m_shared->function; }
-
         Linkage* getLinkage() { return m_shared->m_linkage; }
         NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
+            /// Information for tracking one or more outer statements.
+            ///
+            /// During checking of statements, we need to track what
+            /// outer statements are in scope, so that we can resolve
+            /// the target for a `break` or `continue` statement (and
+            /// validate that such statements are only used in contexts
+            /// where such a target exists).
+            ///
+            /// We use a linked list of `OuterStmtInfo` threaded up
+            /// through the recursive call stack to track the statements
+            /// that are lexically surrounding the one we are checking.
+            ///
+        struct OuterStmtInfo
+        {
+            Stmt*           stmt;
+            OuterStmtInfo*  next;
+        };
 
     public:
         // Translate Types
@@ -402,7 +411,7 @@ namespace Slang
         // so that we can add some quality-of-life features for users
         // in cases where the compiler crashes
         void dispatchDecl(DeclBase* decl);
-        void dispatchStmt(Stmt* stmt);
+        void dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts);
         void dispatchExpr(Expr* expr);
 
         // Make sure a declaration has been checked, so we can refer to it.
@@ -767,7 +776,7 @@ namespace Slang
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
 
-        void checkStmt(Stmt* stmt);
+        void checkStmt(Stmt* stmt, FuncDecl* outerFunction, OuterStmtInfo* outerStmts);
 
         void getGenericParams(
             GenericDecl*                        decl,
@@ -790,13 +799,6 @@ namespace Slang
         void ValidateFunctionRedeclaration(FuncDecl* funcDecl);
 
         void VisitFunctionDeclaration(FuncDecl *functionNode);
-
-        template<typename T>
-        T* FindOuterStmt();
-
-        void PushOuterStmt(Stmt* stmt);
-
-        void PopOuterStmt(Stmt* /*stmt*/);
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr);
 
@@ -1360,9 +1362,25 @@ namespace Slang
         : public SemanticsVisitor
         , StmtVisitor<SemanticsStmtVisitor>
     {
-        SemanticsStmtVisitor(SharedSemanticsContext* shared)
+        SemanticsStmtVisitor(SharedSemanticsContext* shared, FuncDecl* parentFunc, OuterStmtInfo* outerStmts)
             : SemanticsVisitor(shared)
+            , m_parentFunc(parentFunc)
+            , m_outerStmts(outerStmts)
         {}
+
+            /// The parent function (if any) that surrounds the statement being checked.
+            // TODO: This should probably be a more general case like `CallableDecl`
+        FuncDecl* m_parentFunc = nullptr;
+
+            /// The linked list of lexically surrounding statements.
+        OuterStmtInfo* m_outerStmts = nullptr;
+
+        FuncDecl* getParentFunc() { return m_parentFunc; }
+
+        void checkStmt(Stmt* stmt);
+
+        template<typename T>
+        T* FindOuterStmt();
 
         void visitDeclStmt(DeclStmt* stmt);
 
@@ -1408,6 +1426,11 @@ namespace Slang
         SemanticsDeclVisitor(SharedSemanticsContext* shared)
             : SemanticsVisitor(shared)
         {}
+
+        void checkBodyStmt(Stmt* stmt, FuncDecl* parentDecl)
+        {
+            checkStmt(stmt, parentDecl, nullptr);
+        }
 
         void visitGenericDecl(GenericDecl* genericDecl);
 
