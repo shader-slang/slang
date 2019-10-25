@@ -112,7 +112,10 @@ struct RiffUtil
     static SlangResult writeData(const RiffChunk* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out);
     static SlangResult readData(Stream* stream, RiffChunk* outHeader, size_t headerSize, List<uint8_t>& data);
 
-    
+
+    static SlangResult readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize);
+
+
         /// Total size is the size of all the contained chunks
     static SlangResult writeContainerHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out);
 
@@ -122,6 +125,125 @@ struct RiffUtil
         /// Read a riff container. The chunks memory is stored in the arena. 
     static SlangResult readContainer(Stream* stream, RiffContainerHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks);
 
+        /// Read a header. Handles special case of list/riff types
+    static SlangResult readHeader(Stream* stream, RiffContainerHeader& outHeader);
+
+        /// True if the type is a container type
+    static bool isContainerType(FourCC type)
+    {
+        return type == RiffFourCC::kRiff || type == RiffFourCC::kList;
+    }
+
+};
+
+class RiffContainer
+{
+public:
+
+    struct Data
+    {
+            /// Get the payload
+        void* getPayload() { return (void*)(this + 1); }
+        size_t getSize() { return size; }
+
+        size_t size;
+        Data* next;
+        // Followed by the payload
+    };
+
+    struct Chunk
+    {
+        FourCC type;                    ///< Type of chunk
+        size_t size;                    ///< After closed 
+        Chunk* next;                    ///< Next chunk in this list
+        Data* dataList;                 ///< List of 0 or more data items
+    };
+
+    struct Container : public Chunk
+    {
+        // the type can only be list or riff
+        FourCC subType;                       ///< The subtype of this contained
+        Chunk* containedChunks;               ///< The contained chunks
+        Chunk* endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
+    };
+
+    class ScopeChunk
+    {
+    public:
+        ScopeChunk(RiffContainer* container, FourCC type):
+            m_container(container)
+        {
+            container->startChunk(type);
+        }
+        ~ScopeChunk()
+        {
+            m_container->endChunk();
+        }
+    private:
+        RiffContainer* m_container;
+    };
+
+    class ScopeContainer
+    {
+    public:
+        ScopeContainer(RiffContainer* container, FourCC subType):
+            m_container(container)
+        {
+            container->startContainer(subType);
+        }
+        ~ScopeContainer()
+        {
+            m_container->endContainer();
+        }
+    private:
+        RiffContainer* m_container;
+    };
+
+        /// Start a chunk
+    void startChunk(FourCC chunkType);
+        /// Write data into a chunk
+    void write(const void* data, size_t size);
+    Data* addData(size_t size);
+        /// End a chunk
+    void endChunk();
+
+        /// Start a container
+    void startContainer(FourCC subType);
+        /// End a container
+    void endContainer();
+
+        /// Get the root
+    Container* getRoot() const { return m_rootContainer; }
+
+        /// Reset the container
+    void reset();
+
+        /// true if has a root container, and nothing remains open
+    bool isFullyConstructed() { return m_rootContainer && m_container == nullptr; }
+
+        /// Write a container and contents to a stream
+    static SlangResult write(Container* container, bool isRoot, Stream* stream);
+
+        /// Read the stream into the container
+    static SlangResult read(Stream* stream, RiffContainer& outContainer);
+
+    static bool isContainerOk(Container* container);
+
+        /// Ctor
+    RiffContainer();
+
+protected:
+    void _initAndAddChunk(FourCC chunkType, Chunk* chunk);
+    
+    Container* m_rootContainer;
+    Container* m_container;
+    Chunk* m_endChunk;
+    Data* m_endData;
+
+    // The last member is the top of the stack and the current container
+    List<Container*> m_containerStack;
+
+    MemoryArena m_arena;
 };
 
 }
