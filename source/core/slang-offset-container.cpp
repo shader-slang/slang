@@ -1,14 +1,11 @@
-// slang-relative-containere.cpp
-#include "slang-relative-container.h"
+// slang-offset-container.cpp
+#include "slang-offset-container.h"
 
 namespace Slang {
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OffsetString !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */RelativeBase RelativeBase::g_null = { nullptr };
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RelativeString !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeSize])
+size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeSize])
 {
     SLANG_ASSERT(size <= 0xffffffff);
     if (size <= kSizeBase)
@@ -32,7 +29,7 @@ size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncod
     return num + 1;
 }
 
-/* static */const char* RelativeString::decodeSize(const char* in, size_t& outSize)
+/* static */const char* OffsetString::decodeSize(const char* in, size_t& outSize)
 {
     const uint8_t* cur = (const uint8_t*)in;
     if (*cur <= kSizeBase)
@@ -72,7 +69,7 @@ size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncod
     }
 }
 
-/* static */size_t RelativeString::calcAllocationSize(size_t stringSize)
+/* static */size_t OffsetString::calcAllocationSize(size_t stringSize)
 {
     uint8_t encode[kMaxSizeEncodeSize];
     size_t encodeSize = calcEncodedSize(stringSize, encode);
@@ -80,12 +77,12 @@ size_t RelativeString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncod
     return encodeSize + stringSize + 1;
 }
 
-/* static */size_t RelativeString::calcAllocationSize(const UnownedStringSlice& slice)
+/* static */size_t OffsetString::calcAllocationSize(const UnownedStringSlice& slice)
 {
     return calcAllocationSize(slice.size());
 }
 
-UnownedStringSlice RelativeString::getSlice() const
+UnownedStringSlice OffsetString::getSlice() const
 {
     size_t size;
     const char* chars = decodeSize(m_sizeThenContents, size);
@@ -93,41 +90,43 @@ UnownedStringSlice RelativeString::getSlice() const
     return UnownedStringSlice(chars, size);
 }
 
-const char* RelativeString::getCstr() const
+const char* OffsetString::getCstr() const
 {
     return getSlice().begin();
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RelativeContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OffsetContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-RelativeContainer::RelativeContainer()
+OffsetContainer::OffsetContainer()
 {
-    m_current = 0;
     m_capacity = 0;
-    m_base.m_data = nullptr;
+    m_data = nullptr;
+
+    // We need to allocate some of the first bytes 0 can be used for nullptr. 
+    allocateAndZero(kStartOffset, 1);
 }
 
-RelativeContainer::~RelativeContainer()
+OffsetContainer::~OffsetContainer()
 {
-    if (m_base.m_data)
+    if (m_data)
     {
-        ::free(m_base.m_data);
+        ::free(m_data);
     }
 }
 
-void* RelativeContainer::allocate(size_t size)
+void* OffsetContainer::allocate(size_t size)
 {
     return allocate(size, 1);
 }
 
-void RelativeContainer::fixAlignment(size_t alignment)
+void OffsetContainer::fixAlignment(size_t alignment)
 {
     allocate(0, alignment);
 }
 
-void* RelativeContainer::allocate(size_t size, size_t alignment)
+void* OffsetContainer::allocate(size_t size, size_t alignment)
 {
-    size_t offset = (m_current + alignment - 1) & ~(alignment - 1);
+    size_t offset = (m_dataSize + alignment - 1) & ~(alignment - 1);
 
     if (offset + size > m_capacity)
     {
@@ -148,29 +147,29 @@ void* RelativeContainer::allocate(size_t size, size_t alignment)
         size_t newSize = (calcSize < minSize) ? minSize : calcSize;
 
         // Reallocate space
-        m_base.m_data = (uint8_t*)::realloc(m_base.m_data, newSize);
+        m_data = (uint8_t*)::realloc(m_data, newSize);
         m_capacity = newSize;
     }
 
     SLANG_ASSERT(offset + size <= m_capacity);
 
-    m_current = offset + size;
-    return m_base.m_data + offset;
+    m_dataSize = offset + size;
+    return m_data + offset;
 }
 
-void* RelativeContainer::allocateAndZero(size_t size, size_t alignment)
+void* OffsetContainer::allocateAndZero(size_t size, size_t alignment)
 {
     void* data = allocate(size, alignment);
     memset(data, 0, size);
     return data;
 }
 
-Safe32Ptr<RelativeString> RelativeContainer::newString(const UnownedStringSlice& slice)
+Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& slice)
 {
     size_t stringSize = slice.size();
 
-    uint8_t head[RelativeString::kMaxSizeEncodeSize];
-    size_t headSize = RelativeString::calcEncodedSize(stringSize, head);
+    uint8_t head[OffsetString::kMaxSizeEncodeSize];
+    size_t headSize = OffsetString::calcEncodedSize(stringSize, head);
 
     size_t allocSize = headSize + stringSize + 1;
     uint8_t* bytes = (uint8_t*)allocate(allocSize);
@@ -181,35 +180,17 @@ Safe32Ptr<RelativeString> RelativeContainer::newString(const UnownedStringSlice&
     // 0 terminate
     bytes[headSize + stringSize] = 0;
 
-    return Safe32Ptr<RelativeString>(getOffset(bytes), &m_base);
+    return Offset32Ptr<OffsetString>(getOffset(bytes));
 }
 
-Safe32Ptr<RelativeString> RelativeContainer::newString(const char* contents)
+Offset32Ptr<OffsetString> OffsetContainer::newString(const char* contents)
 {
-    Safe32Ptr<RelativeString> relString;
+    Offset32Ptr<OffsetString> relString;
     if (contents)
     {
         relString = newString(UnownedStringSlice(contents));
     }
     return relString;
-}
-
-void RelativeContainer::set(void* data, size_t size)
-{
-    if (m_base.m_data)
-    {
-        ::free(m_base.m_data);
-        m_base.m_data = nullptr;
-    }
-
-    if (size > 0)
-    {
-        m_base.m_data = (uint8_t*)::malloc(size);
-        ::memcpy(m_base.m_data, data, size);
-    }
-
-    m_current = size;
-    m_capacity = size;
 }
 
 } // namespace Slang

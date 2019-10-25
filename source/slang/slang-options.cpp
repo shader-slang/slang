@@ -498,6 +498,10 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
                     spEnableReproCapture(asExternal(requestImpl));
                 }
+                else if (argStr == "-dump-repro-on-error")
+                {
+                    requestImpl->dumpReproOnError = true;
+                }
                 else if (argStr == "-extract-repro")
                 {
                     String reproName;
@@ -514,6 +518,8 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
 
                     auto requestState = StateSerializeUtil::getRequest(buffer);
+                    MemoryOffsetBase base;
+                    base.set(buffer.getBuffer(), buffer.getCount());
 
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
                     ComPtr<ISlangFileSystem> fileSystem;
@@ -527,7 +533,7 @@ struct OptionsParser
                         }
                     }
 
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(requestState, fileSystem, requestImpl));
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
 
                     if (argCursor < argEnd)
                     {
