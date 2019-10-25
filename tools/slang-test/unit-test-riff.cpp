@@ -13,15 +13,15 @@ static void riffUnitTest()
 
     {
         typedef RiffContainer::ScopeChunk ScopeChunk;
-        typedef RiffContainer::ScopeContainer ScopeContainer;
+        typedef RiffContainer::Chunk::Kind Kind;
 
         RiffContainer container;
 
         {
-            ScopeContainer scopeContainer(&container, markThings);
+            ScopeChunk scopeContainer(&container, Kind::Container, markThings);
 
             {
-                ScopeChunk scopeChunk(&container, markData);
+                ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
                 const char hello[] = "Hello ";
                 const char world[] = "World!";
@@ -31,7 +31,7 @@ static void riffUnitTest()
             }
 
             {
-                ScopeChunk scopeChunk(&container, markData);
+                ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
                 const char test0[] = "Testing... ";
                 const char test1[] = "Testing!";
@@ -41,10 +41,10 @@ static void riffUnitTest()
             }
 
             {
-                ScopeContainer innerScopeContainer(&container, markThings);
+                ScopeChunk innerScopeContainer(&container, Kind::Container, markThings);
 
                 {
-                    ScopeChunk scopeChunk(&container, markData);
+                    ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
                     const char another[] = "Another?";
                     container.write(another, sizeof(another));

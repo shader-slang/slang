@@ -140,40 +140,95 @@ class RiffContainer
 {
 public:
 
+    struct ContainerChunk;
+    struct DataChunk;
+
     struct Data
     {
             /// Get the payload
         void* getPayload() { return (void*)(this + 1); }
-        size_t getSize() { return size; }
+        size_t getSize() { return m_size; }
 
-        size_t size;
-        Data* next;
+        void init()
+        {
+            m_size = 0;
+            m_next = nullptr;
+        }
+
+        size_t m_size;
+        Data* m_next;
         // Followed by the payload
     };
 
     struct Chunk
     {
-        FourCC type;                    ///< Type of chunk
-        size_t size;                    ///< After closed 
-        Chunk* next;                    ///< Next chunk in this list
-        Data* dataList;                 ///< List of 0 or more data items
+        enum class Kind
+        {
+            Container,
+            Data,
+        };
+
+        void init(Kind kind, FourCC type)
+        {
+            m_kind = kind;
+            m_type = type;
+            m_payloadSize = 0;
+            m_next = nullptr;
+            m_parent = nullptr;
+        }
+
+        Kind m_kind;                      ///< Kind of chunk
+        FourCC m_type;                    ///< Type of chunk
+        size_t m_payloadSize;             ///< The payload size (ie does NOT include RiffChunk header). 
+        Chunk* m_next;                    ///< Next chunk in this list
+        ContainerChunk* m_parent;         ///< The chunk this belongs to
     };
 
-    struct Container : public Chunk
+    struct ContainerChunk : public Chunk
     {
+        typedef Chunk Super;
+        static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Container; }
+
+        void init(FourCC type, FourCC subType)
+        {
+            Super::init(Kind::Container, type);
+            m_subType = subType;
+            m_containedChunks = nullptr;
+            m_endChunk = nullptr;
+
+            m_payloadSize = uint32_t(sizeof(RiffContainerHeader) - sizeof(RiffChunk));
+        }
+
         // the type can only be list or riff
-        FourCC subType;                       ///< The subtype of this contained
-        Chunk* containedChunks;               ///< The contained chunks
-        Chunk* endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
+        FourCC m_subType;                       ///< The subtype of this contained
+        Chunk* m_containedChunks;               ///< The contained chunks
+        Chunk* m_endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
+    };
+
+    struct DataChunk : public Chunk
+    {
+        typedef Chunk Super;
+
+        static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
+
+        void init(FourCC type)
+        {
+            Super::init(Kind::Data, type);
+            m_dataList = nullptr;
+            m_endData = nullptr;
+        }
+
+        Data* m_dataList;                 ///< List of 0 or more data items
+        Data* m_endData;                  ///< The last data point
     };
 
     class ScopeChunk
     {
     public:
-        ScopeChunk(RiffContainer* container, FourCC type):
+        ScopeChunk(RiffContainer* container, Chunk::Kind kind, FourCC fourCC):
             m_container(container)
         {
-            container->startChunk(type);
+            container->startChunk(kind, fourCC);
         }
         ~ScopeChunk()
         {
@@ -183,68 +238,54 @@ public:
         RiffContainer* m_container;
     };
 
-    class ScopeContainer
-    {
-    public:
-        ScopeContainer(RiffContainer* container, FourCC subType):
-            m_container(container)
-        {
-            container->startContainer(subType);
-        }
-        ~ScopeContainer()
-        {
-            m_container->endContainer();
-        }
-    private:
-        RiffContainer* m_container;
-    };
-
         /// Start a chunk
-    void startChunk(FourCC chunkType);
-        /// Write data into a chunk
+    void startChunk(Chunk::Kind kind, FourCC type);
+
+        /// Write data into a chunk (can only be inside a Kind::Data)
     void write(const void* data, size_t size);
     Data* addData(size_t size);
+    
         /// End a chunk
     void endChunk();
 
-        /// Start a container
-    void startContainer(FourCC subType);
-        /// End a container
-    void endContainer();
-
         /// Get the root
-    Container* getRoot() const { return m_rootContainer; }
+    ContainerChunk* getRoot() const { return m_rootContainer; }
 
         /// Reset the container
     void reset();
 
         /// true if has a root container, and nothing remains open
-    bool isFullyConstructed() { return m_rootContainer && m_container == nullptr; }
+    bool isFullyConstructed() { return m_rootContainer && m_container == nullptr && m_dataChunk == nullptr; }
 
         /// Write a container and contents to a stream
-    static SlangResult write(Container* container, bool isRoot, Stream* stream);
+    static SlangResult write(ContainerChunk* container, bool isRoot, Stream* stream);
 
         /// Read the stream into the container
     static SlangResult read(Stream* stream, RiffContainer& outContainer);
 
-    static bool isContainerOk(Container* container);
+    static bool isContainerOk(ContainerChunk* container);
 
         /// Ctor
     RiffContainer();
 
 protected:
-    void _initAndAddChunk(FourCC chunkType, Chunk* chunk);
+    void _addChunk(Chunk* chunk);
+    ContainerChunk* _newContainerChunk(FourCC type, FourCC subType);
+    DataChunk* _newDataChunk(FourCC type);
     
-    Container* m_rootContainer;
-    Container* m_container;
-    Chunk* m_endChunk;
-    Data* m_endData;
+    ContainerChunk* m_rootContainer;        ///< Root container
 
-    // The last member is the top of the stack and the current container
-    List<Container*> m_containerStack;
+    ContainerChunk* m_container;            
+    DataChunk* m_dataChunk;                 
 
     MemoryArena m_arena;
 };
+
+template <typename T>
+T* as(RiffContainer::Chunk* chunk)
+{
+    return T::isType(chunk) ? static_cast<T*>(chunk) : nullptr;
+}
 
 }
 

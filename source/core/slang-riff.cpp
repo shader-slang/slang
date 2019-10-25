@@ -287,8 +287,7 @@ RiffContainer::RiffContainer() :
 {
     m_rootContainer = nullptr;
     m_container = nullptr;
-    m_endChunk = nullptr;
-    m_endData = nullptr;
+    m_dataChunk = nullptr;
 }
 
 void RiffContainer::reset()
@@ -297,74 +296,130 @@ void RiffContainer::reset()
 
     m_rootContainer = nullptr;
     m_container = nullptr;
-    m_endChunk = nullptr;
-    m_endData = nullptr;
+    m_dataChunk = nullptr;
 }
 
-void RiffContainer::_initAndAddChunk(FourCC chunkType, Chunk* chunk)
-{    
-    chunk->type = chunkType;
-    chunk->next = nullptr;
-    chunk->dataList = nullptr;
-    chunk->size = 0;
-
-    if (m_endChunk)
-    {
-        m_endChunk->next = chunk;
-        m_endChunk = chunk;
-    }
-    else if (m_container)
-    {
-        // It can't have any set
-        SLANG_ASSERT(m_container->containedChunks == nullptr);
-
-        // Make this the fist in this container
-        m_container->containedChunks = chunk;
-        m_endChunk = chunk;
-    }
-}
-
-void RiffContainer::startChunk(FourCC chunkType)
+RiffContainer::ContainerChunk* RiffContainer::_newContainerChunk(FourCC type, FourCC subType)
 {
-    // Can't be a container
-    SLANG_ASSERT(!RiffUtil::isContainerType(chunkType));
+    SLANG_ASSERT(RiffUtil::isContainerType(type));
+    SLANG_ASSERT(!RiffUtil::isContainerType(subType));
 
-    // We can only start a chunk if we are in a container
-    SLANG_ASSERT(m_container);
-    // Can't be in a regular chunk
-    SLANG_ASSERT(m_endData == nullptr);
+    ContainerChunk* chunk = (ContainerChunk*)m_arena.allocate(sizeof(ContainerChunk));
+    chunk->init(type, subType);
+    return chunk;
+}
 
-    _initAndAddChunk(chunkType, (Chunk*)m_arena.allocate(sizeof(Chunk)));
+RiffContainer::DataChunk* RiffContainer::_newDataChunk(FourCC type)
+{
+    SLANG_ASSERT(!RiffUtil::isContainerType(type));
+
+    DataChunk* chunk = (DataChunk*)m_arena.allocate(sizeof(DataChunk));
+    chunk->init(type);
+    return chunk;
+}
+
+void RiffContainer::_addChunk(Chunk* chunk)
+{
+    if (m_container)
+    {
+        chunk->m_parent = m_container;
+        Chunk*& next = m_container->m_endChunk ? m_container->m_endChunk->m_next : m_container->m_containedChunks;
+        SLANG_ASSERT(next == nullptr);
+        next = chunk;
+        m_container->m_endChunk = chunk;
+    }
+}
+
+void RiffContainer::startChunk(Chunk::Kind kind, FourCC fourCC)
+{
+    SLANG_ASSERT(m_container || m_rootContainer == nullptr);
+
+    switch (kind)
+    {
+        case Chunk::Kind::Data:
+        {
+            // We can only start a data chunk if we are in a container, and we can't already be in data chunk
+            SLANG_ASSERT(m_container && m_dataChunk == nullptr);
+
+            DataChunk* chunk = _newDataChunk(fourCC);
+            _addChunk(chunk);
+            m_dataChunk = chunk;
+            break;
+        }
+        case Chunk::Kind::Container:
+        {
+            // We can't be in a data chunk
+            SLANG_ASSERT(m_dataChunk == nullptr);
+
+            ContainerChunk* container = _newContainerChunk(RiffFourCC::kList, fourCC);
+
+            // If this is the first, make it the root
+            if (!m_rootContainer)
+            {
+                m_rootContainer = container;
+            }
+
+            _addChunk(container);
+
+            m_container = container;
+            break;
+        }
+    }
+}
+
+void RiffContainer::endChunk()
+{
+    size_t chunkPayloadSize;
+
+    ContainerChunk* parent;
+    if (m_dataChunk)
+    {
+        parent = m_dataChunk->m_parent;
+        chunkPayloadSize = m_dataChunk->m_payloadSize;
+
+        m_dataChunk = nullptr;
+    }
+    else
+    {
+        SLANG_ASSERT(m_container && m_dataChunk == nullptr);
+        parent = m_container->m_parent;
+        chunkPayloadSize = m_container->m_payloadSize;
+    }
+
+    m_container = parent;
+
+
+    
+    if (parent)
+    {
+        // Fix the size taking into account the 4 bytes alignment requirement
+        chunkPayloadSize = (chunkPayloadSize + 3) & ~size_t(3);
+
+        // Update the parents size
+        parent->m_payloadSize += sizeof(RiffChunk) + chunkPayloadSize;
+    }
 }
 
 RiffContainer::Data* RiffContainer::addData(size_t size)
 {
     // We must be in a chunk
-    SLANG_ASSERT(m_endChunk);
+    SLANG_ASSERT(m_dataChunk);
 
     // Add current chunks data
-    m_endChunk->size += size;
+    m_dataChunk->m_payloadSize += size;
 
     Data* data = (Data*)m_arena.allocate(sizeof(Data) + size);
 
-    data->next = nullptr;
-    data->size = size;
+    data->m_next = nullptr;
+    data->m_size = size;
 
-    // If there is a previous, just add to the end
-    if (m_endData)
-    {
-        m_endData->next = data;
-    }
-    else
-    {
-        // Set as the first in the chunk
-        SLANG_ASSERT(m_endChunk->dataList == nullptr);
-        m_endChunk->dataList = data;
-    }
+    Data*& next = m_dataChunk->m_endData ? m_dataChunk->m_endData->m_next : m_dataChunk->m_dataList;
+    SLANG_ASSERT(next == nullptr);
 
-    // This is the new end
-    m_endData = data;
-
+    // Add to linked list
+    next = data;
+    // Make this the new end
+    m_dataChunk->m_endData = data;
     return data;
 }
 
@@ -374,120 +429,54 @@ void RiffContainer::write(const void* inData, size_t size)
     ::memcpy(data->getPayload(), inData, size);
 }
 
-void RiffContainer::endChunk()
-{
-    // There must be an end chunk
-    SLANG_ASSERT(m_endChunk);
-
-    // We can add the size to the container
-    const size_t chunkContentsSize = (m_endChunk->size + 3) & ~size_t(3);
-    m_container->size += sizeof(RiffChunk) + chunkContentsSize;
-
-    // We can reset data
-    m_endData = nullptr;
-}
-
-void RiffContainer::startContainer(FourCC subType)
-{
-    // Can't be *in* a chunk
-    SLANG_ASSERT(m_endData == nullptr);
-    // Either there is a root container and there is a container
-    // or there is no root container, and therefore also no container
-    SLANG_ASSERT((m_rootContainer && m_container) || (m_rootContainer == nullptr && m_container == nullptr));
-
-    Container* container = (Container*)m_arena.allocate(sizeof(Container));
-
-    container->containedChunks = nullptr;
-    container->subType = subType;  
-    container->endChunk = nullptr;
-
-    // We'll store all containers as list. Only when writing - we will decide to make the root one a 'riff'
-    _initAndAddChunk(RiffFourCC::kList, container);
-
-    // If there is a container, save it
-    if (m_container)
-    {
-        // Save off in the container, the last chunk
-        m_container->endChunk = m_endChunk;
-        m_containerStack.add(m_container);
-    }
-    else
-    {
-        // Can't be a root
-        SLANG_ASSERT(m_rootContainer == nullptr);
-        // Save as the root
-        m_rootContainer = container;
-    }
-
-    // This now becomes the current container
-    m_container = container;
-    m_endChunk = nullptr;
-}
-
-void RiffContainer::endContainer()
-{
-    if (m_containerStack.getCount())
-    {
-        Container* container = m_containerStack.getLast();
-        m_containerStack.removeLast();
-
-        m_container = container;
-        m_endChunk = container->endChunk;
-    }
-    else
-    {
-        m_container = nullptr;
-        m_endChunk = nullptr;
-    }
-}
-
-
-/* static */bool RiffContainer::isContainerOk(Container* container)
+/* static */bool RiffContainer::isContainerOk(ContainerChunk* container)
 {
     // Check the size
 
     size_t totalSize = sizeof(RiffContainerHeader) - sizeof(RiffChunk);
-    Chunk* chunk = container->containedChunks;
+    Chunk* chunk = container->m_containedChunks;
     while (chunk)
     {
-        if (RiffUtil::isContainerType(chunk->type))
+        if (ContainerChunk* contChunk = as<ContainerChunk>(chunk))
         {
-            if (!isContainerOk(static_cast<Container*>(chunk)))
+            if (!isContainerOk(contChunk))
             {
                 return false;
             }
         }
-        else
+        else if (DataChunk* dataChunk = as<DataChunk>(chunk))
         {
             size_t chunkSize = 0;
             // Work out what contained size is
-            Data* data = chunk->dataList;
+            Data* data = dataChunk->m_dataList;
             while (data)
             {
-                chunkSize += data->size;
-                data = data->next;
+                chunkSize += data->m_size;
+                data = data->m_next;
             }
 
-            if (chunkSize != chunk->size)
+            if (chunkSize != chunk->m_payloadSize)
             {
                 return false;
             }
         }
 
-        totalSize += sizeof(RiffChunk) + chunk->size;
-        chunk = chunk->next;
+        const size_t payloadSize = (chunk->m_payloadSize + 3) & ~size_t(3);
+
+        totalSize += sizeof(RiffChunk) + payloadSize;
+        chunk = chunk->m_next;
     }
 
-    return totalSize == container->size;
+    return totalSize == container->m_payloadSize;
 }
 
-/* static */SlangResult RiffContainer::write(Container* container, bool isRoot, Stream* stream)
+/* static */SlangResult RiffContainer::write(ContainerChunk* container, bool isRoot, Stream* stream)
 {
     RiffContainerHeader containerHeader;
 
     containerHeader.chunk.m_type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
-    containerHeader.chunk.m_size = uint32_t(sizeof(RiffContainerHeader) - sizeof(RiffChunk) + container->size);
-    containerHeader.subType = container->subType;
+    containerHeader.chunk.m_size = uint32_t(sizeof(RiffContainerHeader) - sizeof(RiffChunk) + container->m_payloadSize);
+    containerHeader.subType = container->m_subType;
 
     try
     {
@@ -495,36 +484,36 @@ void RiffContainer::endContainer()
         stream->write(&containerHeader, sizeof(containerHeader));
 
         // Write the contained chunks
-        Chunk* chunk = container->containedChunks;
+        Chunk* chunk = container->m_containedChunks;
         while (chunk)
         {
-            if (chunk->type == RiffFourCC::kList)
+            if (auto containerChunk = as<ContainerChunk>(chunk))
             {
                 // It's a container
-                SLANG_RETURN_ON_FAIL(write(static_cast<Container*>(chunk), false, stream));
+                SLANG_RETURN_ON_FAIL(write(containerChunk, false, stream));
             }
-            else
+            else if (auto dataChunk = as<DataChunk>(chunk))
             {
                 // Must be a regular chunk with data
 
                 RiffChunk chunkHeader;
-                chunkHeader.m_type = chunk->type;
-                chunkHeader.m_size = uint32_t(chunk->size);
+                chunkHeader.m_type = dataChunk->m_type;
+                chunkHeader.m_size = uint32_t(dataChunk->m_payloadSize);
 
                 stream->write(&chunkHeader, sizeof(chunkHeader));
 
-                Data* data = chunk->dataList;
+                Data* data = dataChunk->m_dataList;
                 while (data)
                 {
                     stream->write(data->getPayload(), data->getSize());
 
                     // Next but of data
-                    data = data->next;
+                    data = data->m_next;
                 }
             }
 
             // Next
-            chunk = chunk->next;
+            chunk = chunk->m_next;
         }
     }
     catch (const IOException&)
@@ -552,7 +541,7 @@ void RiffContainer::endContainer()
 
         remaining = header.chunk.m_size - (sizeof(RiffContainerHeader) - sizeof(RiffChunk));
 
-        outContainer.startContainer(header.subType);
+        outContainer.startChunk(Chunk::Kind::Container, header.subType);
     }
 
     List<size_t> remainingStack;
@@ -561,7 +550,7 @@ void RiffContainer::endContainer()
         if (remaining == 0)
         {
             // If it's a container then we pop container
-            outContainer.endContainer();
+            outContainer.endChunk();
             if (remainingStack.getCount() <= 0)
             {
                 break;
@@ -588,11 +577,11 @@ void RiffContainer::endContainer()
                 remaining -= (header.chunk.m_size - (sizeof(RiffContainerHeader) - sizeof(RiffChunk)) +  3) & ~size_t(3);
 
                 // Start a container
-                outContainer.startContainer(header.subType);
+                outContainer.startChunk(Chunk::Kind::Container, header.subType);
             }
             else
             {
-                ScopeChunk scopeChunk(&outContainer, header.chunk.m_type);
+                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.m_type);
                 Data* data = outContainer.addData(header.chunk.m_size);
 
                 size_t readSize;
