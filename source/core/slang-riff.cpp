@@ -58,12 +58,19 @@ namespace Slang
     {
         // The chunk
         out->write(&chunk, sizeof(RiffChunk));
-        // The rest of the header
-        out->write(header + 1, headerSize - sizeof(RiffChunk));
 
+        // Remainder of header
+        if (headerSize > sizeof(RiffChunk))
+        {
+            // The rest of the header
+            out->write(header + 1, headerSize - sizeof(RiffChunk));
+        }
+
+        // Write the payload
         out->write(payload, payloadSize);
-        size_t remaining = payloadSize & 3;
 
+        // The riff spec requires all chunks are 4 byte aligned (even if size is not)
+        size_t remaining = payloadSize & 3;
         if (remaining)
         {
             uint8_t end[4] = { 0, 0, 0, 0};
@@ -111,6 +118,137 @@ namespace Slang
     {
     	return SLANG_FAIL;
     }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult RiffUtil::writeContainerHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out)
+{
+    RiffContainerHeader header;
+
+    // Container can only be list or riff - they are the only available options
+    SLANG_ASSERT(containerType == RiffFourCC::kList || containerType == RiffFourCC::kRiff);
+    if (!(containerType == RiffFourCC::kList || containerType == RiffFourCC::kRiff))
+    {
+        return SLANG_FAIL;
+    }
+
+    // Size of header of Riff container
+    totalSize += sizeof(RiffContainerHeader) - sizeof(RiffChunk);
+
+    header.chunk.m_type = containerType;
+    header.chunk.m_size = uint32_t(totalSize);
+    header.subType = subType;
+    
+    try
+    {
+        out->write(&header, sizeof(header));
+    }
+    catch (IOException&)
+    {
+    	return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult RiffUtil::writeContainer(FourCC containerType, FourCC subType, const SubChunk* subChunks, size_t subChunkCount, Stream* out)
+{
+    size_t totalSize = 0;
+
+    for (size_t i = 0; i < subChunkCount; ++i)
+    {
+        const auto& subChunk = subChunks[i];
+
+        RiffChunk chunk;
+        chunk.m_type = subChunk.chunkType;
+        SLANG_ASSERT(subChunk.dataSize <= 0xffffffff);
+        chunk.m_size = uint32_t(subChunk.dataSize);
+
+        totalSize += calcChunkTotalSize(chunk);
+    }
+
+    // Write the container header
+    SLANG_RETURN_ON_FAIL(writeContainerHeader(containerType, subType, totalSize, out));
+
+    for (size_t i = 0; i < subChunkCount; ++i)
+    {
+        const auto& subChunk = subChunks[i];
+
+        RiffChunk chunk;
+        chunk.m_type = subChunk.chunkType;
+        SLANG_ASSERT(subChunk.dataSize <= 0xffffffff);
+        chunk.m_size = uint32_t(subChunk.dataSize);
+
+        // Write the chunk
+        SLANG_RETURN_ON_FAIL(writeData(&chunk, sizeof(chunk), subChunk.data, subChunk.dataSize, out));
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult RiffUtil::readContainer(Stream* stream, RiffContainerHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks)
+{
+    outChunks.clear();
+
+    // Need to read the chunk header
+    SLANG_RETURN_ON_FAIL(readChunk(stream, outHeader.chunk));
+
+    // Must be a riff container!
+    if (outHeader.chunk.m_type != RiffFourCC::kRiff && outHeader.chunk.m_type != RiffFourCC::kList)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Read the sub type
+    try
+    {
+        stream->read(&outHeader.subType, sizeof(RiffContainerHeader) - sizeof(RiffChunk));
+    }
+    catch (const IOException&)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Okay we have the header. We now need to read all of the contained chunks. Making sure we don't read past the end
+    size_t remainingSize = size_t(outHeader.chunk.m_size) - (sizeof(RiffContainerHeader) - sizeof(RiffChunk));
+    while (remainingSize >= sizeof(RiffChunk))
+    {
+        // Read the contained chunk
+        RiffChunk chunk;
+        SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
+
+        remainingSize -= sizeof(RiffChunk);
+        if (remainingSize < 0 || chunk.m_size > remainingSize)
+        {
+            return SLANG_FAIL;
+        }
+        
+        // Allocate the space for the payload
+        void* data = ioArena.allocate(chunk.m_size);
+
+        // Read the payload
+        try
+        {
+            stream->read(data, chunk.m_size);
+        }
+        catch (const IOException&)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Add to the list
+        SubChunk subChunk;
+        subChunk.chunkType = chunk.m_type;
+        subChunk.data = data;
+        subChunk.dataSize = chunk.m_size;
+
+        // Decrease the remaining size
+        remainingSize -= chunk.m_size;
+    }
+
+    // Remaining size should be 0 for well formed riff
+    SLANG_ASSERT(remainingSize == 0);
 
     return SLANG_OK;
 }

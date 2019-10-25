@@ -39,8 +39,8 @@ public:
     virtual ~Stream() {}
 	virtual Int64 getPosition()=0;
 	virtual void seek(SeekOrigin origin, Int64 offset)=0;
-	virtual Int64 read(void * buffer, Int64 length) = 0;
-	virtual Int64 write(const void * buffer, Int64 length) = 0;
+	virtual size_t read(void * buffer, size_t length) = 0;
+	virtual size_t write(const void * buffer, size_t length) = 0;
 	virtual bool isEnd() = 0;
 	virtual bool canRead() = 0;
 	virtual bool canWrite() = 0;
@@ -70,8 +70,8 @@ public:
 
     virtual Int64 getPosition() SLANG_OVERRIDE { return m_position; }
     virtual void seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
-    virtual Int64 read(void * buffer, Int64 length) SLANG_OVERRIDE;
-    virtual Int64 write(const void * buffer, Int64 length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
+    virtual size_t read(void * buffer, size_t length) SLANG_OVERRIDE;
+    virtual size_t write(const void * buffer, size_t length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
     virtual bool isEnd() SLANG_OVERRIDE { return m_atEnd; }
     virtual bool canRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
@@ -117,7 +117,7 @@ class OwnedMemoryStream : public MemoryStreamBase
 public:
     typedef MemoryStreamBase Super;
 
-    virtual Int64 write(const void* buffer, Int64 length) SLANG_OVERRIDE;
+    virtual size_t write(const void* buffer, size_t length) SLANG_OVERRIDE;
 
         /// Set the contents
     void setContent(const void* contents, size_t contentsSize)
@@ -150,8 +150,8 @@ public:
     // Stream interface
 	virtual Int64 getPosition();
 	virtual void seek(SeekOrigin origin, Int64 offset);
-	virtual Int64 read(void* buffer, Int64 length);
-	virtual Int64 write(const void* buffer, Int64 length);
+	virtual size_t read(void* buffer, size_t length);
+	virtual size_t write(const void* buffer, size_t length);
 	virtual bool canRead();
 	virtual bool canWrite();
 	virtual void close();

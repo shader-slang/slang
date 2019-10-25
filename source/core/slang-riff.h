@@ -1,8 +1,9 @@
 #ifndef SLANG_RIFF_H
 #define SLANG_RIFF_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-stream.h"
+#include "slang-basic.h"
+#include "slang-stream.h"
+#include "slang-memory-arena.h"
 
 namespace Slang
 {
@@ -10,12 +11,22 @@ namespace Slang
 // http://fileformats.archiveteam.org/wiki/RIFF
 // http://www.fileformat.info/format/riff/egff.htm
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) ((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
+typedef uint32_t FourCC;
+
+#define SLANG_FOUR_CC(c0, c1, c2, c3) FourCC((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
 struct RiffFourCC
 {
-     static const uint32_t kRiff = SLANG_FOUR_CC('R', 'I', 'F', 'F');
+        /// A 'riff' is the high level file container. It is followed by a subtype and then the contained modules
+     static const FourCC kRiff = SLANG_FOUR_CC('R', 'I', 'F', 'F');
+        /// A is like riff but can be contained multiple times within a file. It is also followed by a header
+     static const FourCC kList = SLANG_FOUR_CC('L', 'I', 'S', 'T');
+
+
+        /// The sub type of a riff container containing modules
+     //static const FourCC kSlangModule = SLANG_FOUR_CC('S', 'L', 'm', 'o');
 };
+
 
 // Follows semantic version rules
 // https://semver.org/
@@ -72,12 +83,26 @@ struct RiffSemanticVersion
 
 struct RiffChunk
 {
-    uint32_t m_type;            ///< The FourCC code that identifies this chunk
-    uint32_t m_size;            ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
+    FourCC m_type;            ///< The FourCC code that identifies this chunk
+    uint32_t m_size;          ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
+};
+
+struct RiffContainerHeader
+{
+    RiffChunk chunk;
+    FourCC subType;
+    // This is then followed by the contained subchunk/s
 };
 
 struct RiffUtil
 {
+    struct SubChunk
+    {
+        FourCC chunkType;
+        const void* data;
+        size_t dataSize;
+    };
+
     static int64_t calcChunkTotalSize(const RiffChunk& chunk);
 
     static SlangResult skip(const RiffChunk& chunk, Stream* stream, int64_t* remainingBytesInOut);
@@ -86,6 +111,17 @@ struct RiffUtil
 
     static SlangResult writeData(const RiffChunk* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out);
     static SlangResult readData(Stream* stream, RiffChunk* outHeader, size_t headerSize, List<uint8_t>& data);
+
+    
+        /// Total size is the size of all the contained chunks
+    static SlangResult writeContainerHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out);
+
+        /// Write riff with subType subtype, containing the specified chunks to stream
+    static SlangResult writeContainer(FourCC containerType, FourCC subType, const SubChunk* subChunks, size_t subChunkCount, Stream* out);
+
+        /// Read a riff container. The chunks memory is stored in the arena. 
+    static SlangResult readContainer(Stream* stream, RiffContainerHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks);
+
 };
 
 }

@@ -181,9 +181,10 @@ void FileStream::seek(SeekOrigin origin, Int64 offset)
 		throw IOException("FileStream seek failed.");
 	}
 }
-Int64 FileStream::read(void* buffer, Int64 length)
+
+size_t FileStream::read(void* buffer, size_t length)
 {
-	auto bytes = fread_s(buffer, (size_t)length, 1, (size_t)length, m_handle);
+	auto bytes = fread_s(buffer, length, 1, length, m_handle);
 	if (bytes == 0 && length > 0)
 	{
 		if (!feof(m_handle))
@@ -192,25 +193,29 @@ Int64 FileStream::read(void* buffer, Int64 length)
 			throw EndOfStreamException("End of file is reached.");
 		m_endReached = true;
 	}
-	return (int)bytes;
+	return bytes;
 }
-Int64 FileStream::write(const void* buffer, Int64 length)
+
+size_t FileStream::write(const void* buffer, size_t length)
 {
-	auto bytes = (Int64)fwrite(buffer, 1, (size_t)length, m_handle);
+	auto bytes = fwrite(buffer, 1, length, m_handle);
 	if (bytes < length)
 	{
 		throw IOException("FileStream write failed.");
 	}
 	return bytes;
 }
+
 bool FileStream::canRead()
 {
 	return ((int)m_fileAccess & (int)FileAccess::Read) != 0;
 }
+
 bool FileStream::canWrite()
 {
 	return ((int)m_fileAccess & (int)FileAccess::Write) != 0;
 }
+
 void FileStream::close()
 {
 	if (m_handle)
@@ -219,6 +224,7 @@ void FileStream::close()
 		m_handle = 0;
 	}
 }
+
 bool FileStream::isEnd()
 {
 	return m_endReached;
@@ -251,18 +257,17 @@ void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
     pos = (pos < 0) ? 0 : pos;
     pos = (pos > Int64(m_contentsSize)) ? Int64(m_contentsSize) : pos;
 
-    m_position = UInt(pos);
+    m_position = ptrdiff_t(pos);
 }
 
-Int64 MemoryStreamBase::read(void* buffer, Int64 length)
+size_t MemoryStreamBase::read(void* buffer, size_t length)
 {
     if (!canRead())
     {
         throw IOException("Cannot read this stream.");
     }
 
-    const Int64 maxRead = Int64(m_contentsSize - m_position);
-
+    const size_t maxRead = size_t(m_contentsSize - m_position);
     if (maxRead == 0 && length > 0)
     {
         m_atEnd = true;
@@ -271,14 +276,14 @@ Int64 MemoryStreamBase::read(void* buffer, Int64 length)
 
     length = length > maxRead ? maxRead : length;
 
-    ::memcpy(buffer, m_contents + m_position, size_t(length));
-    m_position += UInt(length);
+    ::memcpy(buffer, m_contents + m_position, length);
+    m_position += ptrdiff_t(length);
     return maxRead;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! OwnedMemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Int64 OwnedMemoryStream::write(const void * buffer, Int64 length)
+size_t OwnedMemoryStream::write(const void * buffer, size_t length)
 {
     if (!canWrite())
     {
@@ -287,11 +292,11 @@ Int64 OwnedMemoryStream::write(const void * buffer, Int64 length)
 
     if (m_position == m_ownedContents.getCount())
     {
-        m_ownedContents.addRange((const uint8_t*)buffer, UInt(length));
+        m_ownedContents.addRange((const uint8_t*)buffer, Index(length));
     }
     else
     {
-        m_ownedContents.insertRange(m_position, (const uint8_t*)buffer, UInt(length));
+        m_ownedContents.insertRange(m_position, (const uint8_t*)buffer, Index(length));
     }
 
     m_contents = m_ownedContents.getBuffer();

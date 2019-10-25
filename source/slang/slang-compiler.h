@@ -70,7 +70,7 @@ namespace Slang
     CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
     UnownedStringSlice getCodeGenTargetName(CodeGenTarget target);
 
-    enum class ContainerFormat
+    enum class ContainerFormat : SlangContainerFormat
     {
         None            = SLANG_CONTAINER_FORMAT_NONE,
         SlangModule     = SLANG_CONTAINER_FORMAT_SLANG_MODULE,
