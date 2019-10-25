@@ -156,9 +156,11 @@ namespace Slang
     void checkTranslationUnit(
         TranslationUnitRequest* translationUnit)
     {
-        SemanticsVisitor visitor(
+        SharedSemanticsContext sharedSemanticsContext(
             translationUnit->compileRequest->getLinkage(),
             translationUnit->compileRequest->getSink());
+
+        SemanticsDeclVisitor visitor(&sharedSemanticsContext);
 
         // Apply the visitor to do the main semantic
         // checking that is required on all declarations
@@ -170,9 +172,10 @@ namespace Slang
 
     void SemanticsVisitor::dispatchDecl(DeclBase* decl)
     {
+        SemanticsDeclVisitor visitor(getShared());
         try
         {
-            DeclVisitor::dispatch(decl);
+            visitor.dispatch(decl);
         }
         // Don't emit any context message for an explicit `AbortCompilationException`
         // because it should only happen when an error is already emitted.
@@ -186,9 +189,10 @@ namespace Slang
 
     void SemanticsVisitor::dispatchStmt(Stmt* stmt)
     {
+        SemanticsStmtVisitor visitor(getShared());
         try
         {
-            StmtVisitor::dispatch(stmt);
+            visitor.dispatch(stmt);
         }
         catch(AbortCompilationException&) { throw; }
         catch(...)
@@ -200,9 +204,10 @@ namespace Slang
 
     void SemanticsVisitor::dispatchExpr(Expr* expr)
     {
+        SemanticsExprVisitor visitor(getShared());
         try
         {
-            ExprVisitor::dispatch(expr);
+            visitor.dispatch(expr);
         }
         catch(AbortCompilationException&) { throw; }
         catch(...)

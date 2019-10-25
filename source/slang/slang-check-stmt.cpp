@@ -12,7 +12,7 @@ namespace Slang
         checkModifiers(stmt);
     }
 
-    void SemanticsVisitor::visitDeclStmt(DeclStmt* stmt)
+    void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     {
         // We directly dispatch here instead of using `EnsureDecl()` for two
         // reasons:
@@ -27,12 +27,12 @@ namespace Slang
         checkModifiers(stmt->decl);
     }
 
-    void SemanticsVisitor::visitBlockStmt(BlockStmt* stmt)
+    void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
     {
         checkStmt(stmt->body);
     }
 
-    void SemanticsVisitor::visitSeqStmt(SeqStmt* stmt)
+    void SemanticsStmtVisitor::visitSeqStmt(SeqStmt* stmt)
     {
         for(auto ss : stmt->stmts)
         {
@@ -43,6 +43,7 @@ namespace Slang
     template<typename T>
     T* SemanticsVisitor::FindOuterStmt()
     {
+        auto& outerStmts = getShared()->outerStmts;
         const Index outerStmtCount = outerStmts.getCount();
         for (Index ii = outerStmtCount; ii > 0; --ii)
         {
@@ -54,7 +55,7 @@ namespace Slang
         return nullptr;
     }
 
-    void SemanticsVisitor::visitBreakStmt(BreakStmt *stmt)
+    void SemanticsStmtVisitor::visitBreakStmt(BreakStmt *stmt)
     {
         auto outer = FindOuterStmt<BreakableStmt>();
         if (!outer)
@@ -64,7 +65,7 @@ namespace Slang
         stmt->parentStmt = outer;
     }
 
-    void SemanticsVisitor::visitContinueStmt(ContinueStmt *stmt)
+    void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt *stmt)
     {
         auto outer = FindOuterStmt<LoopStmt>();
         if (!outer)
@@ -76,11 +77,13 @@ namespace Slang
 
     void SemanticsVisitor::PushOuterStmt(Stmt* stmt)
     {
+        auto& outerStmts = getShared()->outerStmts;
         outerStmts.add(stmt);
     }
 
     void SemanticsVisitor::PopOuterStmt(Stmt* /*stmt*/)
     {
+        auto& outerStmts = getShared()->outerStmts;
         outerStmts.removeAt(outerStmts.getCount() - 1);
     }
 
@@ -92,7 +95,7 @@ namespace Slang
         return e;
     }
 
-    void SemanticsVisitor::visitDoWhileStmt(DoWhileStmt *stmt)
+    void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt *stmt)
     {
         PushOuterStmt(stmt);
         stmt->Predicate = checkPredicateExpr(stmt->Predicate);
@@ -101,7 +104,7 @@ namespace Slang
         PopOuterStmt(stmt);
     }
 
-    void SemanticsVisitor::visitForStmt(ForStmt *stmt)
+    void SemanticsStmtVisitor::visitForStmt(ForStmt *stmt)
     {
         PushOuterStmt(stmt);
         checkStmt(stmt->InitialStatement);
@@ -127,7 +130,7 @@ namespace Slang
         return expr;
     }
 
-    void SemanticsVisitor::visitCompileTimeForStmt(CompileTimeForStmt* stmt)
+    void SemanticsStmtVisitor::visitCompileTimeForStmt(CompileTimeForStmt* stmt)
     {
         PushOuterStmt(stmt);
 
@@ -160,7 +163,7 @@ namespace Slang
         PopOuterStmt(stmt);
     }
 
-    void SemanticsVisitor::visitSwitchStmt(SwitchStmt* stmt)
+    void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     {
         PushOuterStmt(stmt);
         // TODO(tfoley): need to coerce condition to an integral type...
@@ -174,7 +177,7 @@ namespace Slang
         PopOuterStmt(stmt);
     }
 
-    void SemanticsVisitor::visitCaseStmt(CaseStmt* stmt)
+    void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     {
         // TODO(tfoley): Need to coerce to type being switch on,
         // and ensure that value is a compile-time constant
@@ -195,7 +198,7 @@ namespace Slang
         stmt->parentStmt = switchStmt;
     }
 
-    void SemanticsVisitor::visitDefaultStmt(DefaultStmt* stmt)
+    void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     {
         auto switchStmt = FindOuterStmt<SwitchStmt>();
         if (!switchStmt)
@@ -205,33 +208,33 @@ namespace Slang
         stmt->parentStmt = switchStmt;
     }
 
-    void SemanticsVisitor::visitIfStmt(IfStmt *stmt)
+    void SemanticsStmtVisitor::visitIfStmt(IfStmt *stmt)
     {
         stmt->Predicate = checkPredicateExpr(stmt->Predicate);
         checkStmt(stmt->PositiveStatement);
         checkStmt(stmt->NegativeStatement);
     }
 
-    void SemanticsVisitor::visitUnparsedStmt(UnparsedStmt*)
+    void SemanticsStmtVisitor::visitUnparsedStmt(UnparsedStmt*)
     {
         // Nothing to do
     }
 
-    void SemanticsVisitor::visitEmptyStmt(EmptyStmt*)
+    void SemanticsStmtVisitor::visitEmptyStmt(EmptyStmt*)
     {
         // Nothing to do
     }
 
-    void SemanticsVisitor::visitDiscardStmt(DiscardStmt*)
+    void SemanticsStmtVisitor::visitDiscardStmt(DiscardStmt*)
     {
         // Nothing to do
     }
 
-    void SemanticsVisitor::visitReturnStmt(ReturnStmt *stmt)
+    void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt *stmt)
     {
         if (!stmt->Expression)
         {
-            if (function && !function->ReturnType.Equals(getSession()->getVoidType()))
+            if (getFunction() && !getFunction()->ReturnType.Equals(getSession()->getVoidType()))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }
@@ -241,9 +244,9 @@ namespace Slang
             stmt->Expression = CheckTerm(stmt->Expression);
             if (!stmt->Expression->type->Equals(getSession()->getErrorType()))
             {
-                if (function)
+                if (getFunction())
                 {
-                    stmt->Expression = coerce(function->ReturnType.Ptr(), stmt->Expression);
+                    stmt->Expression = coerce(getFunction()->ReturnType.Ptr(), stmt->Expression);
                 }
                 else
                 {
@@ -257,7 +260,7 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitWhileStmt(WhileStmt *stmt)
+    void SemanticsStmtVisitor::visitWhileStmt(WhileStmt *stmt)
     {
         PushOuterStmt(stmt);
         stmt->Predicate = checkPredicateExpr(stmt->Predicate);
@@ -265,7 +268,7 @@ namespace Slang
         PopOuterStmt(stmt);
     }
 
-    void SemanticsVisitor::visitExpressionStmt(ExpressionStmt *stmt)
+    void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt *stmt)
     {
         stmt->Expression = CheckExpr(stmt->Expression);
     }

@@ -9,7 +9,7 @@ void checkDecl(SemanticsVisitor* visitor, Decl* decl);
 //
 
 DeclRef<ExtensionDecl> ApplyExtensionToType(
-    SemanticsVisitor*       semantics,
+    SemanticsVisitor*   semantics,
     ExtensionDecl*          extDecl,
     RefPtr<Type>  type);
 
@@ -556,7 +556,7 @@ LookupResult lookUpLocal(
     SemanticsVisitor*       semantics,
     Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef,
-    LookupMask              mask)
+    LookupMask          mask)
 {
     LookupRequest request;
     request.semantics = semantics;

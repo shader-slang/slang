@@ -11,9 +11,12 @@ namespace Slang
         TypeExp         typeExp,
         DiagnosticSink* sink)
     {
-        SemanticsVisitor visitor(
+        SharedSemanticsContext sharedSemanticsContext(
             linkage,
             sink);
+        SemanticsVisitor visitor(&sharedSemanticsContext);
+
+
         auto typeOut = visitor.CheckProperType(typeExp);
         return typeOut.type;
     }
@@ -331,7 +334,7 @@ namespace Slang
             declRef).as<VectorExpressionType>();
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
     {
         if (!expr->type.Ptr())
         {
@@ -341,7 +344,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
     {
         // We have an expression of the form `__TaggedUnion(A, B, ...)`
         // which will evaluate to a tagged-union type over `A`, `B`, etc.

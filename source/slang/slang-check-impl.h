@@ -213,19 +213,10 @@ namespace Slang
         Header, Body
     };
 
-    struct SemanticsVisitor
-        : ExprVisitor<SemanticsVisitor, RefPtr<Expr>>
-        , StmtVisitor<SemanticsVisitor>
-        , DeclVisitor<SemanticsVisitor>
+        /// Shared state for a semantics-checking session.
+    struct SharedSemanticsContext
     {
         CheckingPhase checkingPhase = CheckingPhase::Header;
-        DeclCheckState getCheckedState()
-        {
-            if (checkingPhase == CheckingPhase::Body)
-                return DeclCheckState::Checked;
-            else
-                return DeclCheckState::CheckedHeader;
-        }
 
         Linkage* m_linkage = nullptr;
         DiagnosticSink* m_sink = nullptr;
@@ -235,7 +226,6 @@ namespace Slang
             return m_sink;
         }
 
-//        ModuleDecl * program = nullptr;
         FuncDecl * function = nullptr;
 
 
@@ -250,7 +240,7 @@ namespace Slang
         HashSet<ModuleDecl*> importedModules;
 
     public:
-        SemanticsVisitor(
+        SharedSemanticsContext(
             Linkage*        linkage,
             DiagnosticSink* sink)
             : m_linkage(linkage)
@@ -262,11 +252,42 @@ namespace Slang
             return m_linkage->getSessionImpl();
         }
 
+    };
+
+    struct SemanticsVisitor
+    {
+        SemanticsVisitor(
+            SharedSemanticsContext* shared)
+            : m_shared(shared)
+        {}
+
+        SharedSemanticsContext* m_shared = nullptr;
+
+        SharedSemanticsContext* getShared() { return m_shared; }
+
+        CheckingPhase getCheckingPhase() { return m_shared->checkingPhase; }
+        DeclCheckState getCheckedState()
+        {
+            if (getCheckingPhase() == CheckingPhase::Body)
+                return DeclCheckState::Checked;
+            else
+                return DeclCheckState::CheckedHeader;
+        }
+
+
+        DiagnosticSink* getSink() { return m_shared->getSink(); }
+
+        Session* getSession() { return m_shared->getSession(); }
+
+        FuncDecl* getFunction() { return m_shared->function; }
+
+        Linkage* getLinkage() { return m_shared->m_linkage; }
+        NamePool* getNamePool() { return getLinkage()->getNamePool(); }
+
+
     public:
         // Translate Types
 
-        // TODO(tfoley): What is this and why is it needed?
-        RefPtr<Type> typeResult;
 
         RefPtr<Expr> TranslateTypeNodeImpl(const RefPtr<Expr> & node);
         RefPtr<Type> ExtractTypeFromTypeRepr(const RefPtr<Expr>& typeRepr);
@@ -618,12 +639,6 @@ namespace Slang
 
         void checkGenericDeclHeader(GenericDecl* genericDecl);
 
-        void visitGenericDecl(GenericDecl* genericDecl);
-
-        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl);
-
-        void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
-
         RefPtr<ConstantIntVal> checkConstantIntVal(
             RefPtr<Expr>    expr);
 
@@ -635,14 +650,6 @@ namespace Slang
         bool checkLiteralStringVal(
             RefPtr<Expr>    expr,
             String*         outVal);
-
-        void visitSyntaxDecl(SyntaxDecl*);
-
-        void visitAttributeDecl(AttributeDecl*);
-
-        void visitGenericTypeParamDecl(GenericTypeParamDecl*);
-
-        void visitGenericValueParamDecl(GenericValueParamDecl*);
 
         void visitModifier(Modifier*);
 
@@ -667,8 +674,6 @@ namespace Slang
 
             /// Perform checking of interface conformaces for this decl and all its children
         void checkInterfaceConformancesRec(Decl* decl);
-
-        void visitModuleDecl(ModuleDecl* programNode);
 
         bool doesSignatureMatchRequirement(
             DeclRef<CallableDecl>   satisfyingMemberDeclRef,
@@ -762,21 +767,7 @@ namespace Slang
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
 
-        void visitEnumDecl(EnumDecl* decl);
-
-        void visitEnumCaseDecl(EnumCaseDecl* decl);
-
-        void visitDeclGroup(DeclGroup* declGroup);
-
-        void visitTypeDefDecl(TypeDefDecl* decl);
-
-        void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl);
-
-        void visitAssocTypeDecl(AssocTypeDecl* decl);
-
         void checkStmt(Stmt* stmt);
-
-        void visitFuncDecl(FuncDecl* functionNode);
 
         void getGenericParams(
             GenericDecl*                        decl,
@@ -798,24 +789,10 @@ namespace Slang
 
         void ValidateFunctionRedeclaration(FuncDecl* funcDecl);
 
-        void visitScopeDecl(ScopeDecl*);
-
-        void visitParamDecl(ParamDecl* paramDecl);
-
         void VisitFunctionDeclaration(FuncDecl *functionNode);
-
-        void visitDeclStmt(DeclStmt* stmt);
-
-        void visitBlockStmt(BlockStmt* stmt);
-
-        void visitSeqStmt(SeqStmt* stmt);
 
         template<typename T>
         T* FindOuterStmt();
-
-        void visitBreakStmt(BreakStmt *stmt);
-
-        void visitContinueStmt(ContinueStmt *stmt);
 
         void PushOuterStmt(Stmt* stmt);
 
@@ -823,28 +800,7 @@ namespace Slang
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr);
 
-        void visitDoWhileStmt(DoWhileStmt *stmt);
-
-        void visitForStmt(ForStmt *stmt);
-
         RefPtr<Expr> checkExpressionAndExpectIntegerConstant(RefPtr<Expr> expr, RefPtr<IntVal>* outIntVal);
-        void visitCompileTimeForStmt(CompileTimeForStmt* stmt);
-
-        void visitSwitchStmt(SwitchStmt* stmt);
-
-        void visitCaseStmt(CaseStmt* stmt);
-
-        void visitDefaultStmt(DefaultStmt* stmt);
-
-        void visitIfStmt(IfStmt *stmt);
-
-        void visitUnparsedStmt(UnparsedStmt*);
-
-        void visitEmptyStmt(EmptyStmt*);
-
-        void visitDiscardStmt(DiscardStmt*);
-
-        void visitReturnStmt(ReturnStmt *stmt);
 
         IntegerLiteralValue GetMinBound(RefPtr<IntVal> val);
 
@@ -852,21 +808,7 @@ namespace Slang
 
         void validateArraySizeForVariable(VarDeclBase* varDecl);
 
-        void visitVarDecl(VarDecl* varDecl);
-
-        void visitWhileStmt(WhileStmt *stmt);
-
-        void visitExpressionStmt(ExpressionStmt *stmt);
-
-        RefPtr<Expr> visitBoolLiteralExpr(BoolLiteralExpr* expr);
-        RefPtr<Expr> visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
-        RefPtr<Expr> visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
-        RefPtr<Expr> visitStringLiteralExpr(StringLiteralExpr* expr);
-
         IntVal* GetIntVal(IntegerLiteralExpr* expr);
-
-        Linkage* getLinkage() { return m_linkage; }
-        NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
         Name* getName(String const& text)
         {
@@ -907,32 +849,17 @@ namespace Slang
             RefPtr<Type>  elementType,
             RefPtr<IntVal>          elementCount);
 
-        RefPtr<Expr> visitIndexExpr(IndexExpr* subscriptExpr);
-
-        RefPtr<Expr> visitParenExpr(ParenExpr* expr);
-
         //
 
             /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived from `this`.
         void maybeDiagnoseThisNotLValue(Expr* expr);
 
-        RefPtr<Expr> visitAssignExpr(AssignExpr* expr);
-
         void registerExtension(ExtensionDecl* decl);
-
-        void visitExtensionDecl(ExtensionDecl* decl);
 
         // Figure out what type an initializer/constructor declaration
         // is supposed to return. In most cases this is just the type
         // declaration that its declaration is nested inside.
         RefPtr<Type> findResultTypeForConstructorDecl(ConstructorDecl* decl);
-
-        void visitConstructorDecl(ConstructorDecl* decl);
-
-
-        void visitSubscriptDecl(SubscriptDecl* decl);
-
-        void visitAccessorDecl(AccessorDecl* decl);
 
 
         //
@@ -1318,52 +1245,15 @@ namespace Slang
             RefPtr<Expr>	baseExpr,
             OverloadResolveContext&			context);
 
-        RefPtr<Expr> visitGenericAppExpr(GenericAppExpr* genericAppExpr);
-
             /// Check a generic application where the operands have already been checked.
         RefPtr<Expr> checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);
-
-        RefPtr<Expr> visitSharedTypeExpr(SharedTypeExpr* expr);
-
-        RefPtr<Expr> visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr);
 
         RefPtr<Expr> CheckExpr(RefPtr<Expr> expr);
 
         RefPtr<Expr> CheckInvokeExprWithCheckedOperands(InvokeExpr *expr);
 
-        RefPtr<Expr> visitInvokeExpr(InvokeExpr *expr);
-
-        RefPtr<Expr> visitVarExpr(VarExpr *expr);
-
-        RefPtr<Expr> visitTypeCastExpr(TypeCastExpr * expr);
-
         // Get the type to use when referencing a declaration
         QualType GetTypeForDeclRef(DeclRef<Decl> declRef);
-
-        //
-        // Some syntax nodes should not occur in the concrete input syntax,
-        // and will only appear *after* checking is complete. We need to
-        // deal with this cases here, even if they are no-ops.
-        //
-
-    #define CASE(NAME)                                  \
-        RefPtr<Expr> visit##NAME(NAME* expr)            \
-        {                                               \
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr,  \
-                "should not appear in input syntax");   \
-            return expr;                                \
-        }
-
-        CASE(DerefExpr)
-        CASE(SwizzleExpr)
-        CASE(OverloadedExpr)
-        CASE(OverloadedExpr2)
-        CASE(AggTypeCtorExpr)
-        CASE(CastToInterfaceExpr)
-        CASE(LetExpr)
-        CASE(ExtractExistentialValueExpr)
-
-    #undef CASE
 
         //
         //
@@ -1392,23 +1282,183 @@ namespace Slang
             DeclRefExpr*     expr,
             QualType const& baseType);
 
-        RefPtr<Expr> visitMemberExpr(MemberExpr * expr);
-
-        SemanticsVisitor & operator = (const SemanticsVisitor &) = delete;
+        SharedSemanticsContext & operator = (const SharedSemanticsContext &) = delete;
 
 
         //
 
+        void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
+    };
+
+    struct SemanticsExprVisitor
+        : public SemanticsVisitor
+        , ExprVisitor<SemanticsExprVisitor, RefPtr<Expr>>
+    {
+    public:
+        SemanticsExprVisitor(SharedSemanticsContext* shared)
+            : SemanticsVisitor(shared)
+        {}
+
+        RefPtr<Expr> visitBoolLiteralExpr(BoolLiteralExpr* expr);
+        RefPtr<Expr> visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
+        RefPtr<Expr> visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
+        RefPtr<Expr> visitStringLiteralExpr(StringLiteralExpr* expr);
+
+        RefPtr<Expr> visitIndexExpr(IndexExpr* subscriptExpr);
+
+        RefPtr<Expr> visitParenExpr(ParenExpr* expr);
+
+        RefPtr<Expr> visitAssignExpr(AssignExpr* expr);
+
+        RefPtr<Expr> visitGenericAppExpr(GenericAppExpr* genericAppExpr);
+
+        RefPtr<Expr> visitSharedTypeExpr(SharedTypeExpr* expr);
+
+        RefPtr<Expr> visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr);
+
+        RefPtr<Expr> visitInvokeExpr(InvokeExpr *expr);
+
+        RefPtr<Expr> visitVarExpr(VarExpr *expr);
+
+        RefPtr<Expr> visitTypeCastExpr(TypeCastExpr * expr);
+
+        //
+        // Some syntax nodes should not occur in the concrete input syntax,
+        // and will only appear *after* checking is complete. We need to
+        // deal with this cases here, even if they are no-ops.
+        //
+
+    #define CASE(NAME)                                  \
+        RefPtr<Expr> visit##NAME(NAME* expr)            \
+        {                                               \
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr,  \
+                "should not appear in input syntax");   \
+            return expr;                                \
+        }
+
+        CASE(DerefExpr)
+        CASE(SwizzleExpr)
+        CASE(OverloadedExpr)
+        CASE(OverloadedExpr2)
+        CASE(AggTypeCtorExpr)
+        CASE(CastToInterfaceExpr)
+        CASE(LetExpr)
+        CASE(ExtractExistentialValueExpr)
+
+    #undef CASE
+
+        RefPtr<Expr> visitStaticMemberExpr(StaticMemberExpr* expr);
+
+        RefPtr<Expr> visitMemberExpr(MemberExpr * expr);
+
         RefPtr<Expr> visitInitializerListExpr(InitializerListExpr* expr);
 
-        void importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl);
+        RefPtr<Expr> visitThisExpr(ThisExpr* expr);
+    };
+
+    struct SemanticsStmtVisitor
+        : public SemanticsVisitor
+        , StmtVisitor<SemanticsStmtVisitor>
+    {
+        SemanticsStmtVisitor(SharedSemanticsContext* shared)
+            : SemanticsVisitor(shared)
+        {}
+
+        void visitDeclStmt(DeclStmt* stmt);
+
+        void visitBlockStmt(BlockStmt* stmt);
+
+        void visitSeqStmt(SeqStmt* stmt);
+
+        void visitBreakStmt(BreakStmt *stmt);
+
+        void visitContinueStmt(ContinueStmt *stmt);
+
+        void visitDoWhileStmt(DoWhileStmt *stmt);
+
+        void visitForStmt(ForStmt *stmt);
+
+        void visitCompileTimeForStmt(CompileTimeForStmt* stmt);
+
+        void visitSwitchStmt(SwitchStmt* stmt);
+
+        void visitCaseStmt(CaseStmt* stmt);
+
+        void visitDefaultStmt(DefaultStmt* stmt);
+
+        void visitIfStmt(IfStmt *stmt);
+
+        void visitUnparsedStmt(UnparsedStmt*);
+
+        void visitEmptyStmt(EmptyStmt*);
+
+        void visitDiscardStmt(DiscardStmt*);
+
+        void visitReturnStmt(ReturnStmt *stmt);
+
+        void visitWhileStmt(WhileStmt *stmt);
+
+        void visitExpressionStmt(ExpressionStmt *stmt);
+    };
+
+    struct SemanticsDeclVisitor
+        : public SemanticsVisitor
+        , DeclVisitor<SemanticsDeclVisitor>
+    {
+        SemanticsDeclVisitor(SharedSemanticsContext* shared)
+            : SemanticsVisitor(shared)
+        {}
+
+        void visitGenericDecl(GenericDecl* genericDecl);
+
+        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl);
+
+        void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
+
+        void visitSyntaxDecl(SyntaxDecl*);
+
+        void visitAttributeDecl(AttributeDecl*);
+
+        void visitGenericTypeParamDecl(GenericTypeParamDecl*);
+
+        void visitGenericValueParamDecl(GenericValueParamDecl*);
+
+        void visitModuleDecl(ModuleDecl* programNode);
+
+        void visitAggTypeDecl(AggTypeDecl* decl);
+
+        void visitEnumDecl(EnumDecl* decl);
+
+        void visitEnumCaseDecl(EnumCaseDecl* decl);
+
+        void visitDeclGroup(DeclGroup* declGroup);
+
+        void visitTypeDefDecl(TypeDefDecl* decl);
+
+        void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl);
+
+        void visitAssocTypeDecl(AssocTypeDecl* decl);
+
+        void visitFuncDecl(FuncDecl* functionNode);
+
+        void visitScopeDecl(ScopeDecl*);
+
+        void visitParamDecl(ParamDecl* paramDecl);
+
+        void visitVarDecl(VarDecl* varDecl);
+
+        void registerExtension(ExtensionDecl* decl);
+
+        void visitExtensionDecl(ExtensionDecl* decl);
+
+        void visitConstructorDecl(ConstructorDecl* decl);
+
+        void visitSubscriptDecl(SubscriptDecl* decl);
+
+        void visitAccessorDecl(AccessorDecl* decl);
 
         void visitEmptyDecl(EmptyDecl* /*decl*/);
 
         void visitImportDecl(ImportDecl* decl);
-
-        // Perform semantic checking of an object-oriented `this`
-        // expression.
-        RefPtr<Expr> visitThisExpr(ThisExpr* expr);
     };
 }

@@ -1376,7 +1376,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
+    RefPtr<Expr> SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
         // Start by checking the base expression and arguments.
         auto& baseExpr = genericAppExpr->FunctionExpr;

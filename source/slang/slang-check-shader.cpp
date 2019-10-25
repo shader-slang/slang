@@ -1402,7 +1402,8 @@ static bool doesParameterMatch(
     {
         SLANG_ASSERT(argCount == getSpecializationParamCount());
 
-        SemanticsVisitor visitor(getLinkage(), sink);
+        SharedSemanticsContext semanticsContext(getLinkage(), sink);
+        SemanticsVisitor visitor(&semanticsContext);
 
         RefPtr<Module::ModuleSpecializationInfo> specializationInfo = new Module::ModuleSpecializationInfo();
 
@@ -1575,7 +1576,8 @@ static bool doesParameterMatch(
         auto args = inArgs;
         auto argCount = inArgCount;
 
-        SemanticsVisitor visitor(getLinkage(), sink);
+        SharedSemanticsContext sharedSemanticsContext(getLinkage(), sink);
+        SemanticsVisitor visitor(&sharedSemanticsContext);
 
         // The first N arguments will be for the explicit generic parameters
         // of the entry point (if it has any).
@@ -1724,9 +1726,11 @@ static bool doesParameterMatch(
         //
         auto linkage = endToEndReq->getLinkage();
         auto sink = endToEndReq->getSink();
-        SemanticsVisitor semantics(
+
+        SharedSemanticsContext sharedSemanticsContext(
             linkage,
             sink);
+        SemanticsVisitor semantics(&sharedSemanticsContext);
 
         // We will be looping over the generic argument strings
         // that the user provided via the API (or command line),
@@ -1769,7 +1773,8 @@ static bool doesParameterMatch(
         // TODO: We should cache and re-use specialized types
         // when the exact same arguments are provided again later.
 
-        SemanticsVisitor visitor(this, sink);
+        SharedSemanticsContext sharedSemanticsContext(this, sink);
+        SemanticsVisitor visitor(&sharedSemanticsContext);
 
         SpecializationParams specializationParams;
         _collectExistentialSpecializationParamsRec(specializationParams, unspecializedType);
@@ -1826,7 +1831,7 @@ static bool doesParameterMatch(
         // We have an appropriate number of arguments for the global specialization parameters,
         // and now we need to check that the arguments conform to the declared constraints.
         //
-        SemanticsVisitor visitor(linkage, sink);
+        SharedSemanticsContext visitor(linkage, sink);
 
         List<SpecializationArg> specializationArgs;
         _extractSpecializationArgs(unspecializedProgram, specializationArgExprs, specializationArgs, sink);

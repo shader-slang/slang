@@ -416,7 +416,9 @@ namespace Slang
     RefPtr<Expr> SemanticsVisitor::CheckTerm(RefPtr<Expr> term)
     {
         if (!term) return nullptr;
-        return ExprVisitor::dispatch(term);
+
+        SemanticsExprVisitor exprVisitor(getShared());
+        return exprVisitor.dispatch(term);
     }
 
     RefPtr<Expr> SemanticsVisitor::CreateErrorExpr(Expr* expr)
@@ -448,13 +450,13 @@ namespace Slang
         return nullptr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
         expr->type = getSession()->getBoolType();
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         // The expression might already have a type, determined by its suffix.
         // It it doesn't, we will give it a default type.
@@ -474,7 +476,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
     {
         if(!expr->type.type)
         {
@@ -483,7 +485,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
     {
         expr->type = getSession()->getStringType();
         return expr;
@@ -766,7 +768,7 @@ namespace Slang
         return subscriptExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
+    RefPtr<Expr> SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
         auto baseExpr = subscriptExpr->BaseExpression;
         baseExpr = CheckExpr(baseExpr);
@@ -804,7 +806,6 @@ namespace Slang
                 elementType,
                 elementCount);
 
-            typeResult = arrayType;
             subscriptExpr->type = QualType(getTypeType(arrayType));
             return subscriptExpr;
         }
@@ -873,7 +874,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitParenExpr(ParenExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
     {
         auto base = expr->base;
         base = CheckTerm(base);
@@ -920,7 +921,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitAssignExpr(AssignExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
     {
         expr->left = CheckExpr(expr->left);
 
@@ -1032,7 +1033,7 @@ namespace Slang
         return rs;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitInvokeExpr(InvokeExpr *expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
     {
         // check the base expression first
         expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
@@ -1045,7 +1046,7 @@ namespace Slang
         return CheckInvokeExprWithCheckedOperands(expr);
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitVarExpr(VarExpr *expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitVarExpr(VarExpr *expr)
     {
         // If we've already resolved this expression, don't try again.
         if (expr->declRef)
@@ -1068,7 +1069,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitTypeCastExpr(TypeCastExpr * expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         // Check the term we are applying first
         auto funcExpr = expr->FunctionExpr;
@@ -1421,7 +1422,7 @@ namespace Slang
         return lookupMemberResultFailure(expr, baseType);
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     {
         expr->BaseExpression = CheckExpr(expr->BaseExpression);
 
@@ -1452,7 +1453,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitMemberExpr(MemberExpr * expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
         expr->BaseExpression = CheckExpr(expr->BaseExpression);
 
@@ -1521,7 +1522,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::visitInitializerListExpr(InitializerListExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
         // When faced with an initializer list, we first just check the sub-expressions blindly.
         // Actually making them conform to a desired type will wait for when we know the desired
@@ -1539,7 +1540,7 @@ namespace Slang
 
     // Perform semantic checking of an object-oriented `this`
     // expression.
-    RefPtr<Expr> SemanticsVisitor::visitThisExpr(ThisExpr* expr)
+    RefPtr<Expr> SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         // A `this` expression will default to immutable.
         expr->type.IsLeftValue = false;

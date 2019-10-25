@@ -485,7 +485,7 @@ namespace Slang
         }
         else
         {
-            if (function || checkingPhase == CheckingPhase::Header)
+            if (getFunction() || getCheckingPhase() == CheckingPhase::Header)
             {
                 TypeExp typeExp = CheckUsableType(varDecl->type);
                 varDecl->type = typeExp;
@@ -495,7 +495,7 @@ namespace Slang
                 }
             }
 
-            if (checkingPhase == CheckingPhase::Body)
+            if (getCheckingPhase() == CheckingPhase::Body)
             {
                 if (auto initExpr = varDecl->initExpr)
                 {
@@ -557,7 +557,7 @@ namespace Slang
 
     void SemanticsVisitor::checkDecl(Decl* decl)
     {
-        EnsureDecl(decl, checkingPhase == CheckingPhase::Header ? DeclCheckState::CheckedHeader : DeclCheckState::Checked);
+        EnsureDecl(decl, getCheckingPhase() == CheckingPhase::Header ? DeclCheckState::CheckedHeader : DeclCheckState::Checked);
     }
 
     void SemanticsVisitor::checkGenericDeclHeader(GenericDecl* genericDecl)
@@ -585,7 +585,7 @@ namespace Slang
         genericDecl->SetCheckState(DeclCheckState::CheckedHeader);
     }
 
-    void SemanticsVisitor::visitGenericDecl(GenericDecl* genericDecl)
+    void SemanticsDeclVisitor::visitGenericDecl(GenericDecl* genericDecl)
     {
         checkGenericDeclHeader(genericDecl);
 
@@ -595,7 +595,7 @@ namespace Slang
         genericDecl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl)
+    void SemanticsDeclVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl)
     {
         if (genericConstraintDecl->IsChecked(DeclCheckState::CheckedHeader))
             return;
@@ -605,7 +605,7 @@ namespace Slang
         genericConstraintDecl->sup = base;
     }
 
-    void SemanticsVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
+    void SemanticsDeclVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
         if (inheritanceDecl->IsChecked(DeclCheckState::CheckedHeader))
             return;
@@ -636,22 +636,22 @@ namespace Slang
         getSink()->diagnose( base.exp, Diagnostics::expectedAnInterfaceGot, base.type);
     }
 
-    void SemanticsVisitor::visitSyntaxDecl(SyntaxDecl*)
+    void SemanticsDeclVisitor::visitSyntaxDecl(SyntaxDecl*)
     {
         // These are only used in the stdlib, so no checking is needed
     }
 
-    void SemanticsVisitor::visitAttributeDecl(AttributeDecl*)
+    void SemanticsDeclVisitor::visitAttributeDecl(AttributeDecl*)
     {
         // These are only used in the stdlib, so no checking is needed
     }
 
-    void SemanticsVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*)
+    void SemanticsDeclVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*)
     {
         // These are only used in the stdlib, so no checking is needed for now
     }
 
-    void SemanticsVisitor::visitGenericValueParamDecl(GenericValueParamDecl*)
+    void SemanticsDeclVisitor::visitGenericValueParamDecl(GenericValueParamDecl*)
     {
         // These are only used in the stdlib, so no checking is needed for now
     }
@@ -694,7 +694,7 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitModuleDecl(ModuleDecl* programNode)
+    void SemanticsDeclVisitor::visitModuleDecl(ModuleDecl* programNode)
     {
         // Try to register all the builtin decls
         for (auto decl : programNode->Members)
@@ -756,6 +756,7 @@ namespace Slang
 
         for (int pass = 0; pass < 2; pass++)
         {
+            auto& checkingPhase = getShared()->checkingPhase;
             checkingPhase = pass == 0 ? CheckingPhase::Header : CheckingPhase::Body;
 
             for (auto & s : programNode->getMembersOfType<AggTypeDecl>())
@@ -1372,7 +1373,7 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitAggTypeDecl(AggTypeDecl* decl)
+    void SemanticsDeclVisitor::visitAggTypeDecl(AggTypeDecl* decl)
     {
         if (decl->IsChecked(getCheckedState()))
             return;
@@ -1439,7 +1440,7 @@ namespace Slang
         getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
     }
 
-    void SemanticsVisitor::visitEnumDecl(EnumDecl* decl)
+    void SemanticsDeclVisitor::visitEnumDecl(EnumDecl* decl)
     {
         if (decl->IsChecked(getCheckedState()))
             return;
@@ -1449,7 +1450,7 @@ namespace Slang
         // to make the type usable in the first phase, and
         // then check the actual cases in the second phase.
         //
-        if(this->checkingPhase == CheckingPhase::Header)
+        if(getCheckingPhase() == CheckingPhase::Header)
         {
             // Look at inheritance clauses, and
             // see if one of them is making the enum
@@ -1576,7 +1577,7 @@ namespace Slang
                 enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
             }
         }
-        else if( checkingPhase == CheckingPhase::Body )
+        else if( getCheckingPhase() == CheckingPhase::Body )
         {
             auto enumType = DeclRefType::Create(
                 getSession(),
@@ -1672,12 +1673,12 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
+    void SemanticsDeclVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     {
         if (decl->IsChecked(getCheckedState()))
             return;
 
-        if(checkingPhase == CheckingPhase::Body)
+        if(getCheckingPhase() == CheckingPhase::Body)
         {
             // An enum case had better appear inside an enum!
             //
@@ -1709,7 +1710,7 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitDeclGroup(DeclGroup* declGroup)
+    void SemanticsDeclVisitor::visitDeclGroup(DeclGroup* declGroup)
     {
         for (auto decl : declGroup->decls)
         {
@@ -1717,20 +1718,20 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitTypeDefDecl(TypeDefDecl* decl)
+    void SemanticsDeclVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             decl->type = CheckProperType(decl->type);
         }
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
+    void SemanticsDeclVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             decl->SetCheckState(DeclCheckState::CheckedHeader);
             // global generic param only allowed in global scope
@@ -1746,10 +1747,10 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
+    void SemanticsDeclVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             decl->SetCheckState(DeclCheckState::CheckedHeader);
 
@@ -1767,28 +1768,29 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitFuncDecl(FuncDecl* functionNode)
+    void SemanticsDeclVisitor::visitFuncDecl(FuncDecl* functionNode)
     {
         if (functionNode->IsChecked(getCheckedState()))
             return;
 
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             VisitFunctionDeclaration(functionNode);
         }
         // TODO: This should really only set "checked header"
         functionNode->SetCheckState(getCheckedState());
 
-        if (checkingPhase == CheckingPhase::Body)
+        if (getCheckingPhase() == CheckingPhase::Body)
         {
             // TODO: should put the checking of the body onto a "work list"
             // to avoid recursion here.
             if (functionNode->Body)
             {
+                auto& function = getShared()->function;
                 auto oldFunc = function;
-                this->function = functionNode;
+                function = functionNode;
                 checkStmt(functionNode->Body);
-                this->function = oldFunc;
+                function = oldFunc;
             }
         }
     }
@@ -2189,12 +2191,12 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitScopeDecl(ScopeDecl*)
+    void SemanticsDeclVisitor::visitScopeDecl(ScopeDecl*)
     {
         // Nothing to do
     }
 
-    void SemanticsVisitor::visitParamDecl(ParamDecl* paramDecl)
+    void SemanticsDeclVisitor::visitParamDecl(ParamDecl* paramDecl)
     {
         // TODO: This logic should be shared with the other cases of
         // variable declarations. The main reason I am not doing it
@@ -2253,8 +2255,10 @@ namespace Slang
     {
         if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
         functionNode->SetCheckState(DeclCheckState::CheckingHeader);
-        auto oldFunc = this->function;
-        this->function = functionNode;
+
+        auto& function = getShared()->function;
+        auto oldFunc = function;
+        function = functionNode;
 
         auto resultType = functionNode->ReturnType;
         if(resultType.exp)
@@ -2280,7 +2284,7 @@ namespace Slang
             else
                 paraNames.Add(para->getName());
         }
-        this->function = oldFunc;
+        function = oldFunc;
         functionNode->SetCheckState(DeclCheckState::CheckedHeader);
 
         // One last bit of validation: check if we are redeclaring an existing function
@@ -2353,12 +2357,12 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitVarDecl(VarDecl* varDecl)
+    void SemanticsDeclVisitor::visitVarDecl(VarDecl* varDecl)
     {
         CheckVarDeclCommon(varDecl);
     }
 
-    void SemanticsVisitor::registerExtension(ExtensionDecl* decl)
+    void SemanticsDeclVisitor::registerExtension(ExtensionDecl* decl)
     {
         if (decl->IsChecked(DeclCheckState::CheckedHeader))
             return;
@@ -2383,7 +2387,7 @@ namespace Slang
         getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
     }
 
-    void SemanticsVisitor::visitExtensionDecl(ExtensionDecl* decl)
+    void SemanticsDeclVisitor::visitExtensionDecl(ExtensionDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
 
@@ -2436,10 +2440,10 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitConstructorDecl(ConstructorDecl* decl)
+    void SemanticsDeclVisitor::visitConstructorDecl(ConstructorDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             decl->SetCheckState(DeclCheckState::CheckingHeader);
 
@@ -2459,7 +2463,7 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitSubscriptDecl(SubscriptDecl* decl)
+    void SemanticsDeclVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
         if (decl->IsChecked(getCheckedState())) return;
         for (auto& paramDecl : decl->GetParameters())
@@ -2503,9 +2507,9 @@ namespace Slang
         decl->SetCheckState(getCheckedState());
     }
 
-    void SemanticsVisitor::visitAccessorDecl(AccessorDecl* decl)
+    void SemanticsDeclVisitor::visitAccessorDecl(AccessorDecl* decl)
     {
-        if (checkingPhase == CheckingPhase::Header)
+        if (getCheckingPhase() == CheckingPhase::Header)
         {
             // An accessor must appear nested inside a subscript declaration (today),
             // or a property declaration (when we add them). It will derive
@@ -2655,6 +2659,7 @@ namespace Slang
 
     QualType SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef)
     {
+        RefPtr<Type> typeResult;
         return getTypeForDeclRef(
             getSession(),
             this,
@@ -2667,6 +2672,7 @@ namespace Slang
     {
         // If we've imported this one already, then
         // skip the step where we modify the current scope.
+        auto& importedModules = getShared()->importedModules;
         if (importedModules.Contains(moduleDecl))
         {
             return;
@@ -2693,12 +2699,12 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::visitEmptyDecl(EmptyDecl* /*decl*/)
+    void SemanticsDeclVisitor::visitEmptyDecl(EmptyDecl* /*decl*/)
     {
         // nothing to do
     }
 
-    void SemanticsVisitor::visitImportDecl(ImportDecl* decl)
+    void SemanticsDeclVisitor::visitImportDecl(ImportDecl* decl)
     {
         if(decl->IsChecked(DeclCheckState::CheckedHeader))
             return;
