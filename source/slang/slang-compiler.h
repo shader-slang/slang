@@ -1728,6 +1728,9 @@ namespace Slang
             // If set, will dump the compilation state 
         String dumpRepro;
 
+            /// If set, if a compilation failure occurs will attempt to save off a dump repro with a unique name
+        bool dumpReproOnError = false;
+
             /// A blob holding the diagnostic output
         ComPtr<ISlangBlob> diagnosticOutputBlob;
 

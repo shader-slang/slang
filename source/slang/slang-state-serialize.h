@@ -180,6 +180,9 @@ struct StateSerializeUtil
 
         /// Given the repo file work out a suitable path
     static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);
+
+        /// Given a request trys to determine a suitable dump file name, that is unique. 
+    static SlangResult findUniqueReproDumpStream(EndToEndCompileRequest* request, String& outFileName, RefPtr<Stream>& outStream);
 };
 
 } // namespace Slang

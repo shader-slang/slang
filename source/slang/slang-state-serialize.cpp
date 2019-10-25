@@ -3,6 +3,8 @@
 
 #include "../core/slang-text-io.h"
 
+#include "../core/slang-stream.h"
+
 #include "../core/slang-math.h"
 
 #include "slang-source-loc.h"
@@ -1166,8 +1168,6 @@ struct LoadContext
                 case CompressedResult::CannotOpen:  builder << "[cannot open]"; break;
                 case CompressedResult::Fail:        builder << "[fail]"; break;
             }
-
-            
         }
 
         builder << "\n";
@@ -1175,6 +1175,76 @@ struct LoadContext
 
     SLANG_RETURN_ON_FAIL(fileSystem->saveFile("manifest.txt", builder.getBuffer(), builder.getLength()));
     return SLANG_OK;
+}
+
+static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String& outFilename)
+{
+    // We are going to look through all of the srcTranlationUnits, looking for the first filename
+
+    auto frontEndReq = request->getFrontEndReq();
+    const auto& srcTranslationUnits = frontEndReq->translationUnits;
+
+    for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
+    {
+        TranslationUnitRequest* srcTranslationUnit = srcTranslationUnits[i];
+        const auto& srcSourceFiles = srcTranslationUnit->getSourceFiles();
+
+        for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
+        {
+            SourceFile* sourceFile = srcSourceFiles[j];
+
+            const PathInfo& pathInfo = sourceFile->getPathInfo();
+
+            if (pathInfo.foundPath.getLength())
+            {
+                outFilename = pathInfo.foundPath;
+                return SLANG_OK;
+            }
+        }
+    }
+    return SLANG_FAIL;
+}
+
+/* static */SlangResult StateSerializeUtil::findUniqueReproDumpStream(EndToEndCompileRequest* request, String& outFileName, RefPtr<Stream>& outStream)
+{
+    String sourcePath;
+
+    if (SLANG_FAILED(_findFirstSourcePath(request, sourcePath)))
+    {
+        sourcePath = "unknown.slang";
+    }
+
+    String sourceFileName = Path::getFileName(sourcePath);
+    String sourceBaseName = Path::getFileNameWithoutExt(sourceFileName);
+
+    // Okay we need a unique number to make sure the name is unique
+    const int maxTries = 100;
+    for (int triesCount = 0; triesCount < maxTries; ++triesCount)
+    {
+        // We could include the count in some way perhaps, but for now let's just go with ticks
+        auto tick = ProcessUtil::getClockTick();
+
+        StringBuilder builder;
+        builder << sourceBaseName << "-" << tick << ".slang-repro";
+
+        // We write out the file name tried even if it fails, as might be useful in reporting
+        outFileName = builder;
+
+        // We could have clashes, as we use ticks, we should get to a point where the clashes stop
+        try
+        {
+            outStream = new FileStream(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly);
+            return SLANG_OK;
+        }
+        catch (IOException&)
+        {
+        }
+
+        // TODO(JS): 
+        // Might make sense to sleep here - but don't seem to have cross platform func for that yet.
+    }
+
+    return SLANG_FAIL;
 }
 
 } // namespace Slang

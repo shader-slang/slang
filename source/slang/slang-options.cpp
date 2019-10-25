@@ -498,6 +498,10 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
                     spEnableReproCapture(asExternal(requestImpl));
                 }
+                else if (argStr == "-dump-repro-on-error")
+                {
+                    requestImpl->dumpReproOnError = true;
+                }
                 else if (argStr == "-extract-repro")
                 {
                     String reproName;
