@@ -195,9 +195,6 @@
     <ClInclude Include="slang-syntax-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-syntax-visitors.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -223,6 +220,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-strip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-check-impl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -390,6 +390,36 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-strip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-expr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-stmt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-decl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-modifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-constraint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-conformance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-overload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-conversion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

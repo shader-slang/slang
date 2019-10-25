@@ -5,13 +5,13 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
 
+#include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-reflection.h"
-#include "slang-syntax-visitors.h"
 #include "slang-type-layout.h"
 
 #include "slang-state-serialize.h"
