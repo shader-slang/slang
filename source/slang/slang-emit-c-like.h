@@ -140,6 +140,9 @@ public:
     
     bool isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration);
 
+        /// Is the `candidate` decoration more specialized for the current target than `existing`?
+    bool isTargetIntrinsicModifierBetter(IRTargetIntrinsicDecoration* candidate, IRTargetIntrinsicDecoration* existing);
+
     void emitStringLiteral(const String& value);
 
     void emitVal(IRInst* val, const EmitOpInfo& outerPrec);
@@ -184,18 +187,12 @@ public:
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
     // to the new name with the arguments of the old operation.
-    static bool isOrdinaryName(const String& name);
-    
-    void emitTargetIntrinsicCallExpr(
-        IRCall*                         inst,
-        IRFunc*                         /* func */,
-        IRTargetIntrinsicDecoration*    targetIntrinsic,
-        EmitOpInfo const&               inOuterPrec);
+    static bool isOrdinaryName(const UnownedStringSlice& name);
 
     void emitIntrinsicCallExpr(
-        IRCall*             inst,
-        IRFunc*             func,
-        EmitOpInfo const&   inOuterPrec);
+        IRCall*                         inst,
+        IRTargetIntrinsicDecoration*    targetIntrinsic,
+        EmitOpInfo const&               inOuterPrec);
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
@@ -252,11 +249,6 @@ public:
         // declaration of an intrinsic/builtin for the
         // current code-generation target.
     bool isTargetIntrinsic(IRFunc* func);
-
-        // Check whether a given value names a target intrinsic,
-        // and return the IR function representing the intrinsic
-        // if it does.
-    IRFunc* asTargetIntrinsic(IRInst* value);
 
     void emitFunc(IRFunc* func);
 
