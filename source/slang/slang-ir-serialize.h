@@ -381,17 +381,17 @@ struct IRSerialBinary
 
     struct SlangHeader
     {
-        RiffChunk m_chunk;
+        RiffHeader m_chunk;
         uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader
     {
-        RiffChunk m_chunk;
+        RiffHeader m_chunk;
         uint32_t m_numEntries;
     };
     struct CompressedArrayHeader
     {
-        RiffChunk m_chunk;
+        RiffHeader m_chunk;
         uint32_t m_numEntries;              ///< The number of entries
         uint32_t m_numCompressedEntries;    ///< The amount of compressed entries
     };
