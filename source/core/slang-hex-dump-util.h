@@ -15,6 +15,9 @@ struct HexDumpUtil
         /// Dump data to writer, with lines starting with hex data
     static SlangResult dump(const List<uint8_t>& data, int numBytesPerLine, ISlangWriter* writer);
 
+        /// Dump a single value
+    static void dump(uint32_t value, ISlangWriter* writer);
+
     static SlangResult dumpWithMarkers(const List<uint8_t>& data, int numBytesPerLine, ISlangWriter* writer);
 
         /// Parses lines formatted by dump, back into bytes

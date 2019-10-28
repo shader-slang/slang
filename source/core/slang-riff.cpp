@@ -2,6 +2,8 @@
 
 #include "../../slang-com-helper.h"
 
+#include "slang-hex-dump-util.h"
+
 namespace Slang
 {
 
@@ -351,6 +353,31 @@ size_t RiffContainer::Chunk::calcPayloadSize()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+int RiffContainer::DataChunk::calcHash() const
+{
+    int hash = 0;
+
+    Data* data = m_dataList;
+    while (data)
+    {
+        // This is a little contrived (in that we don't use the function GetHashCode), but the
+        // reason to be careful is we want the same result however many Data blocks there are.
+        const char* buffer = (const char*)data->getPayload();
+        const size_t size = data->getSize();
+
+        for (size_t i = 0; i < size; ++i)
+        {
+            hash = int(buffer[i]) + (hash << 6) + (hash << 16) - hash;
+        }
+
+        data = data->m_next;
+    }
+
+    return hash;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 RiffContainer::RiffContainer() :
     m_arena(4096)
 {
@@ -525,6 +552,91 @@ static SlangResult _calcAndSetSize(RiffContainer::Chunk* chunk, void* data)
 /* static */void RiffContainer::calcAndSetSize(Chunk* chunk)
 {
     chunk->visitPostOrder(&_calcAndSetSize, nullptr);
+}
+
+namespace { // anonymous
+
+struct DumpVisitor : public RiffContainer::Visitor
+{
+    typedef RiffContainer::Chunk Chunk;
+    typedef RiffContainer::ListChunk ListChunk;
+    typedef RiffContainer::DataChunk DataChunk;
+
+  
+    // Visitor
+    virtual SlangResult enterList(ListChunk* list) SLANG_OVERRIDE
+    {
+        _dumpIndent();
+        // If it's the root it's 'riff'
+        _dumpRiffType(list == m_rootChunk ? RiffFourCC::kRiff : RiffFourCC::kList);
+        m_writer.put(" ");
+        _dumpRiffType(list->m_subType);
+        m_writer.put("\n");
+        m_indent++;
+        return SLANG_OK;
+    }
+    virtual SlangResult handleData(DataChunk* data) SLANG_OVERRIDE
+    {
+        _dumpIndent();
+        // Write out the name
+        _dumpRiffType(data->m_type);
+        m_writer.put(" ");
+
+
+        int hash = data->calcHash();
+
+        // We don't know in general what the contents is or means... but we can display a hash
+        HexDumpUtil::dump(uint32_t(hash), m_writer.getWriter());
+        m_writer.put(" ");
+
+        m_writer.put("\n");
+        return SLANG_OK;
+    }
+    virtual SlangResult leaveList(ListChunk* list) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(list);
+        m_indent--;
+        return SLANG_OK;
+    }
+
+    DumpVisitor(WriterHelper writer, Chunk* rootChunk):
+        m_writer(writer),
+        m_indent(0),
+        m_rootChunk(rootChunk)
+    {
+    }
+
+    void _dumpIndent()
+    {
+        for (int i = 0; i < m_indent; ++i)
+        {
+            m_writer.put("  ");
+        }
+    }
+    void _dumpRiffType(FourCC fourCC)
+    {
+        char c[5];
+        for (int i = 0; i < 4; ++i)
+        {
+            c[i] = char(fourCC);
+            fourCC >>= 8;
+        }
+        c[4] = 0;
+        m_writer.put(c);
+    }
+
+    Chunk* m_rootChunk;
+
+    int m_indent;
+    WriterHelper m_writer;
+};
+
+}
+
+/* static */void RiffContainer::dump(Chunk* chunk, WriterHelper writer)
+{
+    DumpVisitor visitor(writer, chunk);
+    chunk->visit(&visitor);
 }
 
 /* static */SlangResult RiffContainer::write(ListChunk* container, bool isRoot, Stream* stream)

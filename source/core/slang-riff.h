@@ -4,6 +4,7 @@
 #include "slang-basic.h"
 #include "slang-stream.h"
 #include "slang-memory-arena.h"
+#include "slang-writer.h"
 
 namespace Slang
 {
@@ -237,6 +238,9 @@ public:
 
         SLANG_FORCE_INLINE static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
 
+            /// Calculate a has
+        int calcHash() const;
+
         size_t calcPayloadSize() const
         {
             size_t size = 0;
@@ -316,6 +320,9 @@ public:
 
         /// Traverses over chunk hierarchy and sets the sizes
     static void calcAndSetSize(Chunk* chunk);
+
+        /// Dump the structure
+    static void dump(Chunk* chunk, WriterHelper writer);
 
         /// Ctor
     RiffContainer();

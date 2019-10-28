@@ -55,6 +55,7 @@ static void riffUnitTest()
         SLANG_CHECK(container.isFullyConstructed());
         SLANG_CHECK(RiffContainer::isChunkOk(container.getRoot()));
 
+        //RiffContainer::dump(container.getRoot(), StdWriters::getOut());
     }
 }
 

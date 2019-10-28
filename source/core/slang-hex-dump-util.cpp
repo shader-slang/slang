@@ -12,6 +12,7 @@ namespace Slang
 
 static const UnownedStringSlice s_start = UnownedStringSlice::fromLiteral("--START--");
 static const UnownedStringSlice s_end = UnownedStringSlice::fromLiteral("--END--");
+static const char s_hex[] = "0123456789abcdef";
 
 /* static */SlangResult HexDumpUtil::dumpWithMarkers(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
 {
@@ -26,6 +27,17 @@ static const UnownedStringSlice s_end = UnownedStringSlice::fromLiteral("--END--
     return SLANG_OK;
 }
 
+/* static */void HexDumpUtil::dump(uint32_t value, ISlangWriter* writer)
+{
+    char c[9];
+    for (int i = 0; i < 8; ++i)
+    {
+        c[i] = s_hex[value >> 28];
+        value <<= 4;
+    }
+    writer->write(c, 8);
+}
+
 /* static */SlangResult HexDumpUtil::dump(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
 {
     int maxCharsPerLine = 2 * maxBytesPerLine + 1 + maxBytesPerLine + 1;
@@ -33,8 +45,7 @@ static const UnownedStringSlice s_end = UnownedStringSlice::fromLiteral("--END--
     const uint8_t* cur = data.begin();
     const uint8_t* end = data.end();
 
-    static char s_hex[] = "0123456789abcdef";
-
+ 
     while (cur < end)
     {
         size_t count = size_t(end - cur);
