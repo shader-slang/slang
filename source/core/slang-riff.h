@@ -321,13 +321,6 @@ struct RiffUtil
     typedef RiffContainer::ListChunk ListChunk;
     typedef RiffContainer::DataChunk DataChunk;
 
-    struct SubChunk
-    {
-        FourCC chunkType;
-        const void* data;
-        size_t dataSize;
-    };
-
     static int64_t calcChunkTotalSize(const RiffHeader& chunk);
 
     static SlangResult skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut);
@@ -338,15 +331,6 @@ struct RiffUtil
     static SlangResult readData(Stream* stream, RiffHeader* outHeader, size_t headerSize, List<uint8_t>& data);
 
     static SlangResult readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize);
-
-        /// Total size is the size of all the contained chunks
-    static SlangResult writeListHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out);
-
-        /// Write riff with subType subtype, containing the specified chunks to stream
-    static SlangResult writeList(FourCC containerType, FourCC subType, const SubChunk* subChunks, size_t subChunkCount, Stream* out);
-
-        /// Read a riff container. The chunks memory is stored in the arena. 
-    static SlangResult readList(Stream* stream, RiffListHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks);
 
         /// Read a header. Handles special case of list/riff types
     static SlangResult readHeader(Stream* stream, RiffListHeader& outHeader);
