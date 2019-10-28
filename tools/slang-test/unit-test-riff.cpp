@@ -18,7 +18,7 @@ static void riffUnitTest()
         RiffContainer container;
 
         {
-            ScopeChunk scopeContainer(&container, Kind::Container, markThings);
+            ScopeChunk scopeContainer(&container, Kind::List, markThings);
 
             {
                 ScopeChunk scopeChunk(&container, Kind::Data, markData);
@@ -41,7 +41,7 @@ static void riffUnitTest()
             }
 
             {
-                ScopeChunk innerScopeContainer(&container, Kind::Container, markThings);
+                ScopeChunk innerScopeContainer(&container, Kind::List, markThings);
 
                 {
                     ScopeChunk scopeChunk(&container, Kind::Data, markData);
@@ -53,7 +53,7 @@ static void riffUnitTest()
         }
 
         SLANG_CHECK(container.isFullyConstructed());
-        SLANG_CHECK(RiffContainer::isContainerOk(container.getRoot()));
+        SLANG_CHECK(RiffContainer::isChunkOk(container.getRoot()));
 
     }
 }
