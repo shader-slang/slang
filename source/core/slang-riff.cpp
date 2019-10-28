@@ -9,7 +9,7 @@ namespace Slang
 
 /* static */int64_t RiffUtil::calcChunkTotalSize(const RiffHeader& chunk)
 {
-    int64_t size = chunk.m_size + sizeof(RiffHeader);
+    int64_t size = chunk.size + sizeof(RiffHeader);
     return (size + 3) & ~int64_t(3);
 }
 
@@ -53,8 +53,8 @@ namespace Slang
     // TODO(JS): Could handle endianness here
 
     RiffHeader chunk;
-    chunk.m_type = header->m_type;
-    chunk.m_size = uint32_t(headerSize - sizeof(RiffHeader) + payloadSize);
+    chunk.type = header->type;
+    chunk.size = uint32_t(headerSize - sizeof(RiffHeader) + payloadSize);
 
     try
     {
@@ -114,7 +114,7 @@ namespace Slang
 {
     RiffHeader chunk;
     SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
-    if (chunk.m_size < headerSize)
+    if (chunk.size < headerSize)
     {
         return SLANG_FAIL;
     }
@@ -134,7 +134,7 @@ namespace Slang
         return SLANG_FAIL;
     }
 
-    const size_t payloadSize = chunk.m_size - (headerSize - sizeof(RiffHeader));
+    const size_t payloadSize = chunk.size - (headerSize - sizeof(RiffHeader));
     size_t readSize;
     data.setCount(payloadSize);
     return readPayload(stream, payloadSize, data.getBuffer(), readSize);
@@ -154,8 +154,8 @@ namespace Slang
     // Size of header of Riff container
     totalSize += sizeof(RiffListHeader) - sizeof(RiffHeader);
 
-    header.chunk.m_type = containerType;
-    header.chunk.m_size = uint32_t(totalSize);
+    header.chunk.type = containerType;
+    header.chunk.size = uint32_t(totalSize);
     header.subType = subType;
     
     try
@@ -179,9 +179,9 @@ namespace Slang
         const auto& subChunk = subChunks[i];
 
         RiffHeader chunk;
-        chunk.m_type = subChunk.chunkType;
+        chunk.type = subChunk.chunkType;
         SLANG_ASSERT(subChunk.dataSize <= 0xffffffff);
-        chunk.m_size = uint32_t(subChunk.dataSize);
+        chunk.size = uint32_t(subChunk.dataSize);
 
         totalSize += calcChunkTotalSize(chunk);
     }
@@ -194,9 +194,9 @@ namespace Slang
         const auto& subChunk = subChunks[i];
 
         RiffHeader chunk;
-        chunk.m_type = subChunk.chunkType;
+        chunk.type = subChunk.chunkType;
         SLANG_ASSERT(subChunk.dataSize <= 0xffffffff);
-        chunk.m_size = uint32_t(subChunk.dataSize);
+        chunk.size = uint32_t(subChunk.dataSize);
 
         // Write the chunk
         SLANG_RETURN_ON_FAIL(writeData(&chunk, sizeof(chunk), subChunk.data, subChunk.dataSize, out));
@@ -211,7 +211,7 @@ namespace Slang
     SLANG_RETURN_ON_FAIL(readChunk(stream, outHeader.chunk));
     outHeader.subType = 0;
 
-    if (isListType(outHeader.chunk.m_type))
+    if (isListType(outHeader.chunk.type))
     {
         // Read the sub type
         try
@@ -234,13 +234,13 @@ namespace Slang
     SLANG_RETURN_ON_FAIL(readHeader(stream, outHeader));
 
     // Must be a riff container!
-    if (!isListType(outHeader.chunk.m_type))
+    if (!isListType(outHeader.chunk.type))
     {
         return SLANG_FAIL;
     }
 
     // Okay we have the header. We now need to read all of the contained chunks. Making sure we don't read past the end
-    size_t remainingSize = size_t(outHeader.chunk.m_size) - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+    size_t remainingSize = size_t(outHeader.chunk.size) - (sizeof(RiffListHeader) - sizeof(RiffHeader));
     while (remainingSize >= sizeof(RiffHeader))
     {
         // Read the contained chunk
@@ -248,18 +248,18 @@ namespace Slang
         SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
 
         remainingSize -= sizeof(RiffHeader);
-        if (remainingSize < 0 || chunk.m_size > remainingSize)
+        if (remainingSize < 0 || chunk.size > remainingSize)
         {
             return SLANG_FAIL;
         }
         
         // Allocate the space for the payload
-        void* data = ioArena.allocate(chunk.m_size);
+        void* data = ioArena.allocate(chunk.size);
 
         // Read the payload
         try
         {
-            stream->read(data, chunk.m_size);
+            stream->read(data, chunk.size);
         }
         catch (const IOException&)
         {
@@ -268,12 +268,12 @@ namespace Slang
 
         // Add to the list
         SubChunk subChunk;
-        subChunk.chunkType = chunk.m_type;
+        subChunk.chunkType = chunk.type;
         subChunk.data = data;
-        subChunk.dataSize = chunk.m_size;
+        subChunk.dataSize = chunk.size;
 
         // Decrease the remaining size
-        remainingSize -= chunk.m_size;
+        remainingSize -= chunk.size;
     }
 
     // Remaining size should be 0 for well formed riff
@@ -643,8 +643,8 @@ struct DumpVisitor : public RiffContainer::Visitor
 {
     RiffListHeader containerHeader;
 
-    containerHeader.chunk.m_type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
-    containerHeader.chunk.m_size = uint32_t(sizeof(RiffListHeader) - sizeof(RiffHeader) + container->m_payloadSize);
+    containerHeader.chunk.type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
+    containerHeader.chunk.size = uint32_t(sizeof(RiffListHeader) - sizeof(RiffHeader) + container->m_payloadSize);
     containerHeader.subType = container->m_subType;
 
     try
@@ -666,8 +666,8 @@ struct DumpVisitor : public RiffContainer::Visitor
                 // Must be a regular chunk with data
 
                 RiffHeader chunkHeader;
-                chunkHeader.m_type = dataChunk->m_type;
-                chunkHeader.m_size = uint32_t(dataChunk->m_payloadSize);
+                chunkHeader.type = dataChunk->m_type;
+                chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
 
                 stream->write(&chunkHeader, sizeof(chunkHeader));
 
@@ -703,12 +703,12 @@ struct DumpVisitor : public RiffContainer::Visitor
     {
         RiffListHeader header;
         SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
-        if (!RiffUtil::isListType(header.chunk.m_type))
+        if (!RiffUtil::isListType(header.chunk.type))
         {
             return SLANG_FAIL;
         }
 
-        remaining = header.chunk.m_size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+        remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
 
         outContainer.startChunk(Chunk::Kind::List, header.subType);
     }
@@ -733,28 +733,28 @@ struct DumpVisitor : public RiffContainer::Visitor
             RiffListHeader header;
             SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
 
-            if (header.chunk.m_type == RiffFourCC::kList)
+            if (header.chunk.type == RiffFourCC::kList)
             {
                 // Subtract the size of this chunk from remaining
                 remaining -= sizeof(RiffListHeader);
-                remaining -= (header.chunk.m_size + 3) & ~size_t(3);
+                remaining -= (header.chunk.size + 3) & ~size_t(3);
 
                 // Push it, for when we hit the end
                 remainingStack.add(remaining);
 
                 // Work out how much remains in this container
-                remaining -= (header.chunk.m_size - (sizeof(RiffListHeader) - sizeof(RiffHeader)) +  3) & ~size_t(3);
+                remaining -= (header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader)) +  3) & ~size_t(3);
 
                 // Start a container
                 outContainer.startChunk(Chunk::Kind::List, header.subType);
             }
             else
             {
-                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.m_type);
-                Data* data = outContainer.addData(header.chunk.m_size);
+                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
+                Data* data = outContainer.addData(header.chunk.size);
 
                 size_t readSize;
-                SLANG_RETURN_ON_FAIL(RiffUtil::readPayload(stream, header.chunk.m_size, data->getPayload(), readSize));
+                SLANG_RETURN_ON_FAIL(RiffUtil::readPayload(stream, header.chunk.size, data->getPayload(), readSize));
 
                 // Correct remaining
                 remaining -= sizeof(RiffHeader) + readSize;

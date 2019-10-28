@@ -84,8 +84,8 @@ struct RiffSemanticVersion
 
 struct RiffHeader
 {
-    FourCC m_type;            ///< The FourCC code that identifies this chunk
-    uint32_t m_size;          ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
+    FourCC type;                ///< The FourCC code that identifies this chunk
+    uint32_t size;              ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
 };
 
 struct RiffListHeader

@@ -843,8 +843,8 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             payloadSize = sizeof(Bin::ArrayHeader) - sizeof(RiffHeader) + typeSize * numEntries;
 
             Bin::ArrayHeader header;
-            header.m_chunk.m_type = chunkId;
-            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_chunk.type = chunkId;
+            header.m_chunk.size = uint32_t(payloadSize);
             header.m_numEntries = uint32_t(numEntries);
 
             stream->write(&header, sizeof(header));
@@ -863,8 +863,8 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(RiffHeader) + compressedPayload.getCount();
 
             Bin::CompressedArrayHeader header;
-            header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
-            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_chunk.type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
+            header.m_chunk.size = uint32_t(payloadSize);
             header.m_numEntries = uint32_t(numEntries);
             header.m_numCompressedEntries = uint32_t(numCompressedEntries);
 
@@ -1008,8 +1008,8 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             size_t payloadSize = sizeof(Bin::CompressedArrayHeader) - sizeof(RiffHeader) + compressedPayload.getCount();
 
             Bin::CompressedArrayHeader header;
-            header.m_chunk.m_type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
-            header.m_chunk.m_size = uint32_t(payloadSize);
+            header.m_chunk.type = SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId);
+            header.m_chunk.size = uint32_t(payloadSize);
             header.m_numEntries = uint32_t(array.getCount());
             header.m_numCompressedEntries = 0;          
 
@@ -1125,15 +1125,15 @@ static size_t _calcInstChunkSize(IRSerialBinary::CompressionType compressionType
 
     {
         RiffHeader riffHeader;
-        riffHeader.m_type = Bin::kRiffFourCc;
-        riffHeader.m_size = uint32_t(totalSize);
+        riffHeader.type = Bin::kRiffFourCc;
+        riffHeader.size = uint32_t(totalSize);
         
         stream->write(&riffHeader, sizeof(riffHeader));
     }
     {
         Bin::SlangHeader slangHeader;
-        slangHeader.m_chunk.m_type = Bin::kSlangFourCc;
-        slangHeader.m_chunk.m_size = uint32_t(sizeof(slangHeader) - sizeof(RiffHeader));
+        slangHeader.m_chunk.type = Bin::kSlangFourCc;
+        slangHeader.m_chunk.size = uint32_t(sizeof(slangHeader) - sizeof(RiffHeader));
         slangHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
 
         stream->write(&slangHeader, sizeof(slangHeader));
@@ -1212,7 +1212,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, c
             void* data = listOut.setSize(header.m_numEntries);
             
             // Need to read all the compressed data... 
-            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(RiffHeader));
+            size_t payloadSize = header.m_chunk.size - (sizeof(header) - sizeof(RiffHeader));
 
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
@@ -1266,7 +1266,7 @@ static Result _readArrayChunk(const IRSerialBinary::SlangHeader& header, const R
 
     Bin::CompressionType compressionType = Bin::CompressionType::None;
 
-    if (chunk.m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.m_type))
+    if (chunk.type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.type))
     {
         // If it has compression, use the compression type set in the header
         compressionType = Bin::CompressionType(header.m_compressionType);
@@ -1356,7 +1356,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
     typedef IRSerialBinary Bin;
 
     Bin::CompressionType compressionType = Bin::CompressionType::None;
-    if (chunk.m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.m_type))
+    if (chunk.type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk.type))
     {
         compressionType = Bin::CompressionType(slangHeader.m_compressionType);
     }
@@ -1378,7 +1378,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
             *numReadInOut += sizeof(header) - sizeof(RiffHeader);
             
             // Need to read all the compressed data... 
-            size_t payloadSize = header.m_chunk.m_size - (sizeof(header) - sizeof(RiffHeader));
+            size_t payloadSize = header.m_chunk.size - (sizeof(header) - sizeof(RiffHeader));
 
             List<uint8_t> compressedPayload;
             compressedPayload.setCount(payloadSize);
@@ -1419,12 +1419,12 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
     {
         RiffHeader header;
         SLANG_RETURN_ON_FAIL(RiffUtil::readChunk(stream, header));
-        if (header.m_type != Bin::kRiffFourCc)
+        if (header.type != Bin::kRiffFourCc)
         {
             return SLANG_FAIL;
         }
 
-        remainingBytes = header.m_size;
+        remainingBytes = header.size;
     }
     
     // Header
@@ -1439,7 +1439,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::SlangHeader& slangHeader
 
         size_t bytesRead = sizeof(chunk);
 
-        switch (chunk.m_type)
+        switch (chunk.type)
         {
             case Bin::kSlangFourCc:
             {
