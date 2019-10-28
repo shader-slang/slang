@@ -1223,8 +1223,14 @@ matrix<T,N,M> saturate(matrix<T,N,M> x)
 
 
 // Extract sign of value
-__generic<T : __BuiltinSignedArithmeticType> int sign(T x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<int,N> sign(vector<T,N> x);
+__generic<T : __BuiltinSignedArithmeticType>
+__target_intrinsic(glsl, "int(sign($0))")
+int sign(T x);
+
+__generic<T : __BuiltinSignedArithmeticType, let N : int>
+__target_intrinsic(glsl, "ivec$N0(sign($0))")
+vector<int,N> sign(vector<T,N> x);
+
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<int,N,M> sign(matrix<T,N,M> x);
 
 

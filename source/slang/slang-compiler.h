@@ -1444,6 +1444,9 @@ namespace Slang
 
         List<RefPtr<ComponentType>> const& getUnspecializedEntryPoints() { return m_unspecializedEntryPoints; }
 
+            /// Does the code we are compiling represent part of the Slang standard library?
+        bool m_isStandardLibraryCode = false;
+
     private:
             /// A component type that includes only the global scopes of the translation unit(s) that were compiled.
         RefPtr<ComponentType> m_globalComponentType;

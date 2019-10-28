@@ -5,13 +5,13 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
 
+#include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-reflection.h"
-#include "slang-syntax-visitors.h"
 #include "slang-type-layout.h"
 
 #include "slang-state-serialize.h"
@@ -967,6 +967,24 @@ void FrontEndCompileRequest::parseTranslationUnit(
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
+
+    // When compiling a module of code that belongs to the Slang
+    // standard library, we add a modifier to the module to act
+    // as a marker, so that downstream code can detect declarations
+    // that came from the standard library (by walking up their
+    // chain of ancestors and looking for the marker), and treat
+    // them differently from user declarations.
+    //
+    // We are adding the marker here, before we even parse the
+    // code in the module, in case the subsequent steps would
+    // like to treat the standard library differently. Alternatiely
+    // we could pass down the `m_isStandardLibraryCode` flag to
+    // these passes.
+    //
+    if( m_isStandardLibraryCode )
+    {
+        translationUnitSyntax->modifiers.first = new FromStdLibModifier();
+    }
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -2570,7 +2588,7 @@ void Session::addBuiltinSource(
     RefPtr<FrontEndCompileRequest> compileRequest = new FrontEndCompileRequest(
         m_builtinLinkage,
         &sink);
-
+    compileRequest->m_isStandardLibraryCode = true;
 
     // Set the source manager on the sink
     sink.sourceManager = sourceManager;
@@ -2601,16 +2619,6 @@ void Session::addBuiltinSource(
 
     // Extract the AST for the code we just parsed
     auto syntax = compileRequest->translationUnits[translationUnitIndex]->getModuleDecl();
-
-    // HACK(tfoley): mark all declarations in the "stdlib" so
-    // that we can detect them later (e.g., so we don't emit them)
-    for (auto m : syntax->Members)
-    {
-        auto fromStdLibModifier = new FromStdLibModifier();
-
-        fromStdLibModifier->next = m->modifiers.first;
-        m->modifiers.first = fromStdLibModifier;
-    }
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)

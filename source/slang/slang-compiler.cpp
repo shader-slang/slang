@@ -6,6 +6,7 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-hex-dump-util.h"
 
+#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-lexer.h"
 #include "slang-lower-to-ir.h"
@@ -13,7 +14,6 @@
 #include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
-#include "slang-syntax-visitors.h"
 #include "slang-type-layout.h"
 #include "slang-reflection.h"
 #include "slang-emit.h"

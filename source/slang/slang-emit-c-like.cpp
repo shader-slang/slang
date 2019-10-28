@@ -358,6 +358,18 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDe
     return isTargetIntrinsicModifierApplicable(targetName);
 }
 
+bool CLikeSourceEmitter::isTargetIntrinsicModifierBetter(IRTargetIntrinsicDecoration* candidate, IRTargetIntrinsicDecoration* existing)
+{
+    // For now, the rule is that an empty string represents a catch-all
+    // definition, which is worse than any target-specific declaration.
+    // Therefore, if the new `candidate` has a non-empty target name
+    // specified, then it is automatically better (or at least as
+    // good) as `existing`.
+    //
+    SLANG_UNUSED(existing);
+    return candidate->getTargetName().size() != 0;
+}
+
 void CLikeSourceEmitter::emitStringLiteral(String const& value)
 {
     m_writer->emit("\"");
@@ -1034,31 +1046,68 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     m_writer->emit(" = ");
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(IRInst* inst)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(IRInst* inInst)
 {
+    // An intrinsic generic function will be invoked through a `specialize` instruction,
+    // so the callee won't directly be the thing that is decorated. We will look up
+    // through specializations until we can see the actual thing being called.
+    //
+    IRInst* inst = inInst;
+    while (auto specInst = as<IRSpecialize>(inst))
+    {
+        inst = getSpecializedValue(specInst);
+
+        // If `getSpecializedValue` can't find the result value
+        // of the generic being specialized, then it returns
+        // the original instruction. This would be a disaster
+        // for use because this loop would go on forever.
+        //
+        // This case should never happen if the stdlib is well-formed
+        // and the compiler is doing its job right.
+        //
+        SLANG_ASSERT(inst != specInst);
+    }
+
+    // We will search through all the `IRTargetIntrinsicDecoration`s on
+    // the instruction, looking for those that are applicable to the
+    // current code generation target. Among the application decorations
+    // we will try to find one that is "best" in the sense that it is
+    // more (or at least as) specialized for the target than the
+    // others.
+    //
+    IRTargetIntrinsicDecoration* best = nullptr;
     for(auto dd : inst->getDecorations())
     {
         if (dd->op != kIROp_TargetIntrinsicDecoration)
             continue;
 
         auto targetIntrinsic = (IRTargetIntrinsicDecoration*)dd;
-        if (isTargetIntrinsicModifierApplicable(targetIntrinsic))
-            return targetIntrinsic;
+        if (!isTargetIntrinsicModifierApplicable(targetIntrinsic))
+            continue;
+
+        if(!best || isTargetIntrinsicModifierBetter(targetIntrinsic, best))
+            best = targetIntrinsic;
     }
 
-    return nullptr;
+    return best;
 }
 
-/* static */bool CLikeSourceEmitter::isOrdinaryName(String const& name)
+/* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)
 {
     char const* cursor = name.begin();
     char const* end = name.end();
+
+    // Consume an optional `.` at the start, which indicates
+    // the ordinary name is for a member function.
+    if(cursor != end && *cursor == '.')
+        cursor++;
 
     while(cursor != end)
     {
         int c = *cursor++;
         if( (c >= 'a') && (c <= 'z') ) continue;
         if( (c >= 'A') && (c <= 'Z') ) continue;
+        if( (c >= '0') && (c <= '9') ) continue;
         if( c == '_' ) continue;
 
         return false;
@@ -1066,9 +1115,8 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(I
     return true;
 }
 
-void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
+void CLikeSourceEmitter::emitIntrinsicCallExpr(
     IRCall*                         inst,
-    IRFunc*                         /* func */,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     EmitOpInfo const&               inOuterPrec)
 {
@@ -1081,13 +1129,27 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
     args++;
     argCount--;
 
-    auto name = String(targetIntrinsic->getDefinition());
+    auto name = targetIntrinsic->getDefinition();
 
     if(isOrdinaryName(name))
     {
         // Simple case: it is just an ordinary name, so we call it like a builtin.
         auto prec = getInfo(EmitOp::Postfix);
         bool needClose = maybeEmitParens(outerPrec, prec);
+
+        // The definition string may be an ordinary name prefixed with `.`
+        // to indicate that the operation should be called as a member
+        // function on its first operand.
+        //
+        if(name[0] == '.')
+        {
+            emitOperand(args[0].get(), leftSide(outerPrec, prec));
+            m_writer->emit(".");
+
+            name = UnownedStringSlice(name.begin() + 1, name.end());
+            args++;
+            argCount--;
+        }
 
         m_writer->emit(name);
         m_writer->emit("(");
@@ -1097,6 +1159,35 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
             emitOperand(args[aa].get(), getInfo(EmitOp::General));
         }
         m_writer->emit(")");
+
+        maybeCloseParens(needClose);
+        return;
+    }
+    else if(name == ".operator[]")
+    {
+        // The user is invoking a built-in subscript operator
+        //
+        // TODO: We might want to remove this bit of special-casing
+        // in favor of making all subscript operations in the standard
+        // library explicitly declare how they lower. On the flip
+        // side, that would require modifications to a very large
+        // number of declarations.
+
+        auto prec = getInfo(EmitOp::Postfix);
+        bool needClose = maybeEmitParens(outerPrec, prec);
+
+        Int argIndex = 0;
+
+        emitOperand(args[argIndex++].get(), leftSide(outerPrec, prec));
+        m_writer->emit("[");
+        emitOperand(args[argIndex++].get(), getInfo(EmitOp::General));
+        m_writer->emit("]");
+
+        if(argIndex < argCount)
+        {
+            m_writer->emit(" = ");
+            emitOperand(args[argIndex++].get(), getInfo(EmitOp::General));
+        }
 
         maybeCloseParens(needClose);
         return;
@@ -1516,151 +1607,6 @@ void CLikeSourceEmitter::emitTargetIntrinsicCallExpr(
     }
 }
 
-void CLikeSourceEmitter::emitIntrinsicCallExpr(
-    IRCall*             inst,
-    IRFunc*             func,
-    EmitOpInfo const&   inOuterPrec)
-{
-    auto outerPrec = inOuterPrec;
-    bool needClose = false;
-
-    // For a call with N arguments, the instruction will
-    // have N+1 operands. We will start consuming operands
-    // starting at the index 1.
-    UInt operandCount = inst->getOperandCount();
-    UInt argCount = operandCount - 1;
-    UInt operandIndex = 1;
-
-
-    //
-    if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(func))
-    {
-        emitTargetIntrinsicCallExpr(
-            inst,
-            func,
-            targetIntrinsicDecoration,
-            outerPrec);
-        return;
-    }
-
-    // Our current strategy for dealing with intrinsic
-    // calls is to "un-mangle" the mangled name, in
-    // order to figure out what the user was originally
-    // calling. This is a bit messy, and there might
-    // be better strategies (including just stuffing
-    // a pointer to the original decl onto the callee).
-
-    // If the intrinsic the user is calling is a generic,
-    // then the mangled name will have been set on the
-    // outer-most generic, and not on the leaf value
-    // (which is `func` above), so we need to walk
-    // upwards to find it.
-    //
-    IRInst* valueForName = func;
-    for(;;)
-    {
-        auto parentBlock = as<IRBlock>(valueForName->parent);
-        if(!parentBlock)
-            break;
-
-        auto parentGeneric = as<IRGeneric>(parentBlock->parent);
-        if(!parentGeneric)
-            break;
-
-        valueForName = parentGeneric;
-    }
-
-    // If we reach this point, we are assuming that the value
-    // has some kind of linkage, and thus a mangled name.
-    //
-    auto linkageDecoration = valueForName->findDecoration<IRLinkageDecoration>();
-    SLANG_ASSERT(linkageDecoration);
-    
-    // We will use the `MangledLexer` to
-    // help us split the original name into its pieces.
-    MangledLexer lexer(linkageDecoration->getMangledName());
-    
-    // We'll read through the qualified name of the
-    // symbol (e.g., `Texture2D<T>.Sample`) and then
-    // only keep the last segment of the name (e.g.,
-    // the `Sample` part).
-    auto name = lexer.readSimpleName();
-
-    // We will special-case some names here, that
-    // represent callable declarations that aren't
-    // ordinary functions, and thus may use different
-    // syntax.
-    if(name == "operator[]")
-    {
-        // The user is invoking a built-in subscript operator
-
-        auto prec = getInfo(EmitOp::Postfix);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        emitOperand(inst->getOperand(operandIndex++), leftSide(outerPrec, prec));
-        m_writer->emit("[");
-        emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
-        m_writer->emit("]");
-
-        if(operandIndex < operandCount)
-        {
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
-        }
-
-        maybeCloseParens(needClose);
-        return;
-    }
-
-    auto prec = getInfo(EmitOp::Postfix);
-    needClose = maybeEmitParens(outerPrec, prec);
-
-    // The mangled function name currently records
-    // the number of explicit parameters, and thus
-    // doesn't include the implicit `this` parameter.
-    // We can compare the argument and parameter counts
-    // to figure out whether we have a member function call.
-    UInt paramCount = lexer.readParamCount();
-
-    if(argCount != paramCount)
-    {
-        // Looks like a member function call
-        emitOperand(inst->getOperand(operandIndex), leftSide(outerPrec, prec));
-        m_writer->emit(".");
-        operandIndex++;
-    }
-    // fixing issue #602 for GLSL sign function: https://github.com/shader-slang/slang/issues/602
-    bool glslSignFix = getSourceStyle() == SourceStyle::GLSL && name == "sign";
-    if (glslSignFix)
-    {
-        if (auto vectorType = as<IRVectorType>(inst->getDataType()))
-        {
-            m_writer->emit("ivec");
-            m_writer->emit(as<IRConstant>(vectorType->getElementCount())->value.intVal);
-            m_writer->emit("(");
-        }
-        else if (auto scalarType = as<IRBasicType>(inst->getDataType()))
-        {
-            m_writer->emit("int(");
-        }
-        else
-            glslSignFix = false;
-    }
-    m_writer->emit(name);
-    m_writer->emit("(");
-    bool first = true;
-    for(; operandIndex < operandCount; ++operandIndex )
-    {
-        if(!first) m_writer->emit(", ");
-        emitOperand(inst->getOperand(operandIndex), getInfo(EmitOp::General));
-        first = false;
-    }
-    m_writer->emit(")");
-    if (glslSignFix)
-        m_writer->emit(")");
-    maybeCloseParens(needClose);
-}
-
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
@@ -1670,9 +1616,9 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
-    if(auto irFunc = asTargetIntrinsic(funcValue))
+    if(auto targetIntrinsic = findTargetIntrinsicDecoration(funcValue))
     {
-        emitIntrinsicCallExpr(inst, irFunc, outerPrec);
+        emitIntrinsicCallExpr(inst, targetIntrinsic, outerPrec);
     }
     else
     {
@@ -2728,30 +2674,11 @@ IREntryPointLayout* CLikeSourceEmitter::asEntryPoint(IRFunc* func)
 
 bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
 {
-    // For now we do this in an overly simplistic
-    // fashion: we say that *any* function declaration
-    // (rather then definition) must be an intrinsic:
-    return !isDefinition(func);
-}
-
-IRFunc* CLikeSourceEmitter::asTargetIntrinsic(IRInst* value)
-{
-    if(!value)
-        return nullptr;
-
-    while (auto specInst = as<IRSpecialize>(value))
-    {
-        value = getSpecializedValue(specInst);
-    }
-
-    if(value->op != kIROp_Func)
-        return nullptr;
-
-    IRFunc* func = (IRFunc*) value;
-    if(!isTargetIntrinsic(func))
-        return nullptr;
-
-    return func;
+    // A function is a target intrinsic if and only if
+    // it has a suitable decoration marking it as a
+    // target intrinsic for the current compilation target.
+    //
+    return findTargetIntrinsicDecoration(func) != nullptr;
 }
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
