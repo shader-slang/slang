@@ -282,8 +282,239 @@ namespace Slang
     return SLANG_OK;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::Chunk !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+namespace { // anonymous
+
+struct DumpVisitor : public RiffContainer::Visitor
+{
+    typedef RiffContainer::Chunk Chunk;
+    typedef RiffContainer::ListChunk ListChunk;
+    typedef RiffContainer::DataChunk DataChunk;
+
+
+    // Visitor
+    virtual SlangResult enterList(ListChunk* list) SLANG_OVERRIDE
+    {
+        _dumpIndent();
+        // If it's the root it's 'riff'
+        _dumpRiffType(list == m_rootChunk ? RiffFourCC::kRiff : RiffFourCC::kList);
+        m_writer.put(" ");
+        _dumpRiffType(list->m_subType);
+        m_writer.put("\n");
+        m_indent++;
+        return SLANG_OK;
+    }
+    virtual SlangResult handleData(DataChunk* data) SLANG_OVERRIDE
+    {
+        _dumpIndent();
+        // Write out the name
+        _dumpRiffType(data->m_type);
+        m_writer.put(" ");
+
+
+        int hash = data->calcHash();
+
+        // We don't know in general what the contents is or means... but we can display a hash
+        HexDumpUtil::dump(uint32_t(hash), m_writer.getWriter());
+        m_writer.put(" ");
+
+        m_writer.put("\n");
+        return SLANG_OK;
+    }
+    virtual SlangResult leaveList(ListChunk* list) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(list);
+        m_indent--;
+        return SLANG_OK;
+    }
+
+    DumpVisitor(WriterHelper writer, Chunk* rootChunk) :
+        m_writer(writer),
+        m_indent(0),
+        m_rootChunk(rootChunk)
+    {
+    }
+
+    void _dumpIndent()
+    {
+        for (int i = 0; i < m_indent; ++i)
+        {
+            m_writer.put("  ");
+        }
+    }
+    void _dumpRiffType(FourCC fourCC)
+    {
+        char c[5];
+        for (int i = 0; i < 4; ++i)
+        {
+            c[i] = char(fourCC);
+            fourCC >>= 8;
+        }
+        c[4] = 0;
+        m_writer.put(c);
+    }
+
+    Chunk* m_rootChunk;
+
+    int m_indent;
+    WriterHelper m_writer;
+};
+
+}
+
+/* static */void RiffUtil::dump(RiffContainer::Chunk* chunk, WriterHelper writer)
+{
+    DumpVisitor visitor(writer, chunk);
+    chunk->visit(&visitor);
+}
+
+/* static */SlangResult RiffUtil::write(RiffContainer::ListChunk* list, bool isRoot, Stream* stream)
+{
+    RiffListHeader listHeader;
+
+    listHeader.chunk.type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
+    listHeader.chunk.size = uint32_t(list->m_payloadSize);
+    listHeader.subType = list->m_subType;
+
+    try
+    {
+        // Write the header
+        stream->write(&listHeader, sizeof(listHeader));
+
+        // Write the contained chunks
+        Chunk* chunk = list->m_containedChunks;
+        while (chunk)
+        {
+            switch (chunk->m_kind)
+            {
+                case Chunk::Kind::List:
+                {
+                    auto listChunk = static_cast<ListChunk*>(chunk);
+                    // It's a container
+                    SLANG_RETURN_ON_FAIL(write(listChunk, false, stream));
+                    break;
+                }
+                case Chunk::Kind::Data:
+                {
+                    auto dataChunk = static_cast<DataChunk*>(chunk);
+
+                    // Must be a regular chunk with data
+                    RiffHeader chunkHeader;
+                    chunkHeader.type = dataChunk->m_type;
+                    chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
+
+                    stream->write(&chunkHeader, sizeof(chunkHeader));
+
+                    RiffContainer::Data* data = dataChunk->m_dataList;
+                    while (data)
+                    {
+                        stream->write(data->getPayload(), data->getSize());
+
+                        // Next but of data
+                        data = data->m_next;
+                    }
+
+                    // Need to write for alignment
+                    const size_t alignedSize = (dataChunk->m_payloadSize + 3) & ~size_t(3);
+                    const size_t remainingSize = alignedSize - dataChunk->m_payloadSize;
+
+                    if (remainingSize)
+                    {
+                        static const uint8_t trailing[] = { 0, 0, 0, 0};
+                        stream->write(trailing, remainingSize);
+                    }
+                }
+                default: break;
+            }
+
+            // Next
+            chunk = chunk->m_next;
+        }
+    }
+    catch (const IOException&)
+    {
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
+{
+    typedef RiffContainer::ScopeChunk ScopeChunk;
+    typedef RiffContainer::ScopeChunk ScopeContainer;
+    outContainer.reset();
+
+    size_t remaining;
+    {
+        RiffListHeader header;
+
+        SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
+        if (!RiffUtil::isListType(header.chunk.type))
+        {
+            return SLANG_FAIL;
+        }
+        remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+        outContainer.startChunk(Chunk::Kind::List, header.subType);
+    }
+
+    List<size_t> remainingStack;
+    while (true)
+    {
+        if (remaining == 0)
+        {
+            // If it's a container then we pop container
+            outContainer.endChunk();
+            if (remainingStack.getCount() <= 0)
+            {
+                break;
+            }
+
+            remaining = remainingStack.getLast();
+            remainingStack.removeLast();
+        }
+        else
+        {
+            RiffListHeader header;
+            SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
+
+            if (header.chunk.type == RiffFourCC::kList)
+            {
+                if (header.chunk.size & 3)
+                {
+                    SLANG_ASSERT(!"A list chunk can only have divisible by 4 size");
+                    return SLANG_FAIL;
+                }
+
+                // Subtract the size of this chunk from remaining of the current chunk
+                remaining -= sizeof(RiffHeader) + header.chunk.size;                
+                // Push it, for when we hit the end
+                remainingStack.add(remaining);
+
+                // Work out how much remains in this container
+                remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+
+                // Start a container
+                outContainer.startChunk(Chunk::Kind::List, header.subType);
+            }
+            else
+            {
+                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
+                RiffContainer::Data* data = outContainer.addData(header.chunk.size);
+
+                size_t readSize;
+                SLANG_RETURN_ON_FAIL(RiffUtil::readPayload(stream, header.chunk.size, data->getPayload(), readSize));
+
+                // Correct remaining
+                remaining -= sizeof(RiffHeader) + readSize;
+            }
+        }
+    }
+
+    return outContainer.isFullyConstructed() ? SLANG_OK : SLANG_FAIL;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::Chunk !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SlangResult RiffContainer::Chunk::visit(Visitor* visitor)
 {
@@ -351,7 +582,26 @@ size_t RiffContainer::Chunk::calcPayloadSize()
     }
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::ListChunk !!!!!!!!!!!!!!!!!!!!!!
+
+size_t RiffContainer::ListChunk::calcPayloadSize()
+{
+    // Have to include the part of the header not taken up by the RiffHeader
+    size_t size = sizeof(RiffListHeader) - sizeof(RiffHeader);
+    Chunk* chunk = m_containedChunks;
+    while (chunk)
+    {
+        size_t chunkSize = chunk->m_payloadSize + sizeof(RiffHeader);
+        // Align the contained chunk size
+        chunkSize = (chunkSize + 3) & ~size_t(3);
+
+        size += chunkSize;
+
+        chunk = chunk->m_next;
+    }
+    return size;
+}
+// !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::DataChunk !!!!!!!!!!!!!!!!!!!!!!
 
 int RiffContainer::DataChunk::calcHash() const
 {
@@ -374,6 +624,18 @@ int RiffContainer::DataChunk::calcHash() const
     }
 
     return hash;
+}
+
+size_t RiffContainer::DataChunk::calcPayloadSize() const
+{
+    size_t size = 0;
+    Data* data = m_dataList;
+    while (data)
+    {
+        size += data->getSize();
+        data = data->m_next;
+    }
+    return size;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -552,217 +814,6 @@ static SlangResult _calcAndSetSize(RiffContainer::Chunk* chunk, void* data)
 /* static */void RiffContainer::calcAndSetSize(Chunk* chunk)
 {
     chunk->visitPostOrder(&_calcAndSetSize, nullptr);
-}
-
-namespace { // anonymous
-
-struct DumpVisitor : public RiffContainer::Visitor
-{
-    typedef RiffContainer::Chunk Chunk;
-    typedef RiffContainer::ListChunk ListChunk;
-    typedef RiffContainer::DataChunk DataChunk;
-
-  
-    // Visitor
-    virtual SlangResult enterList(ListChunk* list) SLANG_OVERRIDE
-    {
-        _dumpIndent();
-        // If it's the root it's 'riff'
-        _dumpRiffType(list == m_rootChunk ? RiffFourCC::kRiff : RiffFourCC::kList);
-        m_writer.put(" ");
-        _dumpRiffType(list->m_subType);
-        m_writer.put("\n");
-        m_indent++;
-        return SLANG_OK;
-    }
-    virtual SlangResult handleData(DataChunk* data) SLANG_OVERRIDE
-    {
-        _dumpIndent();
-        // Write out the name
-        _dumpRiffType(data->m_type);
-        m_writer.put(" ");
-
-
-        int hash = data->calcHash();
-
-        // We don't know in general what the contents is or means... but we can display a hash
-        HexDumpUtil::dump(uint32_t(hash), m_writer.getWriter());
-        m_writer.put(" ");
-
-        m_writer.put("\n");
-        return SLANG_OK;
-    }
-    virtual SlangResult leaveList(ListChunk* list) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(list);
-        m_indent--;
-        return SLANG_OK;
-    }
-
-    DumpVisitor(WriterHelper writer, Chunk* rootChunk):
-        m_writer(writer),
-        m_indent(0),
-        m_rootChunk(rootChunk)
-    {
-    }
-
-    void _dumpIndent()
-    {
-        for (int i = 0; i < m_indent; ++i)
-        {
-            m_writer.put("  ");
-        }
-    }
-    void _dumpRiffType(FourCC fourCC)
-    {
-        char c[5];
-        for (int i = 0; i < 4; ++i)
-        {
-            c[i] = char(fourCC);
-            fourCC >>= 8;
-        }
-        c[4] = 0;
-        m_writer.put(c);
-    }
-
-    Chunk* m_rootChunk;
-
-    int m_indent;
-    WriterHelper m_writer;
-};
-
-}
-
-/* static */void RiffContainer::dump(Chunk* chunk, WriterHelper writer)
-{
-    DumpVisitor visitor(writer, chunk);
-    chunk->visit(&visitor);
-}
-
-/* static */SlangResult RiffContainer::write(ListChunk* container, bool isRoot, Stream* stream)
-{
-    RiffListHeader containerHeader;
-
-    containerHeader.chunk.type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
-    containerHeader.chunk.size = uint32_t(sizeof(RiffListHeader) - sizeof(RiffHeader) + container->m_payloadSize);
-    containerHeader.subType = container->m_subType;
-
-    try
-    {
-        // Write the header
-        stream->write(&containerHeader, sizeof(containerHeader));
-
-        // Write the contained chunks
-        Chunk* chunk = container->m_containedChunks;
-        while (chunk)
-        {
-            if (auto containerChunk = as<ListChunk>(chunk))
-            {
-                // It's a container
-                SLANG_RETURN_ON_FAIL(write(containerChunk, false, stream));
-            }
-            else if (auto dataChunk = as<DataChunk>(chunk))
-            {
-                // Must be a regular chunk with data
-
-                RiffHeader chunkHeader;
-                chunkHeader.type = dataChunk->m_type;
-                chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
-
-                stream->write(&chunkHeader, sizeof(chunkHeader));
-
-                Data* data = dataChunk->m_dataList;
-                while (data)
-                {
-                    stream->write(data->getPayload(), data->getSize());
-
-                    // Next but of data
-                    data = data->m_next;
-                }
-            }
-
-            // Next
-            chunk = chunk->m_next;
-        }
-    }
-    catch (const IOException&)
-    {
-    	return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult RiffContainer::read(Stream* stream, RiffContainer& outContainer)
-{
-    typedef RiffContainer::ScopeChunk ScopeChunk;
-    typedef RiffContainer::ScopeChunk ScopeContainer;
-    outContainer.reset();
-
-    size_t remaining;
-    {
-        RiffListHeader header;
-        SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
-        if (!RiffUtil::isListType(header.chunk.type))
-        {
-            return SLANG_FAIL;
-        }
-
-        remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
-
-        outContainer.startChunk(Chunk::Kind::List, header.subType);
-    }
-
-    List<size_t> remainingStack;
-    while (true)
-    {
-        if (remaining == 0)
-        {
-            // If it's a container then we pop container
-            outContainer.endChunk();
-            if (remainingStack.getCount() <= 0)
-            {
-                break;
-            }
-
-            remaining = remainingStack.getLast();
-            remainingStack.removeLast();
-        }
-        else
-        {
-            RiffListHeader header;
-            SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
-
-            if (header.chunk.type == RiffFourCC::kList)
-            {
-                // Subtract the size of this chunk from remaining
-                remaining -= sizeof(RiffListHeader);
-                remaining -= (header.chunk.size + 3) & ~size_t(3);
-
-                // Push it, for when we hit the end
-                remainingStack.add(remaining);
-
-                // Work out how much remains in this container
-                remaining -= (header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader)) +  3) & ~size_t(3);
-
-                // Start a container
-                outContainer.startChunk(Chunk::Kind::List, header.subType);
-            }
-            else
-            {
-                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
-                Data* data = outContainer.addData(header.chunk.size);
-
-                size_t readSize;
-                SLANG_RETURN_ON_FAIL(RiffUtil::readPayload(stream, header.chunk.size, data->getPayload(), readSize));
-
-                // Correct remaining
-                remaining -= sizeof(RiffHeader) + readSize;
-            }
-        }
-    }
-
-    return outContainer.isFullyConstructed() ? SLANG_OK : SLANG_FAIL;
 }
 
 }

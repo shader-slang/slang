@@ -55,7 +55,34 @@ static void riffUnitTest()
         SLANG_CHECK(container.isFullyConstructed());
         SLANG_CHECK(RiffContainer::isChunkOk(container.getRoot()));
 
-        //RiffContainer::dump(container.getRoot(), StdWriters::getOut());
+        {
+            StringBuilder builder;
+            {
+                StringWriter writer(&builder, 0);
+                RiffUtil::dump(container.getRoot(), &writer);
+            }
+
+            {
+                OwnedMemoryStream stream(FileAccess::ReadWrite); 
+                SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::write(container.getRoot(), true, &stream)));
+
+                stream.seek(SeekOrigin::Start, 0);
+
+                RiffContainer readContainer;
+                SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::read(&stream, readContainer)));
+
+                // Dump the read contents
+                StringBuilder readBuilder;
+                {
+                    StringWriter writer(&readBuilder, 0);
+                    RiffUtil::dump(readContainer.getRoot(), &writer);
+                }
+
+                // They should be the same
+                SLANG_CHECK(readBuilder == builder);
+            }
+        }
+
     }
 }
 

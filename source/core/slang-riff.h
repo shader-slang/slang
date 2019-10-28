@@ -16,18 +16,26 @@ typedef uint32_t FourCC;
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) FourCC((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
+struct RiffHeader
+{
+    FourCC type;                ///< The FourCC code that identifies this chunk
+    uint32_t size;              ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
+};
+
+struct RiffListHeader
+{
+    RiffHeader chunk;
+    FourCC subType;
+    // This is then followed by the contained subchunk/s
+};
+
 struct RiffFourCC
 {
         /// A 'riff' is the high level file container. It is followed by a subtype and then the contained modules
      static const FourCC kRiff = SLANG_FOUR_CC('R', 'I', 'F', 'F');
         /// A is like riff but can be contained multiple times within a file. It is also followed by a header
      static const FourCC kList = SLANG_FOUR_CC('L', 'I', 'S', 'T');
-
-
-        /// The sub type of a riff container containing modules
-     //static const FourCC kSlangModule = SLANG_FOUR_CC('S', 'L', 'm', 'o');
 };
-
 
 // Follows semantic version rules
 // https://semver.org/
@@ -82,59 +90,6 @@ struct RiffSemanticVersion
     RawType m_raw;
 };
 
-struct RiffHeader
-{
-    FourCC type;                ///< The FourCC code that identifies this chunk
-    uint32_t size;              ///< Size does *NOT* include the riff chunk size. The size can be byte sized, but on storage it will always be treated as aligned up by 4.
-};
-
-struct RiffListHeader
-{
-    RiffHeader chunk;
-    FourCC subType;
-    // This is then followed by the contained subchunk/s
-};
-
-struct RiffUtil
-{
-    struct SubChunk
-    {
-        FourCC chunkType;
-        const void* data;
-        size_t dataSize;
-    };
-
-    static int64_t calcChunkTotalSize(const RiffHeader& chunk);
-
-    static SlangResult skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut);
-
-    static SlangResult readChunk(Stream* stream, RiffHeader& outChunk);
-
-    static SlangResult writeData(const RiffHeader* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out);
-    static SlangResult readData(Stream* stream, RiffHeader* outHeader, size_t headerSize, List<uint8_t>& data);
-
-    static SlangResult readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize);
-
-        /// Total size is the size of all the contained chunks
-    static SlangResult writeListHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out);
-
-        /// Write riff with subType subtype, containing the specified chunks to stream
-    static SlangResult writeList(FourCC containerType, FourCC subType, const SubChunk* subChunks, size_t subChunkCount, Stream* out);
-
-        /// Read a riff container. The chunks memory is stored in the arena. 
-    static SlangResult readList(Stream* stream, RiffListHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks);
-
-        /// Read a header. Handles special case of list/riff types
-    static SlangResult readHeader(Stream* stream, RiffListHeader& outHeader);
-
-        /// True if the type is a container type
-    static bool isListType(FourCC type)
-    {
-        return type == RiffFourCC::kRiff || type == RiffFourCC::kList;
-    }
-
-};
-
 class RiffContainer
 {
 public:
@@ -144,7 +99,7 @@ public:
 
     struct Data
     {
-            /// Get the payload
+        /// Get the payload
         void* getPayload() { return (void*)(this + 1); }
         size_t getSize() { return m_size; }
 
@@ -206,23 +161,7 @@ public:
         }
 
             /// NOTE! Assumes all contained chunks have correct payload sizes
-        size_t calcPayloadSize()
-        {
-            // Have to include the part of the header not taken up by the RiffHeader
-            size_t size = sizeof(RiffListHeader) - sizeof(RiffHeader);
-            Chunk* chunk = m_containedChunks;
-            while (chunk)
-            {
-                size_t chunkSize = chunk->m_payloadSize + sizeof(RiffHeader);
-                // Align the contained chunk size
-                chunkSize = (chunkSize + 3) & ~size_t(3);
-
-                size += chunkSize;
-
-                chunk = chunk->m_next;
-            }
-            return size;
-        }
+        size_t calcPayloadSize();
 
         // the type can only be list or riff
         FourCC m_subType;                       ///< The subtype of this contained
@@ -233,23 +172,12 @@ public:
     struct DataChunk : public Chunk
     {
         typedef Chunk Super;
-
         SLANG_FORCE_INLINE static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
 
             /// Calculate a has
         int calcHash() const;
-
-        size_t calcPayloadSize() const
-        {
-            size_t size = 0;
-            Data* data = m_dataList;
-            while (data)
-            {
-                size += data->getSize();
-                data = data->m_next;
-            }
-            return size;
-        }
+            /// Calculate the payload size
+        size_t calcPayloadSize() const;
 
         void init(FourCC type)
         {
@@ -267,7 +195,7 @@ public:
     class ScopeChunk
     {
     public:
-        ScopeChunk(RiffContainer* container, Chunk::Kind kind, FourCC fourCC):
+        ScopeChunk(RiffContainer* container, Chunk::Kind kind, FourCC fourCC) :
             m_container(container)
         {
             container->startChunk(kind, fourCC);
@@ -285,7 +213,7 @@ public:
     public:
         virtual SlangResult enterList(ListChunk* list) = 0;
         virtual SlangResult handleData(DataChunk* data) = 0;
-        virtual SlangResult leaveList(ListChunk* list) = 0; 
+        virtual SlangResult leaveList(ListChunk* list) = 0;
     };
 
         /// Start a chunk
@@ -294,7 +222,7 @@ public:
         /// Write data into a chunk (can only be inside a Kind::Data)
     void write(const void* data, size_t size);
     Data* addData(size_t size);
-    
+
         /// End a chunk
     void endChunk();
 
@@ -307,20 +235,12 @@ public:
         /// true if has a root container, and nothing remains open
     bool isFullyConstructed() { return m_rootList && m_listChunk == nullptr && m_dataChunk == nullptr; }
 
-        /// Write a container and contents to a stream
-    static SlangResult write(ListChunk* container, bool isRoot, Stream* stream);
-
-        /// Read the stream into the container
-    static SlangResult read(Stream* stream, RiffContainer& outContainer);
-
+    
         /// The if the list and sublists appear correct
     static bool isChunkOk(Chunk* chunk);
 
         /// Traverses over chunk hierarchy and sets the sizes
     static void calcAndSetSize(Chunk* chunk);
-
-        /// Dump the structure
-    static void dump(Chunk* chunk, WriterHelper writer);
 
         /// Ctor
     RiffContainer();
@@ -329,20 +249,70 @@ protected:
     void _addChunk(Chunk* chunk);
     ListChunk* _newListChunk(FourCC subType);
     DataChunk* _newDataChunk(FourCC type);
-    
+
     ListChunk* m_rootList;          ///< Root list
 
-    ListChunk* m_listChunk;            
-    DataChunk* m_dataChunk;                 
+    ListChunk* m_listChunk;
+    DataChunk* m_dataChunk;
 
     MemoryArena m_arena;
 };
 
+// -----------------------------------------------------------------------------
 template <typename T>
 T* as(RiffContainer::Chunk* chunk)
 {
     return T::isType(chunk) ? static_cast<T*>(chunk) : nullptr;
 }
+
+
+struct RiffUtil
+{
+    typedef RiffContainer::Chunk Chunk;
+    typedef RiffContainer::ListChunk ListChunk;
+    typedef RiffContainer::DataChunk DataChunk;
+
+    struct SubChunk
+    {
+        FourCC chunkType;
+        const void* data;
+        size_t dataSize;
+    };
+
+    static int64_t calcChunkTotalSize(const RiffHeader& chunk);
+
+    static SlangResult skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut);
+
+    static SlangResult readChunk(Stream* stream, RiffHeader& outChunk);
+
+    static SlangResult writeData(const RiffHeader* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out);
+    static SlangResult readData(Stream* stream, RiffHeader* outHeader, size_t headerSize, List<uint8_t>& data);
+
+    static SlangResult readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize);
+
+        /// Total size is the size of all the contained chunks
+    static SlangResult writeListHeader(FourCC containerType, FourCC subType, size_t totalSize, Stream* out);
+
+        /// Write riff with subType subtype, containing the specified chunks to stream
+    static SlangResult writeList(FourCC containerType, FourCC subType, const SubChunk* subChunks, size_t subChunkCount, Stream* out);
+
+        /// Read a riff container. The chunks memory is stored in the arena. 
+    static SlangResult readList(Stream* stream, RiffListHeader& outHeader, MemoryArena& ioArena, List<SubChunk>& outChunks);
+
+        /// Read a header. Handles special case of list/riff types
+    static SlangResult readHeader(Stream* stream, RiffListHeader& outHeader);
+
+        /// True if the type is a container type
+    static bool isListType(FourCC type) { return type == RiffFourCC::kRiff || type == RiffFourCC::kList; }
+
+       /// Dump the chunk structure
+    static void dump(Chunk* chunk, WriterHelper writer);
+
+        /// Write a container and contents to a stream
+    static SlangResult write(ListChunk* container, bool isRoot, Stream* stream);
+        /// Read the stream into the container
+    static SlangResult read(Stream* stream, RiffContainer& outContainer);
+};
 
 }
 
