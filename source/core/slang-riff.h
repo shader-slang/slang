@@ -37,10 +37,12 @@ struct RiffListHeader
 
 struct RiffFourCC
 {
-        /// A 'riff' is the high level file container. It is followed by a subtype and then the contained modules
+        /// A 'riff' is the high level file container. It is followed by a subtype and then the contained chunks.
      static const FourCC kRiff = SLANG_FOUR_CC('R', 'I', 'F', 'F');
-        /// A is like riff but can be contained multiple times within a file. It is also followed by a header
+        /// A list is the same as a 'riff' except can be placed anywhere in hierarchy.  
      static const FourCC kList = SLANG_FOUR_CC('L', 'I', 'S', 'T');
+private:
+    RiffFourCC() = delete;
 };
 
 // Follows semantic version rules
@@ -96,6 +98,16 @@ struct RiffSemanticVersion
     RawType m_raw;
 };
 
+/* A container for data in RIFF format. Holds the contents in memory.
+
+With the data held in memory allows for adding or removing chunks at will.
+
+A future implementation does not necessarily have to be backed by memory when construction,
+as data could be written to stream, and the chunk sizes written by seeking back over the file and setting the value.
+
+In normal usage the chunk sizes are calculated during construction. If the structure is changed, the sizes may
+need to be recalculated, before serialization.  
+*/
 class RiffContainer
 {
 public:
@@ -120,7 +132,6 @@ public:
         // Followed by the payload
     };
 
-    
     struct Chunk;
     typedef SlangResult(*VisitorCallback)(Chunk* chunk, void* data);
 
@@ -205,8 +216,7 @@ public:
         typedef Chunk Super;
         SLANG_FORCE_INLINE static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
 
-        
-            /// Calculate a has
+            /// Calculate a hash (not necessarily very fast)
         int calcHash() const;
             /// Calculate the payload size
         size_t calcPayloadSize() const;
