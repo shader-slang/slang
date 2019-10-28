@@ -84,6 +84,23 @@ static void riffUnitTest()
         }
 
     }
+
+#if 0
+    {
+        RiffContainer container;
+        {
+            FileStream readStream("ambient-drop.wav", FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+            SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::read(&readStream, container)));
+            RiffUtil::dump(container.getRoot(), StdWriters::getOut());
+        }
+        // Write it
+        {
+
+            FileStream writeStream("check.wav", FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+            SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::write(container.getRoot(), true, &writeStream)));
+        }
+    }
+#endif
 }
 
 SLANG_UNIT_TEST("Riff", riffUnitTest);

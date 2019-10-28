@@ -16,6 +16,12 @@ typedef uint32_t FourCC;
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) FourCC((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
 
+enum 
+{
+    kRiffPadSize = 2,       ///< We only align to 2 bytes
+    kRiffPadMask = kRiffPadSize - 1,
+};
+
 struct RiffHeader
 {
     FourCC type;                ///< The FourCC code that identifies this chunk
@@ -114,6 +120,7 @@ public:
         // Followed by the payload
     };
 
+    
     struct Chunk;
     typedef SlangResult(*VisitorCallback)(Chunk* chunk, void* data);
 
@@ -136,9 +143,20 @@ public:
 
         SlangResult visit(Visitor* visitor);
         SlangResult visitPostOrder(VisitorCallback callback, void* data);
+        SlangResult visitPreOrder(VisitorCallback callback, void* data);
+
+            /// Returns a single data chunk
+        Data* getSingleData() const;
+
+            /// Get the unique type
+        FourCC getUniqueType() const;
 
         size_t calcPayloadSize();
 
+        // TODO(JS):
+        // We might want to consider moving subType/type to the Chunk, because in practice they typically
+        // mean the same thing, and as it has been arranged, for list chunk the overall chunk type is implied
+        // by the kind.
         Kind m_kind;                      ///< Kind of chunk
         size_t m_payloadSize;             ///< The payload size (ie does NOT include RiffChunk header). 
         Chunk* m_next;                    ///< Next chunk in this list
@@ -160,10 +178,23 @@ public:
             m_payloadSize = uint32_t(sizeof(RiffListHeader) - sizeof(RiffHeader));
         }
 
+            /// Finds chunk (list or data) that matches type. For List/Riff, type is the subtype
+        Chunk* findContained(FourCC type) const;
+
+        void* findContainedData(FourCC type, size_t minSize) const;
+
+            /// Finds the contained data. NOTE! Assumes that there is only as single data block, and will return nullptr if there is not
+        Data* findContainedData(FourCC type) const;
+
+        template <typename T>
+        T* findContainedData(FourCC type) const { return (T*)findContainedData(type, sizeof(T)); }
+
+            /// Find the list (including self) that matches subtype recursively
+        ListChunk* findListRec(FourCC subType);
+
             /// NOTE! Assumes all contained chunks have correct payload sizes
         size_t calcPayloadSize();
 
-        // the type can only be list or riff
         FourCC m_subType;                       ///< The subtype of this contained
         Chunk* m_containedChunks;               ///< The contained chunks
         Chunk* m_endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
@@ -174,10 +205,14 @@ public:
         typedef Chunk Super;
         SLANG_FORCE_INLINE static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
 
+        
             /// Calculate a has
         int calcHash() const;
             /// Calculate the payload size
         size_t calcPayloadSize() const;
+
+            /// Get single data payload.
+        Data* getSingleData() const;
 
         void init(FourCC type)
         {
@@ -235,7 +270,6 @@ public:
         /// true if has a root container, and nothing remains open
     bool isFullyConstructed() { return m_rootList && m_listChunk == nullptr && m_dataChunk == nullptr; }
 
-    
         /// The if the list and sublists appear correct
     static bool isChunkOk(Chunk* chunk);
 
@@ -258,6 +292,11 @@ protected:
     MemoryArena m_arena;
 };
 
+// -----------------------------------------------------------------------------
+SLANG_FORCE_INLINE FourCC RiffContainer::Chunk::getUniqueType() const
+{
+    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->m_type : static_cast<const ListChunk*>(this)->m_subType;
+}
 // -----------------------------------------------------------------------------
 template <typename T>
 T* as(RiffContainer::Chunk* chunk)
@@ -307,6 +346,9 @@ struct RiffUtil
 
        /// Dump the chunk structure
     static void dump(Chunk* chunk, WriterHelper writer);
+
+        /// Get the size taking into account padding
+    static size_t getPadSize(size_t in) { return (in + kRiffPadMask) & ~size_t(kRiffPadMask); }
 
         /// Write a container and contents to a stream
     static SlangResult write(ListChunk* container, bool isRoot, Stream* stream);

@@ -9,8 +9,8 @@ namespace Slang
 
 /* static */int64_t RiffUtil::calcChunkTotalSize(const RiffHeader& chunk)
 {
-    int64_t size = chunk.size + sizeof(RiffHeader);
-    return (size + 3) & ~int64_t(3);
+    size_t size = chunk.size + sizeof(RiffHeader);
+    return getPadSize(size);
 }
 
 /* static */SlangResult RiffUtil::skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut)
@@ -25,7 +25,6 @@ namespace Slang
     stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffHeader));
     return SLANG_OK;
 }
-
 
 /* static */SlangResult RiffUtil::readChunk(Stream* stream, RiffHeader& outChunk)
 {
@@ -48,7 +47,6 @@ namespace Slang
 {
     SLANG_ASSERT(uint64_t(payloadSize) <= uint64_t(0xfffffffff));
     SLANG_ASSERT(headerSize >= sizeof(RiffHeader));
-    SLANG_ASSERT((headerSize & 3) == 0);
 
     // TODO(JS): Could handle endianness here
 
@@ -72,11 +70,11 @@ namespace Slang
         out->write(payload, payloadSize);
 
         // The riff spec requires all chunks are 4 byte aligned (even if size is not)
-        size_t remaining = payloadSize & 3;
-        if (remaining)
+        size_t padSize = getPadSize(payloadSize);
+        if (padSize - payloadSize)
         {
-            uint8_t end[4] = { 0, 0, 0, 0};
-            out->write(end, 4 - remaining);
+            uint8_t end[kRiffPadSize] = { 0 };
+            out->write(end, padSize - payloadSize);
         }
     }
     catch (IOException&)
@@ -93,14 +91,13 @@ namespace Slang
     try
     {
         stream->read(outData, size);
-        const size_t readSize = (size + 3) & ~size_t(3);
-
+        const size_t alignedSize = getPadSize(size);
         // Skip to the alignment
-        if (readSize > size)
+        if (alignedSize > size)
         {
-            stream->seek(SeekOrigin::Current, readSize - size);
+            stream->seek(SeekOrigin::Current, alignedSize - size);
         }
-        outReadSize = readSize;
+        outReadSize = alignedSize;
     }
     catch (IOException&)
     {
@@ -415,12 +412,11 @@ struct DumpVisitor : public RiffContainer::Visitor
                     }
 
                     // Need to write for alignment
-                    const size_t alignedSize = (dataChunk->m_payloadSize + 3) & ~size_t(3);
-                    const size_t remainingSize = alignedSize - dataChunk->m_payloadSize;
+                    const size_t remainingSize = getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
 
                     if (remainingSize)
                     {
-                        static const uint8_t trailing[] = { 0, 0, 0, 0};
+                        static const uint8_t trailing[kRiffPadSize] = { 0 };
                         stream->write(trailing, remainingSize);
                     }
                 }
@@ -449,18 +445,20 @@ struct DumpVisitor : public RiffContainer::Visitor
     {
         RiffListHeader header;
 
-        SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
-        if (!RiffUtil::isListType(header.chunk.type))
+        SLANG_RETURN_ON_FAIL(readHeader(stream, header));
+        if (!isListType(header.chunk.type))
         {
             return SLANG_FAIL;
         }
-        remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+
+        remaining = getPadSize(header.chunk.size) - (sizeof(RiffListHeader) - sizeof(RiffHeader));
         outContainer.startChunk(Chunk::Kind::List, header.subType);
     }
 
     List<size_t> remainingStack;
     while (true)
     {
+        // It must be the end
         if (remaining == 0)
         {
             // If it's a container then we pop container
@@ -476,23 +474,32 @@ struct DumpVisitor : public RiffContainer::Visitor
         else
         {
             RiffListHeader header;
-            SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(stream, header));
+            SLANG_RETURN_ON_FAIL(readHeader(stream, header));
+
+            // The amount of data can't be larger than what remains
+            if (header.chunk.size > remaining)
+            {
+                return SLANG_FAIL;
+            }
 
             if (header.chunk.type == RiffFourCC::kList)
             {
-                if (header.chunk.size & 3)
+                if (header.chunk.size & kRiffPadMask)
                 {
-                    SLANG_ASSERT(!"A list chunk can only have divisible by 4 size");
+                    SLANG_ASSERT(!"A list chunk can only have divisible by 2 size");
                     return SLANG_FAIL;
                 }
 
+                // Work out the pad size
+                const size_t padSize = getPadSize(header.chunk.size);
+
                 // Subtract the size of this chunk from remaining of the current chunk
-                remaining -= sizeof(RiffHeader) + header.chunk.size;                
+                remaining -= sizeof(RiffHeader) + padSize;                
                 // Push it, for when we hit the end
                 remainingStack.add(remaining);
 
                 // Work out how much remains in this container
-                remaining = header.chunk.size - (sizeof(RiffListHeader) - sizeof(RiffHeader));
+                remaining = padSize - (sizeof(RiffListHeader) - sizeof(RiffHeader));
 
                 // Start a container
                 outContainer.startChunk(Chunk::Kind::List, header.subType);
@@ -503,7 +510,10 @@ struct DumpVisitor : public RiffContainer::Visitor
                 RiffContainer::Data* data = outContainer.addData(header.chunk.size);
 
                 size_t readSize;
-                SLANG_RETURN_ON_FAIL(RiffUtil::readPayload(stream, header.chunk.size, data->getPayload(), readSize));
+                SLANG_RETURN_ON_FAIL(readPayload(stream, header.chunk.size, data->getPayload(), readSize));
+
+                // All read sizes must end up aligned
+                SLANG_ASSERT((readSize & kRiffPadMask) == 0);
 
                 // Correct remaining
                 remaining -= sizeof(RiffHeader) + readSize;
@@ -544,6 +554,33 @@ SlangResult RiffContainer::Chunk::visit(Visitor* visitor)
     }
 }
 
+SlangResult RiffContainer::Chunk::visitPreOrder(VisitorCallback callback, void* data)
+{
+    switch (m_kind)
+    {
+        case Kind::Data:
+        {
+            return callback(this, data);
+        }
+        case Kind::List:
+        {
+            auto list = static_cast<ListChunk*>(this);
+            // Do this containing node first
+            SLANG_RETURN_ON_FAIL(callback(this, data));
+
+            // Do the contents next
+            Chunk* chunk = list->m_containedChunks;
+            while (chunk)
+            {
+                SLANG_RETURN_ON_FAIL(chunk->visitPreOrder(callback, data));
+                chunk = chunk->m_next;
+            }
+            return SLANG_OK;
+        }
+        default: return SLANG_FAIL;
+    }
+}
+
 SlangResult RiffContainer::Chunk::visitPostOrder(VisitorCallback callback, void* data)
 {
     switch (m_kind)
@@ -563,7 +600,6 @@ SlangResult RiffContainer::Chunk::visitPostOrder(VisitorCallback callback, void*
                 SLANG_RETURN_ON_FAIL(chunk->visitPostOrder(callback, data));
                 chunk = chunk->m_next;
             }
-
             // Then the list node (so a post order)
             SLANG_RETURN_ON_FAIL(callback(this, data));
             return SLANG_OK;
@@ -582,6 +618,11 @@ size_t RiffContainer::Chunk::calcPayloadSize()
     }
 }
 
+RiffContainer::Data* RiffContainer::Chunk::getSingleData() const
+{
+    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->getSingleData(): nullptr;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::ListChunk !!!!!!!!!!!!!!!!!!!!!!
 
 size_t RiffContainer::ListChunk::calcPayloadSize()
@@ -593,15 +634,96 @@ size_t RiffContainer::ListChunk::calcPayloadSize()
     {
         size_t chunkSize = chunk->m_payloadSize + sizeof(RiffHeader);
         // Align the contained chunk size
-        chunkSize = (chunkSize + 3) & ~size_t(3);
-
-        size += chunkSize;
+        size += RiffUtil::getPadSize(chunkSize);
 
         chunk = chunk->m_next;
     }
     return size;
 }
+
+RiffContainer::Chunk* RiffContainer::ListChunk::findContained(FourCC type) const
+{
+    Chunk* chunk = m_containedChunks;
+    while (chunk)
+    {
+        const FourCC checkType = (chunk->m_kind  == Chunk::Kind::Data) ?
+            static_cast<RiffContainer::DataChunk*>(chunk)->m_type :
+            static_cast<RiffContainer::ListChunk*>(chunk)->m_subType;
+        if (checkType == type)
+        {
+            return chunk;
+        }
+        chunk = chunk->m_next;
+    }
+    return nullptr;
+}
+
+RiffContainer::Data* RiffContainer::ListChunk::findContainedData(FourCC type) const
+{
+    Chunk* found = findContained(type);
+    if (found && found->m_kind == Kind::Data)
+    {
+        DataChunk* dataChunk = static_cast<DataChunk*>(found);
+        // Assumes that there is a single data chunk
+
+        Data* data = dataChunk->m_dataList;
+        if (data && data->m_next == nullptr)
+        {
+            return data;
+        }
+    }
+    return nullptr;
+}
+
+void* RiffContainer::ListChunk::findContainedData(FourCC type, size_t minSize) const
+{
+    Data* data = findContainedData(type);
+    return (data && data->m_size >= minSize) ? data->getPayload() : nullptr;
+}
+
+static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, FourCC subType)
+{
+    RiffContainer::Chunk* chunk = list->m_containedChunks;
+    while (chunk)
+    {
+        if (auto childList = as<RiffContainer::ListChunk>(chunk))
+        {
+            // Test if the child is the subtype, if so we are done
+            if (childList->m_subType == subType)
+            {
+                return childList;
+            }
+            auto found = _findListRec(childList, subType);
+            if (found)
+            {
+                return found;
+            }
+        }
+        chunk = chunk->m_next;
+    }
+    return nullptr;
+}
+
+/* static */RiffContainer::ListChunk* RiffContainer::ListChunk::findListRec(FourCC subType)
+{
+    return (m_subType == subType) ? this : _findListRec(this, subType);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::DataChunk !!!!!!!!!!!!!!!!!!!!!!
+
+RiffContainer::Data* RiffContainer::DataChunk::getSingleData() const
+{
+    if (m_kind == Kind::Data)
+    {
+        auto dataChunk = static_cast<const DataChunk*>(this);
+        Data* data = dataChunk->m_dataList;
+        if (data && data->m_next == nullptr)
+        {
+            return data;
+        }
+    }
+    return nullptr;
+}
 
 int RiffContainer::DataChunk::calcHash() const
 {
@@ -754,8 +876,8 @@ void RiffContainer::endChunk()
 
     if (parent)
     {
-        // Fix the size taking into account the 4 bytes alignment requirement
-        chunkPayloadSize = (chunkPayloadSize + 3) & ~size_t(3);
+        // Fix the size taking into account padding bytes requirement
+        chunkPayloadSize = RiffUtil::getPadSize(chunkPayloadSize);
         // Update the parents size
         parent->m_payloadSize += sizeof(RiffHeader) + chunkPayloadSize;
     }
@@ -815,5 +937,7 @@ static SlangResult _calcAndSetSize(RiffContainer::Chunk* chunk, void* data)
 {
     chunk->visitPostOrder(&_calcAndSetSize, nullptr);
 }
+
+
 
 }
