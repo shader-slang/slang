@@ -208,16 +208,9 @@ namespace Slang
         Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
     };
 
-    enum class CheckingPhase
-    {
-        Header, Body
-    };
-
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
-        CheckingPhase checkingPhase = CheckingPhase::Header;
-
         Linkage* m_linkage = nullptr;
         DiagnosticSink* m_sink = nullptr;
 
@@ -258,16 +251,6 @@ namespace Slang
         SharedSemanticsContext* m_shared = nullptr;
 
         SharedSemanticsContext* getShared() { return m_shared; }
-
-        CheckingPhase getCheckingPhase() { return m_shared->checkingPhase; }
-        DeclCheckState getCheckedState()
-        {
-            if (getCheckingPhase() == CheckingPhase::Body)
-                return DeclCheckState::Checked;
-            else
-                return DeclCheckState::CheckedHeader;
-        }
-
 
         DiagnosticSink* getSink() { return m_shared->getSink(); }
 
@@ -407,19 +390,38 @@ namespace Slang
             DeclRef<GenericDecl>        genericDeclRef,
             List<RefPtr<Expr>> const&   args);
 
-        // This routine is a bottleneck for all declaration checking,
+        // These routines are bottlenecks for semantic checking,
         // so that we can add some quality-of-life features for users
         // in cases where the compiler crashes
-        void dispatchDecl(DeclBase* decl);
+        //
         void dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts);
         void dispatchExpr(Expr* expr);
 
-        // Make sure a declaration has been checked, so we can refer to it.
-        // Note that this may lead to us recursively invoking checking,
-        // so this may not be the best way to handle things.
-        void EnsureDecl(RefPtr<Decl> decl, DeclCheckState state);
+            /// Ensure that a declaration has been checked up to some state
+            /// (aka, a phase of semantic checking) so that we can safely
+            /// perform certain operations on it.
+            ///
+            /// Calling `ensureDecl` may cause the type-checker to recursively
+            /// start checking `decl` on top of the stack that is already
+            /// doing other semantic checking. Care should be taken when relying
+            /// on this function to avoid blowing out the stack or (even worse
+            /// creating a circular dependency).
+            ///
+        void ensureDecl(Decl* decl, DeclCheckState state);
 
-        void EnusreAllDeclsRec(RefPtr<Decl> decl);
+            /// Helper routine allowing `ensureDecl` to be called on a `DeclRef`
+        void ensureDecl(DeclRefBase const& declRef, DeclCheckState state)
+        {
+            ensureDecl(declRef.getDecl(), state);
+        }
+
+            /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
+            ///
+            /// `DeclBase` is the base clas of `Decl` and `DeclGroup`. When
+            /// called on a `DeclGroup` this function just calls `ensureDecl()`
+            /// on each declaration in the group.
+            ///
+        void ensureDeclBase(DeclBase* decl, DeclCheckState state);
 
         // A "proper" type is one that can be used as the type of an expression.
         // Put simply, it can be a concrete type like `int`, or a generic
@@ -637,14 +639,8 @@ namespace Slang
             RefPtr<Type>    toType,
             RefPtr<Expr>    fromExpr);
 
-        void CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl);
-
         // Fill in default substitutions for the 'subtype' part of a type constraint decl
         void CheckConstraintSubType(TypeExp& typeExp);
-
-        void CheckGenericConstraintDecl(GenericTypeConstraintDecl* decl);
-
-        void checkDecl(Decl* decl);
 
         void checkGenericDeclHeader(GenericDecl* genericDecl);
 
@@ -680,9 +676,6 @@ namespace Slang
             ModifiableSyntaxNode*   syntaxNode);
 
         void checkModifiers(ModifiableSyntaxNode* syntaxNode);
-
-            /// Perform checking of interface conformaces for this decl and all its children
-        void checkInterfaceConformancesRec(Decl* decl);
 
         bool doesSignatureMatchRequirement(
             DeclRef<CallableDecl>   satisfyingMemberDeclRef,
@@ -768,8 +761,6 @@ namespace Slang
 
         void checkAggTypeConformance(AggTypeDecl* decl);
 
-        void visitAggTypeDecl(AggTypeDecl* decl);
-
         bool isIntegerBaseType(BaseType baseType);
 
         // Validate that `type` is a suitable type to use
@@ -797,8 +788,6 @@ namespace Slang
             GenericDecl* genericDecl);
 
         void ValidateFunctionRedeclaration(FuncDecl* funcDecl);
-
-        void VisitFunctionDeclaration(FuncDecl *functionNode);
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr);
 
@@ -1419,11 +1408,10 @@ namespace Slang
         void visitExpressionStmt(ExpressionStmt *stmt);
     };
 
-    struct SemanticsDeclVisitor
+    struct SemanticsDeclVisitorBase
         : public SemanticsVisitor
-        , DeclVisitor<SemanticsDeclVisitor>
     {
-        SemanticsDeclVisitor(SharedSemanticsContext* shared)
+        SemanticsDeclVisitorBase(SharedSemanticsContext* shared)
             : SemanticsVisitor(shared)
         {}
 
@@ -1432,56 +1420,6 @@ namespace Slang
             checkStmt(stmt, parentDecl, nullptr);
         }
 
-        void visitGenericDecl(GenericDecl* genericDecl);
-
-        void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl * genericConstraintDecl);
-
-        void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
-
-        void visitSyntaxDecl(SyntaxDecl*);
-
-        void visitAttributeDecl(AttributeDecl*);
-
-        void visitGenericTypeParamDecl(GenericTypeParamDecl*);
-
-        void visitGenericValueParamDecl(GenericValueParamDecl*);
-
-        void visitModuleDecl(ModuleDecl* programNode);
-
-        void visitAggTypeDecl(AggTypeDecl* decl);
-
-        void visitEnumDecl(EnumDecl* decl);
-
-        void visitEnumCaseDecl(EnumCaseDecl* decl);
-
-        void visitDeclGroup(DeclGroup* declGroup);
-
-        void visitTypeDefDecl(TypeDefDecl* decl);
-
-        void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl);
-
-        void visitAssocTypeDecl(AssocTypeDecl* decl);
-
-        void visitFuncDecl(FuncDecl* functionNode);
-
-        void visitScopeDecl(ScopeDecl*);
-
-        void visitParamDecl(ParamDecl* paramDecl);
-
-        void visitVarDecl(VarDecl* varDecl);
-
-        void registerExtension(ExtensionDecl* decl);
-
-        void visitExtensionDecl(ExtensionDecl* decl);
-
-        void visitConstructorDecl(ConstructorDecl* decl);
-
-        void visitSubscriptDecl(SubscriptDecl* decl);
-
-        void visitAccessorDecl(AccessorDecl* decl);
-
-        void visitEmptyDecl(EmptyDecl* /*decl*/);
-
-        void visitImportDecl(ImportDecl* decl);
+        void checkModule(ModuleDecl* programNode);
     };
 }

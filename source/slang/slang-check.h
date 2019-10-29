@@ -35,4 +35,5 @@ namespace Slang
         DiagnosticSink*     sink);
 
     bool isGlobalShaderParameter(VarDeclBase* decl);
+    bool isFromStdLib(Decl* decl);
 }

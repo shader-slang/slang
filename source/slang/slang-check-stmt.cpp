@@ -44,17 +44,17 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     {
-        // We directly dispatch here instead of using `EnsureDecl()` for two
-        // reasons:
+        // When we encounter a declaration during statement checking,
+        // we expect that it hasn't been checked yet (because otherwise
+        // it would be referenced before its declaration point), but
+        // we will bottleneck through the `ensureDecl()` path anyway,
+        // to unify with the rest of semantic checking.
         //
-        // 1. We expect that a local declaration won't have been referenced
-        // before it is declared, so that we can just check things in-order
+        // TODO: This logic might not suffice for something like a
+        // local `struct` declaration, where it would have members
+        // that need to be recursively checked.
         //
-        // 2. `EnsureDecl()` is specialized for `Decl*` instead of `DeclBase*`
-        // and trying to special case `DeclGroup*` here feels silly.
-        //
-        dispatchDecl(stmt->decl);
-        checkModifiers(stmt->decl);
+        ensureDeclBase(stmt->decl, DeclCheckState::Checked);
     }
 
     void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)

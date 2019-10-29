@@ -188,7 +188,7 @@ namespace Slang
             //
 
             auto genericDeclRef = genericDeclRefType->GetDeclRef();
-            checkDecl(genericDeclRef.decl);
+            ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
             List<RefPtr<Expr>> args;
             for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
             {

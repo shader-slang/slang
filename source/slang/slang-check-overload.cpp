@@ -600,7 +600,7 @@ namespace Slang
         OverloadResolveContext&		context)
     {
         auto funcDecl = funcDeclRef.getDecl();
-        checkDecl(funcDecl);
+        ensureDecl(funcDecl, DeclCheckState::CanUseFuncSignature);
 
         // If this function is a redeclaration,
         // then we don't want to include it multiple times,
@@ -659,7 +659,7 @@ namespace Slang
         OverloadResolveContext&     context,
         RefPtr<Type>                resultType)
     {
-        checkDecl(ctorDeclRef.getDecl());
+        ensureDecl(ctorDeclRef, DeclCheckState::CanUseFuncSignature);
 
         // `typeItem` refers to the type being constructed (the thing
         // that was applied as a function) so we need to construct
@@ -684,7 +684,7 @@ namespace Slang
         DeclRef<GenericDecl>    genericDeclRef,
         OverloadResolveContext& context)
     {
-        checkDecl(genericDeclRef.getDecl());
+        ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
 
         ConstraintSystem constraints;
         constraints.loc = context.loc;
@@ -1341,7 +1341,7 @@ namespace Slang
     {
         if (auto genericDeclRef = baseItem.declRef.as<GenericDecl>())
         {
-            checkDecl(genericDeclRef.getDecl());
+            ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
 
             OverloadCandidate candidate;
             candidate.flavor = OverloadCandidate::Flavor::Generic;

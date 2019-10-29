@@ -2021,7 +2021,15 @@ void Type::accept(IValVisitor* visitor, void* extra)
         RefPtr<Decl>                decl,
         RefPtr<MagicTypeModifier>   modifier)
     {
-        session->magicDecls[modifier->name] = decl.Ptr();
+        // In some cases the modifier will have been applied to the
+        // "inner" declaration of a `GenericDecl`, but what we
+        // actually want to register is the generic itself.
+        //
+        auto declToRegister = decl;
+        if(auto genericDecl = as<GenericDecl>(decl->ParentDecl))
+            declToRegister = genericDecl;
+
+        session->magicDecls[modifier->name] = declToRegister.Ptr();
     }
 
     RefPtr<Decl> findMagicDecl(

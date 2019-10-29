@@ -1562,7 +1562,7 @@ namespace Slang
             }
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
-                checkDecl(aggTypeDecl);
+                ensureDecl(aggTypeDecl, DeclCheckState::CanUseAsType);
 
                 // Okay, we are using `this` in the context of an
                 // aggregate type, so the expression should be
@@ -1574,7 +1574,7 @@ namespace Slang
             }
             else if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
             {
-                checkDecl(extensionDecl);
+                ensureDecl(extensionDecl, DeclCheckState::CanUseExtensionTargetType);
 
                 // When `this` is used in the context of an `extension`
                 // declaration, then it should refer to an instance of
