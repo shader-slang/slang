@@ -258,6 +258,42 @@ MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
     return block;
 }
 
+void MemoryArena::addExternalBlock(void* inData, size_t size)
+{
+    // Allocate block
+    Block* block = (Block*)m_blockFreeList.allocate();
+    if (!block)
+    {
+        return;
+    }
+
+    uint8_t* alloc = (uint8_t*)inData;
+
+    const size_t alignMask = m_blockAlignment - 1;
+
+    // Do the alignment on the allocation
+    uint8_t* const start = (uint8_t*)((size_t(alloc) + alignMask) & ~alignMask);
+
+    // Setup the block
+    block->m_alloc = alloc;
+    block->m_start = start;
+    block->m_end = alloc + size;
+    block->m_next = nullptr;
+
+    // We don't want to place at start, if there is any used blocks - as that is the one
+    // that is being split from and can be rewound. So we place just behind in that case
+    if (m_usedBlocks)
+    {
+        block->m_next = m_usedBlocks->m_next;
+        m_usedBlocks->m_next = block;
+    }
+    else
+    {
+        // There aren't any blocks, so just place at the front
+        m_usedBlocks = block;
+    }
+}
+
 void* MemoryArena::_allocateAlignedFromNewBlockAndZero(size_t sizeInBytes, size_t alignment)
 {
     void* mem = _allocateAlignedFromNewBlock(sizeInBytes, alignment);
