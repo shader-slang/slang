@@ -28,7 +28,7 @@ struct StateSerializeUtil
 
     struct Header
     {
-        RiffChunk m_chunk;                              ///< The chunk 
+        RiffHeader m_chunk;                              ///< The chunk 
         RiffSemanticVersion m_semanticVersion;          ///< The semantic version
         uint32_t m_typeHash;                            ///< A hash based on the binary representation. If doesn't match then not binary compatible (extra check over semantic versioning)
     };

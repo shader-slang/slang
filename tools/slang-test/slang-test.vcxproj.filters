@@ -59,6 +59,9 @@
     <ClCompile Include="unit-test-path.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="unit-test-riff.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="unit-test-string.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

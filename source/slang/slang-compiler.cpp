@@ -2183,7 +2183,58 @@ SlangResult dissassembleDXILUsingDXC(
         }
     }
 
+    static SlangResult _writeContainerFile(
+        EndToEndCompileRequest* endToEndReq,
+        Stream* stream)
+    {
+        SLANG_UNUSED(stream);
 
+        auto linkage = endToEndReq->getLinkage();
+        auto sink = endToEndReq->getSink();
+        auto frontEndReq = endToEndReq->getFrontEndReq();
+
+        for (auto translationUnit : frontEndReq->translationUnits)
+        {
+            auto module = translationUnit->module;
+            auto irModule = module->getIRModule();
+
+            SLANG_UNUSED(irModule);
+
+            // Okay, we need to serialize this module to our container file,
+            // including both its name and generated IR code.
+        }
+
+        auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
+
+        
+
+        // TODO: in the case where we have specialization, we might need
+        // to serialize IR related to `program`...
+
+        for (auto target : linkage->targets)
+        {
+            auto targetProgram = program->getTargetProgram(target);
+            auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
+
+            // Okay, we need to serialize this target program and its IR too...
+        }
+
+        return SLANG_OK;
+    }
+
+        /// Write out a "container" file with the stuff that has
+        /// been compiled as part of this request.
+        ///
+    static void _writeContainerFile(
+        EndToEndCompileRequest* endToEndReq,
+        const String& fileName)
+    {
+        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        if (SLANG_FAILED(_writeContainerFile(endToEndReq, &stream)))
+        {
+            endToEndReq->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
+        }
+    }
 
     static void _generateOutput(
         BackEndCompileRequest* compileRequest,
@@ -2228,6 +2279,11 @@ SlangResult dissassembleDXILUsingDXC(
                         targetReq,
                         ee);
                 }
+            }
+
+            if (compileRequest->containerOutputPath.getLength() != 0)
+            {
+                _writeContainerFile(compileRequest, compileRequest->containerOutputPath);
             }
         }
     }

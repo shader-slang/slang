@@ -969,7 +969,7 @@ struct LoadContext
     SLANG_RETURN_ON_FAIL(store(request, container, requestState));
 
     Header header;
-    header.m_chunk.m_type = kSlangStateFourCC;
+    header.m_chunk.type = kSlangStateFourCC;
     header.m_semanticVersion = g_semanticVersion;
     header.m_typeHash = _getTypeHash();
 
@@ -1002,7 +1002,7 @@ struct LoadContext
     Header header;
 
     SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer));
-    if (header.m_chunk.m_type != kSlangStateFourCC)
+    if (header.m_chunk.type != kSlangStateFourCC)
     {
         return SLANG_FAIL;
     }

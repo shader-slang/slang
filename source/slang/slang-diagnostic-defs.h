@@ -110,6 +110,7 @@ DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple 
 
 DIAGNOSTIC(    81, Error, parametersAfterLoadReproIgnored, "parameters after -load-repro [file] are ignored")
 DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'");
+DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'");
 
 //
 // 1xxxx - Lexical anaylsis

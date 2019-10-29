@@ -351,7 +351,6 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
 
 struct IRSerialBinary
 {
-
     enum class CompressionType
     {
         None,
@@ -359,7 +358,10 @@ struct IRSerialBinary
     };
 
     static const uint32_t kRiffFourCc = RiffFourCC::kRiff;
-    static const uint32_t kSlangFourCc = SLANG_FOUR_CC('S', 'L', 'N', 'G');             ///< Holds all the slang specific chunks
+
+    static const uint32_t kSlangModuleFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'd');             ///< Holds all the slang specific chunks
+
+    static const uint32_t kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
 
     static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
     static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
@@ -379,19 +381,16 @@ struct IRSerialBinary
     static const uint32_t kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
     static const uint32_t kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
 
-    struct SlangHeader
+    struct ModuleHeader
     {
-        RiffChunk m_chunk;
         uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader
     {
-        RiffChunk m_chunk;
         uint32_t m_numEntries;
     };
     struct CompressedArrayHeader
     {
-        RiffChunk m_chunk;
         uint32_t m_numEntries;              ///< The number of entries
         uint32_t m_numCompressedEntries;    ///< The amount of compressed entries
     };
@@ -418,6 +417,9 @@ struct IRSerialWriter
   
     static Result writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream);
 
+        /// Write to a container
+    static Result writeContainer(const IRSerialData& data, Bin::CompressionType compressionType, RiffContainer* container);
+    
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const { return inst ? Ser::InstIndex(m_instMap[inst]) : Ser::InstIndex(0); }
 
@@ -498,6 +500,9 @@ struct IRSerialReader
 
         /// Read a stream to fill in dataOut IRSerialData
     static Result readStream(Stream* stream, IRSerialData* dataOut);
+
+        /// Read a stream to fill in dataOut IRSerialData
+    static Result readContainer(RiffContainer::ListChunk* module, IRSerialData* outData);
 
         /// Read a module from serial data
     Result read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut);
