@@ -3,26 +3,28 @@
 // A test to try out the basics of module
 // serialization.
 
-//TEST:SERIALIZED_MODULE:
-
+//DISABLE_TEST:SERIALIZED_MODULE:
+//TEST:COMPARE_COMPUTE_EX:-slang -compute
 
 #ifdef PRODUCER
 
-int foo(int x) { return x; }
+//int foo(int x) { return x; }
 
+#else
 
-#endif
-
-#ifdef CONSUMER
-
-import serialized_module;
-
-// TODO: do something with `foo`?
+//import serialized_module;
 
 // TODO: need to get the name mangling to line up!
-int foo(int x);
+int foo(int x) { return x; }
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
-
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int index = (int)dispatchThreadID.x;
+    outputBuffer[index] = foo(index);
+}
 
 #endif

@@ -2149,9 +2149,12 @@ TestResult runSerializedModuleTest(TestContext* context, TestInput& input)
     }
 
     // Next we want to run a compute comparison test
+    List<const char*> options;
 
-    const char* langOpts[] = { "-xslang", "-r", "-xslang", moduleFilePath.getBuffer(), "-slang", "-compute" };
-    return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
+    const char* langOpts[] = { "-xslang", "-r", "-xslang", moduleFilePath.getBuffer() };
+    options.addRange(langOpts, SLANG_COUNT_OF(langOpts));
+
+    return runComputeComparisonImpl(context, input, options.begin(), options.getCount());
 }
 
 TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
