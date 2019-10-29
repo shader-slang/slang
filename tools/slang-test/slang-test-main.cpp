@@ -2099,7 +2099,7 @@ TestResult runSerializedModuleTest(TestContext* context, TestInput& input)
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
-    auto moduleFilePath = outputStem + ".slang-module";
+    auto moduleFilePath = Path::getFileNameWithoutExt(outputStem) + ".slang-module";
 
     // First, we want to run `slangc` to generate a module file
     {
@@ -2150,7 +2150,7 @@ TestResult runSerializedModuleTest(TestContext* context, TestInput& input)
 
     // Next we want to run a compute comparison test
 
-    const char* langOpts[] = { "-xslang", "-r", moduleFilePath.getBuffer() };
+    const char* langOpts[] = { "-xslang", "-r", "-xslang", moduleFilePath.getBuffer(), "-slang", "-compute" };
     return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 

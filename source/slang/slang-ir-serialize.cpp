@@ -1357,6 +1357,51 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
 }
 
+/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules)
+{
+    // Load up the module
+    RiffContainer container;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
+    
+    List<RiffContainer::ListChunk*> moduleChunks;
+    // First try to find a list
+    {
+        RiffContainer::ListChunk* listChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleListFourCc);
+        if (listChunk)
+        {
+            listChunk->findContained(IRSerialBinary::kSlangModuleFourCc, moduleChunks);
+        }
+        else
+        {
+            // Maybe its just a single module
+            RiffContainer::ListChunk* moduleChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleFourCc);
+            if (!moduleChunk)
+            {
+                // Couldn't find any modules
+                return SLANG_FAIL;
+            }
+            moduleChunks.add(moduleChunk);
+        }
+    }
+
+    // Okay, we need to decode into ir modules
+    for (auto moduleChunk : moduleChunks)
+    {
+        IRSerialData serialData;
+
+        SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(moduleChunk, &serialData));
+
+        // Construct into a module
+        RefPtr<IRModule> irModule;
+        IRSerialReader reader;
+        SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceManager, irModule));
+
+        outModules.add(irModule);
+    }
+
+    return SLANG_OK;
+}
+
 /* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut)
 {
     typedef Ser::Inst::PayloadType PayloadType;

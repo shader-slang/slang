@@ -245,6 +245,9 @@ public:
         template <typename T>
         T* findContainedData(FourCC type) const { return (T*)findContainedData(type, sizeof(T)); }
 
+            /// Find all contained that match the type
+        void findContained(FourCC type, List<ListChunk*>& out);
+
             /// Find the list (including self) that matches subtype recursively
         ListChunk* findListRec(FourCC subType);
 
