@@ -2205,7 +2205,11 @@ SlangResult dissassembleDXILUsingDXC(
             auto frontEndReq = endToEndReq->getFrontEndReq();
 
             IRSerialWriter::OptionFlags optionFlags = 0;
-            optionFlags |= (linkage->debugInfoLevel != DebugInfoLevel::None) ? IRSerialWriter::OptionFlag::DebugInfo : 0;
+
+            if (linkage->debugInfoLevel != DebugInfoLevel::None)
+            {
+                optionFlags |= IRSerialWriter::OptionFlag::DebugInfo;
+            }
 
             SourceManager* sourceManager = frontEndReq->getSourceManager();
 
