@@ -175,7 +175,7 @@ struct DumpVisitor : public RiffContainer::Visitor
         // If it's the root it's 'riff'
         _dumpRiffType(list == m_rootChunk ? RiffFourCC::kRiff : RiffFourCC::kList);
         m_writer.put(" ");
-        _dumpRiffType(list->m_subType);
+        _dumpRiffType(list->getSubType());
         m_writer.put("\n");
         m_indent++;
         return SLANG_OK;
@@ -184,9 +184,8 @@ struct DumpVisitor : public RiffContainer::Visitor
     {
         _dumpIndent();
         // Write out the name
-        _dumpRiffType(data->m_type);
+        _dumpRiffType(data->m_fourCC);
         m_writer.put(" ");
-
 
         int hash = data->calcHash();
 
@@ -250,7 +249,7 @@ struct DumpVisitor : public RiffContainer::Visitor
 
     listHeader.chunk.type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
     listHeader.chunk.size = uint32_t(list->m_payloadSize);
-    listHeader.subType = list->m_subType;
+    listHeader.subType = list->getSubType();
 
     try
     {
@@ -276,7 +275,7 @@ struct DumpVisitor : public RiffContainer::Visitor
 
                     // Must be a regular chunk with data
                     RiffHeader chunkHeader;
-                    chunkHeader.type = dataChunk->m_type;
+                    chunkHeader.type = dataChunk->m_fourCC;
                     chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
 
                     stream->write(&chunkHeader, sizeof(chunkHeader));
@@ -520,15 +519,12 @@ size_t RiffContainer::ListChunk::calcPayloadSize()
     return size;
 }
 
-RiffContainer::Chunk* RiffContainer::ListChunk::findContained(FourCC type) const
+RiffContainer::Chunk* RiffContainer::ListChunk::findContained(FourCC fourCC) const
 {
     Chunk* chunk = m_containedChunks;
     while (chunk)
     {
-        const FourCC checkType = (chunk->m_kind  == Chunk::Kind::Data) ?
-            static_cast<RiffContainer::DataChunk*>(chunk)->m_type :
-            static_cast<RiffContainer::ListChunk*>(chunk)->m_subType;
-        if (checkType == type)
+        if (chunk->m_fourCC == fourCC)
         {
             return chunk;
         }
@@ -568,7 +564,7 @@ static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, Fo
         if (auto childList = as<RiffContainer::ListChunk>(chunk))
         {
             // Test if the child is the subtype, if so we are done
-            if (childList->m_subType == subType)
+            if (childList->getSubType() == subType)
             {
                 return childList;
             }
@@ -585,7 +581,7 @@ static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, Fo
 
 /* static */RiffContainer::ListChunk* RiffContainer::ListChunk::findListRec(FourCC subType)
 {
-    return (m_subType == subType) ? this : _findListRec(this, subType);
+    return (getSubType() == subType) ? this : _findListRec(this, subType);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::DataChunk !!!!!!!!!!!!!!!!!!!!!!

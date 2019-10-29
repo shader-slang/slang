@@ -1089,7 +1089,7 @@ static Result _readArrayChunk(const IRSerialBinary::ModuleHeader* header, RiffCo
 
     Bin::CompressionType compressionType = Bin::CompressionType::None;
 
-    if (dataChunk->m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_type))
+    if (dataChunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_fourCC))
     {
         // If it has compression, use the compression type set in the header
         compressionType = Bin::CompressionType(header->m_compressionType);
@@ -1184,7 +1184,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
     typedef IRSerialBinary Bin;
 
     Bin::CompressionType compressionType = Bin::CompressionType::None;
-    if (chunk->m_type == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_type))
+    if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
     {
         compressionType = Bin::CompressionType(moduleHeader->m_compressionType);
     }
@@ -1237,7 +1237,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
             continue;
         }
         
-        switch (dataChunk->m_type)
+        switch (dataChunk->m_fourCC)
         {
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
             case Bin::kInstFourCc:

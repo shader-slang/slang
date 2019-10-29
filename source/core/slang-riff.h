@@ -98,6 +98,7 @@ struct RiffSemanticVersion
     RawType m_raw;
 };
 
+/* A helper class that makes reading data from a data block simpler */
 class RiffReadHelper
 {
 public:
@@ -132,6 +133,7 @@ protected:
     const uint8_t* m_end;
     const uint8_t* m_cur;
 };
+
 /* A container for data in RIFF format. Holds the contents in memory.
 
 With the data held in memory allows for adding or removing chunks at will.
@@ -178,9 +180,10 @@ public:
             Data,
         };
 
-        void init(Kind kind)
+        void init(Kind kind, FourCC fourCC)
         {
             m_kind = kind;
+            m_fourCC = fourCC;
             m_payloadSize = 0;
             m_next = nullptr;
             m_parent = nullptr;
@@ -193,19 +196,14 @@ public:
             /// Returns a single data chunk
         Data* getSingleData() const;
 
-            /// Get the unique type
-        FourCC getUniqueType() const;
-
+            /// Calculate the payload size
         size_t calcPayloadSize();
 
-        // TODO(JS):
-        // We might want to consider moving subType/type to the Chunk, because in practice they typically
-        // mean the same thing, and as it has been arranged, for list chunk the overall chunk type is implied
-        // by the kind.
-        Kind m_kind;                      ///< Kind of chunk
-        size_t m_payloadSize;             ///< The payload size (ie does NOT include RiffChunk header). 
-        Chunk* m_next;                    ///< Next chunk in this list
-        ListChunk* m_parent;         ///< The chunk this belongs to
+        Kind m_kind;                        ///< Kind of chunk
+        FourCC m_fourCC;                    ///< The chunk type for data, or the sub type for a List (riff/list)
+        size_t m_payloadSize;               ///< The payload size (ie does NOT include RiffChunk header). 
+        Chunk* m_next;                      ///< Next chunk in this list
+        ListChunk* m_parent;                ///< The chunk this belongs to
     };
 
     struct ListChunk : public Chunk
@@ -215,8 +213,7 @@ public:
 
         void init(FourCC subType)
         {
-            Super::init(Kind::List);
-            m_subType = subType;
+            Super::init(Kind::List, subType);
             m_containedChunks = nullptr;
             m_endChunk = nullptr;
 
@@ -240,7 +237,9 @@ public:
             /// NOTE! Assumes all contained chunks have correct payload sizes
         size_t calcPayloadSize();
 
-        FourCC m_subType;                       ///< The subtype of this contained
+            /// Get the sub type
+        FourCC getSubType() const { return m_fourCC; }
+
         Chunk* m_containedChunks;               ///< The contained chunks
         Chunk* m_endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
     };
@@ -261,15 +260,13 @@ public:
             /// Return as read helper
         RiffReadHelper asReadHelper() const;
 
-        void init(FourCC type)
+        void init(FourCC fourCC)
         {
-            Super::init(Kind::Data);
-            m_type = type;
+            Super::init(Kind::Data, fourCC);
             m_dataList = nullptr;
             m_endData = nullptr;
         }
 
-        FourCC m_type;                    ///< Type of chunk
         Data* m_dataList;                 ///< List of 0 or more data items
         Data* m_endData;                  ///< The last data point
     };
@@ -339,11 +336,6 @@ protected:
     MemoryArena m_arena;
 };
 
-// -----------------------------------------------------------------------------
-SLANG_FORCE_INLINE FourCC RiffContainer::Chunk::getUniqueType() const
-{
-    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->m_type : static_cast<const ListChunk*>(this)->m_subType;
-}
 // -----------------------------------------------------------------------------
 template <typename T>
 T* as(RiffContainer::Chunk* chunk)
