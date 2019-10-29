@@ -8,8 +8,15 @@
 
 //import serialized_module;
 
+// This is fragile - needs match the definition in serialized_module
+struct Thing
+{
+    int a;
+    int b;
+};
+
 // TODO: need to get the name mangling to line up!
-int foo(int x);
+int foo(Thing thing);
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -17,6 +24,12 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    Thing thing;
+
     int index = (int)dispatchThreadID.x;
-    outputBuffer[index] = foo(index);
+        
+    thing.a = index;
+    thing.b = -index;
+
+    outputBuffer[index] = foo(thing);
 }

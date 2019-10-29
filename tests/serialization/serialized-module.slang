@@ -2,5 +2,14 @@
 
 // serialized-module.slang
 
-int foo(int x) { return x; }
+struct Thing
+{
+    int a; 
+    int b;
+};
+
+int foo(Thing thing) 
+{ 
+    return (thing.a + thing.b) - thing.b; 
+}
 
