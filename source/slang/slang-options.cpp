@@ -873,8 +873,10 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
-                    // TODO(JS): Need to do something with the modules
- 
+                    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+                    // For now just add to the linkage
+                    auto linkage = requestImpl->getLinkage();
+                    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
                 }
                 else if (argStr == "-v")
                 {

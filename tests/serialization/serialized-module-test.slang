@@ -9,7 +9,7 @@
 //import serialized_module;
 
 // TODO: need to get the name mangling to line up!
-int foo(int x) { return x; }
+int foo(int x);
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
