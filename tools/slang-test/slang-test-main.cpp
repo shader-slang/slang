@@ -2094,6 +2094,66 @@ TestResult runSlangRenderComputeComparisonTest(TestContext* context, TestInput& 
     return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
 }
 
+TestResult runSerializedModuleTest(TestContext* context, TestInput& input)
+{
+    auto filePath = input.filePath;
+    auto outputStem = input.outputStem;
+
+    auto moduleFilePath = outputStem + ".slang-module";
+
+    // First, we want to run `slangc` to generate a module file
+    {
+        CommandLine cmdLine;
+        _initSlangCompiler(context, cmdLine);
+
+        cmdLine.addArg(input.filePath);
+
+        for (auto arg : input.testOptions->args)
+        {
+            cmdLine.addArg(arg);
+        }
+
+        cmdLine.addArg("-o");
+        cmdLine.addArg(moduleFilePath);
+
+        cmdLine.addArg("-D");
+        cmdLine.addArg("PRODUCER=1");
+
+        ExecuteResult exeRes;
+        TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+        // TODO(tfoley): what in the world does this do?
+        // JS: The test running context can be 'collecting requirement's or running. When in collecting mode it looks at
+        // all the command lines that are invoked to work out what requirements of the test are (which happens in spawn).
+        // This could be achieved more easily now with the CommandLine - without having to do it in spawn. 
+        if (context->isCollectingRequirements())
+        {
+            return TestResult::Pass;
+        }
+
+        String actualOutput = getOutput(exeRes);
+        String expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+
+        TestResult result = TestResult::Pass;
+
+        // Otherwise we compare to the expected output
+        if (actualOutput != expectedOutput)
+        {
+            String actualOutputPath = outputStem + ".actual";
+            Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+
+            return TestResult::Fail;
+        }
+    }
+
+    // Next we want to run a compute comparison test
+
+    const char* langOpts[] = { "-xslang", "-r", moduleFilePath.getBuffer() };
+    return runComputeComparisonImpl(context, input, langOpts, SLANG_COUNT_OF(langOpts));
+}
+
 TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, char const* langOption, char const* outputKind, String* outOutput)
 {
     // TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
@@ -2406,6 +2466,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
     { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
+    { "SERIALIZED_MODULE",                      &runSerializedModuleTest},
 };
 
 TestResult runTest(

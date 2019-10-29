@@ -357,42 +357,44 @@ struct IRSerialBinary
         VariableByteLite,
     };
 
-    static const uint32_t kRiffFourCc = RiffFourCC::kRiff;
+    static const FourCC kRiffFourCc = RiffFourCC::kRiff;
 
-    static const uint32_t kSlangModuleFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'd');             ///< Holds all the slang specific chunks
+    static const FourCC kSlangModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
 
-    static const uint32_t kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
+    static const FourCC kSlangModuleFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'd');             ///< Holds all the slang specific chunks
 
-    static const uint32_t kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
-    static const uint32_t kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
-    static const uint32_t kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
+    static const FourCC kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
 
-    static const uint32_t kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
-    static const uint32_t kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
-    static const uint32_t kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
+    static const FourCC kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
+    static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
+    static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
 
-    static const uint32_t kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
+    static const FourCC kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
+    static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
+    static const FourCC kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
 
-    static const uint32_t kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+    static const FourCC kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
-    static const uint32_t kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
-    static const uint32_t kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
-    static const uint32_t kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
-    static const uint32_t kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
-    static const uint32_t kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
+    static const FourCC kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+
+    static const FourCC kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
+    static const FourCC kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
+    static const FourCC kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
+    static const FourCC kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
+    static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
 
     struct ModuleHeader
     {
-        uint32_t m_compressionType;         ///< Holds the compression type used (if used at all)
+        uint32_t compressionType;         ///< Holds the compression type used (if used at all)
     };
     struct ArrayHeader
     {
-        uint32_t m_numEntries;
+        uint32_t numEntries;
     };
     struct CompressedArrayHeader
     {
-        uint32_t m_numEntries;              ///< The number of entries
-        uint32_t m_numCompressedEntries;    ///< The amount of compressed entries
+        uint32_t numEntries;              ///< The number of entries
+        uint32_t numCompressedEntries;    ///< The amount of compressed entries
     };
 };
 

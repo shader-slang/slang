@@ -5,6 +5,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-hex-dump-util.h"
+#include "../core/slang-riff.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -17,6 +18,8 @@
 #include "slang-type-layout.h"
 #include "slang-reflection.h"
 #include "slang-emit.h"
+
+#include "slang-ir-serialize.h"
 
 // Enable calling through to `fxc` or `dxc` to
 // generate code on Windows.
@@ -2187,37 +2190,59 @@ SlangResult dissassembleDXILUsingDXC(
         EndToEndCompileRequest* endToEndReq,
         Stream* stream)
     {
-        SLANG_UNUSED(stream);
+        RiffContainer container;
 
-        auto linkage = endToEndReq->getLinkage();
-        auto sink = endToEndReq->getSink();
-        auto frontEndReq = endToEndReq->getFrontEndReq();
+        // TODO(JS): We may want a switch to control is we use compression and/or we may just want compressed by default.
+        // For now uncompressed is fine.
+        const auto compressionType = IRSerialBinary::CompressionType::None;
 
-        for (auto translationUnit : frontEndReq->translationUnits)
         {
-            auto module = translationUnit->module;
-            auto irModule = module->getIRModule();
+            // Module list
+            RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, IRSerialBinary::kSlangModuleListFourCc);
 
-            SLANG_UNUSED(irModule);
+            auto linkage = endToEndReq->getLinkage();
+            auto sink = endToEndReq->getSink();
+            auto frontEndReq = endToEndReq->getFrontEndReq();
 
-            // Okay, we need to serialize this module to our container file,
-            // including both its name and generated IR code.
+            IRSerialWriter::OptionFlags optionFlags = 0;
+            optionFlags |= (linkage->debugInfoLevel != DebugInfoLevel::None) ? IRSerialWriter::OptionFlag::DebugInfo : 0;
+
+            SourceManager* sourceManager = frontEndReq->getSourceManager();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                auto module = translationUnit->module;
+                auto irModule = module->getIRModule();
+
+                // Okay, we need to serialize this module to our container file.
+                // We currently don't serialize it's name..., but support for that could be added.
+
+                IRSerialData serialData;
+                IRSerialWriter writer;
+                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
+            }
+
+            auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
+
+            // TODO: in the case where we have specialization, we might need
+            // to serialize IR related to `program`...
+
+            for (auto target : linkage->targets)
+            {
+                auto targetProgram = program->getTargetProgram(target);
+                auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
+
+                // Okay, we need to serialize this target program and its IR too...
+                IRSerialData serialData;
+                IRSerialWriter writer;
+                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
+            }
         }
 
-        auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
-
-        
-
-        // TODO: in the case where we have specialization, we might need
-        // to serialize IR related to `program`...
-
-        for (auto target : linkage->targets)
-        {
-            auto targetProgram = program->getTargetProgram(target);
-            auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
-
-            // Okay, we need to serialize this target program and its IR too...
-        }
+        // We now write the RiffContainer to the stream
+        SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
 
         return SLANG_OK;
     }
