@@ -807,6 +807,7 @@ IRFunc* specializeIRForEntryPoint(
         return nullptr;
     }
 
+    
     // Note: it is possible that `sym` shows multiple
     // definitions, coming from different IR modules that
     // were input to the linking process. We don't have
@@ -816,7 +817,33 @@ IRFunc* specializeIRForEntryPoint(
     // follow the linkage decoration and discover the
     // other values on its own.
     //
+
     auto originalVal = sym->irGlobalValue;
+
+    // Lets look for the *best* version - if it's a function then it will have the definition not the declaration
+    if (IRFunc* originalFunc = as<IRFunc>(originalVal))
+    {
+        auto block = originalFunc->getFirstBlock();
+        SLANG_UNUSED(block);
+
+
+        IRSpecSymbol* cur = sym->nextWithSameName;
+        while (cur)
+        {
+            auto val = cur->irGlobalValue;
+            if (IRFunc* func = as<IRFunc>(val))
+            {
+                // If it has a definition then we go with that
+                if (func->getFirstBlock())
+                {
+                    originalVal = func;
+                    break;
+                }
+            }
+            
+            cur = cur->nextWithSameName;
+        }
+    }
 
     // We will start by cloning the entry point reference
     // like any other global value.
