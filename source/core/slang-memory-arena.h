@@ -138,6 +138,9 @@ public:
         /// Rewind (and effectively deallocate) all allocations *after* the cursor
     void rewindToCursor(const void* cursor);
 
+        /// Add a block such that it will be freed when everything else is freed.
+    void addExternalBlock(void* data, size_t size);
+
         /// Default Ctor
     MemoryArena();
         /// Construct with block size and alignment. Block alignment must be a power of 2.

@@ -148,24 +148,38 @@ class RiffContainer
 {
 public:
 
+    enum class Ownership
+    {
+        Uninitialized,      ///< Doesn't contain anything
+        NotOwned,           ///< It's not owned by the container
+        Arena,              ///< It's owned and allocated on the arena
+        Owned,              ///< It's owned, but wasn't allocated on the arena
+    };
+
     struct ListChunk;
     struct DataChunk;
 
     struct Data
     {
-        /// Get the payload
-        void* getPayload() { return (void*)(this + 1); }
-        size_t getSize() { return m_size; }
+            /// Get the payload
+        void* getPayload() { return m_payload; }
+            /// Get the size of the payload
+        size_t getSize() const { return m_size; }
+            /// Get the ownership of the data held in the payload
+        Ownership getOwnership() const { return m_ownership; }
 
         void init()
         {
+            m_ownership = Ownership::Uninitialized;
             m_size = 0;
             m_next = nullptr;
+            m_payload = nullptr;
         }
 
-        size_t m_size;
-        Data* m_next;
-        // Followed by the payload
+        Ownership m_ownership;          ///< Stores the ownership of the payload
+        size_t m_size;                  ///< The size of the payload
+        void* m_payload;                ///< The payload
+        Data* m_next;                   ///< The next Data block in the list
     };
 
     struct Chunk;
@@ -300,7 +314,16 @@ public:
 
         /// Write data into a chunk (can only be inside a Kind::Data)
     void write(const void* data, size_t size);
-    Data* addData(size_t size);
+
+        /// Adds an empty data block
+    Data* addData();
+        /// Set the payload on a data. Payload can be passed as nullptr, if it is no memory will be copied.
+    void setPayload(Data* data, const void* payload, size_t size);
+
+        /// Move ownership to
+    void moveOwned(Data* data, void* payload, size_t size);
+        /// Move unowned
+    void setUnowned(Data* data, void* payload, size_t size);
 
         /// End a chunk
     void endChunk();
@@ -333,7 +356,7 @@ protected:
     ListChunk* m_listChunk;
     DataChunk* m_dataChunk;
 
-    MemoryArena m_arena;
+    MemoryArena m_arena;            ///< Can be used to use other owned blocks
 };
 
 // -----------------------------------------------------------------------------

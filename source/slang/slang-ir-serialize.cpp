@@ -827,7 +827,9 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             header.m_numCompressedEntries = uint32_t(numCompressedEntries);
 
             container->write(&header, sizeof(header));
-            container->write(compressedPayload.begin(), compressedPayload.getCount());
+
+            const size_t compressedSize = compressedPayload.getCount();
+            container->moveOwned(container->addData(), compressedPayload.detachBuffer(), compressedSize);
             break;
         }
         default:
@@ -963,7 +965,10 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             header.m_numCompressedEntries = 0;          
 
             container->write(&header, sizeof(header));
-            container->write(compressedPayload.begin(), compressedPayload.getCount());
+
+            const size_t compressedPayloadSize = compressedPayload.getCount();
+            container->moveOwned(container->addData(), compressedPayload.detachBuffer(), compressedPayloadSize);
+
             return SLANG_OK;
         }
         default: break;

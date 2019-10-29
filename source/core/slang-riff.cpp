@@ -385,7 +385,9 @@ struct DumpVisitor : public RiffContainer::Visitor
             else
             {
                 ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
-                RiffContainer::Data* data = outContainer.addData(header.chunk.size);
+                RiffContainer::Data* data = outContainer.addData();
+                
+                outContainer.setPayload(data, nullptr, header.chunk.size);
 
                 size_t readSize;
                 SLANG_RETURN_ON_FAIL(readPayload(stream, header.chunk.size, data->getPayload(), readSize));
@@ -763,18 +765,66 @@ void RiffContainer::endChunk()
     SLANG_ASSERT(isChunkOk(chunk));
 }
 
-RiffContainer::Data* RiffContainer::addData(size_t size)
+void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
 {
-    // We must be in a chunk
+    // We must be in a data chunk
     SLANG_ASSERT(m_dataChunk);
+    // The data shouldn't be set up
+    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
 
     // Add current chunks data
     m_dataChunk->m_payloadSize += size;
 
-    Data* data = (Data*)m_arena.allocate(sizeof(Data) + size);
-
-    data->m_next = nullptr;
+    data->m_ownership = Ownership::Arena;
     data->m_size = size;
+
+    data->m_payload = m_arena.allocate(size);
+
+    if (payload)
+    {
+        ::memcpy(data->m_payload, payload, size);
+    }
+}
+
+void RiffContainer::moveOwned(Data* data, void* payload, size_t size)
+{
+    // We must be in a data chunk
+    SLANG_ASSERT(m_dataChunk);
+    // The data shouldn't be set up
+    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
+
+    // Add current chunks data
+    m_dataChunk->m_payloadSize += size;
+
+    data->m_ownership = Ownership::Owned;
+    data->m_size = size;
+
+    // The area will manage this block
+    m_arena.addExternalBlock(payload, size);
+    data->m_payload = payload;
+}
+
+void RiffContainer::setUnowned(Data* data, void* payload, size_t size)
+{
+    // We must be in a data chunk
+    SLANG_ASSERT(m_dataChunk);
+    // The data shouldn't be set up
+    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
+    // Add current chunks data
+    m_dataChunk->m_payloadSize += size;
+
+    data->m_ownership = Ownership::NotOwned;
+    data->m_size = size;
+    data->m_payload = payload;
+}
+
+RiffContainer::Data* RiffContainer::addData()
+{
+    // We must be in a chunk
+    SLANG_ASSERT(m_dataChunk);
+
+    Data* data = (Data*)m_arena.allocate(sizeof(Data));
+    data->init();
 
     Data*& next = m_dataChunk->m_endData ? m_dataChunk->m_endData->m_next : m_dataChunk->m_dataList;
     SLANG_ASSERT(next == nullptr);
@@ -788,8 +838,8 @@ RiffContainer::Data* RiffContainer::addData(size_t size)
 
 void RiffContainer::write(const void* inData, size_t size)
 {
-    auto data = addData(size);
-    ::memcpy(data->getPayload(), inData, size);
+    auto data = addData();
+    setPayload(data, inData, size);
 }
 
 static SlangResult _isChunkOk(RiffContainer::Chunk* chunk, void* data)
