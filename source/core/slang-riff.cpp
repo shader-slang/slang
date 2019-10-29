@@ -592,16 +592,18 @@ static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, Fo
 
 RiffContainer::Data* RiffContainer::DataChunk::getSingleData() const
 {
-    if (m_kind == Kind::Data)
+    Data* data = m_dataList;
+    return (data && data->m_next == nullptr) ? data : nullptr;
+}
+
+RiffReadHelper RiffContainer::DataChunk::asReadHelper() const
+{
+    Data* data = getSingleData();
+    if (data)
     {
-        auto dataChunk = static_cast<const DataChunk*>(this);
-        Data* data = dataChunk->m_dataList;
-        if (data && data->m_next == nullptr)
-        {
-            return data;
-        }
+        return RiffReadHelper((const uint8_t*)data->getPayload(), data->getSize());
     }
-    return nullptr;
+    return RiffReadHelper(nullptr, 0);
 }
 
 int RiffContainer::DataChunk::calcHash() const

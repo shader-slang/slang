@@ -98,6 +98,40 @@ struct RiffSemanticVersion
     RawType m_raw;
 };
 
+class RiffReadHelper
+{
+public:
+    template <typename T>
+    SlangResult read(T& out)
+    {
+        if (m_cur + sizeof(T) > m_end)
+        {
+            return SLANG_FAIL;
+        }
+        // Make sure the alignment is plausible
+        SLANG_ASSERT((size_t(m_cur) & (SLANG_ALIGN_OF(T) - 1)) == 0);
+        ::memcpy(&out, m_cur, sizeof(T));
+        m_cur += sizeof(T);
+        return SLANG_OK;
+    }
+
+        /// Get the data
+    const uint8_t* getData() const { return m_cur; }
+        /// Get the remaining size
+    size_t getRemainingSize() const { return size_t(m_end - m_cur); }
+
+    RiffReadHelper(const uint8_t* data, size_t size):
+        m_start(data),
+        m_end(data + size),
+        m_cur(data)
+    {
+    }
+
+protected:
+    const uint8_t* m_start;
+    const uint8_t* m_end;
+    const uint8_t* m_cur;
+};
 /* A container for data in RIFF format. Holds the contents in memory.
 
 With the data held in memory allows for adding or removing chunks at will.
@@ -223,6 +257,9 @@ public:
 
             /// Get single data payload.
         Data* getSingleData() const;
+
+            /// Return as read helper
+        RiffReadHelper asReadHelper() const;
 
         void init(FourCC type)
         {

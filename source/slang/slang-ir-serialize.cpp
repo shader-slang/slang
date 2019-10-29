@@ -1050,56 +1050,32 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, R
 {
     typedef IRSerialBinary Bin;
 
-    RiffContainer::Data* data = dataChunk->getSingleData();
-    const uint8_t* cur = (const uint8_t*)data->getPayload();
-    const uint8_t* end = cur + data->m_size;
-
+    RiffReadHelper read = dataChunk->asReadHelper();
     const size_t typeSize = listOut.getTypeSize();
 
     switch (compressionType)
     {
         case Bin::CompressionType::VariableByteLite:
         {
-            if (cur + sizeof(Bin::CompressedArrayHeader) > end)
-            {
-                return SLANG_FAIL;
-            }
+            Bin::CompressedArrayHeader header;
+            SLANG_RETURN_ON_FAIL(read.read(header));
 
-            // We have a compressed header
-            Bin::CompressedArrayHeader header = *(const Bin::CompressedArrayHeader*)cur;
-            cur += sizeof(Bin::CompressedArrayHeader);
-            
             void* dst = listOut.setSize(header.m_numEntries);
-            
-            // Need to read all the compressed data... 
-            size_t payloadSize = size_t(end - cur);
-
-            List<uint8_t> compressedPayload;
-            compressedPayload.setCount(payloadSize);
-
             SLANG_ASSERT(header.m_numCompressedEntries == uint32_t((header.m_numEntries * typeSize) / sizeof(uint32_t)));
 
             // Decode..
-            ByteEncodeUtil::decodeLiteUInt32(cur, header.m_numCompressedEntries, (uint32_t*)dst);
+            ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.m_numCompressedEntries, (uint32_t*)dst);
             break;
         }
         case Bin::CompressionType::None:
         {
             // Read uncompressed
-            if (cur + sizeof(Bin::ArrayHeader) > end)
-            {
-                return SLANG_FAIL;
-            }
-
-            Bin::ArrayHeader header = *(const Bin::ArrayHeader*)cur;
-            cur += sizeof(Bin::ArrayHeader);
-
+            Bin::ArrayHeader header;
+            SLANG_RETURN_ON_FAIL(read.read(header));
             const size_t payloadSize = header.m_numEntries * typeSize;
-
-            SLANG_ASSERT(payloadSize == size_t(end - cur));
+            SLANG_ASSERT(payloadSize == read.getRemainingSize());
             void* dst = listOut.setSize(header.m_numEntries);
-
-            ::memcpy(dst, cur, payloadSize);
+            ::memcpy(dst, read.getData(), payloadSize);
             break;
         }
     }
@@ -1125,10 +1101,9 @@ static Result _readArrayChunk(const IRSerialBinary::ModuleHeader* header, RiffCo
 template <typename T>
 static Result _readArrayUncompressedChunk(const IRSerialBinary::ModuleHeader* header, RiffContainer::DataChunk* chunk, List<T>& arrayOut)
 {
-    typedef IRSerialBinary Bin;
     SLANG_UNUSED(header);
     ListResizerForType<T> resizer(arrayOut);
-    return _readArrayChunk(Bin::CompressionType::None, chunk, resizer);
+    return _readArrayChunk(IRSerialBinary::CompressionType::None, chunk, resizer);
 }
 
 static Result _decodeInsts(IRSerialBinary::CompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
@@ -1223,22 +1198,14 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
         }
         case Bin::CompressionType::VariableByteLite:
         {
-            RiffContainer::Data* data = chunk->getSingleData();
-            const uint8_t* cur = (const uint8_t*)data->getPayload();
-            const uint8_t* end = cur + data->m_size;
-            if (cur + sizeof(Bin::CompressedArrayHeader) <= end)
-            {
-                return SLANG_FAIL;
-            }
-            Bin::CompressedArrayHeader header = *(const Bin::CompressedArrayHeader*)cur;
-            cur += sizeof(Bin::CompressedArrayHeader);
-            
+            RiffReadHelper read = chunk->asReadHelper();
+
+            Bin::CompressedArrayHeader header;
+            SLANG_RETURN_ON_FAIL(read.read(header));
+
             arrayOut.setCount(header.m_numEntries);
 
-            // Need to read all the compressed data... 
-            size_t payloadSize = size_t(end - cur);
-
-            SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, cur, payloadSize, arrayOut));
+            SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, read.getData(), read.getRemainingSize(), arrayOut));
             break;
         }
         default:
