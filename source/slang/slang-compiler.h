@@ -1260,6 +1260,9 @@ namespace Slang
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
 
+        // Modules that have been read in with the -r option
+        List<RefPtr<IRModule>> m_libModules;
+
     private:
         Session* m_session = nullptr;
 
@@ -1299,6 +1302,7 @@ namespace Slang
         bool isBeingImported(Module* module);
 
         List<RefPtr<Type>> m_specializedTypes;
+
     };
 
         /// Shared functionality between front- and back-end compile requests.

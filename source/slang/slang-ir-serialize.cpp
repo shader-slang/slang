@@ -809,7 +809,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
         {
             ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
             Bin::ArrayHeader header;
-            header.m_numEntries = uint32_t(numEntries);
+            header.numEntries = uint32_t(numEntries);
 
             container->write(&header, sizeof(header));
             container->write(data, typeSize * numEntries);
@@ -823,8 +823,8 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
 
             Bin::CompressedArrayHeader header;
-            header.m_numEntries = uint32_t(numEntries);
-            header.m_numCompressedEntries = uint32_t(numCompressedEntries);
+            header.numEntries = uint32_t(numEntries);
+            header.numCompressedEntries = uint32_t(numCompressedEntries);
 
             container->write(&header, sizeof(header));
 
@@ -961,8 +961,8 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
             ScopeChunk scope(container, Chunk::Kind::Data, SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId));
 
             Bin::CompressedArrayHeader header;
-            header.m_numEntries = uint32_t(array.getCount());
-            header.m_numCompressedEntries = 0;          
+            header.numEntries = uint32_t(array.getCount());
+            header.numCompressedEntries = 0;          
 
             container->write(&header, sizeof(header));
 
@@ -986,7 +986,7 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
     // Write the header
     {
         Bin::ModuleHeader moduleHeader;
-        moduleHeader.m_compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
+        moduleHeader.compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
         ScopeChunk scopeHeader(container, Chunk::Kind::Data, Bin::kSlangModuleHeaderFourCc);
         container->write(&moduleHeader, sizeof(moduleHeader));
     }
@@ -1065,11 +1065,11 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, R
             Bin::CompressedArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
 
-            void* dst = listOut.setSize(header.m_numEntries);
-            SLANG_ASSERT(header.m_numCompressedEntries == uint32_t((header.m_numEntries * typeSize) / sizeof(uint32_t)));
+            void* dst = listOut.setSize(header.numEntries);
+            SLANG_ASSERT(header.numCompressedEntries == uint32_t((header.numEntries * typeSize) / sizeof(uint32_t)));
 
             // Decode..
-            ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.m_numCompressedEntries, (uint32_t*)dst);
+            ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.numCompressedEntries, (uint32_t*)dst);
             break;
         }
         case Bin::CompressionType::None:
@@ -1077,9 +1077,9 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, R
             // Read uncompressed
             Bin::ArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
-            const size_t payloadSize = header.m_numEntries * typeSize;
+            const size_t payloadSize = header.numEntries * typeSize;
             SLANG_ASSERT(payloadSize == read.getRemainingSize());
-            void* dst = listOut.setSize(header.m_numEntries);
+            void* dst = listOut.setSize(header.numEntries);
             ::memcpy(dst, read.getData(), payloadSize);
             break;
         }
@@ -1097,7 +1097,7 @@ static Result _readArrayChunk(const IRSerialBinary::ModuleHeader* header, RiffCo
     if (dataChunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_fourCC))
     {
         // If it has compression, use the compression type set in the header
-        compressionType = Bin::CompressionType(header->m_compressionType);
+        compressionType = Bin::CompressionType(header->compressionType);
     }
     ListResizerForType<T> resizer(arrayOut);
     return _readArrayChunk(compressionType, dataChunk, resizer);
@@ -1191,7 +1191,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
     Bin::CompressionType compressionType = Bin::CompressionType::None;
     if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
     {
-        compressionType = Bin::CompressionType(moduleHeader->m_compressionType);
+        compressionType = Bin::CompressionType(moduleHeader->compressionType);
     }
 
     switch (compressionType)
@@ -1208,7 +1208,7 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
             Bin::CompressedArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
 
-            arrayOut.setCount(header.m_numEntries);
+            arrayOut.setCount(header.numEntries);
 
             SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, read.getData(), read.getRemainingSize(), arrayOut));
             break;
@@ -1355,6 +1355,51 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 {
     rangeOut = _toSourceRange(info);
     return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
+}
+
+/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules)
+{
+    // Load up the module
+    RiffContainer container;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
+    
+    List<RiffContainer::ListChunk*> moduleChunks;
+    // First try to find a list
+    {
+        RiffContainer::ListChunk* listChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleListFourCc);
+        if (listChunk)
+        {
+            listChunk->findContained(IRSerialBinary::kSlangModuleFourCc, moduleChunks);
+        }
+        else
+        {
+            // Maybe its just a single module
+            RiffContainer::ListChunk* moduleChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleFourCc);
+            if (!moduleChunk)
+            {
+                // Couldn't find any modules
+                return SLANG_FAIL;
+            }
+            moduleChunks.add(moduleChunk);
+        }
+    }
+
+    // Okay, we need to decode into ir modules
+    for (auto moduleChunk : moduleChunks)
+    {
+        IRSerialData serialData;
+
+        SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(moduleChunk, &serialData));
+
+        // Construct into a module
+        RefPtr<IRModule> irModule;
+        IRSerialReader reader;
+        SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceManager, irModule));
+
+        outModules.add(irModule);
+    }
+
+    return SLANG_OK;
 }
 
 /* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut)
