@@ -1327,13 +1327,21 @@ extern "C"
 
     /** Add a distinct translation unit to the compilation request
 
-    `name` is optional.
+    `name` is optional. 
     Returns the zero-based index of the translation unit created.
     */
     SLANG_API int spAddTranslationUnit(
         SlangCompileRequest*    request,
         SlangSourceLanguage     language,
         char const*             name);
+
+    
+    /** Set a default module name. Translation units will default to this module name if one is not
+    passed. If not set each translation unit will get a unique name. 
+    */
+    SLANG_API void spSetDefaultModuleName(
+        SlangCompileRequest*    request,
+        const char* defaultModuleName);
 
     /** Add a preprocessor definition that is scoped to a single translation unit.
 

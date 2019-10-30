@@ -497,7 +497,7 @@ struct OptionsParser
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
-                    spEnableReproCapture(asExternal(requestImpl));
+                    spEnableReproCapture(compileRequest);
                 }
                 else if (argStr == "-dump-repro-on-error")
                 {
@@ -509,6 +509,13 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::extractFilesToDirectory(reproName));
+                }
+                else if (argStr == "-module-name")
+                {
+                    String moduleName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
+
+                    spSetDefaultModuleName(compileRequest, moduleName.getBuffer());
                 }
                 else if(argStr == "-load-repro")
                 {
@@ -860,16 +867,16 @@ struct OptionsParser
                 }
                 else if (argStr == "-r")
                 {
-                    String moduleName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
+                    String referenceModuleName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, referenceModuleName));
 
                     // We need to deserialize and add the modules
-                    FileStream fileStream(moduleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+                    FileStream fileStream(referenceModuleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 
                     List<RefPtr<IRModule>> irModules;
                     if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, asInternal(session), requestImpl->getFrontEndReq()->getSourceManager(), irModules)))
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, moduleName);
+                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, referenceModuleName);
                         return SLANG_FAIL;
                     }
 
