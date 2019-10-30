@@ -225,6 +225,9 @@
     <ClInclude Include="slang-check-impl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-check.cpp">

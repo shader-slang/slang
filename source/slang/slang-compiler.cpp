@@ -393,23 +393,23 @@ namespace Slang
         }
     }
 
-    Stage findStageByName(String const& name)
+    static const struct
     {
-        static const struct
-        {
-            char const* name;
-            Stage       stage;
-        } kStages[] =
-        {
-        #define PROFILE_STAGE(ID, NAME, ENUM) \
+        char const* name;
+        Stage       stage;
+    } kStages[] =
+    {
+    #define PROFILE_STAGE(ID, NAME, ENUM) \
             { #NAME,    Stage::ID },
 
         #define PROFILE_STAGE_ALIAS(ID, NAME, VAL) \
             { #NAME,    Stage::ID },
 
         #include "slang-profile-defs.h"
-        };
+    };
 
+    Stage findStageByName(String const& name)
+    {
         for(auto entry : kStages)
         {
             if(name == entry.name)
@@ -419,6 +419,18 @@ namespace Slang
         }
 
         return Stage::Unknown;
+    }
+
+    UnownedStringSlice getStageText(Stage stage)
+    {
+        for (auto entry : kStages)
+        {
+            if (stage == entry.stage)
+            {
+                return UnownedStringSlice(entry.name);
+            }
+        }
+        return UnownedStringSlice();
     }
 
     static UnownedStringSlice _getPassThroughAsText(PassThroughMode mode)

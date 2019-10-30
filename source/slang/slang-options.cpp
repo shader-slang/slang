@@ -3,6 +3,8 @@
 // Implementation of options parsing for `slangc` command line,
 // and also for API interface that takes command-line argument strings.
 
+#include "slang-options.h"
+
 #include "../../slang.h"
 
 #include "slang-compiler.h"
@@ -58,6 +60,16 @@ static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassTh
     if (name == #x) { outPassThrough = SLANG_PASS_THROUGH_##y; return SLANG_OK; }
     SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_CHECK)
     return SLANG_FAIL;
+}
+
+UnownedStringSlice getPassThroughName(SlangPassThrough passThru)
+{
+#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
+    if (passThru == SLANG_PASS_THROUGH_##y) return UnownedStringSlice::fromLiteral(#x);
+
+    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
+
+    return UnownedStringSlice::fromLiteral("unknown");
 }
 
 struct OptionsParser
