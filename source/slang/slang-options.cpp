@@ -11,6 +11,7 @@
 #include "slang-file-system.h"
 
 #include "slang-state-serialize.h"
+#include "slang-ir-serialize.h"
 
 #include <assert.h>
 
@@ -856,6 +857,26 @@ struct OptionsParser
                         sink->diagnose(SourceLoc(), Diagnostics::unknownFileSystemOption, name);
                         return SLANG_FAIL;
                     }
+                }
+                else if (argStr == "-r")
+                {
+                    String moduleName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
+
+                    // We need to deserialize and add the modules
+                    FileStream fileStream(moduleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+
+                    List<RefPtr<IRModule>> irModules;
+                    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, asInternal(session), requestImpl->getFrontEndReq()->getSourceManager(), irModules)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, moduleName);
+                        return SLANG_FAIL;
+                    }
+
+                    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+                    // For now just add to the linkage
+                    auto linkage = requestImpl->getLinkage();
+                    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
                 }
                 else if (argStr == "-v")
                 {
