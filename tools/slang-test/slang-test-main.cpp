@@ -1086,6 +1086,30 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     return result;
 }
 
+TestResult runCompile(TestContext* context, TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    return TestResult::Pass;
+}
+
+
 static SlangResult _loadAsSharedLibrary(const UnownedStringSlice& hexDump, TemporaryFileSet& inOutTemporaryFileSet, SharedLibrary::Handle& outSharedLibrary)
 {
     // We need to extract the binary
@@ -2406,6 +2430,7 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
     { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
+    { "COMPILE",                                &runCompile},
 };
 
 TestResult runTest(
