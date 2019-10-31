@@ -117,8 +117,8 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     enum class PathStyle
     {
         Default,                    ///< Pass to say use the default 
-        Unknown,                    ///< It's an unknown type of path
         Simplifiable,               ///< It can be simplified by Path::Simplify
+        FileSystemExt,              ///< Use file system
     };
 
     enum UniqueIdentityMode
@@ -216,6 +216,14 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         return SLANG_E_NOT_IMPLEMENTED;
     }
 
+        /// Get the unique identity mode
+    UniqueIdentityMode getUniqueIdentityMode() const { return m_uniqueIdentityMode; }
+        /// Get the path style
+    PathStyle getPathStyle() const { return m_pathStyle; }
+
+        /// Set the inner file system 
+    void setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
+
         /// Ctor
     CacheFileSystem(ISlangFileSystem* fileSystem, UniqueIdentityMode uniqueIdentityMode = UniqueIdentityMode::Default, PathStyle pathStyle = PathStyle::Default);
         /// Dtor
@@ -291,9 +299,10 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
 
-    RelativeFileSystem(ISlangFileSystemExt* fileSystem, const String& relativePath):
+    RelativeFileSystem(ISlangFileSystemExt* fileSystem, const String& relativePath, bool stripPath = false):
         m_fileSystem(fileSystem),
-        m_relativePath(relativePath)
+        m_relativePath(relativePath),
+        m_stripPath(stripPath)
     {
     }
 
@@ -302,6 +311,8 @@ protected:
     SlangResult _getFixedPath(const char* path, String& outPath);
 
     ISlangUnknown* getInterface(const Guid& guid);
+
+    bool m_stripPath;
 
     ComPtr<ISlangFileSystemExt> m_fileSystem;
     String m_relativePath;
