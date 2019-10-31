@@ -1180,15 +1180,17 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
         while (flags)
         {
             // Extract a bit
-            SlangCompileFlags newFlags = flags & (flags - 1);
-            SlangCompileFlags flag = newFlags ^ flags;
+            const SlangCompileFlags isolatedBit = flags & SlangCompileFlags(-int(flags)); 
 
-            switch (flag)
+            switch (isolatedBit)
             {
                 case SLANG_COMPILE_FLAG_NO_MANGLING:    cmd.addArg("-no-mangle"); break;
                 case SLANG_COMPILE_FLAG_NO_CODEGEN:     cmd.addArg("-no-codegen"); break;
                 default: break;
             }
+
+            // Remove the bit
+            flags &= ~isolatedBit;
         }
         //spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
 
