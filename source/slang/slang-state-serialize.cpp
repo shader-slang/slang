@@ -878,7 +878,9 @@ struct LoadContext
         {
             const auto& srcTranslationUnit = base.asRaw(srcTranslationUnits[i]);
 
-            int index = frontEndReq->addTranslationUnit(srcTranslationUnit.language);
+            // TODO(JS): We should probably serialize off the module name
+            // Passing in nullptr will just generate the module name
+            int index = frontEndReq->addTranslationUnit(srcTranslationUnit.language, nullptr);
             SLANG_UNUSED(index);
             SLANG_ASSERT(index == i);
 
