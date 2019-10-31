@@ -1287,6 +1287,20 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
             break;
         }
     }
+    if( auto oldPendingTypeLayout = oldTypeLayout->pendingDataTypeLayout )
+    {
+        if( auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout )
+        {
+            for (auto oldResInfo : oldPendingTypeLayout->resourceInfos)
+            {
+                if (auto offsetResInfo = pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
+                {
+                    anyHit = true;
+                    break;
+                }
+            }
+        }
+    }
 
     if (!anyHit)
         return oldTypeLayout;
@@ -1324,6 +1338,35 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 }
             }
 
+            if( auto oldPendingField = oldField->pendingVarLayout )
+            {
+                RefPtr<VarLayout> newPendingField = new VarLayout();
+                newPendingField->varDecl                   = oldPendingField->varDecl;
+                newPendingField->typeLayout                = oldPendingField->typeLayout;
+                newPendingField->flags                     = oldPendingField->flags;
+                newPendingField->semanticIndex             = oldPendingField->semanticIndex;
+                newPendingField->semanticName              = oldPendingField->semanticName;
+                newPendingField->stage                     = oldPendingField->stage;
+                newPendingField->systemValueSemantic       = oldPendingField->systemValueSemantic;
+                newPendingField->systemValueSemanticIndex  = oldPendingField->systemValueSemanticIndex;
+
+                newField->pendingVarLayout = newPendingField;
+
+                for (auto oldResInfo : oldPendingField->resourceInfos)
+                {
+                    auto newResInfo = newPendingField->findOrAddResourceInfo(oldResInfo.kind);
+                    newResInfo->index = oldResInfo.index;
+                    newResInfo->space = oldResInfo.space;
+                    if( auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout )
+                    {
+                        if (auto offsetResInfo = pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
+                        {
+                            newResInfo->index += offsetResInfo->index;
+                        }
+                    }
+                }
+            }
+
             newStructTypeLayout->fields.add(newField);
 
             mapOldFieldToNew.Add(oldField.Ptr(), newField.Ptr());
@@ -1352,6 +1395,14 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     {
         auto newResInfo = newTypeLayout->findOrAddResourceInfo(oldResInfo.kind);
         newResInfo->count = oldResInfo.count;
+    }
+
+    if( auto oldPendingTypeLayout = oldTypeLayout->pendingDataTypeLayout )
+    {
+        if( auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout )
+        {
+            newTypeLayout->pendingDataTypeLayout = applyOffsetToTypeLayout(oldPendingTypeLayout, pendingOffsetVarLayout);
+        }
     }
 
     return newTypeLayout;
@@ -1707,36 +1758,6 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         }
     }
 
-    // The existing Slang reflection API was created before we really
-    // understood the wrinkle that the "container" and elements parts
-    // of a parameter group could collide on some resource kinds,
-    // so the API doesn't currently expose the nice `VarLayout`s we've
-    // just computed.
-    //
-    // Instead, the API allows the user to query the element type layout
-    // for the group, and the user just assumes that the offsetting
-    // is magically applied there. To go back to the earlier example:
-    //
-    //      struct MyMaterial { Texture2D t; SamplerState s; };
-    //      ConstantBuffer<MyMaterial> gMaterial;
-    //
-    // A user of the existing reflection API expects to be able to
-    // query the `binding` of `gMaterial` and get back zero, then
-    // query the `binding` of the `t` field of the element type
-    // and get *one*. It is clear that in the abstract, the
-    // `MyMaterial::t` field should have an offset of zero (as
-    // the first field in a `struct`), so to meet the user's
-    // expectations, some cleverness is needed.
-    //
-    // We will use a subroutine `applyOffsetToTypeLayout`
-    // that tries to recursively walk an existing `TypeLayout`
-    // and apply an offset to its fields. This is currently
-    // quite ad hoc, but that doesn't matter much as it
-    // handles `struct` types which are the 99% case for
-    // parameter blocks.
-    //
-    typeLayout->offsetElementTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, elementVarLayout);
-
     // Next, resource usage from the container and element
     // types may need to "bleed through" to the overall
     // parameter group type.
@@ -1934,7 +1955,41 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // Now we need to update the type layout to  what we've done.
         //
         typeLayout->pendingDataTypeLayout = unmaskedPendingDataTypeLayout;
+
+        // TODO: we should probably adjust the size reported by the element type
+        // to include any "pending" data that was allocated into the group, so
+        // that it can be easier for client code to allocate their instances.
     }
+
+    // The existing Slang reflection API was created before we really
+    // understood the wrinkle that the "container" and elements parts
+    // of a parameter group could collide on some resource kinds,
+    // so the API doesn't currently expose the nice `VarLayout`s we've
+    // just computed.
+    //
+    // Instead, the API allows the user to query the element type layout
+    // for the group, and the user just assumes that the offsetting
+    // is magically applied there. To go back to the earlier example:
+    //
+    //      struct MyMaterial { Texture2D t; SamplerState s; };
+    //      ConstantBuffer<MyMaterial> gMaterial;
+    //
+    // A user of the existing reflection API expects to be able to
+    // query the `binding` of `gMaterial` and get back zero, then
+    // query the `binding` of the `t` field of the element type
+    // and get *one*. It is clear that in the abstract, the
+    // `MyMaterial::t` field should have an offset of zero (as
+    // the first field in a `struct`), so to meet the user's
+    // expectations, some cleverness is needed.
+    //
+    // We will use a subroutine `applyOffsetToTypeLayout`
+    // that tries to recursively walk an existing `TypeLayout`
+    // and apply an offset to its fields. This is currently
+    // quite ad hoc, but that doesn't matter much as it
+    // handles `struct` types which are the 99% case for
+    // parameter blocks.
+    //
+    typeLayout->offsetElementTypeLayout = applyOffsetToTypeLayout(rawElementTypeLayout, elementVarLayout);
 
     return typeLayout;
 }
@@ -3351,6 +3406,7 @@ static TypeLayoutResult _createTypeLayout(
         RefPtr<VarLayout> pendingDataVarLayout = new VarLayout();
         if(auto pendingDataTypeLayout = baseTypeLayoutResult.layout->pendingDataTypeLayout)
         {
+            pendingDataVarLayout->typeLayout = pendingDataTypeLayout;
             for( auto pendingResInfo : pendingDataTypeLayout->resourceInfos )
             {
                 auto kind = pendingResInfo.kind;
