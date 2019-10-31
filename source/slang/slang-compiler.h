@@ -1407,20 +1407,14 @@ namespace Slang
             /// Add a translation unit to be compiled.
             ///
             /// @param language The source language that the translation unit will use (e.g., `SourceLanguage::Slang`
-            /// @param moduleName The name that will be used for the module compile from the translation unit.
-            /// @return The zero-based index of the translation unit in this compile request.
-        int addTranslationUnit(SourceLanguage language, Name* moduleName);
-
-            /// Add a translation unit to be compiled.
+            /// @param moduleName The name that will be used for the module compile from the translation unit. 
             ///
-            /// @param language The source language that the translation unit will use (e.g., `SourceLanguage::Slang`
-            /// @return The zero-based index of the translation unit in this compile request.
-            ///
-            /// The module name for the translation unit will be automatically generated.
+            /// If moduleName is passed as nullptr a module name is generated.
             /// If all translation units in a compile request use automatically generated
             /// module names, then they are guaranteed not to conflict with one another.
-            ///
-        int addTranslationUnit(SourceLanguage language);
+            /// 
+            /// @return The zero-based index of the translation unit in this compile request.
+        int addTranslationUnit(SourceLanguage language, Name* moduleName);
 
         void addTranslationUnitSourceFile(
             int             translationUnitIndex,
@@ -1450,6 +1444,8 @@ namespace Slang
 
             /// Does the code we are compiling represent part of the Slang standard library?
         bool m_isStandardLibraryCode = false;
+
+        Name* m_defaultModuleName = nullptr;
 
     private:
             /// A component type that includes only the global scopes of the translation unit(s) that were compiled.

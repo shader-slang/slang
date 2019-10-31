@@ -806,7 +806,7 @@ IRFunc* specializeIRForEntryPoint(
         SLANG_UNEXPECTED("no matching IR symbol");
         return nullptr;
     }
-
+    
     // Note: it is possible that `sym` shows multiple
     // definitions, coming from different IR modules that
     // were input to the linking process. We don't have

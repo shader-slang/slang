@@ -6473,6 +6473,8 @@ static void lowerFrontEndEntryPointToIR(
     }
 
     // Go through the entry point parameters creating decorations from layout as appropriate
+    // But only if this is a definition not a declaration
+    if (isDefinition(instToDecorate))
     {
         FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
 

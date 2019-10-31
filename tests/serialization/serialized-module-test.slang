@@ -3,7 +3,7 @@
 // A test to try out the basics of module
 // serialization.
 
-//TEST:SIMPLE_EX: tests/serialization/serialized-module.slang -o tests/serialization/serialized-module.slang-module
+//TEST:COMPILE: tests/serialization/serialized-module.slang -o tests/serialization/serialized-module.slang-module
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -xslang -r -xslang tests/serialization/serialized-module.slang-module
 
 //import serialized_module;
