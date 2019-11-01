@@ -3583,6 +3583,8 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
 {
     using namespace Slang;
 
+    SLANG_UNUSED(session);
+    
     MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
 
     List<uint8_t> buffer;
