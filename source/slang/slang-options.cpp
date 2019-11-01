@@ -563,6 +563,39 @@ struct OptionsParser
 
                     return SLANG_OK;
                 }
+                else if (argStr == "-repro-file-system")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    List<uint8_t> buffer;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+
+                    auto requestState = StateSerializeUtil::getRequest(buffer);
+                    MemoryOffsetBase base;
+                    base.set(buffer.getBuffer(), buffer.getCount());
+
+                    // If we can find a directory, that exists, we will set up a file system to load from that directory
+                    ComPtr<ISlangFileSystem> dirFileSystem;
+                    String dirPath;
+                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    {
+                        SlangPathType pathType;
+                        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+                        {
+                            dirFileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath, true);
+                        }
+                    }
+
+                    RefPtr<CacheFileSystem> cacheFileSystem;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
+
+                    // I might want to make the dir file system the fallback file system...
+                    cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
+
+                    // Set as the file system
+                    spSetFileSystem(compileRequest, cacheFileSystem);
+                }
                 else if (argStr == "-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;

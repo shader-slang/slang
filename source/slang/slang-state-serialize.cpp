@@ -631,16 +631,18 @@ struct LoadContext
     typedef StateSerializeUtil::FileState FileState;
     typedef StateSerializeUtil::PathInfoState PathInfoState;
 
-    ISlangBlob* getFileBlob(FileState* file)
+    CacheFileSystem::PathInfo* getPathInfoFromFile(FileState* file)
     {
         if (!file)
         {
             return nullptr;
         }
 
-        ComPtr<ISlangBlob> blob;
-        if (!m_fileToBlobMap.TryGetValue(file, blob))
+        CacheFileSystem::PathInfo* dstInfo = nullptr;
+        if (!m_fileToPathInfoMap.TryGetValue(file, dstInfo))
         {
+            ComPtr<ISlangBlob> blob;
+
             if (m_fileSystem && file->uniqueName)
             {
                 // Try loading from the file system
@@ -653,11 +655,39 @@ struct LoadContext
                 blob = new StringBlob(m_base->asRaw(file->contents)->getSlice());
             }
 
+            dstInfo = new CacheFileSystem::PathInfo(String());
+
+            if (file->uniqueIdentity)
+            {
+                String uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
+                dstInfo->m_uniqueIdentity = new StringBlob(uniqueIdentity);
+            }
+
+            if (file->canonicalPath)
+            {
+                dstInfo->m_canonicalPath = new StringBlob(m_base->asRaw(file->canonicalPath)->getSlice());
+            }
+
+            if (blob)
+            {
+                dstInfo->m_loadFileResult = CacheFileSystem::CompressedResult::Ok;
+                dstInfo->m_getPathTypeResult = CacheFileSystem::CompressedResult::Ok;
+                dstInfo->m_pathType = SLANG_PATH_TYPE_FILE;
+            }
+
+            dstInfo->m_fileBlob = blob;
+
             // Add to map, even if the blob is nullptr (say from a failed read)
-            m_fileToBlobMap.Add(file, blob);
+            m_fileToPathInfoMap.Add(file, dstInfo);
         }
 
-        return blob;
+        return dstInfo;
+    }
+
+    ISlangBlob* getFileBlobFromFile(FileState* file)
+    {
+        CacheFileSystem::PathInfo* pathInfo = getPathInfoFromFile(file);
+        return pathInfo ? pathInfo->m_fileBlob.get() : nullptr;
     }
 
     SourceFile* getSourceFile(SourceFileState* sourceFile)
@@ -671,7 +701,7 @@ struct LoadContext
         if (!m_sourceFileMap.TryGetValue(sourceFile, dstFile))
         {
             FileState* file = m_base->asRaw(sourceFile->file);
-            ISlangBlob* blob = getFileBlob(file);
+            ISlangBlob* blob = getFileBlobFromFile(file);
 
             PathInfo pathInfo;
 
@@ -711,22 +741,18 @@ struct LoadContext
             return pathInfo;
         }
 
-        CacheFileSystem::PathInfo* dstInfo = new CacheFileSystem::PathInfo(String());
         FileState* file = m_base->asRaw(srcInfo->file);
+        CacheFileSystem::PathInfo* dstInfo;
+
         if (file)
         {
-            if (file->uniqueIdentity)
-            {
-                String uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
-                dstInfo->m_uniqueIdentity = new StringBlob(uniqueIdentity);
-            }
-
-            if (file->canonicalPath)
-            {
-                dstInfo->m_canonicalPath = new StringBlob(m_base->asRaw(file->canonicalPath)->getSlice());
-            }
-
-            dstInfo->m_fileBlob = getFileBlob(file);
+            dstInfo = getPathInfoFromFile(file);
+        }
+        else
+        {
+            // TODO(JS): Hmmm... this could end up not being cleared up
+            // Because it is not added to the unique set (as unique set is for files and this isn't a file)
+            dstInfo = new CacheFileSystem::PathInfo(String());
         }
 
         dstInfo->m_getCanonicalPathResult = srcInfo->getCanonicalPathResult;
@@ -773,14 +799,67 @@ struct LoadContext
     OffsetBase* m_base;
 
     SourceManager* m_sourceManager;
+
     Dictionary<SourceFileState*, SourceFile*> m_sourceFileMap;
-    Dictionary<FileState*, ComPtr<ISlangBlob> > m_fileToBlobMap;
+    Dictionary<FileState*, CacheFileSystem::PathInfo*> m_fileToPathInfoMap;
     Dictionary<const PathInfoState*, CacheFileSystem::PathInfo*> m_pathInfoMap;
 };
 
 } // anonymous
 
 
+/* static */SlangResult StateSerializeUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, RefPtr<CacheFileSystem>& outFileSystem)
+{
+    LoadContext context(nullptr, fileSystem, &base);
+
+    RefPtr<CacheFileSystem> cacheFileSystem = new CacheFileSystem(nullptr);
+    auto& dstUniqueMap = cacheFileSystem->getUniqueMap();
+    auto& dstPathMap = cacheFileSystem->getPathMap();
+
+    for (auto fileOffset : requestState->files)
+    {
+        // add the file
+        FileState* fileState = base.asRaw(base.asRaw(fileOffset));
+        CacheFileSystem::PathInfo* pathInfo = context.getPathInfoFromFile(fileState);
+
+        if (fileState->foundPath)
+        {
+            String foundPath = base.asRaw(fileState->foundPath)->getSlice();
+            dstPathMap.AddIfNotExists(foundPath, pathInfo);
+        }
+    }
+
+    // Put all the paths to path info
+    {
+        for (const auto& pairOffset : requestState->pathInfoMap)
+        {
+            const auto& pair = base.asRaw(pairOffset);
+            CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(base.asRaw(pair.pathInfo));
+            dstPathMap.AddIfNotExists(base.asRaw(pair.path)->getSlice(), pathInfo);
+        }
+    }
+
+    // Put all the path infos in the cache system
+    {
+        for (const auto& pair : context.m_fileToPathInfoMap)
+        {
+            CacheFileSystem::PathInfo* pathInfo = pair.Value;
+            SLANG_ASSERT(pathInfo->m_uniqueIdentity);
+            dstUniqueMap.Add(pathInfo->m_uniqueIdentity->getString(), pathInfo);
+
+            // Add canonical paths too..
+            if (pathInfo->m_canonicalPath)
+            {
+                String canonicalPath = pathInfo->m_canonicalPath->getString();
+
+                dstPathMap.AddIfNotExists(canonicalPath, pathInfo);
+            }
+        }
+    }
+
+    outFileSystem = cacheFileSystem;
+    return SLANG_OK;
+}
 
 /* static */SlangResult StateSerializeUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
 {
@@ -947,7 +1026,7 @@ struct LoadContext
         }
         // Put all the path infos in the cache system
         {
-            for (const auto& pair : context.m_pathInfoMap)
+            for (const auto& pair : context.m_fileToPathInfoMap)
             {
                 CacheFileSystem::PathInfo* pathInfo = pair.Value;
                 SLANG_ASSERT(pathInfo->m_uniqueIdentity);
@@ -1076,6 +1155,21 @@ struct LoadContext
     return extractFiles(base, requestState, &relFileSystem);
 }
 
+static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<StateSerializeUtil::StringPair>& srcDefines, CommandLine& cmd)
+{
+    for (const auto& define : srcDefines)
+    {
+        StringBuilder builder;
+        builder << "-D" << base.asRaw(base.asRaw(define).first)->getSlice();
+        if (base.asRaw(define).second)
+        {
+            builder << "=" << base.asRaw(base.asRaw(define).second)->getSlice();
+        }
+
+        cmd.addArg(builder);
+    }
+}
+
 static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::RequestState* requestState, CommandLine& cmd)
 {
     typedef StateSerializeUtil::TargetRequestState TargetRequestState;
@@ -1086,15 +1180,17 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
         while (flags)
         {
             // Extract a bit
-            SlangCompileFlags newFlags = flags & (flags - 1);
-            SlangCompileFlags flag = newFlags ^ flags;
+            const SlangCompileFlags isolatedBit = flags & SlangCompileFlags(-int(flags)); 
 
-            switch (flag)
+            switch (isolatedBit)
             {
                 case SLANG_COMPILE_FLAG_NO_MANGLING:    cmd.addArg("-no-mangle"); break;
                 case SLANG_COMPILE_FLAG_NO_CODEGEN:     cmd.addArg("-no-codegen"); break;
                 default: break;
             }
+
+            // Remove the bit
+            flags &= ~isolatedBit;
         }
         //spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
 
@@ -1220,17 +1316,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
         }
     }
 
-    {
-        for (const auto& define : requestState->preprocessorDefinitions)
-        {
-            StringBuilder builder;
-            builder << "-D" << base.asRaw(base.asRaw(define).first)->getSlice();
-            if (base.asRaw(define).second)
-            {
-                builder << "=" << base.asRaw(base.asRaw(define).second)->getSlice();
-            }
-        }
-    }
+    _calcPreprocessorDefines(base, requestState->preprocessorDefinitions, cmd);
 
     {
         const auto& srcTranslationUnits = requestState->translationUnits;
@@ -1239,8 +1325,9 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
         {
             const auto& srcTranslationUnit = base.asRaw(srcTranslationUnits[i]);
 
-            //context.loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
+            _calcPreprocessorDefines(base, srcTranslationUnit.preprocessorDefinitions, cmd);
 
+            
 #if 0
             if (srcTranslationUnit.moduleName)
             {
