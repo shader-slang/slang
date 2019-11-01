@@ -1685,6 +1685,25 @@ extern "C"
         size_t reproDataSize,
         ISlangFileSystemExt* fileSystem);
 
+    /* Turns a repro into a file system.
+
+    Makes the contents of the repro available as a file system - that is able to access the files with the same
+    paths as were used on the original repro file system. 
+
+    @param session          The slang session
+    @param reproData        The repro data
+    @param reproDataSize    The size of the repro data
+    @param replaceFileSystem  Will attempt to load by unique names from this file system before using contents of the repro. Optional.
+    @param outFileSystem    The file system that can be used to access contents
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spLoadReproAsFileSystem(
+        SlangSession* session,
+        const void* reproData,
+        size_t reproDataSize,
+        ISlangFileSystem* replaceFileSystem,
+        ISlangFileSystemExt** outFileSystem);
+    
     /*
     Forward declarations of types used in the reflection interface;
     */

@@ -3574,6 +3574,31 @@ SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproDat
     return StateSerializeUtil::extractFiles(base, requestState, fileSystem);
 }
 
+SLANG_API SlangResult spLoadReproAsFileSystem(
+    SlangSession* session,
+    const void* reproData,
+    size_t reproDataSize,
+    ISlangFileSystem* replaceFileSystem,
+    ISlangFileSystemExt** outFileSystem)
+{
+    using namespace Slang;
+
+    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&stream, buffer));
+
+    auto requestState = StateSerializeUtil::getRequest(buffer);
+    MemoryOffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
+    RefPtr<CacheFileSystem> cacheFileSystem;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
+
+    *outFileSystem = cacheFileSystem.detach();
+    return SLANG_OK;
+}
+
 // Reflection API
 
 SLANG_API SlangResult spCompileRequest_getProgram(
