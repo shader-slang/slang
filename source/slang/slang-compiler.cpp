@@ -75,6 +75,7 @@
 
 namespace Slang
 {
+
 #define SLANG_CODE_GEN_TARGETS(x) \
     x("unknown", Unknown) \
     x("none", None) \

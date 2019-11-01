@@ -1393,6 +1393,18 @@ extern "C"
         char const*             source);
 
 
+    /** Add a slang library - such that its contents can be referenced during linking.
+    This is equivalent to the -r command line option.
+
+    @param request The compile request
+    @param libData The library data
+    @param libDataSize The size of the library data
+    */
+    SLANG_API SlangResult spAddLibraryReference(
+        SlangCompileRequest*    request,
+        const void* libData,
+        size_t libDataSize);
+
     /** Add a source string to the given translation unit.
 
     @param request The compile request that owns the translation unit.

@@ -3039,6 +3039,33 @@ SLANG_API void spSetDefaultModuleName(
 }
 
 
+SLANG_API SlangResult spAddLibraryReference(
+    SlangCompileRequest*    request,
+    const void* libData,
+    size_t libDataSize)
+{
+    using namespace Slang;
+    auto req = Slang::asInternal(request);
+
+    // We need to deserialize and add the modules
+    MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
+
+    // Read all of the contained modules
+    List<RefPtr<IRModule>> irModules;
+    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules)))
+    {
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
+        return SLANG_FAIL;
+    }
+
+    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+    // For now just add to the linkage
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
+
+    return SLANG_OK;
+}
+
 SLANG_API void spTranslationUnit_addPreprocessorDefine(
     SlangCompileRequest*    request,
     int                     translationUnitIndex,
