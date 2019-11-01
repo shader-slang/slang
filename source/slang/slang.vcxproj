@@ -223,6 +223,7 @@
     <ClInclude Include="slang-name.h" />
     <ClInclude Include="slang-object-meta-begin.h" />
     <ClInclude Include="slang-object-meta-end.h" />
+    <ClInclude Include="slang-options.h" />
     <ClInclude Include="slang-parameter-binding.h" />
     <ClInclude Include="slang-parser.h" />
     <ClInclude Include="slang-preprocessor.h" />

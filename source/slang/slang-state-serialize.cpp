@@ -7,6 +7,8 @@
 
 #include "../core/slang-math.h"
 
+#include "slang-options.h"
+
 #include "slang-source-loc.h"
 
 namespace Slang {
@@ -1074,10 +1076,234 @@ struct LoadContext
     return extractFiles(base, requestState, &relFileSystem);
 }
 
+static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::RequestState* requestState, CommandLine& cmd)
+{
+    typedef StateSerializeUtil::TargetRequestState TargetRequestState;
+    typedef StateSerializeUtil::SourceFileState SourceFileState;
+
+    {
+        SlangCompileFlags flags = (SlangCompileFlags)requestState->compileFlags;
+        while (flags)
+        {
+            // Extract a bit
+            SlangCompileFlags newFlags = flags & (flags - 1);
+            SlangCompileFlags flag = newFlags ^ flags;
+
+            switch (flag)
+            {
+                case SLANG_COMPILE_FLAG_NO_MANGLING:    cmd.addArg("-no-mangle"); break;
+                case SLANG_COMPILE_FLAG_NO_CODEGEN:     cmd.addArg("-no-codegen"); break;
+                default: break;
+            }
+        }
+        //spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
+
+        switch (SlangLineDirectiveMode(requestState->lineDirectiveMode))
+        {
+            case SLANG_LINE_DIRECTIVE_MODE_DEFAULT: break;
+            case SLANG_LINE_DIRECTIVE_MODE_NONE:
+            {
+                cmd.addArg("-line-directive-mode none"); break;
+            }
+            default: break;
+        }
+
+        switch (SlangDebugInfoLevel(requestState->debugInfoLevel))
+        {
+            case SLANG_DEBUG_INFO_LEVEL_STANDARD:       cmd.addArg("-g"); break;
+            case SLANG_DEBUG_INFO_LEVEL_NONE:           cmd.addArg("-g0"); break;
+            case SLANG_DEBUG_INFO_LEVEL_MINIMAL:        cmd.addArg("-g1"); break;
+            case SLANG_DEBUG_INFO_LEVEL_MAXIMAL:        cmd.addArg("-g3"); break;
+            default: break;
+        }
+
+        switch (SlangOptimizationLevel(requestState->optimizationLevel))
+        {
+            case SLANG_OPTIMIZATION_LEVEL_NONE:         cmd.addArg("-O0"); break;
+            case SLANG_OPTIMIZATION_LEVEL_DEFAULT:      cmd.addArg("-O");  break;
+            case SLANG_OPTIMIZATION_LEVEL_HIGH:         cmd.addArg("-O2"); break;
+            case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:      cmd.addArg("-O3"); break;
+            default: break;
+        }
+
+        //spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
+
+        switch (SlangPassThrough(requestState->passThroughMode))
+        {
+            case SLANG_PASS_THROUGH_NONE: break;
+            default:
+            {
+                cmd.addArg("-pass-through");
+                cmd.addArg(getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
+                break;
+            }
+        }
+
+        //request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
+        //request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
+        //request->getFrontEndReq()->obfuscateCode = requestState->obfuscateCode;
+
+        switch (requestState->defaultMatrixLayoutMode)
+        {
+            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:     cmd.addArg("-matrix-layout-row-major"); break;
+            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:  cmd.addArg("-matrix-layout-column-major"); break;
+            default: break;
+        }
+    }
+
+    // Add the target requests
+    {
+        for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
+        {
+            TargetRequestState& src = base.asRaw(requestState->targetRequests[i]);
+
+            cmd.addArg("-target");
+            cmd.addArg(getCodeGenTargetName(CodeGenTarget(src.target)));
+
+            cmd.addArg("-profile");
+            cmd.addArg(Profile(src.profile).getName());
+
+            if (src.targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
+            {
+                cmd.addArg("-parameter-blocks-use-register-spaces");
+            }
+
+            switch (src.floatingPointMode)
+            {
+                case FloatingPointMode::Fast:
+                {
+                    cmd.addArg("-fp-mode");
+                    cmd.addArg("fast");
+                    break;
+                }
+                case FloatingPointMode::Precise:
+                {
+                    cmd.addArg("-fp-mode");
+                    cmd.addArg("precise");
+                    break;
+                }
+                default: break;
+            }
+
+#if 0
+            // If there is output state (like output filenames) add here
+            if (src.outputStates.getCount())
+            {
+                RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
+                request->targetInfos[dstTarget] = dstTargetInfo;
+
+                for (const auto& srcOutputStateOffset : src.outputStates)
+                {
+                    const auto& srcOutputState = base.asRaw(srcOutputStateOffset);
+
+                    SLANG_ASSERT(srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
+
+                    String entryPointPath;
+                    if (srcOutputState.outputPath)
+                    {
+                        entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
+                    }
+
+                    dstTargetInfo->entryPointOutputPaths.Add(srcOutputState.entryPointIndex, entryPointPath);
+                }
+            }
+#endif
+        }
+    }
+
+    {
+        const auto& srcPaths = requestState->searchPaths;
+        for (Index i = 0; i < srcPaths.getCount(); ++i)
+        {
+            cmd.addArg("-I");
+            cmd.addArg(base.asRaw(base.asRaw(srcPaths[i]))->getSlice());
+        }
+    }
+
+    {
+        for (const auto& define : requestState->preprocessorDefinitions)
+        {
+            StringBuilder builder;
+            builder << "-D" << base.asRaw(base.asRaw(define).first)->getSlice();
+            if (base.asRaw(define).second)
+            {
+                builder << "=" << base.asRaw(base.asRaw(define).second)->getSlice();
+            }
+        }
+    }
+
+    {
+        const auto& srcTranslationUnits = requestState->translationUnits;
+
+        for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
+        {
+            const auto& srcTranslationUnit = base.asRaw(srcTranslationUnits[i]);
+
+            //context.loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
+
+#if 0
+            if (srcTranslationUnit.moduleName)
+            {
+                moduleName = base[srcTranslationUnit].moduleName->getSlice());
+            }
+#endif
+      
+            const auto& srcSourceFiles = srcTranslationUnit.sourceFiles;
+            
+            for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
+            {
+                SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[i]));
+                OffsetString* path = base[sourceFile->foundPath];
+
+                if (path)
+                {
+                    cmd.addArg(path->getSlice());
+                }
+            }
+        }
+    }
+
+    // Entry points
+    {
+        for (const auto& srcEntryPointOffset : requestState->entryPoints)
+        {
+            const auto srcEntryPoint = base.asRaw(srcEntryPointOffset);
+
+            const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
+
+            cmd.addArg("-entry");
+            cmd.addArg(name);
+
+            cmd.addArg("-stage");
+            UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.GetStage());
+            cmd.addArg(stageText);
+
+            //cmd.addArg("-profile");
+            //cmd.addArg(Profile(srcEntryPoint.profile).getName());
+
+
+            //List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
+
+            //spAddEntryPointEx(externalRequest, int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
+        }
+    }
+
+    return SLANG_OK;
+}
+
 /* static */SlangResult StateSerializeUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem)
 {
     StringBuilder builder;
 
+    builder << "[command-line]\n";
+
+    {
+        CommandLine cmdLine;
+        _calcCommandLine(base, requestState, cmdLine);
+        String text = ProcessUtil::getCommandLineString(cmdLine);
+        builder << text << "\n";
+    }
+        
     builder << "[files]\n";
 
     for (auto fileOffset : requestState->files)
