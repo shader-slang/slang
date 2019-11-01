@@ -1348,6 +1348,18 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
 {
     Index result = translationUnits.getCount();
 
+    if (!moduleName)
+    {
+        // We want to ensure that symbols defined in different translation
+        // units get unique mangled names, so that we can, e.g., tell apart
+        // a `main()` function in `vertex.slang` and a `main()` in `fragment.slang`,
+        // even when they are being compiled together.
+        //
+        String generatedName = "tu";
+        generatedName.append(translationUnits.getCount());
+        moduleName = getNamePool()->getName(generatedName);
+    }
+
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(this);
     translationUnit->compileRequest = this;
     translationUnit->sourceLanguage = SourceLanguage(language);
@@ -1357,18 +1369,6 @@ int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* mo
     translationUnits.add(translationUnit);
 
     return (int) result;
-}
-
-int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language)
-{
-    // We want to ensure that symbols defined in different translation
-    // units get unique mangled names, so that we can, e.g., tell apart
-    // a `main()` function in `vertex.slang` and a `main()` in `fragment.slang`,
-    // even when they are being compiled together.
-    //
-    String generatedName = "tu";
-    generatedName.append(translationUnits.getCount());
-    return addTranslationUnit(language,  getNamePool()->getName(generatedName));
 }
 
 void FrontEndCompileRequest::addTranslationUnitSourceFile(
@@ -3009,16 +3009,35 @@ SLANG_API SlangResult spGetDiagnosticOutputBlob(
 SLANG_API int spAddTranslationUnit(
     SlangCompileRequest*    request,
     SlangSourceLanguage     language,
-    char const*             name)
+    char const*             inName)
 {
-    SLANG_UNUSED(name);
-
     auto req = Slang::asInternal(request);
     auto frontEndReq = req->getFrontEndReq();
 
+    Slang::NamePool* namePool = req->getFrontEndReq()->getNamePool();
+
+    // Work out a module name. Can be nullptr if so will generate a name
+    Slang::Name* moduleName = inName ? namePool->getName(inName) : frontEndReq->m_defaultModuleName;
+
+    // If moduleName is nullptr a name will be generated
+    
     return frontEndReq->addTranslationUnit(
-        Slang::SourceLanguage(language));
+        Slang::SourceLanguage(language),
+        moduleName);
 }
+
+SLANG_API void spSetDefaultModuleName(
+    SlangCompileRequest*    request,
+    const char* defaultModuleName)
+{
+    auto req = Slang::asInternal(request);
+    auto frontEndReq = req->getFrontEndReq();
+
+    Slang::NamePool* namePool = req->getFrontEndReq()->getNamePool();
+
+    frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
+}
+
 
 SLANG_API void spTranslationUnit_addPreprocessorDefine(
     SlangCompileRequest*    request,
@@ -3553,6 +3572,33 @@ SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproDat
 
     StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
     return StateSerializeUtil::extractFiles(base, requestState, fileSystem);
+}
+
+SLANG_API SlangResult spLoadReproAsFileSystem(
+    SlangSession* session,
+    const void* reproData,
+    size_t reproDataSize,
+    ISlangFileSystem* replaceFileSystem,
+    ISlangFileSystemExt** outFileSystem)
+{
+    using namespace Slang;
+
+    SLANG_UNUSED(session);
+    
+    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&stream, buffer));
+
+    auto requestState = StateSerializeUtil::getRequest(buffer);
+    MemoryOffsetBase base;
+    base.set(buffer.getBuffer(), buffer.getCount());
+
+    RefPtr<CacheFileSystem> cacheFileSystem;
+    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
+
+    *outFileSystem = cacheFileSystem.detach();
+    return SLANG_OK;
 }
 
 // Reflection API

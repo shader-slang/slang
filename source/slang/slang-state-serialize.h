@@ -163,6 +163,10 @@ struct StateSerializeUtil
 
     static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
 
+        /// Create a cache file system that uses contents of the request state.
+        /// The passed in fileSystem is used for accessing any file accesses not found in the cache
+    static SlangResult loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, RefPtr<CacheFileSystem>& outFileSystem);
+
         /// Load the requestState into request
         /// The fileSystem is optional and can be passed as nullptr. If set, as each file is loaded
         /// it will attempt to load from fileSystem the *uniqueName*

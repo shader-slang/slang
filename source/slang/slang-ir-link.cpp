@@ -806,7 +806,7 @@ IRFunc* specializeIRForEntryPoint(
         SLANG_UNEXPECTED("no matching IR symbol");
         return nullptr;
     }
-
+    
     // Note: it is possible that `sym` shows multiple
     // definitions, coming from different IR modules that
     // were input to the linking process. We don't have
@@ -1339,15 +1339,26 @@ LinkedIR linkIR(
 
     state->irModule = sharedContext->module;
 
+    auto linkage = compileRequest->getLinkage();
+
     // We need to be able to look up IR definitions for any symbols in
     // modules that the program depends on (transitively). To
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
+
+    List<IRModule*> irModules;
     program->enumerateIRModules([&](IRModule* irModule)
     {
-        insertGlobalValueSymbols(sharedContext, irModule);
+        irModules.add(irModule);
     });
+    irModules.addRange(linkage->m_libModules.getBuffer()->readRef(), linkage->m_libModules.getCount());
+
+    // Add any modules that were loaded as libraries
+    for (IRModule* irModule : irModules)
+    {
+        insertGlobalValueSymbols(sharedContext, irModule);
+    }
 
     // We will also insert the IR global symbols from the IR module
     // attached to the `TargetProgram`, since this module is
@@ -1373,7 +1384,6 @@ LinkedIR linkIR(
         if (sym.Value->irGlobalValue->op == kIROp_WitnessTable)
             cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
     }
-
 
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
@@ -1401,17 +1411,18 @@ LinkedIR linkIR(
     // In the long run we do not want to *ever* iterate over all the
     // instructions in all the input modules.
     //
-    program->enumerateIRModules([&](IRModule* irModule)
+    
+    for (IRModule* irModule : irModules)
     {
-        for(auto inst : irModule->getGlobalInsts())
+        for (auto inst : irModule->getGlobalInsts())
         {
             auto bindInst = as<IRBindGlobalGenericParam>(inst);
-            if(!bindInst)
+            if (!bindInst)
                 continue;
 
             cloneValue(context, bindInst);
         }
-    });
+    }
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

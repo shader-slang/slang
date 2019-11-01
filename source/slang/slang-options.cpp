@@ -3,6 +3,8 @@
 // Implementation of options parsing for `slangc` command line,
 // and also for API interface that takes command-line argument strings.
 
+#include "slang-options.h"
+
 #include "../../slang.h"
 
 #include "slang-compiler.h"
@@ -11,6 +13,7 @@
 #include "slang-file-system.h"
 
 #include "slang-state-serialize.h"
+#include "slang-ir-serialize.h"
 
 #include <assert.h>
 
@@ -58,6 +61,16 @@ static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassTh
     if (name == #x) { outPassThrough = SLANG_PASS_THROUGH_##y; return SLANG_OK; }
     SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_CHECK)
     return SLANG_FAIL;
+}
+
+UnownedStringSlice getPassThroughName(SlangPassThrough passThru)
+{
+#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
+    if (passThru == SLANG_PASS_THROUGH_##y) return UnownedStringSlice::fromLiteral(#x);
+
+    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
+
+    return UnownedStringSlice::fromLiteral("unknown");
 }
 
 struct OptionsParser
@@ -496,7 +509,7 @@ struct OptionsParser
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
-                    spEnableReproCapture(asExternal(requestImpl));
+                    spEnableReproCapture(compileRequest);
                 }
                 else if (argStr == "-dump-repro-on-error")
                 {
@@ -508,6 +521,13 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::extractFilesToDirectory(reproName));
+                }
+                else if (argStr == "-module-name")
+                {
+                    String moduleName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
+
+                    spSetDefaultModuleName(compileRequest, moduleName.getBuffer());
                 }
                 else if(argStr == "-load-repro")
                 {
@@ -542,6 +562,39 @@ struct OptionsParser
                     }
 
                     return SLANG_OK;
+                }
+                else if (argStr == "-repro-file-system")
+                {
+                    String reproName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+
+                    List<uint8_t> buffer;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+
+                    auto requestState = StateSerializeUtil::getRequest(buffer);
+                    MemoryOffsetBase base;
+                    base.set(buffer.getBuffer(), buffer.getCount());
+
+                    // If we can find a directory, that exists, we will set up a file system to load from that directory
+                    ComPtr<ISlangFileSystem> dirFileSystem;
+                    String dirPath;
+                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    {
+                        SlangPathType pathType;
+                        if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+                        {
+                            dirFileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath, true);
+                        }
+                    }
+
+                    RefPtr<CacheFileSystem> cacheFileSystem;
+                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
+
+                    // I might want to make the dir file system the fallback file system...
+                    cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
+
+                    // Set as the file system
+                    spSetFileSystem(compileRequest, cacheFileSystem);
                 }
                 else if (argStr == "-serial-ir")
                 {
@@ -856,6 +909,26 @@ struct OptionsParser
                         sink->diagnose(SourceLoc(), Diagnostics::unknownFileSystemOption, name);
                         return SLANG_FAIL;
                     }
+                }
+                else if (argStr == "-r")
+                {
+                    String referenceModuleName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, referenceModuleName));
+
+                    // We need to deserialize and add the modules
+                    FileStream fileStream(referenceModuleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+
+                    List<RefPtr<IRModule>> irModules;
+                    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, asInternal(session), requestImpl->getFrontEndReq()->getSourceManager(), irModules)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, referenceModuleName);
+                        return SLANG_FAIL;
+                    }
+
+                    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+                    // For now just add to the linkage
+                    auto linkage = requestImpl->getLinkage();
+                    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
                 }
                 else if (argStr == "-v")
                 {

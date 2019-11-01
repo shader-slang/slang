@@ -103,6 +103,8 @@ namespace Slang
     };
 
     Stage findStageByName(String const& name);
+
+    UnownedStringSlice getStageText(Stage stage);
 }
 
 #endif
