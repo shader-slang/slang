@@ -2199,9 +2199,8 @@ SlangResult dissassembleDXILUsingDXC(
         }
     }
 
-    static SlangResult _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
-        Stream* stream)
+    
+    SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         RiffContainer container;
 
@@ -2213,9 +2212,9 @@ SlangResult dissassembleDXILUsingDXC(
             // Module list
             RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, IRSerialBinary::kSlangModuleListFourCc);
 
-            auto linkage = endToEndReq->getLinkage();
-            auto sink = endToEndReq->getSink();
-            auto frontEndReq = endToEndReq->getFrontEndReq();
+            auto linkage = getLinkage();
+            auto sink = getSink();
+            auto frontEndReq = getFrontEndReq();
 
             IRSerialWriter::OptionFlags optionFlags = 0;
 
@@ -2240,7 +2239,7 @@ SlangResult dissassembleDXILUsingDXC(
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
             }
 
-            auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
+            auto program = getSpecializedGlobalAndEntryPointsComponentType();
 
             // TODO: in the case where we have specialization, we might need
             // to serialize IR related to `program`...
@@ -2267,15 +2266,16 @@ SlangResult dissassembleDXILUsingDXC(
         /// Write out a "container" file with the stuff that has
         /// been compiled as part of this request.
         ///
-    static void _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
+    SlangResult EndToEndCompileRequest::writeContainerToFile(
         const String& fileName)
     {
         FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-        if (SLANG_FAILED(_writeContainerFile(endToEndReq, &stream)))
+        const SlangResult res = writeContainerToStream(&stream);
+        if (SLANG_FAILED(res))
         {
-            endToEndReq->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
+            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
         }
+        return res;
     }
 
     static void _generateOutput(
@@ -2325,7 +2325,7 @@ SlangResult dissassembleDXILUsingDXC(
 
             if (compileRequest->containerOutputPath.getLength() != 0)
             {
-                _writeContainerFile(compileRequest, compileRequest->containerOutputPath);
+                compileRequest->writeContainerToFile(compileRequest->containerOutputPath);
             }
         }
     }

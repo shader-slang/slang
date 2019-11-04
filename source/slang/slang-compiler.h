@@ -1701,16 +1701,14 @@ namespace Slang
 
         // What container format are we being asked to generate?
         //
-        // Note: This field is unused except by the options-parsing
-        // logic; it exists to support wriiting out binary modules
-        // once that feature is ready.
+        // This field is unused except by the options-parsing
+        // logic; it exists to support wriiting out binary modules.
         //
         ContainerFormat containerFormat = ContainerFormat::None;
 
         // Path to output container to
         //
-        // Note: This field exists to support wriiting out binary modules
-        // once that feature is ready.
+        // This field exists to support writing out binary module.
         //
         String containerOutputPath;
 
@@ -1756,6 +1754,10 @@ namespace Slang
             Dictionary<Int, String> entryPointOutputPaths;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> targetInfos;
+
+            /// Writes the modules in a container to the stream
+        SlangResult writeContainerToStream(Stream* stream);
+        SlangResult writeContainerToFile(const String& fileName);
 
         Linkage* getLinkage() { return m_linkage; }
 

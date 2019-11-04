@@ -1271,6 +1271,11 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         m_specializedGlobalAndEntryPointsComponentType = getUnspecializedGlobalAndEntryPointsComponentType();
         m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
+        if (containerOutputPath.getLength() != 0)
+        {            
+            SLANG_RETURN_ON_FAIL(writeContainerToFile(containerOutputPath));
+        }
+
         return SLANG_OK;
     }
 

@@ -398,7 +398,7 @@ struct OptionsParser
 
 #undef CASE
 
-        else if (path.endsWith(".slang-module"))
+        else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->containerOutputPath = path;
