@@ -1699,18 +1699,16 @@ namespace Slang
         EndToEndCompileRequest(
             Linkage* linkage);
 
-        // What container format are we being asked to generate?
-        //
-        // This field is unused except by the options-parsing
-        // logic; it exists to support wriiting out binary modules.
-        //
-        ContainerFormat containerFormat = ContainerFormat::None;
+            // What container format are we being asked to generate?
+            // If it's set to a format, the container blob will be calculated during compile
+        ContainerFormat m_containerFormat = ContainerFormat::None;
 
-        // Path to output container to
-        //
-        // This field exists to support writing out binary module.
-        //
-        String containerOutputPath;
+            /// Where the container blob is stored. This is calculated as part of compile if m_containerFormat is set to
+            /// a supported format. 
+        ComPtr<ISlangBlob> m_containerBlob;
+
+            // Path to output container to
+        String m_containerOutputPath;
 
         // Should we just pass the input to another compiler?
         PassThroughMode passThrough = PassThroughMode::None;
@@ -1757,7 +1755,12 @@ namespace Slang
 
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);
-        SlangResult writeContainerToFile(const String& fileName);
+        
+            /// If a container format has been specified produce a container (stored in m_containerBlob)
+        SlangResult maybeCreateContainer();
+            /// If a container has been constructed and the filename/path has contents will try to write
+            /// the container contents to the file
+        SlangResult maybeWriteContainer(const String& fileName);
 
         Linkage* getLinkage() { return m_linkage; }
 

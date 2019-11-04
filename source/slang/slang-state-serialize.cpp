@@ -350,7 +350,7 @@ static bool _isStorable(const PathInfo::Type type)
 
         dst->debugInfoLevel = linkage->debugInfoLevel;
         dst->optimizationLevel = linkage->optimizationLevel;
-        dst->containerFormat = request->containerFormat;
+        dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->passThrough;
 
 

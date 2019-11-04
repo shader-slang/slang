@@ -1271,10 +1271,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         m_specializedGlobalAndEntryPointsComponentType = getUnspecializedGlobalAndEntryPointsComponentType();
         m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
-        if (containerOutputPath.getLength() != 0)
-        {            
-            SLANG_RETURN_ON_FAIL(writeContainerToFile(containerOutputPath));
-        }
+        SLANG_RETURN_ON_FAIL(maybeCreateContainer());
+        SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
     }
@@ -2918,7 +2916,7 @@ SLANG_API void spSetOutputContainerFormat(
     SlangContainerFormat    format)
 {
     auto req = Slang::asInternal(request);
-    req->containerFormat = Slang::ContainerFormat(format);
+    req->m_containerFormat = Slang::ContainerFormat(format);
 }
 
 

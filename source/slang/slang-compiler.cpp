@@ -2263,20 +2263,56 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-        /// Write out a "container" file with the stuff that has
-        /// been compiled as part of this request.
-        ///
-    SlangResult EndToEndCompileRequest::writeContainerToFile(
-        const String& fileName)
+    SlangResult EndToEndCompileRequest::maybeCreateContainer()
     {
-        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-        const SlangResult res = writeContainerToStream(&stream);
-        if (SLANG_FAILED(res))
+        switch (m_containerFormat)
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
+            case ContainerFormat::SlangModule:
+            {
+                m_containerBlob.setNull();
+
+                OwnedMemoryStream stream(FileAccess::Write);
+                SlangResult res = writeContainerToStream(&stream);
+                if (SLANG_FAILED(res))
+                {
+                    getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
+                    return res;
+                }
+
+                // Need to turn into a blob
+                RefPtr<ListBlob> blob(new ListBlob);
+                // Swap the streams contents into the blob
+                stream.swapContents(blob->m_data);
+                m_containerBlob = blob;
+
+                return res;
+            }
+            default: break;
         }
-        return res;
+        return SLANG_OK;
     }
+
+    SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
+    {
+        // If there is no container, or filename, don't write anything 
+        if (fileName.getLength() == 0 || !m_containerBlob)
+        {
+            return SLANG_OK;
+        }
+
+        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        try
+        {
+            stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize());
+        }
+        catch (IOException&)
+        {
+            // Unable to write
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
 
     static void _generateOutput(
         BackEndCompileRequest* compileRequest,
@@ -2323,10 +2359,8 @@ SlangResult dissassembleDXILUsingDXC(
                 }
             }
 
-            if (compileRequest->containerOutputPath.getLength() != 0)
-            {
-                compileRequest->writeContainerToFile(compileRequest->containerOutputPath);
-            }
+            compileRequest->maybeCreateContainer();
+            compileRequest->maybeWriteContainer(compileRequest->m_containerOutputPath);
         }
     }
 
