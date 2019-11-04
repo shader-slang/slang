@@ -1626,16 +1626,27 @@ extern "C"
 
     /** Get the output bytecode associated with an entire compile request.
 
-    The lifetime of the output pointer is the same as `request`.
+    The lifetime of the output pointer is the same as `request` and the last spCompile.
 
-    DEPRECIATED: No longer outputs anything. 
+    @param request          The request
+    @param outSize          The size of the containers contents in bytes. Will be zero if there is no code available.
+    @returns                Pointer to start of the contained data, or nullptr if there is no code available.
     */
     SLANG_API void const* spGetCompileRequestCode(
         SlangCompileRequest*    request,
         size_t*                 outSize);
 
+    /** Return the container code as a blob. The container blob is created as part of a compilation (with spCompile),
+    and a container is produced with a suitable ContainerFormat. 
 
-    
+    @param request          The request
+    @param outSize          The blob containing the container data. 
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spGetContainerCode(
+        SlangCompileRequest*    request,
+        ISlangBlob**            outBlob);
+
     /** Load repro from memory specified.
 
     Should only be performed on a newly created request.

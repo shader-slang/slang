@@ -3527,12 +3527,39 @@ SLANG_API char const* spGetEntryPointSource(
 }
 
 SLANG_API void const* spGetCompileRequestCode(
-    SlangCompileRequest*    request,
+    SlangCompileRequest*    inRequest,
     size_t*                 outSize)
 {
-    SLANG_UNUSED(request);
-    SLANG_UNUSED(outSize);
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    if (request->m_containerBlob)
+    {
+        *outSize = request->m_containerBlob->getBufferSize();
+        return request->m_containerBlob->getBufferPointer();
+    }
+
+    // Container blob does not have any contents
+    *outSize = 0;
     return nullptr;
+}
+
+SLANG_API SlangResult spGetContainerCode(
+    SlangCompileRequest*    inRequest,
+    ISlangBlob**            outBlob)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    ISlangBlob* containerBlob = request->m_containerBlob;
+    if (containerBlob)
+    {
+        containerBlob->addRef();
+        *outBlob = containerBlob;
+        return SLANG_OK;
+    }
+
+    return SLANG_FAIL;
 }
 
 SLANG_API SlangResult spLoadRepro(
