@@ -75,6 +75,7 @@
 
 namespace Slang
 {
+
 #define SLANG_CODE_GEN_TARGETS(x) \
     x("unknown", Unknown) \
     x("none", None) \
@@ -2198,9 +2199,8 @@ SlangResult dissassembleDXILUsingDXC(
         }
     }
 
-    static SlangResult _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
-        Stream* stream)
+    
+    SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         RiffContainer container;
 
@@ -2212,9 +2212,9 @@ SlangResult dissassembleDXILUsingDXC(
             // Module list
             RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, IRSerialBinary::kSlangModuleListFourCc);
 
-            auto linkage = endToEndReq->getLinkage();
-            auto sink = endToEndReq->getSink();
-            auto frontEndReq = endToEndReq->getFrontEndReq();
+            auto linkage = getLinkage();
+            auto sink = getSink();
+            auto frontEndReq = getFrontEndReq();
 
             IRSerialWriter::OptionFlags optionFlags = 0;
 
@@ -2239,7 +2239,7 @@ SlangResult dissassembleDXILUsingDXC(
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
             }
 
-            auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
+            auto program = getSpecializedGlobalAndEntryPointsComponentType();
 
             // TODO: in the case where we have specialization, we might need
             // to serialize IR related to `program`...
@@ -2263,19 +2263,56 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-        /// Write out a "container" file with the stuff that has
-        /// been compiled as part of this request.
-        ///
-    static void _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
-        const String& fileName)
+    SlangResult EndToEndCompileRequest::maybeCreateContainer()
     {
-        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-        if (SLANG_FAILED(_writeContainerFile(endToEndReq, &stream)))
+        switch (m_containerFormat)
         {
-            endToEndReq->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
+            case ContainerFormat::SlangModule:
+            {
+                m_containerBlob.setNull();
+
+                OwnedMemoryStream stream(FileAccess::Write);
+                SlangResult res = writeContainerToStream(&stream);
+                if (SLANG_FAILED(res))
+                {
+                    getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
+                    return res;
+                }
+
+                // Need to turn into a blob
+                RefPtr<ListBlob> blob(new ListBlob);
+                // Swap the streams contents into the blob
+                stream.swapContents(blob->m_data);
+                m_containerBlob = blob;
+
+                return res;
+            }
+            default: break;
         }
+        return SLANG_OK;
     }
+
+    SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
+    {
+        // If there is no container, or filename, don't write anything 
+        if (fileName.getLength() == 0 || !m_containerBlob)
+        {
+            return SLANG_OK;
+        }
+
+        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        try
+        {
+            stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize());
+        }
+        catch (IOException&)
+        {
+            // Unable to write
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
 
     static void _generateOutput(
         BackEndCompileRequest* compileRequest,
@@ -2322,10 +2359,8 @@ SlangResult dissassembleDXILUsingDXC(
                 }
             }
 
-            if (compileRequest->containerOutputPath.getLength() != 0)
-            {
-                _writeContainerFile(compileRequest, compileRequest->containerOutputPath);
-            }
+            compileRequest->maybeCreateContainer();
+            compileRequest->maybeWriteContainer(compileRequest->m_containerOutputPath);
         }
     }
 
