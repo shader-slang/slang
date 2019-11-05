@@ -23,6 +23,8 @@
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 
+#include "slang-ir-strip.h"
+
 #include "slang-emit-source-writer.h"
 
 #include "slang-emit-c-like.h"
@@ -470,6 +472,15 @@ String emitEntryPoint(
 
         default:
             break;
+        }
+
+        // If we have obfuscation strip
+        if (compileRequest->getLinkage()->m_obfuscateCode)
+        {
+            IRStripOptions options;
+            options.shouldStripNameHints = true;
+            options.stripSourceLocs = true;
+            stripFrontEndOnlyInstructions(irModule, options);
         }
 
         // The resource-based specialization pass above
