@@ -882,8 +882,7 @@ struct OptionsParser
                 }
                 else if (argStr == "-obfuscate")
                 {
-                    requestImpl->getFrontEndReq()->obfuscateCode = true;
-                    requestImpl->getBackEndReq()->obfuscateCode = true;
+                    requestImpl->getLinkage()->m_obfuscateCode = true;
                 }
                 else if (argStr == "-file-system")
                 {

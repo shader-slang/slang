@@ -305,14 +305,17 @@ struct SharedIRGenContext
     SharedIRGenContext(
         Session*        session,
         DiagnosticSink* sink,
+        bool obfuscateCode, 
         ModuleDecl*     mainModuleDecl = nullptr)
         : m_session(session)
         , m_sink(sink)
+        , m_obfuscateCode(obfuscateCode)
         , m_mainModuleDecl(mainModuleDecl)
     {}
 
     Session*        m_session = nullptr;
     DiagnosticSink* m_sink = nullptr;
+    bool            m_obfuscateCode = false;
     ModuleDecl*     m_mainModuleDecl = nullptr;
 
     // The "global" environment for mapping declarations to their IR values.
@@ -1820,6 +1823,11 @@ static void addNameHint(
     IRInst*         inst,
     Decl*           decl)
 {
+    if (context->shared->m_obfuscateCode)
+    {
+        return;
+    }
+
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
@@ -1832,6 +1840,11 @@ static void addNameHint(
     IRInst*         inst,
     char const*     text)
 {
+    if (context->shared->m_obfuscateCode)
+    {
+        return;
+    }
+
     context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
 }
 
@@ -6598,6 +6611,7 @@ IRModule* generateIRForTranslationUnit(
     SharedIRGenContext sharedContextStorage(
         translationUnit->getSession(),
         translationUnit->compileRequest->getSink(),
+        translationUnit->compileRequest->getLinkage()->m_obfuscateCode,
         translationUnit->getModuleDecl());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
 
@@ -6706,7 +6720,11 @@ IRModule* generateIRForTranslationUnit(
         // by setting up the options for the stripping pass appropriately.
         //
         IRStripOptions stripOptions;
-        stripOptions.shouldStripNameHints = compileRequest->obfuscateCode;
+
+        Linkage* linkage = compileRequest->getLinkage();
+
+        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
 
         stripFrontEndOnlyInstructions(module, stripOptions);
 
@@ -6765,7 +6783,9 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
         SharedIRGenContext sharedContextStorage(
             session,
-            sink);
+            sink,
+            linkage->m_obfuscateCode
+        );
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext);
@@ -7174,7 +7194,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     SharedIRGenContext sharedContextStorage(
         session,
-        sink);
+        sink,
+        linkage->m_obfuscateCode);
     auto sharedContext = &sharedContextStorage;
 
     IRLayoutGenContext contextStorage(sharedContext);
