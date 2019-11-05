@@ -1318,3 +1318,7 @@ attribute_syntax [format(format : String)] : FormatAttribute;
 __attributeTarget(Decl)
 attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 
+// Linking
+__attributeTarget(Decl)
+attribute_syntax [__extern] : ExternAttribute;
+

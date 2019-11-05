@@ -448,6 +448,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
+    INST(ExternDecoration, __extern, 0, 0)
+
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`
     INST(FormatDecoration, format, 1, 0)
 

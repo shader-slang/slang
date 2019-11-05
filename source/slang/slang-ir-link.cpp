@@ -979,6 +979,17 @@ bool isBetterForTarget(
     IRInst*         newVal,
     IRInst*         oldVal)
 {
+    if (newVal->findDecoration<IRExternDecoration>())
+    {
+        return false;
+    }
+
+    // Anything is better than nothing..
+    if (oldVal == nullptr)
+    {
+        return true;
+    }
+
     String targetName = getTargetName(context);
 
     // For right now every declaration might have zero or more
@@ -1012,6 +1023,7 @@ bool isBetterForTarget(
     // of the other's.
 
     auto newLevel = getTargetSpecialiationLevel(newVal, targetName);
+    
     auto oldLevel = getTargetSpecialiationLevel(oldVal, targetName);
     if(newLevel != oldLevel)
         return UInt(newLevel) > UInt(oldLevel);
@@ -1182,16 +1194,21 @@ IRInst* cloneGlobalValueWithLinkage(
 
     // We will try to track the "best" declaration we can find.
     //
-    // Generally, one declaration wil lbe better than another if it is
+    // Generally, one declaration will be better than another if it is
     // more specialized for the chosen target. Otherwise, we simply favor
     // definitions over declarations.
     //
-    IRInst* bestVal = sym->irGlobalValue;
-    for( auto ss = sym->nextWithSameName; ss; ss = ss->nextWithSameName )
+    IRInst* bestVal = nullptr;
+    for(IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName )
     {
         IRInst* newVal = ss->irGlobalValue;
         if(isBetterForTarget(context, newVal, bestVal))
             bestVal = newVal;
+    }
+
+    if (!bestVal)
+    {
+        return nullptr;
     }
 
     // Check if we've already cloned this value, for the case where

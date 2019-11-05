@@ -150,6 +150,10 @@ struct IRNameHintDecoration : IRDecoration
     };                                  \
     /**/
 
+/// A decoration indicating the owning inst, is to be used as just declaration, that it's actual definition
+/// is not in this module.
+IR_SIMPLE_DECORATION(ExternDecoration)
+
 /// A decoration that indicates that a variable represents
 /// a vulkan ray payload, and should have a location assigned
 /// to it.

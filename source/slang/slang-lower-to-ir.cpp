@@ -5083,6 +5083,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irStruct, decl);
         addLinkageDecoration(context, irStruct, decl);
 
+        if (decl->FindModifier<ExternAttribute>())
+        {
+            subBuilder->addDecoration(irStruct, kIROp_ExternDecoration);
+        }
+
         subBuilder->setInsertInto(irStruct);
 
         for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
@@ -5788,6 +5793,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
+
+        if (decl->FindModifier<ExternAttribute>())
+        {
+            subBuilder->addDecoration(irFunc, kIROp_ExternDecoration);
+        }
 
         List<IRType*> paramTypes;
 
