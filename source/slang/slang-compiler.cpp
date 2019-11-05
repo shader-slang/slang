@@ -250,6 +250,7 @@ namespace Slang
             funcDeclRef.GetName(),
             profile,
             funcDeclRef);
+        entryPoint->m_mangledName = getMangledName(funcDeclRef);
         return entryPoint;
     }
 
@@ -263,6 +264,21 @@ namespace Slang
             name,
             profile,
             DeclRef<FuncDecl>());
+        return entryPoint;
+    }
+
+    RefPtr<EntryPoint> EntryPoint::createDummyForDeserialize(
+        Linkage*    linkage,
+        Name*       name,
+        Profile     profile,
+        String      mangledName)
+    {
+        RefPtr<EntryPoint> entryPoint = new EntryPoint(
+            linkage,
+            name,
+            profile,
+            DeclRef<FuncDecl>());
+        entryPoint->m_mangledName = mangledName;
         return entryPoint;
     }
 
@@ -338,16 +354,7 @@ namespace Slang
         SLANG_UNUSED(index);
         SLANG_ASSERT(index == 0);
 
-        // Note: this routine might get called on the "dummy"
-        // `EntryPoint` objects we create when doing pass-through
-        // compilation, in which case there won't be any
-        // function decl to be referenced and thus have
-        // its mangled name computed.
-        //
-        if(auto funcDeclRef = getFuncDeclRef())
-            return getMangledName(funcDeclRef);
-        else
-            return String();
+        return m_mangledName;
     }
 
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -2254,6 +2261,29 @@ SlangResult dissassembleDXILUsingDXC(
                 IRSerialWriter writer;
                 SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
+            }
+
+            auto entryPointCount = program->getEntryPointCount();
+            for( Index ii = 0; ii < entryPointCount; ++ii )
+            {
+                auto entryPoint = program->getEntryPoint(ii);
+                auto entryPointMangledName = program->getEntryPointMangledName(ii);
+
+                RiffContainer::ScopeChunk entryPointScope(&container, RiffContainer::Chunk::Kind::Data, IRSerialBinary::kEntryPointFourCc);
+
+                auto writeString = [&](String const& str)
+                {
+                    uint32_t length = (uint32_t) str.getLength();
+                    container.write(&length, sizeof(length));
+                    container.write(str.getBuffer(), length+1);
+                };
+
+                writeString(entryPoint->getName()->text);
+
+                Profile profile = entryPoint->getProfile();
+                container.write(&profile, sizeof(profile));
+
+                writeString(entryPointMangledName);
             }
         }
 

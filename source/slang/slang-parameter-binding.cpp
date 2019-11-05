@@ -2161,7 +2161,36 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     EntryPoint*                                 entryPoint,
     EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
+    // We will take responsibility for creating and filling in
+    // the `EntryPointLayout` object here.
+    //
+    RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
+    entryPointLayout->profile = entryPoint->getProfile();
+
+    // The entry point layout must be added to the output
+    // program layout so that it can be accessed by reflection.
+    //
+    context->shared->programLayout->entryPoints.add(entryPointLayout);
+
     DeclRef<FuncDecl> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
+
+    // HACK: We might have an `EntryPoint` that has been deserialized, in
+    // which case we don't currently have access to its AST-level information,
+    // and as a result we cannot collect parameter information from it.
+    //
+    if( !entryPointFuncDeclRef )
+    {
+        // TODO: figure out what fields we absolutely need to fill in.
+
+        RefPtr<StructTypeLayout> paramsTypeLayout = new StructTypeLayout();
+
+        RefPtr<VarLayout> paramsLayout = new VarLayout();
+        paramsLayout->typeLayout = paramsTypeLayout;
+
+        entryPointLayout->parametersLayout = paramsLayout;
+
+        return entryPointLayout;
+    }
 
     // If specialization was applied to the entry point, then the side-band
     // information that was generated will have a more specialized reference
@@ -2173,17 +2202,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
     auto entryPointType = DeclRefType::Create(context->getLinkage()->getSessionImpl(), entryPointFuncDeclRef);
 
-    // We will take responsibility for creating and filling in
-    // the `EntryPointLayout` object here.
-    //
-    RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
-    entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->entryPoint = entryPointFuncDeclRef;
-
-    // The entry point layout must be added to the output
-    // program layout so that it can be accessed by reflection.
-    //
-    context->shared->programLayout->entryPoints.add(entryPointLayout);
 
     // For the duration of our parameter collection work we will
     // establish this entry point as the current one in the context.

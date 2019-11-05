@@ -128,6 +128,16 @@ public:
     {
     }
 
+    SlangResult skip(size_t size)
+    {
+        if (m_cur + size > m_end)
+        {
+            return SLANG_FAIL;
+        }
+        m_cur += size;
+        return SLANG_OK;
+    }
+
 protected:
     const uint8_t* m_start;
     const uint8_t* m_end;
@@ -247,6 +257,9 @@ public:
 
             /// Find all contained that match the type
         void findContained(FourCC type, List<ListChunk*>& out);
+
+            /// Find all contained that match the type
+        void findContained(FourCC type, List<DataChunk*>& out);
 
             /// Find the list (including self) that matches subtype recursively
         ListChunk* findListRec(FourCC subType);

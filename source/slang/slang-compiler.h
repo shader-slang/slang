@@ -695,6 +695,13 @@ namespace Slang
             Name*       name,
             Profile     profile);
 
+            /// Create a dummy `EntryPoint` that stands in for a serialized entry point
+        static RefPtr<EntryPoint> createDummyForDeserialize(
+            Linkage*    linkage,
+            Name*       name,
+            Profile     profile,
+            String      mangledName);
+
             /// Get the number of existential type parameters for the entry point.
         Index getSpecializationParamCount() SLANG_OVERRIDE;
 
@@ -751,6 +758,9 @@ namespace Slang
         // The declaration of the entry-point function itself.
         //
         DeclRef<FuncDecl> m_funcDeclRef;
+
+            /// The mangled name of the entry point function
+        String m_mangledName;
 
         SpecializationParams m_genericSpecializationParams;
         SpecializationParams m_existentialSpecializationParams;
@@ -1444,6 +1454,17 @@ namespace Slang
         bool m_isStandardLibraryCode = false;
 
         Name* m_defaultModuleName = nullptr;
+
+            /// An "extra" entry point that was added via a library reference
+        struct ExtraEntryPointInfo
+        {
+            Name*   name;
+            Profile profile;
+            String  mangledName;
+        };
+
+            /// A list of "extra" entry points added via a library reference
+        List<ExtraEntryPointInfo> m_extraEntryPoints;
 
     private:
             /// A component type that includes only the global scopes of the translation unit(s) that were compiled.

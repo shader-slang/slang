@@ -1357,19 +1357,25 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
 }
 
-/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules)
+// TODO: The following function isn't really part of the IR serialization system, but rather
+// a layered "container" format, and as such probably belongs in a higher-level system that
+// simply calls into the `IRSerialReader` rather than being part of it...
+//
+/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
 {
     // Load up the module
     RiffContainer container;
     SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
     
     List<RiffContainer::ListChunk*> moduleChunks;
+    List<RiffContainer::DataChunk*> entryPointChunks;
     // First try to find a list
     {
         RiffContainer::ListChunk* listChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleListFourCc);
         if (listChunk)
         {
             listChunk->findContained(IRSerialBinary::kSlangModuleFourCc, moduleChunks);
+            listChunk->findContained(IRSerialBinary::kEntryPointFourCc, entryPointChunks);
         }
         else
         {
@@ -1397,6 +1403,30 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceManager, irModule));
 
         outModules.add(irModule);
+    }
+
+    for( auto entryPointChunk : entryPointChunks )
+    {
+        auto reader = entryPointChunk->asReadHelper();
+
+        auto readString = [&]()
+        {
+            uint32_t length = 0;
+            reader.read(length);
+
+            char* begin = (char*) reader.getData();
+            reader.skip(length+1);
+
+            return UnownedStringSlice(begin, begin + length);
+        };
+
+        FrontEndCompileRequest::ExtraEntryPointInfo entryPointInfo;
+
+        entryPointInfo.name = session->getNamePool()->getName(readString());
+        reader.read(entryPointInfo.profile);
+        entryPointInfo.mangledName = readString();
+
+        outEntryPoints.add(entryPointInfo);
     }
 
     return SLANG_OK;
