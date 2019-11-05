@@ -5083,11 +5083,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irStruct, decl);
         addLinkageDecoration(context, irStruct, decl);
 
-        if (decl->FindModifier<ExternAttribute>())
-        {
-            subBuilder->addDecoration(irStruct, kIROp_ExternDecoration);
-        }
-
         subBuilder->setInsertInto(irStruct);
 
         for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
@@ -5794,11 +5789,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
 
-        if (decl->FindModifier<ExternAttribute>())
-        {
-            subBuilder->addDecoration(irFunc, kIROp_ExternDecoration);
-        }
-
         List<IRType*> paramTypes;
 
         for( auto paramInfo : parameterLists.params )
@@ -6271,6 +6261,11 @@ LoweredValInfo ensureDecl(
     subContext.env = &subEnv;
 
     result = lowerDecl(&subContext, decl);
+
+    if (result.flavor == LoweredValInfo::Flavor::Simple && result.val && decl->FindModifier<ExternAttribute>())
+    {
+        subIRBuilder.addDecoration(result.val, kIROp_ExternDecoration);
+    }
 
     // By default assume that any value we are lowering represents
     // something that should be installed globally.
