@@ -1065,7 +1065,14 @@ static void addLinkageDecoration(
     IRInst*                     inst,
     Decl*                       decl)
 {
-    addLinkageDecoration(context, inst, decl, getMangledName(decl).getUnownedSlice());
+     String mangledName = getMangledName(decl);
+
+     if (context->shared->m_obfuscateCode)
+     {
+         mangledName = getHashedName(mangledName.getUnownedSlice());
+     }
+
+    addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
 }
 
 IRStructKey* getInterfaceRequirementKey(
