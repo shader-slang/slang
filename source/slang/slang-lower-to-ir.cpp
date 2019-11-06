@@ -422,6 +422,13 @@ bool isFromStdLib(Decl* decl)
 
 bool isImportedDecl(IRGenContext* context, Decl* decl)
 {
+    // If the declaration has the extern attribute then it must be imported
+    // from another module
+    if (decl->FindModifier<ExternAttribute>())
+    {
+        return true;
+    }
+
     ModuleDecl* moduleDecl = findModuleDecl(decl);
     if (!moduleDecl)
         return false;
@@ -6261,11 +6268,6 @@ LoweredValInfo ensureDecl(
     subContext.env = &subEnv;
 
     result = lowerDecl(&subContext, decl);
-
-    if (result.flavor == LoweredValInfo::Flavor::Simple && result.val && decl->FindModifier<ExternAttribute>())
-    {
-        subIRBuilder.addDecoration(result.val, kIROp_ExternDecoration);
-    }
 
     // By default assume that any value we are lowering represents
     // something that should be installed globally.

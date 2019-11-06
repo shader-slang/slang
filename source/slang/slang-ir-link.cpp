@@ -979,11 +979,6 @@ bool isBetterForTarget(
     IRInst*         newVal,
     IRInst*         oldVal)
 {
-    if (newVal->findDecoration<IRExternDecoration>())
-    {
-        return false;
-    }
-
     // Anything is better than nothing..
     if (oldVal == nullptr)
     {
@@ -1011,7 +1006,7 @@ bool isBetterForTarget(
     //     (A and B and C) or (A and D) or (E) or (F and G) ...
     //
     // A code generation target would then consist of a
-    // conjunction of invidual tags:
+    // conjunction of individual tags:
     //
     //    (HLSL and SM_4_0 and Vertex and ...)
     //
