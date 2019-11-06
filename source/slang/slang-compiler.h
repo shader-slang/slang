@@ -1148,6 +1148,8 @@ namespace Slang
         SourceManager m_defaultSourceManager;
         SourceManager* m_sourceManager = nullptr;
 
+        bool m_obfuscateCode = false;
+
         // Name pool for looking up names
         NamePool namePool;
 
@@ -1334,10 +1336,6 @@ namespace Slang
 
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;
-
-        // Remove name hints to help obfuscate code
-        //
-        bool obfuscateCode = false;
 
     protected:
         CompileRequestBase(

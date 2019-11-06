@@ -659,25 +659,17 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
 
         StringBuilder sb;
 
-        if (!m_compileRequest->obfuscateCode)
-        {
+        String nameHint = nameHintDecoration->getName();
+        nameHint = scrubName(nameHint);
 
-            String nameHint = nameHintDecoration->getName();
-            nameHint = scrubName(nameHint);
+        sb.append(nameHint);
 
-            sb.append(nameHint);
-
-            // Avoid introducing a double underscore
-            if (!nameHint.endsWith("_"))
-            {
-                sb.append("_");
-            }
-        }
-        else
+        // Avoid introducing a double underscore
+        if (!nameHint.endsWith("_"))
         {
             sb.append("_");
         }
-
+        
         String key = sb.ProduceString();
         UInt count = 0;
         m_uniqueNameCounters.TryGetValue(key, count);

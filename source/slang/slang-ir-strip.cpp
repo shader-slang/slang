@@ -35,6 +35,11 @@ static void _stripFrontEndOnlyInstructionsRec(
         return;
     }
 
+    if (options.stripSourceLocs)
+    {
+        inst->sourceLoc = SourceLoc();
+    }
+
     IRInst* nextChild = nullptr;
     for( IRInst* child = inst->getFirstDecorationOrChild(); child; child = nextChild )
     {

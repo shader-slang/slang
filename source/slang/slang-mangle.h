@@ -14,6 +14,8 @@ namespace Slang
     String getMangledName(DeclRef<Decl> const & declRef);
     String getMangledName(DeclRefBase const & declRef);
 
+    String getHashedName(const UnownedStringSlice& mangledName);
+
     String getMangledNameForConformanceWitness(
         Type* sub,
         Type* sup);
