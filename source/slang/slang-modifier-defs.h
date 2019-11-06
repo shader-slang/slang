@@ -460,3 +460,8 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(AllowAttribute, Attribute)
     FIELD_INIT(DiagnosticInfo const*, diagnostic, nullptr)
 END_SYNTAX_CLASS()
+
+
+// A `[__extern]` attribute, which indicates that a function/type is defined externally
+//
+SIMPLE_SYNTAX_CLASS(ExternAttribute, Attribute)
