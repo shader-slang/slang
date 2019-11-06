@@ -1271,6 +1271,9 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         m_specializedGlobalAndEntryPointsComponentType = getUnspecializedGlobalAndEntryPointsComponentType();
         m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
 
+        SLANG_RETURN_ON_FAIL(maybeCreateContainer());
+        SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
+
         return SLANG_OK;
     }
 
@@ -2913,7 +2916,7 @@ SLANG_API void spSetOutputContainerFormat(
     SlangContainerFormat    format)
 {
     auto req = Slang::asInternal(request);
-    req->containerFormat = Slang::ContainerFormat(format);
+    req->m_containerFormat = Slang::ContainerFormat(format);
 }
 
 
@@ -3038,6 +3041,33 @@ SLANG_API void spSetDefaultModuleName(
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
+
+SLANG_API SlangResult spAddLibraryReference(
+    SlangCompileRequest*    request,
+    const void* libData,
+    size_t libDataSize)
+{
+    using namespace Slang;
+    auto req = Slang::asInternal(request);
+
+    // We need to deserialize and add the modules
+    MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
+
+    // Read all of the contained modules
+    List<RefPtr<IRModule>> irModules;
+    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules)))
+    {
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
+        return SLANG_FAIL;
+    }
+
+    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+    // For now just add to the linkage
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
+
+    return SLANG_OK;
+}
 
 SLANG_API void spTranslationUnit_addPreprocessorDefine(
     SlangCompileRequest*    request,
@@ -3497,12 +3527,39 @@ SLANG_API char const* spGetEntryPointSource(
 }
 
 SLANG_API void const* spGetCompileRequestCode(
-    SlangCompileRequest*    request,
+    SlangCompileRequest*    inRequest,
     size_t*                 outSize)
 {
-    SLANG_UNUSED(request);
-    SLANG_UNUSED(outSize);
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    if (request->m_containerBlob)
+    {
+        *outSize = request->m_containerBlob->getBufferSize();
+        return request->m_containerBlob->getBufferPointer();
+    }
+
+    // Container blob does not have any contents
+    *outSize = 0;
     return nullptr;
+}
+
+SLANG_API SlangResult spGetContainerCode(
+    SlangCompileRequest*    inRequest,
+    ISlangBlob**            outBlob)
+{
+    using namespace Slang;
+    auto request = asInternal(inRequest);
+
+    ISlangBlob* containerBlob = request->m_containerBlob;
+    if (containerBlob)
+    {
+        containerBlob->addRef();
+        *outBlob = containerBlob;
+        return SLANG_OK;
+    }
+
+    return SLANG_FAIL;
 }
 
 SLANG_API SlangResult spLoadRepro(

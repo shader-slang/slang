@@ -803,8 +803,13 @@ IRFunc* specializeIRForEntryPoint(
     RefPtr<IRSpecSymbol> sym;
     if (!context->getSymbols().TryGetValue(mangledName, sym))
     {
-        SLANG_UNEXPECTED("no matching IR symbol");
-        return nullptr;
+        String hashedName = getHashedName(mangledName.getUnownedSlice());
+
+        if (!context->getSymbols().TryGetValue(hashedName, sym))
+        {
+            SLANG_UNEXPECTED("no matching IR symbol");
+            return nullptr;
+        }
     }
     
     // Note: it is possible that `sym` shows multiple

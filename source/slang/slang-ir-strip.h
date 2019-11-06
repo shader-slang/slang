@@ -8,6 +8,7 @@ namespace Slang
     struct IRStripOptions
     {
         bool shouldStripNameHints = false;
+        bool stripSourceLocs = false;
     };
 
         /// Strip out instructions that should only be used by the front-end.

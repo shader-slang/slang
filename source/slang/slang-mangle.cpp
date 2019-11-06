@@ -474,5 +474,15 @@ namespace Slang
         return context.sb.ProduceString();
     }
 
+    String getHashedName(const UnownedStringSlice& mangledName)
+    {
+        uint64_t hash = GetHashCode64(mangledName.begin(), mangledName.size());
+
+        StringBuilder builder;
+        builder << "_Sh";
+        builder.append(hash, 16);
+
+        return builder;
+    }
 
 }

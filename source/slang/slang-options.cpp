@@ -398,10 +398,10 @@ struct OptionsParser
 
 #undef CASE
 
-        else if (path.endsWith(".slang-module"))
+        else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
-            requestImpl->containerOutputPath = path;
+            requestImpl->m_containerOutputPath = path;
         }
         else
         {
@@ -882,8 +882,7 @@ struct OptionsParser
                 }
                 else if (argStr == "-obfuscate")
                 {
-                    requestImpl->getFrontEndReq()->obfuscateCode = true;
-                    requestImpl->getBackEndReq()->obfuscateCode = true;
+                    requestImpl->getLinkage()->m_obfuscateCode = true;
                 }
                 else if (argStr == "-file-system")
                 {

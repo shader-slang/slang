@@ -350,12 +350,12 @@ static bool _isStorable(const PathInfo::Type type)
 
         dst->debugInfoLevel = linkage->debugInfoLevel;
         dst->optimizationLevel = linkage->optimizationLevel;
-        dst->containerFormat = request->containerFormat;
+        dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->passThrough;
 
 
         dst->useUnknownImageFormatAsDefault = request->getBackEndReq()->useUnknownImageFormatAsDefault;
-        dst->obfuscateCode = request->getBackEndReq()->obfuscateCode;
+        dst->obfuscateCode = linkage->m_obfuscateCode;
 
         dst->defaultMatrixLayoutMode = linkage->defaultMatrixLayoutMode;
     }
@@ -889,9 +889,7 @@ struct LoadContext
         spSetPassThrough(externalRequest, SlangPassThrough(request->passThrough));
 
         request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
-        request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
-
-        request->getFrontEndReq()->obfuscateCode = requestState->obfuscateCode;
+        linkage->m_obfuscateCode = requestState->obfuscateCode;
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
     }
