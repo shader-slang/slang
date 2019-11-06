@@ -109,8 +109,8 @@ public:
         {
             return SLANG_FAIL;
         }
-        // Make sure the alignment is plausible
-        SLANG_ASSERT((size_t(m_cur) & (SLANG_ALIGN_OF(T) - 1)) == 0);
+        // TODO: consider whether this type should enforce alignment.
+        // SLANG_ASSERT((size_t(m_cur) & (SLANG_ALIGN_OF(T) - 1)) == 0);
         ::memcpy(&out, m_cur, sizeof(T));
         m_cur += sizeof(T);
         return SLANG_OK;
