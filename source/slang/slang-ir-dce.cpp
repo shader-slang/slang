@@ -256,6 +256,11 @@ struct DeadCodeEliminationContext
             }
         }
 
+        if (options.keepLayoutsAlive && inst->findDecoration<IRLayoutDecoration>())
+        {
+            return true;
+        }
+
         // A basic block is an interesting case. Knowing that a function
         // is live means that its entry block is live, but the liveness
         // of any other blocks is determined by whether they are referenced
