@@ -347,11 +347,17 @@ public:
         /// Get the root
     ListChunk* getRoot() const { return m_rootList; }
 
+        /// Get the current chunk
+    Chunk* getCurrentChunk() { return m_dataChunk ? static_cast<Chunk*>(m_dataChunk) : static_cast<Chunk*>(m_listChunk); }
+
         /// Reset the container
     void reset();
 
         /// true if has a root container, and nothing remains open
     bool isFullyConstructed() { return m_rootList && m_listChunk == nullptr && m_dataChunk == nullptr; }
+
+        /// Get the memory arena that is backing the storage of data
+    MemoryArena& getMemoryArena() { return m_arena; }
 
         /// The if the list and sublists appear correct
     static bool isChunkOk(Chunk* chunk);

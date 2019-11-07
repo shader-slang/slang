@@ -2,24 +2,25 @@
 
 #include "../../source/core/slang-riff.h"
 
+#include "../../source/core/slang-random-generator.h"
+
 #include "test-context.h"
 
 using namespace Slang;
 
 static void riffUnitTest()
 {
+    typedef RiffContainer::ScopeChunk ScopeChunk;
+    typedef RiffContainer::Chunk::Kind Kind;
+
     const FourCC markThings = SLANG_FOUR_CC('T', 'H', 'I', 'N');
     const FourCC markData = SLANG_FOUR_CC('D', 'A', 'T', 'A');
 
     {
-        typedef RiffContainer::ScopeChunk ScopeChunk;
-        typedef RiffContainer::Chunk::Kind Kind;
-
         RiffContainer container;
 
         {
-            ScopeChunk scopeContainer(&container, Kind::List, markThings);
-
+            ScopeChunk scopeContainer(&container, Kind::List, markThings);        
             {
                 ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
@@ -83,6 +84,52 @@ static void riffUnitTest()
             }
         }
 
+    }
+
+    {
+        RiffContainer container;
+
+        ScopeChunk scopeChunk(&container, Kind::List, markData);
+        {
+            ScopeChunk scopeChunk(&container, Kind::Data, markData);
+
+            size_t maxUse =  container.getMemoryArena().getBlockPayloadSize() / 2;
+
+            RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
+
+            List<uint8_t> data;
+
+            while (true)
+            {
+                const Index oldCount = data.getCount();
+
+                const size_t allocSize = size_t(rand->nextInt32InRange(1, 50));
+
+                if (allocSize + oldCount > maxUse)
+                {
+                    break;
+                }
+
+                data.setCount(oldCount + Index(allocSize));
+                rand->nextData(data.getBuffer() + oldCount, allocSize);
+
+                // Write
+                container.write(data.getBuffer() + oldCount, allocSize);
+            }
+
+            // Should be a single block with same data as the List
+            RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(container.getCurrentChunk());
+            SLANG_ASSERT(dataChunk);
+
+            RiffContainer::Data* chunkData = dataChunk->getSingleData();
+
+            SLANG_CHECK(chunkData != nullptr);
+            if (chunkData)
+            {
+                SLANG_CHECK(chunkData->getSize() == data.getCount());
+                SLANG_CHECK(::memcmp(chunkData->getPayload(), data.getBuffer(), chunkData->getSize()) == 0);
+            }
+        }
     }
 
 #if 0

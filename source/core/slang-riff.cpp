@@ -864,6 +864,25 @@ RiffContainer::Data* RiffContainer::addData()
 
 void RiffContainer::write(const void* inData, size_t size)
 {
+    // We must be in a chunk
+    SLANG_ASSERT(m_dataChunk);
+    // Get the last data chunk
+    Data* endData = m_dataChunk->m_endData;
+    if (endData)
+    {
+        uint8_t* end = ((uint8_t*)endData->m_payload) + endData->m_size;
+        // See if can just add to end of current data
+        if ( end == m_arena.getCursor() && m_arena.allocateCurrentUnaligned(size))
+        {
+            ::memcpy(end, inData, size);
+            endData->m_size += size;
+
+            // Add current chunks data
+            m_dataChunk->m_payloadSize += size;
+            return;
+        }
+    }
+
     auto data = addData();
     setPayload(data, inData, size);
 }
