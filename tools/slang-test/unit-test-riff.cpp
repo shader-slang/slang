@@ -111,6 +111,7 @@ static void riffUnitTest()
 
     }
 
+    // Test writing as a stream only allocates a single data block (as long as there is enough space).
     {
         RiffContainer container;
 
@@ -134,6 +135,7 @@ static void riffUnitTest()
         }
     } 
 
+    // Test writing across multiple data blocks
     {
         RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
 
