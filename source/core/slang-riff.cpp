@@ -548,6 +548,19 @@ void RiffContainer::ListChunk::findContained(FourCC type, List<ListChunk*>& out)
     }
 }
 
+void RiffContainer::ListChunk::findContained(FourCC type, List<DataChunk*>& out)
+{
+    Chunk* chunk = m_containedChunks;
+    while (chunk)
+    {
+        if (chunk->m_fourCC == type && chunk->m_kind == Chunk::Kind::Data)
+        {
+            out.add(static_cast<DataChunk*>(chunk));
+        }
+        chunk = chunk->m_next;
+    }
+}
+
 RiffContainer::Data* RiffContainer::ListChunk::findContainedData(FourCC type) const
 {
     Chunk* found = findContained(type);

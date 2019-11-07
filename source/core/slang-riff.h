@@ -109,8 +109,8 @@ public:
         {
             return SLANG_FAIL;
         }
-        // Make sure the alignment is plausible
-        SLANG_ASSERT((size_t(m_cur) & (SLANG_ALIGN_OF(T) - 1)) == 0);
+        // TODO: consider whether this type should enforce alignment.
+        // SLANG_ASSERT((size_t(m_cur) & (SLANG_ALIGN_OF(T) - 1)) == 0);
         ::memcpy(&out, m_cur, sizeof(T));
         m_cur += sizeof(T);
         return SLANG_OK;
@@ -126,6 +126,16 @@ public:
         m_end(data + size),
         m_cur(data)
     {
+    }
+
+    SlangResult skip(size_t size)
+    {
+        if (m_cur + size > m_end)
+        {
+            return SLANG_FAIL;
+        }
+        m_cur += size;
+        return SLANG_OK;
     }
 
 protected:
@@ -247,6 +257,9 @@ public:
 
             /// Find all contained that match the type
         void findContained(FourCC type, List<ListChunk*>& out);
+
+            /// Find all contained that match the type
+        void findContained(FourCC type, List<DataChunk*>& out);
 
             /// Find the list (including self) that matches subtype recursively
         ListChunk* findListRec(FourCC subType);

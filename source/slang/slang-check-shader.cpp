@@ -1382,6 +1382,19 @@ static bool doesParameterMatch(
             }
         }
 
+        // Also consider entry points that were introduced via adding
+        // a library reference...
+        //
+        for( auto extraEntryPoint : compileRequest->m_extraEntryPoints )
+        {
+            auto entryPoint = EntryPoint::createDummyForDeserialize(
+                linkage,
+                extraEntryPoint.name,
+                extraEntryPoint.profile,
+                extraEntryPoint.mangledName);
+            allComponentTypes.add(entryPoint);
+        }
+
         if(allComponentTypes.getCount() > 1)
         {
             auto composite = CompositeComponentType::create(
@@ -1998,9 +2011,29 @@ static bool doesParameterMatch(
         allComponentTypes.add(specializedGlobalComponentType);
 
         auto unspecializedGlobalAndEntryPointsComponentType = endToEndReq->getUnspecializedGlobalAndEntryPointsComponentType();
-        auto entryPointCount = unspecializedGlobalAndEntryPointsComponentType->getEntryPointCount();
 
-        for(Index ii = 0; ii < entryPointCount; ++ii)
+        // It is possible that there were entry points other than those specified
+        // vai the original end-to-end compile request. In particular:
+        //
+        // * It is possible to compile with *no* entry points specified, in which
+        //   case the current compiler behavior is to use any entry points marked
+        //   via `[shader(...)]` attributes in the AST.
+        //
+        // * It is possible for entry points to come into play via serialized libraries
+        //   loaded with `-r` on the command line (or the equivalent API).
+        //
+        // We will thus draw a distinction between the "specified" entry points,
+        // and the "found" entry points.
+        //
+        auto specifiedEntryPointCount = endToEndReq->entryPoints.getCount();
+        auto foundEntryPointCount = unspecializedGlobalAndEntryPointsComponentType->getEntryPointCount();
+
+        SLANG_ASSERT(foundEntryPointCount >= specifiedEntryPointCount);
+
+        // For any entry points that were specified, we can use the specialization
+        // argument information provided via API or command line.
+        //
+        for(Index ii = 0; ii < specifiedEntryPointCount; ++ii)
         {
             auto& entryPointInfo = endToEndReq->entryPoints[ii];
             auto unspecializedEntryPoint = unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
@@ -2009,6 +2042,16 @@ static bool doesParameterMatch(
             allComponentTypes.add(specializedEntryPoint);
 
             outSpecializedEntryPoints.add(specializedEntryPoint);
+        }
+
+        // Any entry points beyond those that were specified up front will be
+        // assumed to not need/want specialization.
+        //
+        for( Index ii = specifiedEntryPointCount; ii < foundEntryPointCount; ++ii )
+        {
+            auto unspecializedEntryPoint = unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
+            allComponentTypes.add(unspecializedEntryPoint);
+            outSpecializedEntryPoints.add(unspecializedEntryPoint);
         }
 
         RefPtr<ComponentType> composed = CompositeComponentType::create(endToEndReq->getLinkage(), allComponentTypes);

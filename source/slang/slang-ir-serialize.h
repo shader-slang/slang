@@ -383,6 +383,8 @@ struct IRSerialBinary
     static const FourCC kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
     static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
 
+    static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
+
     struct ModuleHeader
     {
         uint32_t compressionType;         ///< Holds the compression type used (if used at all)
@@ -504,7 +506,7 @@ struct IRSerialReader
     static Result readStream(Stream* stream, IRSerialData* dataOut);
 
         /// Read potentially multiple modules from a stream
-    static Result readStreamModules(Stream* stream, Session* session, SourceManager* manager, List<RefPtr<IRModule>>& outModules);
+    static Result readStreamModules(Stream* stream, Session* session, SourceManager* manager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints);
 
         /// Read a stream to fill in dataOut IRSerialData
     static Result readContainer(RiffContainer::ListChunk* module, IRSerialData* outData);

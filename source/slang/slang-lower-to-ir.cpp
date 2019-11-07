@@ -7265,6 +7265,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
 
+        // HACK: skip over entry points that came from deserialization,
+        // and thus don't have AST-level information for us to work with.
+        //
+        if(!funcDeclRef)
+            continue;
+
         auto irFuncType = lowerType(context, getFuncType(session, funcDeclRef));
         auto irFunc = getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType));
 

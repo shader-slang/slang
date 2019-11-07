@@ -19,6 +19,8 @@
 
 namespace Slang {
 
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream);
+
 SlangResult tryReadCommandLineArgumentRaw(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, char const** argOut)
 {
     *argOut = nullptr;
@@ -917,17 +919,9 @@ struct OptionsParser
                     // We need to deserialize and add the modules
                     FileStream fileStream(referenceModuleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 
-                    List<RefPtr<IRModule>> irModules;
-                    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, asInternal(session), requestImpl->getFrontEndReq()->getSourceManager(), irModules)))
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, referenceModuleName);
-                        return SLANG_FAIL;
-                    }
+                    // TODO: probalby near an error when we can't open the file?
 
-                    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-                    // For now just add to the linkage
-                    auto linkage = requestImpl->getLinkage();
-                    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
+                    _addLibraryReference(requestImpl, &fileStream);
                 }
                 else if (argStr == "-v")
                 {

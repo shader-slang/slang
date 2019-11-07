@@ -149,13 +149,17 @@ static const char computeEntryPointName[] = "computeMain";
 
     if (request.computeShader.name)
     {
-        int computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit, 
-            computeEntryPointName,
-            SLANG_STAGE_COMPUTE,
-            (int)rawEntryPointTypeNames.getCount(),
-            rawEntryPointTypeNames.getBuffer());
+        int computeEntryPoint = 0;
+        if(!gOptions.dontAddDefaultEntryPoints)
+        {
+            computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit,
+                computeEntryPointName,
+                SLANG_STAGE_COMPUTE,
+                (int)rawEntryPointTypeNames.getCount(),
+                rawEntryPointTypeNames.getBuffer());
 
-        setEntryPointExistentialTypeArgs(computeEntryPoint);
+            setEntryPointExistentialTypeArgs(computeEntryPoint);
+        }
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
         const SlangResult res = spCompile(slangRequest);
@@ -180,11 +184,16 @@ static const char computeEntryPointName[] = "computeMain";
     }
     else
     {
-        int vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
-        int fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
+        int vertexEntryPoint = 0;
+        int fragmentEntryPoint = 1;
+        if( !gOptions.dontAddDefaultEntryPoints )
+        {
+            vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
+            fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
 
-        setEntryPointExistentialTypeArgs(vertexEntryPoint);
-        setEntryPointExistentialTypeArgs(fragmentEntryPoint);
+            setEntryPointExistentialTypeArgs(vertexEntryPoint);
+            setEntryPointExistentialTypeArgs(fragmentEntryPoint);
+        }
 
         const SlangResult res = spCompile(slangRequest);
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))

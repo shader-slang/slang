@@ -3041,6 +3041,30 @@ SLANG_API void spSetDefaultModuleName(
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
+namespace Slang
+{
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
+{
+    // Read all of the contained modules
+    List<RefPtr<IRModule>> irModules;
+    List<FrontEndCompileRequest::ExtraEntryPointInfo> entryPointMangledNames;
+    if (SLANG_FAILED(IRSerialReader::readStreamModules(stream, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules, entryPointMangledNames)))
+    {
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
+        return SLANG_FAIL;
+    }
+
+    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
+    // For now just add to the linkage
+    auto linkage = req->getLinkage();
+    linkage->m_libModules.addRange(irModules);
+
+    req->getFrontEndReq()->m_extraEntryPoints.addRange(entryPointMangledNames);
+
+    return SLANG_OK;
+}
+}
+
 
 SLANG_API SlangResult spAddLibraryReference(
     SlangCompileRequest*    request,
@@ -3053,20 +3077,7 @@ SLANG_API SlangResult spAddLibraryReference(
     // We need to deserialize and add the modules
     MemoryStreamBase fileStream(FileAccess::Read, libData, libDataSize);
 
-    // Read all of the contained modules
-    List<RefPtr<IRModule>> irModules;
-    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules)))
-    {
-        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
-        return SLANG_FAIL;
-    }
-
-    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-    // For now just add to the linkage
-    auto linkage = req->getLinkage();
-    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
-
-    return SLANG_OK;
+    return _addLibraryReference(req, &fileStream);
 }
 
 SLANG_API void spTranslationUnit_addPreprocessorDefine(
@@ -3417,7 +3428,7 @@ SLANG_API void const* spGetEntryPointCode(
 
 
     if(entryPointIndex < 0) return nullptr;
-    if(Index(entryPointIndex) >= req->entryPoints.getCount()) return nullptr;
+    if(Index(entryPointIndex) >= program->getEntryPointCount()) return nullptr;
     auto entryPoint = program->getEntryPoint(entryPointIndex);
 
     auto targetProgram = program->getTargetProgram(targetReq);

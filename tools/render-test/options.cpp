@@ -255,6 +255,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
 
             gOptions.sourceLanguage = sourceLanguage;
         }
+        else if( strcmp(arg, "-no-default-entry-point") == 0 )
+        {
+            gOptions.dontAddDefaultEntryPoints = true;
+        }
         else
         {
             // Lookup
