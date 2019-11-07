@@ -8,6 +8,7 @@ namespace Slang
     struct IRDeadCodeEliminationOptions
     {
         bool keepExportsAlive = false;
+        bool keepLayoutsAlive = false;
     };
 
         /// Eliminate "dead" code from the given IR module.

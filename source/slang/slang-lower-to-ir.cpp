@@ -1846,11 +1846,6 @@ static void addNameHint(
     IRInst*         inst,
     Decl*           decl)
 {
-    if (context->shared->m_obfuscateCode)
-    {
-        return;
-    }
-
     String name = getNameForNameHint(context, decl);
     if(name.getLength() == 0)
         return;
@@ -7292,6 +7287,24 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         auto irTypeLayout = lowerTypeLayout(context, taggedUnionTypeLayout);
 
         builder->addLayoutDecoration(irType, irTypeLayout);
+    }
+
+    // Lets strip and run DCE here
+    if (linkage->m_obfuscateCode)
+    {
+        IRStripOptions stripOptions;
+
+        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
+
+        stripFrontEndOnlyInstructions(irModule, stripOptions);
+
+        IRDeadCodeEliminationOptions options;
+        options.keepExportsAlive = true;
+        options.keepLayoutsAlive = true;
+
+        // Eliminate any dead code
+        eliminateDeadCode(irModule, options);
     }
 
     m_irModuleForLayout = irModule;

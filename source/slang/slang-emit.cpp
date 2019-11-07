@@ -474,15 +474,6 @@ String emitEntryPoint(
             break;
         }
 
-        // If we have obfuscation strip
-        if (compileRequest->getLinkage()->m_obfuscateCode)
-        {
-            IRStripOptions options;
-            options.shouldStripNameHints = true;
-            options.stripSourceLocs = true;
-            stripFrontEndOnlyInstructions(irModule, options);
-        }
-
         // The resource-based specialization pass above
         // may create specialized versions of functions, but
         // it does not try to completely eliminate the original
