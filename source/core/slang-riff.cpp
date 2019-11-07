@@ -665,6 +665,47 @@ size_t RiffContainer::DataChunk::calcPayloadSize() const
     return size;
 }
 
+void RiffContainer::DataChunk::getPayload(void* inDst) const
+{
+    uint8_t* dst = (uint8_t*)inDst;
+
+    Data* data = m_dataList;
+    while (data)
+    {
+        const size_t size = data->getSize();
+        ::memcpy(dst, data->getPayload(), size);
+
+        dst += size;
+        data = data->m_next;
+    }
+}
+
+bool RiffContainer::DataChunk::isEqual(const void* inData, size_t count) const
+{
+    const uint8_t* src = (const uint8_t*)inData;
+
+    Data* data = m_dataList;
+    while (data)
+    {
+        const size_t size = data->getSize();
+        // Can't have more content than remaining
+        // Contents must match
+        if (size > count || ::memcmp(src, data->getPayload(), size) != 0)
+        {
+            return false;
+        }
+
+        src += size;
+        count -= size;
+
+        // Next data block
+        data = data->m_next;
+    }
+
+    // If match must be at the end
+    return count == 0;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 RiffContainer::RiffContainer() :
@@ -860,6 +901,42 @@ RiffContainer::Data* RiffContainer::addData()
     // Make this the new end
     m_dataChunk->m_endData = data;
     return data;
+}
+
+RiffContainer::Data* RiffContainer::makeSingleData(DataChunk* dataChunk)
+{
+    // There is no data
+    if (dataChunk->m_dataList == nullptr)
+    {
+        return nullptr;
+    }
+
+    if (dataChunk->m_dataList->m_next == nullptr)
+    {
+        return dataChunk->m_dataList;
+    }
+
+    {
+        Data* data = dataChunk->m_dataList;
+        
+        // Okay lets combine all into one block
+        const size_t payloadSize = dataChunk->calcPayloadSize();
+
+        void* dst = m_arena.allocate(payloadSize);
+        dataChunk->getPayload(dst);
+
+        // Remove other datas
+        data->m_next = nullptr;
+        // Make this the end
+        dataChunk->m_endData = data;
+
+        // Point to the block with all of the data
+        data->m_ownership = Ownership::Arena;
+        data->m_payload = dst;
+        data->m_size = payloadSize;
+
+        return data;
+    }
 }
 
 void RiffContainer::write(const void* inData, size_t size)
