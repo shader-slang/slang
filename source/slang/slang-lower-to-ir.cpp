@@ -2088,6 +2088,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 break;
 
             case BaseType::Bool:
+                return LoweredValInfo::simple(getBuilder()->getBoolValue(false));
+
             case BaseType::Int8:
             case BaseType::Int16:
             case BaseType::Int:
