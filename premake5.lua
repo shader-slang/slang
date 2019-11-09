@@ -611,7 +611,7 @@ standardProject "slang"
     --
     defines { "SLANG_DYNAMIC_EXPORT" }
 
-    includedirs { "external" }
+    includedirs { "external/spirv-headers/include" }
 
     -- The `standardProject` operation already added all the code in
     -- `source/slang/*`, but we also want to incldue the umbrella

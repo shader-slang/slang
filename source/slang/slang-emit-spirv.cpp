@@ -5,7 +5,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
-#include "spirv/spirv.h"
+#include "spirv/unified1/spirv.h"
 
 namespace Slang
 {
