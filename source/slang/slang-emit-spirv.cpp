@@ -210,7 +210,7 @@ struct SpvInst : SpvInstParent
         // > including the word holding the word count and opcode, and any optional
         // > operands. An instruction’s word count is the total space taken by the instruction.
         //
-        SpvWord wordCount = 1 + operandWords.getCount();
+        SpvWord wordCount = 1 + SpvWord(operandWords.getCount());
 
         // [2.3: Physical Layout of a SPIR-V Module and Instruction]
         //
