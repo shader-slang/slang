@@ -649,7 +649,7 @@ standardProject "slang"
 
         filter { "system:linux" }
             postbuildcommands {
-                "{COPY} external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
+                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
             }
     end
 
