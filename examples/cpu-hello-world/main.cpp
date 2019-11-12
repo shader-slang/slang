@@ -49,7 +49,7 @@ static SlangResult _innerMain(int argc, char** argv)
     // somewhat heavy-weight operation. When possible, an application
     // should try to re-use the same session across multiple compiles.
     //
-    // NOTE that we use attach instead of setting via assignment, as assingment will increase
+    // NOTE that we use attach instead of setting via assignment, as assignment will increase
     // the refcount. spCreateSession returns a IGlobalSession with a refcount of 1.
     ComPtr<slang::IGlobalSession> slangSession;
     slangSession.attach(spCreateSession(NULL));
