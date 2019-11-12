@@ -642,9 +642,15 @@ standardProject "slang"
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
     if not buildGlslang then
-        postbuildcommands {
-            "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/*slang-glslang* %{cfg.targetdir}"
-        }
+        filter { "system:windows" }
+            postbuildcommands {
+                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
+            }
+
+        filter { "system:linux" }
+            postbuildcommands {
+                "{COPY} external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
+            }
     end
 
     filter { "system:linux" }
