@@ -2382,6 +2382,37 @@ SlangResult dissassembleDXILUsingDXC(
         BackEndCompileRequest* compileRequest,
         EndToEndCompileRequest* endToEndReq)
     {
+        // If we are about to generate output code, but we still
+        // have unspecialized generic/existential parameters,
+        // then there is a problem.
+        //
+        auto program = compileRequest->getProgram();
+        auto specializationParamCount = program->getSpecializationParamCount();
+        if( specializationParamCount != 0 )
+        {
+            auto sink = compileRequest->getSink();
+            
+            for( Index ii = 0; ii < specializationParamCount; ++ii )
+            {
+                auto specializationParam = program->getSpecializationParam(ii);
+                if( auto decl = as<Decl>(specializationParam.object) )
+                {
+                    sink->diagnose(specializationParam.loc, Diagnostics::specializationParameterOfNameNotSpecialized, decl);
+                }
+                else if( auto type = as<Type>(specializationParam.object) )
+                {
+                    sink->diagnose(specializationParam.loc, Diagnostics::specializationParameterOfNameNotSpecialized, type);
+                }
+                else
+                {
+                    sink->diagnose(specializationParam.loc, Diagnostics::specializationParameterNotSpecialized);
+                }
+            }
+
+            return;
+        }
+
+
         // Go through the code-generation targets that the user
         // has specified, and generate code for each of them.
         //

@@ -49,6 +49,11 @@ namespace Slang
             checkVarDeclCommon(varDecl);
         }
 
+        void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
+        {
+            checkVarDeclCommon(decl);
+        }
+
         void visitImportDecl(ImportDecl* decl);
 
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
@@ -112,6 +117,11 @@ namespace Slang
         void visitVarDecl(VarDecl* varDecl)
         {
             checkVarDeclCommon(varDecl);
+        }
+
+        void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
+        {
+            checkVarDeclCommon(decl);
         }
 
         void visitEnumCaseDecl(EnumCaseDecl* decl);

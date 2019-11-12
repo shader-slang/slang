@@ -2386,7 +2386,7 @@ namespace Slang
         return assocTypeDecl;
     }
 
-    RefPtr<RefObject> parseGlobalGenericParamDecl(Parser * parser, void *)
+    RefPtr<RefObject> parseGlobalGenericTypeParamDecl(Parser * parser, void *)
     {
         RefPtr<GlobalGenericParamDecl> genParamDecl = new GlobalGenericParamDecl();
         auto nameToken = parser->ReadToken(TokenType::Identifier);
@@ -2395,6 +2395,27 @@ namespace Slang
         parseOptionalGenericConstraints(parser, genParamDecl);
         parser->ReadToken(TokenType::Semicolon);
         return genParamDecl;
+    }
+
+    RefPtr<RefObject> parseGlobalGenericValueParamDecl(Parser * parser, void *)
+    {
+        RefPtr<GlobalGenericValueParamDecl> genericParamDecl = new GlobalGenericValueParamDecl();
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        genericParamDecl->nameAndLoc = NameLoc(nameToken);
+        genericParamDecl->loc = nameToken.loc;
+
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            genericParamDecl->type = parser->ParseTypeExp();
+        }
+
+        if(AdvanceIf(parser, TokenType::OpAssign))
+        {
+            genericParamDecl->initExpr = parser->ParseInitExpr();
+        }
+
+        parser->ReadToken(TokenType::Semicolon);
+        return genericParamDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -4270,7 +4291,7 @@ namespace Slang
         return parsePrefixExpr(this);
     }
 
-    RefPtr<Expr> parseTypeFromSourceFile(
+    RefPtr<Expr> parseTermFromSourceFile(
         Session*                        session,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
@@ -4282,7 +4303,7 @@ namespace Slang
         parser.currentScope = outerScope;
         parser.namePool = namePool;
         parser.sourceLanguage = sourceLanguage;
-        return parser.ParseType();
+        return parser.ParseExpression();
     }
 
     // Parse a source file into an existing translation unit
@@ -4649,7 +4670,7 @@ namespace Slang
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
         DECL(typedef,         ParseTypeDef);
         DECL(associatedtype,  parseAssocType);
-        DECL(type_param,    parseGlobalGenericParamDecl);
+        DECL(type_param,    parseGlobalGenericTypeParamDecl);
         DECL(cbuffer,         parseHLSLCBufferDecl);
         DECL(tbuffer,         parseHLSLTBufferDecl);
         DECL(__generic,       ParseGenericDecl);
@@ -4666,6 +4687,7 @@ namespace Slang
         DECL(var,             parseVarDecl);
         DECL(func,            parseFuncDecl);
         DECL(typealias,       parseTypeAliasDecl);
+        DECL(__generic_value_param, parseGlobalGenericValueParamDecl);
 
     #undef DECL
 

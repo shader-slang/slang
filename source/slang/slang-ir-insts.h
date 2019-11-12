@@ -1926,7 +1926,18 @@ struct IRBuilder
         UInt            caseArgCount,
         IRInst* const* caseArgs);
 
-    IRGlobalGenericParam* emitGlobalGenericParam();
+    IRGlobalGenericParam* emitGlobalGenericParam(
+        IRType* type);
+
+    IRGlobalGenericParam* emitGlobalGenericTypeParam()
+    {
+        return emitGlobalGenericParam(getTypeKind());
+    }
+
+    IRGlobalGenericParam* emitGlobalGenericWitnessTableParam()
+    {
+        return emitGlobalGenericParam(getWitnessTableType());
+    }
 
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(
         IRInst* param,

@@ -14,7 +14,7 @@ namespace Slang
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope);
 
-    RefPtr<Expr> parseTypeFromSourceFile(
+    RefPtr<Expr> parseTermFromSourceFile(
         Session*                        session,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,

@@ -552,7 +552,7 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
     IRGlobalGenericParam*           originalVal,
     IROriginalValuesForClone const& originalValues)
 {
-    auto clonedVal = builder->emitGlobalGenericParam();
+    auto clonedVal = builder->emitGlobalGenericParam(originalVal->getFullType());
     cloneSimpleGlobalValueImpl(context, originalVal, originalValues, clonedVal);
     return clonedVal;
 }
