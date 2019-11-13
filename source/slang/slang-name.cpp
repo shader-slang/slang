@@ -14,6 +14,11 @@ UnownedStringSlice getUnownedStringSliceText(Name* name)
     return name ? name->text.getUnownedSlice() : UnownedStringSlice();
 }
 
+const char* getCstr(Name* name)
+{
+    return name ? name->text.getBuffer() : nullptr;
+}
+
 Name* NamePool::getName(String const& text)
 {
     RefPtr<Name> name;

@@ -1210,9 +1210,7 @@ SLANG_API char const* spReflectionEntryPoint_getName(
     SlangReflectionEntryPoint* inEntryPoint)
 {
     auto entryPointLayout = convert(inEntryPoint);
-    if(!entryPointLayout) return 0;
-
-    return getText(entryPointLayout->entryPoint.GetName()).begin();
+    return entryPointLayout ? getCstr(entryPointLayout->name) : nullptr;
 }
 
 SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
