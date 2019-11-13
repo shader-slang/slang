@@ -76,6 +76,14 @@ newoption {
    allowed     = { {"cygwin"}, {"mingw"} }
 }
 
+newoption {
+   trigger     = "build-glslang",
+   description = "(Optional) If true glslang and spirv-opt will be built",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
