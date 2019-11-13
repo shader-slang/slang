@@ -2166,6 +2166,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     //
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
     entryPointLayout->profile = entryPoint->getProfile();
+    entryPointLayout->name = entryPoint->getName();
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
