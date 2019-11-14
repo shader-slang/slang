@@ -174,9 +174,6 @@ workspace "slang"
     		
     filter { "system:linux" }
         linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
-
-    filter { "platforms:x64 or x86"}
-        
             
 function dump(o)
     if type(o) == 'table' then
