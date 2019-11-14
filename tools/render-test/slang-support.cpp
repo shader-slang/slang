@@ -149,20 +149,22 @@ static const char computeEntryPointName[] = "computeMain";
 
     if (request.computeShader.name)
     {
-        int computeEntryPoint = 0;
+        int computeEntryPointIndex = 0;
         if(!gOptions.dontAddDefaultEntryPoints)
         {
-            computeEntryPoint = spAddEntryPointEx(slangRequest, computeTranslationUnit,
+            computeEntryPointIndex = spAddEntryPointEx(slangRequest, computeTranslationUnit,
                 computeEntryPointName,
                 SLANG_STAGE_COMPUTE,
                 (int)rawEntryPointTypeNames.getCount(),
                 rawEntryPointTypeNames.getBuffer());
 
-            setEntryPointExistentialTypeArgs(computeEntryPoint);
+            setEntryPointExistentialTypeArgs(computeEntryPointIndex);
         }
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+
         const SlangResult res = spCompile(slangRequest);
+
         if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
         {
             fprintf(stderr, "%s", diagnostics);
@@ -170,9 +172,26 @@ static const char computeEntryPointName[] = "computeMain";
 
         SLANG_RETURN_ON_FAIL(res);
 
+        // We are going to get the entry point count... lets check what we have
+        {
+            auto reflection = spGetReflection(slangRequest);
+            // Get the amount of entry points in reflection
+            const int entryPointCount = int(spReflection_getEntryPointCount(reflection));
+
+            // Above code assumes there is an entry point
+            SLANG_ASSERT(entryPointCount && computeEntryPointIndex < entryPointCount);
+
+            auto entryPoint = spReflection_getEntryPointByIndex(reflection, computeEntryPointIndex);
+
+            // Get the entry point name
+            const char* entryPointName = spReflectionEntryPoint_getName(entryPoint);
+
+            SLANG_ASSERT(entryPointName);
+        }
+
         {
             size_t codeSize = 0;
-            char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPoint, &codeSize);
+            char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPointIndex, &codeSize);
 
             ShaderProgram::KernelDesc kernelDesc;
             kernelDesc.stage = StageType::Compute;

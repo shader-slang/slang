@@ -503,6 +503,10 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
                 }
+                else if (argStr == "-dump-intermediates")
+                {
+                    spSetDumpIntermediates(compileRequest, true);
+                }
                 else if(argStr == "-dump-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
