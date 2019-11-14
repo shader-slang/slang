@@ -293,6 +293,9 @@
     <ClCompile Include="slang-emit-source-writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-emit-spirv.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-emit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
