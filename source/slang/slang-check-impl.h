@@ -25,69 +25,56 @@ namespace Slang
 
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
-    struct BasicTypeKey
+    enum class BasicTypeKey : uint8_t
     {
-        union
-        {
-            struct
-            {
-                unsigned char type : 4;
-                unsigned char dim1 : 2;
-                unsigned char dim2 : 2;
-            } data;
-            unsigned char aggVal;
-        };
-        bool fromType(Type* typeIn)
-        {
-            aggVal = 0;
-            if (auto basicType = as<BasicExpressionType>(typeIn))
-            {
-                data.type = (unsigned char)basicType->baseType;
-                data.dim1 = data.dim2 = 0;
-            }
-            else if (auto vectorType = as<VectorExpressionType>(typeIn))
-            {
-                if (auto elemCount = as<ConstantIntVal>(vectorType->elementCount))
-                {
-                    data.dim1 = elemCount->value - 1;
-                    auto elementBasicType = as<BasicExpressionType>(vectorType->elementType);
-                    data.type = (unsigned char)elementBasicType->baseType;
-                    data.dim2 = 0;
-                }
-                else
-                    return false;
-            }
-            else if (auto matrixType = as<MatrixExpressionType>(typeIn))
-            {
-                if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
-                {
-                    if (auto elemCount2 = as<ConstantIntVal>(matrixType->getColumnCount()))
-                    {
-                        auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType());
-                        data.type = (unsigned char)elemBasicType->baseType;
-                        data.dim1 = elemCount1->value - 1;
-                        data.dim2 = elemCount2->value - 1;
-                    }
-                }
-                else
-                    return false;
-            }
-            else
-                return false;
-            return true;
-        }
+        Invalid = 0xff,                 ///< Value that can never be a valid type                
     };
+
+    SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 1, IntegerLiteralValue dim2 = 1)
+    {
+        SLANG_ASSERT(dim1 > 0 && dim2 > 0);
+        return BasicTypeKey((uint8_t(baseType) << 4) | ((uint8_t(dim1) - 1) << 2) | (uint8_t(dim2) - 1));
+    }
+
+    inline BasicTypeKey makeBasicTypeKey(Type* typeIn)
+    {
+        if (auto basicType = as<BasicExpressionType>(typeIn))
+        {
+            return makeBasicTypeKey(basicType->baseType);
+        }
+        else if (auto vectorType = as<VectorExpressionType>(typeIn))
+        {
+            if (auto elemCount = as<ConstantIntVal>(vectorType->elementCount))
+            {
+                auto elemBasicType = as<BasicExpressionType>(vectorType->elementType);
+                return makeBasicTypeKey(elemBasicType->baseType, elemCount->value);
+            }
+        }
+        else if (auto matrixType = as<MatrixExpressionType>(typeIn))
+        {
+            if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
+            {
+                if (auto elemCount2 = as<ConstantIntVal>(matrixType->getColumnCount()))
+                {
+                    auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType());
+                    return makeBasicTypeKey(elemBasicType->baseType, elemCount1->value, elemCount2->value);
+                }
+            }
+        }
+        return BasicTypeKey::Invalid;
+    }
 
     struct BasicTypeKeyPair
     {
         BasicTypeKey type1, type2;
-        bool operator == (BasicTypeKeyPair p)
-        {
-            return type1.aggVal == p.type1.aggVal && type2.aggVal == p.type2.aggVal;
-        }
+        bool operator==(const BasicTypeKeyPair& rhs) const { return type1 == rhs.type1 && type2 == rhs.type2; }
+        bool operator!=(const BasicTypeKeyPair& rhs) const { return !(*this == rhs); }
+
+        bool isValid() const { return type1 != BasicTypeKey::Invalid && type2 != BasicTypeKey::Invalid; }
+
         int GetHashCode()
         {
-            return combineHash(type1.aggVal, type2.aggVal);
+            return int(type1) << 16 | int(type2);
         }
     };
 
@@ -97,26 +84,29 @@ namespace Slang
         BasicTypeKey args[2];
         bool operator == (OperatorOverloadCacheKey key)
         {
-            return operatorName == key.operatorName && args[0].aggVal == key.args[0].aggVal
-                && args[1].aggVal == key.args[1].aggVal;
+            return operatorName == key.operatorName && args[0] == key.args[0] && args[1] == key.args[1];
         }
         int GetHashCode()
         {
-            return ((int)(UInt64)(void*)(operatorName) << 16) ^ (args[0].aggVal << 8) ^ (args[1].aggVal);
+            return ((int)(UInt64)(void*)(operatorName) << 16) ^ (int(args[0]) << 8) ^ (int(args[1]));
         }
         bool fromOperatorExpr(OperatorExpr* opExpr)
         {
             // First, lets see if the argument types are ones
             // that we can encode in our space of keys.
-            args[0].aggVal = 0;
-            args[1].aggVal = 0;
+            args[0] = BasicTypeKey::Invalid;
+            args[1] = BasicTypeKey::Invalid;
             if (opExpr->Arguments.getCount() > 2)
                 return false;
 
             for (Index i = 0; i < opExpr->Arguments.getCount(); i++)
             {
-                if (!args[i].fromType(opExpr->Arguments[i]->type.Ptr()))
+                auto key = makeBasicTypeKey(opExpr->Arguments[i]->type.Ptr());
+                if (key == BasicTypeKey::Invalid)
+                {
                     return false;
+                }
+                args[i]=  key;
             }
 
             // Next, lets see if we can find an intrinsic opcode

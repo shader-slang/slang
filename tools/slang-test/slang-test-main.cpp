@@ -1106,6 +1106,18 @@ TestResult runCompile(TestContext* context, TestInput& input)
         return TestResult::Pass;
     }
 
+    if (exeRes.resultCode != 0)
+    {
+        auto reporter = context->reporter;
+        if (reporter)
+        {
+            auto output = getOutput(exeRes);
+            reporter->message(TestMessageType::TestFailure, output);
+        }
+
+        return TestResult::Fail;
+    }
+
     return TestResult::Pass;
 }
 

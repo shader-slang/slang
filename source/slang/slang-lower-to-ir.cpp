@@ -305,14 +305,17 @@ struct SharedIRGenContext
     SharedIRGenContext(
         Session*        session,
         DiagnosticSink* sink,
+        bool obfuscateCode, 
         ModuleDecl*     mainModuleDecl = nullptr)
         : m_session(session)
         , m_sink(sink)
+        , m_obfuscateCode(obfuscateCode)
         , m_mainModuleDecl(mainModuleDecl)
     {}
 
     Session*        m_session = nullptr;
     DiagnosticSink* m_sink = nullptr;
+    bool            m_obfuscateCode = false;
     ModuleDecl*     m_mainModuleDecl = nullptr;
 
     // The "global" environment for mapping declarations to their IR values.
@@ -419,6 +422,22 @@ bool isFromStdLib(Decl* decl)
 
 bool isImportedDecl(IRGenContext* context, Decl* decl)
 {
+    // If the declaration has the extern attribute then it must be imported
+    // from another module
+    //
+    // The [__extern] attribute is a very special case feature (aka "a hack") that allows a symbol to be declared
+    // as if it is part of the current module for AST purposes, but then expects to be imported from another IR module.
+    // For that linkage to work, both the exporting and importing modules must have the same name (which would
+    // usually indicate that they are the same module).
+    //
+    // Note that in practice for matching during linking uses the fully qualified name - including module name.
+    // Thus using extern __attribute isn't useful for symbols that are imported via `import`, only symbols
+    // that notionally come from the same module but are split into separate compilations (as can be done with -module-name)
+    if (decl->FindModifier<ExternAttribute>())
+    {
+        return true;
+    }
+
     ModuleDecl* moduleDecl = findModuleDecl(decl);
     if (!moduleDecl)
         return false;
@@ -1062,7 +1081,14 @@ static void addLinkageDecoration(
     IRInst*                     inst,
     Decl*                       decl)
 {
-    addLinkageDecoration(context, inst, decl, getMangledName(decl).getUnownedSlice());
+     String mangledName = getMangledName(decl);
+
+     if (context->shared->m_obfuscateCode)
+     {
+         mangledName = getHashedName(mangledName.getUnownedSlice());
+     }
+
+    addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
 }
 
 IRStructKey* getInterfaceRequirementKey(
@@ -1832,6 +1858,11 @@ static void addNameHint(
     IRInst*         inst,
     char const*     text)
 {
+    if (context->shared->m_obfuscateCode)
+    {
+        return;
+    }
+
     context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
 }
 
@@ -2057,6 +2088,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 break;
 
             case BaseType::Bool:
+                return LoweredValInfo::simple(getBuilder()->getBoolValue(false));
+
             case BaseType::Int8:
             case BaseType::Int16:
             case BaseType::Int:
@@ -6598,6 +6631,7 @@ IRModule* generateIRForTranslationUnit(
     SharedIRGenContext sharedContextStorage(
         translationUnit->getSession(),
         translationUnit->compileRequest->getSink(),
+        translationUnit->compileRequest->getLinkage()->m_obfuscateCode,
         translationUnit->getModuleDecl());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
 
@@ -6706,7 +6740,11 @@ IRModule* generateIRForTranslationUnit(
         // by setting up the options for the stripping pass appropriately.
         //
         IRStripOptions stripOptions;
-        stripOptions.shouldStripNameHints = compileRequest->obfuscateCode;
+
+        Linkage* linkage = compileRequest->getLinkage();
+
+        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
 
         stripFrontEndOnlyInstructions(module, stripOptions);
 
@@ -6765,7 +6803,9 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
         SharedIRGenContext sharedContextStorage(
             session,
-            sink);
+            sink,
+            linkage->m_obfuscateCode
+        );
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext);
@@ -7174,7 +7214,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     SharedIRGenContext sharedContextStorage(
         session,
-        sink);
+        sink,
+        linkage->m_obfuscateCode);
     auto sharedContext = &sharedContextStorage;
 
     IRLayoutGenContext contextStorage(sharedContext);
@@ -7221,6 +7262,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
 
+        // HACK: skip over entry points that came from deserialization,
+        // and thus don't have AST-level information for us to work with.
+        //
+        if(!funcDeclRef)
+            continue;
+
         auto irFuncType = lowerType(context, getFuncType(session, funcDeclRef));
         auto irFunc = getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType));
 
@@ -7242,6 +7289,24 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         auto irTypeLayout = lowerTypeLayout(context, taggedUnionTypeLayout);
 
         builder->addLayoutDecoration(irType, irTypeLayout);
+    }
+
+    // Lets strip and run DCE here
+    if (linkage->m_obfuscateCode)
+    {
+        IRStripOptions stripOptions;
+
+        stripOptions.shouldStripNameHints = linkage->m_obfuscateCode;
+        stripOptions.stripSourceLocs = linkage->m_obfuscateCode;
+
+        stripFrontEndOnlyInstructions(irModule, stripOptions);
+
+        IRDeadCodeEliminationOptions options;
+        options.keepExportsAlive = true;
+        options.keepLayoutsAlive = true;
+
+        // Eliminate any dead code
+        eliminateDeadCode(irModule, options);
     }
 
     m_irModuleForLayout = irModule;

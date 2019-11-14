@@ -112,6 +112,9 @@ DIAGNOSTIC(    81, Error, parametersAfterLoadReproIgnored, "parameters after -lo
 DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'");
 DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'");
 DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module container '%0'");
+DIAGNOSTIC(    85, Error, unableToAddReferenceToModuleContainer, "unable to add a reference to a module container");
+DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create module container");
+
 
 //
 // 1xxxx - Lexical anaylsis

@@ -19,6 +19,8 @@
 
 namespace Slang {
 
+SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream);
+
 SlangResult tryReadCommandLineArgumentRaw(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, char const** argOut)
 {
     *argOut = nullptr;
@@ -398,10 +400,10 @@ struct OptionsParser
 
 #undef CASE
 
-        else if (path.endsWith(".slang-module"))
+        else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
-            requestImpl->containerOutputPath = path;
+            requestImpl->m_containerOutputPath = path;
         }
         else
         {
@@ -500,6 +502,10 @@ struct OptionsParser
                 else if (argStr == "-no-codegen")
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
+                }
+                else if (argStr == "-dump-intermediates")
+                {
+                    spSetDumpIntermediates(compileRequest, true);
                 }
                 else if(argStr == "-dump-ir" )
                 {
@@ -882,8 +888,7 @@ struct OptionsParser
                 }
                 else if (argStr == "-obfuscate")
                 {
-                    requestImpl->getFrontEndReq()->obfuscateCode = true;
-                    requestImpl->getBackEndReq()->obfuscateCode = true;
+                    requestImpl->getLinkage()->m_obfuscateCode = true;
                 }
                 else if (argStr == "-file-system")
                 {
@@ -918,21 +923,17 @@ struct OptionsParser
                     // We need to deserialize and add the modules
                     FileStream fileStream(referenceModuleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 
-                    List<RefPtr<IRModule>> irModules;
-                    if (SLANG_FAILED(IRSerialReader::readStreamModules(&fileStream, asInternal(session), requestImpl->getFrontEndReq()->getSourceManager(), irModules)))
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::unableToReadModuleContainer, referenceModuleName);
-                        return SLANG_FAIL;
-                    }
+                    // TODO: probalby near an error when we can't open the file?
 
-                    // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
-                    // For now just add to the linkage
-                    auto linkage = requestImpl->getLinkage();
-                    linkage->m_libModules.addRange(irModules.getBuffer(), irModules.getCount());
+                    _addLibraryReference(requestImpl, &fileStream);
                 }
                 else if (argStr == "-v")
                 {
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
+                }
+                else if( argStr == "-emit-spirv-directly" )
+                {
+                    requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
                 }
                 else if (argStr == "--")
                 {

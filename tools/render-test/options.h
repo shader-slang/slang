@@ -62,6 +62,8 @@ struct Options
 
     bool performanceProfile = false;
 
+    bool dontAddDefaultEntryPoints = false;
+
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 
     Slang::List<Slang::CommandLine::Arg> compileArgs;

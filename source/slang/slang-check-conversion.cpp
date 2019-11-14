@@ -750,16 +750,17 @@ namespace Slang
         // As an optimization, we will maintain a cache of conversion results
         // for basic types such as scalars and vectors.
         //
-        BasicTypeKey key1, key2;
-        BasicTypeKeyPair cacheKey;
+        
         bool shouldAddToCache = false;
         ConversionCost cost;
         TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
-        if( key1.fromType(toType.Ptr()) && key2.fromType(fromType.Ptr()) )
-        {
-            cacheKey.type1 = key1;
-            cacheKey.type2 = key2;
 
+        BasicTypeKeyPair cacheKey;
+        cacheKey.type1 = makeBasicTypeKey(toType.Ptr());
+        cacheKey.type2 = makeBasicTypeKey(fromType.Ptr());
+    
+        if( cacheKey.isValid())
+        {
             if (typeCheckingCache->conversionCostCache.TryGetValue(cacheKey, cost))
             {
                 if (outCost)

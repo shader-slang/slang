@@ -75,6 +75,7 @@
 
 namespace Slang
 {
+
 #define SLANG_CODE_GEN_TARGETS(x) \
     x("unknown", Unknown) \
     x("none", None) \
@@ -249,6 +250,7 @@ namespace Slang
             funcDeclRef.GetName(),
             profile,
             funcDeclRef);
+        entryPoint->m_mangledName = getMangledName(funcDeclRef);
         return entryPoint;
     }
 
@@ -262,6 +264,21 @@ namespace Slang
             name,
             profile,
             DeclRef<FuncDecl>());
+        return entryPoint;
+    }
+
+    RefPtr<EntryPoint> EntryPoint::createDummyForDeserialize(
+        Linkage*    linkage,
+        Name*       name,
+        Profile     profile,
+        String      mangledName)
+    {
+        RefPtr<EntryPoint> entryPoint = new EntryPoint(
+            linkage,
+            name,
+            profile,
+            DeclRef<FuncDecl>());
+        entryPoint->m_mangledName = mangledName;
         return entryPoint;
     }
 
@@ -337,16 +354,7 @@ namespace Slang
         SLANG_UNUSED(index);
         SLANG_ASSERT(index == 0);
 
-        // Note: this routine might get called on the "dummy"
-        // `EntryPoint` objects we create when doing pass-through
-        // compilation, in which case there won't be any
-        // function decl to be referenced and thus have
-        // its mangled name computed.
-        //
-        if(auto funcDeclRef = getFuncDeclRef())
-            return getMangledName(funcDeclRef);
-        else
-            return String();
+        return m_mangledName;
     }
 
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
@@ -652,7 +660,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(
+            return emitEntryPointSource(
                 compileRequest,
                 entryPointIndex,
                 CodeGenTarget::HLSL,
@@ -684,7 +692,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
+            return emitEntryPointSource(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
         }
     }
 
@@ -724,7 +732,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPoint(
+            return emitEntryPointSource(
                 compileRequest,
                 entryPointIndex,
                 CodeGenTarget::GLSL,
@@ -1616,7 +1624,13 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    SlangResult emitSPIRVForEntryPoint(
+    SlangResult emitSPIRVForEntryPointDirectly(
+        BackEndCompileRequest*  compileRequest,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        List<uint8_t>&          spirvOut);
+
+    SlangResult emitSPIRVForEntryPointViaGLSL(
         BackEndCompileRequest*  slangRequest,
         EntryPoint*             entryPoint,
         Int                     entryPointIndex,
@@ -1653,6 +1667,34 @@ SlangResult dissassembleDXILUsingDXC(
 
         SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
         return SLANG_OK;
+    }
+
+    SlangResult emitSPIRVForEntryPoint(
+        BackEndCompileRequest*  slangRequest,
+        EntryPoint*             entryPoint,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        EndToEndCompileRequest* endToEndReq,
+        List<uint8_t>&          spirvOut)
+    {
+        if( slangRequest->shouldEmitSPIRVDirectly )
+        {
+            return emitSPIRVForEntryPointDirectly(
+                slangRequest,
+                entryPointIndex,
+                targetReq,
+                spirvOut);
+        }
+        else
+        {
+            return emitSPIRVForEntryPointViaGLSL(
+                slangRequest,
+                entryPoint,
+                entryPointIndex,
+                targetReq,
+                endToEndReq,
+                spirvOut);
+        }
     }
 
     SlangResult emitSPIRVAssemblyForEntryPoint(
@@ -1747,7 +1789,7 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
-                return emitEntryPoint(
+                return emitEntryPointSource(
                     compileRequest,
                     entryPointIndex,
                     target, 
@@ -2198,9 +2240,8 @@ SlangResult dissassembleDXILUsingDXC(
         }
     }
 
-    static SlangResult _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
-        Stream* stream)
+    
+    SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
         RiffContainer container;
 
@@ -2212,9 +2253,9 @@ SlangResult dissassembleDXILUsingDXC(
             // Module list
             RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, IRSerialBinary::kSlangModuleListFourCc);
 
-            auto linkage = endToEndReq->getLinkage();
-            auto sink = endToEndReq->getSink();
-            auto frontEndReq = endToEndReq->getFrontEndReq();
+            auto linkage = getLinkage();
+            auto sink = getSink();
+            auto frontEndReq = getFrontEndReq();
 
             IRSerialWriter::OptionFlags optionFlags = 0;
 
@@ -2239,7 +2280,7 @@ SlangResult dissassembleDXILUsingDXC(
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
             }
 
-            auto program = endToEndReq->getSpecializedGlobalAndEntryPointsComponentType();
+            auto program = getSpecializedGlobalAndEntryPointsComponentType();
 
             // TODO: in the case where we have specialization, we might need
             // to serialize IR related to `program`...
@@ -2255,6 +2296,29 @@ SlangResult dissassembleDXILUsingDXC(
                 SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
             }
+
+            auto entryPointCount = program->getEntryPointCount();
+            for( Index ii = 0; ii < entryPointCount; ++ii )
+            {
+                auto entryPoint = program->getEntryPoint(ii);
+                auto entryPointMangledName = program->getEntryPointMangledName(ii);
+
+                RiffContainer::ScopeChunk entryPointScope(&container, RiffContainer::Chunk::Kind::Data, IRSerialBinary::kEntryPointFourCc);
+
+                auto writeString = [&](String const& str)
+                {
+                    uint32_t length = (uint32_t) str.getLength();
+                    container.write(&length, sizeof(length));
+                    container.write(str.getBuffer(), length+1);
+                };
+
+                writeString(entryPoint->getName()->text);
+
+                Profile profile = entryPoint->getProfile();
+                container.write(&profile, sizeof(profile));
+
+                writeString(entryPointMangledName);
+            }
         }
 
         // We now write the RiffContainer to the stream
@@ -2263,19 +2327,56 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-        /// Write out a "container" file with the stuff that has
-        /// been compiled as part of this request.
-        ///
-    static void _writeContainerFile(
-        EndToEndCompileRequest* endToEndReq,
-        const String& fileName)
+    SlangResult EndToEndCompileRequest::maybeCreateContainer()
     {
-        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-        if (SLANG_FAILED(_writeContainerFile(endToEndReq, &stream)))
+        switch (m_containerFormat)
         {
-            endToEndReq->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteModuleContainer, fileName);
+            case ContainerFormat::SlangModule:
+            {
+                m_containerBlob.setNull();
+
+                OwnedMemoryStream stream(FileAccess::Write);
+                SlangResult res = writeContainerToStream(&stream);
+                if (SLANG_FAILED(res))
+                {
+                    getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
+                    return res;
+                }
+
+                // Need to turn into a blob
+                RefPtr<ListBlob> blob(new ListBlob);
+                // Swap the streams contents into the blob
+                stream.swapContents(blob->m_data);
+                m_containerBlob = blob;
+
+                return res;
+            }
+            default: break;
         }
+        return SLANG_OK;
     }
+
+    SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
+    {
+        // If there is no container, or filename, don't write anything 
+        if (fileName.getLength() == 0 || !m_containerBlob)
+        {
+            return SLANG_OK;
+        }
+
+        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        try
+        {
+            stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize());
+        }
+        catch (IOException&)
+        {
+            // Unable to write
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
 
     static void _generateOutput(
         BackEndCompileRequest* compileRequest,
@@ -2322,10 +2423,8 @@ SlangResult dissassembleDXILUsingDXC(
                 }
             }
 
-            if (compileRequest->containerOutputPath.getLength() != 0)
-            {
-                _writeContainerFile(compileRequest, compileRequest->containerOutputPath);
-            }
+            compileRequest->maybeCreateContainer();
+            compileRequest->maybeWriteContainer(compileRequest->m_containerOutputPath);
         }
     }
 

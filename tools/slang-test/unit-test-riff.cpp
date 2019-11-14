@@ -2,24 +2,50 @@
 
 #include "../../source/core/slang-riff.h"
 
+#include "../../source/core/slang-random-generator.h"
+
 #include "test-context.h"
 
 using namespace Slang;
 
+static void _writeRandom(RandomGenerator* rand, size_t maxSize, RiffContainer& ioContainer, List<uint8_t>& ioData)
+{
+    while (true)
+    {
+        const Index oldCount = ioData.getCount();
+
+        const size_t allocSize = size_t(rand->nextInt32InRange(1, 50));
+
+        if (allocSize + oldCount > maxSize)
+        {
+            break;
+        }
+
+        ioData.setCount(oldCount + Index(allocSize));
+        rand->nextData(ioData.getBuffer() + oldCount, allocSize);
+
+        // Write
+        ioContainer.write(ioData.getBuffer() + oldCount, allocSize);
+    }
+
+    // Should be a single block with same data as the List
+    RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(ioContainer.getCurrentChunk());
+    SLANG_ASSERT(dataChunk);
+}
+
 static void riffUnitTest()
 {
+    typedef RiffContainer::ScopeChunk ScopeChunk;
+    typedef RiffContainer::Chunk::Kind Kind;
+
     const FourCC markThings = SLANG_FOUR_CC('T', 'H', 'I', 'N');
     const FourCC markData = SLANG_FOUR_CC('D', 'A', 'T', 'A');
 
     {
-        typedef RiffContainer::ScopeChunk ScopeChunk;
-        typedef RiffContainer::Chunk::Kind Kind;
-
         RiffContainer container;
 
         {
-            ScopeChunk scopeContainer(&container, Kind::List, markThings);
-
+            ScopeChunk scopeContainer(&container, Kind::List, markThings);        
             {
                 ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
@@ -83,6 +109,54 @@ static void riffUnitTest()
             }
         }
 
+    }
+
+    // Test writing as a stream only allocates a single data block (as long as there is enough space).
+    {
+        RiffContainer container;
+
+        ScopeChunk scopeChunk(&container, Kind::List, markData);
+        {
+            ScopeChunk scopeChunk(&container, Kind::Data, markData);
+            RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
+
+            List<uint8_t> data;
+            _writeRandom(rand, container.getMemoryArena().getBlockPayloadSize() / 2, container, data); 
+
+            // Should be a single block with same data as the List
+            RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(container.getCurrentChunk());
+            SLANG_ASSERT(dataChunk);
+
+            // It should be a single block
+            SLANG_CHECK(dataChunk->getSingleData() != nullptr);
+
+            SLANG_CHECK(dataChunk->isEqual(data.getBuffer(), data.getCount()));
+
+        }
+    } 
+
+    // Test writing across multiple data blocks
+    {
+        RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
+
+        for (Int i = 0 ; i < 100; ++i)
+        {
+            RiffContainer container;
+
+            const size_t maxSize = rand->nextInt32InRange(1, int32_t(container.getMemoryArena().getBlockPayloadSize() * 3));
+            
+            ScopeChunk scopeChunk(&container, Kind::List, markData);
+            {
+                ScopeChunk scopeChunk(&container, Kind::Data, markData);
+            
+                List<uint8_t> data;
+                _writeRandom(rand, maxSize, container, data);
+
+                // Should be a single block with same data as the List
+                RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(container.getCurrentChunk());
+                SLANG_CHECK(dataChunk && dataChunk->isEqual(data.getBuffer(), data.getCount()));
+            }
+        }
     }
 
 #if 0
