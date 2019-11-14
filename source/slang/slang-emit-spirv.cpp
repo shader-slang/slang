@@ -51,7 +51,7 @@ typedef uint32_t SpvWord;
 // > Each instruction is a stream of words
 //
 // After a fixed-size header, the contents of a SPIR-V module
-// is just a flat sequence of instructions, each of whic is
+// is just a flat sequence of instructions, each of which is
 // just a sequence of words.
 //
 // In principle we could try to emit instructions directly
@@ -420,7 +420,7 @@ struct SPIRVEmitContext
 
         /// Begin emitting an instruction with the given SPIR-V `opcode`.
         ///
-        /// If `irInst` is non-null, then the reuslting SPIR-V instruction
+        /// If `irInst` is non-null, then the resulting SPIR-V instruction
         /// will be registered as corresponding to `irInst`.
         ///
     SpvInst* beginInst(SpvOp opcode, IRInst* irInst = nullptr)
