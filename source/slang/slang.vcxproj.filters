@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -19,6 +19,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hlsl.meta.slang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-check-impl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-check.h">
@@ -123,6 +126,9 @@
     <ClInclude Include="slang-ir-ssa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-strip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-union.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -160,6 +166,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-object-meta-end.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-parameter-binding.h">
@@ -219,17 +228,38 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-strip.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-check-impl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-options.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-check-conformance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-constraint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-conversion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-decl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-expr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-modifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-overload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-stmt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-check-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-check.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -320,6 +350,9 @@
     <ClCompile Include="slang-ir-ssa.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-strip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-union.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -392,39 +425,6 @@
     <ClCompile Include="slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-strip.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-expr.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-stmt.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-decl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-type.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-shader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-modifier.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-constraint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-conformance.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-overload.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-check-conversion.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang">
@@ -438,6 +438,8 @@
     <Natvis Include="..\core\core.natvis">
       <Filter>Source Files</Filter>
     </Natvis>
-    <Natvis Include="slang.natvis" />
+    <Natvis Include="slang.natvis">
+      <Filter>Source Files</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

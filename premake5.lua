@@ -87,6 +87,7 @@ newoption {
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
+buildGlslang = (_OPTIONS["build-glslang"] == "true")
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
 local isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
@@ -173,7 +174,6 @@ workspace "slang"
     		
     filter { "system:linux" }
         linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
-        
             
 function dump(o)
     if type(o) == 'table' then
@@ -589,7 +589,7 @@ standardProject "slangc"
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
-    
+
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
 -- to make sure that the binaries it generates use a "relative `RPATH`"
@@ -624,6 +624,8 @@ standardProject "slang"
     -- `slang.h` header in this prject, so we do that manually here.
     files { "slang.h" }
 
+    files { "source/core/core.natvis" }
+
     -- The most challenging part of building `slang` is that we need
     -- to invoke the `slang-generate` tool to generate the version
     -- of the Slang standard library that we embed into the compiler.
@@ -633,6 +635,20 @@ standardProject "slang"
     -- the projects here:
     --
     dependson { "slang-generate" }
+
+    -- If we are not building glslang from source, then be
+    -- sure to copy a binary copy over to the output directory
+    if not buildGlslang then
+        filter { "system:windows" }
+            postbuildcommands {
+                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
+            }
+
+        filter { "system:linux" }
+            postbuildcommands {
+                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
+            }
+    end
 
     filter { "system:linux" }
 	-- might be able to do pic(true)
@@ -680,6 +696,8 @@ standardProject "slang"
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
+
+if buildGlslang then
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
@@ -758,3 +776,5 @@ standardProject "slang-glslang"
 -- * Packaging up binaries
 -- * "Installing" Slang on a user's machine
 --
+
+end

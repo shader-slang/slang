@@ -241,9 +241,7 @@
     <ClCompile Include="windows\slang-win-visual-studio-util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="core.natvis">
-      <FileType>Document</FileType>
-    </Natvis>
+    <Natvis Include="core.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
