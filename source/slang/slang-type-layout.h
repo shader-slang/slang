@@ -658,6 +658,9 @@ public:
     // The shader profile that was used to compile the entry point
     Profile profile;
 
+    // The name of the entry point. Always available even if entryPoint is nullptr (for example when it came from a library)
+    Name* name = nullptr;
+
     // Layout for any results of the entry point
     RefPtr<VarLayout> resultLayout;
 
