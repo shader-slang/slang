@@ -318,7 +318,7 @@ namespace Slang
             /// of an attribute from the parsed-but-unchecked form into a checked
             /// form (in which it has the appropriate C++ subclass) happens here.
             ///
-        ModifieredChecked,
+        ModifiersChecked,
 
             /// The declaration's basic signature has been checked to the point that
             /// it is ready to be referenced in other places.

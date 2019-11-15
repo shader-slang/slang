@@ -64,7 +64,7 @@ We tackle all of these problems by introducing the `ErrorType` and `ErrorExpr` c
 If we can't determine a correct type for an expression (say, because it has an error) then we will assign it the type `ErrorType`.
 If we can't reasonably form an expression to return *at all* then we will return an `ErrorExpr` (which has type `ErrorType`).
 
-These classes are designed to make sure that subsequent code won't crash on them (since we hae non-null objects), but to help avoid cascading errors.
+These classes are designed to make sure that subsequent code won't crash on them (since we have non-null objects), but to help avoid cascading errors.
 Some semantic checking logic will detect `ErrorType`s on sub-expressions and skip its own checking logic (e.g., this happens for function overload resolution), producing an `ErrorType` further up.
 In other cases, expressions with `ErrorType` can be silently consumed.
 For example, an errorneous expression is implicitly convertible to *any* type, which means that assignment of an error expression to a local variable will always succeed, regardless of variable's type.
@@ -115,7 +115,7 @@ We do not currently have cases where a statement needs to be transformed into an
 
 The most interesting part of statement checking is that it requires information about the lexical context.
 Checking a `return` statement requires knowing the surrounding function and its declared result type.
-Checkng a `break` statement requires knowing about any surrounding loop or `switch` statements.
+Checking a `break` statement requires knowing about any surrounding loop or `switch` statements.
 
 We represent the surrounding function explicitly on the `SemanticsStmtVisitor` type, and also use a linked list of `OuterStmtInfo` threaded up through the stack to track lexically enclosing statements.
 
@@ -141,7 +141,7 @@ Simple approaches to semantic checking of declarations fall into two camps:
 
 1. One can define a total ordering on declarations (usually textual order in the source file) and only allow dependecies to follow that order, so that checking can follow the same order. This is the style of C/C++, which is inherited from the legacy of traditional single-pass compilers.
 
-2. One can define a total ordering on *phases* of semantic checking, so that every declaration in the file is checked at phase N before any is checked at phase N+1. E.g., the types of all variables and functions must be determined before any expressions that use those variables/functions can be checked. This is the style of, e.g., Java nad C#, which put a premium on defining context-free languages that don't dictate order of declaration.
+2. One can define a total ordering on *phases* of semantic checking, so that every declaration in the file is checked at phase N before any is checked at phase N+1. E.g., the types of all variables and functions must be determined before any expressions that use those variables/functions can be checked. This is the style of, e.g., Java and C#, which put a premium on defining context-free languages that don't dictate order of declaration.
 
 Slang tries to bridge these two worlds: it has inherited features from HLSL that were inspired by C/C++, while it also strives to support out-of-order declarations like Java/C#.
 Unsurprisngly, this leads to unique challenges.
@@ -151,9 +151,9 @@ For that last part observe that:
 
 * Resolving an overloaded function call requires knowing the types of the parameters for candidate functions.
 
-* Determinin the type of a parameter requires checking type epxressions.
+* Determining the type of a parameter requires checking type expressions.
 
-* Type expressions may contian value arguments to generics, so checking type expressions requires checking value expressions.
+* Type expressions may contain value arguments to generics, so checking type expressions requires checking value expressions.
 
 * Value expressions can include function calls (e.g., operator invocations), which then require overload resolution to type-check.
 
@@ -169,7 +169,7 @@ In many cases this will reproduce the behavior of a Java or C#-style compiler wi
 
 The main difference for Slang is that whenever, during the checking of some declaration `D`, we discover that we need information from some other declaration `E` that would depend on `E` being in state `S`, we manually call a routine `ensureDecl(E,S)` whose job is to ensure that `E` has been checked enough for us to proceed.
 
-The `ensureDecl` operation will oftne be a no-op, if the declaration has already been checked previously, but in cases where the declaration *hasn't* been checked yet it will cause the compiler to recursively re-enter semantic checking and try to check `E` until it reached the desired state.
+The `ensureDecl` operation will often be a no-op, if the declaration has already been checked previously, but in cases where the declaration *hasn't* been checked yet it will cause the compiler to recursively re-enter semantic checking and try to check `E` until it reached the desired state.
 
 In pathological cases, this method can result in unbounded recursion in the type checker. The breadth-first strategy helps to make such cases less likely, and introducing more phases to semantic checking can also help reduce problems.
 In the long run we may need to investigate options that don't rely on unbounded recursion.
@@ -191,7 +191,7 @@ As a programmer contributing to the semantic checking infrastructure, the declar
 Name Lookup
 -----------
 
-Lookup is the processing of resolving the contetual meaning of names either in a lexical scope (e.g., the user wrote `foo` in a function body - what does it refer to?) or in the scope of scome type (e.g., the user wrote `obj.foo` for some value `obj` of type `T` - what does it refer to?).
+Lookup is the processing of resolving the contextual meaning of names either in a lexical scope (e.g., the user wrote `foo` in a function body - what does it refer to?) or in the scope of scome type (e.g., the user wrote `obj.foo` for some value `obj` of type `T` - what does it refer to?).
 
 Lookup can be tied to semantic analysis quite deeply.
 In order to know what a member reference like `obj.foo` refers to, we not only need to know the type of `obj`, but we may also need to know what interfaces that type conforms to (e.g., it might be a type parameter `T` with a constraint `T : IFoo`).

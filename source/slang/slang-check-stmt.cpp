@@ -118,10 +118,10 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt *stmt)
     {
-        WithOuterStmt subContxt(this, stmt);
+        WithOuterStmt subContext(this, stmt);
 
         stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        subContxt.checkStmt(stmt->Statement);
+        subContext.checkStmt(stmt->Statement);
     }
 
     void SemanticsStmtVisitor::visitForStmt(ForStmt *stmt)

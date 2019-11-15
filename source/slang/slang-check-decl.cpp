@@ -266,7 +266,7 @@ namespace Slang
                 }
             }
 
-            // Once we've rules out the case of refererencing a local declaration
+            // Once we've rules out the case of referencing a local declaration
             // before it has been checked, we will go ahead and ensure that
             // semantic checking has been performed on the chosen declaration,
             // at least up to the point where we can query its type.
@@ -1017,7 +1017,7 @@ namespace Slang
         //
         DeclCheckState states[] =
         {
-            DeclCheckState::ModifieredChecked,
+            DeclCheckState::ModifiersChecked,
             DeclCheckState::ReadyForReference,
             DeclCheckState::ReadyForLookup,
             DeclCheckState::ReadyForLookup,
@@ -2826,7 +2826,7 @@ namespace Slang
     {
         switch(state)
         {
-        case DeclCheckState::ModifieredChecked:
+        case DeclCheckState::ModifiersChecked:
             SemanticsDeclModifiersVisitor(shared).dispatch(decl);
             break;
 
