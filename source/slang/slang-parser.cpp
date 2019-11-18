@@ -1788,6 +1788,11 @@ namespace Slang
         return taggedUnionType;
     }
 
+    static RefPtr<RefObject> parseTaggedUnionType(Parser* parser, void* /*unused*/)
+    {
+        return parseTaggedUnionType(parser);
+    }
+
     static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
@@ -1831,6 +1836,12 @@ namespace Slang
             typeSpec.expr = createDeclRefType(parser, decl);
             return typeSpec;
         }
+        // TODO: This case would not be needed if we had the
+        // code below dispatch into `parseAtomicExpr`, which
+        // already includes logic for keyword lookup.
+        //
+        // Leaving this case here for now to avoid breaking anything.
+        //
         else if(AdvanceIf(parser, "__TaggedUnion"))
         {
             typeSpec.expr = parseTaggedUnionType(parser);
@@ -4775,6 +4786,7 @@ namespace Slang
         EXPR(this,  parseThisExpr);
         EXPR(true,  parseTrueExpr);
         EXPR(false, parseFalseExpr);
+        EXPR(__TaggedUnion, parseTaggedUnionType);
 
     #undef EXPR
 
