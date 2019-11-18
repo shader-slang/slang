@@ -173,11 +173,11 @@ namespace Slang
 
             if( auto aggTypeDeclRef = declRef.as<AggTypeDecl>() )
             {
-                checkDecl(aggTypeDeclRef.getDecl());
+                ensureDecl(aggTypeDeclRef, DeclCheckState::CanEnumerateBases);
 
                 for( auto inheritanceDeclRef : getMembersOfTypeWithExt<InheritanceDecl>(aggTypeDeclRef))
                 {
-                    checkDecl(inheritanceDeclRef.getDecl());
+                    ensureDecl(inheritanceDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
 
                     // Here we will recursively look up conformance on the type
                     // that is being inherited from. This is dangerous because
@@ -210,7 +210,7 @@ namespace Slang
                 // if an inheritance decl is not found, try to find a GenericTypeConstraintDecl
                 for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {
-                    checkDecl(genConstraintDeclRef.getDecl());
+                    ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
                     auto inheritedType = GetSup(genConstraintDeclRef);
                     TypeWitnessBreadcrumb breadcrumb;
                     breadcrumb.prev = inBreadcrumbs;

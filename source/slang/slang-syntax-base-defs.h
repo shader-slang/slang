@@ -275,7 +275,7 @@ ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     )
 
 
-    FIELD_INIT(DeclCheckState, checkState, DeclCheckState::Unchecked)
+    FIELD_INIT(DeclCheckStateExt, checkState, DeclCheckState::Unchecked)
 
     // The next declaration defined in the same container with the same name
     DECL_FIELD(Decl*, nextInContainerWithSameName RAW(= nullptr))
@@ -284,8 +284,8 @@ ABSTRACT_SYNTAX_CLASS(Decl, DeclBase)
     bool IsChecked(DeclCheckState state) { return checkState >= state; }
     void SetCheckState(DeclCheckState state)
     {
-        SLANG_RELEASE_ASSERT(state >= checkState);
-        checkState = state;
+        SLANG_RELEASE_ASSERT(state >= checkState.getState());
+        checkState.setState(state);
     }
     )
 END_SYNTAX_CLASS()

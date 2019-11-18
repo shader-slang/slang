@@ -156,39 +156,27 @@ namespace Slang
     void checkTranslationUnit(
         TranslationUnitRequest* translationUnit)
     {
-        SemanticsVisitor visitor(
+        SharedSemanticsContext sharedSemanticsContext(
             translationUnit->compileRequest->getLinkage(),
             translationUnit->compileRequest->getSink());
+
+        SemanticsDeclVisitorBase visitor(&sharedSemanticsContext);
 
         // Apply the visitor to do the main semantic
         // checking that is required on all declarations
         // in the translation unit.
-        visitor.checkDecl(translationUnit->getModuleDecl());
+
+        visitor.checkModule(translationUnit->getModuleDecl());
 
         translationUnit->getModule()->_collectShaderParams();
     }
 
-    void SemanticsVisitor::dispatchDecl(DeclBase* decl)
+    void SemanticsVisitor::dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts)
     {
+        SemanticsStmtVisitor visitor(getShared(), parentFunc, outerStmts);
         try
         {
-            DeclVisitor::dispatch(decl);
-        }
-        // Don't emit any context message for an explicit `AbortCompilationException`
-        // because it should only happen when an error is already emitted.
-        catch(AbortCompilationException&) { throw; }
-        catch(...)
-        {
-            getSink()->noteInternalErrorLoc(decl->loc);
-            throw;
-        }
-    }
-
-    void SemanticsVisitor::dispatchStmt(Stmt* stmt)
-    {
-        try
-        {
-            StmtVisitor::dispatch(stmt);
+            visitor.dispatch(stmt);
         }
         catch(AbortCompilationException&) { throw; }
         catch(...)
@@ -200,9 +188,10 @@ namespace Slang
 
     void SemanticsVisitor::dispatchExpr(Expr* expr)
     {
+        SemanticsExprVisitor visitor(getShared());
         try
         {
-            ExprVisitor::dispatch(expr);
+            visitor.dispatch(expr);
         }
         catch(AbortCompilationException&) { throw; }
         catch(...)

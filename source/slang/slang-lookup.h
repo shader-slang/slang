@@ -31,7 +31,7 @@ LookupResult lookUpLocal(
     SemanticsVisitor*       semantics,
     Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef,
-    LookupMask          mask = LookupMask::Default);
+    LookupMask              mask = LookupMask::Default);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(

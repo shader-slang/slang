@@ -153,7 +153,10 @@ namespace Slang
         structAttribDef->ParentDecl->Members.add(attribDecl.Ptr());
         structAttribDef->ParentDecl->memberDictionaryIsValid = false;
         // do necessary checks on this newly constructed node
-        checkDecl(attribDecl.Ptr());
+
+        // TODO: what check state is relevant here?
+        ensureDecl(attribDecl, DeclCheckState::Checked);
+
         return attribDecl.Ptr();
     }
 
@@ -368,11 +371,14 @@ namespace Slang
         }
         else if (auto userDefAttr = as<UserDefinedAttribute>(attr))
         {
+
             // check arguments against attribute parameters defined in attribClassDecl
             Index paramIndex = 0;
             auto params = attribClassDecl->getMembersOfType<ParamDecl>();
             for (auto paramDecl : params)
             {
+                ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
+
                 if (paramIndex < attr->args.getCount())
                 {
                     auto & arg = attr->args[paramIndex];

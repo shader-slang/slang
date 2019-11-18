@@ -4,12 +4,12 @@
 
 namespace Slang {
 
-void checkDecl(SemanticsVisitor* visitor, Decl* decl);
+void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state);
 
 //
 
 DeclRef<ExtensionDecl> ApplyExtensionToType(
-    SemanticsVisitor*       semantics,
+    SemanticsVisitor*   semantics,
     ExtensionDecl*          extDecl,
     RefPtr<Type>  type);
 
@@ -241,6 +241,11 @@ DeclRef<Decl> maybeSpecializeInterfaceDeclRef(
 {
     if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
     {
+        // TODO: This case should probably loop back into the semantic
+        // checking logic (when available) in order to ensure that
+        // appropriate witness values have been registered for (at least)
+        // the associated type requirements of the super-type.
+
         // Create a subtype witness value to note the subtype relationship
         // that makes this specialization valid.
         //
@@ -358,6 +363,11 @@ void DoLocalLookupImpl(
     // Consider lookup via extension
     if( auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>() )
     {
+        if (request.semantics)
+        {
+            ensureDecl(request.semantics, containerDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
+        }
+
         RefPtr<Type> type = DeclRefType::Create(
             session,
             aggTypeDeclRef);
@@ -397,6 +407,8 @@ void DoLocalLookupImpl(
         RefPtr<DeclRefType> targetDeclRefType;
         if (auto extDeclRef = containerDeclRef.as<ExtensionDecl>())
         {
+            ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
+
             targetDeclRefType = as<DeclRefType>(extDeclRef.getDecl()->targetType);
             SLANG_ASSERT(targetDeclRefType);
             int diff = 0;
@@ -414,7 +426,7 @@ void DoLocalLookupImpl(
             auto baseInterfaces = getMembersOfType<InheritanceDecl>(containerDeclRef);
             for (auto inheritanceDeclRef : baseInterfaces)
             {
-                checkDecl(request.semantics, inheritanceDeclRef.decl);
+                ensureDecl(request.semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
 
                 auto baseType = inheritanceDeclRef.getDecl()->base.type.dynamicCast<DeclRefType>();
                 SLANG_ASSERT(baseType);
@@ -556,7 +568,7 @@ LookupResult lookUpLocal(
     SemanticsVisitor*       semantics,
     Name*                   name,
     DeclRef<ContainerDecl>  containerDeclRef,
-    LookupMask              mask)
+    LookupMask          mask)
 {
     LookupRequest request;
     request.semantics = semantics;
