@@ -2245,9 +2245,7 @@ SlangResult dissassembleDXILUsingDXC(
     {
         RiffContainer container;
 
-        // TODO(JS): We may want a switch to control is we use compression and/or we may just want compressed by default.
-        // For now uncompressed is fine.
-        const auto compressionType = IRSerialBinary::CompressionType::None;
+        const IRSerialBinary::CompressionType compressionType = getLinkage()->irCompressionType;
 
         {
             // Module list

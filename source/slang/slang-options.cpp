@@ -627,6 +627,12 @@ struct OptionsParser
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
+                else if (argStr == "-ir-compression")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    SLANG_RETURN_ON_FAIL(IRSerialTypeUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->irCompressionType));
+                }
                 else if (argStr == "-target")
                 {
                     String name;
