@@ -4211,7 +4211,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
 
-            auto inst = getBuilder()->emitGlobalGenericParam();
+            auto inst = getBuilder()->emitGlobalGenericWitnessTableParam();
             addLinkageDecoration(context, inst, decl);
             return LoweredValInfo::simple(inst);
         }
@@ -4227,10 +4227,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
-        auto inst = getBuilder()->emitGlobalGenericParam();
+        auto inst = getBuilder()->emitGlobalGenericTypeParam();
         addLinkageDecoration(context, inst, decl);
         return LoweredValInfo::simple(inst);
     }
+
+    LoweredValInfo visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
+    {
+        auto builder = getBuilder();
+        auto type = lowerType(context, decl->type);
+        auto inst = builder->emitGlobalGenericParam(type);
+        addLinkageDecoration(context, inst, decl);
+        return LoweredValInfo::simple(inst);
+    }
+
 
     void lowerWitnessTable(
         IRGenContext*                               subContext,

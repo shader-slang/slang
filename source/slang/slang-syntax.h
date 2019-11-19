@@ -1241,7 +1241,8 @@ namespace Slang
             ExistentialValue,
         };
         Flavor              flavor;
-        RefPtr<RefObject>   object;
+        SourceLoc           loc;
+        RefPtr<NodeBase>    object;
     };
     typedef List<SpecializationParam> SpecializationParams;
 

@@ -3328,12 +3328,13 @@ namespace Slang
         return inst;
     }
 
-    IRGlobalGenericParam* IRBuilder::emitGlobalGenericParam()
+    IRGlobalGenericParam* IRBuilder::emitGlobalGenericParam(
+        IRType* type)
     {
         IRGlobalGenericParam* irGenericParam = createInst<IRGlobalGenericParam>(
             this,
             kIROp_GlobalGenericParam,
-            nullptr);
+            type);
         addGlobalValue(this, irGenericParam);
         return irGenericParam;
     }

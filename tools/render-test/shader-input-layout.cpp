@@ -89,10 +89,8 @@ namespace renderer_test
     void ShaderInputLayout::parse(RandomGenerator* rand, const char * source)
     {
         entries.clear();
-        globalGenericTypeArguments.clear();
-        entryPointGenericTypeArguments.clear();
-        globalExistentialTypeArguments.clear();
-        entryPointExistentialTypeArguments.clear();
+        globalSpecializationArgs.clear();
+        entryPointSpecializationArgs.clear();
         auto lines = Split(source, '\n');
         for (auto & line : lines)
         {
@@ -102,37 +100,25 @@ namespace renderer_test
                 TokenReader parser(lineContent);
                 try
                 {
-                    if (parser.LookAhead("type"))
+                    if (parser.LookAhead("entryPointSpecializationArg")
+                        || parser.LookAhead("type")
+                        || parser.LookAhead("entryPointExistentialType"))
                     {
                         parser.ReadToken();
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        entryPointGenericTypeArguments.add(typeExp);
+                        entryPointSpecializationArgs.add(typeExp);
                     }
-                    else if (parser.LookAhead("global_type"))
+                    else if (parser.LookAhead("globalSpecializationArg")
+                        || parser.LookAhead("global_type")
+                        || parser.LookAhead("globalExistentialType"))
                     {
                         parser.ReadToken();
                         StringBuilder typeExp;
                         while (!parser.IsEnd())
                             typeExp << parser.ReadToken().Content;
-                        globalGenericTypeArguments.add(typeExp);
-                    }
-                    else if (parser.LookAhead("globalExistentialType"))
-                    {
-                        parser.ReadToken();
-                        StringBuilder typeExp;
-                        while (!parser.IsEnd())
-                            typeExp << parser.ReadToken().Content;
-                        globalExistentialTypeArguments.add(typeExp);
-                    }
-                    else if (parser.LookAhead("entryPointExistentialType"))
-                    {
-                        parser.ReadToken();
-                        StringBuilder typeExp;
-                        while (!parser.IsEnd())
-                            typeExp << parser.ReadToken().Content;
-                        entryPointExistentialTypeArguments.add(typeExp);
+                        globalSpecializationArgs.add(typeExp);
                     }
                     else
                     {

@@ -813,7 +813,7 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
     return SLANG_OK;
 }
 
-RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
+RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
 {
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
@@ -856,7 +856,7 @@ RefPtr<Expr> Linkage::parseTypeString(String typeStr, RefPtr<Scope> scope)
         this,
         nullptr);
 
-    return parseTypeFromSourceFile(
+    return parseTermFromSourceFile(
         getSessionImpl(),
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
@@ -893,7 +893,7 @@ Type* ComponentType::getTypeFromString(
     auto linkage = getLinkage();
     for(auto& s : scopesToTry)
     {
-        RefPtr<Expr> typeExpr = linkage->parseTypeString(
+        RefPtr<Expr> typeExpr = linkage->parseTermString(
             typeStr, s);
         type = checkProperType(linkage, TypeExp(typeExpr), sink);
         if (type && !type.as<ErrorType>())

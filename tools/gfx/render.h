@@ -146,10 +146,8 @@ struct ShaderCompileRequest
     EntryPoint vertexShader;
     EntryPoint fragmentShader;
     EntryPoint computeShader;
-    Slang::List<Slang::String> globalGenericTypeArguments;
-    Slang::List<Slang::String> entryPointGenericTypeArguments;
-    Slang::List<Slang::String> entryPointExistentialTypeArguments;
-    Slang::List<Slang::String> globalExistentialTypeArguments;
+    Slang::List<Slang::String> globalSpecializationArgs;
+    Slang::List<Slang::String> entryPointSpecializationArgs;
 
     Slang::List<Slang::CommandLine::Arg> compileArgs;
 };
