@@ -119,8 +119,8 @@ static const char computeEntryPointName[] = "computeMain";
         computeTranslationUnit = translationUnit;
     }
 
-    const int globalSpecializationArgCountCount = int(request.globalSpecializationArgs.getCount());
-    for(int ii = 0; ii < globalSpecializationArgCountCount; ++ii )
+    const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
+    for(int ii = 0; ii < globalSpecializationArgCount; ++ii )
     {
         spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalSpecializationArgs[ii].getBuffer());
     }
