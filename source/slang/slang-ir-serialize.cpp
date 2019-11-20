@@ -423,7 +423,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     return SLANG_OK;
 }
 
-static Result _writeArrayChunk(IRSerialCompressionType compressionType, uint32_t chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
+static Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -434,11 +434,15 @@ static Result _writeArrayChunk(IRSerialCompressionType compressionType, uint32_t
         return SLANG_OK;
     }
 
+    // Make compressed fourCC
+    chunkId = (compressionType != IRSerialCompressionType::None) ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId) : chunkId;
+
+    ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
+
     switch (compressionType)
     {
         case IRSerialCompressionType::None:
         {
-            ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
             Bin::ArrayHeader header;
             header.numEntries = uint32_t(numEntries);
 
@@ -472,7 +476,7 @@ static Result _writeArrayChunk(IRSerialCompressionType compressionType, uint32_t
 }
 
 template <typename T>
-Result _writeArrayChunk(IRSerialCompressionType compressionType, uint32_t chunkId, const List<T>& array, RiffContainer* container)
+Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<T>& array, RiffContainer* container)
 {
     return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.getCount()), sizeof(T), container);
 }
@@ -567,7 +571,7 @@ Result _encodeInsts(IRSerialCompressionType compressionType, const List<IRSerial
     return SLANG_OK;
 }
 
-Result _writeInstArrayChunk(IRSerialCompressionType compressionType, uint32_t chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
+Result _writeInstArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -618,6 +622,7 @@ Result _writeInstArrayChunk(IRSerialCompressionType compressionType, uint32_t ch
     {
         Bin::ModuleHeader moduleHeader;
         moduleHeader.compressionType = uint32_t(IRSerialCompressionType::VariableByteLite);
+
         ScopeChunk scopeHeader(container, Chunk::Kind::Data, Bin::kSlangModuleHeaderFourCc);
         container->write(&moduleHeader, sizeof(moduleHeader));
     }

@@ -353,10 +353,12 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
     }
 }
 
-#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) (((fourCc) & 0xffff00ff) | (uint32_t('c') << 8))
+// Replace first char with 's'
+#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) SLANG_FOUR_CC_REPLACE_FIRST_CHAR(fourCc, 's')
 
 struct IRSerialBinary
-{    
+{
+    
     static const FourCC kRiffFourCc = RiffFourCC::kRiff;
 
     static const FourCC kSlangModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
@@ -365,6 +367,9 @@ struct IRSerialBinary
 
     static const FourCC kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
 
+    /* NOTE! All FourCC that can be compressed must start with capital 'S', because compressed version is the same FourCC
+    with the 'S' replaced with 's' */
+
     static const FourCC kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
     static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
@@ -372,6 +377,7 @@ struct IRSerialBinary
     static const FourCC kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
     static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
     static const FourCC kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
+
 
     static const FourCC kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
