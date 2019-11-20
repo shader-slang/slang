@@ -1,9 +1,9 @@
 Slang Linking
 =============
 
-The Slang feature around libraries and linking are a *work in progress*. Future versions of Slang are likely to change the API and binary compatibility. 
+The Slang feature around libraries and linking are a *work in progress*. Future versions of Slang are likely to change the API and binary compatibility. Also note that currently reflection is mainly unsupported. 
 
-In many languages it is possible to compile source files into binaries such as libraries and object files. Then these files can be combined perhaps with other source files to produce a result such as an executable. Slang now has experimental support for such a feature. 
+In many languages it is possible to compile source files into binaries such as libraries and object files. Later these files can be combined perhaps with other source files to produce a result such as an executable. Slang now has experimental support for such a feature. 
 
 To make such a feature work we need a few abilities
 
@@ -69,6 +69,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 ```
 
+Slang libraries are stored as serialized Slang IR. That Slang IR currently maintains no forward or backward compatibility, and a new version of Slang may either produce incompatible IR, or be unable to consume previous versions IR.
+
+By default Slang stores serialized Slang IR in a compressed `lite` format. It can also be stored without any addition compression. These options can be specified via the command line via
+
+```
+-ir-compression lite
+-ir-compression none
+```
+
+They are also available via the API through the `spProcessCommandLineArguments` function. 
+
+Note that Slang can consume and process either `lite` or `none` styles transparently. Also mixing compressed libraries with uncompressed libraries also works. 
+
 Symbols
 -------
 
@@ -132,11 +145,24 @@ From the API use
 SLANG_API SlangResult spAddLibraryReference(
     SlangCompileRequest*    request,
     const void* libData,
-    size_t libDataSize)```
+    size_t libDataSize)
+```
     
 The libData/libDataSize is the binary data that was was either loaded from a `slang-lib` file or was the result of a compilation of a module and the library contents retrieved via `spGetContainerCode` or `spGetCompileRequestCode`. 
 
 As with -r command line option, multiple libraries can be added to a SlangCompileRequest and all will be searched for relevant symbolds during linking. 
+
+Reflection
+----------
+
+In general reflection is *not* available post linkage currently. A subset of functionality is available though including
+
+* spGetReflection
+* spReflection_getEntryPointCount
+* spReflection_getEntryPointByIndex
+* spReflectionEntryPoint_getName
+
+That other reflection functions currently either do not work or may *crash*. 
 
 Other issues
 ------------
@@ -157,7 +183,6 @@ int main()
 It does not matter that Thing might be defined in another library or object file. For compilation of main, we have to have the definition of Thing. 
 
 In Slang and libraries this is not the case. If I have a file `module-a.slang`
- 
  
 ```
 struct Thing
@@ -183,6 +208,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 ```
 
 This is possible because when linkage occurs the code is actually *Slang IR*, and Slang IR contains the information necessary for the use of the Thing type. 
+
+It also worth noting that if the `-obfuscate` feature is used, all libraries and source must also have `-obfuscate` enabled, for linking to work. 
+
 
 Examples
 --------
