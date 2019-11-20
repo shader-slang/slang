@@ -10,362 +10,16 @@
 
 namespace Slang {
 
-// Needed for linkage with some compilers
-/* static */ const IRSerialData::StringIndex IRSerialData::kNullStringIndex;
-/* static */ const IRSerialData::StringIndex IRSerialData::kEmptyStringIndex;
-
-/* Note that an IRInst can be derived from, but when it derived from it's new members are IRUse variables, and they in 
-effect alias over the operands - and reflected in the operand count. There _could_ be other members after these IRUse 
-variables, but only a few types include extra data, and these do not have any operands:
-
-* IRConstant        - Needs special-case handling
-* IRModuleInst      - Presumably we can just set to the module pointer on reconstruction
-
-Note! That on an IRInst there is an IRType* variable (accessed as getFullType()). As it stands it may NOT actually point 
-to an IRType derived type. Its 'ok' as long as it's an instruction that can be used in the place of the type. So this code does not 
-bother to check if it's correct, and just casts it.
-*/
-
-/* static */const IRSerialData::PayloadInfo IRSerialData::s_payloadInfos[int(Inst::PayloadType::CountOf)] = 
-{
-    { 0, 0 },   // Empty
-    { 1, 0 },   // Operand_1
-    { 2, 0 },   // Operand_2
-    { 1, 0 },   // OperandAndUInt32,
-    { 0, 0 },   // OperandExternal - This isn't correct, Operand has to be specially handled
-    { 0, 1 },   // String_1,              
-    { 0, 2 },   // String_2,              
-    { 0, 0 },   // UInt32,               
-    { 0, 0 },   // Float64,
-    { 0, 0 }    // Int64,
-};
-
-static bool isTextureTypeBase(IROp opIn)
+static bool _isTextureTypeBase(IROp opIn)
 {
     const int op = (kIROpMeta_PseudoOpMask & opIn);
     return op >= kIROp_FirstTextureTypeBase && op <= kIROp_LastTextureTypeBase;
 }
 
-static bool isConstant(IROp opIn)
+static bool _isConstant(IROp opIn)
 {
     const int op = (kIROpMeta_PseudoOpMask & opIn);
     return op >= kIROp_FirstConstant && op <= kIROp_LastConstant;
-}
-
-struct PrefixString;
-
-namespace { // anonymous
-
-struct CharReader
-{
-    char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
-    CharReader(const char* pos) :m_pos(pos) {}
-    mutable const char* m_pos;
-};
-
-} // anonymous
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringRepresentationCache !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-StringRepresentationCache::StringRepresentationCache():
-    m_stringTable(nullptr),
-    m_namePool(nullptr),
-    m_scopeManager(nullptr)
-{
-}
-
-void StringRepresentationCache::init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager)
-{
-    m_stringTable = stringTable;
-    m_namePool = namePool;
-    m_scopeManager = scopeManager;
-
-    // Decode the table
-    m_entries.setCount(StringSlicePool::kNumDefaultHandles);
-    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kNumDefaultHandles == 2);
-
-    {
-        Entry& entry = m_entries[0];
-        entry.m_numChars = 0;
-        entry.m_startIndex = 0;
-        entry.m_object = nullptr;
-    }
-    {
-        Entry& entry = m_entries[1];
-        entry.m_numChars = 0;
-        entry.m_startIndex = 0;
-        entry.m_object = nullptr;
-    }
-
-    {
-        const char* start = stringTable->begin();
-        const char* cur = start;
-        const char* end = stringTable->end();
-
-        while (cur < end)
-        {
-            CharReader reader(cur);
-            const int len = GetUnicodePointFromUTF8(reader);
-
-            Entry entry;
-            entry.m_startIndex = uint32_t(reader.m_pos - start);
-            entry.m_numChars = len;
-            entry.m_object = nullptr;
-
-            m_entries.add(entry);
-
-            cur = reader.m_pos + len;
-        }
-    }
-
-    m_entries.compress();
-}
-
-Name* StringRepresentationCache::getName(Handle handle)
-{
-    if (handle == StringSlicePool::kNullHandle)
-    {
-        return nullptr;
-    }
-
-    Entry& entry = m_entries[int(handle)];
-    if (entry.m_object)
-    {
-        Name* name = dynamicCast<Name>(entry.m_object);
-        if (name)
-        {
-            return name;
-        }
-        StringRepresentation* stringRep = static_cast<StringRepresentation*>(entry.m_object);
-        // Promote it to a name
-        name = m_namePool->getName(String(stringRep));
-        entry.m_object = name;
-        return name;
-    }
-
-    Name* name = m_namePool->getName(String(getStringSlice(handle)));
-    entry.m_object = name;
-    return name;
-}
-
-String StringRepresentationCache::getString(Handle handle)
-{
-    return String(getStringRepresentation(handle));
-}
-
-UnownedStringSlice StringRepresentationCache::getStringSlice(Handle handle) const
-{
-    const Entry& entry = m_entries[int(handle)];
-    const char* start = m_stringTable->begin();
-
-    return UnownedStringSlice(start + entry.m_startIndex, int(entry.m_numChars));
-}
-
-StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle handle)
-{
-    if (handle == StringSlicePool::kNullHandle || handle == StringSlicePool::kEmptyHandle)
-    {
-        return nullptr;
-    }
-
-    Entry& entry = m_entries[int(handle)];
-    if (entry.m_object)
-    {
-        Name* name = dynamicCast<Name>(entry.m_object);
-        if (name)
-        {
-            return name->text.getStringRepresentation();
-        }
-        return static_cast<StringRepresentation*>(entry.m_object);
-    }
-
-    const UnownedStringSlice slice = getStringSlice(handle);
-    const UInt size = slice.size();
-
-    StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
-    memcpy(stringRep->getData(), slice.begin(), size);
-    entry.m_object = stringRep;
-
-    // Keep the StringRepresentation in scope
-    m_scopeManager->add(stringRep);
-    
-    return stringRep;
-}
-
-char* StringRepresentationCache::getCStr(Handle handle)
-{
-    // It turns out StringRepresentation is always 0 terminated, so can just use that
-    StringRepresentation* rep = getStringRepresentation(handle);
-    return rep->getData();
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-/* static */void SerialStringTableUtil::encodeStringTable(const StringSlicePool& pool, List<char>& stringTable)
-{
-    // Skip the default handles -> nothing is encoded via them
-    return encodeStringTable(pool.getSlices().begin() + StringSlicePool::kNumDefaultHandles, pool.getNumSlices() - StringSlicePool::kNumDefaultHandles, stringTable);
-}
-    
-/* static */void SerialStringTableUtil::encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable)
-{
-    stringTable.clear();
-    for (size_t i = 0; i < numSlices; ++i)
-    {
-        const UnownedStringSlice slice = slices[i];
-        const int len = int(slice.size());
-        
-        // We need to write into the the string array
-        char prefixBytes[6];
-        const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
-        const Index baseIndex = stringTable.getCount();
-
-        stringTable.setCount(baseIndex + numPrefixBytes + len);
-
-        char* dst = stringTable.begin() + baseIndex;
-
-        memcpy(dst, prefixBytes, numPrefixBytes);
-        memcpy(dst + numPrefixBytes, slice.begin(), len);   
-    }
-}
-
-/* static */void SerialStringTableUtil::appendDecodedStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut)
-{
-    const char* start = stringTable.begin();
-    const char* cur = start;
-    const char* end = stringTable.end();
-
-    while (cur < end)
-    {
-        CharReader reader(cur);
-        const int len = GetUnicodePointFromUTF8(reader);
-        slicesOut.add(UnownedStringSlice(reader.m_pos, len));
-        cur = reader.m_pos + len;
-    }
-}
-
-/* static */void SerialStringTableUtil::decodeStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut)
-{
-    slicesOut.setCount(2);
-    slicesOut[0] = UnownedStringSlice(nullptr, size_t(0));
-    slicesOut[1] = UnownedStringSlice("", size_t(0));
-
-    appendDecodedStringTable(stringTable, slicesOut);
-}
-
-/* static */void SerialStringTableUtil::calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMapOut)
-{
-    SLANG_ASSERT(slices.getCount() >= StringSlicePool::kNumDefaultHandles);
-    SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
-    SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
-
-    indexMapOut.setCount(slices.getCount());
-    // Set up all of the defaults
-    for (int i = 0; i < StringSlicePool::kNumDefaultHandles; ++i)
-    {
-        indexMapOut[i] = StringSlicePool::Handle(i);
-    }
-
-    const Index numSlices = slices.getCount();
-    for (Index i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
-    {
-        indexMapOut[i] = pool.add(slices[i]);
-    }
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-template<typename T>
-static size_t _calcArraySize(const List<T>& list)
-{
-    return list.getCount() * sizeof(T);
-}
-
-size_t IRSerialData::calcSizeInBytes() const
-{
-    return
-        _calcArraySize(m_insts) +
-        _calcArraySize(m_childRuns) +
-        _calcArraySize(m_externalOperands) +
-        _calcArraySize(m_stringTable) +
-        /* Raw source locs */
-        _calcArraySize(m_rawSourceLocs) +
-        /* Debug */
-        _calcArraySize(m_debugStringTable) +
-        _calcArraySize(m_debugLineInfos) +
-        _calcArraySize(m_debugSourceInfos) +
-        _calcArraySize(m_debugAdjustedLineInfos) +
-        _calcArraySize(m_debugSourceLocRuns);
-}
-
-IRSerialData::IRSerialData()
-{
-    clear();
-}
-
-void IRSerialData::clear()
-{
-    // First Instruction is null
-    m_insts.setCount(1);
-    memset(&m_insts[0], 0, sizeof(Inst));
-
-    m_childRuns.clear();
-    m_externalOperands.clear();
-    m_rawSourceLocs.clear();
-
-    m_stringTable.clear();
-    
-    // Debug data
-    m_debugLineInfos.clear();
-    m_debugAdjustedLineInfos.clear();
-    m_debugSourceInfos.clear();
-    m_debugSourceLocRuns.clear();
-    m_debugStringTable.clear();
-}
-
-template <typename T>
-static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
-{
-    if (aIn.getCount() != bIn.getCount())
-    {
-        return false;
-    }
-
-    size_t size = size_t(aIn.getCount());
-
-    const T* a = aIn.begin();
-    const T* b = bIn.begin();
-
-    if (a == b)
-    {
-        return true;
-    }
-
-    for (size_t i = 0; i < size; ++i)
-    {
-        if (a[i] != b[i])
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool IRSerialData::operator==(const ThisType& rhs) const
-{
-    return (this == &rhs) ||
-        (_isEqual(m_insts, rhs.m_insts) &&
-        _isEqual(m_childRuns, rhs.m_childRuns) &&
-        _isEqual(m_externalOperands, rhs.m_externalOperands) &&
-        _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
-        _isEqual(m_stringTable, rhs.m_stringTable) &&
-        /* Debug */
-        _isEqual(m_debugStringTable, rhs.m_debugStringTable) &&
-        _isEqual(m_debugLineInfos, rhs.m_debugLineInfos) &&
-        _isEqual(m_debugAdjustedLineInfos, rhs.m_debugAdjustedLineInfos) &&
-        _isEqual(m_debugSourceInfos, rhs.m_debugSourceInfos) &&
-        _isEqual(m_debugSourceLocRuns, rhs.m_debugSourceLocRuns));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -379,29 +33,6 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     m_instMap.Add(inst, Ser::InstIndex(m_insts.getCount()));
     m_insts.add(inst);
 }
-
-#if 0
-// Find a view index that matches the view by file (and perhaps other characteristics in the future)
-static int _findSourceViewIndex(const List<SourceView*>& viewsIn, SourceView* view)
-{
-    const int numViews = int(viewsIn.Count());
-    SourceView*const* views = viewsIn.begin();
-    
-    SourceFile* sourceFile = view->getSourceFile();
-
-    for (int i = 0; i < numViews; ++i)
-    {
-        SourceView* curView = views[i];
-        // For now we just match on source file
-        if (curView->getSourceFile() == sourceFile)
-        {
-            // It's a hit
-            return i;
-        }
-    }
-    return -1;
-}
-#endif
 
 void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startInstIndex, uint32_t numInsts)
 {
@@ -792,7 +423,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     return SLANG_OK;
 }
 
-static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
+static Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -803,11 +434,15 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
         return SLANG_OK;
     }
 
+    // Make compressed fourCC
+    chunkId = (compressionType != IRSerialCompressionType::None) ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId) : chunkId;
+
+    ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
+
     switch (compressionType)
     {
-        case Bin::CompressionType::None:
+        case IRSerialCompressionType::None:
         {
-            ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
             Bin::ArrayHeader header;
             header.numEntries = uint32_t(numEntries);
 
@@ -815,7 +450,7 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
             container->write(data, typeSize * numEntries);
             break;
         }
-        case Bin::CompressionType::VariableByteLite:
+        case IRSerialCompressionType::VariableByteLite:
         {
             List<uint8_t> compressedPayload;
 
@@ -841,17 +476,17 @@ static Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, 
 }
 
 template <typename T>
-Result _writeArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<T>& array, RiffContainer* container)
+Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<T>& array, RiffContainer* container)
 {
     return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.getCount()), sizeof(T), container);
 }
 
-Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
+Result _encodeInsts(IRSerialCompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
 {
     typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
-    if (compressionType != Bin::CompressionType::VariableByteLite)
+    if (compressionType != IRSerialCompressionType::VariableByteLite)
     {
         return SLANG_FAIL;
     }
@@ -936,7 +571,7 @@ Result _encodeInsts(IRSerialBinary::CompressionType compressionType, const List<
     return SLANG_OK;
 }
 
-Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uint32_t chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
+Result _writeInstArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -949,11 +584,11 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
 
     switch (compressionType)
     {
-        case Bin::CompressionType::None:
+        case IRSerialCompressionType::None:
         {
             return _writeArrayChunk(compressionType, chunkId, array, container);
         }
-        case Bin::CompressionType::VariableByteLite:
+        case IRSerialCompressionType::VariableByteLite:
         {
             List<uint8_t> compressedPayload;
             SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
@@ -976,7 +611,7 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
     return SLANG_FAIL;
 }
 
-/* static */Result IRSerialWriter::writeContainer(const IRSerialData& data, Bin::CompressionType compressionType, RiffContainer* container)
+/* static */Result IRSerialWriter::writeContainer(const IRSerialData& data, IRSerialCompressionType compressionType, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -986,7 +621,8 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
     // Write the header
     {
         Bin::ModuleHeader moduleHeader;
-        moduleHeader.compressionType = uint32_t(Bin::CompressionType::VariableByteLite);
+        moduleHeader.compressionType = uint32_t(IRSerialCompressionType::VariableByteLite);
+
         ScopeChunk scopeHeader(container, Chunk::Kind::Data, Bin::kSlangModuleHeaderFourCc);
         container->write(&moduleHeader, sizeof(moduleHeader));
     }
@@ -994,23 +630,23 @@ Result _writeInstArrayChunk(IRSerialBinary::CompressionType compressionType, uin
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, container));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, container));
     SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, container));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kStringFourCc, data.m_stringTable, container));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(IRSerialCompressionType::None, Bin::kStringFourCc, data.m_stringTable, container));
 
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(Bin::CompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, container));
+    SLANG_RETURN_ON_FAIL(_writeArrayChunk(IRSerialCompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, container));
 
     if (data.m_debugSourceInfos.getCount())
     {
-        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugStringFourCc, data.m_debugStringTable, container);
-        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugLineInfoFourCc, data.m_debugLineInfos, container);
-        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugAdjustedLineInfoFourCc, data.m_debugAdjustedLineInfos, container);
-        _writeArrayChunk(Bin::CompressionType::None, Bin::kDebugSourceInfoFourCc, data.m_debugSourceInfos, container);
+        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugStringFourCc, data.m_debugStringTable, container);
+        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugLineInfoFourCc, data.m_debugLineInfos, container);
+        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugAdjustedLineInfoFourCc, data.m_debugAdjustedLineInfos, container);
+        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugSourceInfoFourCc, data.m_debugSourceInfos, container);
         _writeArrayChunk(compressionType, Bin::kDebugSourceLocRunFourCc, data.m_debugSourceLocRuns, container);
     }
 
     return SLANG_OK;
 }
 
-/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, Bin::CompressionType compressionType, Stream* stream)
+/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, IRSerialCompressionType compressionType, Stream* stream)
 {
     RiffContainer container;
     SLANG_RETURN_ON_FAIL(writeContainer(data, compressionType, &container));
@@ -1051,7 +687,7 @@ class ListResizerForType: public ListResizer
     List<T>& m_list;
 };
 
-static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, RiffContainer::DataChunk* dataChunk, ListResizer& listOut)
+static Result _readArrayChunk(IRSerialCompressionType compressionType, RiffContainer::DataChunk* dataChunk, ListResizer& listOut)
 {
     typedef IRSerialBinary Bin;
 
@@ -1060,7 +696,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, R
 
     switch (compressionType)
     {
-        case Bin::CompressionType::VariableByteLite:
+        case IRSerialCompressionType::VariableByteLite:
         {
             Bin::CompressedArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
@@ -1072,7 +708,7 @@ static Result _readArrayChunk(IRSerialBinary::CompressionType compressionType, R
             ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.numCompressedEntries, (uint32_t*)dst);
             break;
         }
-        case Bin::CompressionType::None:
+        case IRSerialCompressionType::None:
         {
             // Read uncompressed
             Bin::ArrayHeader header;
@@ -1111,14 +747,14 @@ static Result _readArrayUncompressedChunk(const IRSerialBinary::ModuleHeader* he
     return _readArrayChunk(IRSerialBinary::CompressionType::None, chunk, resizer);
 }
 
-static Result _decodeInsts(IRSerialBinary::CompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
+static Result _decodeInsts(IRSerialCompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
 {
     const uint8_t* encodeEnd = encodeCur + encodeInSize;
 
     typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
-    if (compressionType != Bin::CompressionType::VariableByteLite)
+    if (compressionType != IRSerialCompressionType::VariableByteLite)
     {
         return SLANG_FAIL;
     }
@@ -1188,20 +824,20 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
 {
     typedef IRSerialBinary Bin;
 
-    Bin::CompressionType compressionType = Bin::CompressionType::None;
+    IRSerialCompressionType compressionType = IRSerialCompressionType::None;
     if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
     {
-        compressionType = Bin::CompressionType(moduleHeader->compressionType);
+        compressionType = IRSerialCompressionType(moduleHeader->compressionType);
     }
 
     switch (compressionType)
     {
-        case Bin::CompressionType::None:
+        case IRSerialCompressionType::None:
         {
             ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
             return _readArrayChunk(compressionType, chunk, resizer);
         }
-        case Bin::CompressionType::VariableByteLite:
+        case IRSerialCompressionType::VariableByteLite:
         {
             RiffReadHelper read = chunk->asReadHelper();
 
@@ -1481,7 +1117,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
         const IROp op((IROp)srcInst.m_op);
 
-        if (isConstant(op))
+        if (_isConstant(op))
         {
             // Handling of constants
 
@@ -1548,7 +1184,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
             insts[i] = irConst;
         }
-        else if (isTextureTypeBase(op))
+        else if (_isTextureTypeBase(op))
         {
             IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
@@ -1823,7 +1459,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     }
 }
 
-/* static */SlangResult IRSerialUtil::verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialBinary::CompressionType compressionType, IRSerialWriter::OptionFlags optionFlags)
+/* static */SlangResult IRSerialUtil::verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialCompressionType compressionType, IRSerialWriter::OptionFlags optionFlags)
 {
     // Verify if we can stream out with debug information
         

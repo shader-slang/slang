@@ -12,9 +12,26 @@ namespace Slang
 // http://fileformats.archiveteam.org/wiki/RIFF
 // http://www.fileformat.info/format/riff/egff.htm
 
+
 typedef uint32_t FourCC;
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) FourCC((uint32_t(c0) << 0) | (uint32_t(c1) << 8) | (uint32_t(c2) << 16) | (uint32_t(c3) << 24)) 
+/* Use of macros to construct and extract from FourCC means the FourCC ordering can be fixed for endian differences. */
+
+#if SLANG_LITTLE_ENDIAN 
+
+#define SLANG_FOUR_CC(c0, c1, c2, c3) ((FourCC(c0) << 0) | (FourCC(c1) << 8) | (FourCC(c2) << 16) | (FourCC(c3) << 24)) 
+
+#define SLANG_FOUR_CC_GET_FIRST_CHAR(x) char((x) & 0xff)
+#define SLANG_FOUR_CC_REPLACE_FIRST_CHAR(x, c) (((x) & 0xffffff00) | FourCC(c))
+
+#else
+
+#define SLANG_FOUR_CC(c0, c1, c2, c3) ((FourCC(c0) << 24) | (FourCC(c1) << 16) | (FourCC(c2) << 8) | (FourCC(c3) << 0)) 
+
+#define SLANG_FOUR_CC_GET_FIRST_CHAR(x) char((x) >> 24)
+#define SLANG_FOUR_CC_REPLACE_FIRST_CHAR(x, c) (((x) & 0x00ffffff) | (FourCC(c) << 24))
+
+#endif
 
 enum 
 {

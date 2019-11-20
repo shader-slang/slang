@@ -15,6 +15,8 @@
 
 #include "slang-file-system.h"
 
+#include "slang-ir-serialize-types.h"
+
 #include "../../slang.h"
 
 namespace Slang
@@ -1268,6 +1270,7 @@ namespace Slang
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
+        IRSerialCompressionType irCompressionType = IRSerialCompressionType::VariableByteLite;
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;
