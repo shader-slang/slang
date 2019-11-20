@@ -1,4 +1,4 @@
-// serialized-module-entry-point-test.slang
+// extern-test.slang
 
 //TEST:COMPILE: -module-name module -no-codegen tests/serialization/extern/module-a.slang -o tests/serialization/extern/module-a.slang-lib
 //TEST:COMPILE: -module-name module -no-codegen tests/serialization/extern/module-b.slang -o tests/serialization/extern/module-b.slang-lib
