@@ -1788,6 +1788,11 @@ namespace Slang
         return taggedUnionType;
     }
 
+    static RefPtr<RefObject> parseTaggedUnionType(Parser* parser, void* /*unused*/)
+    {
+        return parseTaggedUnionType(parser);
+    }
+
     static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
@@ -1831,6 +1836,12 @@ namespace Slang
             typeSpec.expr = createDeclRefType(parser, decl);
             return typeSpec;
         }
+        // TODO: This case would not be needed if we had the
+        // code below dispatch into `parseAtomicExpr`, which
+        // already includes logic for keyword lookup.
+        //
+        // Leaving this case here for now to avoid breaking anything.
+        //
         else if(AdvanceIf(parser, "__TaggedUnion"))
         {
             typeSpec.expr = parseTaggedUnionType(parser);
@@ -2386,7 +2397,7 @@ namespace Slang
         return assocTypeDecl;
     }
 
-    RefPtr<RefObject> parseGlobalGenericParamDecl(Parser * parser, void *)
+    RefPtr<RefObject> parseGlobalGenericTypeParamDecl(Parser * parser, void *)
     {
         RefPtr<GlobalGenericParamDecl> genParamDecl = new GlobalGenericParamDecl();
         auto nameToken = parser->ReadToken(TokenType::Identifier);
@@ -2395,6 +2406,27 @@ namespace Slang
         parseOptionalGenericConstraints(parser, genParamDecl);
         parser->ReadToken(TokenType::Semicolon);
         return genParamDecl;
+    }
+
+    RefPtr<RefObject> parseGlobalGenericValueParamDecl(Parser * parser, void *)
+    {
+        RefPtr<GlobalGenericValueParamDecl> genericParamDecl = new GlobalGenericValueParamDecl();
+        auto nameToken = parser->ReadToken(TokenType::Identifier);
+        genericParamDecl->nameAndLoc = NameLoc(nameToken);
+        genericParamDecl->loc = nameToken.loc;
+
+        if(AdvanceIf(parser, TokenType::Colon))
+        {
+            genericParamDecl->type = parser->ParseTypeExp();
+        }
+
+        if(AdvanceIf(parser, TokenType::OpAssign))
+        {
+            genericParamDecl->initExpr = parser->ParseInitExpr();
+        }
+
+        parser->ReadToken(TokenType::Semicolon);
+        return genericParamDecl;
     }
 
     static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
@@ -4270,7 +4302,7 @@ namespace Slang
         return parsePrefixExpr(this);
     }
 
-    RefPtr<Expr> parseTypeFromSourceFile(
+    RefPtr<Expr> parseTermFromSourceFile(
         Session*                        session,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
@@ -4282,7 +4314,7 @@ namespace Slang
         parser.currentScope = outerScope;
         parser.namePool = namePool;
         parser.sourceLanguage = sourceLanguage;
-        return parser.ParseType();
+        return parser.ParseExpression();
     }
 
     // Parse a source file into an existing translation unit
@@ -4649,7 +4681,7 @@ namespace Slang
         addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
         DECL(typedef,         ParseTypeDef);
         DECL(associatedtype,  parseAssocType);
-        DECL(type_param,    parseGlobalGenericParamDecl);
+        DECL(type_param,    parseGlobalGenericTypeParamDecl);
         DECL(cbuffer,         parseHLSLCBufferDecl);
         DECL(tbuffer,         parseHLSLTBufferDecl);
         DECL(__generic,       ParseGenericDecl);
@@ -4666,6 +4698,7 @@ namespace Slang
         DECL(var,             parseVarDecl);
         DECL(func,            parseFuncDecl);
         DECL(typealias,       parseTypeAliasDecl);
+        DECL(__generic_value_param, parseGlobalGenericValueParamDecl);
 
     #undef DECL
 
@@ -4753,6 +4786,7 @@ namespace Slang
         EXPR(this,  parseThisExpr);
         EXPR(true,  parseTrueExpr);
         EXPR(false, parseFalseExpr);
+        EXPR(__TaggedUnion, parseTaggedUnionType);
 
     #undef EXPR
 

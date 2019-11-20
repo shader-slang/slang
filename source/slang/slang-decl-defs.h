@@ -180,6 +180,11 @@ END_SYNTAX_CLASS()
 SYNTAX_CLASS(GlobalGenericParamDecl, AggTypeDecl)
 END_SYNTAX_CLASS()
 
+// A `__generic_value_param` declaration, which defines an existential
+// value parameter (not a type parameter.
+SYNTAX_CLASS(GlobalGenericValueParamDecl, VarDeclBase)
+END_SYNTAX_CLASS()
+
 // A scope for local declarations (e.g., as part of a statement)
 SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
 

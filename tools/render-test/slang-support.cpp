@@ -119,31 +119,18 @@ static const char computeEntryPointName[] = "computeMain";
         computeTranslationUnit = translationUnit;
     }
 
-
-    Slang::List<const char*> rawGlobalTypeNames;
-    for (auto typeName : request.globalGenericTypeArguments)
-        rawGlobalTypeNames.add(typeName.getBuffer());
-    spSetGlobalGenericArgs(
-        slangRequest,
-        (int)rawGlobalTypeNames.getCount(),
-        rawGlobalTypeNames.getBuffer());
-
-    Slang::List<const char*> rawEntryPointTypeNames;
-    for (auto typeName : request.entryPointGenericTypeArguments)
-        rawEntryPointTypeNames.add(typeName.getBuffer());
-
-    const int globalExistentialTypeCount = int(request.globalExistentialTypeArguments.getCount());
-    for(int ii = 0; ii < globalExistentialTypeCount; ++ii )
+    const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
+    for(int ii = 0; ii < globalSpecializationArgCount; ++ii )
     {
-        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalExistentialTypeArguments[ii].getBuffer());
+        spSetTypeNameForGlobalExistentialTypeParam(slangRequest, ii, request.globalSpecializationArgs[ii].getBuffer());
     }
 
-    const int entryPointExistentialTypeCount = int(request.entryPointExistentialTypeArguments.getCount());
-    auto setEntryPointExistentialTypeArgs = [&](int entryPoint)
+    const int entryPointSpecializationArgCount = int(request.entryPointSpecializationArgs.getCount());
+    auto setEntryPointSpecializationArgs = [&](int entryPoint)
     {
-        for( int ii = 0; ii < entryPointExistentialTypeCount; ++ii )
+        for( int ii = 0; ii < entryPointSpecializationArgCount; ++ii )
         {
-            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointExistentialTypeArguments[ii].getBuffer());
+            spSetTypeNameForEntryPointExistentialTypeParam(slangRequest, entryPoint, ii, request.entryPointSpecializationArgs[ii].getBuffer());
         }
     };
 
@@ -152,13 +139,11 @@ static const char computeEntryPointName[] = "computeMain";
         int computeEntryPointIndex = 0;
         if(!gOptions.dontAddDefaultEntryPoints)
         {
-            computeEntryPointIndex = spAddEntryPointEx(slangRequest, computeTranslationUnit,
+            computeEntryPointIndex = spAddEntryPoint(slangRequest, computeTranslationUnit,
                 computeEntryPointName,
-                SLANG_STAGE_COMPUTE,
-                (int)rawEntryPointTypeNames.getCount(),
-                rawEntryPointTypeNames.getBuffer());
+                SLANG_STAGE_COMPUTE);
 
-            setEntryPointExistentialTypeArgs(computeEntryPointIndex);
+            setEntryPointSpecializationArgs(computeEntryPointIndex);
         }
 
         spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
@@ -207,11 +192,11 @@ static const char computeEntryPointName[] = "computeMain";
         int fragmentEntryPoint = 1;
         if( !gOptions.dontAddDefaultEntryPoints )
         {
-            vertexEntryPoint = spAddEntryPointEx(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
-            fragmentEntryPoint = spAddEntryPointEx(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT, (int)rawEntryPointTypeNames.getCount(), rawEntryPointTypeNames.getBuffer());
+            vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX);
+            fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT);
 
-            setEntryPointExistentialTypeArgs(vertexEntryPoint);
-            setEntryPointExistentialTypeArgs(fragmentEntryPoint);
+            setEntryPointSpecializationArgs(vertexEntryPoint);
+            setEntryPointSpecializationArgs(fragmentEntryPoint);
         }
 
         const SlangResult res = spCompile(slangRequest);
@@ -340,10 +325,8 @@ static const char computeEntryPointName[] = "computeMain";
         compileRequest.computeShader.source = sourceInfo;
         compileRequest.computeShader.name = computeEntryPointName;
     }
-    compileRequest.globalGenericTypeArguments = layout.globalGenericTypeArguments;
-    compileRequest.entryPointGenericTypeArguments = layout.entryPointGenericTypeArguments;
-    compileRequest.globalExistentialTypeArguments = layout.globalExistentialTypeArguments;
-    compileRequest.entryPointExistentialTypeArguments = layout.entryPointExistentialTypeArguments;
+    compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
+    compileRequest.entryPointSpecializationArgs = layout.entryPointSpecializationArgs;
 
     return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.output);
 }
