@@ -15,13 +15,13 @@ struct Data
 	int4 val[4];
 }
 
-//TEST_INPUT:cbuffer(data=[0 1 2 3  16 17 18 19  32 33 34 35  48 49 50 51]):dxbinding(0),glbinding(0),name=a
+//TEST_INPUT:cbuffer(data=[0 1 2 3  16 17 18 19  32 33 34 35  48 49 50 51]):name=a
 ConstantBuffer<Data> a;
 
-//TEST_INPUT:cbuffer(data=[16 17 18 19  32 33 34 35  48 49 50 51  64 65 66 67]):dxbinding(1),glbinding(1),name=b
+//TEST_INPUT:cbuffer(data=[16 17 18 19  32 33 34 35  48 49 50 51  64 65 66 67]):name=b
 ConstantBuffer<Data> b;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(2),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 int helper(ConstantBuffer<Data>  buffer, int index)

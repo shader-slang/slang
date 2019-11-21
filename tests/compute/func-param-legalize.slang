@@ -7,11 +7,11 @@ struct Param
     float base;
 };
 
-//TEST_INPUT:Texture2D(size=4, content = one) : dxbinding(0),glbinding(0),name=diffuseMap
+//TEST_INPUT:Texture2D(size=4, content = one):name=diffuseMap
 Texture2D diffuseMap;
-//TEST_INPUT: Sampler : dxbinding(0),glbinding(0,1,2,3,4,5,6),name=samplerState
+//TEST_INPUT: Sampler:name=samplerState
 SamplerState samplerState;
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 float4 run(Param p)

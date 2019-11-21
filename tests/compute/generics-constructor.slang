@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE:-cpu
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 __generic<T:__BuiltinFloatingPointType>

@@ -15,7 +15,7 @@ int test(int val)
 	return int(result);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gBuffer;
 
 [numthreads(4, 1, 1)]

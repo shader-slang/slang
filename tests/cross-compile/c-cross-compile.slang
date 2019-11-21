@@ -62,7 +62,7 @@ struct Thing
     float b;
 };
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> outputBuffer;
 
 RWStructuredBuffer<int> outputBuffer2;

@@ -4,4 +4,4 @@
 //TEST:COMPILE: -module-name module tests/serialization/serialized-module.slang -o tests/serialization/serialized-module.slang-module -ir-compression none
 //TEST:COMPARE_COMPUTE_EX: -xslang -module-name -xslang module -slang -compute -xslang -r -xslang tests/serialization/serialized-module-entry-point.slang-module -xslang -r -xslang tests/serialization/serialized-module.slang-module -no-default-entry-point
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer

@@ -17,7 +17,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-column-major
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23], stride=48):dxbinding(0),glbinding(0),name=gMatrices
+//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23], stride=48):name=gMatrices
 RWStructuredBuffer<int3x4> gMatrices;
 
 int test(int val)
@@ -35,7 +35,7 @@ int test(int val)
     return tmp;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(1),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out
 RWStructuredBuffer<int> buffer;
 
 [numthreads(12, 1, 1)]

@@ -27,17 +27,17 @@ struct Things
 // A shader parameter at global scope should be assigned
 // a register/binding before any related to the entry point.
 
-//TEST_INPUT:cbuffer(data=[1 0 0 0]):dxbinding(0),glbinding(0),name=signs
+//TEST_INPUT:cbuffer(data=[1 0 0 0]):name=signs
 ConstantBuffer<Signs> signs;
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:cbuffer(data=[2 0 0 0 3 0 0 0]):dxbinding(1),glbinding(1),name=stuff
+//TEST_INPUT:cbuffer(data=[2 0 0 0 3 0 0 0]):name=stuff
 	uniform Stuff  stuff,
-//TEST_INPUT:cbuffer(data=[3]):,isCPUOnly,name=things    
+//TEST_INPUT:cbuffer(data=[3]):isCPUOnly,name=things
 	uniform Things things,
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(2),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 	uniform RWStructuredBuffer<int> outputBuffer,
 
 	uint3 dispatchThreadID : SV_DispatchThreadID)

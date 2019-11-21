@@ -2,9 +2,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute
 
-//TEST_INPUT:ubuffer(data=[0 3 1 2 6 4 7 6], stride=4):dxbinding(0),glbinding(0),name=inputBuffer
+//TEST_INPUT:ubuffer(data=[0 3 1 2 6 4 7 6], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
-//TEST_INPUT:ubuffer(data=[8 8 8 8 8 8 8 8], stride=4):dxbinding(1),glbinding(1),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[8 8 8 8 8 8 8 8], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 int2 reduce(int2 val)

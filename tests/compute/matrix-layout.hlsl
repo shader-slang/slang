@@ -23,13 +23,13 @@ struct S
     int    b;
 };
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):dxbinding(0),glbinding(0)
+//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):
 cbuffer C0
 {
     S s;
 };
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):dxbinding(1),glbinding(1)
+//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):
 cbuffer C1
 {
 
@@ -60,7 +60,7 @@ int test(int val)
     return ((a*N + b) * N + c) * N + d;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(2),out,name=buffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buffer
 RWStructuredBuffer<int> buffer;
 
 [numthreads(12, 1, 1)]

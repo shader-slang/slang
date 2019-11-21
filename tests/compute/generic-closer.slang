@@ -17,7 +17,7 @@ struct Gen1<TGetter : IGetter> : IGetter
     int get() { return g.get(); }
 };
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 void writeArray(inout float3 a[4])

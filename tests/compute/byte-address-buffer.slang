@@ -10,10 +10,10 @@
 // TODO: I'm only using `RWByteAddressBuffer` for now because I don't
 // know if `render-test` supports the non-UAV case.
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]):dxbinding(0),glbinding(0),name=inputBuffer
+//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]):name=inputBuffer
 RWByteAddressBuffer inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0]):dxbinding(1),glbinding(1),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0]):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;
 
 void test(int val)

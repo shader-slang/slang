@@ -1,6 +1,6 @@
 //TEST(compute):SIMPLE:-target hlsl -dump-repro repro.slang-repro
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:array(size=2):name g_aoa

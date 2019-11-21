@@ -43,7 +43,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
@@ -57,7 +57,7 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 // Here's the data for `gStrategy`:
 //
 //TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):dxbinding(1),glbinding(1)
+//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):
 
 
 [numthreads(4, 1, 1)]
@@ -75,7 +75,7 @@ void computeMain(
 // the previous test, the concrete type plugged in for `modifier`
 // has no uniform/ordinary data, so we don't need to fill it in.
 //
-//TEST_INPUT:cbuffer(data=[256]):dxbinding(0),glbinding(2)
+//TEST_INPUT:cbuffer(data=[256]):
 
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {
@@ -127,4 +127,4 @@ struct MyModifier : IModifier
 // Here's the data for `modifier`:
 //
 //TEST_INPUT: entryPointExistentialType MyModifier
-//TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):dxbinding(2),glbinding(3)
+//TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):
