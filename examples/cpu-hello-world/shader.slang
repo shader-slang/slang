@@ -1,6 +1,6 @@
 // shader.slang
 
-//TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):dxbinding(0),glbinding(0),name=ioBuffer
+//TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
 RWStructuredBuffer<float> ioBuffer;
 
 [numthreads(4, 1, 1)]

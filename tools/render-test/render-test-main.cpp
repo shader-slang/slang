@@ -89,7 +89,7 @@ class RenderTestApp : public WindowListener
     uint64_t m_startTicks;
 
 	// variables for state to be used for rendering...
-	uintptr_t m_constantBufferSize, m_computeResultBufferSize;
+	uintptr_t m_constantBufferSize;
 
 	RefPtr<Renderer> m_renderer;
 

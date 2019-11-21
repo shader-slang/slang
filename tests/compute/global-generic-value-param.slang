@@ -29,7 +29,7 @@ __generic_value_param kOffset : uint = 0;
 // bit less trivial.
 //
 RWStructuredBuffer<uint> vals;
-//TEST_INPUT: ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15], stride=4):dxbinding(0),glbinding(0)
+//TEST_INPUT: ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15], stride=4):
 
 // The core test function will use the `kOffset` value
 // we declared above along with the input value (the
@@ -45,7 +45,7 @@ uint test(uint value)
 // And finally we have the boilerplate cruft that almost
 // all of our compute tests use.
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(1),out
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(16, 1, 1)]

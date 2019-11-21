@@ -25,7 +25,7 @@ int test(int val)
 	return t.x + t.y*16;
 }
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=gOutputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]

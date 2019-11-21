@@ -42,7 +42,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
@@ -56,7 +56,7 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 // type argument at the same time.
 //
 //TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(0),glbinding(1)
+//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):
 
 [numthreads(4, 1, 1)]
 void computeMain(
@@ -83,7 +83,7 @@ void computeMain(
 //
 // Here's the incantation to make the test runner fill in the constant buffer:
 //
-//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):dxbinding(1),glbinding(2)
+//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):
 //
 // So, the value `256` will be used for `extra` and the value `16`
 // will be written to the first four bytes of the concrete value

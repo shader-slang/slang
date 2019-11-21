@@ -7,7 +7,7 @@
 //
 //TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 
-//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out
 
 RWBuffer<uint> outputBuffer;
 

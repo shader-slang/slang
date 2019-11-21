@@ -1,11 +1,11 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:
-//TEST_INPUT: cbuffer(data=[0.5 0 0 0], stride=4):dxbinding(0),glbinding(0)
-//TEST_INPUT: cbuffer(data=[1.0], stride=4):dxbinding(1),glbinding(1)
-//TEST_INPUT: Texture2D(size=4, content = zero) : dxbinding(0),glbinding(0)
-//TEST_INPUT: Texture2D(size=4, content = one) : dxbinding(1),glbinding(1)
-//TEST_INPUT: Sampler : dxbinding(0),glbinding(0,1,2,3,4,5,6)
-//TEST_INPUT: Sampler : dxbinding(1),glbinding(0,1,2,3,4,5,6)
-//TEST_INPUT: ubuffer(data=[0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT: cbuffer(data=[0.5 0 0 0], stride=4):
+//TEST_INPUT: cbuffer(data=[1.0], stride=4):
+//TEST_INPUT: Texture2D(size=4, content = zero):
+//TEST_INPUT: Texture2D(size=4, content = one):
+//TEST_INPUT: Sampler:
+//TEST_INPUT: Sampler:
+//TEST_INPUT: ubuffer(data=[0], stride=4):out
 //TEST_INPUT: type Impl
 
 

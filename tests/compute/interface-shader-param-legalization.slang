@@ -19,7 +19,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]
@@ -51,4 +51,4 @@ struct ConcreteModifier : IModifier
 }
 
 //TEST_INPUT: globalExistentialType ConcreteModifier
-//TEST_INPUT:cbuffer(data=[256], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:cbuffer(data=[256], stride=4):out
