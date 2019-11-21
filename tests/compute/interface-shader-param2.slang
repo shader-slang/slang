@@ -42,16 +42,16 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
-//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):dxbinding(0),glbinding(1)
+//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 
 [numthreads(4, 1, 1)]
 void computeMain(
 
-//TEST_INPUT:cbuffer(data=[8 0 0 0], stride=4):dxbinding(1),glbinding(2)
+//TEST_INPUT:cbuffer(data=[8 0 0 0], stride=4):
     uniform IModifier   modifier,
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {

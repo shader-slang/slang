@@ -67,8 +67,6 @@ public:
     ArrayDesc arrayDesc;
     bool isOutput = false;
     bool isCPUOnly = false;
-    int hlslBinding = -1;
-    Slang::List<int> glslBinding;
 
     Slang::String name;                     ///< Optional name. Useful for binding through reflection.
 };

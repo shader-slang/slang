@@ -75,7 +75,7 @@ int test(
 //
 // We'll start with the buffer for writing the test output.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=gOutputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 // Now we'll define a global shader parameter for the

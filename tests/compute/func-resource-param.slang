@@ -11,10 +11,10 @@
 
 //NO_TEST:SIMPLE:-target glsl -entry computeMain -stage compute -validate-ir -dump-ir
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 16 32 48], stride=4):dxbinding(1),glbinding(1),name=inputBuffer
+//TEST_INPUT:ubuffer(data=[0 16 32 48], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
 int helper(RWStructuredBuffer<int> buffer, int index)

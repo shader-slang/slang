@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE:
 
 //TEST_INPUT: global_type AssembledVertex
-//TEST_INPUT: ubuffer(data=[0], stride=4):dxbinding(1),glbinding(0),out
+//TEST_INPUT: ubuffer(data=[0], stride=4):out
 
 // Testing associated types in a varying parameter field
 

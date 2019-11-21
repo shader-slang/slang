@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):out
 
 // Test that `swith` statement works
 

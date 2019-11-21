@@ -62,9 +62,6 @@ struct ShaderRendererUtil
         /// Create BindingState::Desc from the contents of layout
     static Slang::Result createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState);
 
-        /// Get the binding register associated with this binding (or -1 if none defined)
-    static BindingStateImpl::RegisterRange calcRegisterRange(Renderer* renderer, const ShaderInputLayoutEntry& entry);
-
 private:
         /// Create BindingState::Desc from a list of ShaderInputLayout entries
     static Slang::Result _createBindingState(ShaderInputLayoutEntry* srcEntries, int numEntries, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState);

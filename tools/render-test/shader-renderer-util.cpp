@@ -156,53 +156,6 @@ static RefPtr<SamplerState> _createSamplerState(
     return renderer->createSamplerState(_calcSamplerDesc(srcDesc));
 }
 
-/* static */BindingStateImpl::RegisterRange ShaderRendererUtil::calcRegisterRange(Renderer* renderer, const ShaderInputLayoutEntry& entry)
-{
-    typedef BindingStateImpl::RegisterRange RegisterRange;
-
-    BindingStyle bindingStyle = RendererUtil::getBindingStyle(renderer->getRendererType());
-
-    switch (bindingStyle)
-    {
-        case BindingStyle::DirectX:
-        {
-            return RegisterRange::makeSingle(entry.hlslBinding);
-        }
-        case BindingStyle::Vulkan:
-        {
-            // USe OpenGls for now
-            // fallthru
-        }
-        case BindingStyle::OpenGl:
-        {
-            const int count = int(entry.glslBinding.getCount());
-
-            if (count <= 0)
-            {
-                break;
-            }
-
-            int baseIndex = entry.glslBinding[0];
-            // Make sure they are contiguous
-            for (Index i = 1; i < int(entry.glslBinding.getCount()); ++i)
-            {
-                if (baseIndex + i != entry.glslBinding[i])
-                {
-                    assert(!"Bindings must be contiguous");
-                    break;
-                }
-            }
-            return RegisterRange::makeRange(baseIndex, count);
-        }
-        /* case BindingStyle::Vulkan:
-        {
-        } */
-        default: break;
-    }
-    // Return invalid
-    return RegisterRange::makeInvalid();
-}
-
 /* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
 {
     auto srcEntries = layout.entries.getBuffer();
@@ -224,13 +177,6 @@ static RefPtr<SamplerState> _createSamplerState(
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
         SLANG_ASSERT(srcEntry.isCPUOnly == false);
-
-        const BindingStateImpl::RegisterRange registerSet = calcRegisterRange(renderer, srcEntry);
-        if (!registerSet.isValid())
-        {
-            assert(!"Couldn't find a binding");
-            return SLANG_FAIL;
-        }
 
         DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
 

@@ -21,7 +21,7 @@ uint test(uint inVal)
     return tmp + inVal;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<uint> gBuffer;
 
 [numthreads(4, 1, 1)]

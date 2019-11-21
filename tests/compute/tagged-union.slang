@@ -92,10 +92,10 @@ void computeMain
 // We will thus set up the same data buffer to look like an `A`
 // value to Vulkan!
 //
-//TEST_INPUT: cbuffer(data=[16 9 1 0 0], stride=4):dxbinding(0),glbinding(0)
+//TEST_INPUT: cbuffer(data=[16 9 1 0 0], stride=4):
 
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(1),out
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out
     uniform RWStructuredBuffer<int> gOutputBuffer,
     uint3 dispatchThreadID : SV_DispatchThreadID)
 {

@@ -41,7 +41,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
 cbuffer C
@@ -50,7 +50,7 @@ cbuffer C
 }
 
 //TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):dxbinding(1),glbinding(1)
+//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):
 
 struct Stuff
 {
@@ -60,7 +60,7 @@ struct Stuff
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:cbuffer(data=[256]):dxbinding(0),glbinding(2)
+//TEST_INPUT:cbuffer(data=[256]):
     uniform Stuff stuff,
 
     uint3       dispatchThreadID : SV_DispatchThreadID)
@@ -111,4 +111,4 @@ struct MyModifier : IModifier
 }
 
 //TEST_INPUT: entryPointExistentialType MyModifier
-//TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):dxbinding(2),glbinding(3)
+//TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):

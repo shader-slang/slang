@@ -4,7 +4,7 @@
 //TEST:COMPILE: -module-name module -no-codegen tests/serialization/extern/module-b.slang -o tests/serialization/extern/module-b.slang-lib
 //TEST:COMPARE_COMPUTE_EX: -xslang -module-name -xslang module -slang -compute -xslang -r -xslang tests/serialization/extern/module-a.slang-lib -xslang -r -xslang tests/serialization/extern/module-b.slang-lib 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 // Declare the type exists

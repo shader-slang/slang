@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE:
-//TEST_INPUT: cbuffer(data=[1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0], stride=16):dxbinding(0),glbinding(0)
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(1),glbinding(0),out
+//TEST_INPUT: cbuffer(data=[1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0], stride=16):
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out
 //TEST_INPUT: global_type VertImpl
 
 interface IVertInterpolant
