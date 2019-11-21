@@ -25,7 +25,7 @@ int test(int inVal)
 	     + t.d;
 }
 
-//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]

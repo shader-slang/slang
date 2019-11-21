@@ -1,10 +1,10 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4]):dxbinding(0),glbinding(0),name=C.p.c
-//TEST_INPUT:Texture2D(size=4, content = one) : dxbinding(0),glbinding(0),name=C.p.t
-//TEST_INPUT: Sampler : dxbinding(0),glbinding(0,1,2,3,4,5,6),name=C.p.s
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT:cbuffer(data=[1 2 3 4]):name=C.p.c
+//TEST_INPUT:Texture2D(size=4, content = one):name=C.p.t
+//TEST_INPUT: Sampler:name=C.p.s
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 
 struct P
 {

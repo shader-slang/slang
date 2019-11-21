@@ -1,17 +1,17 @@
 //TEST:CROSS_COMPILE: -target spirv -entry computeMain -profile cs_6_2
 //TEST:SIMPLE: -target hlsl -entry computeMain -profile cs_6_2 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: Texture2D(size=4):dxbinding(1),glbinding(1)
+//TEST_INPUT: Texture2D(size=4):
 RWTexture2D<half> halfTexture;
-//TEST_INPUT: Texture2D(size=4):dxbinding(2),glbinding(2)
+//TEST_INPUT: Texture2D(size=4):
 RWTexture2D<half2> halfTexture2;
-//TEST_INPUT: Texture2D(size=4):dxbinding(3),glbinding(3)
+//TEST_INPUT: Texture2D(size=4):
 RWTexture2D<half4> halfTexture4;
 
-//TEST_INPUT: Sampler : dxbinding(0),glbinding(0)
+//TEST_INPUT: Sampler:
 SamplerState 	s;
 
 [numthreads(4, 4, 1)]

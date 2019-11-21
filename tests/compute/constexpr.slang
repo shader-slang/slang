@@ -1,9 +1,9 @@
 // constexpr.slang
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -gcompute
 //DISABLED://TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -gcompute
-//TEST_INPUT: Texture2D(size=4, content = one) : dxbinding(0),glbinding(0)
-//TEST_INPUT: Sampler : dxbinding(0),glbinding(0)
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):dxbinding(1),glbinding(0),out
+//TEST_INPUT: Texture2D(size=4, content = one):
+//TEST_INPUT: Sampler:
+//TEST_INPUT: ubuffer(data=[0 0], stride=4):out
 
 // Note: Vulkan version of this test is disabled pending adding
 // support for rendering tests to the harness.

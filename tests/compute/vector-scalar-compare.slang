@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-dx12 -compute 
 //TEST(compute):COMPARE_COMPUTE:-vk -compute 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out
 
 // Test doing vector comparisons 
 RWStructuredBuffer<int> outputBuffer;

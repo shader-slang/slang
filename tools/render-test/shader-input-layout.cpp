@@ -463,27 +463,6 @@ namespace renderer_test
                                     entry.isCPUOnly = true;
                                     parser.ReadToken();
                                 }
-                                else if (parser.LookAhead("dxbinding"))
-                                {
-                                    parser.ReadToken();
-                                    parser.Read("(");
-                                    entry.hlslBinding = parser.ReadInt();
-                                    parser.Read(")");
-                                }
-                                else if (parser.LookAhead("glbinding"))
-                                {
-                                    parser.ReadToken();
-                                    parser.Read("(");
-                                    while (!parser.IsEnd() && !parser.LookAhead(")"))
-                                    {
-                                        entry.glslBinding.add(parser.ReadInt());
-                                        if (parser.LookAhead(","))
-                                            parser.Read(",");
-                                        else
-                                            break;
-                                    }
-                                    parser.Read(")");
-                                }
                                 else if (parser.LookAhead("out"))
                                 {
                                     parser.ReadToken();
@@ -540,6 +519,11 @@ namespace renderer_test
                                     }
 
                                     entry.name = builder;
+                                }
+                                else
+                                {
+                                    fprintf(stderr, "Invalid TEST_INPUT syntax '%s'\n", parser.NextToken().Content.getBuffer());
+                                    break;
                                 }
 
                                 if (parser.LookAhead(","))

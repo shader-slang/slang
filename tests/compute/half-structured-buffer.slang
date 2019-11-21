@@ -2,7 +2,7 @@
 //Disable on Dx12 for now - because writing to structured buffer produces unexpected results
 //TEST_DISABLED(compute):COMPARE_COMPUTE:-dx12 -compute -use-dxil -profile cs_6_2 -render-features half
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):dxbinding(0),glbinding(0),out
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
 
 struct Thing
 {

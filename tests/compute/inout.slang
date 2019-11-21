@@ -35,7 +35,7 @@ int test(int inVal)
 	return x3;
 }
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):dxbinding(0),glbinding(0),out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]

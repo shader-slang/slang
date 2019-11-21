@@ -10,19 +10,19 @@ struct Thing
     float b;
 };
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):dxbinding(0),glbinding(0),out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[7 2 9 53], stride=4):dxbinding(1),glbinding(1),name buffer0
+//TEST_INPUT:ubuffer(data=[7 2 9 53], stride=4):name buffer0
 RWStructuredBuffer<int> buffer0;
 
-//TEST_INPUT:ubuffer(data=[23 2], stride=4):dxbinding(2),glbinding(2),name buffer1
+//TEST_INPUT:ubuffer(data=[23 2], stride=4):name buffer1
 RWStructuredBuffer<int> buffer1;
 
-//TEST_INPUT:ubuffer(data=[-10 17 9 4 2 0], stride=4):dxbinding(3),glbinding(3),name buffer2
+//TEST_INPUT:ubuffer(data=[-10 17 9 4 2 0], stride=4):name buffer2
 RWStructuredBuffer<float> buffer2;
 
-//TEST_INPUT:ubuffer(data=[1 0 3 0 7 0], stride=8):dxbinding(4),glbinding(4),name buffer3
+//TEST_INPUT:ubuffer(data=[1 0 3 0 7 0], stride=8):name buffer3
 RWStructuredBuffer<Thing> buffer3;
 
 [numthreads(4, 1, 1)]
