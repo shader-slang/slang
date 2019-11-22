@@ -460,6 +460,32 @@ namespace Slang
         }
     }
 
+    static const struct
+    {
+        char const*     name;
+        SourceLanguage  sourceLanguage;
+    } kSourceLanguages[] =
+    {
+        { "slang", SourceLanguage::Slang },
+        { "hlsl", SourceLanguage::HLSL },
+        { "glsl", SourceLanguage::GLSL },
+        { "c", SourceLanguage::C },
+        { "cxx", SourceLanguage::CPP },
+    };
+
+    SourceLanguage findSourceLanguageByName(String const& name)
+    {
+        for (auto entry : kSourceLanguages)
+        {
+            if (name == entry.name)
+            {
+                return entry.sourceLanguage;
+            }
+        }
+
+        return SourceLanguage::Unknown;
+    };
+
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         switch (passThrough)

@@ -105,6 +105,8 @@ namespace Slang
     Stage findStageByName(String const& name);
 
     UnownedStringSlice getStageText(Stage stage);
+
+    SourceLanguage findSourceLanguageByName(String const& name);
 }
 
 #endif
