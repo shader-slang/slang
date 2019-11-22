@@ -393,13 +393,13 @@ __target_intrinsic(glsl, "uintBitsToFloat")
 vector<float,N> asfloat(vector<uint,N> x);
 
 // No op
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 float asfloat(float x);
 __generic<let N : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<float,N> asfloat(vector<float,N> x);
 __generic<let N : int, let M : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<float,N,M> asfloat(matrix<float,N,M> x);
 
 // Pass thru to HLSL
@@ -430,13 +430,13 @@ __target_intrinsic(glsl, "ivec$N0($0)")
 vector<int,N> asint(vector<uint,N> x);
 
 // No op
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 int asint(int x);
 __generic<let N : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<int,N> asint(vector<int,N> x);
 __generic<let N : int, let M : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<int,N,M> asint(matrix<int,N,M> x);
 
 // Pass thru HLSL
@@ -473,13 +473,13 @@ __target_intrinsic(glsl, "uvec$N0($0)")
 vector<uint,N> asuint(vector<int,N> x);
 
 // No op
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 uint asuint(uint x);
 __generic<let N : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<uint,N> asuint(vector<uint,N> x);
 __generic<let N : int, let M : int>
-__intrinsic_op($(kIRPseudoOp_Pos))
+__intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<uint,N,M> asuint(matrix<uint,N,M> x);
 
 // Pass thru HLSL
@@ -1431,7 +1431,7 @@ for(auto op : binaryOps)
         continue;
 
     case kIROp_Mul:
-    case kIRPseudoOp_MulAssign:
+    case kCompoundIntrinsicOp_MulAssign:
         break;
     }
 

@@ -28,16 +28,26 @@ SIMPLE_MODIFIER(GloballyCoherent)
 #undef SIMPLE_MODIFIER
 
 // A modifier that marks something as an operation that
+// translates to special
 // has a one-to-one translation to the IR, and thus
 // has no direct definition in the high-level language.
 //
 SYNTAX_CLASS(IntrinsicOpModifier, Modifier)
 
-    // token that names the intrinsic op
+    // Token that names the intrinsic op.
     FIELD(Token, opToken)
 
-    // The opcode for the intrinsic operation
-    FIELD_INIT(IROp, op, kIROp_Nop)
+    // The opcode for the intrinsic operation.
+    //
+    // If greather than or equal to zero, then `op`
+    // is an `IROp` and directly identifies an IR
+    // instruction that the intrinsic should translate to.
+    //
+    // If less than zero, then `op` is a `CompoundIntrinsicOp`
+    // which maps to zero or more IR instructions using
+    // special-case logic in the IR lowering phase.
+    //
+    FIELD_INIT(int32_t, op, 0)
 END_SYNTAX_CLASS()
 
 // A modifier that marks something as an intrinsic function,

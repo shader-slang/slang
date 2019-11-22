@@ -5,6 +5,7 @@
 
 #include "slang-check.h"
 #include "slang-ir.h"
+#include "slang-compound-intrinsics.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
@@ -478,12 +479,13 @@ LoweredValInfo emitDeclRef(
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
-IROp getIntrinsicOp(
+int32_t getIntrinsicOp(
     Decl*                   decl,
     IntrinsicOpModifier*    intrinsicOpMod)
 {
-    if (int(intrinsicOpMod->op) != 0)
-        return intrinsicOpMod->op;
+    int32_t op = intrinsicOpMod->op;
+    if(op != 0)
+        return op;
 
     // No specified modifier? Then we need to look it up
     // based on the name of the declaration...
@@ -491,9 +493,10 @@ IROp getIntrinsicOp(
     auto name = decl->getName();
     auto nameText = getUnownedStringSliceText(name);
 
-    IROp op = findIROp(nameText);
-    SLANG_ASSERT(op != kIROp_Invalid);
-    return op;
+    IROp irOp = findIROp(nameText);
+    SLANG_ASSERT(irOp != kIROp_Invalid);
+    SLANG_ASSERT(int32_t(irOp) >= 0);
+    return int32_t(irOp);
 }
 
 // Given a `LoweredValInfo` for something callable, along with a
@@ -713,16 +716,23 @@ LoweredValInfo emitCallToDeclRef(
     auto funcDecl = funcDeclRef.getDecl();
     if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
     {
-        auto op = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-
-        if (isPseudoOp(op))
+        // An intrinsic op either maps to a single IR instruction
+        // (in the case where the opcode value is >= 0), or to
+        // a `CompountIntrinsicOp` (in the case where it is < 0).
+        //
+        auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
+        if(intrinsicOp < 0)
         {
-            switch (op)
+            // We have a compound op, which requires special-case
+            // handling to generate zero or more IR instructions.
+            //
+            auto compoundOp = CompoundIntrinsicOp(intrinsicOp);
+            switch (compoundOp)
             {
-            case kIRPseudoOp_Pos:
+            case kCompoundIntrinsicOp_Pos:
                 return LoweredValInfo::simple(args[0]);
 
-            case kIRPseudoOp_Sequence:
+            case kCompoundIntrinsicOp_Sequence:
                 // The main effect of "operator comma" is to enforce
                 // sequencing of its operands, but Slang already
                 // implements a strictly left-to-right evaluation
@@ -734,44 +744,49 @@ LoweredValInfo emitCallToDeclRef(
 #define CASE(COMPOUND, OP)  \
             case COMPOUND: return emitCompoundAssignOp(context, type, OP, argCount, args)
 
-            CASE(kIRPseudoOp_AddAssign, kIROp_Add);
-            CASE(kIRPseudoOp_SubAssign, kIROp_Sub);
-            CASE(kIRPseudoOp_MulAssign, kIROp_Mul);
-            CASE(kIRPseudoOp_DivAssign, kIROp_Div);
-            CASE(kIRPseudoOp_IRemAssign,kIROp_IRem);
-            CASE(kIRPseudoOp_FRemAssign,kIROp_FRem);
-            CASE(kIRPseudoOp_AndAssign, kIROp_BitAnd);
-            CASE(kIRPseudoOp_OrAssign, kIROp_BitOr);
-            CASE(kIRPseudoOp_XorAssign, kIROp_BitXor);
-            CASE(kIRPseudoOp_LshAssign, kIROp_Lsh);
-            CASE(kIRPseudoOp_RshAssign, kIROp_Rsh);
+            CASE(kCompoundIntrinsicOp_AddAssign, kIROp_Add);
+            CASE(kCompoundIntrinsicOp_SubAssign, kIROp_Sub);
+            CASE(kCompoundIntrinsicOp_MulAssign, kIROp_Mul);
+            CASE(kCompoundIntrinsicOp_DivAssign, kIROp_Div);
+            CASE(kCompoundIntrinsicOp_IRemAssign,kIROp_IRem);
+            CASE(kCompoundIntrinsicOp_FRemAssign,kIROp_FRem);
+            CASE(kCompoundIntrinsicOp_AndAssign, kIROp_BitAnd);
+            CASE(kCompoundIntrinsicOp_OrAssign, kIROp_BitOr);
+            CASE(kCompoundIntrinsicOp_XorAssign, kIROp_BitXor);
+            CASE(kCompoundIntrinsicOp_LshAssign, kIROp_Lsh);
+            CASE(kCompoundIntrinsicOp_RshAssign, kIROp_Rsh);
 
 #undef CASE
 
 #define CASE(COMPOUND, OP)  \
             case COMPOUND: return emitPrefixIncDecOp(context, type, OP, argCount, args)
-            CASE(kIRPseudoOp_PreInc, kIROp_Add);
-            CASE(kIRPseudoOp_PreDec, kIROp_Sub);
+            CASE(kCompoundIntrinsicOp_PreInc, kIROp_Add);
+            CASE(kCompoundIntrinsicOp_PreDec, kIROp_Sub);
 #undef CASE
 
 #define CASE(COMPOUND, OP)  \
             case COMPOUND: return emitPostfixIncDecOp(context, type, OP, argCount, args)
-            CASE(kIRPseudoOp_PostInc, kIROp_Add);
-            CASE(kIRPseudoOp_PostDec, kIROp_Sub);
+            CASE(kCompoundIntrinsicOp_PostInc, kIROp_Add);
+            CASE(kCompoundIntrinsicOp_PostDec, kIROp_Sub);
 #undef CASE
             default:
                 SLANG_UNIMPLEMENTED_X("IR pseudo-op");
                 UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
-
-        return LoweredValInfo::simple(builder->emitIntrinsicInst(
-            type,
-            op,
-            argCount,
-            args));
+        else
+        {
+            // The intrinsic op maps to a single IR instruction,
+            // so we will emit an instruction with the chosen
+            // opcode, and the arguments to the call as its operands.
+            //
+            return LoweredValInfo::simple(builder->emitIntrinsicInst(
+                type,
+                IROp(intrinsicOp),
+                argCount,
+                args));
+        }
     }
-    // TODO: handle target intrinsic modifier too...
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {

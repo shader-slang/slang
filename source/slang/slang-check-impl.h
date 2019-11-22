@@ -80,7 +80,7 @@ namespace Slang
 
     struct OperatorOverloadCacheKey
     {
-        IROp operatorName;
+        intptr_t operatorName;
         BasicTypeKey args[2];
         bool operator == (OperatorOverloadCacheKey key)
         {

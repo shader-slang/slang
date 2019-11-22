@@ -1,6 +1,7 @@
 // slang-stdlib.cpp
 
 #include "slang-compiler.h"
+#include "slang-compound-intrinsics.h"
 #include "slang-ir.h"
 #include "slang-syntax.h"
 
@@ -201,14 +202,14 @@ namespace Slang
     struct OpInfo { int32_t opCode; char const* opName; unsigned flags; };
 
     static const OpInfo unaryOps[] = {
-        { kIRPseudoOp_Pos,     "+",    ARITHMETIC_MASK },
+        { kCompoundIntrinsicOp_Pos,     "+",    ARITHMETIC_MASK },
         { kIROp_Neg,     "-",    ARITHMETIC_MASK },
         { kIROp_Not,     "!",    BOOL_MASK | BOOL_RESULT },
         { kIROp_BitNot,    "~",    INT_MASK        },
-        { kIRPseudoOp_PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
-        { kIRPseudoOp_PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
-        { kIRPseudoOp_PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-        { kIRPseudoOp_PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+        { kCompoundIntrinsicOp_PreInc,  "++",   ARITHMETIC_MASK | ASSIGNMENT },
+        { kCompoundIntrinsicOp_PreDec,  "--",   ARITHMETIC_MASK | ASSIGNMENT },
+        { kCompoundIntrinsicOp_PostInc, "++",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
+        { kCompoundIntrinsicOp_PostDec, "--",   ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
     };
 
     static const OpInfo binaryOps[] = {
@@ -231,17 +232,17 @@ namespace Slang
         { kIROp_Less,    "<",    ARITHMETIC_MASK | BOOL_RESULT },
         { kIROp_Geq,     ">=",   ARITHMETIC_MASK | BOOL_RESULT },
         { kIROp_Leq,     "<=",   ARITHMETIC_MASK | BOOL_RESULT },
-        { kIRPseudoOp_AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { kIRPseudoOp_SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { kIRPseudoOp_MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { kIRPseudoOp_DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
-        { kIRPseudoOp_IRemAssign,    "%=",    ASSIGNMENT | INT_MASK },
-        { kIRPseudoOp_FRemAssign,    "%=",    ASSIGNMENT | FLOAT_MASK },
-        { kIRPseudoOp_AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
-        { kIRPseudoOp_OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
-        { kIRPseudoOp_XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
-        { kIRPseudoOp_LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
-        { kIRPseudoOp_RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
+        { kCompoundIntrinsicOp_AddAssign,     "+=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kCompoundIntrinsicOp_SubAssign,     "-=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kCompoundIntrinsicOp_MulAssign,     "*=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kCompoundIntrinsicOp_DivAssign,     "/=",    ASSIGNMENT | ARITHMETIC_MASK },
+        { kCompoundIntrinsicOp_IRemAssign,    "%=",    ASSIGNMENT | INT_MASK },
+        { kCompoundIntrinsicOp_FRemAssign,    "%=",    ASSIGNMENT | FLOAT_MASK },
+        { kCompoundIntrinsicOp_AndAssign,     "&=",    ASSIGNMENT | LOGICAL_MASK },
+        { kCompoundIntrinsicOp_OrAssign,      "|=",    ASSIGNMENT | LOGICAL_MASK },
+        { kCompoundIntrinsicOp_XorAssign,     "^=",    ASSIGNMENT | LOGICAL_MASK },
+        { kCompoundIntrinsicOp_LshAssign,     "<<=",   ASSIGNMENT | INT_MASK },
+        { kCompoundIntrinsicOp_RshAssign,     ">>=",   ASSIGNMENT | INT_MASK },
     };
 
     String Session::getCoreLibraryCode()

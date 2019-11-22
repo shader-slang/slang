@@ -11,7 +11,7 @@ namespace Slang
     struct IRSpecContext;
 
 
-    SLANG_COMPILE_TIME_ASSERT(kIROpCount < kIRPseudoOp_First);
+//    SLANG_COMPILE_TIME_ASSERT(kIROpCount < kCompoundIntrinsicOp_First);
 
     IRInst* cloneGlobalValueWithLinkage(
         IRSpecContext*          context,
@@ -39,31 +39,14 @@ namespace Slang
     { kIROp_##ID, { #MNEMONIC, ARG_COUNT, FLAGS, } },
 #include "slang-ir-inst-defs.h"
 
-    // Pseudo ops
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  /* empty */
-#define PSEUDO_INST(ID)  \
-    { kIRPseudoOp_##ID, { #ID, 0, 0 } },
-
-    // First is 'invalid' 
+    // Invalid op sentinel value comes after all the valid ones
     { kIROp_Invalid,{ "invalid", 0, 0 } },
-    // Then all the other psuedo ops
-#include "slang-ir-inst-defs.h"
-
     };
 
     IROpInfo getIROpInfo(IROp opIn)
     {
-        const int op = opIn & kIROpMeta_PseudoOpMask;
-        if ((op & kIROpMeta_IsPseudoOp) && op < kIRPseudoOp_LastPlusOne)
-        {
-            // It's a pseudo op
-            const int index = op - kIRPseudoOp_First;
-            // Pseudo ops start from kIROpcount
-            const auto& entry =  kIROps[kIROpCount + index];
-            SLANG_ASSERT(entry.op == op);
-            return entry.info;
-        }
-        else if (op < kIROpCount)
+        const int op = opIn & kIROpMeta_OpMask;
+        if (op < kIROpCount)
         {
             // It's a main op
             const auto& entry = kIROps[op];
@@ -4460,8 +4443,8 @@ namespace Slang
             return false;
         }
 
-        const IROp opA = IROp(a->op & kIROpMeta_PseudoOpMask);
-        const IROp opB = IROp(b->op & kIROpMeta_PseudoOpMask);
+        const IROp opA = IROp(a->op & kIROpMeta_OpMask);
+        const IROp opB = IROp(b->op & kIROpMeta_OpMask);
 
         if (opA != opB)
         {

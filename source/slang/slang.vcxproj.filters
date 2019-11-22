@@ -30,6 +30,9 @@
     <ClInclude Include="slang-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-compound-intrinsics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-decl-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>

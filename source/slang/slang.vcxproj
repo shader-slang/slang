@@ -193,6 +193,7 @@
     <ClInclude Include="slang-check-impl.h" />
     <ClInclude Include="slang-check.h" />
     <ClInclude Include="slang-compiler.h" />
+    <ClInclude Include="slang-compound-intrinsics.h" />
     <ClInclude Include="slang-decl-defs.h" />
     <ClInclude Include="slang-diagnostic-defs.h" />
     <ClInclude Include="slang-diagnostics.h" />
@@ -337,7 +338,7 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-generate" %(Identity)</Command>
-      <Outputs>%(Identity).h</Outputs>
+      <Outputs>../../core.meta.slang.h</Outputs>
       <Message>slang-generate %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
@@ -350,7 +351,7 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-generate" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-generate" %(Identity)</Command>
-      <Outputs>%(Identity).h</Outputs>
+      <Outputs>../../hlsl.meta.slang.h</Outputs>
       <Message>slang-generate %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-generate.exe</AdditionalInputs>
