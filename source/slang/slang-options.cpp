@@ -324,7 +324,8 @@ struct OptionsParser
     }
 
     SlangResult addInputPath(
-        char const*  inPath)
+        char const*  inPath,
+        SourceLanguage langOverride = SourceLanguage::Unknown)
     {
         inputPathCount++;
 
@@ -332,7 +333,7 @@ struct OptionsParser
         // how we should handle it.
         String path = String(inPath);
 
-        if( path.endsWith(".slang") )
+        if( path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
         {
             // Plain old slang code
             addInputSlangPath(path);
@@ -340,8 +341,8 @@ struct OptionsParser
         }
 
         Stage impliedStage = Stage::Unknown;
-        SlangSourceLanguage sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
-        
+        SlangSourceLanguage sourceLanguage = langOverride == SourceLanguage::Unknown ? findSourceLanguageFromPath(path, impliedStage) : SlangSourceLanguage(langOverride);
+
         if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
         {
             requestImpl->getSink()->diagnose(SourceLoc(), Diagnostics::cannotDeduceSourceLanguage, inPath);
@@ -706,6 +707,26 @@ struct OptionsParser
                     rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
                     rawEntryPoints.add(rawEntryPoint);
+                }
+                else if (argStr == "-lang")
+                {
+                    String name;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+
+                    SourceLanguage sourceLanguage = findSourceLanguageByName(name);
+
+                    if (sourceLanguage == SourceLanguage::Unknown)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, name);
+                        return SLANG_FAIL;
+                    }
+                    else
+                    {
+                        while ((*argCursor)[0] != '-' && argCursor != argEnd)
+                        {
+                            SLANG_RETURN_ON_FAIL(addInputPath(*argCursor++, sourceLanguage));
+                        }
+                    }
                 }
                 else if (argStr == "-pass-through")
                 {
