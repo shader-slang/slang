@@ -1,4 +1,5 @@
 // slang-compound-intrinsics.h
+#pragma once
 
 // Intrinsic functions in the Slang standard library are marked
 // with the `__intrinsic_op(...)` modifier. Many of these map
@@ -45,11 +46,18 @@
     M(Or)                    \
     /* end */
 
+// We will use a simple type alias to capture the fact that
+// a 32-bit integer is sufficient to represent compound
+// intrinsic ops (as negative values) plus IR opcode values
+// for single-instruction intrinsics (as non-negative values)
+//
+typedef int32_t IntrinsicOp;
+
 // Next we use an enumeration declaration as an implementation
 // detail, to associate each of the above cases with a (positive)
 // integer.
 //
-enum class _CompoundIntrinsicOpVal
+enum class _CompoundIntrinsicOpVal : IntrinsicOp
 {
 #define DECLARE_COMPOUND_INTRINSIC_OP_VAL(NAME) NAME,
     FOREACH_COMPOUND_INTRINSIC_OP(DECLARE_COMPOUND_INTRINSIC_OP_VAL)
@@ -65,9 +73,9 @@ enum class _CompoundIntrinsicOpVal
     /// All of the values of this enumeration are guaranteed to be negative, and thus
     /// cannot conflict with any valid value of type `IROp`
     ///
-enum CompoundIntrinsicOp : int32_t
+enum CompoundIntrinsicOp : IntrinsicOp
 {
-#define DECLARE_COMPOUND_INTRINSIC_OP(NAME) kCompoundIntrinsicOp_##NAME = ~int32_t(_CompoundIntrinsicOpVal::NAME),
+#define DECLARE_COMPOUND_INTRINSIC_OP(NAME) kCompoundIntrinsicOp_##NAME = ~IntrinsicOp(_CompoundIntrinsicOpVal::NAME),
     FOREACH_COMPOUND_INTRINSIC_OP(DECLARE_COMPOUND_INTRINSIC_OP)
 #undef DECLARE_COMPOUND_INTRINSIC_OP
 };

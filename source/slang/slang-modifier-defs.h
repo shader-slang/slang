@@ -28,7 +28,6 @@ SIMPLE_MODIFIER(GloballyCoherent)
 #undef SIMPLE_MODIFIER
 
 // A modifier that marks something as an operation that
-// translates to special
 // has a one-to-one translation to the IR, and thus
 // has no direct definition in the high-level language.
 //
@@ -47,7 +46,7 @@ SYNTAX_CLASS(IntrinsicOpModifier, Modifier)
     // which maps to zero or more IR instructions using
     // special-case logic in the IR lowering phase.
     //
-    FIELD_INIT(int32_t, op, 0)
+    FIELD_INIT(IntrinsicOp, op, 0)
 END_SYNTAX_CLASS()
 
 // A modifier that marks something as an intrinsic function,

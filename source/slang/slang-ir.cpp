@@ -10,9 +10,6 @@ namespace Slang
 {
     struct IRSpecContext;
 
-
-//    SLANG_COMPILE_TIME_ASSERT(kIROpCount < kCompoundIntrinsicOp_First);
-
     IRInst* cloneGlobalValueWithLinkage(
         IRSpecContext*          context,
         IRInst*                 originalVal,

@@ -199,7 +199,7 @@ namespace Slang
         }
     }
 
-    struct OpInfo { int32_t opCode; char const* opName; unsigned flags; };
+    struct OpInfo { IntrinsicOp opCode; char const* opName; unsigned flags; };
 
     static const OpInfo unaryOps[] = {
         { kCompoundIntrinsicOp_Pos,     "+",    ARITHMETIC_MASK },
