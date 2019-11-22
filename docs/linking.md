@@ -12,12 +12,20 @@ To make such a feature work we need a few abilities
 * Linkage - ability to combine source/libraries to produce things (such as other libraries, executables, etc)
 * A way to specify libraries to be used in linkage
 
+
+Binding
+-------
+
+Due to how the feature currently works, if a library contains any kind of binding (implicit or explicit) it should be considered platform specific. When linking with libraries, the libraries will not supply any reflection, other than minimal entry point information. Any source compiled and linked against does follow normal Slang rules in terms of implicit binding assignments and reflection.  
+
+In practice this means that libraries either have to have no binding or manual binding. If any library has manual binding, this binding must be ensured to not clash with either implict or explicit binding in the source or other linked libraries. It is not guaranteed that Slang or downstream compilers will report binding clashes. 
+
+If platform independent libraries are linked against source compilation then appropriate reflection and normal Slang implicit binding rules apply.
+
 Libraries
 ---------
 
-A library can be created from source from the Slang command line with the `-o` option naming the output file. The filename currently requires a `slang-lib` or `slang-module` extension. This extension will mean the library will be stored as serialized Slang IR. The option `-no-codegen` is also typically specified because we don't want to generate any *target* code, such as dxil, spir-v and so forth when producing a library. 
-
-It is important to note that due to how the feature currently works, if it contains any kind of binding it should be considered platform specific. 
+A library can be created from source from the Slang command line with the `-o` option naming the output file. The filename currently requires a `slang-lib` or `slang-module` extension. This extension will mean the library will be stored as serialized Slang IR. The option `-no-codegen` is also typically specified because we don't want to generate any *target* code, such as dxil, spir-v and so forth when producing a library, just the Slang IR. 
 
 For example
 
@@ -25,7 +33,7 @@ For example
 slangc -no-codegen tests/serialization/extern/module-a.slang -o tests/serialization/extern/module-a.slang-lib
 ```
 
-From the slang API we, need to indicate the container format and to disable target code generation 
+From the slang API we need to indicate the container format and to disable target code generation 
 
 ```
     SlangCompileRequest* compileRequest = ...;
@@ -59,7 +67,7 @@ When the compilation is completed the resulting serialized IR code can be access
 
 Libraries can contain entry points. It is necessary though that the entry point is specified during the compilation producing the library. This can be achieved by specifying a function as an entry point via the API or command line through the normal mechanisms. 
 
-Entry points can also be specified in source via the `[shader()]` attribute also. For example
+Entry points can also be specified in source via the `[shader()]` attribute. For example
 
 ```
 [shader("compute")]
@@ -85,11 +93,11 @@ Note that Slang can consume and process either `lite` or `none` styles transpare
 Symbols
 -------
 
-Linkage is the process of combining of libraries and source to produce something. The mechanism used with Slang, is that items that are going to be imported or exported are named. As the Slang language supports function overloading and generics, it is not possible to just use a function name, or type name to uniquely identify the item. Thus exported and imported names are 'mangled' to include this additional information. This is not unlike how C++ produces mangled names for symbols for similar reasons.
+Linkage is the process of combining of libraries and source to produce something. The mechanism used with Slang, is that items that are going to be imported or exported are named. As the Slang language supports function overloading and generics, it is not possible to just use a function name or a type name to uniquely identify an item. Thus exported and imported names are 'mangled' to include this additional information. This is not unlike how C++ produces mangled names for symbols for similar reasons.
 
 Symbols within a module are additionally uniquely marked with the name of the module, and thus the module name becomes part of the mangled name. This has implications for includes. For example say we have two modules, and they both #include a header file that contains a function. That function will appear as two separate functions - one defined in each module, because a #include is a textual the function will be defined once in each module and with each module name.
 
-By default Slang will provide linkage symbols for all global symbols - types or functions, including declarations. In the future this is likely to change with declarations *not* being exported by default, as the declaration is made available just to forward define within the current compilation, not as a mechnism to descibe something to be imported. 
+By default Slang will provide linkage symbols for all global symbols - types or functions, including declarations. In the future this is likely to change with declarations *not* being exported by default. 
 
 To mark a declaration as having it's definition defined elsewhere outside the current module, the `[__extern]` attribute can be used. For example 
 
@@ -103,9 +111,11 @@ With types the `[__extern]` attribute can also be used. For the moment though a 
 [__extern] struct Thing {};
 ```
 
-Which looks a little like a definition of `Thing` but because of the `[__extern]` it actually means that `Thing` is defined elsewhere.  
+Which looks a little like a definition of `Thing` but because of the `[__extern]` it actually means that `Thing` is defined elsewhere. 
 
-Without further language and API support, having every module have all of it's symbols include the module name becomes a problem. If we have two modules `module-a` and `module-b` - how do I use a function defined in `module-a` in `module-b`? There needs to be mechansism/s to allow access to the function as part of the other module. Until the language and API features are added to allow such support, the problem is side stepped by allowing the specifying of a module name. If `module-a` and `module-b` use the same module name they will be able to access one anothers symbols during linkage. 
+The mechanism for making other symbols available from a library and/or source within Slang is through `import`. Currently though `import` does not support importing of libraries. 
+
+This means that a work around (aka hack) is needed so linkage works with a library. The short term fix, until importing of libraries is available, is to allow overriding of the name of the module - typically so that all symbols appear in the same module name. For example say we have two modules `module-a` and `module-b`, if `module-a` and `module-b` use the same module name they will be able to access one anothers symbols during linkage. 
 
 Specifying the module name can be achieve on the command line with the `-module-name` option as in
 
@@ -118,6 +128,8 @@ From the API the module name can be specified via
 ```
 spSetDefaultModuleName(compileRequest, "somename");
 ```
+
+The `[__extern]` attribute and the use of module names, are temporary functionality until more complete support for libraries and linkage is implemented. 
 
 Linkage
 -------
@@ -134,7 +146,7 @@ Specifying Libraries
 When compiling there needs to be a mechanism to specify library or libraries that will be used during linkage. From the command line this can be achieved with the `-r` option. For example...
 
 ```
-slangc -target dxil -profile lib_6_3 computeMain.slang -entry computeMain -stage compute -r module-a.slang-lib -o linked.dxil
+slangc -target dxil -profile sm_6_3 computeMain.slang -entry computeMain -stage compute -r module-a.slang-lib -o linked.dxil
 ```
 
 Note that multiple `-r` options can be specified on a command line to reference multiple libraries. 
