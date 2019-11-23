@@ -443,19 +443,19 @@ SLANG_RAW("vector<float,N> asfloat(vector<uint,N> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// No op\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("float asfloat(float x);\n")
 SLANG_RAW("__generic<let N : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("vector<float,N> asfloat(vector<float,N> x);\n")
 SLANG_RAW("__generic<let N : int, let M : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("matrix<float,N,M> asfloat(matrix<float,N,M> x);\n")
@@ -489,19 +489,19 @@ SLANG_RAW("vector<int,N> asint(vector<uint,N> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// No op\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("int asint(int x);\n")
 SLANG_RAW("__generic<let N : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("vector<int,N> asint(vector<int,N> x);\n")
 SLANG_RAW("__generic<let N : int, let M : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("matrix<int,N,M> asint(matrix<int,N,M> x);\n")
@@ -541,19 +541,19 @@ SLANG_RAW("vector<uint,N> asuint(vector<int,N> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// No op\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("uint asuint(uint x);\n")
 SLANG_RAW("__generic<let N : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("vector<uint,N> asuint(vector<uint,N> x);\n")
 SLANG_RAW("__generic<let N : int, let M : int>\n")
 SLANG_RAW("__intrinsic_op(")
-SLANG_SPLICE(kIRPseudoOp_Pos
+SLANG_SPLICE(kCompoundIntrinsicOp_Pos
 )
 SLANG_RAW(")\n")
 SLANG_RAW("matrix<uint,N,M> asuint(matrix<uint,N,M> x);\n")
@@ -1507,7 +1507,7 @@ for(auto op : binaryOps)
         continue;
 
     case kIROp_Mul:
-    case kIRPseudoOp_MulAssign:
+    case kCompoundIntrinsicOp_MulAssign:
         break;
     }
 

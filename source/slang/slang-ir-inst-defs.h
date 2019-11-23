@@ -8,10 +8,6 @@
 #define INST_RANGE(BASE, FIRST, LAST) /* empty */
 #endif
 
-#ifndef PSEUDO_INST
-#define PSEUDO_INST(ID) /* empty */
-#endif
-
 #define PARENT kIROpFlag_Parent
 #define USE_OTHER kIROpFlag_UseOther
 
@@ -516,30 +512,6 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
 INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
 
-PSEUDO_INST(Pos)
-PSEUDO_INST(PreInc)
-
-PSEUDO_INST(PreDec)
-PSEUDO_INST(PostInc)
-PSEUDO_INST(PostDec)
-PSEUDO_INST(Sequence)
-PSEUDO_INST(AddAssign)
-PSEUDO_INST(SubAssign)
-PSEUDO_INST(MulAssign)
-PSEUDO_INST(DivAssign)
-PSEUDO_INST(IRemAssign)
-PSEUDO_INST(FRemAssign)
-PSEUDO_INST(AndAssign)
-PSEUDO_INST(OrAssign)
-PSEUDO_INST(XorAssign )
-PSEUDO_INST(LshAssign)
-PSEUDO_INST(RshAssign)
-PSEUDO_INST(Assign)
-PSEUDO_INST(And)
-PSEUDO_INST(Or)
-
-
-#undef PSEUDO_INST
 #undef PARENT
 #undef USE_OTHER
 #undef INST_RANGE

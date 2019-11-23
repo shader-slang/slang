@@ -58,8 +58,19 @@ SLANG_RAW("interface __FlagsEnumType : __EnumType\n")
 SLANG_RAW("{\n")
 SLANG_RAW("};\n")
 SLANG_RAW("\n")
-SLANG_RAW("__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);\n")
+SLANG_RAW("// The \"comma operator\" is effectively just a generic function that returns its second\n")
+SLANG_RAW("// argument. The left-to-right evaluation order guaranteed by Slang then ensures that\n")
+SLANG_RAW("// `left` is evaluated before `right`.\n")
+SLANG_RAW("//\n")
+SLANG_RAW("__generic<T,U> __intrinsic_op(")
+SLANG_SPLICE(kCompoundIntrinsicOp_Sequence
+)
+SLANG_RAW(") U operator,(T left, U right);\n")
 SLANG_RAW("\n")
+SLANG_RAW("// The ternary `?:` operator does not short-circuit in HLSL, and Slang continues to\n")
+SLANG_RAW("// follow that definition, so that this operator is effectively just an ordinary\n")
+SLANG_RAW("// function, rather than a special-case piece of syntax.\n")
+SLANG_RAW("//\n")
 SLANG_RAW("__generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);\n")
 SLANG_RAW("__generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);\n")
 SLANG_RAW("\n")
@@ -142,7 +153,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
         // TODO: should this cover the full gamut of integer types?
     case BaseType::Int:
     case BaseType::UInt:
-SLANG_RAW("#line 145 \"core.meta.slang\"")
+SLANG_RAW("#line 153 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("        __generic<T:__EnumType>\n")
 SLANG_RAW("        __init(T value);\n")
@@ -158,7 +169,7 @@ SLANG_RAW("        __init(T value);\n")
 
 // Declare built-in pointer type
 // (eventually we can have the traditional syntax sugar for this)
-SLANG_RAW("#line 160 \"core.meta.slang\"")
+SLANG_RAW("#line 168 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
@@ -220,7 +231,7 @@ sb << "    __init(T value);\n";
 sb << "    __init(vector<T,N> value);\n";
 
 sb << "};\n";
-SLANG_RAW("#line 206 \"core.meta.slang\"")
+SLANG_RAW("#line 214 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T = float, let R : int = 4, let C : int = 4>\n")
@@ -974,7 +985,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 
                 sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
-//                sb << "__intrinsic_op(sampleGrad)\n";
                 sb << "T SampleGrad(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -984,7 +994,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"$ctextureGradOffset($p, $2, $3, $4, $5)$z\")\n";
-//                    sb << "__intrinsic_op(sampleGrad)\n";
                     sb << "T SampleGrad(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1176,7 +1185,7 @@ for (auto op : binaryOps)
         switch (op.opCode)
         {
         case kIROp_Mul:
-        case kIRPseudoOp_MulAssign:
+        case kCompoundIntrinsicOp_MulAssign:
             break;
 
         default:
@@ -1207,7 +1216,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1192 \"core.meta.slang\"")
+SLANG_RAW("#line 1198 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Operators to apply to `enum` types\n")

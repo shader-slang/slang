@@ -58,8 +58,16 @@ interface __FlagsEnumType : __EnumType
 {
 };
 
-__generic<T,U> __intrinsic_op(Sequence) U operator,(T left, U right);
+// The "comma operator" is effectively just a generic function that returns its second
+// argument. The left-to-right evaluation order guaranteed by Slang then ensures that
+// `left` is evaluated before `right`.
+//
+__generic<T,U> __intrinsic_op($(kCompoundIntrinsicOp_Sequence)) U operator,(T left, U right);
 
+// The ternary `?:` operator does not short-circuit in HLSL, and Slang continues to
+// follow that definition, so that this operator is effectively just an ordinary
+// function, rather than a special-case piece of syntax.
+//
 __generic<T> __intrinsic_op(select) T operator?:(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
@@ -956,7 +964,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 
                 sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
-//                sb << "__intrinsic_op(sampleGrad)\n";
                 sb << "T SampleGrad(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -966,7 +973,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"$ctextureGradOffset($p, $2, $3, $4, $5)$z\")\n";
-//                    sb << "__intrinsic_op(sampleGrad)\n";
                     sb << "T SampleGrad(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
@@ -1158,7 +1164,7 @@ for (auto op : binaryOps)
         switch (op.opCode)
         {
         case kIROp_Mul:
-        case kIRPseudoOp_MulAssign:
+        case kCompoundIntrinsicOp_MulAssign:
             break;
 
         default:
