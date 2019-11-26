@@ -250,6 +250,7 @@ DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is an imm
 
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
+DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accepts a string literal")
 
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type got a '$0'")
 
@@ -264,9 +265,6 @@ DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 DIAGNOSTIC(   -1, Note, noteExplicitConversionPossible, "explicit conversion from '$0' to '$1' is possible")
 DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one implicit conversion exists from '$0' to '$1'")
-
-
-
 
 // Attributes
 DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
