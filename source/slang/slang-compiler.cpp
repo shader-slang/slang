@@ -939,6 +939,93 @@ namespace Slang
         return UnownedStringSlice();
     }
 
+        /// Read a file in the context of handling a preprocessor directive
+    static SlangResult readFile(
+        Linkage*        linkage,
+        String const&   path,
+        ISlangBlob**    outBlob)
+    {
+        // The actual file loading will be handled by the file system
+        // associated with the parent linkage.
+        //
+        auto fileSystemExt = linkage->getFileSystemExt();
+        SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
+
+        return SLANG_OK;
+    }
+
+    struct FxcIncludeHandler : ID3DInclude
+    {
+        Linkage*        linkage;
+        DiagnosticSink* sink;
+        IncludeHandler* includeHandler;
+        PathInfo        rootPathInfo;
+
+        STDMETHOD(Open)(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override
+        {
+            SLANG_UNUSED(IncludeType);
+            SLANG_UNUSED(pParentData);
+
+            String path(pFileName);
+
+            SourceLoc loc;
+
+            PathInfo includedFromPathInfo = rootPathInfo;
+
+            if (!includeHandler)
+            {
+                return SLANG_E_NOT_IMPLEMENTED;
+            }
+
+            // Find the path relative to the foundPath
+            PathInfo filePathInfo;
+            if (SLANG_FAILED(includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
+            {
+                return SLANG_E_CANNOT_OPEN;
+            }
+
+            // We must have a uniqueIdentity to be compare
+            if (!filePathInfo.hasUniqueIdentity())
+            {
+                return SLANG_E_ABORT;
+            }
+
+            // Simplify the path
+            filePathInfo.foundPath = includeHandler->simplifyPath(filePathInfo.foundPath);
+
+            // See if this an already loaded source file
+            auto sourceManager = linkage->getSourceManager();
+            SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.uniqueIdentity);
+
+            // If not create a new one, and add to the list of known source files
+            if (!sourceFile)
+            {
+                ComPtr<ISlangBlob> foundSourceBlob;
+                if (SLANG_FAILED(readFile(linkage, filePathInfo.foundPath, foundSourceBlob.writeRef())))
+                {
+                    return SLANG_E_CANNOT_OPEN;
+                }
+
+                sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
+                sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
+            }
+
+            // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
+            SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo);
+
+            *ppData = sourceView->getContent().begin();
+            *pBytes = sourceView->getContentSize();
+
+            return S_OK;
+        }
+
+        STDMETHOD(Close)(LPCVOID pData) override
+        {
+            SLANG_UNUSED(pData);
+            return S_OK;
+        }
+    };
+
     SlangResult emitDXBytecodeForEntryPoint(
         BackEndCompileRequest*  compileRequest,
         EntryPoint*             entryPoint,
@@ -963,6 +1050,8 @@ namespace Slang
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
 
+        auto linkage = compileRequest->getLinkage();
+
         // If we have been invoked in a pass-through mode, then we need to make sure
         // that the downstream compiler sees whatever options were passed to Slang
         // via the command line or API.
@@ -971,6 +1060,14 @@ namespace Slang
         //
         List<D3D_SHADER_MACRO> dxMacrosStorage;
         D3D_SHADER_MACRO const* dxMacros = nullptr;
+
+        IncludeHandlerImpl includeHandler;
+        includeHandler.linkage = linkage;
+        includeHandler.searchDirectories = &linkage->searchDirectories;
+
+        FxcIncludeHandler fxcIncludeHandlerStorage;
+        FxcIncludeHandler* fxcIncludeHandler = nullptr;
+
         if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
         {
             for( auto& define :  translationUnit->compileRequest->preprocessorDefinitions )
@@ -991,6 +1088,12 @@ namespace Slang
             dxMacrosStorage.add(nullTerminator);
 
             dxMacros = dxMacrosStorage.getBuffer();
+
+            fxcIncludeHandler = &fxcIncludeHandlerStorage;
+            fxcIncludeHandler->linkage = linkage;
+            fxcIncludeHandler->sink = compileRequest->getSink();
+            fxcIncludeHandler->includeHandler = &includeHandler;
+            fxcIncludeHandler->rootPathInfo = translationUnit->m_sourceFiles[0]->getPathInfo();
         }
 
         DWORD flags = 0;
@@ -1018,7 +1121,6 @@ namespace Slang
         flags |= D3DCOMPILE_ENABLE_STRICTNESS;
         flags |= D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
 
-        auto linkage = compileRequest->getLinkage();
         switch( linkage->optimizationLevel )
         {
         default:
@@ -1049,7 +1151,7 @@ namespace Slang
             hlslCode.getLength(),
             sourcePath.getBuffer(),
             dxMacros,
-            nullptr,
+            fxcIncludeHandler,
             getText(entryPoint->getName()).begin(),
             GetHLSLProfileName(profile).getBuffer(),
             flags,

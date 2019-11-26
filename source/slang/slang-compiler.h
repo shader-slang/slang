@@ -10,6 +10,7 @@
 
 #include "slang-diagnostics.h"
 #include "slang-name.h"
+#include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
 
@@ -157,20 +158,6 @@ namespace Slang
         DeclRef<VarDeclBase>    paramDeclRef;
         Int                     firstSpecializationParamIndex = 0;
         Int                     specializationParamCount = 0;
-    };
-
-        /// Extended information specific to global shader parameters
-    struct GlobalShaderParamInfo : ShaderParamInfo
-    {
-        // TODO: This type should be eliminated if/when we remove
-        // support for compilation with multiple translation units
-        // that all declare the "same" shader parameter (e.g., a
-        // `cbuffer`) and expect those duplicate declarations
-        // to get the same parameter binding/layout.
-
-        // Additional global-scope declarations that are conceptually
-        // declaring the "same" parameter as the `paramDeclRef`.
-        List<DeclRef<VarDeclBase>> additionalParamDeclRefs;
     };
 
         /// A request for the front-end to find and validate an entry-point function
@@ -321,7 +308,7 @@ namespace Slang
         virtual Index getShaderParamCount() = 0;
 
             /// Get one of the global shader parametesr linked into this component type.
-        virtual GlobalShaderParamInfo getShaderParam(Index index) = 0;
+        virtual ShaderParamInfo getShaderParam(Index index) = 0;
 
             /// Get the number of (unspecialized) specialization parameters for the component type.
         virtual Index getSpecializationParamCount() = 0;
@@ -351,8 +338,7 @@ namespace Slang
             /// to the provided `sink`.
             ///
             /// TODO: This function shouldn't be on the base class, since
-            /// it only really makes sense on `Module` and (as a compatibility
-            /// feature) on `LegacyProgram`.
+            /// it only really makes sense on `Module`.
             ///
         Type* getTypeFromString(
             String const&   typeStr,
@@ -508,7 +494,7 @@ namespace Slang
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE;
-        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE;
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE;
 
         Index getSpecializationParamCount() SLANG_OVERRIDE;
         SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE;
@@ -555,7 +541,7 @@ namespace Slang
         //
         List<EntryPoint*> m_entryPoints;
         List<String> m_entryPointMangledNames;
-        List<GlobalShaderParamInfo> m_shaderParams;
+        List<ShaderParamInfo> m_shaderParams;
         List<SpecializationParam> m_specializationParams;
         List<ComponentType*> m_requirements;
 
@@ -595,7 +581,7 @@ namespace Slang
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_base->getShaderParamCount(); }
-        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_base->getShaderParam(index); }
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_base->getShaderParam(index); }
 
         Index getSpecializationParamCount() SLANG_OVERRIDE { return 0; }
         SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); static SpecializationParam dummy; return dummy; }
@@ -726,7 +712,7 @@ namespace Slang
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
-        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return GlobalShaderParamInfo(); }
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return ShaderParamInfo(); }
 
         class EntryPointSpecializationInfo : public SpecializationInfo
         {
@@ -890,7 +876,7 @@ namespace Slang
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
-        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
 
         Index getSpecializationParamCount() SLANG_OVERRIDE { return m_specializationParams.getCount(); }
         SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { return m_specializationParams[index]; }
@@ -940,7 +926,7 @@ namespace Slang
         // The IR for the module
         RefPtr<IRModule> m_irModule = nullptr;
 
-        List<GlobalShaderParamInfo> m_shaderParams;
+        List<ShaderParamInfo> m_shaderParams;
         SpecializationParams m_specializationParams;
 
         List<Module*> m_requirements;
@@ -1479,64 +1465,6 @@ namespace Slang
         List<RefPtr<ComponentType>> m_unspecializedEntryPoints;
     };
 
-        /// A "legacy" program composes multiple translation units from a single compile request,
-        /// and takes care to treat global declarations of the same name from different translation
-        /// units as representing the "same" parameter.
-        ///
-        /// TODO: This type only exists to support a single requirement: that multiple translation
-        /// units can be compiled in one pass and be guaranteed that the "same" parameter declared
-        /// in different translation units (hence different modules) will get the same layout.
-        /// This feature should be deprecated and removed as soon as possible, since the complexity
-        /// it creates in the codebase is not justified by its limited utility.
-        ///
-    class LegacyProgram : public ComponentType
-    {
-    public:
-        LegacyProgram(
-            Linkage*                                    linkage,
-            List<RefPtr<TranslationUnitRequest>> const& translationUnits,
-            DiagnosticSink*                             sink);
-
-        Index getTranslationUnitCount() { return m_translationUnits.getCount(); }
-        RefPtr<TranslationUnitRequest> getTranslationUnit(Index index) { return m_translationUnits[index]; }
-
-        Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
-        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
-        String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
-
-        Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
-        GlobalShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }
-
-        Index getSpecializationParamCount() SLANG_OVERRIDE { return m_specializationParams.getCount(); }
-        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE { return m_specializationParams[index]; }
-
-        Index getRequirementCount() SLANG_OVERRIDE;
-        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
-
-        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies.getModuleList(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_fileDependencies.getFilePathList(); }
-
-    protected:
-        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
-
-        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
-            SpecializationArg const*    args,
-            Index                       argCount,
-            DiagnosticSink*             sink) SLANG_OVERRIDE;
-
-    private:
-        void _collectShaderParams(DiagnosticSink* sink);
-
-        List<RefPtr<TranslationUnitRequest>> m_translationUnits;
-
-        List<EntryPoint*> m_entryPoints;
-        List<GlobalShaderParamInfo> m_shaderParams;
-        List<ComponentType*> m_requirements;
-        SpecializationParams m_specializationParams;
-        ModuleDependencyList m_moduleDependencies;
-        FilePathDependencyList m_fileDependencies;
-    };
-
         /// A visitor for use with `ComponentType`s, allowing dispatch over the concrete subclasses.
     class ComponentTypeVisitor
     {
@@ -1552,23 +1480,14 @@ namespace Slang
         virtual void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) = 0;
         virtual void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
         virtual void visitSpecialized(SpecializedComponentType* specialized) = 0;
-        virtual void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
 
     protected:
         // These helpers can be used to recurse into the logical children of a
         // component type, and are useful for the common case where a visitor
         // only cares about a few leaf cases.
         //
-        // Note that for a `LegacyProgram` the "children" in this case are the
-        // `Module`s of the translation units that make up the legacy program.
-        // In some cases this is what is desired, but in others it is incorrect
-        // to treat a legacy program as a composition of modules, and instead
-        // it should be treated directly as a leaf case. Clients should make
-        // an informed decision based on an understanding of what `LegacyProgram` is used for.
-        //
         void visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo);
         void visitChildren(SpecializedComponentType* specialized);
-        void visitChildren(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo);
     };
 
         /// A `TargetProgram` represents a `ComponentType` specialized for a particular `TargetRequest`
@@ -2066,6 +1985,23 @@ namespace Slang
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];              ///< Paths for each pass through
         String m_downstreamCompilerPreludes[int(PassThroughMode::CountOf)];             ///< Prelude for each type of target
     };
+
+struct IncludeHandlerImpl : IncludeHandler
+{
+    Linkage*    linkage;
+    SearchDirectoryList*    searchDirectories;
+
+    ISlangFileSystemExt* _getFileSystemExt();
+
+    SlangResult _findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut);
+
+    virtual SlangResult findFile(
+        String const& pathToInclude,
+        String const& pathIncludedFrom,
+        PathInfo& pathInfoOut) override;
+
+    virtual String simplifyPath(const String& path) override;
+};
 
 
 //
