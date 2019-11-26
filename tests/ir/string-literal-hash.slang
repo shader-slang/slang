@@ -11,9 +11,9 @@ int doSomething(String string)
 void main(
     uint tid   : SV_DispatchThreadIndex)
 {
-	doSomething("Hello \t\n\0x083 World");
+	//doSomething("Hello \t\n\0x083 World");
     
-    int value = getStringHash("Hello \t\n\0x083 World");
+    int value = 1 + getStringHash("Hello \t\n\0x083 World");
     
 }
 
