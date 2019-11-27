@@ -30,9 +30,12 @@ union Union64
 // Helpers
 SLANG_FORCE_INLINE float F32_calcSafeRadians(float radians)
 {
-	float a = radians * (1.0f /  float(SLANG_PRELUDE_PI));
-	a = (a < 0.0f) ? (::ceilf(a) - a) : (a - ::floorf(a));
-	return (a * float(SLANG_PRELUDE_PI));
+    // Put 0 to 2pi cycles to cycle around 0 to 1 
+	float a = radians * (1.0f /  float(SLANG_PRELUDE_PI * 2));
+    // Get truncated fraction, as value in  0 - 1 range
+    a = a - ::floorf(a);
+    // Convert back to 0 - 2pi range
+	return (a * float(SLANG_PRELUDE_PI * 2));
 }
 
 // Unary 
@@ -79,9 +82,12 @@ SLANG_FORCE_INLINE int32_t F32_asint(float f) { Union32 u; u.f = f; return u.i; 
 
 SLANG_FORCE_INLINE double F64_calcSafeRadians(double radians)
 {
-    double a = radians * (1.0 / SLANG_PRELUDE_PI);
-    a = (a < 0.0) ? (::ceil(a) - a) : (a - ::floor(a));
-    return (a * SLANG_PRELUDE_PI);
+    // Put 0 to 2pi cycles to cycle around 0 to 1 
+	double a = radians * (1.0f /  (SLANG_PRELUDE_PI * 2));
+    // Get truncated fraction, as value in  0 - 1 range
+    a = a - ::floor(a);
+    // Convert back to 0 - 2pi range
+	return (a * (SLANG_PRELUDE_PI * 2));
 }
 
 // Unary 
