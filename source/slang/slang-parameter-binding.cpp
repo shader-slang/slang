@@ -5,6 +5,8 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
+#include "slang-ir-string-hash.h"
+
 #include "../../slang.h"
 
 namespace Slang {
@@ -2973,6 +2975,11 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout();
     programLayout->targetProgram = targetProgram;
+
+    {
+        auto& pool = programLayout->hashedStringLiteralsPool;
+        program->enumerateIRModules([&](IRModule* module) { findGlobalHashedStringLiterals(module, pool); });
+    }
 
     // Try to find rules based on the selected code-generation target
     auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout);

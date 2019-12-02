@@ -2,6 +2,5 @@
 
 int doSomethingElse()
 {
-    "Hello \t\n\0x083 World";
-    return 20;
+    return getStringHash("Try another");
 }
