@@ -250,7 +250,7 @@ DIAGNOSTIC(30049, Note,  thisIsImmutableByDefault, "a 'this' parameter is an imm
 
 DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
-DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accepts a string literal")
+DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a non-zero length string literal")
 
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type got a '$0'")
 

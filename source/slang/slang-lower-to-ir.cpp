@@ -782,7 +782,9 @@ LoweredValInfo emitCallToDeclRef(
             {
                 case kIROp_GetStringHash:
                 {
-                    if (as<IRStringLit>(args[0]) == nullptr)
+                    IRStringLit* stringLit = as<IRStringLit>(args[0]);
+
+                    if (stringLit == nullptr || stringLit->getStringSlice() == UnownedStringSlice())
                     {
                         auto sink = context->getSink();
 
@@ -790,6 +792,7 @@ LoweredValInfo emitCallToDeclRef(
 
                         return LoweredValInfo();
                     }
+
                 }
             }
 
@@ -6754,8 +6757,8 @@ IRModule* generateIRForTranslationUnit(
     // call graph) based on constraints imposed by different instructions.
     propagateConstExpr(module, compileRequest->getSink());
 
-    // Replace calls to getStringHash  
-    replaceGetStringHash(module);
+    // Replace calls to getStringHash, and save all the unique string lits in a GlobalHashedStringLiterals inst
+    replaceGetStringHashWithGlobal(module, *sharedBuilder);
     
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.

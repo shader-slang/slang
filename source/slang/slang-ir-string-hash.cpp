@@ -45,12 +45,8 @@ void replaceGetStringHash(IRModule* module, SharedIRBuilder& sharedBuilder, Stri
     }
 }
 
-void replaceGetStringHash(IRModule* module)
+void replaceGetStringHashWithGlobal(IRModule* module, SharedIRBuilder& sharedBuilder)
 {
-    SharedIRBuilder sharedBuilder;
-    sharedBuilder.session = module->getSession();
-    sharedBuilder.module = module;
-
     StringSlicePool pool;
     replaceGetStringHash(module, sharedBuilder, pool);
     addGlobalHashedStringLiterals(pool, sharedBuilder);
