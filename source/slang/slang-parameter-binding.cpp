@@ -2977,7 +2977,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     programLayout->targetProgram = targetProgram;
 
     {
-        auto& pool = programLayout->hashedStringLiteralsPool;
+        auto& pool = programLayout->hashedStringLiteralPool;
         program->enumerateIRModules([&](IRModule* module) { findGlobalHashedStringLiterals(module, pool); });
     }
 

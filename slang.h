@@ -2750,6 +2750,13 @@ namespace slang
                 (SlangReflectionType* const*) specializationArgs,
                 outDiagnostics);
         }
+
+        SlangUInt getHashedStringCount() const { return spReflection_getHashedStringCount((SlangReflection*)this); }
+
+        const char* getHashedString(SlangUInt index, size_t* outCount) const
+        {
+            return spReflection_getHashedString((SlangReflection*)this, index, outCount);
+        }
     };
 
     typedef ISlangBlob IBlob;
