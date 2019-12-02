@@ -1014,7 +1014,7 @@ namespace Slang
             SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo);
 
             *ppData = sourceView->getContent().begin();
-            *pBytes = sourceView->getContentSize();
+            *pBytes = (UINT) sourceView->getContentSize();
 
             return S_OK;
         }
