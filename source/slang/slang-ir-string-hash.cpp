@@ -18,57 +18,22 @@ static void _findGetStringHashRec(IRInst* inst, List<IRGetStringHash*>& outInsts
     }
 }
 
-void addGlobalHashedStringLiterals(const HashSet<IRStringLit*>& hashSet, IRBuilder& ioBuilder)
+void replaceGetStringHash(IRModule* module, SharedIRBuilder& sharedBuilder, StringSlicePool& ioPool)
 {
-    // Add the list of all of the instructions 
-    const Index stringLitCount = Index(hashSet.Count());
-    if (stringLitCount == 0)
-    {
-        return;
-    }
-
-    IRModule* module = ioBuilder.getModule();
-
-    // We need to add a global instruction that references all of these string literals
-    ioBuilder.setInsertInto(module->getModuleInst());
-
-    IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(hashSet.Count()));
-
-    Index index = 0;
-    for (auto stringLit : hashSet)
-    {
-        SLANG_ASSERT(index < Index(hashSet.Count()));
-        globalHashedInst->getOperands()[index].set(stringLit);
-        index++;
-    }
-
-    ioBuilder.addInst(globalHashedInst);
-
-    // Mark to keep alive
-    ioBuilder.addKeepAliveDecoration(globalHashedInst);
-}
-
-SlangResult replaceGetStringHash(IRModule* module)
-{
-    List<IRGetStringHash*> insts;
-    _findGetStringHashRec(module->getModuleInst(), insts);
-
-    HashSet<IRStringLit*> hashSet;
-
-    SharedIRBuilder sharedBuilder;
-
-    sharedBuilder.module = module;
-    sharedBuilder.session = module->getSession();
-
     IRBuilder builder;
     builder.sharedBuilder = &sharedBuilder;
+
+    builder.setInsertInto(module->getModuleInst());
+
+    List<IRGetStringHash*> insts;
+    _findGetStringHashRec(module->getModuleInst(), insts);
 
     // Then we want to add the GlobalHashedString instruction in the root
     for (auto inst : insts)
     {
         IRStringLit* stringLit = inst->getStringLit();
-        hashSet.Add(stringLit);
-
+        ioPool.add(stringLit->getStringSlice());
+        
         // Okay work out what the hash is
         const int hash = GetHashCode(stringLit->getStringSlice());
 
@@ -78,10 +43,65 @@ SlangResult replaceGetStringHash(IRModule* module)
         inst->replaceUsesWith(intLit);
         inst->removeAndDeallocate();
     }
+}
 
-    addGlobalHashedStringLiterals(hashSet, builder);
+void replaceGetStringHash(IRModule* module)
+{
+    SharedIRBuilder sharedBuilder;
+    sharedBuilder.session = module->getSession();
+    sharedBuilder.module = module;
 
-    return SLANG_OK;
+    StringSlicePool pool;
+    replaceGetStringHash(module, sharedBuilder, pool);
+    addGlobalHashedStringLiterals(pool, sharedBuilder);
+}
+
+void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
+{
+    IRModuleInst* moduleInst = module->getModuleInst();
+
+    for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    {
+        if (IRGlobalHashedStringLiterals* hashedStringLits = as<IRGlobalHashedStringLiterals>(child))
+        {
+            const Index count = hashedStringLits->getOperandCount();
+            for (Index i = 0; i < count; ++i)
+            {
+                IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
+                pool.add(stringLit->getStringSlice());
+            }
+        }
+    }
+}
+
+void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder& sharedBuilder)
+{
+    IRBuilder builder;
+    builder.sharedBuilder = &sharedBuilder;
+    
+    // 
+    IRModule* module = builder.getModule();
+
+    // We need to add a global instruction that references all of these string literals
+    builder.setInsertInto(module->getModuleInst());
+
+    Index numSlices = Index(pool.getNumSlices() - StringSlicePool::kNumDefaultHandles);
+
+    IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(numSlices));
+
+    auto operands = globalHashedInst->getOperands();
+
+    for (Index i = 0; i < numSlices; ++i)
+    {
+        UnownedStringSlice slice = pool.getSlice(StringSlicePool::Handle(i + StringSlicePool::kNumDefaultHandles));
+        IRStringLit* stringLit = builder.getStringValue(slice);
+        operands[i].set(stringLit);
+    }
+
+    builder.addInst(globalHashedInst);
+
+    // Mark to keep alive
+    builder.addKeepAliveDecoration(globalHashedInst);
 }
 
 }

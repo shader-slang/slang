@@ -1393,33 +1393,13 @@ LinkedIR linkIR(
 
     // Combine all of the contents of IRGlobalHashedStringLiterals
     {
+        StringSlicePool pool;
         IRBuilder& builder = sharedContext->builderStorage;
-
-        HashSet<IRStringLit*> hashSet;
         for (IRModule* irModule : irModules)
         {
-            IRModuleInst* moduleInst = irModule->getModuleInst();
-
-            for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
-            {
-                if (IRGlobalHashedStringLiterals* hashedStringLits = as<IRGlobalHashedStringLiterals>(child))
-                {
-                    const Index count = hashedStringLits->getOperandCount();
-
-                    for (Index i = 0; i < count; ++i)
-                    {
-                        IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
-
-                        // Copy to the new module
-                        IRStringLit* copiedStringLit = builder.getStringValue(stringLit->getStringSlice());
-                        hashSet.Add(copiedStringLit);
-                    }
-                }
-            }
+            findGlobalHashedStringLiterals(irModule, pool);
         }
-
-        // Add all of the string literals 
-        addGlobalHashedStringLiterals(hashSet, builder);
+        addGlobalHashedStringLiterals(pool, *builder.sharedBuilder);
     }
 
     // Set up shared and builder insert point

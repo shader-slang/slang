@@ -1650,6 +1650,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     bool needClose = false;
     switch(inst->op)
     {
+    case kIROp_GlobalHashedStringLiterals:
+        /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
+        are hashed with 'getStringHash' */
+        break;
+
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
@@ -3033,6 +3038,11 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
 
     switch(inst->op)
     {
+    case kIROp_GlobalHashedStringLiterals:
+        /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
+        are hashed with 'getStringHash' */
+        break;
+
     case kIROp_Func:
         emitFunc((IRFunc*) inst);
         break;

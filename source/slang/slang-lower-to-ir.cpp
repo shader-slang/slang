@@ -6754,9 +6754,9 @@ IRModule* generateIRForTranslationUnit(
     // call graph) based on constraints imposed by different instructions.
     propagateConstExpr(module, compileRequest->getSink());
 
-    // Replace calls to getStringHash
+    // Replace calls to getStringHash  
     replaceGetStringHash(module);
-
+    
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
 
