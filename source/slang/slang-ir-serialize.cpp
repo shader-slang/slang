@@ -1222,10 +1222,12 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         {
             const Ser::InstIndex* srcOperandIndices;
             const int numOperands = data.getOperands(srcInst, &srcOperandIndices);
-                         
+
+            auto dstOperands = dstInst->getOperands();
+
             for (int j = 0; j < numOperands; j++)
             {
-                dstInst->setOperand(j, insts[int(srcOperandIndices[j])]);
+                dstOperands[j].init(dstInst, insts[int(srcOperandIndices[j])]);
             }
         }
     }
