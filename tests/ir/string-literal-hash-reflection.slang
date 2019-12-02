@@ -1,4 +1,4 @@
-//TEST:REFLECTION:-stage compute -entry main -target hlsl
+//TEST:REFLECTION:-stage compute -entry computeMain -target hlsl
 
 import string_literal_module;
 
@@ -6,7 +6,7 @@ import string_literal_module;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void main(
+void computeMain(
     uint tid   : SV_DispatchThreadIndex)
 {
     int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");   

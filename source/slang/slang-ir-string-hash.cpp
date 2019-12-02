@@ -76,6 +76,11 @@ void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 
 void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder& sharedBuilder)
 {
+    if (pool.getNumSlices() <= StringSlicePool::kNumDefaultHandles)
+    {
+        return;
+    }
+
     IRBuilder builder;
     builder.sharedBuilder = &sharedBuilder;
     

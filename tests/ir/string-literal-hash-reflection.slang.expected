@@ -20,7 +20,7 @@ standard output = {
     ],
     "entryPoints": [
         {
-            "name": "main",
+            "name": "computeMain",
             "stage:": "compute",
             "parameters": [
                 {
