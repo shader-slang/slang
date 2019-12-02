@@ -93,6 +93,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
     Index numSlices = Index(pool.getNumSlices() - StringSlicePool::kNumDefaultHandles);
 
     IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(numSlices));
+    builder.addInst(globalHashedInst);
 
     auto operands = globalHashedInst->getOperands();
 
@@ -100,10 +101,9 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
     {
         UnownedStringSlice slice = pool.getSlice(StringSlicePool::Handle(i + StringSlicePool::kNumDefaultHandles));
         IRStringLit* stringLit = builder.getStringValue(slice);
-        operands[i].set(stringLit);
-    }
 
-    builder.addInst(globalHashedInst);
+        operands[i].init(globalHashedInst, stringLit);
+    }
 
     // Mark to keep alive
     builder.addKeepAliveDecoration(globalHashedInst);

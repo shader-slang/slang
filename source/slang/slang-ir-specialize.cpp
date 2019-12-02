@@ -136,10 +136,8 @@ struct SpecializationContext
         for( auto use = inst->firstUse; use; use = use->nextUse )
         {
             auto user = use->getUser();
-            if (user)
-            {
-                addToWorkList(user);
-            }
+            
+            addToWorkList(user);
         }
     }
 
