@@ -379,13 +379,76 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
+    LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inResult)
+    {
+        // If the result isn't actually overloaded, it is fine as-is
+        if (!inResult.isValid()) return inResult;
+        if (!inResult.isOverloaded()) return inResult;
+
+        // We are going to build up a list of items to return.
+        List<LookupResultItem> items;
+        for( auto item : inResult.items )
+        {
+            // For each item we consider adding, we will compare it
+            // to those items we've already added.
+            //
+            // If any of the existing items is "better" than `item`,
+            // then we will skip adding `item`.
+            //
+            // If `item` is "better" than any of the existing items,
+            // we will remove those from `items`.
+            //
+            bool shouldAdd = true;
+            for( Index ii = 0; ii < items.getCount(); ++ii )
+            {
+                int cmp = CompareLookupResultItems(item, items[ii]);
+                if( cmp < 0 )
+                {
+                    // The new `item` is strictly better
+                    items.fastRemoveAt(ii);
+                    --ii;
+                }
+                else if( cmp > 0 )
+                {
+                    // The existing item is strictly better
+                    shouldAdd = false;
+                }
+            }
+            if( shouldAdd )
+            {
+                items.add(item);
+            }
+        }
+
+        // The resulting `items` list should be all those items
+        // that were neither better nor worse than one another.
+        //
+        // There should always be at least one such item.
+        //
+        SLANG_ASSERT(items.getCount() != 0);
+
+        LookupResult result;
+        for( auto item : items )
+        {
+            AddToLookupResult(result, item);
+        }
+        return result;
+    }
+
+    RefPtr<Expr> SemanticsVisitor::_resolveOverloadedExprImpl(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask, DiagnosticSink* diagSink)
     {
         auto lookupResult = overloadedExpr->lookupResult2;
         SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
 
         // Take the lookup result we had, and refine it based on what is expected in context.
+        //
+        // E.g., if there is both a type and a variable named `Foo`, but in context we know
+        // that a type is expected, then we can disambiguate by assuming the type is intended.
+        //
         lookupResult = refineLookup(lookupResult, mask);
+
+        // Try to filter out overload candidates based on which ones are "better" than one another.
+        lookupResult = resolveOverloadedLookup(lookupResult);
 
         if (!lookupResult.isValid())
         {
@@ -394,9 +457,23 @@ namespace Slang
             return overloadedExpr;
         }
 
-        if (lookupResult.isOverloaded())
+        if(!lookupResult.isOverloaded())
         {
-            // We had an ambiguity anyway, so report it.
+            // If there is only a single item left in the lookup result,
+            // then we can proceed to use that item alone as the resolved
+            // expression.
+            //
+            return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr->loc);
+        }
+
+        // Otherwise, we weren't able to resolve the overloading given
+        // the information available in context.
+        //
+        // If the client is asking for us to emit diagnostics about
+        // this fact, we should do so here:
+        //
+        if( diagSink )
+        {
             getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
 
             for(auto item : lookupResult.items)
@@ -408,9 +485,32 @@ namespace Slang
             // TODO(tfoley): should we construct a new ErrorExpr here?
             return CreateErrorExpr(overloadedExpr);
         }
+        else
+        {
+            // If the client isn't trying to *force* overload resolution
+            // to complete just yet (e.g., they are just trying out one
+            // candidate for an overloaded call site), then we return
+            // the input expression as-is.
+            //
+            return overloadedExpr;
+        }
+    }
 
-        // otherwise, we had a single decl and it was valid, hooray!
-        return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr->loc);
+    RefPtr<Expr> SemanticsVisitor::maybeResolveOverloadedExpr(RefPtr<Expr> expr, LookupMask mask, DiagnosticSink* diagSink)
+    {
+        if( auto overloadedExpr = as<OverloadedExpr>(expr) )
+        {
+            return _resolveOverloadedExprImpl(overloadedExpr, mask, diagSink);
+        }
+        else
+        {
+            return expr;
+        }
+    }
+
+    RefPtr<Expr> SemanticsVisitor::resolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
+    {
+        return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
     }
 
     RefPtr<Expr> SemanticsVisitor::CheckTerm(RefPtr<Expr> term)

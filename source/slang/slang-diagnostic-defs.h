@@ -340,7 +340,7 @@ DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
 
 DIAGNOSTIC(39999, Error, expectedAnInterfaceGot, "expected an interface, got '$0'")
 
-DIAGNOSTIC(39999, Error, ambiguousReference, "amiguous reference to '$0'");
+DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'");
 
 DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
 

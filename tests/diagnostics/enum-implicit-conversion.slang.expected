@@ -1,6 +1,7 @@
 result code = -1
 standard error = {
 tests/diagnostics/enum-implicit-conversion.slang(27): error 30019: expected an expression of type 'Color', got 'int'
+tests/diagnostics/enum-implicit-conversion.slang(27): note: explicit conversion from 'int' to 'Color' is possible
 tests/diagnostics/enum-implicit-conversion.slang(34): error 30019: expected an expression of type 'int', got 'Color'
 tests/diagnostics/enum-implicit-conversion.slang(34): note: explicit conversion from 'Color' to 'int' is possible
 tests/diagnostics/enum-implicit-conversion.slang(35): error 30019: expected an expression of type 'uint', got 'Color'

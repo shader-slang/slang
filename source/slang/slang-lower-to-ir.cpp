@@ -1690,6 +1690,27 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irType);
     }
 
+    LoweredValInfo visitThisType(ThisType* type)
+    {
+        // TODO: In theory, we should only run into a `ThisType` when lowering a concrete
+        // declaration defined on an interface type (e.g., via an `extension`).
+        //
+        // There is an open question of how we should emit a concrete method (say) defined
+        // on an `interface` type. We could emit the code in "object-oriented" style,
+        // passing in a `this` parameter of type `IFoo`, or we could emit it in a "generic"
+        // type where the whole member is wrapped in a generic on `<This : IFoo>`.
+        //
+        // The generic option has the benefit of having a clear solution in the case of
+        // static members that don't have a `this` parameter, but might still need `This`,
+        // but we have so far favored the "object-oriented" lowering for code involving
+        // bare interface types.
+        //
+        // For now we punt and emit the `ThisType` of an interface `IFoo` as `IFoo`.
+        //
+        return emitDeclRef(context, type->interfaceDeclRef, getBuilder()->getTypeKind());
+    }
+
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }

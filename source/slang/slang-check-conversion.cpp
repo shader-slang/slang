@@ -607,7 +607,7 @@ namespace Slang
         overloadContext.baseExpr = nullptr;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
 
-        AddTypeOverloadCandidates(toType, overloadContext, toType);
+        AddTypeOverloadCandidates(toType, overloadContext);
 
         // After all of the overload candidates have been added
         // to the context and processed, we need to see whether

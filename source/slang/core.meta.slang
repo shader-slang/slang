@@ -52,6 +52,48 @@ interface __EnumType
     associatedtype __Tag : __BuiltinIntegerType;
 };
 
+// Use an extension to declare that every `enum` type
+// inherits an initializer based on the tag type.
+//
+// Note: there is an important and subtle point here.
+// If we declared these initializers inside the `interface`
+// declaration above, then they would implicitly be
+// *requirements* of the `__EnumType` interface, and any
+// type that declares conformance to it would need to
+// provide implementations. That would put the onus on
+// the semantic checker to synthesize such initializers
+// when conforming an `enum` type to `__EnumType` (just
+// as it currently synthesizes the `__Tag` requirement.
+// Putting the declaration in an `extension` makes them
+// concrete declerations rather than interface requirements.
+// (Admittedly, they are "concrete" declarations with
+// no bodies, because currently all initializers are
+// assumed to be intrinsics).
+//
+// TODO: It might be more accurate to express this as:
+//
+//      __generic<T:__EnumType> extension T { ... }
+//
+// That alternative would express an extension of every
+// type that conforms to `__EnumType`, rather than an
+// extension of `__EnumType` itself. The distinction
+// is subtle, and unfortunately not one the Slang type
+// checker is equiped to handle right now. For now we
+// will stick with the syntax that actually works, even
+// if it might be the less technically correct one.
+//
+//
+extension __EnumType
+{
+    // TODO: this should be a single initializer using
+    // the `__Tag` associated type from the `__EnumType`
+    // interface, but right now the scoping for looking
+    // up that type isn't working right.
+    //
+    __init(int value);
+    __init(uint value);
+}
+
 // A type resulting from an `enum` declaration
 // with the `[flags]` attribute.
 interface __FlagsEnumType : __EnumType

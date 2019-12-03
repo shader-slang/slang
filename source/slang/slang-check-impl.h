@@ -360,7 +360,27 @@ namespace Slang
             RefPtr<Expr>            baseExpr,
             SourceLoc               loc);
 
-        RefPtr<Expr> ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask);
+            /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
+        LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
+
+            /// Attempt to resolve `expr` into an expression that refers to a single declaration/value.
+            /// If `expr` isn't overloaded, then it will be returned as-is.
+            ///
+            /// The provided `mask` is used to filter items down to those that are applicable in a given context (e.g., just types).
+            ///
+            /// If the expression cannot be resolved to a single value then *if* `diagSink` is non-null an
+            /// appropriate "ambiguous reference" error will be reported, and an error expression will be returned.
+            /// Otherwise, the original expression is returned if resolution fails.
+            ///
+        RefPtr<Expr> maybeResolveOverloadedExpr(RefPtr<Expr> expr, LookupMask mask, DiagnosticSink* diagSink);
+
+            /// Attempt to resolve `overloadedExpr` into an expression that refers to a single declaration/value.
+            ///
+            /// Equivalent to `maybeResolveOverloadedExpr` with `diagSink` bound to the sink for the `SemanticsVisitor`.
+        RefPtr<Expr> resolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask);
+
+            /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
+        RefPtr<Expr> _resolveOverloadedExprImpl(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask, DiagnosticSink* diagSink);
 
         RefPtr<Expr> ExpectATypeRepr(RefPtr<Expr> expr);
 
@@ -842,6 +862,12 @@ namespace Slang
         // declaration that its declaration is nested inside.
         RefPtr<Type> findResultTypeForConstructorDecl(ConstructorDecl* decl);
 
+            /// Determine what type `This` should refer to in the context of the given parent `decl`.
+        RefPtr<Type> calcThisType(DeclRef<Decl> decl);
+
+            /// Determine what type `This` should refer to in an extension of `type`.
+        RefPtr<Type> calcThisType(Type* type);
+
 
         //
 
@@ -1090,6 +1116,11 @@ namespace Slang
             OverloadCandidate*	left,
             OverloadCandidate*	right);
 
+            /// Compare items `left` and `right` produced by lookup, to see if one should be favored for overloading.
+        int CompareLookupResultItems(
+            LookupResultItem const& left,
+            LookupResultItem const& right);
+
         void AddOverloadCandidateInner(
             OverloadResolveContext& context,
             OverloadCandidate&		candidate);
@@ -1174,25 +1205,16 @@ namespace Slang
             DeclRef<GenericDecl>    genericDeclRef,
             OverloadResolveContext& context);
 
-        void AddAggTypeOverloadCandidates(
-            LookupResultItem        typeItem,
-            RefPtr<Type>            type,
-            DeclRef<AggTypeDecl>    aggTypeDeclRef,
-            OverloadResolveContext& context,
-            RefPtr<Type>            resultType);
-
-        void addGenericTypeParamOverloadCandidates(
-            DeclRef<GenericTypeParamDecl>   typeDeclRef,
-            OverloadResolveContext&         context,
-            RefPtr<Type>                    resultType);
-
         void AddTypeOverloadCandidates(
             RefPtr<Type>	        type,
-            OverloadResolveContext&	context,
-            RefPtr<Type>            resultType);
+            OverloadResolveContext&	context);
 
         void AddDeclRefOverloadCandidates(
             LookupResultItem		item,
+            OverloadResolveContext&	context);
+
+        void AddOverloadCandidates(
+            LookupResult const&     result,
             OverloadResolveContext&	context);
 
         void AddOverloadCandidates(

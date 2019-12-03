@@ -415,8 +415,12 @@ void DoLocalLookupImpl(
             targetDeclRef = targetDeclRefType->declRef.as<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
         }
 
-        // if we are looking inside an interface decl, try find in the interfaces it inherits from
-        if (targetDeclRef.is<InterfaceDecl>())
+        // When looking up inside a type, we want to also perform lookup via
+        // the types it inherits from, in case of them defines the member we are looking for.
+        //
+        // TODO: Need to be careful that this doesn't allow a type to satisfy an interface
+        // requirement using the original declaration of that requirement...
+
         {
             if(!targetDeclRefType)
             {
