@@ -113,6 +113,9 @@ namespace Slang
 	public:
         typedef ConstArrayView<T> Super;
 
+        using Super::m_buffer;
+        using Super::m_count;
+
         using Super::begin;
         T* begin() { return m_buffer; }
 
