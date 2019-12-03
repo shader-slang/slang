@@ -86,9 +86,12 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
         }
         case Style::Empty:
         {
-            SLANG_ASSERT(chars);
-            // Return an invalid handle
-            return Handle(~HandleIntegral(0));
+            if (chars == nullptr)
+            {
+                SLANG_ASSERT(!"Empty style doesn't support nullptr");
+                // Return an invalid handle
+                return Handle(~HandleIntegral(0));
+            }
         }
     }
     
