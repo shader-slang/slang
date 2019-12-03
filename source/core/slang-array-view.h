@@ -108,11 +108,11 @@ namespace Slang
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayView !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     template<typename T>
-	class ArrayView: public ConstArrayView<T>
-	{
-	public:
+    class ArrayView: public ConstArrayView<T>
+    {
+    public:
         typedef ConstArrayView<T> Super;
-
+        
         using Super::m_buffer;
         using Super::m_count;
 
@@ -134,19 +134,19 @@ namespace Slang
 
         ArrayView() : Super() {}
         ArrayView(T* buffer, Index size) :Super(buffer, size) {}
-	};
+    };
 
-	template<typename T>
-	ArrayView<T> makeArrayView(T& obj)
-	{
-		return ArrayView<T>(&obj, 1);
-	}
-		
-	template<typename T>
-	ArrayView<T> makeArrayView(T* buffer, Index count)
-	{
-		return ArrayView<T>(buffer, count);
-	}
+    template<typename T>
+    ArrayView<T> makeArrayView(T& obj)
+    {
+        return ArrayView<T>(&obj, 1);
+    }
+        
+    template<typename T>
+    ArrayView<T> makeArrayView(T* buffer, Index count)
+    {
+        return ArrayView<T>(buffer, count);
+    }
 }
 
 #endif
