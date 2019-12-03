@@ -497,7 +497,7 @@ DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to re
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.");
 
 DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "Could not find a suitable pass-through compiler for '$0'.");
-DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler.");
+DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler for '$0'.");
 
 DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'");
 DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'");

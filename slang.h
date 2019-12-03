@@ -2836,6 +2836,25 @@ namespace slang
             @return The build tag string
             */
         virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() = 0;
+
+            /* For a given downstream compiler, set the default used. This function is only applicable
+            to compilers that have optional backend.
+            When compiling slang source to CPP target it will compile to the SLANG_PASS_THROUGH_DEFAULT_C_CPP compiler
+
+            @param defaultCompiler must be a complier which is overridable such as SLANG_PASS_THROUGH_DEFAULT_C_CPP
+            @param overrideCompiler - the actual compiler to use
+            @return 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDownstreamCompilerOverride(
+            SlangPassThrough defaultCompiler,
+            SlangPassThrough overrideCompiler) = 0;
+
+            /* For a given downstream compiler set what is set as the override.
+
+            @param defaultCompiler the default compiler
+            @return The downstream compiler user for that option */
+        virtual SlangPassThrough SLANG_MCALL getDownstreamCompilerOverride(
+            SlangPassThrough defaultCompiler) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

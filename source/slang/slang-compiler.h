@@ -1910,6 +1910,12 @@ namespace Slang
 
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL setDownstreamCompilerOverride(SlangPassThrough defaultCompiler, SlangPassThrough overrideCompiler) override;
+
+        SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerOverride(SlangPassThrough defaultCompiler) override;
+
+        CPPCompiler* getCPPCompiler(PassThroughMode downstreamCompiler);
+
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,

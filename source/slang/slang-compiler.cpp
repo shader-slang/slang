@@ -1238,45 +1238,21 @@ SlangResult dissassembleDXILUsingDXC(
         outBin.clear();
         outSharedLib.setNull();
       
-        CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
+        PassThroughMode downstreamCompiler = (endToEndReq->passThrough != PassThroughMode::None) ? endToEndReq->passThrough : PassThroughMode::GenericCCpp;
 
         // Determine compiler to use
-        CPPCompiler* compiler = nullptr;
-        switch (endToEndReq->passThrough)
-        {
-            case PassThroughMode::None:
-            case PassThroughMode::GenericCCpp:
-            {
-                // If there is no pass through... still need a compiler
-                compiler = compilerSet->getDefaultCompiler();
-                break;
-            }
-            case PassThroughMode::Clang:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang));
-                break;
-            }
-            case PassThroughMode::VisualStudio:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
-                break;
-            }
-            case PassThroughMode::Gcc:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
-                break;
-            }
-        }
+        CPPCompiler* compiler = slangRequest->getSession()->getCPPCompiler(downstreamCompiler);
 
         if (!compiler)
         {
-            if (endToEndReq->passThrough != PassThroughMode::None)
+            auto compilerName = _getPassThroughAsText(downstreamCompiler);
+            if (downstreamCompiler != PassThroughMode::None)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
             }
             else
             {
-                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound);
+                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound, compilerName);
             }
             return SLANG_FAIL;
         }

@@ -220,6 +220,38 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDownstreamCompilerOverride(SlangPassThrough defaultCompiler, SlangPassThrough overrideCompiler)
+{
+    if (defaultCompiler != SLANG_PASS_THROUGH_GENERIC_C_CPP)
+    {
+        return (defaultCompiler == overrideCompiler) ? SLANG_OK : SLANG_FAIL;
+    }
+
+
+}
+
+SlangPassThrough SLANG_MCALL Session::getDownstreamCompilerOverride(SlangPassThrough defaultCompiler)
+{
+
+}
+
+
+CPPCompiler* Session::getCPPCompiler(PassThroughMode downstreamCompiler)
+{
+    CPPCompilerSet* compilerSet = requireCPPCompilerSet();
+
+    switch (downstreamCompiler)
+    {
+        case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();
+        case PassThroughMode::Clang:        return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang)); 
+        case PassThroughMode::VisualStudio: return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
+        case PassThroughMode::Gcc:          return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+        default:
+    }
+    return nullptr;
+}
+
 struct IncludeHandlerImpl : IncludeHandler
 {
     Linkage*    linkage;
