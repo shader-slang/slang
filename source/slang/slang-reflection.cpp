@@ -1522,7 +1522,7 @@ SLANG_API const char* spReflection_getHashedString(
     return slice.begin();
 }
 
-SLANG_API int spCalcStringHash(const char* chars, size_t count)
+SLANG_API int spComputeStringHash(const char* chars, size_t count)
 {
     UnownedStringSlice slice(chars, count);
     return GetHashCode(slice);

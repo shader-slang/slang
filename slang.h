@@ -2109,9 +2109,9 @@ extern "C"
         SlangUInt index,
         size_t* outCount);
 
-        /// Calculate a string hash.
-        // Count should *NOT* include terminating zero.
-    SLANG_API int spCalcStringHash(const char* chars, size_t count);
+        /// Compute a string hash.
+        /// Count should *NOT* include terminating zero.
+    SLANG_API int spComputeStringHash(const char* chars, size_t count);
 
 #ifdef __cplusplus
 }
