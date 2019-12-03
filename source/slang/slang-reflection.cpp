@@ -1499,3 +1499,27 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
     return convert(specializedType);
 }
+
+SLANG_API SlangUInt spReflection_getHashedStringCount(
+    SlangReflection*  reflection)
+{
+    auto programLayout = convert(reflection);
+    return programLayout->hashedStringLiteralPool.getNumSlices() - StringSlicePool::kNumDefaultHandles;
+}
+
+SLANG_API const char* spReflection_getHashedString(
+    SlangReflection*  reflection,
+    SlangUInt index,
+    size_t* outCount)
+{
+    auto programLayout = convert(reflection);
+    UnownedStringSlice slice = programLayout->hashedStringLiteralPool.getSlice(StringSlicePool::Handle(index + StringSlicePool::kNumDefaultHandles));
+    *outCount = slice.size();
+    return slice.begin();
+}
+
+SLANG_API int spCalcStringHash(const char* chars, size_t count)
+{
+    UnownedStringSlice slice(chars, count);
+    return GetHashCode(slice);
+}

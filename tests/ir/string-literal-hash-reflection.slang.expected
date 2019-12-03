@@ -1,0 +1,44 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "outputBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "tid",
+                    "semanticName": "SV_DISPATCHTHREADINDEX",
+                    "type": {
+                        "kind": "scalar",
+                        "scalarType": "uint32"
+                    }
+                }
+            ],
+            "threadGroupSize": [4, 1, 1]
+        }
+    ],
+    "hashedStrings": {
+        "Hello \t\n\0x083 World": -215446506,
+        "Try another": 900483678
+    }
+
+}
+}

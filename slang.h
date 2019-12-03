@@ -2098,6 +2098,21 @@ extern "C"
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
 
+        /// Get the number of hashed strings
+    SLANG_API SlangUInt spReflection_getHashedStringCount(
+        SlangReflection*  reflection);
+
+        /// Get a hashed string. The number of chars is writtent in outCount. Note the count does *NOT* including terminating 0,
+        /// and the returned pointer will not generally have a terminating zero.
+    SLANG_API const char* spReflection_getHashedString(
+        SlangReflection*  reflection,
+        SlangUInt index,
+        size_t* outCount);
+
+        /// Calculate a string hash.
+        // Count should *NOT* include terminating zero.
+    SLANG_API int spCalcStringHash(const char* chars, size_t count);
+
 #ifdef __cplusplus
 }
 
@@ -2734,6 +2749,13 @@ namespace slang
                 specializationArgCount,
                 (SlangReflectionType* const*) specializationArgs,
                 outDiagnostics);
+        }
+
+        SlangUInt getHashedStringCount() const { return spReflection_getHashedStringCount((SlangReflection*)this); }
+
+        const char* getHashedString(SlangUInt index, size_t* outCount) const
+        {
+            return spReflection_getHashedString((SlangReflection*)this, index, outCount);
         }
     };
 

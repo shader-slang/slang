@@ -1197,6 +1197,11 @@ for (auto op : binaryOps)
 }
 }}}}
 
+// Specialized function
+
+__intrinsic_op
+int getStringHash(String string);
+
 // Operators to apply to `enum` types
 
 __generic<E : __EnumType>

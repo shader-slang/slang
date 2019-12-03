@@ -753,6 +753,9 @@ public:
         /// arguments that have been used to specialize the program.
         ///
     List<RefPtr<TypeLayout>> taggedUnionTypeLayouts;
+
+        /// Holds all of the string literals that have been hashed
+    StringSlicePool hashedStringLiteralPool;
 };
 
 StructTypeLayout* getGlobalStructLayout(
