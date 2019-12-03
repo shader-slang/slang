@@ -20,7 +20,7 @@ namespace Slang
 
         inline const T& operator [](Index idx) const
         {
-            SLANG_ASSERT(idx >= 0 && idx <= m_count);
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
             return m_buffer[idx];
         }
         
@@ -122,7 +122,7 @@ namespace Slang
         using Super::operator[];
         inline T& operator [](Index idx)
         {
-            SLANG_ASSERT(idx >= 0 && idx <= m_count);
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
             return m_buffer[idx];
         }
 
