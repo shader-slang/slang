@@ -18,6 +18,7 @@ class StringSlicePool
 {
 public:
     typedef StringSlicePool ThisType;
+    typedef uint32_t HandleIntegral;
 
     enum class Style
     {
@@ -26,16 +27,16 @@ public:
     };
 
     /// Handle of 0 is null. If accessed will be returned as the empty string
-    enum class Handle : uint32_t;
+    enum class Handle : HandleIntegral;
     typedef UnownedStringSlice Slice;
 
     static const Handle kNullHandle = Handle(0);
     static const Handle kEmptyHandle = Handle(1);
 
-    static const int kNumDefaultHandles = 2;
+    static const Index kDefaultHandlesCount = 2;
 
         /// Returns the index of a slice, if contained, or -1 if not found
-    int findIndex(const Slice& slice) const;
+    Index findIndex(const Slice& slice) const;
 
         /// True if has the slice
     bool has(const Slice& slice) { return findIndex(slice) >= 0; }
@@ -58,13 +59,14 @@ public:
     const List<UnownedStringSlice>& getSlices() const { return m_slices; }
 
         /// Get the number of slices
-    int getNumSlices() const { return int(m_slices.getCount()); }
+    Index getSlicesCount() const { return m_slices.getCount(); }
+
+        /// Returns true if the handle is a default one. Only meaningful on a Style::Default.
+    bool isDefaultHandle(Handle handle) const { SLANG_ASSERT(m_style == Style::Default && Index(handle) >= 0); return Index(handle) < kDefaultHandlesCount; }
 
         /// Convert a handle to and index. (A handle is just an index!) 
-    static int asIndex(Handle handle) { return int(handle); }
-        /// Returns true if the handle is to a slice that contains characters (ie not null or empty)
-    bool hasContents(Handle handle) const { return m_style == Style::Empty || int(handle) >= kNumDefaultHandles; }
-
+    static Index asIndex(Handle handle) { return Index(handle); }
+    
         /// Get the style of the pool
     Style getStyle() const { return m_style; }
 

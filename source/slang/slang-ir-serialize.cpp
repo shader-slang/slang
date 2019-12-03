@@ -88,7 +88,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
             const auto& pool = sourceView->getSourceManager()->getStringSlicePool();
             SLANG_ASSERT(pool.getStyle() == StringSlicePool::Style::Default);
 
-            if (pool.hasContents(entry.m_pathHandle))
+            if (!pool.isDefaultHandle(entry.m_pathHandle))
             {
                 UnownedStringSlice slice = pool.getSlice(entry.m_pathHandle);
                 SLANG_ASSERT(slice.size() > 0);

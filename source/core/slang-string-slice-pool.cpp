@@ -5,7 +5,7 @@ namespace Slang {
 /* static */ const StringSlicePool::Handle StringSlicePool::kNullHandle;
 /* static */ const StringSlicePool::Handle StringSlicePool::kEmptyHandle;
 
-/* static */const int StringSlicePool::kNumDefaultHandles;
+/* static */const Index StringSlicePool::kDefaultHandlesCount;
 
 StringSlicePool::StringSlicePool(Style style) :
     m_style(style),
@@ -87,17 +87,18 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
         case Style::Empty:
         {
             SLANG_ASSERT(chars);
-            break;
+            // Return an invalid handle
+            return Handle(~HandleIntegral(0));
         }
     }
     
     return add(UnownedStringSlice(chars));
 }
 
-int StringSlicePool::findIndex(const Slice& slice) const
+Index StringSlicePool::findIndex(const Slice& slice) const
 {
     const Handle* handlePtr = m_map.TryGetValue(slice);
-    return handlePtr ? int(*handlePtr) : -1;
+    return handlePtr ? Index(*handlePtr) : -1;
 }
 
 ConstArrayView<UnownedStringSlice> StringSlicePool::getAdded() const
@@ -110,7 +111,7 @@ ConstArrayView<UnownedStringSlice> StringSlicePool::getAdded() const
         }
         case Style::Default:
         {
-            return makeConstArrayView(m_slices.getBuffer() + kNumDefaultHandles, m_slices.getCount() - kNumDefaultHandles);
+            return makeConstArrayView(m_slices.getBuffer() + kDefaultHandlesCount, m_slices.getCount() - kDefaultHandlesCount);
         }
     }
     return ConstArrayView<UnownedStringSlice>();
