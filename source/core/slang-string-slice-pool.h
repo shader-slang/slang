@@ -6,12 +6,24 @@
 #include "slang-list.h"
 #include "slang-memory-arena.h"
 #include "slang-dictionary.h"
+#include "slang-array-view.h"
 
 namespace Slang {
+
+/* Holds a unique set of slices.
+NOTE: that all slices are stored with terminating zeros.
+*/
 
 class StringSlicePool
 {
 public:
+    typedef StringSlicePool ThisType;
+
+    enum class Style
+    {
+        Default,            ///< Default style - has default handles (like kNullHandle and kEmptyHandle)
+        Empty,              ///< Empty style - has no handles by default
+    };
 
     /// Handle of 0 is null. If accessed will be returned as the empty string
     enum class Handle : uint32_t;
@@ -51,12 +63,23 @@ public:
         /// Convert a handle to and index. (A handle is just an index!) 
     static int asIndex(Handle handle) { return int(handle); }
         /// Returns true if the handle is to a slice that contains characters (ie not null or empty)
-    static bool hasContents(Handle handle) { return int(handle) >= kNumDefaultHandles; }
+    bool hasContents(Handle handle) const { return m_style == Style::Empty || int(handle) >= kNumDefaultHandles; }
+
+        /// Get the style of the pool
+    Style getStyle() const { return m_style; }
+
+        /// Get all the added slices
+    ConstArrayView<UnownedStringSlice> getAdded() const; 
 
         /// Ctor
-    StringSlicePool();
+    StringSlicePool(Style style);
 
 protected:
+    // Disable copy ctor and assignment
+    StringSlicePool(const ThisType& rhs) = delete;
+    void operator=(const ThisType& rhs) = delete;
+
+    Style m_style;
     List<UnownedStringSlice> m_slices;
     Dictionary<UnownedStringSlice, Handle> m_map;
     MemoryArena m_arena;

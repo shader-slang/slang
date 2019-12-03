@@ -85,9 +85,12 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
             adjustedLineInfo.m_lineInfo = lineInfo;
             adjustedLineInfo.m_pathStringIndex = Ser::kNullStringIndex;
 
-            if (StringSlicePool::hasContents(entry.m_pathHandle))
+            const auto& pool = sourceView->getSourceManager()->getStringSlicePool();
+            SLANG_ASSERT(pool.getStyle() == StringSlicePool::Style::Default);
+
+            if (pool.hasContents(entry.m_pathHandle))
             {
-                UnownedStringSlice slice = sourceView->getSourceManager()->getStringSlicePool().getSlice(entry.m_pathHandle);
+                UnownedStringSlice slice = pool.getSlice(entry.m_pathHandle);
                 SLANG_ASSERT(slice.size() > 0);
                 adjustedLineInfo.m_pathStringIndex = Ser::StringIndex(m_debugStringSlicePool.add(slice));
             }

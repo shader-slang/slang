@@ -47,7 +47,7 @@ void replaceGetStringHash(IRModule* module, SharedIRBuilder& sharedBuilder, Stri
 
 void replaceGetStringHashWithGlobal(IRModule* module, SharedIRBuilder& sharedBuilder)
 {
-    StringSlicePool pool;
+    StringSlicePool pool(StringSlicePool::Style::Empty);
     replaceGetStringHash(module, sharedBuilder, pool);
     addGlobalHashedStringLiterals(pool, sharedBuilder);
 }
@@ -56,7 +56,7 @@ void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
 
-    for (IRInst* child = moduleInst->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    for(IRInst* child : moduleInst->getChildren())
     {
         if (IRGlobalHashedStringLiterals* hashedStringLits = as<IRGlobalHashedStringLiterals>(child))
         {
@@ -72,7 +72,8 @@ void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 
 void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder& sharedBuilder)
 {
-    if (pool.getNumSlices() <= StringSlicePool::kNumDefaultHandles)
+    auto slices = pool.getAdded();
+    if (slices.getCount() == 0)
     {
         return;
     }
@@ -86,18 +87,16 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
     // We need to add a global instruction that references all of these string literals
     builder.setInsertInto(module->getModuleInst());
 
-    Index numSlices = Index(pool.getNumSlices() - StringSlicePool::kNumDefaultHandles);
+    const Index slicesCount = slices.getCount();
 
-    IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(numSlices));
+    IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(slicesCount));
     builder.addInst(globalHashedInst);
 
     auto operands = globalHashedInst->getOperands();
 
-    for (Index i = 0; i < numSlices; ++i)
+    for (Index i = 0; i < slicesCount; ++i)
     {
-        UnownedStringSlice slice = pool.getSlice(StringSlicePool::Handle(i + StringSlicePool::kNumDefaultHandles));
-        IRStringLit* stringLit = builder.getStringValue(slice);
-
+        IRStringLit* stringLit = builder.getStringValue(slices[i]);
         operands[i].init(globalHashedInst, stringLit);
     }
 

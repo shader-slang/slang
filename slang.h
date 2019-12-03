@@ -2102,8 +2102,8 @@ extern "C"
     SLANG_API SlangUInt spReflection_getHashedStringCount(
         SlangReflection*  reflection);
 
-        /// Get a hashed string. The number of chars is writtent in outCount. Note the count does *NOT* including terminating 0,
-        /// and the returned pointer will not generally have a terminating zero.
+        /// Get a hashed string. The number of chars is written in outCount.
+        /// The count does *NOT* including terminating 0. The returned string will be 0 terminated. 
     SLANG_API const char* spReflection_getHashedString(
         SlangReflection*  reflection,
         SlangUInt index,
