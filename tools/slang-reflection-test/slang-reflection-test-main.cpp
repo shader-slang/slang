@@ -1074,7 +1074,7 @@ static void emitReflectionJSON(
 
                 size_t charsCount;
                 const char* chars = programReflection->getHashedString(i, &charsCount);
-                const int hash = spCalcStringHash(chars, charsCount);
+                const int hash = spComputeStringHash(chars, charsCount);
 
                 writeEscapedString(writer, chars, charsCount);
                 write(writer, ": ");

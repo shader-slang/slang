@@ -77,8 +77,8 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
     m_scopeManager = scopeManager;
 
     // Decode the table
-    m_entries.setCount(StringSlicePool::kNumDefaultHandles);
-    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kNumDefaultHandles == 2);
+    m_entries.setCount(StringSlicePool::kDefaultHandlesCount);
+    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kDefaultHandlesCount == 2);
 
     {
         Entry& entry = m_entries[0];
@@ -200,15 +200,14 @@ char* StringRepresentationCache::getCStr(Handle handle)
 /* static */void SerialStringTableUtil::encodeStringTable(const StringSlicePool& pool, List<char>& stringTable)
 {
     // Skip the default handles -> nothing is encoded via them
-    return encodeStringTable(pool.getSlices().begin() + StringSlicePool::kNumDefaultHandles, pool.getNumSlices() - StringSlicePool::kNumDefaultHandles, stringTable);
+    return encodeStringTable(pool.getAdded(), stringTable);
 }
     
-/* static */void SerialStringTableUtil::encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable)
+/* static */void SerialStringTableUtil::encodeStringTable(const ConstArrayView<UnownedStringSlice>& slices, List<char>& stringTable)
 {
     stringTable.clear();
-    for (size_t i = 0; i < numSlices; ++i)
+    for (const auto& slice : slices)
     {
-        const UnownedStringSlice slice = slices[i];
         const int len = int(slice.size());
         
         // We need to write into the the string array
@@ -251,19 +250,19 @@ char* StringRepresentationCache::getCStr(Handle handle)
 
 /* static */void SerialStringTableUtil::calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMapOut)
 {
-    SLANG_ASSERT(slices.getCount() >= StringSlicePool::kNumDefaultHandles);
+    SLANG_ASSERT(slices.getCount() >= StringSlicePool::kDefaultHandlesCount);
     SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
     SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
 
     indexMapOut.setCount(slices.getCount());
     // Set up all of the defaults
-    for (int i = 0; i < StringSlicePool::kNumDefaultHandles; ++i)
+    for (int i = 0; i < StringSlicePool::kDefaultHandlesCount; ++i)
     {
         indexMapOut[i] = StringSlicePool::Handle(i);
     }
 
     const Index numSlices = slices.getCount();
-    for (Index i = StringSlicePool::kNumDefaultHandles; i < numSlices ; ++i)
+    for (Index i = StringSlicePool::kDefaultHandlesCount; i < numSlices ; ++i)
     {
         indexMapOut[i] = pool.add(slices[i]);
     }

@@ -732,6 +732,10 @@ public:
     TargetRequest* getTargetReq() { return targetProgram->getTargetReq(); }
     ComponentType* getProgram() { return targetProgram->getProgram(); }
 
+    ProgramLayout():
+        hashedStringLiteralPool(StringSlicePool::Style::Empty)
+    {
+    }
 
     // We catalog the requested entry points here,
     // and any entry-point-specific parameter data

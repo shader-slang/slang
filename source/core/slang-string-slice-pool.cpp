@@ -5,10 +5,10 @@ namespace Slang {
 /* static */ const StringSlicePool::Handle StringSlicePool::kNullHandle;
 /* static */ const StringSlicePool::Handle StringSlicePool::kEmptyHandle;
 
-/* static */const int StringSlicePool::kNumDefaultHandles;
+/* static */const Index StringSlicePool::kDefaultHandlesCount;
 
-
-StringSlicePool::StringSlicePool() :
+StringSlicePool::StringSlicePool(Style style) :
+    m_style(style),
     m_arena(1024)
 {
     clear();
@@ -16,15 +16,29 @@ StringSlicePool::StringSlicePool() :
 
 void StringSlicePool::clear()
 {
-    m_slices.setCount(2);
-
-    m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
-    m_slices[1] = UnownedStringSlice::fromLiteral("");
-    
-    // Add the empty entry
-    m_map.Add(m_slices[1], kEmptyHandle);
-
     m_map.Clear();
+
+    switch (m_style)
+    {
+        case Style::Default:
+        {
+            // Add the defaults
+            m_slices.setCount(2);
+
+            m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
+            m_slices[1] = UnownedStringSlice::fromLiteral("");
+            
+            // Add the empty entry
+            m_map.Add(m_slices[1], kEmptyHandle);
+            break;
+        }
+        case Style::Empty:
+        {
+            // There are no defaults
+            m_slices.clear();
+            break;
+        }
+    }
 }
 
 StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
@@ -47,31 +61,53 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 
 StringSlicePool::Handle StringSlicePool::add(StringRepresentation* stringRep)
 {
-    if (stringRep == nullptr)
+    if (stringRep == nullptr && m_style == Style::Default)
     {
         return kNullHandle;
     }
     return add(StringRepresentation::asSlice(stringRep));
 }
  
-
 StringSlicePool::Handle StringSlicePool::add(const char* chars)
 {
-    if (!chars)
+    switch (m_style)
     {
-        return kNullHandle;
+        case Style::Default:
+        {
+            if (!chars)
+            {
+                return kNullHandle;
+            }
+            if (chars[0] == 0)
+            {
+                return kEmptyHandle;
+            }
+            break;
+        }
+        case Style::Empty:
+        {
+            if (chars == nullptr)
+            {
+                SLANG_ASSERT(!"Empty style doesn't support nullptr");
+                // Return an invalid handle
+                return Handle(~HandleIntegral(0));
+            }
+        }
     }
-    if (chars[0] == 0)
-    {
-        return kEmptyHandle;
-    }
+    
     return add(UnownedStringSlice(chars));
 }
 
-int StringSlicePool::findIndex(const Slice& slice) const
+Index StringSlicePool::findIndex(const Slice& slice) const
 {
     const Handle* handlePtr = m_map.TryGetValue(slice);
-    return handlePtr ? int(*handlePtr) : -1;
-
+    return handlePtr ? Index(*handlePtr) : -1;
 }
+
+ConstArrayView<UnownedStringSlice> StringSlicePool::getAdded() const
+{
+    const Index firstIndex = getFirstAddedIndex();
+    return makeConstArrayView(m_slices.getBuffer() + firstIndex, m_slices.getCount() - firstIndex);
+}
+
 } // namespace Slang
