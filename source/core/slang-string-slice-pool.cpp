@@ -106,18 +106,8 @@ Index StringSlicePool::findIndex(const Slice& slice) const
 
 ConstArrayView<UnownedStringSlice> StringSlicePool::getAdded() const
 {
-    switch (m_style)
-    {
-        case Style::Empty:
-        {
-            return makeConstArrayView(m_slices.getBuffer(), m_slices.getCount());
-        }
-        case Style::Default:
-        {
-            return makeConstArrayView(m_slices.getBuffer() + kDefaultHandlesCount, m_slices.getCount() - kDefaultHandlesCount);
-        }
-    }
-    return ConstArrayView<UnownedStringSlice>();
+    const Index firstIndex = getFirstAddedIndex();
+    return makeConstArrayView(m_slices.getBuffer() + firstIndex, m_slices.getCount() - firstIndex);
 }
 
 } // namespace Slang
