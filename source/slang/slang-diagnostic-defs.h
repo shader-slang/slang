@@ -116,9 +116,10 @@ DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module co
 DIAGNOSTIC(    85, Error, unableToAddReferenceToModuleContainer, "unable to add a reference to a module container");
 DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create module container");
 
+DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'");
 
 //
-// 1xxxx - Lexical anaylsis
+// 1xxxx - Lexical analysis
 //
 
 DIAGNOSTIC(10000, Error, illegalCharacterPrint, "illegal character '$0'");

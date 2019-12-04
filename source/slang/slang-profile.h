@@ -15,6 +15,7 @@ namespace Slang
         GLSL = SLANG_SOURCE_LANGUAGE_GLSL,
         C = SLANG_SOURCE_LANGUAGE_C,
         CPP = SLANG_SOURCE_LANGUAGE_CPP,
+        CountOf = SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
     // TODO(tfoley): This should merge with the above...

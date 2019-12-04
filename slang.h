@@ -615,6 +615,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_GLSL,
         SLANG_SOURCE_LANGUAGE_C,
         SLANG_SOURCE_LANGUAGE_CPP,
+        SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
     typedef unsigned int SlangProfileID;
@@ -2837,24 +2838,24 @@ namespace slang
             */
         virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() = 0;
 
-            /* For a given downstream compiler, set the default used. This function is only applicable
-            to compilers that have optional backend.
-            When compiling slang source to CPP target it will compile to the SLANG_PASS_THROUGH_DEFAULT_C_CPP compiler
+            /* For a given source language set the default compiler.
+            If a default cannot be chosen (for example the target cannot be achieved by the default),
+            the default will not be used. 
 
-            @param defaultCompiler must be a complier which is overridable such as SLANG_PASS_THROUGH_DEFAULT_C_CPP
-            @param overrideCompiler - the actual compiler to use
+            @param sourceLanguage the source language 
+            @param defaultCompiler the default compiler for that language
             @return 
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDownstreamCompilerOverride(
-            SlangPassThrough defaultCompiler,
-            SlangPassThrough overrideCompiler) = 0;
-
-            /* For a given downstream compiler set what is set as the override.
-
-            @param defaultCompiler the default compiler
-            @return The downstream compiler user for that option */
-        virtual SlangPassThrough SLANG_MCALL getDownstreamCompilerOverride(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(
+            SlangSourceLanguage sourceLanguage,
             SlangPassThrough defaultCompiler) = 0;
+
+            /* For a source type get the default compiler 
+
+            @param sourceLanguage the source language 
+            @return The downstream compiler for that source language */
+        virtual SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(
+            SlangSourceLanguage sourceLanguage) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

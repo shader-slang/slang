@@ -1233,15 +1233,23 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto sink = slangRequest->getSink();
 
+        auto session = slangRequest->getSession();
+
         const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
         outBin.clear();
         outSharedLib.setNull();
       
-        PassThroughMode downstreamCompiler = (endToEndReq->passThrough != PassThroughMode::None) ? endToEndReq->passThrough : PassThroughMode::GenericCCpp;
+        PassThroughMode downstreamCompiler = endToEndReq->passThrough;
 
-        // Determine compiler to use
-        CPPCompiler* compiler = slangRequest->getSession()->getCPPCompiler(downstreamCompiler);
+        // If we are not in pass through, lookup the default compiler for the emitted source type
+        if (downstreamCompiler == PassThroughMode::None)
+        {
+            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+        }
+        
+        // Get the required downstream CPP compiler
+        CPPCompiler* compiler = session->getCPPCompiler(downstreamCompiler);
 
         if (!compiler)
         {
