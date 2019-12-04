@@ -581,8 +581,9 @@ String emitEntryPointSource(
         // If generic CPP work out what compiler will actually be used
         if (passThru == PassThroughMode::GenericCCpp)
         {
-            CPPCompilerSet* compilerSet = session->requireCPPCompilerSet();
-            CPPCompiler* compiler = compilerSet->getDefaultCompiler();
+            const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
+            // Get the compiler used for the language
+            CPPCompiler* compiler = session->getDefaultCPPCompiler(sourceLanguage);
             if (compiler)
             {
                 passThru = getPassThroughModeForCPPCompiler(compiler->getDesc().type);

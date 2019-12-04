@@ -65,6 +65,31 @@ static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassTh
     return SLANG_FAIL;
 }
 
+static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
+{
+    if (text == "c" || text == "C")
+    {
+        return SLANG_SOURCE_LANGUAGE_C;
+    }
+    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
+    {
+        return SLANG_SOURCE_LANGUAGE_CPP;
+    }
+    else if (text == "slang")
+    {
+        return SLANG_SOURCE_LANGUAGE_SLANG;
+    }
+    else if (text == "glsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_GLSL;
+    }
+    else if (text == "hlsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_HLSL;
+    }
+    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+}
+
 UnownedStringSlice getPassThroughName(SlangPassThrough passThru)
 {
 #define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
@@ -962,6 +987,33 @@ struct OptionsParser
                 {
                     requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
                 }
+                else if (argStr == "-default-downstream-compiler")
+                {
+                    String sourceLanguageText;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, sourceLanguageText));
+                    String compilerText;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
+
+                    SlangSourceLanguage sourceLanguage = _findSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
+                        return SLANG_FAIL;
+                    }
+
+                    SlangPassThrough compiler;
+                    if (SLANG_FAILED(_parsePassThrough(compilerText.getUnownedSlice(), compiler)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
+                        return SLANG_FAIL;
+                    }
+
+                    if (SLANG_FAILED(session->setDefaultDownstreamCompiler(sourceLanguage, compiler)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unableToSetDefaultDownstreamCompiler, compilerText, sourceLanguageText, compilerText);
+                        return SLANG_FAIL;
+                    }
+                }       
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,

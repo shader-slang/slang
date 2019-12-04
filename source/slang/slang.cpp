@@ -99,6 +99,15 @@ Session::Session()
 
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+
+    {
+        for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
+        {
+            m_defaultDownstreamCompilers[i] = PassThroughMode::None;
+        }
+        m_defaultDownstreamCompilers[Index(SourceLanguage::C)] = PassThroughMode::GenericCCpp;
+        m_defaultDownstreamCompilers[Index(SourceLanguage::CPP)] = PassThroughMode::GenericCCpp;
+    }
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
@@ -218,6 +227,74 @@ SLANG_NO_THROW void SLANG_MCALL Session::getDownstreamCompilerPrelude(
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 {
     return SLANG_TAG_VERSION;
+}
+
+static bool _canCompile(PassThroughMode compiler, SourceLanguage sourceLanguage)
+{
+    switch (compiler)
+    {
+        case PassThroughMode::Fxc:      
+        case PassThroughMode::Dxc:
+        {
+            return sourceLanguage == SourceLanguage::HLSL;
+        }
+        case PassThroughMode::Glslang:
+        {
+            return sourceLanguage == SourceLanguage::GLSL;
+        }
+        case PassThroughMode::Clang:
+        case PassThroughMode::VisualStudio:
+        case PassThroughMode::Gcc:
+        case PassThroughMode::GenericCCpp:
+        {
+            return sourceLanguage == SourceLanguage::C || sourceLanguage == SourceLanguage::CPP;
+        }
+        default: break;
+    }
+    return false;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage inSourceLanguage, SlangPassThrough defaultCompiler)
+{
+    auto sourceLanguage = SourceLanguage(inSourceLanguage);
+    auto compiler = PassThroughMode(defaultCompiler);
+
+    if (sourceLanguage == SourceLanguage::C || sourceLanguage == SourceLanguage::CPP)
+    {
+        if (_canCompile(compiler, sourceLanguage))
+        {
+            m_defaultDownstreamCompilers[int(sourceLanguage)] = compiler;
+            return SLANG_OK;
+        }
+    }
+    
+    return SLANG_FAIL;
+}
+
+SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLanguage inSourceLanguage)
+{
+    SLANG_ASSERT(inSourceLanguage >= 0 && inSourceLanguage < SLANG_SOURCE_LANGUAGE_COUNT_OF);
+    auto sourceLanguage = SourceLanguage(inSourceLanguage);
+    return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
+}
+
+CPPCompiler* Session::getCPPCompiler(PassThroughMode compiler)
+{
+    CPPCompilerSet* compilerSet = requireCPPCompilerSet();
+    switch (compiler)
+    {
+        case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();
+        case PassThroughMode::Clang:        return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang)); 
+        case PassThroughMode::VisualStudio: return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
+        case PassThroughMode::Gcc:          return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+        default: break;
+    }
+    return nullptr;
+}
+
+CPPCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
+{
+    return getCPPCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
 struct IncludeHandlerImpl : IncludeHandler

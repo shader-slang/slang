@@ -116,9 +116,10 @@ DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module co
 DIAGNOSTIC(    85, Error, unableToAddReferenceToModuleContainer, "unable to add a reference to a module container");
 DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create module container");
 
+DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'");
 
 //
-// 1xxxx - Lexical anaylsis
+// 1xxxx - Lexical analysis
 //
 
 DIAGNOSTIC(10000, Error, illegalCharacterPrint, "illegal character '$0'");
@@ -497,7 +498,7 @@ DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to re
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.");
 
 DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "Could not find a suitable pass-through compiler for '$0'.");
-DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler.");
+DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler for '$0'.");
 
 DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'");
 DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'");
