@@ -11,9 +11,21 @@
 namespace Slang {
 
 /* Holds a unique set of slices.
-NOTE: that all slices are stored with terminating zeros.
-*/
 
+Note that all slices (except kNullHandle) are stored with terminating zeros.
+
+The default handles kNullHandle, kEmptyHandle can only be used on a StringSlicePool
+initialized with the Style::Default. Not doing so will return an undefined result.
+
+TODO(JS): 
+An argument could be made to make different classes, perhaps deriving from a base class
+that exhibited the two behaviors. That doing so would make the default handles defined
+for that class for example.
+
+This is a little awkward in practice, because behavior of some methods need to change
+(like adding a c string with nullptr, or clearing, as well as some other perhaps less necessary
+optimizations). This could be achieved via virtual functions, but this all seems overkill. 
+*/
 class StringSlicePool
 {
 public:
@@ -23,14 +35,17 @@ public:
     enum class Style
     {
         Default,            ///< Default style - has default handles (like kNullHandle and kEmptyHandle)
-        Empty,              ///< Empty style - has no handles by default
+        Empty,              ///< Empty style - has no handles by default. Using default handles will likely produce the wrong result. 
     };
 
-    /// Handle of 0 is null. If accessed will be returned as the empty string
     enum class Handle : HandleIntegral;
     typedef UnownedStringSlice Slice;
 
+        /// The following default handles *only* apply if constructed with the Style::Default
+
+        /// Handle of 0 is null. If accessed will be returned as the empty string with nullptr the chars
     static const Handle kNullHandle = Handle(0);
+        /// Handle of 1 is the empty string. 
     static const Handle kEmptyHandle = Handle(1);
 
     static const Index kDefaultHandlesCount = 2;
@@ -70,11 +85,14 @@ public:
         /// Get the style of the pool
     Style getStyle() const { return m_style; }
 
-        /// Get all the added slices
+        /// Get all the added slices (does not have default slices, if there are any)
     ConstArrayView<UnownedStringSlice> getAdded() const; 
 
+        /// Get the index of the first added handle
+    Index getFirstAddedIndex() const { return m_style == Style::Default ? kDefaultHandlesCount : 0; }
+
         /// Ctor
-    StringSlicePool(Style style);
+    explicit StringSlicePool(Style style);
 
 protected:
     // Disable copy ctor and assignment
