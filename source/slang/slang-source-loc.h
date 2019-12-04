@@ -376,7 +376,8 @@ struct SourceManager
     const List<SourceFile*>& getSourceFiles() const { return m_sourceFiles; }
 
     SourceManager() :
-        m_memoryArena(2048)
+        m_memoryArena(2048),
+        m_slicePool(StringSlicePool::Style::Default)
     {}
     ~SourceManager();
 

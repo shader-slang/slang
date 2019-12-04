@@ -1504,7 +1504,8 @@ SLANG_API SlangUInt spReflection_getHashedStringCount(
     SlangReflection*  reflection)
 {
     auto programLayout = convert(reflection);
-    return programLayout->hashedStringLiteralPool.getNumSlices() - StringSlicePool::kNumDefaultHandles;
+    auto slices = programLayout->hashedStringLiteralPool.getAdded();
+    return slices.getCount();
 }
 
 SLANG_API const char* spReflection_getHashedString(
@@ -1513,12 +1514,15 @@ SLANG_API const char* spReflection_getHashedString(
     size_t* outCount)
 {
     auto programLayout = convert(reflection);
-    UnownedStringSlice slice = programLayout->hashedStringLiteralPool.getSlice(StringSlicePool::Handle(index + StringSlicePool::kNumDefaultHandles));
+
+    auto slices = programLayout->hashedStringLiteralPool.getAdded();
+    auto slice = slices[Index(index)];
+
     *outCount = slice.size();
     return slice.begin();
 }
 
-SLANG_API int spCalcStringHash(const char* chars, size_t count)
+SLANG_API int spComputeStringHash(const char* chars, size_t count)
 {
     UnownedStringSlice slice(chars, count);
     return GetHashCode(slice);

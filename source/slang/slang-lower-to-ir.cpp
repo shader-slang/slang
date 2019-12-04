@@ -783,13 +783,10 @@ LoweredValInfo emitCallToDeclRef(
                 case kIROp_GetStringHash:
                 {
                     IRStringLit* stringLit = as<IRStringLit>(args[0]);
-
-                    if (stringLit == nullptr || stringLit->getStringSlice() == UnownedStringSlice())
+                    if (stringLit == nullptr)
                     {
                         auto sink = context->getSink();
-
                         sink->diagnose(funcDecl, Diagnostics::getStringHashRequiresStringLiteral);
-
                         return LoweredValInfo();
                     }
 
