@@ -1393,7 +1393,7 @@ LinkedIR linkIR(
 
     // Combine all of the contents of IRGlobalHashedStringLiterals
     {
-        StringSlicePool pool;
+        StringSlicePool pool(StringSlicePool::Style::Empty);
         IRBuilder& builder = sharedContext->builderStorage;
         for (IRModule* irModule : irModules)
         {

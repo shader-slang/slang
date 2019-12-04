@@ -5,6 +5,7 @@
 #include "../core/slang-object-scope-manager.h"
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-array-view.h"
 
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -59,7 +60,7 @@ struct SerialStringTableUtil
 {
         /// Convert a pool into a string table
     static void encodeStringTable(const StringSlicePool& pool, List<char>& stringTable);
-    static void encodeStringTable(const UnownedStringSlice* slices, size_t numSlices, List<char>& stringTable);
+    static void encodeStringTable(const ConstArrayView<UnownedStringSlice>& slices, List<char>& stringTable);
         /// Appends the decoded strings into slicesOut
     static void appendDecodedStringTable(const List<char>& stringTable, List<UnownedStringSlice>& slicesOut);
         /// Decodes a string table (and does so such that the indices are compatible with StringSlicePool)
