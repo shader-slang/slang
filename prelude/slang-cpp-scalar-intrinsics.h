@@ -41,8 +41,8 @@ SLANG_FORCE_INLINE float F32_calcSafeRadians(float radians)
 // Unary 
 SLANG_FORCE_INLINE float F32_ceil(float f) { return ::ceilf(f); }
 SLANG_FORCE_INLINE float F32_floor(float f) { return ::floorf(f); }
-SLANG_FORCE_INLINE float F32_sin(float f) { return ::sinf(F32_calcSafeRadians(f)); }
-SLANG_FORCE_INLINE float F32_cos(float f) { return ::cosf(F32_calcSafeRadians(f)); }
+SLANG_FORCE_INLINE float F32_sin(float f) { return ::sinf(f); }
+SLANG_FORCE_INLINE float F32_cos(float f) { return ::cosf(f); }
 SLANG_FORCE_INLINE float F32_tan(float f) { return ::tanf(f); }
 SLANG_FORCE_INLINE float F32_asin(float f) { return ::asinf(f); }
 SLANG_FORCE_INLINE float F32_acos(float f) { return ::acosf(f); }
@@ -93,8 +93,8 @@ SLANG_FORCE_INLINE double F64_calcSafeRadians(double radians)
 // Unary 
 SLANG_FORCE_INLINE double F64_ceil(double f) { return ::ceil(f); }
 SLANG_FORCE_INLINE double F64_floor(double f) { return ::floor(f); }
-SLANG_FORCE_INLINE double F64_sin(double f) { return ::sin(F64_calcSafeRadians(f)); }
-SLANG_FORCE_INLINE double F64_cos(double f) { return ::cos(F64_calcSafeRadians(f)); }
+SLANG_FORCE_INLINE double F64_sin(double f) { return ::sin(f); }
+SLANG_FORCE_INLINE double F64_cos(double f) { return ::cos(f); }
 SLANG_FORCE_INLINE double F64_tan(double f) { return ::tan(f); }
 SLANG_FORCE_INLINE double F64_asin(double f) { return ::asin(f); }
 SLANG_FORCE_INLINE double F64_acos(double f) { return ::acos(f); }
