@@ -4,6 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
+#include "slang-ir-string-hash.h"
 
 namespace Slang
 {
@@ -1374,6 +1375,7 @@ LinkedIR linkIR(
     });
     irModules.addRange(linkage->m_libModules.getBuffer()->readRef(), linkage->m_libModules.getCount());
 
+    
     // Add any modules that were loaded as libraries
     for (IRModule* irModule : irModules)
     {
@@ -1387,8 +1389,21 @@ LinkedIR linkIR(
     //
     insertGlobalValueSymbols(sharedContext, targetProgram->getExistingIRModuleForLayout());
 
-
     auto context = state->getContext();
+
+    // Combine all of the contents of IRGlobalHashedStringLiterals
+    {
+        StringSlicePool pool(StringSlicePool::Style::Empty);
+        IRBuilder& builder = sharedContext->builderStorage;
+        for (IRModule* irModule : irModules)
+        {
+            findGlobalHashedStringLiterals(irModule, pool);
+        }
+        addGlobalHashedStringLiterals(pool, *builder.sharedBuilder);
+    }
+
+    // Set up shared and builder insert point
+
     context->shared = sharedContext;
     context->builder = &sharedContext->builderStorage;
 

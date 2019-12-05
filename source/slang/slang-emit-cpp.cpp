@@ -1785,7 +1785,8 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
 /* !!!!!!!!!!!!!!!!!!!!!! CPPSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
-    Super(desc)
+    Super(desc),
+    m_slicePool(StringSlicePool::Style::Default)
 {
     m_semanticUsedFlags = 0;
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;

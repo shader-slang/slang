@@ -6,12 +6,10 @@
 
 namespace Slang
 {
-	template<typename T, int COUNT>
+    /* An array container with fixed maximum size defined by COUNT. */
+	template<typename T, Index COUNT>
 	class Array
 	{
-	private:
-		T m_buffer[COUNT];
-		int m_count = 0;
 	public:
         T* begin() { return m_buffer; }
         const T* begin() const { return m_buffer; }
@@ -19,9 +17,8 @@ namespace Slang
         const T* end() const { return m_buffer + m_count; }
         T* end() { return m_buffer + m_count; }
 
-	public:
-		inline int getCapacity() const { return COUNT; }
-		inline int getCount() const { return m_count; }
+		inline Index getCapacity() const { return COUNT; }
+		inline Index getCount() const { return m_count; }
 		inline const T& getFirst() const
 		{
             SLANG_ASSERT(m_count > 0);
@@ -42,28 +39,28 @@ namespace Slang
             SLANG_ASSERT(m_count > 0);
             return m_buffer[m_count - 1];
         }
-		inline void setCount(int newCount)
+		inline void setCount(Index newCount)
 		{
             SLANG_ASSERT(newCount >= 0 && newCount <= COUNT);
 			m_count = newCount;
 		}
-		inline void add(const T & item)
+		inline void add(const T& item)
 		{
             SLANG_ASSERT(m_count < COUNT);
 			m_buffer[m_count++] = item;
 		}
-		inline void add(T && item)
+		inline void add(T&& item)
 		{
             SLANG_ASSERT(m_count < COUNT);
 			m_buffer[m_count++] = _Move(item);
 		}
 
-		inline const T& operator [](int idx) const
+		inline const T& operator [](Index idx) const
 		{
             SLANG_ASSERT(idx >= 0 && idx < m_count);
 			return m_buffer[idx];
 		}
-        inline T& operator [](int idx)
+        inline T& operator [](Index idx)
         {
             SLANG_ASSERT(idx >= 0 && idx < m_count);
             return m_buffer[idx];
@@ -75,35 +72,33 @@ namespace Slang
 		inline void clear() { m_count = 0; }
 
 		template<typename T2>
-		int indexOf(const T2& val) const
-		{
-			for (int i = 0; i < m_count; i++)
-			{
-				if (m_buffer[i] == val)
-					return i;
-			}
-			return -1;
-		}
-
+		Index indexOf(const T2& val) const { return getView().indexOf(val);	}
 		template<typename T2>
-		int lastIndexOf(const T2& val) const
+		Index lastIndexOf(const T2& val) const { return getView().lastIndexOf(val); }
+        template<typename Func>
+        Index findFirstIndex(const Func& predicate) const { return getView().findFirstIndex(predicate); }
+        template<typename Func>
+        Index findLastIndex(const Func& predicate) const { return getView().findLastIndex(predicate); }
+
+		inline ConstArrayView<T> getView() const { return ConstArrayView<T>(m_buffer, m_count); }
+		inline ConstArrayView<T> getView(Index start, Index count) const
 		{
-			for (int i = m_count - 1; i >= 0; i--)
-			{
-				if (m_buffer[i] == val)
-					return i;
-			}
-			return -1;
+            SLANG_ASSERT(start >= 0 && count >= 0);
+            SLANG_ASSERT(start <= m_count && start + count < m_count);
+			return ConstArrayView<T>(m_buffer + start, count);
 		}
 
-		inline ArrayView<T> getArrayView() const
-		{
-			return ArrayView<T>((T*)m_buffer, m_count);
-		}
-		inline ArrayView<T> getArrayView(int start, int count) const
-		{
-			return ArrayView<T>((T*)m_buffer + start, count);
-		}
+        inline ArrayView<T> getView() { return ArrayView<T>(m_buffer, m_count); }
+        inline ArrayView<T> getView(Index start, Index count) 
+        {
+            SLANG_ASSERT(start >= 0 && count >= 0);
+            SLANG_ASSERT(start <= m_count && start + count < m_count);
+            return ArrayView<T>(m_buffer + start, count);
+        }
+
+    private:
+        T m_buffer[COUNT];
+        Index m_count = 0;
 	};
 
 	template<typename T, typename ...TArgs>
@@ -113,10 +108,10 @@ namespace Slang
 	};
 
 
-	template<typename T, int SIZE>
+	template<typename T, Index SIZE>
 	void insertArray(Array<T, SIZE>&) {}
 
-	template<typename T, typename ...TArgs, int SIZE>
+	template<typename T, typename ...TArgs, Index SIZE>
 	void insertArray(Array<T, SIZE>& arr, const T& val, TArgs... args)
 	{
 		arr.add(val);
@@ -126,7 +121,7 @@ namespace Slang
 	template<typename ...TArgs>
 	auto makeArray(TArgs ...args) -> Array<typename FirstType<TArgs...>::Type, sizeof...(args)>
 	{
-		Array<typename FirstType<TArgs...>::Type, sizeof...(args)> rs;
+		Array<typename FirstType<TArgs...>::Type, Index(sizeof...(args))> rs;
 		insertArray(rs, args...);
 		return rs;
 	}

@@ -1335,50 +1335,34 @@ SlangResult dissassembleDXILUsingDXC(
     {
         auto sink = slangRequest->getSink();
 
+        auto session = slangRequest->getSession();
+
         const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
         outBin.clear();
         outSharedLib.setNull();
       
-        CPPCompilerSet* compilerSet = slangRequest->getSession()->requireCPPCompilerSet();
+        PassThroughMode downstreamCompiler = endToEndReq->passThrough;
 
-        // Determine compiler to use
-        CPPCompiler* compiler = nullptr;
-        switch (endToEndReq->passThrough)
+        // If we are not in pass through, lookup the default compiler for the emitted source type
+        if (downstreamCompiler == PassThroughMode::None)
         {
-            case PassThroughMode::None:
-            case PassThroughMode::GenericCCpp:
-            {
-                // If there is no pass through... still need a compiler
-                compiler = compilerSet->getDefaultCompiler();
-                break;
-            }
-            case PassThroughMode::Clang:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang));
-                break;
-            }
-            case PassThroughMode::VisualStudio:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
-                break;
-            }
-            case PassThroughMode::Gcc:
-            {
-                compiler = CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
-                break;
-            }
+            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
         }
+        
+        // Get the required downstream CPP compiler
+        CPPCompiler* compiler = session->getCPPCompiler(downstreamCompiler);
 
         if (!compiler)
         {
-            if (endToEndReq->passThrough != PassThroughMode::None)
+            auto compilerName = _getPassThroughAsText(downstreamCompiler);
+            if (downstreamCompiler != PassThroughMode::None)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, _getPassThroughAsText(endToEndReq->passThrough));
+                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
             }
             else
             {
-                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound);
+                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound, compilerName);
             }
             return SLANG_FAIL;
         }
@@ -2590,7 +2574,7 @@ SlangResult dissassembleDXILUsingDXC(
     //
 
     void dumpIntermediate(
-        BackEndCompileRequest*,
+        BackEndCompileRequest* request,
         void const*     data,
         size_t          size,
         char const*     ext,
@@ -2612,7 +2596,7 @@ SlangResult dissassembleDXILUsingDXC(
 #endif
 
         String path;
-        path.append("slang-dump-");
+        path.append(request->m_dumpIntermediatePrefix);
         path.append(id);
         path.append(ext);
 

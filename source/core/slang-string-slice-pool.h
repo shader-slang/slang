@@ -6,24 +6,52 @@
 #include "slang-list.h"
 #include "slang-memory-arena.h"
 #include "slang-dictionary.h"
+#include "slang-array-view.h"
 
 namespace Slang {
 
+/* Holds a unique set of slices.
+
+Note that all slices (except kNullHandle) are stored with terminating zeros.
+
+The default handles kNullHandle, kEmptyHandle can only be used on a StringSlicePool
+initialized with the Style::Default. Not doing so will return an undefined result.
+
+TODO(JS): 
+An argument could be made to make different classes, perhaps deriving from a base class
+that exhibited the two behaviors. That doing so would make the default handles defined
+for that class for example.
+
+This is a little awkward in practice, because behavior of some methods need to change
+(like adding a c string with nullptr, or clearing, as well as some other perhaps less necessary
+optimizations). This could be achieved via virtual functions, but this all seems overkill. 
+*/
 class StringSlicePool
 {
 public:
+    typedef StringSlicePool ThisType;
+    typedef uint32_t HandleIntegral;
 
-    /// Handle of 0 is null. If accessed will be returned as the empty string
-    enum class Handle : uint32_t;
+    enum class Style
+    {
+        Default,            ///< Default style - has default handles (like kNullHandle and kEmptyHandle)
+        Empty,              ///< Empty style - has no handles by default. Using default handles will likely produce the wrong result. 
+    };
+
+    enum class Handle : HandleIntegral;
     typedef UnownedStringSlice Slice;
 
+        /// The following default handles *only* apply if constructed with the Style::Default
+
+        /// Handle of 0 is null. If accessed will be returned as the empty string with nullptr the chars
     static const Handle kNullHandle = Handle(0);
+        /// Handle of 1 is the empty string. 
     static const Handle kEmptyHandle = Handle(1);
 
-    static const int kNumDefaultHandles = 2;
+    static const Index kDefaultHandlesCount = 2;
 
         /// Returns the index of a slice, if contained, or -1 if not found
-    int findIndex(const Slice& slice) const;
+    Index findIndex(const Slice& slice) const;
 
         /// True if has the slice
     bool has(const Slice& slice) { return findIndex(slice) >= 0; }
@@ -46,17 +74,32 @@ public:
     const List<UnownedStringSlice>& getSlices() const { return m_slices; }
 
         /// Get the number of slices
-    int getNumSlices() const { return int(m_slices.getCount()); }
+    Index getSlicesCount() const { return m_slices.getCount(); }
+
+        /// Returns true if the handle is a default one. Only meaningful on a Style::Default.
+    bool isDefaultHandle(Handle handle) const { SLANG_ASSERT(m_style == Style::Default && Index(handle) >= 0); return Index(handle) < kDefaultHandlesCount; }
 
         /// Convert a handle to and index. (A handle is just an index!) 
-    static int asIndex(Handle handle) { return int(handle); }
-        /// Returns true if the handle is to a slice that contains characters (ie not null or empty)
-    static bool hasContents(Handle handle) { return int(handle) >= kNumDefaultHandles; }
+    static Index asIndex(Handle handle) { return Index(handle); }
+    
+        /// Get the style of the pool
+    Style getStyle() const { return m_style; }
+
+        /// Get all the added slices (does not have default slices, if there are any)
+    ConstArrayView<UnownedStringSlice> getAdded() const; 
+
+        /// Get the index of the first added handle
+    Index getFirstAddedIndex() const { return m_style == Style::Default ? kDefaultHandlesCount : 0; }
 
         /// Ctor
-    StringSlicePool();
+    explicit StringSlicePool(Style style);
 
 protected:
+    // Disable copy ctor and assignment
+    StringSlicePool(const ThisType& rhs) = delete;
+    void operator=(const ThisType& rhs) = delete;
+
+    Style m_style;
     List<UnownedStringSlice> m_slices;
     Dictionary<UnownedStringSlice, Handle> m_map;
     MemoryArena m_arena;

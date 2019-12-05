@@ -56,7 +56,9 @@ struct IRSerialWriter
     StringSlicePool& getDebugStringPool() { return m_debugStringSlicePool; }
 
     IRSerialWriter() :
-        m_serialData(nullptr)
+        m_serialData(nullptr),
+        m_stringSlicePool(StringSlicePool::Style::Default),
+        m_debugStringSlicePool(StringSlicePool::Style::Default)
     {}
 
 protected:

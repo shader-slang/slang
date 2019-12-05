@@ -33,6 +33,15 @@ static void writeRawChar(PrettyWriter& writer, int c)
     writeRaw(writer, buffer, buffer + 1);
 }
 
+
+static void writeHexChar(PrettyWriter& writer, int c)
+{
+    char v = char(c) + (c < 10 ? '0' : ('a' - 10)); 
+
+    char buffer[] = { v, 0 };
+    writeRaw(writer, buffer, buffer + 1);
+}
+
 static void adjust(PrettyWriter& writer)
 {
     if (!writer.startOfLine)
@@ -75,6 +84,43 @@ static void write(PrettyWriter& writer, char const* text, size_t length = 0)
 
         writeRawChar(writer, c);
     }
+}
+
+static void writeEscapedString(PrettyWriter& writer, char const* text, size_t length)
+{
+    adjust(writer);
+
+    writeRawChar(writer, '"');
+
+    for (size_t i = 0; i < length; ++i)
+    {
+        const char c = text[i];
+        switch (c)
+        {
+            case '\n': write(writer, "\\n"); break;
+            case '\t': write(writer, "\\t"); break;
+            case '\b': write(writer, "\\b"); break;
+            case '\f': write(writer, "\\f"); break;
+            case '\0': write(writer, "\\0"); break;
+            case '"': write(writer, "\\\""); break;
+            default:
+            {
+                if (c < ' ' || int(c) >= 128)
+                {
+                    // Not strictly right - as we should decode as a unicode code point and write that.
+                    write(writer, "\\u00");
+                    writeHexChar(writer, (c >> 4) & 0xf);
+                    writeHexChar(writer, c & 0xf);
+                }
+                else
+                {
+                    writeRawChar(writer, c);
+                }
+            }
+        }
+    }
+
+    writeRawChar(writer, '"');
 }
 
 static void write(PrettyWriter& writer, uint64_t val)
@@ -1011,6 +1057,36 @@ static void emitReflectionJSON(
         dedent(writer);
         write(writer, "\n]");
     }
+
+    {
+        SlangUInt count = programReflection->getHashedStringCount();
+        if (count)
+        {
+            write(writer, ",\n\"hashedStrings\": {\n");
+            indent(writer);
+
+            for (SlangUInt i = 0; i < count; ++i)
+            {
+                if (i)
+                {
+                    write(writer, ",\n");
+                }
+
+                size_t charsCount;
+                const char* chars = programReflection->getHashedString(i, &charsCount);
+                const int hash = spComputeStringHash(chars, charsCount);
+
+                writeEscapedString(writer, chars, charsCount);
+                write(writer, ": ");
+
+                write(writer, hash);
+            }
+
+            dedent(writer);
+            write(writer, "\n}\n");
+        }
+    }
+
     dedent(writer);
     write(writer, "\n}\n");
 }

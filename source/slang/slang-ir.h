@@ -695,7 +695,6 @@ struct IRBoolLit : IRConstant
     IR_LEAF_ISA(BoolLit);
 };
 
-
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
 IRIntegerValue GetIntVal(IRInst* inst);
@@ -1065,6 +1064,18 @@ SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+struct IRGlobalHashedStringLiterals : IRInst
+{
+    IR_LEAF_ISA(GlobalHashedStringLiterals)
+};
+
+struct IRGetStringHash : IRInst
+{
+    IR_LEAF_ISA(GetStringHash)
+
+    IRStringLit* getStringLit() { return as<IRStringLit>(getOperand(0)); }
+};
 
     /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
     ///

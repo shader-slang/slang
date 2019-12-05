@@ -615,6 +615,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_GLSL,
         SLANG_SOURCE_LANGUAGE_C,
         SLANG_SOURCE_LANGUAGE_CPP,
+        SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
     typedef unsigned int SlangProfileID;
@@ -1196,6 +1197,10 @@ extern "C"
     SLANG_API void spSetDumpIntermediates(
         SlangCompileRequest*    request,
         int                     enable);
+
+    SLANG_API void spSetDumpIntermediatePrefix(
+        SlangCompileRequest*    request,
+        const char* prefix);
 
     /*!
     @brief Set whether (and how) `#line` directives should be output.
@@ -2098,6 +2103,21 @@ extern "C"
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
 
+        /// Get the number of hashed strings
+    SLANG_API SlangUInt spReflection_getHashedStringCount(
+        SlangReflection*  reflection);
+
+        /// Get a hashed string. The number of chars is written in outCount.
+        /// The count does *NOT* including terminating 0. The returned string will be 0 terminated. 
+    SLANG_API const char* spReflection_getHashedString(
+        SlangReflection*  reflection,
+        SlangUInt index,
+        size_t* outCount);
+
+        /// Compute a string hash.
+        /// Count should *NOT* include terminating zero.
+    SLANG_API int spComputeStringHash(const char* chars, size_t count);
+
 #ifdef __cplusplus
 }
 
@@ -2735,6 +2755,13 @@ namespace slang
                 (SlangReflectionType* const*) specializationArgs,
                 outDiagnostics);
         }
+
+        SlangUInt getHashedStringCount() const { return spReflection_getHashedStringCount((SlangReflection*)this); }
+
+        const char* getHashedString(SlangUInt index, size_t* outCount) const
+        {
+            return spReflection_getHashedString((SlangReflection*)this, index, outCount);
+        }
     };
 
     typedef ISlangBlob IBlob;
@@ -2814,6 +2841,25 @@ namespace slang
             @return The build tag string
             */
         virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() = 0;
+
+            /* For a given source language set the default compiler.
+            If a default cannot be chosen (for example the target cannot be achieved by the default),
+            the default will not be used. 
+
+            @param sourceLanguage the source language 
+            @param defaultCompiler the default compiler for that language
+            @return 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(
+            SlangSourceLanguage sourceLanguage,
+            SlangPassThrough defaultCompiler) = 0;
+
+            /* For a source type get the default compiler 
+
+            @param sourceLanguage the source language 
+            @return The downstream compiler for that source language */
+        virtual SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(
+            SlangSourceLanguage sourceLanguage) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

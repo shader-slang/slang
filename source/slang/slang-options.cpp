@@ -65,6 +65,31 @@ static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassTh
     return SLANG_FAIL;
 }
 
+static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
+{
+    if (text == "c" || text == "C")
+    {
+        return SLANG_SOURCE_LANGUAGE_C;
+    }
+    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
+    {
+        return SLANG_SOURCE_LANGUAGE_CPP;
+    }
+    else if (text == "slang")
+    {
+        return SLANG_SOURCE_LANGUAGE_SLANG;
+    }
+    else if (text == "glsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_GLSL;
+    }
+    else if (text == "hlsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_HLSL;
+    }
+    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+}
+
 UnownedStringSlice getPassThroughName(SlangPassThrough passThru)
 {
 #define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
@@ -487,6 +512,8 @@ struct OptionsParser
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
+        bool hasLoadedRepro = false;
+
         char const* const* argCursor = &argv[0];
         char const* const* argEnd = &argv[argc];
         while (argCursor != argEnd)
@@ -507,6 +534,12 @@ struct OptionsParser
                 else if (argStr == "-dump-intermediates")
                 {
                     spSetDumpIntermediates(compileRequest, true);
+                }
+                else if (argStr == "-dump-intermediate-prefix")
+                {
+                    String prefix;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, prefix));
+                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix;
                 }
                 else if(argStr == "-dump-ir" )
                 {
@@ -562,13 +595,7 @@ struct OptionsParser
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
 
-                    if (argCursor < argEnd)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::parametersAfterLoadReproIgnored);
-                        return SLANG_FAIL;
-                    }
-
-                    return SLANG_OK;
+                    hasLoadedRepro = true;
                 }
                 else if (argStr == "-repro-file-system")
                 {
@@ -962,6 +989,33 @@ struct OptionsParser
                 {
                     requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
                 }
+                else if (argStr == "-default-downstream-compiler")
+                {
+                    String sourceLanguageText;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, sourceLanguageText));
+                    String compilerText;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
+
+                    SlangSourceLanguage sourceLanguage = _findSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
+                        return SLANG_FAIL;
+                    }
+
+                    SlangPassThrough compiler;
+                    if (SLANG_FAILED(_parsePassThrough(compilerText.getUnownedSlice(), compiler)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
+                        return SLANG_FAIL;
+                    }
+
+                    if (SLANG_FAILED(session->setDefaultDownstreamCompiler(sourceLanguage, compiler)))
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unableToSetDefaultDownstreamCompiler, compilerText, sourceLanguageText, compilerText);
+                        return SLANG_FAIL;
+                    }
+                }       
                 else if (argStr == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
@@ -1001,6 +1055,15 @@ struct OptionsParser
             {
                 SLANG_RETURN_ON_FAIL(addInputPath(arg));
             }
+        }
+
+        // TODO(JS): This is a restriction because of how setting of state works for load repro
+        // If a repro has been loaded, then many of the following options will overwrite
+        // what was set up. So for now they are ignored, and only parameters set as part
+        // of the loop work if they are after -load-repro
+        if (hasLoadedRepro)
+        {
+            return SLANG_OK;
         }
 
         spSetCompileFlags(compileRequest, flags);

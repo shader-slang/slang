@@ -1622,6 +1622,8 @@ namespace Slang
             /// Should SPIR-V be generated directly from Slang IR rather than via translation to GLSL?
         bool shouldEmitSPIRVDirectly = false;
 
+        String m_dumpIntermediatePrefix;
+
     private:
         RefPtr<ComponentType> m_program;
     };
@@ -1829,6 +1831,15 @@ namespace Slang
 
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler) override;
+
+        SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
+
+            /// Get the specified compiler
+        CPPCompiler* getCPPCompiler(PassThroughMode downstreamCompiler);
+            /// Get the default cpp compiler for a language
+        CPPCompiler* getDefaultCPPCompiler(SourceLanguage sourceLanguage);
+
         enum class SharedLibraryFuncType
         {
             Glslang_Compile,
@@ -1984,6 +1995,7 @@ namespace Slang
 
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];              ///< Paths for each pass through
         String m_downstreamCompilerPreludes[int(PassThroughMode::CountOf)];             ///< Prelude for each type of target
+        PassThroughMode m_defaultDownstreamCompilers[int(SourceLanguage::CountOf)];
     };
 
 struct IncludeHandlerImpl : IncludeHandler

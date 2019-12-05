@@ -169,7 +169,7 @@ INST(InterfaceType, interface, 0, PARENT)
 INST_RANGE(Type, VoidType, InterfaceType)
 
 /*IRGlobalValueWithCode*/
-    /* IRGlobalValueWIthParams*/
+    /* IRGlobalValueWithParams*/
         INST(Func, func, 0, PARENT)
         INST(Generic, generic, 0, PARENT)
     INST_RANGE(GlobalValueWithParams, Func, Generic)
@@ -183,6 +183,8 @@ INST(GlobalConstant, globalConstant, 0, 0)
 INST(StructKey, key, 0, 0)
 INST(GlobalGenericParam, global_generic_param, 0, 0)
 INST(WitnessTable, witness_table, 0, 0)
+
+INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)
 
@@ -368,6 +370,8 @@ INST(BitNot, bitnot, 1, 0)
 INST(Select, select, 3, 0)
 
 INST(Dot, dot, 2, 0)
+
+INST(GetStringHash, getStringHash, 1, 0)
 
 INST(Mul_Vector_Matrix, mulVectorMatrix, 2, 0)
 INST(Mul_Matrix_Vector, mulMatrixVector, 2, 0)

@@ -14,6 +14,8 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-string-hash.h"
+
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -776,6 +778,21 @@ LoweredValInfo emitCallToDeclRef(
         }
         else
         {
+            switch (intrinsicOp)
+            {
+                case kIROp_GetStringHash:
+                {
+                    IRStringLit* stringLit = as<IRStringLit>(args[0]);
+                    if (stringLit == nullptr)
+                    {
+                        auto sink = context->getSink();
+                        sink->diagnose(funcDecl, Diagnostics::getStringHashRequiresStringLiteral);
+                        return LoweredValInfo();
+                    }
+
+                }
+            }
+
             // The intrinsic op maps to a single IR instruction,
             // so we will emit an instruction with the chosen
             // opcode, and the arguments to the call as its operands.
@@ -6737,6 +6754,9 @@ IRModule* generateIRForTranslationUnit(
     // call graph) based on constraints imposed by different instructions.
     propagateConstExpr(module, compileRequest->getSink());
 
+    // Replace calls to getStringHash, and save all the unique string lits in a GlobalHashedStringLiterals inst
+    replaceGetStringHashWithGlobal(module, *sharedBuilder);
+    
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
 
