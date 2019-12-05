@@ -1703,6 +1703,8 @@ namespace Slang
             /// Should SPIR-V be generated directly from Slang IR rather than via translation to GLSL?
         bool shouldEmitSPIRVDirectly = false;
 
+        String m_dumpIntermediatePrefix;
+
     private:
         RefPtr<ComponentType> m_program;
     };

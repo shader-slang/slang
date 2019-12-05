@@ -1265,6 +1265,7 @@ BackEndCompileRequest::BackEndCompileRequest(
     ComponentType*  program)
     : CompileRequestBase(linkage, sink)
     , m_program(program)
+    , m_dumpIntermediatePrefix("slang-dump-")
 {}
 
 EndToEndCompileRequest::EndToEndCompileRequest(
@@ -2878,6 +2879,13 @@ SLANG_API void spSetDumpIntermediates(
     int                     enable)
 {
     Slang::asInternal(request)->getBackEndReq()->shouldDumpIntermediates = enable != 0;
+}
+
+SLANG_API void spSetDumpIntermediatePrefix(
+    SlangCompileRequest*    request,
+    const char* prefix)
+{
+    Slang::asInternal(request)->getBackEndReq()->m_dumpIntermediatePrefix = prefix; 
 }
 
 SLANG_API void spSetLineDirectiveMode(

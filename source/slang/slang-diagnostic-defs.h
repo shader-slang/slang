@@ -109,7 +109,6 @@ DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$
 
 DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple output paths have been specified entry point '$0' on target '$1'")
 
-DIAGNOSTIC(    81, Error, parametersAfterLoadReproIgnored, "parameters after -load-repro [file] are ignored")
 DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'");
 DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'");
 DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module container '%0'");

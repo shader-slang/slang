@@ -2472,7 +2472,7 @@ SlangResult dissassembleDXILUsingDXC(
     //
 
     void dumpIntermediate(
-        BackEndCompileRequest*,
+        BackEndCompileRequest* request,
         void const*     data,
         size_t          size,
         char const*     ext,
@@ -2494,7 +2494,7 @@ SlangResult dissassembleDXILUsingDXC(
 #endif
 
         String path;
-        path.append("slang-dump-");
+        path.append(request->m_dumpIntermediatePrefix);
         path.append(id);
         path.append(ext);
 

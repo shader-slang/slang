@@ -533,6 +533,12 @@ struct OptionsParser
                 {
                     spSetDumpIntermediates(compileRequest, true);
                 }
+                else if (argStr == "-dump-intermediate-prefix")
+                {
+                    String prefix;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, prefix));
+                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix;
+                }
                 else if(argStr == "-dump-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
@@ -586,14 +592,6 @@ struct OptionsParser
                     }
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
-
-                    if (argCursor < argEnd)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::parametersAfterLoadReproIgnored);
-                        return SLANG_FAIL;
-                    }
-
-                    return SLANG_OK;
                 }
                 else if (argStr == "-repro-file-system")
                 {

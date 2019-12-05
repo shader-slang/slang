@@ -1198,6 +1198,10 @@ extern "C"
         SlangCompileRequest*    request,
         int                     enable);
 
+    SLANG_API void spSetDumpIntermediatePrefix(
+        SlangCompileRequest*    request,
+        const char* prefix);
+
     /*!
     @brief Set whether (and how) `#line` directives should be output.
     */
