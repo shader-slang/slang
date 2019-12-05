@@ -512,6 +512,8 @@ struct OptionsParser
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
+        bool hasLoadedRepro = false;
+
         char const* const* argCursor = &argv[0];
         char const* const* argEnd = &argv[argc];
         while (argCursor != argEnd)
@@ -592,6 +594,8 @@ struct OptionsParser
                     }
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
+
+                    hasLoadedRepro = true;
                 }
                 else if (argStr == "-repro-file-system")
                 {
@@ -1051,6 +1055,15 @@ struct OptionsParser
             {
                 SLANG_RETURN_ON_FAIL(addInputPath(arg));
             }
+        }
+
+        // TODO(JS): This is a restriction because of how setting of state works for load repro
+        // If a repro has been loaded, then many of the following options will overwrite
+        // what was set up. So for now they are ignored, and only parameters set as part
+        // of the loop work if they are after -load-repro
+        if (hasLoadedRepro)
+        {
+            return SLANG_OK;
         }
 
         spSetCompileFlags(compileRequest, flags);
