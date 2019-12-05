@@ -512,6 +512,8 @@ struct OptionsParser
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
+        bool hasLoadedRepro = false;
+
         char const* const* argCursor = &argv[0];
         char const* const* argEnd = &argv[argc];
         while (argCursor != argEnd)
@@ -532,6 +534,12 @@ struct OptionsParser
                 else if (argStr == "-dump-intermediates")
                 {
                     spSetDumpIntermediates(compileRequest, true);
+                }
+                else if (argStr == "-dump-intermediate-prefix")
+                {
+                    String prefix;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, prefix));
+                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix;
                 }
                 else if(argStr == "-dump-ir" )
                 {
@@ -587,13 +595,7 @@ struct OptionsParser
 
                     SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
 
-                    if (argCursor < argEnd)
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::parametersAfterLoadReproIgnored);
-                        return SLANG_FAIL;
-                    }
-
-                    return SLANG_OK;
+                    hasLoadedRepro = true;
                 }
                 else if (argStr == "-repro-file-system")
                 {
@@ -1053,6 +1055,15 @@ struct OptionsParser
             {
                 SLANG_RETURN_ON_FAIL(addInputPath(arg));
             }
+        }
+
+        // TODO(JS): This is a restriction because of how setting of state works for load repro
+        // If a repro has been loaded, then many of the following options will overwrite
+        // what was set up. So for now they are ignored, and only parameters set as part
+        // of the loop work if they are after -load-repro
+        if (hasLoadedRepro)
+        {
+            return SLANG_OK;
         }
 
         spSetCompileFlags(compileRequest, flags);
