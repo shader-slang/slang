@@ -106,14 +106,23 @@ namespace Slang {
     int stderrPipe[2];
 
     if (pipe(stdoutPipe) == -1)
+    {
+        fprintf(stderr, "error: `pipe` failed\n");
         return SLANG_FAIL;
+    }
 
     if (pipe(stderrPipe) == -1)
+    {
+        fprintf(stderr, "error: `pipe` failed\n");
         return SLANG_FAIL;
+    }
 
     pid_t childProcessID = fork();
     if (childProcessID == -1)
+    {
+        fprintf(stderr, "error: `fork` failed\n");
         return SLANG_FAIL;
+    }
 
     if (childProcessID == 0)
     {
@@ -178,6 +187,7 @@ namespace Slang {
                     continue;
 
                 // timeout or error...
+                fprintf(stderr, "error: `poll` failed or timed out\n");
                 return SLANG_FAIL;
             }
 
@@ -228,6 +238,7 @@ namespace Slang {
             pid_t terminatedProcessID = waitpid(childProcessID, &childStatus, 0);
             if (terminatedProcessID == -1)
             {
+                fprintf(stderr, "error: `waitpid` failed\n");
                 return SLANG_FAIL;
             }
 
