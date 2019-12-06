@@ -27,10 +27,10 @@
     <ClInclude Include="slang-common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-cpp-compiler.h">
+    <ClInclude Include="slang-dictionary.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-dictionary.h">
+    <ClInclude Include="slang-downstream-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-exception.h">
@@ -134,7 +134,7 @@
     <ClCompile Include="slang-byte-encode-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-cpp-compiler.cpp">
+    <ClCompile Include="slang-downstream-compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-free-list.cpp">

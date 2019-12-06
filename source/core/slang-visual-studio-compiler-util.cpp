@@ -242,9 +242,9 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Diagnostic::Type& outType)
+static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamCompiler::Diagnostic::Type& outType)
 {
-    typedef CPPCompiler::Diagnostic::Type Type;
+    typedef DownstreamCompiler::Diagnostic::Type Type;
 
     if (in == "error" || in == "fatal error")
     {
@@ -265,9 +265,9 @@ static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Di
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::Diagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamCompiler::Diagnostic& outDiagnostic)
 {
-    typedef CPPCompiler::Diagnostic Diagnostic;
+    typedef DownstreamCompiler::Diagnostic Diagnostic;
 
     UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
     if (line.startsWith(linkPrefix))
@@ -389,7 +389,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamCompiler::Output& outOutput)
 {
     outOutput.reset();
 
@@ -402,7 +402,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
         fprintf(stdout, "\n");
 #endif
 
-        CPPCompiler::Diagnostic diagnostic;
+        DownstreamCompiler::Diagnostic diagnostic;
         if (SLANG_SUCCEEDED(_parseVisualStudioLine(line, diagnostic)))
         {
             outOutput.diagnostics.add(diagnostic);
@@ -410,7 +410,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
     }
 
     // if it has a compilation error.. set on output
-    if (outOutput.has(CPPCompiler::Diagnostic::Type::Error))
+    if (outOutput.has(DownstreamCompiler::Diagnostic::Type::Error))
     {
         outOutput.result = SLANG_FAIL;
     }

@@ -19,7 +19,7 @@ using namespace Slang;
 #include "options.h"
 #include "slangc-tool.h"
 
-#include "../../source/core/slang-cpp-compiler.h"
+#include "../../source/core/slang-downstream-compiler.h"
 
 #include "../../source/core/slang-process-util.h"
 
@@ -1257,13 +1257,13 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-static String _calcSummary(const CPPCompiler::Output& inOutput)
+static String _calcSummary(const DownstreamCompiler::Output& inOutput)
 {
-    CPPCompiler::Output output(inOutput);
+    DownstreamCompiler::Output output(inOutput);
 
     // We only want to analyse errors for now
-    output.removeByType(CPPCompiler::Diagnostic::Type::Info);
-    output.removeByType(CPPCompiler::Diagnostic::Type::Warning);
+    output.removeByType(DownstreamCompiler::Diagnostic::Type::Info);
+    output.removeByType(DownstreamCompiler::Diagnostic::Type::Warning);
 
     StringBuilder builder;
 
@@ -1282,7 +1282,7 @@ static String _calcModulePath(const TestInput& input)
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    CPPCompiler* compiler = context->getDefaultCPPCompiler();   
+    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();   
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1324,7 +1324,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
 static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    CPPCompiler* compiler = context->getDefaultCPPCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1352,12 +1352,12 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     File::remove(sharedLibraryPath);
 
     // Set up the compilation options
-    CPPCompiler::CompileOptions options;
+    DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
 
     // Build a shared library
-    options.targetType = CPPCompiler::TargetType::SharedLibrary;
+    options.targetType = DownstreamCompiler::TargetType::SharedLibrary;
 
     // Compile this source
     options.sourceFiles.add(filePath);
@@ -1365,7 +1365,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.includePaths.add(".");
 
-    CPPCompiler::Output output;
+    DownstreamCompiler::Output output;
     if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;
@@ -1440,7 +1440,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    CPPCompiler* compiler = context->getDefaultCPPCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1472,15 +1472,15 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     }
 
     // Set up the compilation options
-    CPPCompiler::CompileOptions options;
+    DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
 
     // Compile this source
     options.sourceFiles.add(filePath);
     options.modulePath = modulePath;
 
-    CPPCompiler::Output output;
+    DownstreamCompiler::Output output;
     if (SLANG_FAILED(compiler->compile(options, output)))
     {
         return TestResult::Fail;

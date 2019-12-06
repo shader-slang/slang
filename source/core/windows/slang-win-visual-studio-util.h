@@ -6,7 +6,7 @@
 
 #include "../slang-process-util.h"
 
-#include "../slang-cpp-compiler.h"
+#include "../slang-downstream-compiler.h"
 
 namespace Slang {
 
@@ -31,7 +31,7 @@ struct WinVisualStudioUtil
     static SlangResult find(Version version, VersionPath& outPath);
 
         /// Find and add to the set (if not already there)
-    static SlangResult find(CPPCompilerSet* set);
+    static SlangResult find(DownstreamCompilerSet* set);
 
         /// Create the cmdLine to start compiler for specified path
     static void calcExecuteCompilerArgs(const VersionPath& versionPath, CommandLine& outCmdLine);
@@ -52,10 +52,10 @@ struct WinVisualStudioUtil
     static void append(Version version, StringBuilder& outBuilder);
 
         /// Get version as desc
-    static CPPCompiler::Desc getDesc(Version version)
+    static DownstreamCompiler::Desc getDesc(Version version)
     {
-        CPPCompiler::Desc desc;
-        desc.type = CPPCompiler::CompilerType::VisualStudio;
+        DownstreamCompiler::Desc desc;
+        desc.type = DownstreamCompiler::CompilerType::VisualStudio;
         desc.majorVersion = Int(version) / 10;
         desc.minorVersion = Int(version) % 10;
         return desc;

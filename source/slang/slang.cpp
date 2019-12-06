@@ -278,21 +278,21 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-CPPCompiler* Session::getCPPCompiler(PassThroughMode compiler)
+DownstreamCompiler* Session::getCPPCompiler(PassThroughMode compiler)
 {
-    CPPCompilerSet* compilerSet = requireCPPCompilerSet();
+    DownstreamCompilerSet* compilerSet = requireCPPCompilerSet();
     switch (compiler)
     {
         case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();
-        case PassThroughMode::Clang:        return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang)); 
-        case PassThroughMode::VisualStudio: return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
-        case PassThroughMode::Gcc:          return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+        case PassThroughMode::Clang:        return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::Clang)); 
+        case PassThroughMode::VisualStudio: return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::VisualStudio));
+        case PassThroughMode::Gcc:          return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::GCC));
         default: break;
     }
     return nullptr;
 }
 
-CPPCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
+DownstreamCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
 {
     return getCPPCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }

@@ -1,5 +1,5 @@
-// slang-cpp-compiler.cpp
-#include "slang-cpp-compiler.h"
+// slang-downstream-compiler.cpp
+#include "slang-downstream-compiler.h"
 
 #include "slang-common.h"
 #include "../../slang-com-helper.h"
@@ -19,9 +19,9 @@
 namespace Slang
 {
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
+void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 {
     out << getCompilerTypeAsText(type);
     out << " ";
@@ -30,9 +30,9 @@ void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
     out << minorVersion;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice CPPCompiler::Diagnostic::getTypeText(Diagnostic::Type type)
+/* static */UnownedStringSlice DownstreamCompiler::Diagnostic::getTypeText(Diagnostic::Type type)
 {
     typedef Diagnostic::Type Type;
     switch (type)
@@ -44,9 +44,9 @@ void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice CPPCompiler::getCompilerTypeAsText(CompilerType type)
+/* static */UnownedStringSlice DownstreamCompiler::getCompilerTypeAsText(CompilerType type)
 {
     switch (type)
     {
@@ -60,9 +60,9 @@ void CPPCompiler::Desc::appendAsText(StringBuilder& out) const
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
 
-Index CPPCompiler::Output::getCountByType(Diagnostic::Type type) const
+Index DownstreamCompiler::Output::getCountByType(Diagnostic::Type type) const
 {
     Index count = 0;
     for (const auto& msg : diagnostics)
@@ -72,7 +72,7 @@ Index CPPCompiler::Output::getCountByType(Diagnostic::Type type) const
     return count;
 }
 
-Int CPPCompiler::Output::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
+Int DownstreamCompiler::Output::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
 {
     Int count = 0;
     ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Type::CountOf));
@@ -87,32 +87,32 @@ Int CPPCompiler::Output::countByStage(Diagnostic::Stage stage, Index counts[Int(
     return count++;
 }
 
-static void _appendCounts(const Index counts[Int(CPPCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(DownstreamCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef CPPCompiler::Diagnostic::Type Type;
+    typedef DownstreamCompiler::Diagnostic::Type Type;
 
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << CPPCompiler::Diagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
+            out << DownstreamCompiler::Diagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
         }
     }
 }
 
-static void _appendSimplified(const Index counts[Int(CPPCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(DownstreamCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef CPPCompiler::Diagnostic::Type Type;
+    typedef DownstreamCompiler::Diagnostic::Type Type;
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << CPPCompiler::Diagnostic::getTypeText(Type(i)) << " ";
+            out << DownstreamCompiler::Diagnostic::getTypeText(Type(i)) << " ";
         }
     }
 }
 
-void CPPCompiler::Output::appendSummary(StringBuilder& out) const
+void DownstreamCompiler::Output::appendSummary(StringBuilder& out) const
 {
     Index counts[Int(Diagnostic::Type::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
@@ -129,7 +129,7 @@ void CPPCompiler::Output::appendSummary(StringBuilder& out) const
     }
 }
 
-void CPPCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
+void DownstreamCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
 {
     Index counts[Int(Diagnostic::Type::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
@@ -146,7 +146,7 @@ void CPPCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
     }
 }
 
-void CPPCompiler::Output::removeByType(Diagnostic::Type type)
+void DownstreamCompiler::Output::removeByType(Diagnostic::Type type)
 {
     Index count = diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
@@ -160,9 +160,9 @@ void CPPCompiler::Output::removeByType(Diagnostic::Type type)
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineCPPCompiler !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Output& outOutput)
+SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options, Output& outOutput)
 {
     outOutput.reset();
 
@@ -193,51 +193,53 @@ SlangResult CommandLineCPPCompiler::compile(const CompileOptions& options, Outpu
     return parseOutput(exeRes, outOutput);
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
-static CPPCompiler::Desc _calcCompiledWithDesc()
+static DownstreamCompiler::Desc _calcCompiledWithDesc()
 {
-    CPPCompiler::Desc desc = {};
+    DownstreamCompiler::Desc desc = {};
 
 #if SLANG_VC
     desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
 #elif SLANG_CLANG
-    desc.type = CPPCompiler::CompilerType::Clang;
+    desc.type = DownstreamCompiler::CompilerType::Clang;
     desc.majorVersion = Int(__clang_major__);
     desc.minorVersion = Int(__clang_minor__);
 #elif SLANG_SNC
-    desc.type = CPPCompiler::CompilerType::SNC;
+    desc.type = DownstreamCompiler::CompilerType::SNC;
 #elif SLANG_GHS
-    desc.type = CPPCompiler::CompilerType::GHS;
+    desc.type = DownstreamCompiler::CompilerType::GHS;
 #elif SLANG_GCC
-    desc.type = CPPCompiler::CompilerType::GCC;
+    desc.type = DownstreamCompiler::CompilerType::GCC;
     desc.majorVersion = Int(__GNUC__);
     desc.minorVersion = Int(__GNUC_MINOR__);
 #else
-    desc.type = CPPCompiler::CompilerType::Unknown;
+    desc.type = DownstreamCompiler::CompilerType::Unknown;
 #endif
 
     return desc;
 }
 
-const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
+/* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/
+
+const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
 {
-    static CPPCompiler::Desc s_desc = _calcCompiledWithDesc();
+    static DownstreamCompiler::Desc s_desc = _calcCompiledWithDesc();
     return s_desc;
 }
 
-/* static */CPPCompiler* CPPCompilerUtil::findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc)
 {
-    List<CPPCompiler*> compilers;
+    List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);
     return findCompiler(compilers, matchType, desc);
 }
 
-/* static */CPPCompiler* CPPCompilerUtil::findCompiler(const List<CPPCompiler*>& compilers, MatchType matchType, const CPPCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc)
 {
     Int bestIndex = -1;
 
-    const CPPCompiler::CompilerType type = desc.type;
+    const DownstreamCompiler::CompilerType type = desc.type;
 
     Int maxVersionValue = 0;
     Int minVersionDiff = 0x7fffffff;
@@ -246,7 +248,7 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
 
     for (Index i = 0; i < compilers.getCount(); ++i)
     {
-        CPPCompiler* compiler = compilers[i];
+        DownstreamCompiler* compiler = compilers[i];
         auto compilerDesc = compiler->getDesc();
 
         if (type == compilerDesc.type)
@@ -291,9 +293,9 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-/* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const List<CPPCompiler*>& compilers, const CPPCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc)
 {
-    CPPCompiler* compiler;
+    DownstreamCompiler* compiler;
 
     compiler = findCompiler(compilers, MatchType::MinGreaterEqual, desc);
     if (compiler)
@@ -307,10 +309,10 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     }
 
     // If we are gcc, we can try clang and vice versa
-    if (desc.type == CPPCompiler::CompilerType::GCC || desc.type == CPPCompiler::CompilerType::Clang)
+    if (desc.type == DownstreamCompiler::CompilerType::GCC || desc.type == DownstreamCompiler::CompilerType::Clang)
     {
-        CPPCompiler::Desc compatible = desc;
-        compatible.type = (compatible.type == CPPCompiler::CompilerType::Clang) ? CPPCompiler::CompilerType::GCC : CPPCompiler::CompilerType::Clang;
+        DownstreamCompiler::Desc compatible = desc;
+        compatible.type = (compatible.type == DownstreamCompiler::CompilerType::Clang) ? DownstreamCompiler::CompilerType::GCC : DownstreamCompiler::CompilerType::Clang;
 
         compiler = findCompiler(compilers, MatchType::MinGreaterEqual, compatible);
         if (compiler)
@@ -327,7 +329,7 @@ const CPPCompiler::Desc& CPPCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-static void _addGCCFamilyCompiler(const String& path, const String& inExeName, CPPCompilerSet* compilerSet)
+static void _addGCCFamilyCompiler(const String& path, const String& inExeName, DownstreamCompilerSet* compilerSet)
 {
     String exeName(inExeName);
     if (path.getLength() > 0)
@@ -335,28 +337,28 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, C
         exeName = Path::combine(path, inExeName);
     }
 
-    CPPCompiler::Desc desc;
-    if (SLANG_SUCCEEDED(GCCCompilerUtil::calcVersion(exeName, desc)))
+    DownstreamCompiler::Desc desc;
+    if (SLANG_SUCCEEDED(GCCDownstreamCompilerUtil::calcVersion(exeName, desc)))
     {
-        RefPtr<CommandLineCPPCompiler> compiler(new GCCCPPCompiler(desc));
+        RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
         compiler->m_cmdLine.setExecutableFilename(exeName);
         compilerSet->addCompiler(compiler);
     }
 }
 
-/* static */CPPCompiler* CPPCompilerUtil::findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc)
+/* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc)
 {
-    CPPCompiler* compiler = set->getCompiler(desc);
+    DownstreamCompiler* compiler = set->getCompiler(desc);
     if (compiler)
     {
         return compiler;
     }
-    List<CPPCompiler*> compilers;
+    List<DownstreamCompiler*> compilers;
     set->getCompilers(compilers);
     return findClosestCompiler(compilers, desc);
 }
 
-/* static */SlangResult CPPCompilerUtil::initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set)
+/* static */SlangResult DownstreamCompilerUtil::initializeSet(const InitializeSetDesc& desc, DownstreamCompilerSet* set)
 {
 #if SLANG_WINDOWS_FAMILY
     WinVisualStudioUtil::find(set);
@@ -370,19 +372,18 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, C
     return SLANG_OK;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPCompilerFactory !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerSet !!!!!!!!!!!!!!!!!!!!!!*/
 
-
-void CPPCompilerSet::getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const
+void DownstreamCompilerSet::getCompilerDescs(List<DownstreamCompiler::Desc>& outCompilerDescs) const
 {
     outCompilerDescs.clear();
-    for (CPPCompiler* compiler : m_compilers)
+    for (DownstreamCompiler* compiler : m_compilers)
     {
         outCompilerDescs.add(compiler->getDesc());
     }
 }
 
-Index CPPCompilerSet::_findIndex(const CPPCompiler::Desc& desc) const
+Index DownstreamCompilerSet::_findIndex(const DownstreamCompiler::Desc& desc) const
 {
     const Index count = m_compilers.getCount();
     for (Index i = 0; i < count; ++i)
@@ -395,21 +396,21 @@ Index CPPCompilerSet::_findIndex(const CPPCompiler::Desc& desc) const
     return -1;
 }
 
-CPPCompiler* CPPCompilerSet::getCompiler(const CPPCompiler::Desc& compilerDesc) const
+DownstreamCompiler* DownstreamCompilerSet::getCompiler(const DownstreamCompiler::Desc& compilerDesc) const
 {
     const Index index = _findIndex(compilerDesc);
     return index >= 0 ? m_compilers[index] : nullptr;
 }
 
-void CPPCompilerSet::getCompilers(List<CPPCompiler*>& outCompilers) const
+void DownstreamCompilerSet::getCompilers(List<DownstreamCompiler*>& outCompilers) const
 {
     outCompilers.clear();
-    outCompilers.addRange((CPPCompiler*const*)m_compilers.begin(), m_compilers.getCount());
+    outCompilers.addRange((DownstreamCompiler*const*)m_compilers.begin(), m_compilers.getCount());
 }
 
-bool CPPCompilerSet::hasCompiler(CPPCompiler::CompilerType compilerType) const
+bool DownstreamCompilerSet::hasCompiler(DownstreamCompiler::CompilerType compilerType) const
 {
-    for (CPPCompiler* compiler : m_compilers)
+    for (DownstreamCompiler* compiler : m_compilers)
     {
         const auto& desc = compiler->getDesc();
         if (desc.type == compilerType)
@@ -420,7 +421,7 @@ bool CPPCompilerSet::hasCompiler(CPPCompiler::CompilerType compilerType) const
     return false;
 }
 
-void CPPCompilerSet::addCompiler(CPPCompiler* compiler)
+void DownstreamCompilerSet::addCompiler(DownstreamCompiler* compiler)
 {
     const Index index = _findIndex(compiler->getDesc());
     if (index >= 0)

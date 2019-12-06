@@ -278,7 +278,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     return SLANG_FAIL;
 }
 
-/* static */SlangResult WinVisualStudioUtil::find(CPPCompilerSet* set)
+/* static */SlangResult WinVisualStudioUtil::find(DownstreamCompilerSet* set)
 {
     const int versionCount = SLANG_COUNT_OF(s_versionInfos);
 
@@ -290,7 +290,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         VersionPath versionPath;
         if (!set->getCompiler(desc) && SLANG_SUCCEEDED(_find(i, versionPath)))
         {
-            RefPtr<CommandLineCPPCompiler> compiler = new VisualStudioCPPCompiler(desc);
+            RefPtr<CommandLineDownstreamCompiler> compiler = new VisualStudioDownstreamCompiler(desc);
             calcExecuteCompilerArgs(versionPath, compiler->m_cmdLine);
             set->addCompiler(compiler);
         }

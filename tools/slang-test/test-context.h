@@ -9,7 +9,7 @@
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-cpp-compiler.h"
+#include "../../source/core/slang-downstream-compiler.h"
 
 #include "options.h"
 
@@ -93,8 +93,8 @@ class TestContext
     bool isExecuting() const { return testRequirements == nullptr; }
 
         /// Get compiler factory
-    Slang::CPPCompilerSet* getCPPCompilerSet();
-    Slang::CPPCompiler* getDefaultCPPCompiler();
+    Slang::DownstreamCompilerSet* getCPPCompilerSet();
+    Slang::DownstreamCompiler* getDefaultCPPCompiler();
 
         /// Ctor
     TestContext();
@@ -112,7 +112,7 @@ class TestContext
     Slang::RenderApiFlags availableRenderApiFlags = 0;
     bool isAvailableRenderApiFlagsValid = false;
 
-    Slang::RefPtr<Slang::CPPCompilerSet> cppCompilerSet;
+    Slang::RefPtr<Slang::DownstreamCompilerSet> cppCompilerSet;
 
 protected:
     struct SharedLibraryTool

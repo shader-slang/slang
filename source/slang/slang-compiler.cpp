@@ -520,19 +520,19 @@ namespace Slang
             }
             case PassThroughMode::Clang:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::VisualStudio:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::Gcc:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(CPPCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::GenericCCpp:
             {
-                List<CPPCompiler::Desc> descs;
+                List<DownstreamCompiler::Desc> descs;
                 session->requireCPPCompilerSet()->getCompilerDescs(descs);
 
                 return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
@@ -597,9 +597,9 @@ namespace Slang
         return PassThroughMode::None;
     }
 
-    PassThroughMode getPassThroughModeForCPPCompiler(CPPCompiler::CompilerType type)
+    PassThroughMode getPassThroughModeForCPPCompiler(DownstreamCompiler::CompilerType type)
     {
-        typedef CPPCompiler::CompilerType CompilerType;
+        typedef DownstreamCompiler::CompilerType CompilerType;
 
         switch (type)
         {
@@ -1249,7 +1249,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
         
         // Get the required downstream CPP compiler
-        CPPCompiler* compiler = session->getCPPCompiler(downstreamCompiler);
+        DownstreamCompiler* compiler = session->getCPPCompiler(downstreamCompiler);
 
         if (!compiler)
         {
@@ -1421,11 +1421,11 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
 
-        typedef CPPCompiler::CompileOptions CompileOptions;
+        typedef DownstreamCompiler::CompileOptions CompileOptions;
         CompileOptions options;
 
         // Set the source type
-        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? CPPCompiler::SourceType::C : CPPCompiler::SourceType::CPP;
+        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
 
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
@@ -1442,12 +1442,12 @@ SlangResult dissassembleDXILUsingDXC(
             case CodeGenTarget::HostCallable:
             case CodeGenTarget::SharedLibrary:
             {
-                options.targetType = CPPCompiler::TargetType::SharedLibrary;
+                options.targetType = DownstreamCompiler::TargetType::SharedLibrary;
                 break;
             }
             case CodeGenTarget::Executable:
             {
-                options.targetType = CPPCompiler::TargetType::Executable;
+                options.targetType = DownstreamCompiler::TargetType::Executable;
                 break;
             }
             default: break;
@@ -1465,7 +1465,7 @@ SlangResult dissassembleDXILUsingDXC(
         TemporaryFileSet productFileSet;
         {
             List<String> paths;
-            SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, CPPCompiler::ProductFlag::All, paths));
+            SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, DownstreamCompiler::ProductFlag::All, paths));
             productFileSet.add(paths);
         }
 
@@ -1476,28 +1476,28 @@ SlangResult dissassembleDXILUsingDXC(
 
             switch (linkage->optimizationLevel)
             {
-                case OptimizationLevel::None:       options.optimizationLevel = CPPCompiler::OptimizationLevel::None; break;
-                case OptimizationLevel::Default:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Default;  break;
-                case OptimizationLevel::High:       options.optimizationLevel = CPPCompiler::OptimizationLevel::High;  break;
-                case OptimizationLevel::Maximal:    options.optimizationLevel = CPPCompiler::OptimizationLevel::Maximal;  break;
+                case OptimizationLevel::None:       options.optimizationLevel = DownstreamCompiler::OptimizationLevel::None; break;
+                case OptimizationLevel::Default:    options.optimizationLevel = DownstreamCompiler::OptimizationLevel::Default;  break;
+                case OptimizationLevel::High:       options.optimizationLevel = DownstreamCompiler::OptimizationLevel::High;  break;
+                case OptimizationLevel::Maximal:    options.optimizationLevel = DownstreamCompiler::OptimizationLevel::Maximal;  break;
                 default: SLANG_ASSERT(!"Unhandled optimization level"); break;
             }
 
             switch (linkage->debugInfoLevel)
             {
-                case DebugInfoLevel::None:          options.debugInfoType = CPPCompiler::DebugInfoType::None; break; 
-                case DebugInfoLevel::Minimal:       options.debugInfoType = CPPCompiler::DebugInfoType::Minimal; break; 
+                case DebugInfoLevel::None:          options.debugInfoType = DownstreamCompiler::DebugInfoType::None; break; 
+                case DebugInfoLevel::Minimal:       options.debugInfoType = DownstreamCompiler::DebugInfoType::Minimal; break; 
                 
-                case DebugInfoLevel::Standard:      options.debugInfoType = CPPCompiler::DebugInfoType::Standard; break; 
-                case DebugInfoLevel::Maximal:       options.debugInfoType = CPPCompiler::DebugInfoType::Maximal; break; 
+                case DebugInfoLevel::Standard:      options.debugInfoType = DownstreamCompiler::DebugInfoType::Standard; break; 
+                case DebugInfoLevel::Maximal:       options.debugInfoType = DownstreamCompiler::DebugInfoType::Maximal; break; 
                 default: SLANG_ASSERT(!"Unhandled debug level"); break;
             }
 
             switch( targetReq->floatingPointMode )
             {
-                case FloatingPointMode::Default:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Default; break;
-                case FloatingPointMode::Precise:    options.floatingPointMode = CPPCompiler::FloatingPointMode::Precise; break;
-                case FloatingPointMode::Fast:       options.floatingPointMode = CPPCompiler::FloatingPointMode::Fast; break;
+                case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Default; break;
+                case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Precise; break;
+                case FloatingPointMode::Fast:       options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Fast; break;
                 default: SLANG_ASSERT(!"Unhanlde floating point mode");
             }
 
@@ -1508,7 +1508,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 for(auto& def : preprocessorDefinitions)
                 {
-                    CPPCompiler::Define define;
+                    DownstreamCompiler::Define define;
                     define.nameWithSig = def.Key;
                     define.value = def.Value;
 
@@ -1518,7 +1518,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Compile
-        CPPCompiler::Output output;
+        DownstreamCompiler::Output output;
         SLANG_RETURN_ON_FAIL(compiler->compile(options, output));
 
         {
@@ -1527,7 +1527,7 @@ SlangResult dissassembleDXILUsingDXC(
 
             StringBuilder builder;
 
-            typedef CPPCompiler::Diagnostic Diagnostic;
+            typedef DownstreamCompiler::Diagnostic Diagnostic;
 
             for (const auto& diagnostic : output.diagnostics)
             {
@@ -1574,7 +1574,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // If any errors are emitted, then we are done
-        if (output.has(CPPCompiler::Diagnostic::Type::Error))
+        if (output.has(DownstreamCompiler::Diagnostic::Type::Error))
         {
             return SLANG_FAIL;
         }
@@ -1613,8 +1613,8 @@ SlangResult dissassembleDXILUsingDXC(
                 // outBin
                 // The problem is that these files have no specific lifetime (unlike with HostCallable).
 
-                CPPCompiler::ProductFlags flags = CPPCompiler::ProductFlag::All;
-                flags &= ~CPPCompiler::ProductFlag::Debug;
+                DownstreamCompiler::ProductFlags flags = DownstreamCompiler::ProductFlag::All;
+                flags &= ~DownstreamCompiler::ProductFlag::Debug;
 
                 List<String> paths;
                 SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, flags, paths));

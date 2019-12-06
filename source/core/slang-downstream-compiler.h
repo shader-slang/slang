@@ -1,5 +1,5 @@
-#ifndef SLANG_CPP_COMPILER_H
-#define SLANG_CPP_COMPILER_H
+#ifndef SLANG_DOWNSTREAM_COMPILER_H
+#define SLANG_DOWNSTREAM_COMPILER_H
 
 #include "slang-common.h"
 #include "slang-string.h"
@@ -11,7 +11,7 @@
 namespace Slang
 {
 
-class CPPCompiler: public RefObject
+class DownstreamCompiler: public RefObject
 {
 public:
     typedef RefObject Super;
@@ -220,17 +220,17 @@ public:
 
 protected:
 
-    CPPCompiler(const Desc& desc) :
+    DownstreamCompiler(const Desc& desc) :
         m_desc(desc)
     {}
 
     Desc m_desc;
 };
 
-class CommandLineCPPCompiler : public CPPCompiler
+class CommandLineDownstreamCompiler : public DownstreamCompiler
 {
 public:
-    typedef CPPCompiler Super;
+    typedef DownstreamCompiler Super;
 
     // CPPCompiler
     virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
@@ -239,74 +239,74 @@ public:
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) = 0;
 
-    CommandLineCPPCompiler(const Desc& desc, const String& exeName) :
+    CommandLineDownstreamCompiler(const Desc& desc, const String& exeName) :
         Super(desc)
     {
         m_cmdLine.setExecutableFilename(exeName);
     }
 
-    CommandLineCPPCompiler(const Desc& desc, const CommandLine& cmdLine) :
+    CommandLineDownstreamCompiler(const Desc& desc, const CommandLine& cmdLine) :
         Super(desc),
         m_cmdLine(cmdLine)
     {}
 
-    CommandLineCPPCompiler(const Desc& desc):Super(desc) {}
+    CommandLineDownstreamCompiler(const Desc& desc):Super(desc) {}
 
     CommandLine m_cmdLine;
 };
 
-class CPPCompilerSet : public RefObject
+class DownstreamCompilerSet : public RefObject
 {
 public:
     typedef RefObject Super;
 
     
         /// Find all the available compilers
-    void getCompilerDescs(List<CPPCompiler::Desc>& outCompilerDescs) const;
+    void getCompilerDescs(List<DownstreamCompiler::Desc>& outCompilerDescs) const;
         /// Returns list of all compilers
-    void getCompilers(List<CPPCompiler*>& outCompilers) const;
+    void getCompilers(List<DownstreamCompiler*>& outCompilers) const;
 
         /// Get a compiler
-    CPPCompiler* getCompiler(const CPPCompiler::Desc& compilerDesc) const;
+    DownstreamCompiler* getCompiler(const DownstreamCompiler::Desc& compilerDesc) const;
   
         /// Will replace if there is one with same desc
-    void addCompiler(CPPCompiler* compiler);
+    void addCompiler(DownstreamCompiler* compiler);
 
         /// Get a default compiler
-    CPPCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
+    DownstreamCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
         /// Set the default compiler
-    void setDefaultCompiler(CPPCompiler* compiler) { m_defaultCompiler = compiler;  }
+    void setDefaultCompiler(DownstreamCompiler* compiler) { m_defaultCompiler = compiler;  }
 
         /// True if has a compiler of the specified type
-    bool hasCompiler(CPPCompiler::CompilerType compilerType) const;
+    bool hasCompiler(DownstreamCompiler::CompilerType compilerType) const;
 
 protected:
 
-    Index _findIndex(const CPPCompiler::Desc& desc) const;
+    Index _findIndex(const DownstreamCompiler::Desc& desc) const;
 
-    RefPtr<CPPCompiler> m_defaultCompiler;
+    RefPtr<DownstreamCompiler> m_defaultCompiler;
     // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
     // somethings easier.
-    List<RefPtr<CPPCompiler>> m_compilers;
+    List<RefPtr<DownstreamCompiler>> m_compilers;
 };
 
 /* Only purpose of having base-class here is to make all the CPPCompiler types available directly in derived Utils */
-struct CPPCompilerBaseUtil
+struct DownstreamCompilerBaseUtil
 {
-    typedef CPPCompiler::CompileOptions CompileOptions;
-    typedef CPPCompiler::OptimizationLevel OptimizationLevel;
-    typedef CPPCompiler::TargetType TargetType;
-    typedef CPPCompiler::DebugInfoType DebugInfoType;
-    typedef CPPCompiler::SourceType SourceType;
-    typedef CPPCompiler::CompilerType CompilerType;
+    typedef DownstreamCompiler::CompileOptions CompileOptions;
+    typedef DownstreamCompiler::OptimizationLevel OptimizationLevel;
+    typedef DownstreamCompiler::TargetType TargetType;
+    typedef DownstreamCompiler::DebugInfoType DebugInfoType;
+    typedef DownstreamCompiler::SourceType SourceType;
+    typedef DownstreamCompiler::CompilerType CompilerType;
 
-    typedef CPPCompiler::Diagnostic Diagnostic;
-    typedef CPPCompiler::FloatingPointMode FloatingPointMode;
-    typedef CPPCompiler::ProductFlag ProductFlag;
-    typedef CPPCompiler::ProductFlags ProductFlags;
+    typedef DownstreamCompiler::Diagnostic Diagnostic;
+    typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
+    typedef DownstreamCompiler::ProductFlag ProductFlag;
+    typedef DownstreamCompiler::ProductFlags ProductFlags;
 };
 
-struct CPPCompilerUtil: public CPPCompilerBaseUtil
+struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
 {
     enum class MatchType
     {
@@ -320,22 +320,22 @@ struct CPPCompilerUtil: public CPPCompilerBaseUtil
         const String& getPath(CompilerType type) const { return paths[int(type)]; }
         void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
 
-        String paths[int(CPPCompiler::CompilerType::CountOf)];
+        String paths[int(DownstreamCompiler::CompilerType::CountOf)];
     };
 
         /// Find a compiler
-    static CPPCompiler* findCompiler(const CPPCompilerSet* set, MatchType matchType, const CPPCompiler::Desc& desc);
-    static CPPCompiler* findCompiler(const List<CPPCompiler*>& compilers, MatchType matchType, const CPPCompiler::Desc& desc);
+    static DownstreamCompiler* findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc);
+    static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc);
 
         /// Find the compiler closest to the desc 
-    static CPPCompiler* findClosestCompiler(const List<CPPCompiler*>& compilers, const CPPCompiler::Desc& desc);
-    static CPPCompiler* findClosestCompiler(const CPPCompilerSet* set, const CPPCompiler::Desc& desc);
+    static DownstreamCompiler* findClosestCompiler(const List<DownstreamCompiler*>& compilers, const DownstreamCompiler::Desc& desc);
+    static DownstreamCompiler* findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc);
 
         /// Get the information on the compiler used to compile this source
-    static const CPPCompiler::Desc& getCompiledWithDesc();
+    static const DownstreamCompiler::Desc& getCompiledWithDesc();
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
-    static SlangResult initializeSet(const InitializeSetDesc& desc, CPPCompilerSet* set);    
+    static SlangResult initializeSet(const InitializeSetDesc& desc, DownstreamCompilerSet* set);    
 };
 
 }
