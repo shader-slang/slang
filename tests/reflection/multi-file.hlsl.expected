@@ -5,7 +5,7 @@ standard output = {
 {
     "parameters": [
         {
-            "name": "sharedT",
+            "name": "vertexT",
             "binding": {"kind": "shaderResource", "index": 0},
             "type": {
                 "kind": "resource",
@@ -13,86 +13,15 @@ standard output = {
             }
         },
         {
-            "name": "sharedS",
+            "name": "vertexS",
             "binding": {"kind": "samplerState", "index": 0},
             "type": {
                 "kind": "samplerState"
             }
         },
         {
-            "name": "sharedC",
-            "binding": {"kind": "constantBuffer", "index": 0},
-            "type": {
-                "kind": "constantBuffer",
-                "elementType": {
-                    "kind": "struct",
-                    "fields": [
-                        {
-                            "name": "sharedCA",
-                            "type": {
-                                "kind": "vector",
-                                "elementCount": 3,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "float32"
-                                }
-                            },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
-                        },
-                        {
-                            "name": "sharedCB",
-                            "type": {
-                                "kind": "scalar",
-                                "scalarType": "float32"
-                            },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
-                        },
-                        {
-                            "name": "sharedCC",
-                            "type": {
-                                "kind": "vector",
-                                "elementCount": 3,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "float32"
-                                }
-                            },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 12}
-                        },
-                        {
-                            "name": "sharedCD",
-                            "type": {
-                                "kind": "vector",
-                                "elementCount": 2,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "float32"
-                                }
-                            },
-                            "binding": {"kind": "uniform", "offset": 32, "size": 8}
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "name": "vertexT",
-            "binding": {"kind": "shaderResource", "index": 1},
-            "type": {
-                "kind": "resource",
-                "baseShape": "texture2D"
-            }
-        },
-        {
-            "name": "vertexS",
-            "binding": {"kind": "samplerState", "index": 1},
-            "type": {
-                "kind": "samplerState"
-            }
-        },
-        {
             "name": "vertexC",
-            "binding": {"kind": "constantBuffer", "index": 1},
+            "binding": {"kind": "constantBuffer", "index": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -147,24 +76,8 @@ standard output = {
             }
         },
         {
-            "name": "sharedTV",
-            "binding": {"kind": "shaderResource", "index": 2},
-            "type": {
-                "kind": "resource",
-                "baseShape": "texture2D"
-            }
-        },
-        {
-            "name": "sharedTF",
-            "binding": {"kind": "shaderResource", "index": 3},
-            "type": {
-                "kind": "resource",
-                "baseShape": "texture2D"
-            }
-        },
-        {
             "name": "fragmentT",
-            "binding": {"kind": "shaderResource", "index": 4},
+            "binding": {"kind": "shaderResource", "index": 1},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D"
@@ -172,14 +85,14 @@ standard output = {
         },
         {
             "name": "fragmentS",
-            "binding": {"kind": "samplerState", "index": 2},
+            "binding": {"kind": "samplerState", "index": 1},
             "type": {
                 "kind": "samplerState"
             }
         },
         {
             "name": "fragmentC",
-            "binding": {"kind": "constantBuffer", "index": 2},
+            "binding": {"kind": "constantBuffer", "index": 1},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -232,16 +145,103 @@ standard output = {
                     ]
                 }
             }
+        },
+        {
+            "name": "sharedT",
+            "binding": {"kind": "shaderResource", "index": 2},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "sharedS",
+            "binding": {"kind": "samplerState", "index": 2},
+            "type": {
+                "kind": "samplerState"
+            }
+        },
+        {
+            "name": "sharedC",
+            "binding": {"kind": "constantBuffer", "index": 2},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "sharedCA",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 3,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                        },
+                        {
+                            "name": "sharedCB",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                        },
+                        {
+                            "name": "sharedCC",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 3,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                        },
+                        {
+                            "name": "sharedCD",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 2,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "sharedTV",
+            "binding": {"kind": "shaderResource", "index": 3},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
+        },
+        {
+            "name": "sharedTF",
+            "binding": {"kind": "shaderResource", "index": 4},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D"
+            }
         }
     ],
     "entryPoints": [
         {
-            "name": "mainFS",
-            "stage:": "fragment"
-        },
-        {
             "name": "mainVS",
             "stage:": "vertex"
+        },
+        {
+            "name": "mainFS",
+            "stage:": "fragment"
         }
     ]
 }
