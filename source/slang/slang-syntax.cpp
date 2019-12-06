@@ -12,7 +12,7 @@ namespace Slang
 
     bool BasicExpressionType::EqualsImpl(Type * type)
     {
-        auto basicType = dynamicCast<const BasicExpressionType>(type);
+        auto basicType = as<BasicExpressionType>(type);
         return basicType && basicType->baseType == this->baseType;
     }
 

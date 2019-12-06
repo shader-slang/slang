@@ -541,6 +541,24 @@ namespace Slang
         return SyntaxClass<T>::getClass();
     }
 
+    template<typename T>
+    T* dynamicCast(NodeBase* node)
+    {
+        if(!node) return nullptr;
+        if(node->getClass().isSubClassOf<T>())
+            return (T*) node;
+        return nullptr;
+    }
+
+    template<typename T>
+    const T* dynamicCast(const NodeBase* node) { return dynamicCast<T>(const_cast<NodeBase*>(node)); }
+
+    template<typename T>
+    T* as(NodeBase* node) { return dynamicCast<T>(node); }
+
+    template<typename T>
+    const T* as(const NodeBase* node) { return dynamicCast<T>(const_cast<NodeBase*>(node)); }
+
     struct SubstitutionSet
     {
         RefPtr<Substitutions> substitutions;
