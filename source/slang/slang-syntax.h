@@ -541,13 +541,12 @@ namespace Slang
         return SyntaxClass<T>::getClass();
     }
 
+    NodeBase* _dynamicCastImpl(NodeBase* node, SyntaxClassBase const& toClass);
+
     template<typename T>
     T* dynamicCast(NodeBase* node)
     {
-        if(!node) return nullptr;
-        if(node->getClass().isSubClassOf<T>())
-            return (T*) node;
-        return nullptr;
+        return (T*) _dynamicCastImpl(node, getClass<T>());
     }
 
     template<typename T>

@@ -85,6 +85,15 @@ bool SyntaxClassBase::isSubClassOfImpl(SyntaxClassBase const& super) const
     return false;
 }
 
+NodeBase* _dynamicCastImpl(NodeBase* node, SyntaxClassBase const& toClass)
+{
+    if(!node) return nullptr;
+    if(node->getClass().isSubClassOfImpl(toClass))
+        return node;
+    return nullptr;
+}
+
+
 void Type::accept(IValVisitor* visitor, void* extra)
 {
     accept((ITypeVisitor*)visitor, extra);
