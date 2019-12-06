@@ -278,7 +278,7 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-DownstreamCompiler* Session::getCPPCompiler(PassThroughMode compiler)
+DownstreamCompiler* Session::getDownstreamCompiler(PassThroughMode compiler)
 {
     DownstreamCompilerSet* compilerSet = requireCPPCompilerSet();
     switch (compiler)
@@ -294,7 +294,7 @@ DownstreamCompiler* Session::getCPPCompiler(PassThroughMode compiler)
 
 DownstreamCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
 {
-    return getCPPCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
+    return getDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
 struct IncludeHandlerImpl : IncludeHandler
@@ -709,56 +709,7 @@ SlangResult Linkage::setMatrixLayoutMode(
     return SLANG_OK;
 }
 
-/** Base class for simple blobs.
-*/
-class BlobBase : public ISlangBlob, public RefObject
-{
-public:
-    // ISlangUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-protected:
-    SLANG_FORCE_INLINE ISlangUnknown* getInterface(const Guid& guid)
-    {
-        return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
-    }
-};
-
-/** A blob that manages some raw data that it owns.
-*/
-class RawBlob : public BlobBase
-{
-public:
-    // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_size; }
-
-    // Ctor
-    RawBlob(const void* data, size_t size):
-        m_size(size)
-    {
-        m_data = malloc(size);
-        memcpy(m_data, data, size);
-    }
-    ~RawBlob()
-    {
-        free(m_data);
-    }
-
-protected:
-    void* m_data;
-    size_t m_size;
-};
-
-ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
-{
-    return ComPtr<ISlangBlob>(new RawBlob(inData, size));
-}
-
-ISlangUnknown* ListBlob::getInterface(const Guid& guid)
-{
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
-}
 //
 // TargetRequest
 //
@@ -3524,24 +3475,18 @@ SLANG_API void const* spGetEntryPointCode(
     void const* data = nullptr;
     size_t size = 0;
 
-    switch (result.format)
+    ComPtr<ISlangBlob> blob;
+    if (SLANG_SUCCEEDED(result.getBlob(blob)))
     {
-    case ResultFormat::None:
-    default:
-        break;
-
-    case ResultFormat::Binary:
-        data = result.outputBinary.getBuffer();
-        size = result.outputBinary.getCount();
-        break;
-
-    case ResultFormat::Text:
-        data = result.outputString.getBuffer();
-        size = result.outputString.getLength();
-        break;
+        data = blob->getBufferPointer();
+        size = blob->getBufferSize();
     }
 
-    if(outSize) *outSize = size;
+    if (outSize)
+    {
+        *outSize = size;
+    }
+
     return data;
 }
 

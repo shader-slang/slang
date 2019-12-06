@@ -21,6 +21,9 @@
     <ClInclude Include="slang-basic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-blob.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-byte-encode-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -131,6 +134,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-blob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-byte-encode-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

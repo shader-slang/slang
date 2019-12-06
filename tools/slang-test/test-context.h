@@ -92,8 +92,8 @@ class TestContext
         /// If set, then tests are executed
     bool isExecuting() const { return testRequirements == nullptr; }
 
-        /// Get compiler factory
-    Slang::DownstreamCompilerSet* getCPPCompilerSet();
+        /// Get compiler set
+    Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler();
 
         /// Ctor
@@ -112,7 +112,7 @@ class TestContext
     Slang::RenderApiFlags availableRenderApiFlags = 0;
     bool isAvailableRenderApiFlagsValid = false;
 
-    Slang::RefPtr<Slang::DownstreamCompilerSet> cppCompilerSet;
+    Slang::RefPtr<Slang::DownstreamCompilerSet> compilerSet;
 
 protected:
     struct SharedLibraryTool

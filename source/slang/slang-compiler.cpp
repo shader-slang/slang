@@ -130,48 +130,16 @@ namespace Slang
         return StringUtil::getAtInSplit(s_codeGenTargetInfos[int(target)].names, ',', 0);
     }
 
-    // CompileResult
-
-    void CompileResult::append(CompileResult const& result)
-    {
-        // Find which to append to
-        ResultFormat appendTo = ResultFormat::None;
-
-        if (format == ResultFormat::None)
-        {
-            format = result.format;
-            appendTo = result.format;
-        }
-        else if (format == result.format)
-        {
-            appendTo = format;
-        }
-
-        if (appendTo == ResultFormat::Text)
-        {
-            outputString.append(result.outputString.getBuffer());
-        }
-        else if (appendTo == ResultFormat::Binary)
-        {
-            outputBinary.addRange(result.outputBinary.getBuffer(), result.outputBinary.getCount());
-        }
-        else if (appendTo == ResultFormat::SharedLibrary)
-        {
-            SLANG_ASSERT(!"Trying to append to a shared library");
-        }
-    }
-
     SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
     {
-        if (format == ResultFormat::SharedLibrary && sharedLibrary)
+        if (downstreamResult)
         {
-            outSharedLibrary = sharedLibrary;
-            return SLANG_OK;
+            return downstreamResult->getHostCallableSharedLibrary(outSharedLibrary);
         }
         return SLANG_FAIL;
     }
 
-    SlangResult CompileResult::getBlob(ComPtr<ISlangBlob>& outBlob)
+    SlangResult CompileResult::getBlob(ComPtr<ISlangBlob>& outBlob) const
     {
         if(!blob)
         {
@@ -184,28 +152,12 @@ namespace Slang
                 case ResultFormat::Text:
                     blob = StringUtil::createStringBlob(outputString);
                     break;
-
                 case ResultFormat::Binary:
-                    blob = createRawBlob(outputBinary.getBuffer(), outputBinary.getCount());
-                    break;
-                case ResultFormat::SharedLibrary:
                 {
-                    // TODO(JS): Could do something more sophisticated to check this cast is safe (like have an interface to get the path), but this
-                    // is simple and works with current impl
-                    TemporarySharedLibrary* tempLibrary = static_cast<TemporarySharedLibrary*>(sharedLibrary.get());
-
-                    SLANG_ASSERT(sharedLibrary);
-                    List<uint8_t> contents;
-                    try
+                    if (downstreamResult)
                     {
-                        // We can read it from the shared library...
-                        contents = File::readAllBytes(tempLibrary->getPath());
+                        SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
                     }
-                    catch (const Slang::IOException&)
-                    {
-                        return SLANG_E_CANNOT_OPEN; 
-                    }
-                    blob = createRawBlob(contents.getBuffer(), contents.getCount());
                     break;
                 }
             }
@@ -1228,8 +1180,7 @@ SlangResult dissassembleDXILUsingDXC(
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
-        ComPtr<ISlangSharedLibrary>& outSharedLib,
-        List<uint8_t>&          outBin)
+        RefPtr<DownstreamCompileResult>& outResult)
     {
         auto sink = slangRequest->getSink();
 
@@ -1237,9 +1188,8 @@ SlangResult dissassembleDXILUsingDXC(
 
         const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        outBin.clear();
-        outSharedLib.setNull();
-      
+        outResult.setNull();
+
         PassThroughMode downstreamCompiler = endToEndReq->passThrough;
 
         // If we are not in pass through, lookup the default compiler for the emitted source type
@@ -1249,7 +1199,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
         
         // Get the required downstream CPP compiler
-        DownstreamCompiler* compiler = session->getCPPCompiler(downstreamCompiler);
+        DownstreamCompiler* compiler = session->getDownstreamCompiler(downstreamCompiler);
 
         if (!compiler)
         {
@@ -1453,22 +1403,6 @@ SlangResult dissassembleDXILUsingDXC(
             default: break;
         }
 
-        String moduleFilePath;
-
-        {
-            StringBuilder builder;
-            SLANG_RETURN_ON_FAIL(compiler->calcModuleFilePath(options, builder));
-            moduleFilePath = builder.ProduceString();
-        }
-
-        // Find all the files that will be produced
-        TemporaryFileSet productFileSet;
-        {
-            List<String> paths;
-            SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, DownstreamCompiler::ProductFlag::All, paths));
-            productFileSet.add(paths);
-        }
-
         // Need to configure for the compilation
 
         {
@@ -1518,10 +1452,10 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Compile
-        RefPtr<DownstreamCompileResult> result;
-        SLANG_RETURN_ON_FAIL(compiler->compile(options, result));
+        RefPtr<DownstreamCompileResult> downstreamCompileResult;
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, downstreamCompileResult));
 
-        const auto& diagnostics = result->getDiagnostics();
+        const auto& diagnostics = downstreamCompileResult->getDiagnostics();
 
         {
             StringBuilder compilerText;
@@ -1581,58 +1515,7 @@ SlangResult dissassembleDXILUsingDXC(
             return SLANG_FAIL;
         }
 
-        // If callable we need to load the shared library
-        if (targetReq->target == CodeGenTarget::HostCallable)
-        {
-            // Try loading the shared library
-            SharedLibrary::Handle handle;
-            if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(moduleFilePath.getBuffer(), handle)))
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::unableToReadFile, moduleFilePath);
-                return SLANG_FAIL;
-            }
-            RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, moduleFilePath));
-            sharedLib->m_temporaryFileSet = productFileSet;
-            productFileSet.clear();
-
-            // Copy the paths in the temporary file set
-            // We particularly want to do this to keep the source
-            sharedLib->m_temporaryFileSet.add(temporaryFileSet.m_paths);
-            temporaryFileSet.clear();
-
-            // Output the shared library
-            outSharedLib = sharedLib;
-        }
-        else
-        {
-            // Read the binary
-            try
-            {
-                // TODO(JS): We have a problem here.. productFileSet will clear up all temporaries
-                // and although we return the binary here (through outBin), we don't return debug info
-                // which is separate (say with a pdb). To work around this we reevaluate productFileSet,
-                // so we don't include debug info. The executable will presumably be reconstructed from
-                // outBin
-                // The problem is that these files have no specific lifetime (unlike with HostCallable).
-
-                DownstreamCompiler::ProductFlags flags = DownstreamCompiler::ProductFlag::All;
-                flags &= ~DownstreamCompiler::ProductFlag::Debug;
-
-                List<String> paths;
-                SLANG_RETURN_ON_FAIL(compiler->calcCompileProducts(options, flags, paths));
-                productFileSet.clear();
-                productFileSet.add(paths);
-
-                // Read the contents of the binary
-                outBin = File::readAllBytes(moduleFilePath);
-            }
-            catch (const Slang::IOException&)
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::unableToReadFile, moduleFilePath);
-                return SLANG_FAIL;
-            }
-        }
-
+        outResult = downstreamCompileResult;
         return SLANG_OK;
     }
 
@@ -1751,26 +1634,18 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::Executable:
             {
-                ComPtr<ISlangSharedLibrary> sharedLibrary;
+                RefPtr<DownstreamCompileResult> downstreamResult;
 
-                List<uint8_t> code;
                 if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
                     compileRequest,
                     entryPointIndex,
                     targetReq,
                     endToEndReq,
-                    sharedLibrary,
-                    code)))
+                    downstreamResult)))
                 {
-                    if (target == CodeGenTarget::HostCallable)
-                    {
-                        result = CompileResult(sharedLibrary);
-                    }
-                    else
-                    {
-                        maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                        result = CompileResult(code);
-                    }
+                    maybeDumpIntermediate(compileRequest, downstreamResult, target);
+
+                    result = CompileResult(downstreamResult);
                 }
             }
             break;
@@ -1801,11 +1676,13 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
-                return emitEntryPointSource(
+                String code = emitEntryPointSource(
                     compileRequest,
                     entryPointIndex,
                     target, 
                     targetReq);
+                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
+                result = CompileResult(code);
             }
             break;
 
@@ -1822,7 +1699,8 @@ SlangResult dissassembleDXILUsingDXC(
                     code)))
                 {
                     maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                    result = CompileResult(code);
+
+                    result = CompileResult(ListBlob::moveCreate(code));
                 }
             }
             break;
@@ -1858,7 +1736,7 @@ SlangResult dissassembleDXILUsingDXC(
                     code)))
                 {
                     maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                    result = CompileResult(code);
+                    result = CompileResult(ListBlob::moveCreate(code));
                 }
             }
             break;
@@ -1883,7 +1761,8 @@ SlangResult dissassembleDXILUsingDXC(
 
                     maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
 
-                    result = CompileResult(assembly);
+                    // Write as text, even if stored in uint8_t array
+                    result = CompileResult(UnownedStringSlice((const char*)code.getBuffer(), code.getCount()));
                 }
             }
             break;
@@ -1901,7 +1780,7 @@ SlangResult dissassembleDXILUsingDXC(
                     code)))
                 {
                     maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                    result = CompileResult(code);
+                    result = CompileResult(ListBlob::moveCreate(code));
                 }
             }
             break;
@@ -2025,11 +1904,12 @@ SlangResult dissassembleDXILUsingDXC(
 
         case ResultFormat::Binary:
             {
-                auto& data = result.outputBinary;
+                ComPtr<ISlangBlob> blob;
+                result.getBlob(blob);
                 writeOutputFile(compileRequest,
                     outputPath,
-                    data.begin(),
-                    data.end() - data.begin(),
+                    blob->getBufferPointer(),
+                    blob->getBufferSize(),
                     OutputFileKind::Binary);
             }
             break;
@@ -2065,13 +1945,18 @@ SlangResult dissassembleDXILUsingDXC(
             writeOutputToConsole(writer, result.outputString);
             break;
 
-        case ResultFormat::SharedLibrary:
-            break;
-
         case ResultFormat::Binary:
             {
-                auto& data = result.outputBinary;
-                
+                ComPtr<ISlangBlob> blob;
+                if (SLANG_FAILED(result.getBlob(blob)))
+                {
+                    return;
+                }
+
+                const void* blobData = blob->getBufferPointer();
+                size_t blobSize = blob->getBufferSize();
+
+          
                 if (writer->isConsole())
                 {
                     // Writing to console, so we need to generate text output.
@@ -2082,9 +1967,7 @@ SlangResult dissassembleDXILUsingDXC(
                     case CodeGenTarget::DXBytecode:
                         {
                             String assembly;
-                            dissassembleDXBC(backEndReq,
-                                data.begin(),
-                                data.end() - data.begin(), assembly);
+                            dissassembleDXBC(backEndReq, blobData, blobSize, assembly);
                             writeOutputToConsole(writer, assembly);
                         }
                         break;
@@ -2094,10 +1977,7 @@ SlangResult dissassembleDXILUsingDXC(
                     case CodeGenTarget::DXIL:
                         {
                             String assembly; 
-                            dissassembleDXILUsingDXC(backEndReq,
-                                data.begin(),
-                                data.end() - data.begin(), 
-                                assembly);
+                            dissassembleDXILUsingDXC(backEndReq, blobData, blobSize, assembly);
                             writeOutputToConsole(writer, assembly);
                         }
                         break;
@@ -2106,16 +1986,15 @@ SlangResult dissassembleDXILUsingDXC(
                     case CodeGenTarget::SPIRV:
                         {
                             String assembly;
-                            dissassembleSPIRV(backEndReq,
-                                data.begin(),
-                                data.end() - data.begin(), assembly);
+                            dissassembleSPIRV(backEndReq, blobData, blobSize, assembly);
                             writeOutputToConsole(writer, assembly);
                         }
                         break;
 
+                    case CodeGenTarget::HostCallable:
                     case CodeGenTarget::SharedLibrary:
                     case CodeGenTarget::Executable:
-                        HexDumpUtil::dumpWithMarkers(data, 24, writer);
+                        HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
                         break;
 
                     default:
@@ -2132,8 +2011,8 @@ SlangResult dissassembleDXILUsingDXC(
                         backEndReq,
                         writer,
                         "stdout",
-                        data.begin(),
-                        data.end() - data.begin());
+                        blobData,
+                        blobSize);
                 }
             }
             break;
@@ -2523,6 +2402,21 @@ SlangResult dissassembleDXILUsingDXC(
         char const*     ext)
     {
         dumpIntermediate(compileRequest, data, size, ext, true);
+    }
+
+    void maybeDumpIntermediate(
+        BackEndCompileRequest* compileRequest,
+        DownstreamCompileResult* compileResult,
+        CodeGenTarget   target)
+    {
+        if (!compileRequest->shouldDumpIntermediates)
+            return;
+
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_SUCCEEDED(compileResult->getBinary(blob)))
+        {
+            maybeDumpIntermediate(compileRequest, blob->getBufferPointer(), blob->getBufferSize(), target);
+        }
     }
 
     void maybeDumpIntermediate(

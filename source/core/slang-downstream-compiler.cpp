@@ -7,6 +7,7 @@
 
 #include "slang-io.h"
 #include "slang-shared-library.h"
+#include "slang-blob.h"
 
 // if Visual Studio import the visual studio platform specific header
 #if SLANG_VC
@@ -159,6 +160,59 @@ void DownstreamDiagnostics::removeByType(Diagnostic::Type type)
     }
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompileResult !!!!!!!!!!!!!!!!!!!!!!*/
+
+SlangResult CommandLineDownstreamCompileResult::getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary)
+{
+    if (m_hostCallableSharedLibrary)
+    {
+        outLibrary = m_hostCallableSharedLibrary;
+        return SLANG_OK;
+    }
+
+    // Okay we want to load
+    // Try loading the shared library
+    SharedLibrary::Handle handle;
+    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
+    {
+        return SLANG_FAIL;
+    }
+    // The shared library needs to keep temp files in scope
+    RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, m_moduleFilePath));
+    sharedLib->m_temporaryFileSet = m_temporaryFiles;
+
+    m_hostCallableSharedLibrary = sharedLib;
+    outLibrary = m_hostCallableSharedLibrary;
+    return SLANG_OK;
+}
+
+SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& outBlob)
+{
+    if (m_binaryBlob)
+    {
+        outBlob = m_binaryBlob;
+        return SLANG_OK;
+    }
+
+    // Read the binary
+    try
+    {
+        // Read the contents of the binary
+        List<uint8_t> contents = File::readAllBytes(m_moduleFilePath);
+
+        // If the contents is going to possibly be executed, we leave the debug files
+        m_temporaryFiles->m_paths = m_nonDebugPaths;
+
+        m_binaryBlob = ListBlob::moveCreate(contents);
+        outBlob = m_binaryBlob;
+        return SLANG_OK;
+    }
+    catch (const Slang::IOException&)
+    {
+        return SLANG_FAIL;
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
 SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& out)
@@ -168,6 +222,23 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
+
+    
+    String moduleFilePath;
+
+    {
+        StringBuilder builder;
+        SLANG_RETURN_ON_FAIL(calcModuleFilePath(options, builder));
+        moduleFilePath = builder.ProduceString();
+    }
+
+    // Find all the files that will be produced
+    RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
+    {
+        List<String> paths;
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamCompiler::ProductFlag::All, paths));
+        productFileSet->add(paths);
+    }
 
     ExecuteResult exeRes;
 
@@ -190,7 +261,25 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options
     DownstreamDiagnostics diagnostics;
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    out = new DownstreamCompileResult(diagnostics);
+    RefPtr<CommandLineDownstreamCompileResult> compileResult;
+    {
+        // TODO(JS): We have a problem here.. productFileSet will clear up all temporaries
+        // and although we return the binary here (through outBin), we don't return debug info
+        // which is separate (say with a pdb). To work around this we reevaluate productFileSet,
+        // so we don't include debug info. The executable will presumably be reconstructed from
+        // outBin
+        // The problem is that these files have no specific lifetime (unlike with HostCallable).
+
+        DownstreamCompiler::ProductFlags flags = DownstreamCompiler::ProductFlag::All;
+        flags &= ~DownstreamCompiler::ProductFlag::Debug;
+
+        List<String> nonDebugPaths;
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, flags, nonDebugPaths));
+
+        compileResult = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet, nonDebugPaths);
+    }
+
+    out = compileResult;
     return SLANG_OK;
 }
 

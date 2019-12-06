@@ -11,30 +11,6 @@
 
 namespace Slang {
 
-/** A blob that uses a `String` for its storage.
-*/
-class StringBlob : public ISlangBlob, public RefObject
-{
-public:
-    // ISlangUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-
-        // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_string.getBuffer(); }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_string.getLength(); }
-
-        /// Get the contained string
-    SLANG_FORCE_INLINE const String& getString() const { return m_string; }
-
-    explicit StringBlob(String const& string)
-        : m_string(string)
-    {}
-
-protected:
-    ISlangUnknown* getInterface(const Guid& guid);
-    String m_string;
-};
-
 struct StringUtil
 {
         /// Split in, by specified splitChar into slices out

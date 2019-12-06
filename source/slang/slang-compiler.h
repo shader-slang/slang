@@ -91,7 +91,6 @@ namespace Slang
         None,
         Text,
         Binary,
-        SharedLibrary,
     };
 
     // When storing the layout for a matrix-type
@@ -134,21 +133,20 @@ namespace Slang
     {
     public:
         CompileResult() = default;
-        CompileResult(String const& str) : format(ResultFormat::Text), outputString(str) {}
-        CompileResult(List<uint8_t> const& buffer) : format(ResultFormat::Binary), outputBinary(buffer) {}
-        CompileResult(ISlangSharedLibrary* inSharedLibrary) : format(ResultFormat::SharedLibrary), sharedLibrary(inSharedLibrary) {}
+        explicit CompileResult(String const& str) : format(ResultFormat::Text), outputString(str) {}
+        explicit CompileResult(ISlangBlob* inBlob) : format(ResultFormat::Binary), blob(inBlob) {}
+        explicit CompileResult(DownstreamCompileResult* inDownstreamResult): format(ResultFormat::Binary), downstreamResult(inDownstreamResult) {}
+        explicit CompileResult(const UnownedStringSlice& slice ) : format(ResultFormat::Text), outputString(slice) {}
 
-        void append(CompileResult const& result);
-
-        SlangResult getBlob(ComPtr<ISlangBlob>& outBlob);
+        SlangResult getBlob(ComPtr<ISlangBlob>& outBlob) const;
         SlangResult getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary);
 
         ResultFormat format = ResultFormat::None;
-        String outputString;
-        List<uint8_t> outputBinary;
+        String outputString;                    ///< Only set if result type is ResultFormat::Text
 
-        ComPtr<ISlangSharedLibrary> sharedLibrary;
-        ComPtr<ISlangBlob> blob;
+        mutable ComPtr<ISlangBlob> blob;
+
+        RefPtr<DownstreamCompileResult> downstreamResult;
     };
 
         /// Information collected about global or entry-point shader parameters
@@ -1087,11 +1085,6 @@ namespace Slang
         List<SearchDirectory>   searchDirectories;
     };
 
-    /// Create a blob that will retain (a copy of) raw data.
-    ///
-    ComPtr<ISlangBlob> createRawBlob(void const* data, size_t size);
-
-
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
@@ -1858,6 +1851,11 @@ namespace Slang
         char const*     text,
         CodeGenTarget   target);
 
+    void maybeDumpIntermediate(
+        BackEndCompileRequest* compileRequest,
+        DownstreamCompileResult* compileResult,
+        CodeGenTarget   target);
+
     /* Returns SLANG_OK if a codeGen target is available. */
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
     /* Returns SLANG_OK if pass through support is available */
@@ -1917,7 +1915,7 @@ namespace Slang
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
 
             /// Get the specified compiler
-        DownstreamCompiler* getCPPCompiler(PassThroughMode downstreamCompiler);
+        DownstreamCompiler* getDownstreamCompiler(PassThroughMode downstreamCompiler);
             /// Get the default cpp compiler for a language
         DownstreamCompiler* getDefaultCPPCompiler(SourceLanguage sourceLanguage);
 
@@ -2159,20 +2157,7 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     return reinterpret_cast<EndToEndCompileRequest*>(request);
 }
 
-class ListBlob : public ISlangBlob, public RefObject
-{
-public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-    // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
-
-    List<uint8_t> m_data;
-
-protected:
-    ISlangUnknown* getInterface(const Guid& guid);
-};
 
 }
 

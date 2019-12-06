@@ -8,6 +8,10 @@
 
 #include "slang-platform.h"
 
+#include "slang-io.h"
+
+#include "../../slang-com-ptr.h"
+
 namespace Slang
 {
 
@@ -75,8 +79,12 @@ struct DownstreamDiagnostics
 class DownstreamCompileResult : public RefObject
 {
 public:
-    const DownstreamDiagnostics& getDiagnostics() const { return m_diagnostics; }
 
+    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) = 0;
+    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) = 0;
+
+    const DownstreamDiagnostics& getDiagnostics() const { return m_diagnostics; }
+    
         /// Ctor
     DownstreamCompileResult(const DownstreamDiagnostics& diagnostics):
         m_diagnostics(diagnostics)
@@ -226,13 +234,7 @@ public:
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
-        /// Given the compilation options and the module name, determines the actual file name used for output
-    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
-        /// Given options determines the paths to products produced (including the 'moduleFilePath').
-        /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
-        /// be produced, such that can be removed on completion.
-    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths) = 0;
-
+ 
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
 
@@ -245,15 +247,53 @@ protected:
     Desc m_desc;
 };
 
+class CommandLineDownstreamCompileResult : public DownstreamCompileResult
+{
+public:
+    typedef DownstreamCompileResult Super;
+
+    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE;
+    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) SLANG_OVERRIDE;
+
+    CommandLineDownstreamCompileResult(const DownstreamDiagnostics& diagnostics, const String& moduleFilePath, TemporaryFileSet* temporaryFileSet, const List<String>& nonDebugPaths) :
+        Super(diagnostics),
+        m_moduleFilePath(moduleFilePath),
+        m_nonDebugPaths(nonDebugPaths),
+        m_temporaryFiles(temporaryFileSet)
+        
+    {
+    }
+    
+    RefPtr<TemporaryFileSet> m_temporaryFiles;
+
+protected:
+
+    List<String> m_nonDebugPaths;
+
+    String m_moduleFilePath;
+    DownstreamCompiler::CompileOptions m_options;
+    ComPtr<ISlangBlob> m_binaryBlob;
+    /// Cache of the shared library if appropriate
+    ComPtr<ISlangSharedLibrary> m_hostCallableSharedLibrary;
+};
+
 class CommandLineDownstreamCompiler : public DownstreamCompiler
 {
 public:
     typedef DownstreamCompiler Super;
 
-    // CPPCompiler
+    // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
     
-    // Functions to be implemented for a specific CommandLine    
+    // Functions to be implemented for a specific CommandLine
+
+        /// Given the compilation options and the module name, determines the actual file name used for output
+    virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
+        /// Given options determines the paths to products produced (including the 'moduleFilePath').
+        /// Note that does *not* guarentee all products were or should be produced. Just aims to include all that could
+        /// be produced, such that can be removed on completion.
+    virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths) = 0;
+
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) = 0;
 
@@ -278,7 +318,6 @@ class DownstreamCompilerSet : public RefObject
 public:
     typedef RefObject Super;
 
-    
         /// Find all the available compilers
     void getCompilerDescs(List<DownstreamCompiler::Desc>& outCompilerDescs) const;
         /// Returns list of all compilers

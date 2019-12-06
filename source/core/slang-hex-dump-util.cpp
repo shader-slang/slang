@@ -16,11 +16,16 @@ static const char s_hex[] = "0123456789abcdef";
 
 /* static */SlangResult HexDumpUtil::dumpWithMarkers(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
 {
+    return dumpWithMarkers(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
+}
+
+/* static */SlangResult HexDumpUtil::dumpWithMarkers(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+{
     WriterHelper helper(writer);
     SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.size()));
-    SLANG_RETURN_ON_FAIL(helper.print(" (%zu)\n", size_t(data.getCount())));
+    SLANG_RETURN_ON_FAIL(helper.print(" (%zu)\n", dataCount));
 
-    SLANG_RETURN_ON_FAIL(dump(data, maxBytesPerLine, writer));
+    SLANG_RETURN_ON_FAIL(dump(data, dataCount, maxBytesPerLine, writer));
 
     SLANG_RETURN_ON_FAIL(helper.write(s_end.begin(), s_end.size()));
     SLANG_RETURN_ON_FAIL(helper.put("\n"));
@@ -38,14 +43,19 @@ static const char s_hex[] = "0123456789abcdef";
     writer->write(c, 8);
 }
 
+
 /* static */SlangResult HexDumpUtil::dump(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
+{
+    return dump(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
+}
+
+/* static */SlangResult HexDumpUtil::dump(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
 {
     int maxCharsPerLine = 2 * maxBytesPerLine + 1 + maxBytesPerLine + 1;
 
-    const uint8_t* cur = data.begin();
-    const uint8_t* end = data.end();
-
- 
+    const uint8_t* cur = data;
+    const uint8_t* end = data + dataCount;
+    
     while (cur < end)
     {
         size_t count = size_t(end - cur);
