@@ -12,7 +12,7 @@ struct VisualStudioCompilerUtil : public DownstreamCompilerBaseUtil
         /// Calculate Visual Studio family compilers cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
         /// Parse Visual Studio exeRes into CPPCompiler::Output
-    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamCompiler::Output& outOutput);
+    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outOutput);
 
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
 
@@ -27,7 +27,7 @@ public:
 
     // CommandLineDownstreamCompiler impl  - just forwards to the Util
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
-    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
     virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags productFlags, List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, productFlags, outPaths); }
 

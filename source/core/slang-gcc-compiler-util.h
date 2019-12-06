@@ -19,7 +19,7 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
 
         /// Parse ExecuteResult into Output
-    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamCompiler::Output& outOutput);
+    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outOutput);
 
         /// Calculate the output module filename 
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
@@ -36,7 +36,7 @@ public:
 
     // CommandLineCPPCompiler impl  - just forwards to the Util
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE { return Util::calcArgs(options, cmdLine); }
-    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) SLANG_OVERRIDE { return Util::parseOutput(exeResult, output); }
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) SLANG_OVERRIDE { return Util::calcModuleFilePath(options, outPath); }
     virtual SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags,  List<String>& outPaths) SLANG_OVERRIDE { return Util::calcCompileProducts(options, flags, outPaths); }
 

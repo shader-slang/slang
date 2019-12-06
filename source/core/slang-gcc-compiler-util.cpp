@@ -92,9 +92,9 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, Downst
     return SLANG_FAIL;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamCompiler::Diagnostic::Type& outType)
+static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamDiagnostic::Type& outType)
 {
-    typedef DownstreamCompiler::Diagnostic::Type Type;
+    typedef DownstreamDiagnostic::Type Type;
 
     if (in == "error" || in == "fatal error")
     {
@@ -127,9 +127,9 @@ enum class LineParseResult
     
 } // anonymous
     
-static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParseResult& outLineParseResult, DownstreamCompiler::Diagnostic& outDiagnostic)
+static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParseResult& outLineParseResult, DownstreamDiagnostic& outDiagnostic)
 {
-    typedef DownstreamCompiler::Diagnostic Diagnostic;
+    typedef DownstreamDiagnostic Diagnostic;
     typedef Diagnostic::Type Type;
     
     // Set to default case
@@ -231,7 +231,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
         else if (text.startsWith("ld returned"))
         {
-            outDiagnostic.stage = DownstreamCompiler::Diagnostic::Stage::Link;
+            outDiagnostic.stage = DownstreamDiagnostic::Stage::Link;
             SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outDiagnostic.type));
             outDiagnostic.text = line;
             outLineParseResult = LineParseResult::Single;
@@ -285,7 +285,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamCompiler::Output& outOutput)
+/* static */SlangResult GCCDownstreamCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outOutput)
 {
     LineParseResult prevLineResult = LineParseResult::Ignore;
     
@@ -294,7 +294,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     for (auto line : LineParser(exeRes.standardError.getUnownedSlice()))
     {
-        DownstreamCompiler::Diagnostic diagnostic;
+        Diagnostic diagnostic;
         diagnostic.reset();
 
         LineParseResult lineRes;
@@ -341,7 +341,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
     }
 
-    if (outOutput.has(DownstreamCompiler::Diagnostic::Type::Error) || exeRes.resultCode != 0)
+    if (outOutput.has(Diagnostic::Type::Error) || exeRes.resultCode != 0)
     {
         outOutput.result = SLANG_FAIL;
     }

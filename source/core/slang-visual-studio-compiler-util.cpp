@@ -242,9 +242,9 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamCompiler::Diagnostic::Type& outType)
+static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Type& outType)
 {
-    typedef DownstreamCompiler::Diagnostic::Type Type;
+    typedef DownstreamDiagnostics::Diagnostic::Type Type;
 
     if (in == "error" || in == "fatal error")
     {
@@ -265,9 +265,9 @@ static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamCompi
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamCompiler::Diagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamDiagnostics::Diagnostic& outDiagnostic)
 {
-    typedef DownstreamCompiler::Diagnostic Diagnostic;
+    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
 
     UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
     if (line.startsWith(linkPrefix))
@@ -389,11 +389,11 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamCompiler::Output& outOutput)
+/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outDiagnostics)
 {
-    outOutput.reset();
+    outDiagnostics.reset();
 
-    outOutput.rawDiagnostics = exeRes.standardOutput;
+    outDiagnostics.rawDiagnostics = exeRes.standardOutput;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {
@@ -402,17 +402,17 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         fprintf(stdout, "\n");
 #endif
 
-        DownstreamCompiler::Diagnostic diagnostic;
+        Diagnostic diagnostic;
         if (SLANG_SUCCEEDED(_parseVisualStudioLine(line, diagnostic)))
         {
-            outOutput.diagnostics.add(diagnostic);
+            outDiagnostics.diagnostics.add(diagnostic);
         }
     }
 
     // if it has a compilation error.. set on output
-    if (outOutput.has(DownstreamCompiler::Diagnostic::Type::Error))
+    if (outDiagnostics.has(Diagnostic::Type::Error))
     {
-        outOutput.result = SLANG_FAIL;
+        outDiagnostics.result = SLANG_FAIL;
     }
 
     return SLANG_OK;

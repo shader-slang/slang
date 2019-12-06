@@ -30,11 +30,10 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
     out << minorVersion;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::OutputMessage !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostic !!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice DownstreamCompiler::Diagnostic::getTypeText(Diagnostic::Type type)
+/* static */UnownedStringSlice DownstreamDiagnostic::getTypeText(Type type)
 {
-    typedef Diagnostic::Type Type;
     switch (type)
     {
         default:            return UnownedStringSlice::fromLiteral("Unknown");
@@ -60,9 +59,9 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Output !!!!!!!!!!!!!!!!!!!!!!*/
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
 
-Index DownstreamCompiler::Output::getCountByType(Diagnostic::Type type) const
+Index DownstreamDiagnostics::getCountByType(Diagnostic::Type type) const
 {
     Index count = 0;
     for (const auto& msg : diagnostics)
@@ -72,7 +71,7 @@ Index DownstreamCompiler::Output::getCountByType(Diagnostic::Type type) const
     return count;
 }
 
-Int DownstreamCompiler::Output::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
+Int DownstreamDiagnostics::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
 {
     Int count = 0;
     ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Type::CountOf));
@@ -87,32 +86,32 @@ Int DownstreamCompiler::Output::countByStage(Diagnostic::Stage stage, Index coun
     return count++;
 }
 
-static void _appendCounts(const Index counts[Int(DownstreamCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(DownstreamDiagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef DownstreamCompiler::Diagnostic::Type Type;
+    typedef DownstreamDiagnostic::Type Type;
 
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << DownstreamCompiler::Diagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
+            out << DownstreamDiagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
         }
     }
 }
 
-static void _appendSimplified(const Index counts[Int(DownstreamCompiler::Diagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(DownstreamDiagnostic::Type::CountOf)], StringBuilder& out)
 {
-    typedef DownstreamCompiler::Diagnostic::Type Type;
+    typedef DownstreamDiagnostic::Type Type;
     for (Index i = 0; i < Int(Type::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << DownstreamCompiler::Diagnostic::getTypeText(Type(i)) << " ";
+            out << DownstreamDiagnostic::getTypeText(Type(i)) << " ";
         }
     }
 }
 
-void DownstreamCompiler::Output::appendSummary(StringBuilder& out) const
+void DownstreamDiagnostics::appendSummary(StringBuilder& out) const
 {
     Index counts[Int(Diagnostic::Type::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
@@ -129,7 +128,7 @@ void DownstreamCompiler::Output::appendSummary(StringBuilder& out) const
     }
 }
 
-void DownstreamCompiler::Output::appendSimplifiedSummary(StringBuilder& out) const
+void DownstreamDiagnostics::appendSimplifiedSummary(StringBuilder& out) const
 {
     Index counts[Int(Diagnostic::Type::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
@@ -146,7 +145,7 @@ void DownstreamCompiler::Output::appendSimplifiedSummary(StringBuilder& out) con
     }
 }
 
-void DownstreamCompiler::Output::removeByType(Diagnostic::Type type)
+void DownstreamDiagnostics::removeByType(Diagnostic::Type type)
 {
     Index count = diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
@@ -162,10 +161,8 @@ void DownstreamCompiler::Output::removeByType(Diagnostic::Type type)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options, Output& outOutput)
+SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& out)
 {
-    outOutput.reset();
-
     // Copy the command line options
     CommandLine cmdLine(m_cmdLine);
 
@@ -190,7 +187,11 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options
     }
 #endif
 
-    return parseOutput(exeRes, outOutput);
+    DownstreamDiagnostics diagnostics;
+    SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
+
+    out = new DownstreamCompileResult(diagnostics);
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/

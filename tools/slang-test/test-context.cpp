@@ -104,7 +104,7 @@ DownstreamCompilerSet* TestContext::getCPPCompilerSet()
     return cppCompilerSet;
 }
 
-Slang::DownstreamCompiler* TestContext::getDefaultCPPCompiler()
+Slang::DownstreamCompiler* TestContext::getDefaultCompiler()
 {
     DownstreamCompilerSet* set = getCPPCompilerSet();
     return set ? set->getDefaultCompiler() : nullptr;

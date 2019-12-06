@@ -1257,13 +1257,13 @@ String getExpectedOutput(String const& outputStem)
     return expectedOutput;
 }
 
-static String _calcSummary(const DownstreamCompiler::Output& inOutput)
+static String _calcSummary(const DownstreamDiagnostics& inOutput)
 {
-    DownstreamCompiler::Output output(inOutput);
+    DownstreamDiagnostics output(inOutput);
 
     // We only want to analyse errors for now
-    output.removeByType(DownstreamCompiler::Diagnostic::Type::Info);
-    output.removeByType(DownstreamCompiler::Diagnostic::Type::Warning);
+    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Info);
+    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Warning);
 
     StringBuilder builder;
 
@@ -1280,9 +1280,9 @@ static String _calcModulePath(const TestInput& input)
     return Path::combine(directory, moduleName);
 }
 
-static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
+static TestResult runCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();   
+    DownstreamCompiler* compiler = context->getDefaultCompiler();   
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1322,9 +1322,9 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
+static TestResult runCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler();
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1365,16 +1365,18 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     options.includePaths.add(".");
 
-    DownstreamCompiler::Output output;
-    if (SLANG_FAILED(compiler->compile(options, output)))
+    RefPtr<DownstreamCompileResult> compileResult;
+    if (SLANG_FAILED(compiler->compile(options, compileResult)))
     {
         return TestResult::Fail;
     }
 
-    if (SLANG_FAILED(output.result))
+    const auto& diagnostics = compileResult->getDiagnostics();
+
+    if (SLANG_FAILED(diagnostics.result))
     {
         // Compilation failed
-        String actualOutput = _calcSummary(output);
+        String actualOutput = _calcSummary(diagnostics);
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
@@ -1438,9 +1440,9 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     return TestResult::Pass;
 }
 
-static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
+static TestResult runCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCPPCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler();
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1480,18 +1482,20 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.sourceFiles.add(filePath);
     options.modulePath = modulePath;
 
-    DownstreamCompiler::Output output;
-    if (SLANG_FAILED(compiler->compile(options, output)))
+    RefPtr<DownstreamCompileResult> compileResult;
+    if (SLANG_FAILED(compiler->compile(options, compileResult)))
     {
         return TestResult::Fail;
     }
 
     String actualOutput;
 
+    const auto& diagnostics = compileResult->getDiagnostics();
+
     // If the actual compilation failed, then the output will be
-    if (SLANG_FAILED(output.result))
+    if (SLANG_FAILED(diagnostics.result))
     {
-        actualOutput = _calcSummary(output);
+        actualOutput = _calcSummary(diagnostics);
     }
     else
     {
@@ -2438,9 +2442,9 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
     { "COMPARE_GLSL",                           &runGLSLComparisonTest},
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
-    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
+    { "CPP_COMPILER_EXECUTE",                   &runCompilerExecute},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCompilerSharedLibrary},
+    { "CPP_COMPILER_COMPILE",                   &runCompilerCompile},
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
     { "COMPILE",                                &runCompile},
 };

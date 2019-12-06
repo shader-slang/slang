@@ -1518,8 +1518,10 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Compile
-        DownstreamCompiler::Output output;
-        SLANG_RETURN_ON_FAIL(compiler->compile(options, output));
+        RefPtr<DownstreamCompileResult> result;
+        SLANG_RETURN_ON_FAIL(compiler->compile(options, result));
+
+        const auto& diagnostics = result->getDiagnostics();
 
         {
             StringBuilder compilerText;
@@ -1527,9 +1529,9 @@ SlangResult dissassembleDXILUsingDXC(
 
             StringBuilder builder;
 
-            typedef DownstreamCompiler::Diagnostic Diagnostic;
+            typedef DownstreamDiagnostic Diagnostic;
 
-            for (const auto& diagnostic : output.diagnostics)
+            for (const auto& diagnostic : diagnostics.diagnostics)
             {
                 builder.Clear();
 
@@ -1574,7 +1576,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // If any errors are emitted, then we are done
-        if (output.has(DownstreamCompiler::Diagnostic::Type::Error))
+        if (diagnostics.has(DownstreamDiagnostic::Type::Error))
         {
             return SLANG_FAIL;
         }

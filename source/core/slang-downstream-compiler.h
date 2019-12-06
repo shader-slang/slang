@@ -11,10 +11,88 @@
 namespace Slang
 {
 
+struct DownstreamDiagnostic
+{
+    enum class Type
+    {
+        Unknown,
+        Info,
+        Warning,
+        Error,
+        CountOf,
+    };
+    enum class Stage
+    {
+        Compile,
+        Link,
+    };
+
+    void reset()
+    {
+        type = Type::Unknown;
+        stage = Stage::Compile;
+        fileLine = 0;
+    }
+    static UnownedStringSlice getTypeText(Type type);
+
+    Type type;                      ///< The type of error
+    Stage stage;                    ///< The stage the error came from
+    String text;                    ///< The text of the error
+    String code;                    ///< The compiler specific error code
+    String filePath;                ///< The path the error originated from
+    Int fileLine;                   ///< The line number the error came from
+};
+
+struct DownstreamDiagnostics
+{
+    typedef DownstreamDiagnostic Diagnostic;
+
+    /// Reset to an initial empty state
+    void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
+
+    /// Get the number of diagnostics by type
+    Index getCountByType(Diagnostic::Type type) const;
+    /// True if there are any diagnostics  of the type
+    bool has(Diagnostic::Type type) const { return getCountByType(type) > 0; }
+
+    /// Stores in outCounts, the amount of diagnostics for the stage of each type
+    Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Type::CountOf)]) const;
+
+    /// Append a summary to out
+    void appendSummary(StringBuilder& out) const;
+    /// Appends a summary that just identifies if there is an error of a type (not a count)
+    void appendSimplifiedSummary(StringBuilder& out) const;
+
+    /// Remove all diagnostics of the type
+    void removeByType(Diagnostic::Type type);
+
+    String rawDiagnostics;
+
+    SlangResult result;
+    List<Diagnostic> diagnostics;
+};
+
+class DownstreamCompileResult : public RefObject
+{
+public:
+    const DownstreamDiagnostics& getDiagnostics() const { return m_diagnostics; }
+
+        /// Ctor
+    DownstreamCompileResult(const DownstreamDiagnostics& diagnostics):
+        m_diagnostics(diagnostics)
+    {}
+
+protected:
+    DownstreamDiagnostics m_diagnostics;
+};
+
 class DownstreamCompiler: public RefObject
 {
 public:
     typedef RefObject Super;
+
+    typedef DownstreamCompileResult CompileResult;
+
     enum class CompilerType
     {
         Unknown,
@@ -120,39 +198,6 @@ public:
         List<String> libraryPaths;
     };
 
-    struct Diagnostic
-    {
-        enum class Type
-        {
-            Unknown,
-            Info,
-            Warning,
-            Error,
-            CountOf,
-        };
-        enum class Stage
-        {
-            Compile,
-            Link,
-        };
-
-        void reset()
-        {
-            type = Type::Unknown;
-            stage = Stage::Compile;
-            fileLine = 0;
-        }
-        static UnownedStringSlice getTypeText(Diagnostic::Type type);
-
-
-        Type type;                      ///< The type of error
-        Stage stage;                    ///< The stage the error came from
-        String text;                    ///< The text of the error
-        String code;                    ///< The compiler specific error code
-        String filePath;                ///< The path the error originated from
-        Int fileLine;                   ///< The line number the error came from
-    };
-
     typedef uint32_t ProductFlags;
     struct ProductFlag
     {
@@ -177,37 +222,10 @@ public:
         All,
     };
 
-    struct Output
-    {
-            /// Reset to an initial empty state
-        void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
-        
-            /// Get the number of diagnostics by type
-        Index getCountByType(Diagnostic::Type type) const;
-            /// True if there are any diagnostics  of the type
-        bool has(Diagnostic::Type type) const { return getCountByType(type) > 0; }
-
-            /// Stores in outCounts, the amount of diagnostics for the stage of each type
-        Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Type::CountOf)]) const;
-
-            /// Append a summary to out
-        void appendSummary(StringBuilder& out) const;
-            /// Appends a summary that just identifies if there is an error of a type (not a count)
-        void appendSimplifiedSummary(StringBuilder& out) const;
-        
-            /// Remove all diagnostics of the type
-        void removeByType(Diagnostic::Type type);
-
-        String rawDiagnostics;
-
-        SlangResult result;
-        List<Diagnostic> diagnostics;
-    };
-
         /// Get the desc of this compiler
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
-    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) = 0;
+    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
         /// Given the compilation options and the module name, determines the actual file name used for output
     virtual SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath) = 0;
         /// Given options determines the paths to products produced (including the 'moduleFilePath').
@@ -233,11 +251,11 @@ public:
     typedef DownstreamCompiler Super;
 
     // CPPCompiler
-    virtual SlangResult compile(const CompileOptions& options, Output& outOutput) SLANG_OVERRIDE;
+    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
     
     // Functions to be implemented for a specific CommandLine    
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
-    virtual SlangResult parseOutput(const ExecuteResult& exeResult, Output& output) = 0;
+    virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) = 0;
 
     CommandLineDownstreamCompiler(const Desc& desc, const String& exeName) :
         Super(desc)
@@ -290,7 +308,7 @@ protected:
     List<RefPtr<DownstreamCompiler>> m_compilers;
 };
 
-/* Only purpose of having base-class here is to make all the CPPCompiler types available directly in derived Utils */
+/* Only purpose of having base-class here is to make all the DownstreamCompiler types available directly in derived Utils */
 struct DownstreamCompilerBaseUtil
 {
     typedef DownstreamCompiler::CompileOptions CompileOptions;
@@ -300,7 +318,8 @@ struct DownstreamCompilerBaseUtil
     typedef DownstreamCompiler::SourceType SourceType;
     typedef DownstreamCompiler::CompilerType CompilerType;
 
-    typedef DownstreamCompiler::Diagnostic Diagnostic;
+    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
+
     typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
     typedef DownstreamCompiler::ProductFlag ProductFlag;
     typedef DownstreamCompiler::ProductFlags ProductFlags;
