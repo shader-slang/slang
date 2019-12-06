@@ -200,10 +200,7 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
         // Read the contents of the binary
         List<uint8_t> contents = File::readAllBytes(m_moduleFilePath);
 
-        // If the contents is going to possibly be executed, we leave the debug files
-        m_temporaryFiles->m_paths = m_nonDebugPaths;
-
-        m_binaryBlob = ListBlob::moveCreate(contents);
+        m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
         outBlob = m_binaryBlob;
         return SLANG_OK;
     }
@@ -261,25 +258,9 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options
     DownstreamDiagnostics diagnostics;
     SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
 
-    RefPtr<CommandLineDownstreamCompileResult> compileResult;
-    {
-        // TODO(JS): We have a problem here.. productFileSet will clear up all temporaries
-        // and although we return the binary here (through outBin), we don't return debug info
-        // which is separate (say with a pdb). To work around this we reevaluate productFileSet,
-        // so we don't include debug info. The executable will presumably be reconstructed from
-        // outBin
-        // The problem is that these files have no specific lifetime (unlike with HostCallable).
-
-        DownstreamCompiler::ProductFlags flags = DownstreamCompiler::ProductFlag::All;
-        flags &= ~DownstreamCompiler::ProductFlag::Debug;
-
-        List<String> nonDebugPaths;
-        SLANG_RETURN_ON_FAIL(calcCompileProducts(options, flags, nonDebugPaths));
-
-        compileResult = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet, nonDebugPaths);
-    }
-
-    out = compileResult;
+    
+    out = new CommandLineDownstreamCompileResult(diagnostics, moduleFilePath, productFileSet);
+    
     return SLANG_OK;
 }
 

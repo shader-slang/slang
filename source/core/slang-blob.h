@@ -1,6 +1,8 @@
 #ifndef SLANG_CORE_BLOB_H
 #define SLANG_CORE_BLOB_H
 
+#include "../../slang.h"
+
 #include "slang-string.h"
 #include "slang-list.h"
 
@@ -46,21 +48,25 @@ protected:
 class ListBlob : public BlobBase
 {
 public:
+    typedef BlobBase Super;
+    typedef ListBlob ThisType;
 
     // ISlangBlob
     SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data.getBuffer(); }
     SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_data.getCount(); }
 
-    static RefPtr<ListBlob> moveCreate(List<uint8_t>& data) 
-    {
-        RefPtr<ListBlob> blob(new ListBlob);
-        blob->m_data.swapWith(data);
-        return blob;
-    }
+    ListBlob() {}
+
+    ListBlob(const List<uint8_t>& data): m_data(data) {}
+        // Move ctor
+    ListBlob(List<uint8_t>&& data): m_data(data) {}
+
+    static RefPtr<ListBlob> moveCreate(List<uint8_t>& data) { return new ListBlob(_Move(data)); } 
 
     List<uint8_t> m_data;
 
 protected:
+    void operator=(const ThisType& rhs) = delete;
 };
 
 /** A blob that manages some raw data that it owns.
@@ -95,6 +101,25 @@ inline ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
 {
     return ComPtr<ISlangBlob>(new RawBlob(inData, size));
 }
+
+class ScopeRefObjectBlob : public BlobBase
+{
+public:
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_blob->getBufferPointer(); }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_blob->getBufferSize(); }
+
+    // Ctor
+    ScopeRefObjectBlob(ISlangBlob* blob, RefObject* scope) :
+        m_blob(blob),
+        m_scope(scope)
+    {
+    }
+
+protected:
+    RefPtr<RefObject> m_scope;
+    ComPtr<ISlangBlob> m_blob;
+};
 
 } // namespace Slang
 

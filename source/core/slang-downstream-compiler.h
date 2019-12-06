@@ -255,20 +255,16 @@ public:
     virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE;
     virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) SLANG_OVERRIDE;
 
-    CommandLineDownstreamCompileResult(const DownstreamDiagnostics& diagnostics, const String& moduleFilePath, TemporaryFileSet* temporaryFileSet, const List<String>& nonDebugPaths) :
+    CommandLineDownstreamCompileResult(const DownstreamDiagnostics& diagnostics, const String& moduleFilePath, TemporaryFileSet* temporaryFileSet) :
         Super(diagnostics),
         m_moduleFilePath(moduleFilePath),
-        m_nonDebugPaths(nonDebugPaths),
         m_temporaryFiles(temporaryFileSet)
-        
     {
     }
     
     RefPtr<TemporaryFileSet> m_temporaryFiles;
 
 protected:
-
-    List<String> m_nonDebugPaths;
 
     String m_moduleFilePath;
     DownstreamCompiler::CompileOptions m_options;
