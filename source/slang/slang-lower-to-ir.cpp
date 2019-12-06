@@ -6962,17 +6962,6 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
     {
         visitChildren(specialized);
     }
-
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        // TODO: This case should be akin to the `Module` case,
-        // and deal with global-scope specialization parameters
-        // directly.
-        //
-        SLANG_UNUSED(legacy);
-        SLANG_UNUSED(specializationInfo);
-        SLANG_UNIMPLEMENTED_X("legacy program case");
-    }
 };
 
 RefPtr<IRModule> generateIRForSpecializedComponentType(

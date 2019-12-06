@@ -306,13 +306,13 @@ struct UsedRangeSet : RefObject
 // Information on a single parameter
 struct ParameterInfo : RefObject
 {
-    // Layout info for the concrete variables that will make up this parameter
-    List<RefPtr<VarLayout>> varLayouts;
+    // Layout info for the variable that represents this parameter
+    RefPtr<VarLayout> varLayout;
 
     ParameterBindingInfo    bindingInfo[kLayoutResourceKindCount];
 
     // The translation unit this parameter is specific to, if any
-    TranslationUnitRequest* translationUnit = nullptr;
+//    TranslationUnitRequest* translationUnit = nullptr;
 
     ParameterInfo()
     {
@@ -696,9 +696,9 @@ static RefPtr<VarLayout> _createVarLayout(
 
 // Collect a single declaration into our set of parameters
 static void collectGlobalScopeParameter(
-    ParameterBindingContext*        context,
-    GlobalShaderParamInfo const&    shaderParamInfo,
-    SubstitutionSet                 globalGenericSubst)
+    ParameterBindingContext*    context,
+    ShaderParamInfo const&      shaderParamInfo,
+    SubstitutionSet             globalGenericSubst)
 {
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
@@ -722,7 +722,7 @@ static void collectGlobalScopeParameter(
     // Now create a variable layout that we can use
     RefPtr<VarLayout> varLayout = _createVarLayout(typeLayout, varDeclRef);
 
-    // The logic in `check.cpp` that created the `GlobalShaderParamInfo`
+    // The logic in `check.cpp` that created the `ShaderParamInfo`
     // will have identified any cases where there might be multiple
     // global variables that logically represent the same shader parameter.
     //
@@ -734,30 +734,10 @@ static void collectGlobalScopeParameter(
     ParameterInfo* parameterInfo = new ParameterInfo();
     context->shared->parameters.add(parameterInfo);
 
-    // Add the first variable declaration to the list of declarations for the parameter
-    parameterInfo->varLayouts.add(varLayout);
-
-    // Add any additional variables to the list of declarations
-    for( auto additionalVarDeclRef : shaderParamInfo.additionalParamDeclRefs )
-    {
-        // TODO: We should either eliminate the design choice where different
-        // declarations of the "same" shade parameter get merged across
-        // translation units (it is effectively just a compatiblity feature),
-        // or we should clean things up earlier in the chain so that we can
-        // re-use a single `VarLayout` across all of the different declarations.
-        //
-        // TODO: It would also make sense in these cases to ensure that
-        // such global shader parameters get the same mangled name across
-        // all translation units, so that they can automatically be collapsed
-        // during linking.
-
-        RefPtr<VarLayout> additionalVarLayout = new VarLayout();
-        additionalVarLayout->typeLayout = typeLayout;
-        additionalVarLayout->varDecl = additionalVarDeclRef;
-        additionalVarLayout->pendingVarLayout = varLayout->pendingVarLayout;
-
-        parameterInfo->varLayouts.add(additionalVarLayout);
-    }
+    // Add the created var layout to the parameter information structure,
+    // so that we can update it as we proceed with parameter binding.
+    //
+    parameterInfo->varLayout = varLayout;
 }
 
 static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
@@ -831,12 +811,6 @@ static void addExplicitParameterBinding(
             || bindingInfo.space != semanticInfo.space )
         {
             getSink(context)->diagnose(varDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(varDecl));
-
-            auto firstVarDecl = parameterInfo->varLayouts[0]->varDecl.getDecl();
-            if( firstVarDecl != varDecl )
-            {
-                getSink(context)->diagnose(firstVarDecl, Diagnostics::seeOtherDeclarationOf, getReflectionName(firstVarDecl));
-            }
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -859,13 +833,13 @@ static void addExplicitParameterBinding(
             markSpaceUsed(context, semanticInfo.space);
         }
         auto overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
-            parameterInfo->varLayouts[0],
+            parameterInfo->varLayout,
             semanticInfo.index,
             semanticInfo.index + count);
 
         if (overlappedVarLayout)
         {
-            auto paramA = parameterInfo->varLayouts[0]->varDecl.getDecl();
+            auto paramA = parameterInfo->varLayout->varDecl.getDecl();
             auto paramB = overlappedVarLayout->varDecl.getDecl();
 
             auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
@@ -1052,19 +1026,24 @@ void generateParameterBindings(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo)
 {
-    // There must be at least one declaration for the parameter.
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
+    // There must have been a declaration for the parameter.
+    SLANG_RELEASE_ASSERT(parameterInfo->varLayout);
 
-    // Iterate over all declarations looking for explicit binding information.
-    for( auto& varLayout : parameterInfo->varLayouts )
-    {
-        // Handle HLSL `register` and `packoffset` modifiers
-        addExplicitParameterBindings_HLSL(context, parameterInfo, varLayout);
+    // We will look for explicit binding information on the declaration.
+    auto varLayout = parameterInfo->varLayout;
+
+    // Handle HLSL `register` and `packoffset` modifiers
+    addExplicitParameterBindings_HLSL(context, parameterInfo, varLayout);
 
 
-        // Handle GLSL `layout` modifiers
-        addExplicitParameterBindings_GLSL(context, parameterInfo, varLayout);
-    }
+    // Handle GLSL `layout` modifiers and `[vk::...]` attributes.
+    //
+    // TODO: We should deprecate the support for `layout` and then rename
+    // these `_HLSL` and `_GLSL` functions to be more explicit and clear
+    // about the fact that they are specific to the *target* and not to
+    // the *source language* (as they were at one point).
+    //
+    addExplicitParameterBindings_GLSL(context, parameterInfo, varLayout);
 }
 
 // Generate the binding information for a shader parameter.
@@ -1292,17 +1271,12 @@ static void completeBindingsForParameter(
     ParameterBindingContext*    context,
     RefPtr<ParameterInfo>       parameterInfo)
 {
-    // We will use the first declaration of the parameter as
-    // a stand-in for all the declarations, so it is important
-    // that earlier code has validated that the declarations
-    // "match".
-
-    SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-    auto firstVarLayout = parameterInfo->varLayouts.getFirst();
+    auto varLayout = parameterInfo->varLayout;
+    SLANG_RELEASE_ASSERT(varLayout);
 
     completeBindingsForParameterImpl(
         context,
-        firstVarLayout,
+        varLayout,
         parameterInfo->bindingInfo,
         parameterInfo);
 
@@ -1310,10 +1284,7 @@ static void completeBindingsForParameter(
     // all the relevant resource kinds, so we can apply these to the
     // declarations:
 
-    for(auto& varLayout : parameterInfo->varLayouts)
-    {
-        applyBindingInfoToParameter(varLayout, parameterInfo->bindingInfo);
-    }
+    applyBindingInfoToParameter(varLayout, parameterInfo->bindingInfo);
 }
 
 static void completeBindingsForParameter(
@@ -1925,11 +1896,10 @@ struct ScopeLayoutBuilder
     }
 
     void _addParameter(
-        RefPtr<VarLayout>   firstVarLayout,
-        ParameterInfo*      parameterInfo)
+        RefPtr<VarLayout>   varLayout)
     {
         // Does the parameter have any uniform data?
-        auto layoutInfo = firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+        auto layoutInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
         if( uniformSize != 0 )
         {
@@ -1937,44 +1907,24 @@ struct ScopeLayoutBuilder
 
             UniformLayoutInfo fieldInfo(
                 uniformSize,
-                firstVarLayout->typeLayout->uniformAlignment);
+                varLayout->typeLayout->uniformAlignment);
 
             LayoutSize uniformOffset = m_rules->AddStructField(
                 &m_structLayoutInfo,
                 fieldInfo);
 
-            if( parameterInfo )
-            {
-                for( auto& varLayout : parameterInfo->varLayouts )
-                {
-                    varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
-                }
-            }
-            else
-            {
-                firstVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
-            }
+            varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
         }
 
-        m_structLayout->fields.add(firstVarLayout);
+        m_structLayout->fields.add(varLayout);
 
-        if( parameterInfo )
-        {
-            for( auto& varLayout : parameterInfo->varLayouts )
-            {
-                m_structLayout->mapVarToLayout.Add(varLayout->varDecl.getDecl(), varLayout);
-            }
-        }
-        else
-        {
-            m_structLayout->mapVarToLayout.Add(firstVarLayout->varDecl.getDecl(), firstVarLayout);
-        }
+        m_structLayout->mapVarToLayout.Add(varLayout->varDecl.getDecl(), varLayout);
     }
 
     void addParameter(
         RefPtr<VarLayout> varLayout)
     {
-        _addParameter(varLayout, nullptr);
+        _addParameter(varLayout);
 
         // Any "pending" items on a field type become "pending" items
         // on the overall `struct` type layout.
@@ -1997,17 +1947,17 @@ struct ScopeLayoutBuilder
     void addParameter(
         ParameterInfo* parameterInfo)
     {
-        SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-        auto firstVarLayout = parameterInfo->varLayouts.getFirst();
+        auto varLayout = parameterInfo->varLayout;
+        SLANG_RELEASE_ASSERT(varLayout);
 
-        _addParameter(firstVarLayout, parameterInfo);
+        _addParameter(varLayout);
 
         // Global parameters will have their non-orindary/uniform
         // pending data handled by the main parameter binding
         // logic, but we still need to construct a layout
         // that includes any pending data.
         //
-        if(auto fieldPendingVarLayout = firstVarLayout->pendingVarLayout)
+        if(auto fieldPendingVarLayout = varLayout->pendingVarLayout)
         {
             auto fieldPendingTypeLayout = fieldPendingVarLayout->typeLayout;
 
@@ -2404,13 +2354,6 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
     {
         specialized->getBaseComponentType()->acceptVisitor(this, specialized->getSpecializationInfo());
     }
-
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        // TODO: Need to do something in this case...
-        SLANG_UNUSED(legacy);
-        SLANG_UNUSED(specializationInfo);
-    }
 };
 
     /// Collect an ordered list of all the specialization arguments given for global generic specialization parameters in `program`.
@@ -2563,34 +2506,6 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         }
     }
 
-
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        // A legacy program is also a leaf case, and we
-        // can enumerate its parameters directly.
-        //
-        // Note: there is a mismatch here where we really
-        // ought to be tracking specialization arguments
-        // for a `LegacyProgram` akin to how they are
-        // tracked for a `Module`, but right now we try
-        // to do it like a `CompositeComponentType`.
-        // As a result we are just ignoring specialization
-        // information here, which will lead to incorrect
-        // results if somebody every uses specialization
-        // together with the "legacy" program case.
-        //
-        // TODO: eliminate this problem by getting rid of
-        // `LegacyProgram`, rather than spend time trying
-        // to make this corner case actually work.
-        //
-        SLANG_UNUSED(specializationInfo);
-
-        auto paramCount = legacy->getShaderParamCount();
-        for(Index pp = 0; pp < paramCount; ++pp)
-        {
-            collectGlobalScopeParameter(m_context, legacy->getShaderParam(pp), SubstitutionSet());
-        }
-    }
 };
 
     /// Recursively collect the global shader parameters and entry points in `program`.
@@ -2751,13 +2666,6 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         visitLeafParams(module);
     }
 
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(specializationInfo);
-        // A legacy program is a leaf case: we just want to visit each parameter.
-        visitLeafParams(legacy);
-    }
-
     void visitLeafParams(ComponentType* componentType)
     {
         auto paramCount = componentType->getShaderParamCount();
@@ -2881,12 +2789,6 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         visitLeafParams(module);
     }
 
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(specializationInfo);
-        visitLeafParams(legacy);
-    }
-
     void visitLeafParams(ComponentType* componentType)
     {
         // In the "leaf" case we just allocate space for any
@@ -2897,9 +2799,9 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         {
             auto globalParamIndex = m_counters->globalParamCounter++;
             auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
-            auto firstVarLayout = globalParamInfo->varLayouts[0];
+            auto varLayout = globalParamInfo->varLayout;
 
-            _allocateBindingsForPendingData(m_context, firstVarLayout->pendingVarLayout);
+            _allocateBindingsForPendingData(m_context, varLayout->pendingVarLayout);
         }
     }
 
@@ -3072,14 +2974,14 @@ RefPtr<ProgramLayout> generateParameterBindings(
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {
-            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-            auto firstVarLayout = parameterInfo->varLayouts.getFirst();
+            auto varLayout = parameterInfo->varLayout;
+            SLANG_RELEASE_ASSERT(varLayout);
 
             // Does the field have any uniform data?
-            if( firstVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+            if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
                 needDefaultConstantBuffer = true;
-                diagnoseGlobalUniform(&sharedContext, firstVarLayout->varDecl);
+                diagnoseGlobalUniform(&sharedContext, varLayout->varDecl);
             }
         }
     }
@@ -3102,12 +3004,12 @@ RefPtr<ProgramLayout> generateParameterBindings(
         //
         for (auto& parameterInfo : sharedContext.parameters)
         {
-            SLANG_RELEASE_ASSERT(parameterInfo->varLayouts.getCount() != 0);
-            auto firstVarLayout = parameterInfo->varLayouts.getFirst();
+            auto varLayout = parameterInfo->varLayout;
+            SLANG_RELEASE_ASSERT(varLayout);
 
             // For each parameter, we will look at each resource it consumes.
             //
-            for (auto resInfo : firstVarLayout->typeLayout->resourceInfos)
+            for (auto resInfo : varLayout->typeLayout->resourceInfos)
             {
                 // We don't care about whole register spaces/sets, since
                 // we don't need to allocate a default space/set for a parameter
