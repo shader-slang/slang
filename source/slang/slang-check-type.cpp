@@ -74,7 +74,7 @@ namespace Slang
     {
         if (auto overloadedExpr = as<OverloadedExpr>(expr))
         {
-            expr = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
+            expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
         }
 
         if (auto typeType = as<TypeType>(expr->type))
@@ -115,7 +115,7 @@ namespace Slang
         if (auto overloadedExpr = as<OverloadedExpr>(exp))
         {
             // assume that if it is overloaded, we want a type
-            exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::type);
+            exp = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
         }
 
         if (auto typeType = as<TypeType>(exp->type))
@@ -162,7 +162,11 @@ namespace Slang
         Type* type = typeExp.type.Ptr();
         if(!type && typeExp.exp)
         {
-            if(auto typeType = as<TypeType>(typeExp.exp->type))
+            auto expr = typeExp.exp;
+
+            expr = maybeResolveOverloadedExpr(expr, LookupMask::type, diagSink);
+
+            if(auto typeType = as<TypeType>(expr->type))
             {
                 type = typeType->type;
             }

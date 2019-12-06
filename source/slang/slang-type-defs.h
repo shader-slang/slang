@@ -488,3 +488,17 @@ RAW(
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 )
 END_SYNTAX_CLASS()
+
+    /// The type of `this` within a polymorphic declaration
+SYNTAX_CLASS(ThisType, Type)
+RAW(
+    DeclRef<InterfaceDecl> interfaceDeclRef;
+
+    virtual String ToString() override;
+    virtual bool EqualsImpl(Type * type) override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+)
+END_SYNTAX_CLASS()
+

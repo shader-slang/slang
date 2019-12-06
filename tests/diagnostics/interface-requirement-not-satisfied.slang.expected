@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/diagnostics/interface-requirement-not-satisfied.slang(10): error 38100: type 'T' does not provide required interface member 'bar'
+}
+standard output = {
+}
