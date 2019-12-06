@@ -1,7 +1,5 @@
-result code = -1
+result code = 0
 standard error = {
-tests/diagnostics/gh-38-fs.hlsl(7): error 39000: conflicting explicit bindings for parameter 'conflicting'
-tests/diagnostics/gh-38-vs.hlsl(7): note: see other declaration of 'conflicting'
 tests/diagnostics/gh-38-fs.hlsl(5): warning 39001: explicit binding for parameter 'overlappingB' overlaps with parameter 'overlappingA'
 tests/diagnostics/gh-38-vs.hlsl(5): note: see declaration of 'overlappingA'
 }

@@ -297,112 +297,92 @@ DownstreamCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage
     return getDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-struct IncludeHandlerImpl : IncludeHandler
+ISlangFileSystemExt* IncludeHandlerImpl::_getFileSystemExt()
 {
-    Linkage*    linkage;
-    SearchDirectoryList*    searchDirectories;
+    return linkage->getFileSystemExt();
+}
 
-    ISlangFileSystemExt* _getFileSystemExt()
+SlangResult IncludeHandlerImpl::_findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut)
+{
+    ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
+
+    // Get relative path
+    ComPtr<ISlangBlob> combinedPathBlob;
+    SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
+    String combinedPath(StringUtil::getString(combinedPathBlob));
+    if (combinedPath.getLength() <= 0)
     {
-        return linkage->getFileSystemExt();
+        return SLANG_FAIL;
     }
-
-    SlangResult _findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut)
-    {
-        ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
-
-        // Get relative path
-        ComPtr<ISlangBlob> combinedPathBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
-        String combinedPath(StringUtil::getString(combinedPathBlob));
-        if (combinedPath.getLength() <= 0)
-        {
-            return SLANG_FAIL;
-        }
      
-        SlangPathType pathType;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(combinedPath.begin(), &pathType));
-        if (pathType != SLANG_PATH_TYPE_FILE)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-
-        // Get the uniqueIdentity
-        ComPtr<ISlangBlob> uniqueIdentityBlob;
-        SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
-
-        // If the rel path exists -> a uniqueIdentity MUST exists too
-        String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
-        if (uniqueIdentity.getLength() <= 0)
-        {   
-            // Unique identity can't be empty
-            return SLANG_FAIL;
-        }
-        
-        pathInfoOut.type = PathInfo::Type::Normal;
-        pathInfoOut.foundPath = combinedPath;
-        pathInfoOut.uniqueIdentity = uniqueIdentity;
-        return SLANG_OK;     
+    SlangPathType pathType;
+    SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(combinedPath.begin(), &pathType));
+    if (pathType != SLANG_PATH_TYPE_FILE)
+    {
+        return SLANG_E_NOT_FOUND;
     }
 
-    virtual SlangResult findFile(
-        String const& pathToInclude,
-        String const& pathIncludedFrom,
-        PathInfo& pathInfoOut) override
-    {
-        pathInfoOut.type = PathInfo::Type::Unknown;
+    // Get the uniqueIdentity
+    ComPtr<ISlangBlob> uniqueIdentityBlob;
+    SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
 
-        // Try just relative to current path
+    // If the rel path exists -> a uniqueIdentity MUST exists too
+    String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
+    if (uniqueIdentity.getLength() <= 0)
+    {   
+        // Unique identity can't be empty
+        return SLANG_FAIL;
+    }
+        
+    pathInfoOut.type = PathInfo::Type::Normal;
+    pathInfoOut.foundPath = combinedPath;
+    pathInfoOut.uniqueIdentity = uniqueIdentity;
+    return SLANG_OK;     
+}
+
+SlangResult IncludeHandlerImpl::findFile(
+    String const& pathToInclude,
+    String const& pathIncludedFrom,
+    PathInfo& pathInfoOut)
+{
+    pathInfoOut.type = PathInfo::Type::Unknown;
+
+    // Try just relative to current path
+    {
+        SlangResult res = _findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
+        // It either succeeded or wasn't found, anything else is a failure passed back
+        if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
         {
-            SlangResult res = _findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
-            // It either succeeded or wasn't found, anything else is a failure passed back
+            return res;
+        }
+    }
+
+    // Search all the searchDirectories
+    for(auto sd = searchDirectories; sd; sd = sd->parent)
+    {
+        for(auto& dir : sd->searchDirectories)
+        {
+            SlangResult res = _findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, pathInfoOut);
             if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
             {
                 return res;
             }
         }
-
-        // Search all the searchDirectories
-        for(auto sd = searchDirectories; sd; sd = sd->parent)
-        {
-            for(auto& dir : sd->searchDirectories)
-            {
-                SlangResult res = _findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, pathInfoOut);
-                if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
-                {
-                    return res;
-                }
-            }
-        }
-
-        return SLANG_E_NOT_FOUND;
     }
 
-#if 0
-    virtual SlangResult readFile(const String& path,
-        ISlangBlob** blobOut) override
+    return SLANG_E_NOT_FOUND;
+}
+
+String IncludeHandlerImpl::simplifyPath(const String& path)
+{
+    ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
+    ComPtr<ISlangBlob> simplifiedPath;
+    if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
     {
-        ISlangFileSystem* fileSystemExt = _getFileSystemExt();
-        SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.begin(), blobOut));
-
-        request->mDependencyFilePaths.Add(path);
-
-        return SLANG_OK;
+        return path;
     }
-#endif
-
-    virtual String simplifyPath(const String& path) override
-    {
-        ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
-        ComPtr<ISlangBlob> simplifiedPath;
-        if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
-        {
-            return path;
-        }
-        return StringUtil::getString(simplifiedPath);
-    }
-
-};
+    return StringUtil::getString(simplifiedPath);
+}
 
 //
 
@@ -1990,11 +1970,6 @@ struct EnumerateModulesVisitor : ComponentTypeVisitor
     {
         visitChildren(specialized);
     }
-
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        visitChildren(legacy, specializationInfo);
-    }
 };
 
 
@@ -2032,11 +2007,6 @@ struct EnumerateIRModulesVisitor : ComponentTypeVisitor
         visitChildren(specialized);
 
         m_callback(specialized->getIRModule(), m_userData);
-    }
-
-    void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        visitChildren(legacy, specializationInfo);
     }
 };
 
@@ -2162,7 +2132,7 @@ Index CompositeComponentType::getShaderParamCount()
     return m_shaderParams.getCount();
 }
 
-GlobalShaderParamInfo CompositeComponentType::getShaderParam(Index index)
+ShaderParamInfo CompositeComponentType::getShaderParam(Index index)
 {
     return m_shaderParams[index];
 }
@@ -2308,8 +2278,6 @@ SpecializedComponentType::SpecializedComponentType(
         { visitChildren(composite, specializationInfo); }
         void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
         { visitChildren(specialized); }
-        void visitLegacy(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-        { visitChildren(legacy, specializationInfo); }
     };
 
     // With the visitor defined, we apply it to ourself to compute
@@ -2346,96 +2314,6 @@ String SpecializedComponentType::getEntryPointMangledName(Index index)
     return m_entryPointMangledNames[index];
 }
 
-//
-// LegacyProgram
-//
-
-LegacyProgram::LegacyProgram(
-    Linkage*                                    linkage,
-    List<RefPtr<TranslationUnitRequest>> const& translationUnits,
-    DiagnosticSink*                             sink)
-    : ComponentType(linkage)
-    , m_translationUnits(translationUnits)
-{
-    HashSet<ComponentType*> requirementsSet;
-
-    for(auto translationUnit : translationUnits )
-    {
-        ComponentType* child = translationUnit->getModule();
-
-        auto childEntryPointCount = child->getEntryPointCount();
-        for(Index cc = 0; cc < childEntryPointCount; ++cc)
-        {
-            m_entryPoints.add(child->getEntryPoint(cc));
-        }
-
-        for(auto module : child->getModuleDependencies())
-        {
-            m_moduleDependencies.addDependency(module);
-        }
-        for(auto filePath : child->getFilePathDependencies())
-        {
-            m_fileDependencies.addDependency(filePath);
-        }
-
-        auto childRequirementCount = child->getRequirementCount();
-        for(Index rr = 0; rr < childRequirementCount; ++rr)
-        {
-            auto childRequirement = child->getRequirement(rr);
-            if(!requirementsSet.Contains(childRequirement))
-            {
-                requirementsSet.Add(childRequirement);
-                m_requirements.add(childRequirement);
-            }
-        }
-    }
-
-    _collectShaderParams(sink);
-}
-
-void LegacyProgram::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
-{
-    visitor->visitLegacy(this, as<CompositeComponentType::CompositeSpecializationInfo>(specializationInfo));
-}
-
-RefPtr<ComponentType::SpecializationInfo> LegacyProgram::_validateSpecializationArgsImpl(
-    SpecializationArg const*    args,
-    Index                       argCount,
-    DiagnosticSink*             sink)
-{
-    SLANG_UNUSED(argCount);
-
-    RefPtr<CompositeComponentType::CompositeSpecializationInfo> info = new CompositeComponentType::CompositeSpecializationInfo();
-
-    Index offset = 0;
-    for(auto translationUnit : m_translationUnits)
-    {
-        ComponentType* child = translationUnit->getModule();
-        auto childParamCount = child->getSpecializationParamCount();
-        SLANG_ASSERT(offset + childParamCount <= argCount);
-
-        auto childInfo = child->_validateSpecializationArgs(
-            args + offset,
-            childParamCount,
-            sink);
-
-        info->childInfos.add(childInfo);
-
-        offset += childParamCount;
-    }
-    return info;
-}
-
-Index LegacyProgram::getRequirementCount()
-{
-    return m_requirements.getCount();
-}
-
-RefPtr<ComponentType> LegacyProgram::getRequirement(Index index)
-{
-    return m_requirements[index];
-}
-
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
 {
     auto childCount = composite->getChildComponentCount();
@@ -2453,21 +2331,6 @@ void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, Comp
 void ComponentTypeVisitor::visitChildren(SpecializedComponentType* specialized)
 {
     specialized->getBaseComponentType()->acceptVisitor(this, specialized->getSpecializationInfo());
-}
-
-void ComponentTypeVisitor::visitChildren(LegacyProgram* legacy, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
-{
-    auto childCount = legacy->getTranslationUnitCount();
-    for(Index ii = 0; ii < childCount; ++ii)
-    {
-        auto translationUnit = legacy->getTranslationUnit(ii);
-        ComponentType* child = translationUnit->getModule();
-        auto childSpecializationInfo = specializationInfo
-            ? specializationInfo->childInfos[ii]
-            : nullptr;
-
-        child->acceptVisitor(this, childSpecializationInfo);
-    }
 }
 
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
