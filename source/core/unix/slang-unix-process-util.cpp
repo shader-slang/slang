@@ -175,9 +175,9 @@ namespace Slang {
                 return SLANG_FAIL;
             }
 
-            // Set a timeout of ten seconds;
+            // Set a timeout of twenty seconds;
             // we really shouldn't wait too long...
-            int pollTimeout = 10000;
+            int pollTimeout = 20000;
             int pollResult = poll(pollInfos, pollInfoCount, pollTimeout);
             if (pollResult <= 0)
             {
