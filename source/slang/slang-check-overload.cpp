@@ -1,6 +1,8 @@
 // slang-check-overload.cpp
 #include "slang-check-impl.h"
 
+#include "slang-lookup.h"
+
 // This file implements semantic checking logic related
 // to resolving overloading call operations, by checking
 // the applicability and relative priority of various candidates.
@@ -482,6 +484,59 @@ namespace Slang
         }
     }
 
+        /// Does the given `declRef` represent an interface requirement?
+    bool isInterfaceRequirement(DeclRef<Decl> const& declRef)
+    {
+        if(!declRef)
+            return false;
+
+        auto parent = declRef.GetParent();
+        if(parent.as<GenericDecl>())
+            parent = parent.GetParent();
+
+        if(parent.as<InterfaceDecl>())
+            return true;
+
+        return false;
+    }
+
+    int SemanticsVisitor::CompareLookupResultItems(
+        LookupResultItem const& left,
+        LookupResultItem const& right)
+    {
+        // It is possible for lookup to return both an interface requirement
+        // and the concrete function that satisfies that requirement.
+        // We always want to favor a concrete method over an interface
+        // requirement it might override.
+        //
+        // TODO: This should turn into a more detailed check such that
+        // a candidate for declaration A is always better than a candidate
+        // for declaration B if A is an override of B. We can't
+        // easily make that check right now because we aren't tracking
+        // this kind of "is an override of ..." information on declarations
+        // directly (it is only visible through the requirement witness
+        // information for inheritance declarations).
+        //
+        bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef);
+        bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef);
+        if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
+            return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+
+        // TODO: We should always have rules such that in a tie a declaration
+        // A::m is better than B::m when all other factors are equal and
+        // A inherits from B.
+
+        // TODO: There are other cases like this we need to add in terms
+        // of ranking/prioritizing overloads, around things like
+        // "transparent" members, or when lookup proceeds from an "inner"
+        // to an "outer" scope. In many cases the right way to proceed
+        // could involve attaching a distance/cost/rank to things directly
+        // as part of lookup, and in other cases it might be best handled
+        // as a semantic check based on the actual declarations found.
+
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -496,6 +551,15 @@ namespace Slang
         {
             if (left->conversionCostSum != right->conversionCostSum)
                 return left->conversionCostSum - right->conversionCostSum;
+
+            // If all conversion costs match, then we should consider
+            // whether one of the two items/declarations should be
+            // preferred based on grounds that have nothing to do
+            // with applicability or conversion costs.
+            //
+            auto itemDiff = CompareLookupResultItems(left->item, right->item);
+            if(itemDiff)
+                return itemDiff;
         }
 
         return 0;
@@ -758,135 +822,39 @@ namespace Slang
         return DeclRef<Decl>(innerDecl, constraintSubst);
     }
 
-    void SemanticsVisitor::AddAggTypeOverloadCandidates(
-        LookupResultItem        typeItem,
-        RefPtr<Type>            type,
-        DeclRef<AggTypeDecl>    aggTypeDeclRef,
-        OverloadResolveContext& context,
-        RefPtr<Type>            resultType)
-    {
-        for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(aggTypeDeclRef))
-        {
-            // now work through this candidate...
-            AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
-        }
-
-        // Also check for generic constructors.
-        //
-        // TODO: There is way too much duplication between this case and the extension
-        // handling below, and all of this is *also* duplicative with the ordinary
-        // overload resolution logic for function.
-        //
-        // The right solution is to handle a "constructor" call expression by
-        // first doing member lookup in the type (for initializer members, which
-        // should all share a common name), and then to do overload resolution using
-        // the (possibly overloaded) result of that lookup.
-        //
-        for (auto genericDeclRef : getMembersOfType<GenericDecl>(aggTypeDeclRef))
-        {
-            if (auto ctorDecl = as<ConstructorDecl>(genericDeclRef.getDecl()->inner))
-            {
-                DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
-                if (!innerRef)
-                    continue;
-
-                DeclRef<ConstructorDecl> innerCtorRef = innerRef.as<ConstructorDecl>();
-                AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context, resultType);
-            }
-        }
-
-        // Now walk through any extensions we can find for this types
-        for (auto ext = GetCandidateExtensions(aggTypeDeclRef); ext; ext = ext->nextCandidateExtension)
-        {
-            auto extDeclRef = ApplyExtensionToType(ext, type);
-            if (!extDeclRef)
-                continue;
-
-            for (auto ctorDeclRef : getMembersOfType<ConstructorDecl>(extDeclRef))
-            {
-                // TODO(tfoley): `typeItem` here should really reference the extension...
-
-                // now work through this candidate...
-                AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context, resultType);
-            }
-
-            // Also check for generic constructors
-            for (auto genericDeclRef : getMembersOfType<GenericDecl>(extDeclRef))
-            {
-                if (auto ctorDecl = genericDeclRef.getDecl()->inner.as<ConstructorDecl>())
-                {
-                    DeclRef<Decl> innerRef = SpecializeGenericForOverload(genericDeclRef, context);
-                    if (!innerRef)
-                        continue;
-
-                    DeclRef<ConstructorDecl> innerCtorRef = innerRef.as<ConstructorDecl>();
-
-                    AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context, resultType);
-
-                    // TODO(tfoley): need a way to do the solving step for the constraint system
-                }
-            }
-        }
-    }
-
-    void SemanticsVisitor::addGenericTypeParamOverloadCandidates(
-        DeclRef<GenericTypeParamDecl>   typeDeclRef,
-        OverloadResolveContext&         context,
-        RefPtr<Type>                    resultType)
-    {
-        // We need to look for any constraints placed on the generic
-        // type parameter, since they will give us information on
-        // interfaces that the type must conform to.
-
-        // We expect the parent of the generic type parameter to be a generic...
-        auto genericDeclRef = typeDeclRef.GetParent().as<GenericDecl>();
-        SLANG_ASSERT(genericDeclRef);
-
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
-        {
-            // Does this constraint pertain to the type we are working on?
-            //
-            // We want constraints of the form `T : Foo` where `T` is the
-            // generic parameter in question, and `Foo` is whatever we are
-            // constraining it to.
-            auto subType = GetSub(constraintDeclRef);
-            auto subDeclRefType = as<DeclRefType>(subType);
-            if(!subDeclRefType)
-                continue;
-            if(!subDeclRefType->declRef.Equals(typeDeclRef))
-                continue;
-
-            // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
-            // will tell us a type we should use for lookup.
-            auto bound = GetSup(constraintDeclRef);
-
-            // Go ahead and use the target type:
-            //
-            // TODO: Need to consider case where this might recurse infinitely.
-            AddTypeOverloadCandidates(bound, context, resultType);
-        }
-    }
-
     void SemanticsVisitor::AddTypeOverloadCandidates(
-        RefPtr<Type>	        type,
-        OverloadResolveContext&	context,
-        RefPtr<Type>            resultType)
+        RefPtr<Type>            type,
+        OverloadResolveContext&	context)
     {
-        if (auto declRefType = as<DeclRefType>(type))
-        {
-            auto declRef = declRefType->declRef;
-            if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
-            {
-                AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context, resultType);
-            }
-            else if(auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
-            {
-                addGenericTypeParamOverloadCandidates(
-                    genericTypeParamDeclRef,
-                    context,
-                    resultType);
-            }
-        }
+        // The code being checked is trying to apply `type` like a function.
+        // Semantically, the operations `T(args...)` is equivalent to
+        // `T.__init(args...)` if we had a surface syntax that supported
+        // looking up `__init` declarations by that name.
+        //
+        // Internally, all `__init` declarations are stored with the name
+        // `$init`, to avoid potential conflicts if a user decided to name
+        // a field/method `__init`.
+        //
+        // We will look up all the initializers on `type` by looking up
+        // its members named `$init`, and then proceed to perform overload
+        // resolution with what we find.
+        //
+        // TODO: One wrinkle here is single-argument constructor syntax.
+        // An operation like `(T) oneArg` or `T(oneArg)` is currently
+        // treated as a call expression, but we might want such cases
+        // to go through the type coercion logic first/instead, because
+        // by doing so we could weed out cases where a type is "constructed"
+        // from a value of the same type. There is no need in Slang for
+        // "copy constructors" but the stdlib currently has to define
+        // some just to make code that does, e.g., `float(1.0f)` work.
+
+        LookupResult initializers = lookUpMember(
+            getSession(),
+            this,
+            getName("$init"),
+            type);
+
+        AddOverloadCandidates(initializers, context);
     }
 
     void SemanticsVisitor::AddDeclRefOverloadCandidates(
@@ -904,7 +872,7 @@ namespace Slang
             auto type = DeclRefType::Create(
                 getSession(),
                 aggTypeDeclRef);
-            AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context, type);
+            AddTypeOverloadCandidates(type, context);
         }
         else if (auto genericDeclRef = item.declRef.as<GenericDecl>())
         {
@@ -938,18 +906,35 @@ namespace Slang
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
             auto type = getNamedType(getSession(), typeDefDeclRef);
-            AddTypeOverloadCandidates(GetType(typeDefDeclRef), context, type);
+            AddTypeOverloadCandidates(type, context);
         }
         else if( auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>() )
         {
             auto type = DeclRefType::Create(
                 getSession(),
                 genericTypeParamDeclRef);
-            addGenericTypeParamOverloadCandidates(genericTypeParamDeclRef, context, type);
+            AddTypeOverloadCandidates(type, context);
         }
         else
         {
             // TODO(tfoley): any other cases needed here?
+        }
+    }
+
+    void SemanticsVisitor::AddOverloadCandidates(
+        LookupResult const&     result,
+        OverloadResolveContext&	context)
+    {
+        if(result.isOverloaded())
+        {
+            for(auto item : result.items)
+            {
+                AddDeclRefOverloadCandidates(item, context);
+            }
+        }
+        else
+        {
+            AddDeclRefOverloadCandidates(result.item, context);
         }
     }
 
@@ -973,12 +958,7 @@ namespace Slang
         }
         else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
         {
-            auto lookupResult = overloadedExpr->lookupResult2;
-            SLANG_RELEASE_ASSERT(lookupResult.isOverloaded());
-            for(auto item : lookupResult.items)
-            {
-                AddDeclRefOverloadCandidates(item, context);
-            }
+            AddOverloadCandidates(overloadedExpr->lookupResult2, context);
         }
         else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
         {
@@ -996,7 +976,7 @@ namespace Slang
             // TODO(tfoley): are there any meaningful types left
             // that aren't declaration references?
             auto type = typeType->type;
-            AddTypeOverloadCandidates(type, context, type);
+            AddTypeOverloadCandidates(type, context);
             return;
         }
     }

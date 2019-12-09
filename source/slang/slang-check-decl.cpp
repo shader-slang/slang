@@ -161,6 +161,14 @@ namespace Slang
         if(as<SimpleTypeDecl>(decl))
             return true;
 
+        // Initializer/constructor declarations are effectively `static`
+        // in Slang. They behave like functions that return an instance
+        // of the enclosing type, rather than as functions that are
+        // called on a pre-existing value.
+        //
+        if(as<ConstructorDecl>(decl))
+            return true;
+
         // Things nested inside functions may have dependencies
         // on values from the enclosing scope, but this needs to
         // be dealt with via "capture" so they are also effectively
@@ -1197,6 +1205,18 @@ namespace Slang
         DeclRef<Decl>               requiredMemberDeclRef,
         RefPtr<WitnessTable>        witnessTable)
     {
+        // Sanity check: if are checking whether a type `T`
+        // implements, say, `IFoo::bar` and lookup of `bar`
+        // in type `T` yielded `IFoo::bar`, then that shouldn't
+        // be treated as a valid satisfaction of the requirement.
+        //
+        // TODO: Ideally this check should be comparing the `DeclRef`s
+        // and not just the `Decl`s, but we currently don't get exactly
+        // the same substitutions when we see the inherited `IFoo::bar`.
+        //
+        if(memberDeclRef.getDecl() == requiredMemberDeclRef.getDecl())
+            return false;
+
         // At a high level, we want to check that the
         // `memberDecl` and the `requiredMemberDeclRef`
         // have the same AST node class, and then also
@@ -2524,6 +2544,78 @@ namespace Slang
         getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
     }
 
+    RefPtr<Type> SemanticsVisitor::calcThisType(DeclRef<Decl> declRef)
+    {
+        if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
+        {
+            // In the body of an `interface`, a `This` type
+            // refers to the concrete type that will eventually
+            // conform to the interface and fill in its
+            // requirements.
+            //
+            RefPtr<ThisType> thisType = new ThisType();
+            thisType->setSession(getSession());
+            thisType->interfaceDeclRef = interfaceDeclRef;
+            return thisType;
+        }
+        else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
+        {
+            // In the body of an ordinary aggregate type,
+            // such as a `struct`, the `This` type just
+            // refers to the type itself.
+            //
+            // TODO: If/when we support `class` types
+            // with inheritance, then `This` inside a class
+            // would need to refer to the eventual concrete
+            // type, much like the `interface` case above.
+            //
+            return DeclRefType::Create(
+                getSession(),
+                aggTypeDeclRef);
+        }
+        else if (auto extDeclRef = declRef.as<ExtensionDecl>())
+        {
+            // In the body of an `extension`, the `This`
+            // type refers to the type being extended.
+            //
+            // Note: we currently have this loop back
+            // around through `calcThisType` for the
+            // type being extended, rather than just
+            // using it directly. This makes a difference
+            // for polymorphic types like `interface`s,
+            // and there are reasonable arguments for
+            // the validity of either option.
+            //
+            // Does `extension IFoo` mean extending
+            // exactly the type `IFoo` (an existential,
+            // which could at runtime be a value of
+            // any type conforming to `IFoo`), or does
+            // it implicitly extend every type that
+            // conforms to `IFoo`? The difference is
+            // significant, and we need to make a choice
+            // sooner or later.
+            //
+            auto targetType = GetTargetType(extDeclRef);
+            return calcThisType(targetType);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    RefPtr<Type> SemanticsVisitor::calcThisType(Type* type)
+    {
+        if( auto declRefType = as<DeclRefType>(type) )
+        {
+            return calcThisType(declRefType->declRef);
+        }
+        else
+        {
+            return type;
+        }
+    }
+
     RefPtr<Type> SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
     {
         // We want to look at the parent of the declaration,
@@ -2538,27 +2630,16 @@ namespace Slang
             parent = genericParent->ParentDecl;
         }
 
-        // Now look at the type of the parent (or grandparent).
-        if (auto aggTypeDecl = as<AggTypeDecl>(parent))
-        {
-            // We are nested in an aggregate type declaration,
-            // so the result type of the initializer will just
-            // be the surrounding type.
-            return DeclRefType::Create(
-                getSession(),
-                makeDeclRef(aggTypeDecl));
-        }
-        else if (auto extDecl = as<ExtensionDecl>(parent))
-        {
-            // We are nested inside an extension, so the result
-            // type needs to be the type being extended.
-            return extDecl->targetType.type;
-        }
-        else
+        // The result type for a constructor is whatever `This` would
+        // refer to in the body of the outer declaration.
+        //
+        auto thisType = calcThisType(makeDeclRef(parent));
+        if( !thisType )
         {
             getSink()->diagnose(decl, Diagnostics::initializerNotInsideType);
-            return nullptr;
+            thisType = getSession()->getErrorType();
         }
+        return thisType;
     }
 
     void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)

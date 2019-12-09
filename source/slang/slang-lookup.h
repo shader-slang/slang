@@ -54,6 +54,10 @@ QualType getTypeForDeclRef(
     Session*        session,
     DeclRef<Decl>   declRef);
 
+    /// Add a found item to a lookup result
+void AddToLookupResult(
+    LookupResult&		result,
+    LookupResultItem	item);
 
 }
 

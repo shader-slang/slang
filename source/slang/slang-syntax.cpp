@@ -2894,4 +2894,68 @@ RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, in
     return substType;
 }
 
+//
+// ThisType
+//
+
+String ThisType::ToString()
+{
+    String result;
+    result.append(interfaceDeclRef.toString());
+    result.append(".This");
+    return result;
+}
+
+bool ThisType::EqualsImpl(Type * type)
+{
+    auto other = as<ThisType>(type);
+    if(!other)
+        return false;
+
+    if(!interfaceDeclRef.Equals(other->interfaceDeclRef))
+        return false;
+
+    return true;
+}
+
+int ThisType::GetHashCode()
+{
+    return combineHash(
+        HashCode(typeid(*this).hash_code()),
+        interfaceDeclRef.GetHashCode());
+}
+
+RefPtr<Type> ThisType::CreateCanonicalType()
+{
+    RefPtr<ThisType> canType = new ThisType();
+    canType->setSession(getSession());
+
+    // TODO: need to canonicalize the decl-ref
+    canType->interfaceDeclRef = interfaceDeclRef;
+    return canType;
+}
+
+RefPtr<Val> ThisType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substInterfaceDeclRef = interfaceDeclRef.SubstituteImpl(subst, &diff);
+
+    auto thisTypeSubst = findThisTypeSubstitution(subst.substitutions, substInterfaceDeclRef.getDecl());
+    if( thisTypeSubst )
+    {
+        return thisTypeSubst->witness->sub;
+    }
+
+    if(!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    RefPtr<ThisType> substType = new ThisType();
+    substType->setSession(getSession());
+    substType->interfaceDeclRef = substInterfaceDeclRef;
+    return substType;
+}
+
 } // namespace Slang
