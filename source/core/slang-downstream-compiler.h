@@ -109,12 +109,14 @@ public:
         Clang,
         SNC,
         GHS,
+        NVRTC,
         CountOf,
     };
     enum class SourceType
     {
         C,              ///< C source
         CPP,            ///< C++ source
+        CUDA,           ///< The CUDA language
     };
 
     struct Desc
@@ -249,6 +251,7 @@ protected:
     DownstreamCompiler(const Desc& desc) :
         m_desc(desc)
     {}
+    DownstreamCompiler() {}
 
     Desc m_desc;
 };
