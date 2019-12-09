@@ -28,6 +28,8 @@ struct HexDumpUtil
     static SlangResult parse(const UnownedStringSlice& lines, List<uint8_t>& outBytes);
 
     static SlangResult parseWithMarkers(const UnownedStringSlice& lines, List<uint8_t>& outBytes);
+
+    static SlangResult findStartAndEndLines(const UnownedStringSlice& lines, UnownedStringSlice& outStart, UnownedStringSlice& outEnd);
 };
 
 }
