@@ -16,6 +16,7 @@
 
 #include "slang-visual-studio-compiler-util.h"
 #include "slang-gcc-compiler-util.h"
+#include "slang-nvrtc-compiler.h"
 
 namespace Slang
 {
@@ -57,6 +58,7 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
         case CompilerType::Clang:       return UnownedStringSlice::fromLiteral("Clang");
         case CompilerType::SNC:         return UnownedStringSlice::fromLiteral("SNC");
         case CompilerType::GHS:         return UnownedStringSlice::fromLiteral("GHS");
+        case CompilerType::NVRTC:       return UnownedStringSlice::fromLiteral("NVRTC");
     }
 }
 
@@ -490,6 +492,24 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, D
 
     // Set the default to the compiler closest to how this source was compiled
     set->setDefaultCompiler(findClosestCompiler(set, getCompiledWithDesc()));
+
+    // Lets see if we have NVRTC. 
+    {
+        SharedLibrary::Handle handle;
+        if (SLANG_SUCCEEDED(SharedLibrary::load("nvrtc64_102_0", handle)))
+        {
+            RefPtr<DownstreamCompiler> compiler;
+            if (SLANG_SUCCEEDED(NVRTCDownstreamCompilerUtil::createCompiler(handle, compiler)))
+            {
+                set->addCompiler(compiler);
+            }
+            else
+            {
+                SharedLibrary::unload(handle);
+            }
+        }
+    }
+
     return SLANG_OK;
 }
 

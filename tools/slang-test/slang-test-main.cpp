@@ -21,6 +21,8 @@ using namespace Slang;
 
 #include "../../source/core/slang-downstream-compiler.h"
 
+#include "../../source/core/slang-nvrtc-compiler.h"
+
 #include "../../source/core/slang-process-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -523,6 +525,10 @@ static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
     {
         return SLANG_PASS_THROUGH_VISUAL_STUDIO;
     }
+    else if (slice == "nvrtc")
+    {
+        return SLANG_PASS_THROUGH_NVRTC;
+    }
 
     return SLANG_PASS_THROUGH_NONE;
 }
@@ -562,6 +568,10 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return PassThroughFlag::Generic_C_CPP;
         }
+        case SLANG_PTX:
+        {
+            return PassThroughFlag::NVRTC;
+        }
 
         default:
         {
@@ -593,6 +603,8 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("dll", SHARED_LIBRARY)
         CASE("callable", HOST_CALLABLE)
         CASE("host-callable", HOST_CALLABLE)
+        CASE("ptx", PTX)
+        CASE("cuda", CUDA_SOURCE)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;
@@ -2777,6 +2789,7 @@ static bool endsWithAllowedExtension(
         ".rgen",
         ".c",
         ".cpp",
+        ".cu",
         };
 
     for( auto allowedExtension : allowedExtensions)
@@ -2870,6 +2883,7 @@ SlangResult innerMain(int argc, char** argv)
 #if SLANG_UNIX_FAMILY
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
+
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;

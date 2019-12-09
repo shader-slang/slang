@@ -26,7 +26,6 @@ typedef enum {
   NVRTC_ERROR_INTERNAL_ERROR = 11
 } nvrtcResult;
 
-
 typedef struct _nvrtcProgram *nvrtcProgram;
 
 #define SLANG_NVRTC_FUNCS(x) \
@@ -42,7 +41,7 @@ typedef struct _nvrtcProgram *nvrtcProgram;
     x(nvrtcResult, nvrtcAddNameExpression, (nvrtcProgram prog, const char * const name_expression)) \
     x(nvrtcResult, nvrtcGetLoweredName, (nvrtcProgram prog, const char *const name_expression, const char** lowered_name))
 
-};
+} // namespace nvrtc
 
 namespace Slang
 {
@@ -60,7 +59,13 @@ public:
     SlangResult init(SharedLibrary::Handle handle);
 
     NVRTCDownstreamCompiler():m_sharedLibraryHandle(0) {}
-    ~NVRTCDownstreamCompiler() {}
+    ~NVRTCDownstreamCompiler()
+    {
+        if (m_sharedLibraryHandle)
+        {
+            SharedLibrary::unload(m_sharedLibraryHandle);
+        }
+    }
 
 protected:
 
@@ -93,7 +98,6 @@ SlangResult NVRTCDownstreamCompiler::init(SharedLibrary::Handle handle)
 
     return SLANG_OK;
 }
-
 
 SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {

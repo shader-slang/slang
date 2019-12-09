@@ -62,6 +62,9 @@ static const char computeEntryPointName[] = "computeMain";
     case SLANG_SOURCE_LANGUAGE_CPP:
         spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
         break;
+    case SLANG_SOURCE_LANGUAGE_CUDA:
+        spAddPreprocessorDefine(slangRequest, "__CUDA__", "1");
+        break;
 
     default:
         assert(!"unexpected");

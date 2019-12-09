@@ -93,7 +93,9 @@ namespace Slang
     x("cpp", CPPSource) \
     x("exe,executable", Executable) \
     x("sharedlib,sharedlibrary,dll", SharedLibrary) \
-    x("callable,host-callable", HostCallable)
+    x("callable,host-callable", HostCallable) \
+    x("ptx", PTX) \
+    x("cu,cuda", CUDASource)
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -489,6 +491,10 @@ namespace Slang
 
                 return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
+            case PassThroughMode::NVRTC:
+            {
+                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::NVRTC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
         }
         return SLANG_E_NOT_IMPLEMENTED;
     }
@@ -540,6 +546,10 @@ namespace Slang
             {
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
+            }
+            case CodeGenTarget::PTX:
+            {
+                return PassThroughMode::NVRTC;
             }
 
             default: break;
@@ -1297,7 +1307,24 @@ SlangResult dissassembleDXILUsingDXC(
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
         {
-            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+            auto target = targetReq->target;
+            
+            switch (target)
+            {
+                case CodeGenTarget::PTX:
+                {
+                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CUDA));
+                    break;
+                }
+                case CodeGenTarget::HostCallable:
+                case CodeGenTarget::SharedLibrary:
+                case CodeGenTarget::Executable:
+                {
+                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+                    break;
+                }
+                default: break;
+            }
         }
         
         // Get the required downstream CPP compiler
@@ -1437,8 +1464,18 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Set the source type
-        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
-
+        switch (rawSourceLanguage)
+        {
+            case SourceLanguage::C:       options.sourceType = DownstreamCompiler::SourceType::C;   break;
+            case SourceLanguage::CPP:     options.sourceType = DownstreamCompiler::SourceType::CPP; break;
+            case SourceLanguage::CUDA:    options.sourceType = DownstreamCompiler::SourceType::CUDA; break;
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled source language");
+                return SLANG_FAIL;
+            }
+        }
+        
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
@@ -1453,6 +1490,13 @@ SlangResult dissassembleDXILUsingDXC(
             }
             case CodeGenTarget::Executable:
             {
+                options.targetType = DownstreamCompiler::TargetType::Executable;
+                break;
+            }
+            case CodeGenTarget::PTX:
+            {
+                // TODO(JS): Not clear what to do here. PTX could be described as an arch? Here
+                // these types are more the code container. Should 'Kernel' be distinct from 'Executable'.
                 options.targetType = DownstreamCompiler::TargetType::Executable;
                 break;
             }
@@ -1488,7 +1532,7 @@ SlangResult dissassembleDXILUsingDXC(
                 case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Default; break;
                 case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Precise; break;
                 case FloatingPointMode::Fast:       options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Fast; break;
-                default: SLANG_ASSERT(!"Unhanlde floating point mode");
+                default: SLANG_ASSERT(!"Unhandled floating point mode");
             }
 
             // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
@@ -1686,6 +1730,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         switch (target)
         {
+        case CodeGenTarget::PTX:
         case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::Executable:

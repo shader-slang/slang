@@ -517,6 +517,8 @@ extern "C"
         SLANG_EXECUTABLE,           ///< Executable (for hosting CPU/OS)
         SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
         SLANG_HOST_CALLABLE,        ///< A CPU target that makes the compiled code available to be run immediately
+        SLANG_CUDA_SOURCE,          ///< Cuda source
+        SLANG_PTX,                  ///< PTX 
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -545,6 +547,7 @@ extern "C"
         SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
         SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
         SLANG_PASS_THROUGH_GENERIC_C_CPP,           ///< Generic C or C++ compiler, which is decided by the source type
+        SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC Cuda compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -615,6 +618,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_GLSL,
         SLANG_SOURCE_LANGUAGE_C,
         SLANG_SOURCE_LANGUAGE_CPP,
+        SLANG_SOURCE_LANGUAGE_CUDA,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 

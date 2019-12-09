@@ -66,6 +66,10 @@ static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
     {
         return SLANG_SOURCE_LANGUAGE_HLSL;
     }
+    else if (text == "cu" || text == "cuda")
+    {
+        return SLANG_SOURCE_LANGUAGE_CUDA;
+    }
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
