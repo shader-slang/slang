@@ -351,6 +351,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
 /* static */ SlangResult GCCDownstreamCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPath.Clear();
 
     switch (options.targetType)
@@ -383,6 +385,8 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPaths.clear();
 
     if (flags & ProductFlag::Execution)
@@ -397,6 +401,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
 /* static */SlangResult GCCDownstreamCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
+    SLANG_ASSERT(options.sourceContents.getLength() == 0);
+    SLANG_ASSERT(options.modulePath.getLength());
+
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
         
     if (options.sourceType == SourceType::CPP)

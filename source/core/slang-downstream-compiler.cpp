@@ -212,15 +212,67 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& out)
+SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, RefPtr<DownstreamCompileResult>& out)
 {
     // Copy the command line options
     CommandLine cmdLine(m_cmdLine);
 
+    CompileOptions options(inOptions);
+
+    // Find all the files that will be produced
+    RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
+    
+    if (options.modulePath.getLength() == 0 || options.sourceContents.getLength() != 0)
+    {
+        String modulePath = options.modulePath;
+
+        // If there is no module path, generate one.
+        if (modulePath.getLength() == 0)
+        {
+            SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
+            options.modulePath = modulePath;
+        }
+        
+        if (options.sourceContents.getLength() != 0)
+        {
+            String compileSourcePath = modulePath;
+
+            // NOTE: Strictly speaking producing filenames by modifying the generateTemporary path that may introduce a temp filename clash, but in practice is extraordinary unlikely
+            compileSourcePath.append("-src");
+
+            // Make the temporary filename have the appropriate extension.
+            if (options.sourceType == DownstreamCompiler::SourceType::C)
+            {
+                compileSourcePath.append(".c");
+            }
+            else
+            {
+                compileSourcePath.append(".cpp");
+            }
+
+            // Write it out
+            try
+            {
+                productFileSet->add(compileSourcePath);
+
+                File::writeAllText(compileSourcePath, options.sourceContents);
+            }
+            catch (...)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Add it as a source file
+            options.sourceFiles.add(compileSourcePath);
+
+            // There is no source contents
+            options.sourceContents = String();
+        }
+    }
+
     // Append command line args to the end of cmdLine using the target specific function for the specified options
     SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
 
-    
     String moduleFilePath;
 
     {
@@ -229,8 +281,6 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& options
         moduleFilePath = builder.ProduceString();
     }
 
-    // Find all the files that will be produced
-    RefPtr<TemporaryFileSet> productFileSet(new TemporaryFileSet);
     {
         List<String> paths;
         SLANG_RETURN_ON_FAIL(calcCompileProducts(options, DownstreamCompiler::ProductFlag::All, paths));

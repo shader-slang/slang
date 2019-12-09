@@ -12,6 +12,8 @@ namespace Slang
 
 /* static */ SlangResult VisualStudioCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPath.Clear();
 
     switch (options.targetType)
@@ -39,6 +41,8 @@ namespace Slang
 
 /* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPaths.clear();
 
     if (flags & ProductFlag::Execution)
@@ -72,6 +76,9 @@ namespace Slang
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
+    SLANG_ASSERT(options.sourceContents.getLength() == 0);
+    SLANG_ASSERT(options.modulePath.getLength());
+
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
     cmdLine.addArg("/nologo");

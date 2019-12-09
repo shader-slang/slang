@@ -1317,18 +1317,13 @@ SlangResult dissassembleDXILUsingDXC(
             return SLANG_FAIL;
         }
 
-        TemporaryFileSet temporaryFileSet;
-
-        bool useOriginalFile = false;
-
-        String compileSourcePath;
-        
-        String rawSource;
-
         SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
 
         Dictionary<String, String> preprocessorDefinitions;
         List<String> includePaths;
+
+        typedef DownstreamCompiler::CompileOptions CompileOptions;
+        CompileOptions options;
 
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
@@ -1387,7 +1382,7 @@ SlangResult dissassembleDXILUsingDXC(
                 const PathInfo& pathInfo = sourceFile->getPathInfo();
                 if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
                 {
-                    compileSourcePath = pathInfo.foundPath;
+                    String compileSourcePath = pathInfo.foundPath;
                     // We can see if we can load it
                     if (File::exists(compileSourcePath))
                     {
@@ -1404,7 +1399,11 @@ SlangResult dissassembleDXILUsingDXC(
                         {
                             String readContents = File::readAllText(compileSourcePath);
                             // We should see if they are the same
-                            useOriginalFile = (sourceFile->getContent() == readContents.getUnownedSlice());
+                            if ((sourceFile->getContent() == readContents.getUnownedSlice()))
+                            {
+                                // We just say use this file
+                                options.sourceFiles.add(compileSourcePath);
+                            }
                         }
                         catch (const Slang::IOException&)
                         {
@@ -1413,80 +1412,35 @@ SlangResult dissassembleDXILUsingDXC(
                 }
             }
 
-            if (!useOriginalFile)
+            // If can't just use file, concat together and make
+            if (options.sourceFiles.getCount() == 0)
             {
                 StringBuilder codeBuilder;
                 for (auto sourceFile : translationUnit->getSourceFiles())
                 {
                     _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
                 }
-                rawSource = codeBuilder.ProduceString();
+                options.sourceContents = codeBuilder.ProduceString();
             }
         }
         else
         {
-            rawSource = emitCPPForEntryPoint(
+            options.sourceContents = emitCPPForEntryPoint(
                 slangRequest,
                 entryPointIndex,
                 targetReq,
                 endToEndReq);
 
-            maybeDumpIntermediate(slangRequest, rawSource.getBuffer(), CodeGenTarget::CPPSource);
+            maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), CodeGenTarget::CPPSource);
 
             rawSourceLanguage = SourceLanguage::CPP;
         }
-
-        // Generate a path a temporary filename for output module
-        String modulePath;
-        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
-
-        if (!useOriginalFile)
-        {
-            // We need to create a new file which has the source. We'll use the module generated name as the basis
-            compileSourcePath = modulePath;
-
-            // NOTE: Strictly speaking producing filenames by modifying the generateTemporary path that may introduce a temp filename clash, but in practice is extraordinary unlikely
-
-            compileSourcePath.append("-src");
-
-            // Make the temporary filename have the appropriate extension.
-            if (rawSourceLanguage == SourceLanguage::C)
-            {
-                compileSourcePath.append(".c");
-            }
-            else
-            {
-                compileSourcePath.append(".cpp");
-            }
-
-            // Delete this path at end of execution
-            temporaryFileSet.add(compileSourcePath);
-
-            try
-            {
-                File::writeAllText(compileSourcePath, rawSource);
-            }
-            catch (...)
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, compileSourcePath);
-                return SLANG_FAIL;
-            }
-        }
-
-        typedef DownstreamCompiler::CompileOptions CompileOptions;
-        CompileOptions options;
 
         // Set the source type
         options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
 
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
-
-        // Remove the temporary path/file when done
-        temporaryFileSet.add(modulePath);
-
-        options.modulePath = modulePath;
-        options.sourceFiles.add(compileSourcePath);
 
         // Set what kind of target we should build
         switch (targetReq->target)
@@ -1556,7 +1510,7 @@ SlangResult dissassembleDXILUsingDXC(
         // Compile
         RefPtr<DownstreamCompileResult> downstreamCompileResult;
         SLANG_RETURN_ON_FAIL(compiler->compile(options, downstreamCompileResult));
-
+        
         const auto& diagnostics = downstreamCompileResult->getDiagnostics();
 
         {

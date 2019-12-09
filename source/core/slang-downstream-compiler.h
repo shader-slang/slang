@@ -196,11 +196,17 @@ public:
 
         PlatformKind platform = PlatformKind::Unknown;
 
-        String modulePath;      ///< The path/name of the output module. Should not have the extension, as that will be added for each of the target types
+            /// The path/name of the output module. Should not have the extension, as that will be added for each of the target types.
+            /// If not set a module path will be internally generated internally on a command line based compiler
+        String modulePath;                  
 
         List<Define> defines;
 
-        List<String> sourceFiles;
+            /// The contents of the source to compile. This can be empty is sourceFiles is set.
+            /// If the compiler is a commandLine file this source will be written to a temporary file.
+        String sourceContents;
+            /// The names/paths of source to compile. This can be empty if sourceContents is set.
+        List<String> sourceFiles;           
 
         List<String> includePaths;
         List<String> libraryPaths;
