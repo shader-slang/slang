@@ -1077,7 +1077,7 @@ namespace Slang
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
-    PassThroughMode getPassThroughModeForCPPCompiler(DownstreamCompiler::CompilerType type);
+    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type);
 
 
         /// A context for loading and re-using code modules.

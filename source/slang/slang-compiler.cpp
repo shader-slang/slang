@@ -559,7 +559,7 @@ namespace Slang
         return PassThroughMode::None;
     }
 
-    PassThroughMode getPassThroughModeForCPPCompiler(DownstreamCompiler::CompilerType type)
+    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type)
     {
         typedef DownstreamCompiler::CompilerType CompilerType;
 
@@ -568,6 +568,7 @@ namespace Slang
             case CompilerType::VisualStudio:        return PassThroughMode::VisualStudio;
             case CompilerType::GCC:                 return PassThroughMode::Gcc;
             case CompilerType::Clang:               return PassThroughMode::Clang;
+            case CompilerType::NVRTC:               return PassThroughMode::NVRTC;
             default:                                return PassThroughMode::None;
         }
     }
