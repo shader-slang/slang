@@ -1292,9 +1292,9 @@ static String _calcModulePath(const TestInput& input)
     return Path::combine(directory, moduleName);
 }
 
-static TestResult runCompilerCompile(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();   
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);   
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1334,9 +1334,9 @@ static TestResult runCompilerCompile(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static TestResult runCompilerSharedLibrary(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1452,9 +1452,9 @@ static TestResult runCompilerSharedLibrary(TestContext* context, TestInput& inpu
     return TestResult::Pass;
 }
 
-static TestResult runCompilerExecute(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -2454,9 +2454,9 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
     { "COMPARE_GLSL",                           &runGLSLComparisonTest},
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "CPP_COMPILER_EXECUTE",                   &runCompilerExecute},
-    { "CPP_COMPILER_SHARED_LIBRARY",            &runCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCompilerCompile},
+    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
     { "COMPILE",                                &runCompile},
 };

@@ -292,11 +292,11 @@ DownstreamCompiler* Session::getDownstreamCompiler(PassThroughMode compiler)
     DownstreamCompilerSet* compilerSet = requireDownstreamCompilerSet();
     switch (compiler)
     {
-        case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();
+        case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
         case PassThroughMode::Clang:        return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::Clang)); 
         case PassThroughMode::VisualStudio: return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::VisualStudio));
         case PassThroughMode::Gcc:          return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::GCC));
-        case PassThroughMode::NVRTC:        return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::NVRTC));
+        case PassThroughMode::NVRTC:        return compilerSet->getDefaultCompiler(DownstreamCompiler::SourceType::CUDA);
         default: break;
     }
     return nullptr;

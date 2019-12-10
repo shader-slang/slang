@@ -52,11 +52,11 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
     SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), builder);
     String path = Path::combine(dirPath, builder);
 
-    ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
+    DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
 
     SharedLibraryTool tool = {};
 
-    if (SLANG_SUCCEEDED(loader->loadSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
+    if (SLANG_SUCCEEDED(loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
     {
         tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
     }
@@ -98,9 +98,9 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     return compilerSet;
 }
 
-Slang::DownstreamCompiler* TestContext::getDefaultCompiler()
+Slang::DownstreamCompiler* TestContext::getDefaultCompiler(DownstreamCompiler::SourceType sourceType)
 {
     DownstreamCompilerSet* set = getCompilerSet();
-    return set ? set->getDefaultCompiler() : nullptr;
+    return set ? set->getDefaultCompiler(sourceType) : nullptr;
 }
 

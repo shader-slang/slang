@@ -117,6 +117,7 @@ public:
         C,              ///< C source
         CPP,            ///< C++ source
         CUDA,           ///< The CUDA language
+        CountOf,
     };
 
     struct Desc
@@ -335,9 +336,9 @@ public:
     void addCompiler(DownstreamCompiler* compiler);
 
         /// Get a default compiler
-    DownstreamCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
+    DownstreamCompiler* getDefaultCompiler(DownstreamCompiler::SourceType sourceType) const { return m_defaultCompilers[int(sourceType)];  }
         /// Set the default compiler
-    void setDefaultCompiler(DownstreamCompiler* compiler) { m_defaultCompiler = compiler;  }
+    void setDefaultCompiler(DownstreamCompiler::SourceType sourceType, DownstreamCompiler* compiler) { m_defaultCompilers[int(sourceType)] = compiler;  }
 
         /// True if has a compiler of the specified type
     bool hasCompiler(DownstreamCompiler::CompilerType compilerType) const;
@@ -346,7 +347,7 @@ protected:
 
     Index _findIndex(const DownstreamCompiler::Desc& desc) const;
 
-    RefPtr<DownstreamCompiler> m_defaultCompiler;
+    RefPtr<DownstreamCompiler> m_defaultCompilers[int(DownstreamCompiler::SourceType::CountOf)];
     // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
     // somethings easier.
     List<RefPtr<DownstreamCompiler>> m_compilers;

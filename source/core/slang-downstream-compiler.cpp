@@ -490,8 +490,13 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, D
     _addGCCFamilyCompiler(desc.getPath(CompilerType::Clang), "clang", set);
     _addGCCFamilyCompiler(desc.getPath(CompilerType::GCC), "g++", set);
 
-    // Set the default to the compiler closest to how this source was compiled
-    set->setDefaultCompiler(findClosestCompiler(set, getCompiledWithDesc()));
+    {
+        DownstreamCompiler* cppCompiler = findClosestCompiler(set, getCompiledWithDesc());
+
+        // Set the default to the compiler closest to how this source was compiled
+        set->setDefaultCompiler(DownstreamCompiler::SourceType::CPP, cppCompiler);
+        set->setDefaultCompiler(DownstreamCompiler::SourceType::C, cppCompiler);
+    }
 
     // Lets see if we have NVRTC. 
     {
@@ -502,6 +507,8 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, D
             if (SLANG_SUCCEEDED(NVRTCDownstreamCompilerUtil::createCompiler(sharedLibrary, compiler)))
             {
                 set->addCompiler(compiler);
+
+                set->setDefaultCompiler(DownstreamCompiler::SourceType::CUDA, compiler);
             }
         }
     }

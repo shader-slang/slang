@@ -45,13 +45,23 @@ ISlangUnknown* DefaultSharedLibraryLoader::getInterface(const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangSharedLibraryLoader) ? static_cast<ISlangSharedLibraryLoader*>(this) : nullptr;
 }
 
-SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISlangSharedLibrary** sharedLibraryOut)
+SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISlangSharedLibrary** outSharedLibrary)
 {
-    *sharedLibraryOut = nullptr;
+    *outSharedLibrary = nullptr;
     // Try loading
     SharedLibrary::Handle handle;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
-    *sharedLibraryOut = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
+    *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
+    return SLANG_OK;
+}
+
+SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* path, ISlangSharedLibrary** outSharedLibrary)
+{
+    *outSharedLibrary = nullptr;
+    // Try loading
+    SharedLibrary::Handle handle;
+    SLANG_RETURN_ON_FAIL(SharedLibrary::loadWithPlatformPath(path, handle));
+    *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
     return SLANG_OK;
 }
 
