@@ -289,7 +289,7 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
 
 DownstreamCompiler* Session::getDownstreamCompiler(PassThroughMode compiler)
 {
-    DownstreamCompilerSet* compilerSet = requireCPPCompilerSet();
+    DownstreamCompilerSet* compilerSet = requireDownstreamCompilerSet();
     switch (compiler)
     {
         case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();

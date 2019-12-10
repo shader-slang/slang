@@ -11,6 +11,8 @@
 #include "../../source/core/slang-render-api-util.h"
 #include "../../source/core/slang-downstream-compiler.h"
 
+#include "../../slang-com-ptr.h"
+
 #include "options.h"
 
 typedef uint32_t PassThroughFlags;
@@ -118,7 +120,7 @@ class TestContext
 protected:
     struct SharedLibraryTool
     {
-        Slang::SharedLibrary::Handle m_sharedLibrary;
+        Slang::ComPtr<ISlangSharedLibrary> m_sharedLibrary;
         InnerMainFunc m_func;
     };
 

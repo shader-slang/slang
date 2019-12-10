@@ -21,6 +21,7 @@ enum class SharedLibraryType
     Fxc,                ///< Fxc compiler
     Glslang,            ///< Slang specific glslang compiler
     Dxil,               ///< Dxil is used with dxc
+    NVRTC,              ///< Nvrtc compiler
     CountOf,
 };
 

@@ -495,17 +495,13 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, D
 
     // Lets see if we have NVRTC. 
     {
-        SharedLibrary::Handle handle;
-        if (SLANG_SUCCEEDED(SharedLibrary::load("nvrtc64_102_0", handle)))
+        ISlangSharedLibrary* sharedLibrary = desc.sharedLibraries[int(CompilerType::NVRTC)];
+        if (sharedLibrary)
         {
             RefPtr<DownstreamCompiler> compiler;
-            if (SLANG_SUCCEEDED(NVRTCDownstreamCompilerUtil::createCompiler(handle, compiler)))
+            if (SLANG_SUCCEEDED(NVRTCDownstreamCompilerUtil::createCompiler(sharedLibrary, compiler)))
             {
                 set->addCompiler(compiler);
-            }
-            else
-            {
-                SharedLibrary::unload(handle);
             }
         }
     }

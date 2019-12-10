@@ -56,17 +56,10 @@ public:
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
 
         /// Must be called before use
-    SlangResult init(SharedLibrary::Handle handle);
+    SlangResult init(ISlangSharedLibrary* library);
 
-    NVRTCDownstreamCompiler():m_sharedLibraryHandle(0) {}
-    ~NVRTCDownstreamCompiler()
-    {
-        if (m_sharedLibraryHandle)
-        {
-            SharedLibrary::unload(m_sharedLibraryHandle);
-        }
-    }
-
+    NVRTCDownstreamCompiler() {}
+    
 protected:
 
 
@@ -75,19 +68,19 @@ protected:
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
 
-    SharedLibrary::Handle m_sharedLibraryHandle;        ///< Note that this class will not release the library
+    ComPtr<ISlangSharedLibrary> m_sharedLibrary;  
 };
 
 
-SlangResult NVRTCDownstreamCompiler::init(SharedLibrary::Handle handle)
+SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 {
 #define SLANG_NVTRC_GET_FUNC(ret, name, params)  \
-    m_##name = (ret (*) params)SharedLibrary::findFuncByName(handle, #name); \
+    m_##name = (ret (*) params)library->findFuncByName(#name); \
     if (m_##name == nullptr) return SLANG_FAIL;
-    
+
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_GET_FUNC)
 
-    m_sharedLibraryHandle = handle;
+    m_sharedLibrary = library;
 
     m_desc.type = CompilerType::NVRTC;
 
@@ -107,11 +100,11 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     return SLANG_FAIL;
 }
 
-/* static */SlangResult NVRTCDownstreamCompilerUtil::createCompiler(SharedLibrary::Handle handle, RefPtr<DownstreamCompiler>& outCompiler)
+/* static */SlangResult NVRTCDownstreamCompilerUtil::createCompiler(ISlangSharedLibrary* library, RefPtr<DownstreamCompiler>& outCompiler)
 {
     RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);
 
-    SLANG_RETURN_ON_FAIL(compiler->init(handle));
+    SLANG_RETURN_ON_FAIL(compiler->init(library));
 
     outCompiler = compiler;
     return SLANG_OK;

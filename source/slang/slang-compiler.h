@@ -1977,7 +1977,7 @@ namespace Slang
         const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
 
             /// Finds out what compilers are present and caches the result
-        DownstreamCompilerSet* requireCPPCompilerSet();
+        DownstreamCompilerSet* requireDownstreamCompilerSet();
 
         Session();
 

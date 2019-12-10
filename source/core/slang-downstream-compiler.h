@@ -383,7 +383,10 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         const String& getPath(CompilerType type) const { return paths[int(type)]; }
         void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
 
+        InitializeSetDesc() { memset(sharedLibraries, 0, sizeof(sharedLibraries)); }
+
         String paths[int(DownstreamCompiler::CompilerType::CountOf)];
+        ISlangSharedLibrary* sharedLibraries[int(DownstreamCompiler::CompilerType::CountOf)];
     };
 
         /// Find a compiler

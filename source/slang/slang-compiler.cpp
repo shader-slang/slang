@@ -476,26 +476,26 @@ namespace Slang
             }
             case PassThroughMode::Clang:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::VisualStudio:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::Gcc:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::GenericCCpp:
             {
                 List<DownstreamCompiler::Desc> descs;
-                session->requireCPPCompilerSet()->getCompilerDescs(descs);
+                session->requireDownstreamCompilerSet()->getCompilerDescs(descs);
 
                 return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::NVRTC:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::NVRTC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::NVRTC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
         }
         return SLANG_E_NOT_IMPLEMENTED;

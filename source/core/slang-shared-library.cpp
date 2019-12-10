@@ -22,6 +22,7 @@ static const Guid IID_ISlangSharedLibraryLoader = SLANG_UUID_ISlangSharedLibrary
     "d3dcompiler_47",           // SharedLibraryType::Fxc
     "slang-glslang",            // SharedLibraryType::Glslang  
     "dxil",                     // SharedLibraryType::Dxil
+    "nvrtc64_102_0",            // SharedLibraryType::NVRTC
 };
 
 /* static */DefaultSharedLibraryLoader DefaultSharedLibraryLoader::s_singleton;
