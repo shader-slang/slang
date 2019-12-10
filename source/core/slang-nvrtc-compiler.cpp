@@ -149,8 +149,71 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
+static SlangResult _parseLocation(const UnownedStringSlice& in, DownstreamDiagnostic& outDiagnostic)
+{
+    const Index startIndex = in.indexOf('(');
+
+    if (startIndex >= 0)
+    {
+        outDiagnostic.filePath = UnownedStringSlice(in.begin(), in.begin() + startIndex);
+        UnownedStringSlice remaining(in.begin() + startIndex + 1, in.end());
+        const Int endIndex = remaining.indexOf(')');
+
+        UnownedStringSlice lineText = UnownedStringSlice(remaining.begin(), remaining.begin() + endIndex);
+
+        Int line;
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineText, line));
+        outDiagnostic.fileLine = line;
+    }
+    else
+    {
+        outDiagnostic.fileLine = 0;
+        outDiagnostic.filePath = in;
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)
+{
+    typedef DownstreamDiagnostic Diagnostic;
+    typedef Diagnostic::Type Type;
+
+    outDiagnostic.stage = Diagnostic::Stage::Compile;
+
+    List<UnownedStringSlice> split;
+    StringUtil::split(line, ':', split);
+
+    if (split.getCount() == 3)
+    {
+        // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its value is set
+
+        const auto split1 = split[1].trim();
+
+        if (split1 == "error")
+        {
+            outDiagnostic.type = Type::Error;
+        }
+        else if (split1 == "warning")
+        {
+            outDiagnostic.type = Type::Warning;
+        }
+        outDiagnostic.text = split[2].trim();
+
+        SLANG_RETURN_ON_FAIL(_parseLocation(split[0], outDiagnostic));
+        return SLANG_OK;
+    }
+   
+    return SLANG_E_NOT_FOUND;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {
+    // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
+    if (options.sourceFiles.getCount() > 0)
+    {
+        return SLANG_FAIL;
+    }
+
     CommandLine cmdLine;
 
     switch (options.debugInfoType)
@@ -215,7 +278,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     
 
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), "", 0, nullptr, nullptr);
+    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(), 0, nullptr, nullptr);
     if (res != NVRTC_SUCCESS)
     {
         return _asResult(res);
@@ -252,6 +315,26 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         }
 
         // Parse the diagnostics here
+        for (auto line : LineParser(diagnostics.rawDiagnostics.getUnownedSlice()))
+        {
+            DownstreamDiagnostic diagnostic;
+            SlangResult lineRes = _parseNVRTCLine(line, diagnostic);
+
+            if (SLANG_SUCCEEDED(lineRes))
+            {
+                diagnostics.diagnostics.add(diagnostic);
+            }
+            else if (lineRes != SLANG_E_NOT_FOUND)
+            {
+                return lineRes;
+            }
+        }
+
+        // if it has a compilation error.. set on output
+        if (diagnostics.has(DownstreamDiagnostic::Type::Error))
+        {
+            diagnostics.result = SLANG_FAIL;
+        }
     }
 
     if (res == nvrtc::NVRTC_SUCCESS)

@@ -1412,39 +1412,13 @@ SlangResult dissassembleDXILUsingDXC(
                 const PathInfo& pathInfo = sourceFile->getPathInfo();
                 if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
                 {
-                    String compileSourcePath = pathInfo.foundPath;
-                    // We can see if we can load it
-                    if (File::exists(compileSourcePath))
-                    {
-                        // Here we look for the file on the regular file system (as opposed to using the 
-                        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
-                        // to the CPP compiler all it is able to (currently) see are files on the file system.
-                        //
-                        // Note that it could be coincidence that the filesystem has a file that's identical in
-                        // contents/name. That being the case though, any includes wouldn't work for a generated
-                        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
-                        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
-                        // file system access.
-                        try
-                        {
-                            String readContents = File::readAllText(compileSourcePath);
-                            // We should see if they are the same
-                            if ((sourceFile->getContent() == readContents.getUnownedSlice()))
-                            {
-                                // We just say use this file
-                                options.sourceFiles.add(compileSourcePath);
-                            }
-                        }
-                        catch (const Slang::IOException&)
-                        {
-                        }
-                    }
+                    options.sourceContentsPath = pathInfo.foundPath;
                 }
+                options.sourceContents = sourceFile->getContent();
             }
-
-            // If can't just use file, concat together and make
-            if (options.sourceFiles.getCount() == 0)
+            else
             {
+                // If can't just use file, concat together and make
                 StringBuilder codeBuilder;
                 for (auto sourceFile : translationUnit->getSourceFiles())
                 {

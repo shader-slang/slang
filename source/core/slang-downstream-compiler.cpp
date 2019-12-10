@@ -214,6 +214,38 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
 
+static bool _isContentsInFile(const DownstreamCompiler::CompileOptions& options)
+{
+    if (options.sourceContentsPath.getLength() <= 0)
+    {
+        return false;
+    }
+
+    // We can see if we can load it
+    if (File::exists(options.sourceContentsPath))
+    {
+        // Here we look for the file on the regular file system (as opposed to using the 
+        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
+        // to the compiler all it is able to (currently) see are files on the file system.
+        //
+        // Note that it could be coincidence that the filesystem has a file that's identical in
+        // contents/name. That being the case though, any includes wouldn't work for a generated
+        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
+        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
+        // file system access.
+        try
+        {
+            String readContents = File::readAllText(options.sourceContentsPath);
+            // We should see if they are the same
+            return options.sourceContents == readContents.getUnownedSlice();
+        }
+        catch (const Slang::IOException&)
+        {
+        }
+    }
+    return false;
+}
+
 SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptions, RefPtr<DownstreamCompileResult>& out)
 {
     // Copy the command line options
@@ -234,8 +266,12 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice::fromLiteral("slang-generated"), modulePath));
             options.modulePath = modulePath;
         }
-        
-        if (options.sourceContents.getLength() != 0)
+
+        if (_isContentsInFile(options))
+        {
+            options.sourceFiles.add(options.sourceContentsPath);
+        }
+        else
         {
             String compileSourcePath = modulePath;
 
@@ -266,10 +302,11 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
             // Add it as a source file
             options.sourceFiles.add(compileSourcePath);
-
-            // There is no source contents
-            options.sourceContents = String();
         }
+
+        // There is no source contents
+        options.sourceContents = String();
+        options.sourceContentsPath = String();
     }
 
     // Append command line args to the end of cmdLine using the target specific function for the specified options
