@@ -583,7 +583,7 @@ String emitEntryPointSource(
         {
             const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
             // Get the compiler used for the language
-            CPPCompiler* compiler = session->getDefaultCPPCompiler(sourceLanguage);
+            DownstreamCompiler* compiler = session->getDefaultCPPCompiler(sourceLanguage);
             if (compiler)
             {
                 passThru = getPassThroughModeForCPPCompiler(compiler->getDesc().type);

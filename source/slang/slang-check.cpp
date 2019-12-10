@@ -121,20 +121,20 @@ namespace Slang
         return func;
     }
 
-    CPPCompilerSet* Session::requireCPPCompilerSet()
+    DownstreamCompilerSet* Session::requireCPPCompilerSet()
     {
         if (cppCompilerSet == nullptr)
         {
-            cppCompilerSet = new CPPCompilerSet;
+            cppCompilerSet = new DownstreamCompilerSet;
 
-            typedef CPPCompiler::CompilerType CompilerType;
-            CPPCompilerUtil::InitializeSetDesc desc;
+            typedef DownstreamCompiler::CompilerType CompilerType;
+            DownstreamCompilerUtil::InitializeSetDesc desc;
        
             desc.paths[int(CompilerType::GCC)] = m_downstreamCompilerPaths[int(PassThroughMode::Gcc)];
             desc.paths[int(CompilerType::Clang)] = m_downstreamCompilerPaths[int(PassThroughMode::Clang)];
             desc.paths[int(CompilerType::VisualStudio)] = m_downstreamCompilerPaths[int(PassThroughMode::VisualStudio)];
 
-            CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
+            DownstreamCompilerUtil::initializeSet(desc, cppCompilerSet);
         }
         SLANG_ASSERT(cppCompilerSet);
         return cppCompilerSet;

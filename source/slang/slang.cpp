@@ -278,23 +278,23 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-CPPCompiler* Session::getCPPCompiler(PassThroughMode compiler)
+DownstreamCompiler* Session::getDownstreamCompiler(PassThroughMode compiler)
 {
-    CPPCompilerSet* compilerSet = requireCPPCompilerSet();
+    DownstreamCompilerSet* compilerSet = requireCPPCompilerSet();
     switch (compiler)
     {
         case PassThroughMode::GenericCCpp:  return compilerSet->getDefaultCompiler();
-        case PassThroughMode::Clang:        return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::Clang)); 
-        case PassThroughMode::VisualStudio: return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::VisualStudio));
-        case PassThroughMode::Gcc:          return CPPCompilerUtil::findCompiler(compilerSet, CPPCompilerUtil::MatchType::Newest, CPPCompiler::Desc(CPPCompiler::CompilerType::GCC));
+        case PassThroughMode::Clang:        return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::Clang)); 
+        case PassThroughMode::VisualStudio: return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::VisualStudio));
+        case PassThroughMode::Gcc:          return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, DownstreamCompiler::Desc(DownstreamCompiler::CompilerType::GCC));
         default: break;
     }
     return nullptr;
 }
 
-CPPCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
+DownstreamCompiler* Session::getDefaultCPPCompiler(SourceLanguage sourceLanguage)
 {
-    return getCPPCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
+    return getDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
 ISlangFileSystemExt* IncludeHandlerImpl::_getFileSystemExt()
@@ -689,56 +689,7 @@ SlangResult Linkage::setMatrixLayoutMode(
     return SLANG_OK;
 }
 
-/** Base class for simple blobs.
-*/
-class BlobBase : public ISlangBlob, public RefObject
-{
-public:
-    // ISlangUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-protected:
-    SLANG_FORCE_INLINE ISlangUnknown* getInterface(const Guid& guid)
-    {
-        return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
-    }
-};
-
-/** A blob that manages some raw data that it owns.
-*/
-class RawBlob : public BlobBase
-{
-public:
-    // ISlangBlob
-    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
-    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_size; }
-
-    // Ctor
-    RawBlob(const void* data, size_t size):
-        m_size(size)
-    {
-        m_data = malloc(size);
-        memcpy(m_data, data, size);
-    }
-    ~RawBlob()
-    {
-        free(m_data);
-    }
-
-protected:
-    void* m_data;
-    size_t m_size;
-};
-
-ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)
-{
-    return ComPtr<ISlangBlob>(new RawBlob(inData, size));
-}
-
-ISlangUnknown* ListBlob::getInterface(const Guid& guid)
-{
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
-}
 //
 // TargetRequest
 //
@@ -3387,24 +3338,18 @@ SLANG_API void const* spGetEntryPointCode(
     void const* data = nullptr;
     size_t size = 0;
 
-    switch (result.format)
+    ComPtr<ISlangBlob> blob;
+    if (SLANG_SUCCEEDED(result.getBlob(blob)))
     {
-    case ResultFormat::None:
-    default:
-        break;
-
-    case ResultFormat::Binary:
-        data = result.outputBinary.getBuffer();
-        size = result.outputBinary.getCount();
-        break;
-
-    case ResultFormat::Text:
-        data = result.outputString.getBuffer();
-        size = result.outputString.getLength();
-        break;
+        data = blob->getBufferPointer();
+        size = blob->getBufferSize();
     }
 
-    if(outSize) *outSize = size;
+    if (outSize)
+    {
+        *outSize = size;
+    }
+
     return data;
 }
 

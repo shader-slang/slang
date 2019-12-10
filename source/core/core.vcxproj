@@ -174,10 +174,11 @@
     <ClInclude Include="slang-array-view.h" />
     <ClInclude Include="slang-array.h" />
     <ClInclude Include="slang-basic.h" />
+    <ClInclude Include="slang-blob.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
     <ClInclude Include="slang-common.h" />
-    <ClInclude Include="slang-cpp-compiler.h" />
     <ClInclude Include="slang-dictionary.h" />
+    <ClInclude Include="slang-downstream-compiler.h" />
     <ClInclude Include="slang-exception.h" />
     <ClInclude Include="slang-free-list.h" />
     <ClInclude Include="slang-gcc-compiler-util.h" />
@@ -212,8 +213,9 @@
     <ClInclude Include="windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-blob.cpp" />
     <ClCompile Include="slang-byte-encode-util.cpp" />
-    <ClCompile Include="slang-cpp-compiler.cpp" />
+    <ClCompile Include="slang-downstream-compiler.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-gcc-compiler-util.cpp" />
     <ClCompile Include="slang-hex-dump-util.cpp" />

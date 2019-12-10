@@ -5,6 +5,8 @@
 #include "../../slang-com-helper.h"
 #include "../../slang-com-ptr.h"
 
+#include "../core/slang-blob.h"
+
 #include "../core/slang-string-util.h"
 #include "../core/slang-dictionary.h"
 

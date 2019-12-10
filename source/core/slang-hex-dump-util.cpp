@@ -6,6 +6,7 @@
 #include "slang-writer.h"
 
 #include "../../slang-com-helper.h"
+#include "slang-hash.h"
 
 namespace Slang
 {
@@ -16,11 +17,19 @@ static const char s_hex[] = "0123456789abcdef";
 
 /* static */SlangResult HexDumpUtil::dumpWithMarkers(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
 {
+    return dumpWithMarkers(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
+}
+
+/* static */SlangResult HexDumpUtil::dumpWithMarkers(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+{
     WriterHelper helper(writer);
     SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.size()));
-    SLANG_RETURN_ON_FAIL(helper.print(" (%zu)\n", size_t(data.getCount())));
+    SLANG_RETURN_ON_FAIL(helper.print(" %zu", dataCount));
 
-    SLANG_RETURN_ON_FAIL(dump(data, maxBytesPerLine, writer));
+    const int hash = GetHashCode((const char*)data, dataCount);
+    SLANG_RETURN_ON_FAIL(helper.print(" %d\n", hash ));
+
+    SLANG_RETURN_ON_FAIL(dump(data, dataCount, maxBytesPerLine, writer));
 
     SLANG_RETURN_ON_FAIL(helper.write(s_end.begin(), s_end.size()));
     SLANG_RETURN_ON_FAIL(helper.put("\n"));
@@ -38,14 +47,19 @@ static const char s_hex[] = "0123456789abcdef";
     writer->write(c, 8);
 }
 
+
 /* static */SlangResult HexDumpUtil::dump(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
+{
+    return dump(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
+}
+
+/* static */SlangResult HexDumpUtil::dump(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
 {
     int maxCharsPerLine = 2 * maxBytesPerLine + 1 + maxBytesPerLine + 1;
 
-    const uint8_t* cur = data.begin();
-    const uint8_t* end = data.end();
-
- 
+    const uint8_t* cur = data;
+    const uint8_t* end = data + dataCount;
+    
     while (cur < end)
     {
         size_t count = size_t(end - cur);
@@ -112,34 +126,16 @@ static int _parseHexDigit(char c)
 {
     outBytes.clear();
 
-    bool inHex = false;
-
     LineParser lineParser(lines);
     for (const auto& line : lineParser)
     {
-        if (!inHex)
-        {
-            if (line.startsWith(s_start))
-            {
-                inHex = true;
-                continue;
-            }
-        }
-        else
-        {
-            if (line.startsWith(s_end))
-            {
-                break;
-            }
-        }
-
         const char* cur = line.begin();
         const char* end = line.end();
 
         while(cur + 2 <= end)
         {
             const char c = cur[0];
-            if (c == ' ' || c== '\n' || c == '\r' || c == '\t')
+            if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
             {
                 // Skip to next line
                 break;
@@ -160,35 +156,59 @@ static int _parseHexDigit(char c)
     return SLANG_OK;
 }
 
-/* static */SlangResult HexDumpUtil::parseWithMarkers(const UnownedStringSlice& lines, List<uint8_t>& outBytes)
+static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice& ioRemaining, UnownedStringSlice& outLine)
 {
-    UnownedStringSlice remaining(lines), line;
-
-    while(StringUtil::extractLine(remaining, line))
+    // Find the start line
+    UnownedStringSlice line;
+    while (StringUtil::extractLine(ioRemaining, line))
     {
-        if (line.startsWith(s_start))
+        if (line.startsWith(find))
         {
-            // Extract next line
-            if (!StringUtil::extractLine(remaining, line))
-            {
-                return SLANG_FAIL;
-            }
-            // It's the start line
-            UnownedStringSlice startLine = line;
-
-            // Look for the ending line
-            do 
-            {
-                if (line.startsWith(s_end))
-                {
-                    return parse(UnownedStringSlice(startLine.begin(), line.begin()), outBytes);
-                }
-            }
-            while ( StringUtil::extractLine(remaining, line));
+            outLine = line;
+            return SLANG_OK;
         }
     }
-
     return SLANG_FAIL;
+}
+
+/* static */SlangResult HexDumpUtil::findStartAndEndLines(const UnownedStringSlice& lines, UnownedStringSlice& outStart, UnownedStringSlice& outEnd)
+{
+    UnownedStringSlice remaining(lines);
+    SLANG_RETURN_ON_FAIL(_findLine(s_start, remaining, outStart));
+    SLANG_RETURN_ON_FAIL(_findLine(s_end, remaining, outEnd));
+    return SLANG_OK;
+}
+
+/* static */SlangResult HexDumpUtil::parseWithMarkers(const UnownedStringSlice& lines, List<uint8_t>& outBytes)
+{
+    UnownedStringSlice startLine, endLine;
+    SLANG_RETURN_ON_FAIL(findStartAndEndLines(lines, startLine, endLine));
+
+    int hash;
+    size_t size;
+    {
+        // Get the size and the hash
+        List<UnownedStringSlice> slices;
+        StringUtil::split(startLine, ' ', slices);
+        if (slices.getCount() != 3)
+        {
+            return SLANG_FAIL;
+        }
+        // Extract the size
+        size = StringToInt(String(slices[1]));
+        hash = int(StringToInt(String(slices[2])));
+    }
+
+    SLANG_RETURN_ON_FAIL(parse(UnownedStringSlice(startLine.end(), endLine.begin()), outBytes));
+
+    // Calc the hash
+    const int readHash = GetHashCode((const char*)outBytes.begin(), outBytes.getCount());
+
+    if (readHash != hash || size_t(outBytes.getCount()) != size)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 }

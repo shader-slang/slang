@@ -12,6 +12,8 @@ namespace Slang
 
 /* static */ SlangResult VisualStudioCompilerUtil::calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPath.Clear();
 
     switch (options.targetType)
@@ -39,6 +41,8 @@ namespace Slang
 
 /* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths)
 {
+    SLANG_ASSERT(options.modulePath.getLength());
+
     outPaths.clear();
 
     if (flags & ProductFlag::Execution)
@@ -72,6 +76,9 @@ namespace Slang
 
 /* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
 {
+    SLANG_ASSERT(options.sourceContents.getLength() == 0);
+    SLANG_ASSERT(options.modulePath.getLength());
+
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
     cmdLine.addArg("/nologo");
@@ -242,9 +249,9 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Diagnostic::Type& outType)
+static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Type& outType)
 {
-    typedef CPPCompiler::Diagnostic::Type Type;
+    typedef DownstreamDiagnostics::Diagnostic::Type Type;
 
     if (in == "error" || in == "fatal error")
     {
@@ -265,9 +272,9 @@ static SlangResult _parseErrorType(const UnownedStringSlice& in, CPPCompiler::Di
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCompiler::Diagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, DownstreamDiagnostics::Diagnostic& outDiagnostic)
 {
-    typedef CPPCompiler::Diagnostic Diagnostic;
+    typedef DownstreamDiagnostics::Diagnostic Diagnostic;
 
     UnownedStringSlice linkPrefix = UnownedStringSlice::fromLiteral("LINK :");
     if (line.startsWith(linkPrefix))
@@ -389,11 +396,11 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, CPPCompiler::Output& outOutput)
+/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outDiagnostics)
 {
-    outOutput.reset();
+    outDiagnostics.reset();
 
-    outOutput.rawDiagnostics = exeRes.standardOutput;
+    outDiagnostics.rawDiagnostics = exeRes.standardOutput;
 
     for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
     {
@@ -402,17 +409,17 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, CPPCom
         fprintf(stdout, "\n");
 #endif
 
-        CPPCompiler::Diagnostic diagnostic;
+        Diagnostic diagnostic;
         if (SLANG_SUCCEEDED(_parseVisualStudioLine(line, diagnostic)))
         {
-            outOutput.diagnostics.add(diagnostic);
+            outDiagnostics.diagnostics.add(diagnostic);
         }
     }
 
     // if it has a compilation error.. set on output
-    if (outOutput.has(CPPCompiler::Diagnostic::Type::Error))
+    if (outDiagnostics.has(Diagnostic::Type::Error))
     {
-        outOutput.result = SLANG_FAIL;
+        outDiagnostics.result = SLANG_FAIL;
     }
 
     return SLANG_OK;

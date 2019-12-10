@@ -103,7 +103,7 @@ public:
     virtual ~TemporarySharedLibrary();
 
         /// Any files specified in this set will be deleted on exit
-    TemporaryFileSet m_temporaryFileSet;
+    RefPtr<TemporaryFileSet> m_temporaryFileSet;
 
 protected:
     String m_path;

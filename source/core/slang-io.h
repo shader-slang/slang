@@ -91,8 +91,12 @@ namespace Slang
 	};
 
     // Helper class to clean up temporary files on dtor
-    struct TemporaryFileSet
+    class TemporaryFileSet: public RefObject
     {
+    public:
+        typedef RefObject Super;
+        typedef TemporaryFileSet ThisType;
+
         void remove(const String& path)
         {
             if (const Index index = m_paths.indexOf(path) >= 0)
@@ -119,6 +123,12 @@ namespace Slang
         {
             m_paths.clear();
         }
+
+        void swapWith(ThisType& rhs)
+        {
+            m_paths.swapWith(rhs.m_paths);
+        }
+
         ~TemporaryFileSet()
         {
             for (const auto& path : m_paths)
@@ -126,7 +136,15 @@ namespace Slang
                 File::remove(path);
             }
         }
+            /// Default Ctor
+        TemporaryFileSet() {}
+
         List<String> m_paths;
+    
+    private:
+        // Disable ctor/assignment
+        TemporaryFileSet(const ThisType& rhs) = delete;
+        void operator=(const ThisType& rhs) = delete;
     };
 }
 

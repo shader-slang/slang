@@ -92,21 +92,21 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
     }
 }
 
-CPPCompilerSet* TestContext::getCPPCompilerSet()
+DownstreamCompilerSet* TestContext::getCompilerSet()
 {
-    if (!cppCompilerSet)
+    if (!compilerSet)
     {
-        cppCompilerSet = new CPPCompilerSet;
+        compilerSet = new DownstreamCompilerSet;
 
-        CPPCompilerUtil::InitializeSetDesc desc;
-        CPPCompilerUtil::initializeSet(desc, cppCompilerSet);
+        DownstreamCompilerUtil::InitializeSetDesc desc;
+        DownstreamCompilerUtil::initializeSet(desc, compilerSet);
     }
-    return cppCompilerSet;
+    return compilerSet;
 }
 
-Slang::CPPCompiler* TestContext::getDefaultCPPCompiler()
+Slang::DownstreamCompiler* TestContext::getDefaultCompiler()
 {
-    CPPCompilerSet* set = getCPPCompilerSet();
+    DownstreamCompilerSet* set = getCompilerSet();
     return set ? set->getDefaultCompiler() : nullptr;
 }
 

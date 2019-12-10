@@ -158,6 +158,7 @@ static const char computeEntryPointName[] = "computeMain";
         SLANG_RETURN_ON_FAIL(res);
 
         // We are going to get the entry point count... lets check what we have
+        if (input.passThrough == SLANG_PASS_THROUGH_NONE)
         {
             auto reflection = spGetReflection(slangRequest);
             // Get the amount of entry points in reflection
