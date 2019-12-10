@@ -94,6 +94,25 @@ protected:
     DownstreamDiagnostics m_diagnostics;
 };
 
+
+class BlobDownstreamCompileResult : public DownstreamCompileResult
+{
+public:
+    typedef DownstreamCompileResult Super;
+
+    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE { SLANG_UNUSED(outLibrary); return SLANG_FAIL; }
+    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) { outBlob = m_blob; return m_blob ? SLANG_OK : SLANG_FAIL; }
+
+    BlobDownstreamCompileResult(const DownstreamDiagnostics& diags, ISlangBlob* blob):
+        Super(diags),
+        m_blob(blob)
+    {
+
+    }
+protected:
+    ComPtr<ISlangBlob> m_blob;
+};
+
 class DownstreamCompiler: public RefObject
 {
 public:

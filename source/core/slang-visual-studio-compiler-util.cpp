@@ -119,6 +119,10 @@ namespace Slang
             cmdLine.addArg("/MD");
             break;
         }
+        case DebugInfoType::None:
+        {
+            break;
+        }
         case DebugInfoType::Maximal:
         {
             // Multithreaded statically linked *debug* runtime library

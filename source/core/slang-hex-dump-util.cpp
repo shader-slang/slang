@@ -75,6 +75,13 @@ static const char s_hex[] = "0123456789abcdef";
             *dst++ = s_hex[byte & 0xf];
         }
 
+        // If not a complete line write spaces
+        for (size_t i = count; i < size_t(maxBytesPerLine); ++i)
+        {
+            *dst++ = ' ';
+            *dst++ = ' '; 
+        }
+
         *dst++ = ' ';
 
         for (size_t i = 0; i < count; ++i)

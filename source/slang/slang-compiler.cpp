@@ -2095,11 +2095,15 @@ SlangResult dissassembleDXILUsingDXC(
                         }
                         break;
 
+                    case CodeGenTarget::PTX:
+                        // For now we just dump PTX out as hex
+
                     case CodeGenTarget::HostCallable:
                     case CodeGenTarget::SharedLibrary:
                     case CodeGenTarget::Executable:
                         HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
                         break;
+
 
                     default:
                         SLANG_UNEXPECTED("unhandled output format");
