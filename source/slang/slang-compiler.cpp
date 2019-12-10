@@ -76,6 +76,7 @@
 namespace Slang
 {
 
+// NOTE! These must be in the same order as the SlangCompileTarget enum 
 #define SLANG_CODE_GEN_TARGETS(x) \
     x("unknown", Unknown) \
     x("none", None) \
@@ -94,8 +95,8 @@ namespace Slang
     x("exe,executable", Executable) \
     x("sharedlib,sharedlibrary,dll", SharedLibrary) \
     x("callable,host-callable", HostCallable) \
-    x("ptx", PTX) \
-    x("cu,cuda", CUDASource)
+    x("cu,cuda", CUDASource) \
+    x("ptx", PTX) 
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -117,6 +118,7 @@ namespace Slang
         {
             const auto& info = s_codeGenTargetInfos[i];
 
+            // If this assert fails, then the SLANG_CODE_GEN_TARGETS macro has the wrong order
             SLANG_ASSERT(i == int(info.target));
 
             if (StringUtil::indexOfInSplit(info.names, ',', name) >= 0)
