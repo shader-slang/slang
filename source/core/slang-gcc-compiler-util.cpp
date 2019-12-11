@@ -581,4 +581,45 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
+/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler)
+{
+    String exeName(inExeName);
+    if (path.getLength() > 0)
+    {
+        exeName = Path::combine(path, inExeName);
+    }
+
+    DownstreamCompiler::Desc desc;
+    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exeName, desc));
+
+    RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
+    compiler->m_cmdLine.setExecutableFilename(exeName);
+
+    outCompiler = compiler;
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCDownstreamCompilerUtil::locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(loader);
+    RefPtr<DownstreamCompiler> compiler;
+    if (SLANG_SUCCEEDED(createCompiler(path, "g++", compiler)))
+    {
+        set->addCompiler(compiler);
+    }
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCDownstreamCompilerUtil::locateClangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(loader);
+
+    RefPtr<DownstreamCompiler> compiler;
+    if (SLANG_SUCCEEDED(createCompiler(path, "clang", compiler)))
+    {
+        set->addCompiler(compiler);
+    }
+    return SLANG_OK;
+}
+
 }

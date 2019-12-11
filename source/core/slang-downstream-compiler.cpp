@@ -9,8 +9,7 @@
 #include "slang-shared-library.h"
 #include "slang-blob.h"
 
-// if Visual Studio import the visual studio platform specific header
-#if SLANG_VC
+#ifdef SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"
 #endif
 
@@ -489,23 +488,6 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return nullptr;
 }
 
-static void _addGCCFamilyCompiler(const String& path, const String& inExeName, DownstreamCompilerSet* compilerSet)
-{
-    String exeName(inExeName);
-    if (path.getLength() > 0)
-    {
-        exeName = Path::combine(path, inExeName);
-    }
-
-    DownstreamCompiler::Desc desc;
-    if (SLANG_SUCCEEDED(GCCDownstreamCompilerUtil::calcVersion(exeName, desc)))
-    {
-        RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
-        compiler->m_cmdLine.setExecutableFilename(exeName);
-        compilerSet->addCompiler(compiler);
-    }
-}
-
 /* static */DownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompiler::Desc& desc)
 {
     DownstreamCompiler* compiler = set->getCompiler(desc);
@@ -518,38 +500,47 @@ static void _addGCCFamilyCompiler(const String& path, const String& inExeName, D
     return findClosestCompiler(compilers, desc);
 }
 
-/* static */SlangResult DownstreamCompilerUtil::initializeSet(const InitializeSetDesc& desc, DownstreamCompilerSet* set)
+/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type)
 {
-#if SLANG_WINDOWS_FAMILY
-    WinVisualStudioUtil::find(set);
-#endif
+    DownstreamCompiler* compiler = nullptr;
 
-    _addGCCFamilyCompiler(desc.getPath(CompilerType::Clang), "clang", set);
-    _addGCCFamilyCompiler(desc.getPath(CompilerType::GCC), "g++", set);
-
+    switch (type)
     {
-        DownstreamCompiler* cppCompiler = findClosestCompiler(set, getCompiledWithDesc());
-
-        // Set the default to the compiler closest to how this source was compiled
-        set->setDefaultCompiler(DownstreamCompiler::SourceType::CPP, cppCompiler);
-        set->setDefaultCompiler(DownstreamCompiler::SourceType::C, cppCompiler);
-    }
-
-    // Lets see if we have NVRTC. 
-    {
-        ISlangSharedLibrary* sharedLibrary = desc.sharedLibraries[int(CompilerType::NVRTC)];
-        if (sharedLibrary)
+        case DownstreamCompiler::SourceType::CPP:
+        case DownstreamCompiler::SourceType::C:
         {
-            RefPtr<DownstreamCompiler> compiler;
-            if (SLANG_SUCCEEDED(NVRTCDownstreamCompilerUtil::createCompiler(sharedLibrary, compiler)))
-            {
-                set->addCompiler(compiler);
-
-                set->setDefaultCompiler(DownstreamCompiler::SourceType::CUDA, compiler);
-            }
+            compiler = findClosestCompiler(set, getCompiledWithDesc());
+            break;
         }
+        case DownstreamCompiler::SourceType::CUDA:
+        {
+            DownstreamCompiler::Desc desc;
+            desc.type = DownstreamCompiler::CompilerType::NVRTC;
+            compiler = findCompiler(set, MatchType::Newest, desc);
+            break;
+        }
+        default: break;
     }
 
+    set->setDefaultCompiler(type, compiler);
+}
+
+/* static */void DownstreamCompilerUtil::updateDefaults(DownstreamCompilerSet* set)
+{
+    for (Index i = 0; i < Index(DownstreamCompiler::SourceType::CountOf); ++i)
+    {
+        updateDefault(set, DownstreamCompiler::SourceType(i));
+    }
+}
+
+/* static */SlangResult DownstreamCompilerUtil::initializeSet(const InitializeSetDesc& initDesc, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    VisualStudioCompilerUtil::locateCompilers(initDesc.getPath(CompilerType::VisualStudio), loader, set);
+    GCCDownstreamCompilerUtil::locateClangCompilers(initDesc.getPath(CompilerType::Clang), loader, set);
+    GCCDownstreamCompilerUtil::locateGCCCompilers(initDesc.getPath(CompilerType::GCC), loader, set);
+    NVRTCDownstreamCompilerUtil::locateCompilers(initDesc.getPath(CompilerType::NVRTC), loader, set);
+
+    updateDefaults(set);
     return SLANG_OK;
 }
 

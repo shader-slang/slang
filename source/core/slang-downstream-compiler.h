@@ -375,6 +375,8 @@ protected:
     List<RefPtr<DownstreamCompiler>> m_compilers;
 };
 
+typedef SlangResult (*DownstreamCompilerLocatorFunc)(const char* path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+
 /* Only purpose of having base-class here is to make all the DownstreamCompiler types available directly in derived Utils */
 struct DownstreamCompilerBaseUtil
 {
@@ -406,10 +408,7 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         const String& getPath(CompilerType type) const { return paths[int(type)]; }
         void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
 
-        InitializeSetDesc() { memset(sharedLibraries, 0, sizeof(sharedLibraries)); }
-
         String paths[int(DownstreamCompiler::CompilerType::CountOf)];
-        ISlangSharedLibrary* sharedLibraries[int(DownstreamCompiler::CompilerType::CountOf)];
     };
 
         /// Find a compiler
@@ -424,7 +423,10 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static const DownstreamCompiler::Desc& getCompiledWithDesc();
 
         /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
-    static SlangResult initializeSet(const InitializeSetDesc& desc, DownstreamCompilerSet* set);    
+    static SlangResult initializeSet(const InitializeSetDesc& desc, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+        
+    static void updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type);
+    static void updateDefaults(DownstreamCompilerSet* set);
 };
 
 }

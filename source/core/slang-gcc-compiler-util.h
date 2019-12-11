@@ -26,6 +26,14 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
 
         /// Given options, calculate paths to products produced for a compilation
     static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
+
+        /// Given a path and an exe name, detects if compiler is present, and if so adds to compiler set.
+    static SlangResult createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler);
+
+    static SlangResult locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+
+    static SlangResult locateClangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+
 };
 
 class GCCDownstreamCompiler : public CommandLineDownstreamCompiler

@@ -88,12 +88,7 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
         compilerSet = new DownstreamCompilerSet;
 
         DownstreamCompilerUtil::InitializeSetDesc desc;
-
-        ComPtr<ISlangSharedLibrary> nvrtcSharedLibrary;
-        DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(DefaultSharedLibraryLoader::getSharedLibraryNameFromType(SharedLibraryType::NVRTC), nvrtcSharedLibrary.writeRef());
-        desc.sharedLibraries[int(DownstreamCompiler::CompilerType::NVRTC)] = nvrtcSharedLibrary;
-
-        DownstreamCompilerUtil::initializeSet(desc, compilerSet);
+        DownstreamCompilerUtil::initializeSet(desc, DefaultSharedLibraryLoader::getSingleton(), compilerSet);
     }
     return compilerSet;
 }
