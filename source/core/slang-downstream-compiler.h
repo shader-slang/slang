@@ -288,6 +288,14 @@ public:
         /// True if this compiler can compile the specified language
     static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
 
+        /// Given a source language name returns a source language. Name here is distinct from extension
+    static SlangSourceLanguage getSourceLanguageFromName(const UnownedStringSlice& text);
+        /// Given a name returns the pass through
+    static SlangPassThrough getPassThroughFromName(const UnownedStringSlice& slice);
+    static SlangResult getPassThroughFromName(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough);
+        /// Get the compilers name
+    static UnownedStringSlice getPassThroughName(SlangPassThrough passThru);
+
 protected:
     static Infos s_infos;
 

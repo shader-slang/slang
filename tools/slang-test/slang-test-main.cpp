@@ -495,44 +495,6 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
-{
-    if (slice == "dxc")
-    {
-        return SLANG_PASS_THROUGH_DXC;
-    }
-    else if (slice == "fxc")
-    {
-        return SLANG_PASS_THROUGH_FXC;
-    }
-    else if (slice == "glslang")
-    {
-        return SLANG_PASS_THROUGH_GLSLANG;
-    }
-    else if (slice == "c" || slice == "cpp")
-    {
-        return SLANG_PASS_THROUGH_GENERIC_C_CPP; 
-    }
-    else if (slice == "clang")
-    {
-        return SLANG_PASS_THROUGH_CLANG;
-    }
-    else if (slice == "gcc")
-    {
-        return SLANG_PASS_THROUGH_GCC;
-    }
-    else if (slice == "vs" || slice == "visualstudio")
-    {
-        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
-    }
-    else if (slice == "nvrtc")
-    {
-        return SLANG_PASS_THROUGH_NVRTC;
-    }
-
-    return SLANG_PASS_THROUGH_NONE;
-}
-
 static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -740,7 +702,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsedBackEnd(_toPassThroughType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(DownstreamCompiler::getPassThroughFromName(passThrough.getUnownedSlice()));
         }
     }
 

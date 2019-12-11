@@ -45,66 +45,6 @@ SlangResult tryReadCommandLineArgument(DiagnosticSink* sink, char const* option,
     return SLANG_OK;
 }
 
-#define SLANG_PASS_THROUGH_TYPES(x) \
-        x(none, NONE) \
-        x(fxc, FXC) \
-        x(dxc, DXC) \
-        x(glslang, GLSLANG) \
-        x(vs, VISUAL_STUDIO) \
-        x(visualstudio, VISUAL_STUDIO) \
-        x(clang, CLANG) \
-        x(gcc, GCC) \
-        x(c, GENERIC_C_CPP) \
-        x(cpp, GENERIC_C_CPP) \
-        x(nvrtc, NVRTC)
-
-static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassThrough& outPassThrough)
-{
-#define SLANG_PASS_THROUGH_TYPE_CHECK(x, y) \
-    if (name == #x) { outPassThrough = SLANG_PASS_THROUGH_##y; return SLANG_OK; }
-    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_CHECK)
-    return SLANG_FAIL;
-}
-
-static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
-{
-    if (text == "c" || text == "C")
-    {
-        return SLANG_SOURCE_LANGUAGE_C;
-    }
-    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
-    {
-        return SLANG_SOURCE_LANGUAGE_CPP;
-    }
-    else if (text == "slang")
-    {
-        return SLANG_SOURCE_LANGUAGE_SLANG;
-    }
-    else if (text == "glsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_GLSL;
-    }
-    else if (text == "hlsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_HLSL;
-    }
-    else if (text == "cu" || text == "cuda")
-    {
-        return SLANG_SOURCE_LANGUAGE_CUDA;
-    }
-    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
-}
-
-UnownedStringSlice getPassThroughName(SlangPassThrough passThru)
-{
-#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
-    if (passThru == SLANG_PASS_THROUGH_##y) return UnownedStringSlice::fromLiteral(#x);
-
-    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
-
-    return UnownedStringSlice::fromLiteral("unknown");
-}
-
 struct OptionsParser
 {
     SlangSession*           session = nullptr;
@@ -768,7 +708,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(_parsePassThrough(name.getUnownedSlice(), passThrough)))
+                    if (SLANG_FAILED(DownstreamCompiler::getPassThroughFromName(name.getUnownedSlice(), passThrough)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
                         return SLANG_FAIL;
@@ -1003,7 +943,7 @@ struct OptionsParser
                     String compilerText;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
 
-                    SlangSourceLanguage sourceLanguage = _findSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(sourceLanguageText.getUnownedSlice());
                     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
@@ -1011,7 +951,7 @@ struct OptionsParser
                     }
 
                     SlangPassThrough compiler;
-                    if (SLANG_FAILED(_parsePassThrough(compilerText.getUnownedSlice(), compiler)))
+                    if (SLANG_FAILED(DownstreamCompiler::getPassThroughFromName(compilerText.getUnownedSlice(), compiler)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
                         return SLANG_FAIL;
@@ -1045,7 +985,7 @@ struct OptionsParser
 
                             String slice = argStr.subString(1, index - 1);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(_parsePassThrough(slice.getUnownedSlice(), passThrough)))
+                            if (SLANG_SUCCEEDED(DownstreamCompiler::getPassThroughFromName(slice.getUnownedSlice(), passThrough)))
                             {
                                 session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;

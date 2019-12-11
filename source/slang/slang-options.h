@@ -7,7 +7,6 @@
 namespace Slang
 {
 
-UnownedStringSlice getPassThroughName(SlangPassThrough passThru);
 
 UnownedStringSlice getCodeGenTargetName(SlangCompileTarget target);
 
