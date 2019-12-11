@@ -475,16 +475,11 @@ namespace Slang
                 break;
             }
             case PassThroughMode::Clang:
-            {
-                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
-            }
             case PassThroughMode::VisualStudio:
-            {
-                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
-            }
             case PassThroughMode::Gcc:
+            case PassThroughMode::NVRTC:
             {
-                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(SlangPassThrough(passThrough)) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::GenericCCpp:
             {
@@ -492,10 +487,6 @@ namespace Slang
                 session->requireDownstreamCompilerSet()->getCompilerDescs(descs);
 
                 return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
-            }
-            case PassThroughMode::NVRTC:
-            {
-                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::NVRTC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
         }
         return SLANG_E_NOT_IMPLEMENTED;
@@ -559,20 +550,6 @@ namespace Slang
 
         SLANG_ASSERT(!"Unhandled target");
         return PassThroughMode::None;
-    }
-
-    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type)
-    {
-        typedef DownstreamCompiler::CompilerType CompilerType;
-
-        switch (type)
-        {
-            case CompilerType::VisualStudio:        return PassThroughMode::VisualStudio;
-            case CompilerType::GCC:                 return PassThroughMode::Gcc;
-            case CompilerType::Clang:               return PassThroughMode::Clang;
-            case CompilerType::NVRTC:               return PassThroughMode::NVRTC;
-            default:                                return PassThroughMode::None;
-        }
     }
 
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)

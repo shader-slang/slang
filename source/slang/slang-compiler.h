@@ -769,7 +769,7 @@ namespace Slang
         Profile m_profile;
     };
 
-    enum class PassThroughMode : SlangPassThrough
+    enum class PassThroughMode : SlangPassThroughIntegral
     {
         None = SLANG_PASS_THROUGH_NONE,	                    ///< don't pass through: use Slang compiler
         Fxc = SLANG_PASS_THROUGH_FXC,	                    ///< pass through HLSL to `D3DCompile` API
@@ -1077,9 +1077,7 @@ namespace Slang
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
-    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type);
-
-
+    
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
     {

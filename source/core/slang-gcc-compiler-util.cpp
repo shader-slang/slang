@@ -70,11 +70,11 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, Downst
         UnownedStringSlice::fromLiteral("gcc version"),
         UnownedStringSlice::fromLiteral("Apple LLVM version"),
     };
-    const DownstreamCompiler::CompilerType types[] =
+    const SlangPassThrough types[] =
     {
-        DownstreamCompiler::CompilerType::Clang,
-        DownstreamCompiler::CompilerType::GCC,
-        DownstreamCompiler::CompilerType::Clang,
+        SLANG_PASS_THROUGH_CLANG,
+        SLANG_PASS_THROUGH_GCC,
+        SLANG_PASS_THROUGH_CLANG,
     };
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));

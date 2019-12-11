@@ -120,17 +120,6 @@ public:
 
     typedef DownstreamCompileResult CompileResult;
 
-    enum class CompilerType
-    {
-        Unknown,
-        VisualStudio,
-        GCC,
-        Clang,
-        SNC,
-        GHS,
-        NVRTC,
-        CountOf,
-    };
     enum class SourceType
     {
         C,              ///< C source
@@ -153,9 +142,9 @@ public:
         void appendAsText(StringBuilder& out) const;
 
             /// Ctor
-        Desc(CompilerType inType = CompilerType::Unknown, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+        Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
-        CompilerType type;                      ///< The type of the compiler
+        SlangPassThrough type;                      ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
         Int minorVersion;               ///< Minor version
     };
@@ -267,7 +256,7 @@ public:
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
  
         /// Return the compiler type as name
-    static UnownedStringSlice getCompilerTypeAsText(CompilerType type);
+    static UnownedStringSlice getCompilerTypeAsText(SlangPassThrough type);
 
 protected:
 
@@ -363,7 +352,7 @@ public:
     void setDefaultCompiler(DownstreamCompiler::SourceType sourceType, DownstreamCompiler* compiler) { m_defaultCompilers[int(sourceType)] = compiler;  }
 
         /// True if has a compiler of the specified type
-    bool hasCompiler(DownstreamCompiler::CompilerType compilerType) const;
+    bool hasCompiler(SlangPassThrough compilerType) const;
 
 protected:
 
@@ -385,8 +374,7 @@ struct DownstreamCompilerBaseUtil
     typedef DownstreamCompiler::TargetType TargetType;
     typedef DownstreamCompiler::DebugInfoType DebugInfoType;
     typedef DownstreamCompiler::SourceType SourceType;
-    typedef DownstreamCompiler::CompilerType CompilerType;
-
+    
     typedef DownstreamDiagnostics::Diagnostic Diagnostic;
 
     typedef DownstreamCompiler::FloatingPointMode FloatingPointMode;
@@ -405,10 +393,10 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
 
     struct InitializeSetDesc
     {
-        const String& getPath(CompilerType type) const { return paths[int(type)]; }
-        void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
+        const String& getPath(SlangPassThrough type) const { return paths[int(type)]; }
+        void setPath(SlangPassThrough type, const String& path) { paths[int(type)] = path; }
 
-        String paths[int(DownstreamCompiler::CompilerType::CountOf)];
+        String paths[int(SLANG_PASS_THROUGH_COUNT_OF)];
     };
 
         /// Find a compiler

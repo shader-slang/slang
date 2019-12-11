@@ -25,10 +25,15 @@ namespace Slang
 void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 {
     out << getCompilerTypeAsText(type);
-    out << " ";
-    out << majorVersion;
-    out << ".";
-    out << minorVersion;
+
+    // Append the version if there is a version
+    if (majorVersion || minorVersion)
+    {
+        out << " ";
+        out << majorVersion;
+        out << ".";
+        out << minorVersion;
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostic !!!!!!!!!!!!!!!!!!!!!!!!*/
@@ -46,18 +51,19 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice DownstreamCompiler::getCompilerTypeAsText(CompilerType type)
+/* static */UnownedStringSlice DownstreamCompiler::getCompilerTypeAsText(SlangPassThrough type)
 {
     switch (type)
     {
         default:
-        case CompilerType::Unknown:     return UnownedStringSlice::fromLiteral("Unknown");
-        case CompilerType::VisualStudio:return UnownedStringSlice::fromLiteral("Visual Studio");
-        case CompilerType::GCC:         return UnownedStringSlice::fromLiteral("GCC");
-        case CompilerType::Clang:       return UnownedStringSlice::fromLiteral("Clang");
-        case CompilerType::SNC:         return UnownedStringSlice::fromLiteral("SNC");
-        case CompilerType::GHS:         return UnownedStringSlice::fromLiteral("GHS");
-        case CompilerType::NVRTC:       return UnownedStringSlice::fromLiteral("NVRTC");
+        case SLANG_PASS_THROUGH_NONE:           return UnownedStringSlice::fromLiteral("Unknown");
+        case SLANG_PASS_THROUGH_VISUAL_STUDIO:  return UnownedStringSlice::fromLiteral("Visual Studio");
+        case SLANG_PASS_THROUGH_GCC:            return UnownedStringSlice::fromLiteral("GCC");
+        case SLANG_PASS_THROUGH_CLANG:          return UnownedStringSlice::fromLiteral("Clang");
+        case SLANG_PASS_THROUGH_NVRTC:          return UnownedStringSlice::fromLiteral("NVRTC");
+        case SLANG_PASS_THROUGH_FXC:            return UnownedStringSlice::fromLiteral("fxc");
+        case SLANG_PASS_THROUGH_DXC:            return UnownedStringSlice::fromLiteral("dxc");
+        case SLANG_PASS_THROUGH_GLSLANG:        return UnownedStringSlice::fromLiteral("glslang");
     }
 }
 
@@ -398,7 +404,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
 {
     Int bestIndex = -1;
 
-    const DownstreamCompiler::CompilerType type = desc.type;
+    const SlangPassThrough type = desc.type;
 
     Int maxVersionValue = 0;
     Int minVersionDiff = 0x7fffffff;
@@ -468,10 +474,10 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     }
 
     // If we are gcc, we can try clang and vice versa
-    if (desc.type == DownstreamCompiler::CompilerType::GCC || desc.type == DownstreamCompiler::CompilerType::Clang)
+    if (desc.type == SLANG_PASS_THROUGH_GCC || desc.type == SLANG_PASS_THROUGH_CLANG)
     {
         DownstreamCompiler::Desc compatible = desc;
-        compatible.type = (compatible.type == DownstreamCompiler::CompilerType::Clang) ? DownstreamCompiler::CompilerType::GCC : DownstreamCompiler::CompilerType::Clang;
+        compatible.type = (compatible.type == SLANG_PASS_THROUGH_CLANG) ? SLANG_PASS_THROUGH_GCC : SLANG_PASS_THROUGH_CLANG;
 
         compiler = findCompiler(compilers, MatchType::MinGreaterEqual, compatible);
         if (compiler)
@@ -515,7 +521,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         case DownstreamCompiler::SourceType::CUDA:
         {
             DownstreamCompiler::Desc desc;
-            desc.type = DownstreamCompiler::CompilerType::NVRTC;
+            desc.type = SLANG_PASS_THROUGH_NVRTC;
             compiler = findCompiler(set, MatchType::Newest, desc);
             break;
         }
@@ -535,10 +541,10 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
 
 /* static */SlangResult DownstreamCompilerUtil::initializeSet(const InitializeSetDesc& initDesc, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
-    VisualStudioCompilerUtil::locateCompilers(initDesc.getPath(CompilerType::VisualStudio), loader, set);
-    GCCDownstreamCompilerUtil::locateClangCompilers(initDesc.getPath(CompilerType::Clang), loader, set);
-    GCCDownstreamCompilerUtil::locateGCCCompilers(initDesc.getPath(CompilerType::GCC), loader, set);
-    NVRTCDownstreamCompilerUtil::locateCompilers(initDesc.getPath(CompilerType::NVRTC), loader, set);
+    VisualStudioCompilerUtil::locateCompilers(initDesc.getPath(SLANG_PASS_THROUGH_VISUAL_STUDIO), loader, set);
+    GCCDownstreamCompilerUtil::locateClangCompilers(initDesc.getPath(SLANG_PASS_THROUGH_CLANG), loader, set);
+    GCCDownstreamCompilerUtil::locateGCCCompilers(initDesc.getPath(SLANG_PASS_THROUGH_GCC), loader, set);
+    NVRTCDownstreamCompilerUtil::locateCompilers(initDesc.getPath(SLANG_PASS_THROUGH_NVRTC), loader, set);
 
     updateDefaults(set);
     return SLANG_OK;
@@ -580,7 +586,7 @@ void DownstreamCompilerSet::getCompilers(List<DownstreamCompiler*>& outCompilers
     outCompilers.addRange((DownstreamCompiler*const*)m_compilers.begin(), m_compilers.getCount());
 }
 
-bool DownstreamCompilerSet::hasCompiler(DownstreamCompiler::CompilerType compilerType) const
+bool DownstreamCompilerSet::hasCompiler(SlangPassThrough compilerType) const
 {
     for (DownstreamCompiler* compiler : m_compilers)
     {

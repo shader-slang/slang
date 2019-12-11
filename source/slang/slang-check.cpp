@@ -127,14 +127,11 @@ namespace Slang
         {
             downstreamCompilerSet = new DownstreamCompilerSet;
 
-            typedef DownstreamCompiler::CompilerType CompilerType;
             DownstreamCompilerUtil::InitializeSetDesc desc;
-       
-            desc.paths[int(CompilerType::GCC)] = m_downstreamCompilerPaths[int(PassThroughMode::Gcc)];
-            desc.paths[int(CompilerType::Clang)] = m_downstreamCompilerPaths[int(PassThroughMode::Clang)];
-            desc.paths[int(CompilerType::VisualStudio)] = m_downstreamCompilerPaths[int(PassThroughMode::VisualStudio)];
-            desc.paths[int(CompilerType::NVRTC)] = m_downstreamCompilerPaths[int(PassThroughMode::NVRTC)];
-            
+            for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
+            {
+                desc.paths[i] = m_downstreamCompilerPaths[i];
+            }
             DownstreamCompilerUtil::initializeSet(desc, sharedLibraryLoader, downstreamCompilerSet);
         }
         SLANG_ASSERT(downstreamCompilerSet);

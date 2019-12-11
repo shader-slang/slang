@@ -55,7 +55,7 @@ struct WinVisualStudioUtil
     static DownstreamCompiler::Desc getDesc(Version version)
     {
         DownstreamCompiler::Desc desc;
-        desc.type = DownstreamCompiler::CompilerType::VisualStudio;
+        desc.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
         desc.majorVersion = Int(version) / 10;
         desc.minorVersion = Int(version) % 10;
         return desc;

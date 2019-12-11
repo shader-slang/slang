@@ -139,7 +139,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     m_sharedLibrary = library;
 
-    m_desc.type = CompilerType::NVRTC;
+    m_desc.type = SLANG_PASS_THROUGH_NVRTC;
 
     int major, minor;
     m_nvrtcVersion(&major, &minor);
