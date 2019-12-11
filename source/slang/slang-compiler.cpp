@@ -1290,7 +1290,7 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    SlangResult emitCPUBinaryForEntryPoint(
+    SlangResult emitDownstreamForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
@@ -1472,8 +1472,8 @@ SlangResult dissassembleDXILUsingDXC(
             }
             case CodeGenTarget::PTX:
             {
-                // TODO(JS): Not clear what to do here. PTX could be described as an arch? Here
-                // these types are more the code container. Should 'Kernel' be distinct from 'Executable'.
+                // TODO(JS): Not clear what to do here.
+                // For example should 'Kernel' be distinct from 'Executable'. For now just use executable.
                 options.targetType = DownstreamCompiler::TargetType::Executable;
                 break;
             }
@@ -1714,7 +1714,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
-                if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
+                if (SLANG_SUCCEEDED(emitDownstreamForEntryPoint(
                     compileRequest,
                     entryPointIndex,
                     targetReq,
@@ -2034,7 +2034,6 @@ SlangResult dissassembleDXILUsingDXC(
                 const void* blobData = blob->getBufferPointer();
                 size_t blobSize = blob->getBufferSize();
 
-          
                 if (writer->isConsole())
                 {
                     // Writing to console, so we need to generate text output.

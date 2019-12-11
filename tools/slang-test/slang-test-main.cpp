@@ -1100,7 +1100,6 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
 TestResult runCompile(TestContext* context, TestInput& input)
 {
-    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
