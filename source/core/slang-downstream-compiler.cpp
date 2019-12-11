@@ -396,19 +396,16 @@ static DownstreamCompiler::Desc _calcCompiledWithDesc()
 #if SLANG_VC
     desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
 #elif SLANG_CLANG
-    desc.type = DownstreamCompiler::CompilerType::Clang;
+    desc.type = SLANG_PASS_THROUGH_CLANG;
     desc.majorVersion = Int(__clang_major__);
     desc.minorVersion = Int(__clang_minor__);
-#elif SLANG_SNC
-    desc.type = DownstreamCompiler::CompilerType::SNC;
-#elif SLANG_GHS
-    desc.type = DownstreamCompiler::CompilerType::GHS;
 #elif SLANG_GCC
-    desc.type = DownstreamCompiler::CompilerType::GCC;
+    desc.type = SLANG_PASS_THROUGH_GCC;
     desc.majorVersion = Int(__GNUC__);
     desc.minorVersion = Int(__GNUC_MINOR__);
 #else
-    desc.type = DownstreamCompiler::CompilerType::Unknown;
+    // TODO(JS): Hmmm None is not quite the same as unknown. It works for now, but we might want to have a distinct enum for unknown.
+    desc.type = SLANG_PASS_THROUGH_NONE;        
 #endif
 
     return desc;
