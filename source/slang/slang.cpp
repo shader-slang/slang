@@ -205,46 +205,13 @@ SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-static bool _canCompile(PassThroughMode compiler, SourceLanguage sourceLanguage)
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
 {
-    switch (compiler)
+    if (DownstreamCompiler::canCompile(defaultCompiler, sourceLanguage))
     {
-        case PassThroughMode::Fxc:      
-        case PassThroughMode::Dxc:
-        {
-            return sourceLanguage == SourceLanguage::HLSL;
-        }
-        case PassThroughMode::Glslang:
-        {
-            return sourceLanguage == SourceLanguage::GLSL;
-        }
-        case PassThroughMode::Clang:
-        case PassThroughMode::VisualStudio:
-        case PassThroughMode::Gcc:
-        case PassThroughMode::GenericCCpp:
-        {
-            return sourceLanguage == SourceLanguage::C || sourceLanguage == SourceLanguage::CPP;
-        }
-        case PassThroughMode::NVRTC:
-        {
-            return sourceLanguage == SourceLanguage::CUDA;
-        }
-        default: break;
-    }
-    return false;
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage inSourceLanguage, SlangPassThrough defaultCompiler)
-{
-    auto sourceLanguage = SourceLanguage(inSourceLanguage);
-    auto compiler = PassThroughMode(defaultCompiler);
-
-    if (_canCompile(compiler, sourceLanguage))
-    {
-        m_defaultDownstreamCompilers[int(sourceLanguage)] = compiler;
+        m_defaultDownstreamCompilers[int(sourceLanguage)] = PassThroughMode(defaultCompiler);
         return SLANG_OK;
     }
-    
     return SLANG_FAIL;
 }
 

@@ -120,6 +120,35 @@ public:
 
     typedef DownstreamCompileResult CompileResult;
 
+    typedef uint32_t SourceLanguageFlags;
+    struct SourceLanguageFlag
+    {
+        enum Enum : SourceLanguageFlags
+        {
+            Unknown = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_UNKNOWN,
+            Slang   = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_SLANG,
+            HLSL    = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_HLSL,
+            GLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
+            C       = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
+            CPP     = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
+            CUDA    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
+        };
+    };
+
+    struct Info
+    {
+        Info():sourceLanguageFlags(0) {}
+
+        Info(SourceLanguageFlags inSourceLanguageFlags):
+            sourceLanguageFlags(inSourceLanguageFlags)
+        {}
+        SourceLanguageFlags sourceLanguageFlags;
+    };
+    struct Infos
+    {
+        Info infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
+    };
+
     struct Desc
     {
         typedef Desc ThisType;
@@ -254,7 +283,13 @@ public:
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(SlangPassThrough type);
 
+        /// Get info for a compiler type
+    static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
+        /// True if this compiler can compile the specified language
+    static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
+
 protected:
+    static Infos s_infos;
 
     DownstreamCompiler(const Desc& desc) :
         m_desc(desc)

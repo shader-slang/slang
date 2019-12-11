@@ -20,6 +20,29 @@
 namespace Slang
 {
 
+static DownstreamCompiler::Infos _calcInfos()
+{
+    typedef DownstreamCompiler::Info Info;
+    typedef DownstreamCompiler::SourceLanguageFlag SourceLanguageFlag;
+    typedef DownstreamCompiler::SourceLanguageFlags SourceLanguageFlags;
+
+    DownstreamCompiler::Infos infos;
+
+    infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_GCC)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+
+    infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
+
+    infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
+
+    return infos;
+}
+
+/* static */DownstreamCompiler::Infos DownstreamCompiler::s_infos = _calcInfos();
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
 void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
@@ -65,6 +88,12 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
         case SLANG_PASS_THROUGH_DXC:            return UnownedStringSlice::fromLiteral("dxc");
         case SLANG_PASS_THROUGH_GLSLANG:        return UnownedStringSlice::fromLiteral("glslang");
     }
+}
+
+/* static */bool DownstreamCompiler::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
+{
+    const auto& info = getInfo(compiler);
+    return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
