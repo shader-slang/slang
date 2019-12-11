@@ -1293,7 +1293,7 @@ static String _calcModulePath(const TestInput& input)
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);   
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1335,7 +1335,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
 static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1365,7 +1365,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
+    options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Build a shared library
     options.targetType = DownstreamCompiler::TargetType::SharedLibrary;
@@ -1453,7 +1453,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1487,7 +1487,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
+    options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Compile this source
     options.sourceFiles.add(filePath);

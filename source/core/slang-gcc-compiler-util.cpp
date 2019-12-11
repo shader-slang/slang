@@ -406,7 +406,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     PlatformKind platformKind = (options.platform == PlatformKind::Unknown) ? PlatformUtil::getPlatformKind() : options.platform;
         
-    if (options.sourceType == SourceType::CPP)
+    if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
     {
         cmdLine.addArg("-fvisibility=hidden");
 
@@ -570,7 +570,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg(libPath);
     }
 
-    if (options.sourceType == SourceType::CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
+    if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP && !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
         // Make STD libs available
         cmdLine.addArg("-lstdc++");

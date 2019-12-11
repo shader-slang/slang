@@ -114,7 +114,7 @@ namespace Slang
 
         if (type == PassThroughMode::GenericCCpp)
         {
-            // try loading all C/C++ compilers
+            // try testing for availablilty on all C/C++ compilers
             getOrLoadDownstreamCompiler(PassThroughMode::Clang, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::Gcc, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, sink);
@@ -138,19 +138,20 @@ namespace Slang
 
         DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
 
+        DownstreamCompiler* compiler = nullptr;
+
         if (type == PassThroughMode::GenericCCpp)
         {
-            m_downstreamCompilers[int(type)] = m_downstreamCompilerSet->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+            compiler = m_downstreamCompilerSet->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
         }
         else
         {
             DownstreamCompiler::Desc desc;
             desc.type = SlangPassThrough(type);
-
-            m_downstreamCompilers[int(type)] = DownstreamCompilerUtil::findCompiler(m_downstreamCompilerSet, DownstreamCompilerUtil::MatchType::Newest, desc);
+            compiler = DownstreamCompilerUtil::findCompiler(m_downstreamCompilerSet, DownstreamCompilerUtil::MatchType::Newest, desc);
         }
-
-        return m_downstreamCompilers[int(type)];
+        m_downstreamCompilers[int(type)] = compiler;
+        return compiler;
     }
 
     SlangFuncPtr Session::getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink)

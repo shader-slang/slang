@@ -1395,18 +1395,8 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Set the source type
-        switch (rawSourceLanguage)
-        {
-            case SourceLanguage::C:       options.sourceType = DownstreamCompiler::SourceType::C;   break;
-            case SourceLanguage::CPP:     options.sourceType = DownstreamCompiler::SourceType::CPP; break;
-            case SourceLanguage::CUDA:    options.sourceType = DownstreamCompiler::SourceType::CUDA; break;
-            default:
-            {
-                SLANG_ASSERT(!"Unhandled source language");
-                return SLANG_FAIL;
-            }
-        }
-        
+        options.sourceLanguage = SlangSourceLanguage(rawSourceLanguage);
+
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 

@@ -284,7 +284,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             compileSourcePath.append("-src");
 
             // Make the temporary filename have the appropriate extension.
-            if (options.sourceType == DownstreamCompiler::SourceType::C)
+            if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_C)
             {
                 compileSourcePath.append(".c");
             }
@@ -518,19 +518,19 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return findClosestCompiler(compilers, desc);
 }
 
-/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type)
+/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage)
 {
     DownstreamCompiler* compiler = nullptr;
 
-    switch (type)
+    switch (sourceLanguage)
     {
-        case DownstreamCompiler::SourceType::CPP:
-        case DownstreamCompiler::SourceType::C:
+        case SLANG_SOURCE_LANGUAGE_CPP:
+        case SLANG_SOURCE_LANGUAGE_C:
         {
             compiler = findClosestCompiler(set, getCompiledWithDesc());
             break;
         }
-        case DownstreamCompiler::SourceType::CUDA:
+        case SLANG_SOURCE_LANGUAGE_CUDA:
         {
             DownstreamCompiler::Desc desc;
             desc.type = SLANG_PASS_THROUGH_NVRTC;
@@ -540,14 +540,14 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         default: break;
     }
 
-    set->setDefaultCompiler(type, compiler);
+    set->setDefaultCompiler(sourceLanguage, compiler);
 }
 
 /* static */void DownstreamCompilerUtil::updateDefaults(DownstreamCompilerSet* set)
 {
-    for (Index i = 0; i < Index(DownstreamCompiler::SourceType::CountOf); ++i)
+    for (Index i = 0; i < Index(SLANG_SOURCE_LANGUAGE_COUNT_OF); ++i)
     {
-        updateDefault(set, DownstreamCompiler::SourceType(i));
+        updateDefault(set, SlangSourceLanguage(i));
     }
 }
 

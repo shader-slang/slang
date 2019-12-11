@@ -94,7 +94,7 @@ namespace Slang
 
     if (options.flags & CompileOptions::Flag::EnableExceptionHandling)
     {
-        if (options.sourceType == SourceType::CPP)
+        if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
         {
             // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
             // Assumes c functions cannot throw

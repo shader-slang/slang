@@ -104,9 +104,9 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     return compilerSet;
 }
 
-Slang::DownstreamCompiler* TestContext::getDefaultCompiler(DownstreamCompiler::SourceType sourceType)
+Slang::DownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage sourceLanguage)
 {
     DownstreamCompilerSet* set = getCompilerSet();
-    return set ? set->getDefaultCompiler(sourceType) : nullptr;
+    return set ? set->getDefaultCompiler(sourceLanguage) : nullptr;
 }
 
